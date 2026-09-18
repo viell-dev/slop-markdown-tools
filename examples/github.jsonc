@@ -1,0 +1,7 @@
+{
+  "extends": ["recommended", "github"],
+  "rules": {
+    "style/wrap": ["warn", { "width": 100 }],
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}
