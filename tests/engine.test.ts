@@ -125,6 +125,16 @@ describe("formatting contracts", () => {
 });
 
 describe("configuration and plugins", () => {
+  it("supports region and next-line suppressions without interpreting code examples", () => {
+    const source =
+      "<!-- mdtools-disable style/emphasis -->\n\n*keep*\n\n<!-- mdtools-enable style/emphasis -->\n\n*change*\n\n<!-- mdtools-disable-next-line style/emphasis -->\n*also keep*\n";
+    const output = formatted(source);
+    expect(output).toContain("*keep*");
+    expect(output).toContain("_change_");
+    expect(output).toContain("*also keep*");
+    const code = "```md\n<!-- mdtools-disable -->\n```\n\n*change*\n";
+    expect(formatted(code)).toContain("_change_");
+  });
   it("supports defaults, overrides, and explicit empty presets", () => {
     expect(resolveConfig({}).rules["style/wrap"]).toBeDefined();
     expect(resolveConfig({ extends: [] }).rules).toEqual({});
@@ -217,6 +227,22 @@ describe("Obsidian and links", () => {
     expect(lint(source, { workspace, config, path: "note.md" })).toEqual([]);
     expect(formatted(source, { workspace, config, path: "note.md" })).toBe(source);
   });
+  it("preserves multiline comments including blank lines and apparent Markdown", () => {
+    const source = "%%\n*hidden emphasis*\n\n[[Missing]]\n\n# Hidden heading\n%%\n\n*visible*\n";
+    const output = formatted(source, { workspace, config, path: "note.md" });
+    expect(output).toBe(source.replace("*visible*", "_visible_"));
+    expect(lint(output, { workspace, config, path: "note.md" })).toEqual([]);
+  });
+  it("preserves inline comments spanning soft lines", () => {
+    const source = "Text %% hidden\n*emphasis* [[Missing]] %% after.\n";
+    expect(formatted(source, { workspace, config, path: "note.md" })).toBe(source);
+  });
+  it("preserves comments inside quote containers", () => {
+    const source = "> %%\n> *hidden* [[Missing]]\n>\n> %%\n\n*visible*\n";
+    expect(formatted(source, { workspace, config, path: "note.md" })).toBe(
+      source.replace("*visible*", "_visible_"),
+    );
+  });
   it("formats callouts without altering folding state or title", () => {
     expect(formatted("> [!NOTE]- Custom title\n> Details.\n", { config, workspace })).toBe(
       "> [!note]- Custom title\n> Details.\n",
@@ -250,6 +276,15 @@ describe("Obsidian and links", () => {
     expect(formatted("[[folder/Target|label]]\n", options)).toBe("[label](<folder/Target>)\n");
     options.config.rules["links/notation"] = ["warn", { style: "wiki" }];
     expect(formatted("[label](<folder/Target>)\n", options)).toBe("[[folder/Target|label]]\n");
+  });
+  it("resolves shortened Obsidian Markdown links and preserves their targets during conversion", () => {
+    expect(workspace.resolve("note.md", "Target", "obsidian").target).toBe("folder/Target.md");
+    const output = formatted("[[Target|label]]\n", {
+      path: "note.md",
+      workspace,
+      config: { ...config, rules: { "links/notation": ["warn", { style: "markdown" }] } },
+    });
+    expect(output).toBe("[label](<Target>)\n");
   });
   it("does not guess ambiguous target names", () => {
     const ambiguous = createWorkspace(

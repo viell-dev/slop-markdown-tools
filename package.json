@@ -36,6 +36,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "pretest": "npm run build",
+    "test:package": "npm run build && node scripts/package-smoke.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

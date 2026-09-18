@@ -53,7 +53,7 @@ export function createWorkspace(
     ...(options.strictLineBreaks !== undefined
       ? { strictLineBreaks: options.strictLineBreaks }
       : {}),
-    resolve(source, destination, dialect, wiki = false): LinkResolution {
+    resolve(source, destination, dialect): LinkResolution {
       if (/^[a-z][a-z\d+.-]*:/i.test(destination) || destination.startsWith("//"))
         return { status: "external" };
       const parts = splitDestination(destination);
@@ -80,7 +80,7 @@ export function createWorkspace(
           add(targetPath.replace(/^\//, ""));
           if (!targetPath.startsWith("/"))
             add(path.posix.join(path.posix.dirname(source), targetPath));
-          if (candidates.size === 0 && wiki) {
+          if (candidates.size === 0) {
             for (const name of entries.keys()) {
               if (
                 name === targetPath ||

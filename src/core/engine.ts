@@ -5,6 +5,7 @@ import { parse } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
 import { linkRules } from "../rules/links.js";
+import { suppressions } from "./directives.js";
 import type {
   Diagnostic,
   Document,
@@ -73,6 +74,7 @@ function inspect(
   phase?: string,
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
+  const suppressed = suppressions(document);
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
     const rule = rules[name]!;
@@ -87,7 +89,8 @@ function inspect(
       ...(workspace ? { workspace } : {}),
     });
     for (const finding of findings)
-      result.push(diagnostic(document.source, name, enabled.severity, finding));
+      if (!suppressed(name, finding))
+        result.push(diagnostic(document.source, name, enabled.severity, finding));
   }
   return result.sort((a, b) => a.start - b.start || a.rule.localeCompare(b.rule));
 }
@@ -156,7 +159,7 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
         );
       } else if (key === "url" && typeof value === "string") result[key] = canonicalUrl(value);
       else if (key === "value" && node.type === "text") {
-        let text = node.value.replace(/\s+/g, " ");
+        let text = node.value.replace(/[ \t\r\n]+/g, " ");
         if (calloutHeader && document.dialect !== "commonmark")
           text = text.replace(
             /^\[!([\w-]+)\]/,
