@@ -100,12 +100,17 @@ library workflow; formatting rules must preserve document meaning.
 Unicode scalar values instead; astral characters count once and combining marks
 count separately. Container prefixes count toward the width in either mode.
 
-`reportUnreflowed: true` reports over-width paragraphs protected by hard breaks,
-block IDs, inline HTML, callout headers, or unsupported multiline syntax or
-containers. `reportUnbreakable: true` reports overflow remaining after reflow
-because an atom cannot be split. Both default to false, propose no edits, and
-use the rule's severity. Use severity `error` or `--max-warnings 0` to make
-these diagnostics fail a check; `--check` does not change rule settings.
+`reportUnreflowed: true` reports breakable over-width lines in paragraphs
+protected by hard breaks, block IDs, inline HTML, callout headers, or
+unsupported multiline syntax or containers. `reportUnbreakable: true` reports
+overflow from an atom that cannot be split, including in protected paragraphs.
+Whitespace inside a link, code span, or other protected inline node is not a
+wrapping opportunity. A protected paragraph with both breakable prose and an
+over-width atom can report both causes; an atom-only overflow does not trigger
+`reportUnreflowed`. Hard-break markers are excluded from protected-line width.
+Both options default to false, propose no edits, and use the rule's severity.
+Use severity `error` or `--max-warnings 0` to make these diagnostics fail a
+check; `--check` does not change rule settings.
 
 Enable `style/inline-code` to join multiline code spans before paragraph reflow.
 This opt-in rule handles single and multiple backticks, including list and quote
