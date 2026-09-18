@@ -35,18 +35,25 @@ export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
   }
   return rules;
 }
+const ruleValidator = new Ajv({ allErrors: true });
+const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.schema));
 function prepare(options: ProcessOptions) {
   const config = resolveConfig(options.config, options.path, options.plugins);
   const rules = ruleRegistry(options.plugins);
-  const ajv = new Ajv({ allErrors: true });
+  let pluginValidator: Ajv | undefined;
   for (const [name, value] of Object.entries(config.rules)) {
     const rule = rules[name];
     if (!rule) throw new Error(`Unknown rule: ${name}`);
     const enabled = setting(value);
     if (rule.schema && enabled.severity !== "off") {
-      const validate = ajv.compile(rule.schema);
+      // Plugin schema IDs are scoped to this call; distinct plugin instances
+      // may legitimately reuse the same ID with different schemas.
+      const validator = builtInSchemas.has(rule.schema)
+        ? ruleValidator
+        : (pluginValidator ??= new Ajv({ allErrors: true }));
+      const validate = validator.compile(rule.schema);
       if (!validate(enabled.options))
-        throw new Error(`Invalid options for ${name}: ${ajv.errorsText(validate.errors)}`);
+        throw new Error(`Invalid options for ${name}: ${validator.errorsText(validate.errors)}`);
     }
   }
   return { config, rules };

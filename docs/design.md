@@ -59,11 +59,21 @@ Heading nesting paths, property aliases, PDF subpaths, and every Obsidian
 plugin's syntax are not fully supported. Embeds are preserved as embeds; image
 dimensions in their aliases remain intact.
 
-All eligible Markdown is currently parsed into an in-memory workspace index.
-There is no persistent cache, watch service, editor extension, or language
-server yet. Use directory selection to scope output; indexing still needs the
-containing workspace for cross-document links. The library has a pluggable
-workspace interface for specialized hosts.
+The workspace indexes eligible paths first and parses target Markdown only when
+a fragment is checked, caching the result for that invocation. CLI discovery
+also defers reading Markdown until it is selected or needed for a fragment.
+Rule-schema validators are reused across documents. A suffix lookup index is
+built on first use instead of scanning every path for each shortened link. There
+is no persistent cache, worker pool, watch service, editor extension, or
+language server yet. The library has a pluggable workspace interface for
+specialized hosts.
+
+Run `npm run build` and `node scripts/benchmark.mjs 1000` for a reproducible
+synthetic library benchmark. It reports path-index construction and lint time
+separately for 1,000 short interlinked notes; pass a different count to scale
+it. These timings exclude filesystem traversal and do not predict a particular
+vault's throughput. Measure the original workload before adding caches or
+workers.
 
 ## Maintenance priorities
 

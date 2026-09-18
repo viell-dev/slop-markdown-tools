@@ -123,6 +123,9 @@ vault-relative path. `leadingDot: true` prefixes ordinary relative paths with
 Markdown destinations are percent-encoded. `extension` accepts `preserve`
 (default), `include`, or `omit`; omission is Obsidian specific. Fragments are
 resolved according to the dialect, separately from percent-decoded filenames.
+Already compliant destinations retain their percent-encoding spelling, including
+literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
+literal percent signs and hashes to preserve target identity.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the
@@ -138,10 +141,15 @@ separate passes.
 
 Network URLs are recognized but never fetched. Website-root paths and
 query-bearing destinations in CommonMark/GitHub are outside local resolution.
-Missing or ambiguous targets are reported, never guessed. The conservative
-Obsidian resolver may report ambiguity where a particular Obsidian version would
-select one candidate; shortest-name/alias resolution is not a complete clone of
-the app.
+Missing or ambiguous targets are reported, never guessed. Obsidian resolution
+uses explicit `./` or `../` paths as source-relative; otherwise an exact
+vault-root match precedes an exact source-relative match, followed by unique
+suffix matching. Multiple candidates within the chosen tier remain ambiguous.
+Relative rewrites use `./` when needed to avoid a vault-root collision. Existing
+directories get a distinct diagnostic in Obsidian; they are not rewritten to
+README or index notes. CommonMark/GitHub directory links are accepted because a
+hosting site can serve them. Shortest-name/alias resolution is not a complete
+clone of Obsidian.
 
 ## Suppressions
 
@@ -167,11 +175,24 @@ it directly above the content to suppress.
 
 Commands accept explicit files/directories, or no paths to select the workspace.
 The CLI honors `.gitignore` files and configured ignore patterns. Config-ignored
-documents remain available for link resolution; Git-ignored content is not
-indexed. `.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and
-`coverage` are excluded from traversal, as are nested Git repositories and
-symlinks. Explicit symlink inputs are rejected. Shell-expanded globs work; the
-CLI does not expand path globs.
+documents remain available for link resolution. Git-ignored content and nested
+repositories are not indexed by default. To make their files available only as
+link targets, set:
+
+```jsonc
+{
+  "resolve": { "gitIgnored": true, "nestedRepositories": true },
+}
+```
+
+These options are independent and default to false. They never select those
+files for linting or formatting, including when a path is supplied explicitly.
+Markdown targets are read and parsed only for fragment checks; attachments need
+only a discovered file entry. Built-in traversal exclusions still apply. `.git`,
+`.obsidian`, `node_modules`, `.npm-cache`, `dist`, and `coverage` are excluded
+from traversal, as are symlinks. Nested Git repositories are traversed for
+targets only when opted in. Explicit symlink inputs are rejected. Shell-expanded
+globs work; the CLI does not expand path globs.
 
 `lint --json` and `format --json` print a single object with `version`, `mode`,
 `files`, and `written`. Each file carries diagnostics with rule ID, severity,

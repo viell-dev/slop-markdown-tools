@@ -63,7 +63,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
-  const set = await discover(root, stdin ? [] : inputs, resolved.ignore);
+  const set = await discover(root, stdin ? [] : inputs, resolved.ignore, resolved.resolve);
   if (stdin) {
     const name = path
       .relative(root, path.resolve(flags.stdinFilepath ?? path.join(root, "stdin.md")))
@@ -88,6 +88,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         config.dialect,
         createWorkspace(set.files, {
           dialect: config.dialect,
+          directories: set.directories,
           ...(set.strictLineBreaks !== undefined ? { strictLineBreaks: set.strictLineBreaks } : {}),
         }),
       );
@@ -97,7 +98,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       plugins: loaded.plugins,
       workspace: indexes.get(config.dialect)!,
     };
-    const source = set.files[name]!;
+    const value = set.files[name]!;
+    const source = typeof value === "function" ? value() : value;
     if (source === null) continue;
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
