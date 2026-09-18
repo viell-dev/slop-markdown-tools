@@ -42,6 +42,7 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
     opening = code === 33 ? "![[" : code === 91 ? "[[" : code === 37 ? "%%" : "==";
     closing = opening.endsWith("[[") ? "]]" : opening;
     effects.enter("obsidianLiteral");
+    effects.enter("obsidianCommentData");
     return open(code);
   };
   const open: State = (code) => {
@@ -53,15 +54,31 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
   const body: State = (code) => {
     if (code === null || (opening !== "%%" && code < 0 && code !== -1 && code !== -2))
       return nok(code);
+    if (code < -2) {
+      // Micromark subtokenizes each physical line separately. Expose every
+      // line ending so a multiline inline comment can span more than two chunks.
+      effects.exit("obsidianCommentData");
+      effects.enter("lineEnding");
+      effects.consume(code);
+      effects.exit("lineEnding");
+      previous = null;
+      count++;
+      return resume;
+    }
     effects.consume(code);
     count++;
     if (code === closing.charCodeAt(1) && previous === closing.charCodeAt(0)) {
       if (count <= 2) return nok(code);
+      effects.exit("obsidianCommentData");
       effects.exit("obsidianLiteral");
       return ok;
     }
     previous = code;
     return body;
+  };
+  const resume: State = (code) => {
+    effects.enter("obsidianCommentData");
+    return body(code);
   };
   return start;
 };

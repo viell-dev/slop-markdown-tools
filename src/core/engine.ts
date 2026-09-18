@@ -4,6 +4,7 @@ import { resolveConfig, setting } from "../config/resolve.js";
 import { parse } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
+import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
 import { suppressions } from "./directives.js";
 import type {
@@ -19,7 +20,12 @@ import type {
   Workspace,
 } from "./types.js";
 
-export const builtInRules: Record<string, Rule> = { ...styleRules, ...dialectRules, ...linkRules };
+export const builtInRules: Record<string, Rule> = {
+  ...styleRules,
+  ...dialectRules,
+  ...linkRules,
+  ...structureRules,
+};
 export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
   const rules = { ...builtInRules };
   const names = new Set<string>();

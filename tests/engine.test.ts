@@ -281,6 +281,17 @@ describe("Obsidian and links", () => {
     const source = "Text %% hidden\n*emphasis* [[Missing]] %% after.\n";
     expect(formatted(source, { workspace, config, path: "note.md" })).toBe(source);
   });
+  it.each(["\n", "\r\n"])(
+    "preserves inline comments spanning several physical lines (%j)",
+    (newline) => {
+      for (const prefix of ["", "> ", "- "]) {
+        const continuation = prefix === "- " ? "  " : prefix;
+        const source = `${prefix}Before %% hidden${newline}${continuation}*hidden* [[Missing]]${newline}${continuation}still hidden %% after.${newline}`;
+        expect(formatted(source, { config, workspace, path: "note.md" })).toBe(source);
+        expect(lint(source, { config, workspace, path: "note.md" })).toEqual([]);
+      }
+    },
+  );
   it("preserves comments inside quote containers", () => {
     const source = "> %%\n> *hidden* [[Missing]]\n>\n> %%\n\n*visible*\n";
     expect(formatted(source, { workspace, config, path: "note.md" })).toBe(
