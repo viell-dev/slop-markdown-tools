@@ -26,7 +26,7 @@
   },
   "files": [
     "dist",
-    "docs",
+    "docs/*.md",
     "examples",
     "README.md",
     "LICENSE"
@@ -36,12 +36,23 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "pretest": "npm run build",
-    "test:package": "npm run build && node scripts/package-smoke.mjs",
+    "test:package": "run-s build test:package:installed",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
-    "prepack": "npm run build"
+    "format": "run-s format:code format:docs",
+    "format:code": "prettier --write .",
+    "format:docs": "run-s build format:docs:write",
+    "format:docs:check": "run-s build lint:docs format:docs:verify",
+    "format:check": "run-p format:code:check format:docs:check",
+    "check": "npm-run-all --parallel typecheck lint format:check docs:build --sequential test",
+    "prepack": "npm run build",
+    "test:package:installed": "node scripts/package-smoke.mjs",
+    "format:docs:write": "node dist/cli/main.js format --write",
+    "lint:docs": "node dist/cli/main.js lint --max-warnings 0",
+    "format:docs:verify": "node dist/cli/main.js format --check",
+    "format:code:check": "prettier --check .",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "ajv": "8.20.0",
@@ -69,9 +80,12 @@
     "@types/unist": "3.0.3",
     "eslint": "10.10.0",
     "fast-check": "4.10.1",
+    "npm-run-all2": "9.0.3",
     "prettier": "3.9.8",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
+    "vitepress": "1.6.4",
     "vitest": "5.0.1"
-  }
+  },
+  "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }

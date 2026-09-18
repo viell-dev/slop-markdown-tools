@@ -20,7 +20,7 @@ try {
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/|examples\/|README\.md$|LICENSE$|package\.json$)/.test(file.path),
+      /^(dist\/|docs\/[^/]+\.md$|examples\/|README\.md$|LICENSE$|package\.json$)/.test(file.path),
     ),
   );
   await writeFile(
