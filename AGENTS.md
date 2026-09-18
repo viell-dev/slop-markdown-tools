@@ -21,6 +21,14 @@ reporter's proposed feature. Reports from agents receive the same scrutiny as
 reports from people. Rejecting, narrowing, splitting, or closing an issue as out
 of scope is a valid outcome.
 
+Maintain labels as part of every issue or PR update, including answers, closure,
+and reopening. Follow the
+[contributor label policy](docs/contributing.md#issue-and-pull-request-labels)
+and [.github/labels.json](.github/labels.json): one primary type, at most one
+current status, and no priority labels. Reassess stale dispositions, remove
+transient statuses on completion, and keep GitHub and the tracked catalog in
+sync. Label changes do not replace explanatory comments or relevant PR links.
+
 For each distinct request, separate the observed problem from its proposed
 solution and choose an appropriate home:
 
