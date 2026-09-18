@@ -36,24 +36,6 @@ describe("wrapping controls", () => {
     ).toContain("code points");
   });
   it.each([
-    "[revision](https://example.test/a-very-long-revision-identifier)",
-    "![image](https://example.test/a-very-long-image-identifier)",
-    "`01234567890123456789012345678901234567890123456789`",
-  ])("keeps a short label with an oversized atom: %s", (atom) => {
-    const source = `- **Revision:** ${atom}\n`;
-    expect(verify(source, wrap({ keepLabelWithAtom: true })).output).toBe(source);
-    expect(verify(source, wrap()).output).toContain("**Revision:**\n  ");
-    const prose = verify(
-      source.trimEnd() + " more words after the value\n",
-      wrap({ keepLabelWithAtom: true }),
-    );
-    expect(prose.output).toBe(source + "  more words after the value\n");
-  });
-  it("still wraps labels with values that fit on a continuation line", () => {
-    const source = "- **Revision:** `123456789012345678901234567890`\n";
-    expect(verify(source, wrap({ keepLabelWithAtom: true })).output).toContain("**Revision:**\n  ");
-  });
-  it.each([
     ["A long line with many words that will not be reflowed.  \nNext line.\n", "hard line break"],
     ["A long line with many words that will not be reflowed. ^id\n", "block identifier"],
     [

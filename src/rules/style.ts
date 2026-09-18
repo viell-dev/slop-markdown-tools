@@ -52,7 +52,6 @@ const wrap: Rule = {
   schema: optionsSchema({
     width: { type: "integer", minimum: 20, maximum: 500 },
     measure: { enum: ["columns", "codepoints"] },
-    keepLabelWithAtom: { type: "boolean" },
     reportUnreflowed: { type: "boolean" },
     reportUnbreakable: { type: "boolean" },
   }),
@@ -137,22 +136,6 @@ const wrap: Rule = {
         if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
           atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
           i--;
-        }
-      }
-      // Keep short metadata labels attached only when their value cannot fit on
-      // a continuation line either. Ordinary prose after the value still wraps.
-      if (options.keepLabelWithAtom === true && /(?:[-+*]|\d+[.)])\s/.test(prefix)) {
-        const labelEnd = atoms.findIndex((atom) => /:(?:\*\*|__|\*|_)?$/.test(atom));
-        if (labelEnd >= 0 && labelEnd < 4) {
-          const label = atoms.slice(0, labelEnd + 1).join(" ");
-          const atom = atoms[labelEnd + 1];
-          if (
-            measure(label) <= Math.min(40, width / 2) &&
-            atom &&
-            /^(?:!?\[|`)/.test(atom) &&
-            measure(atom) > width - measure(continuation)
-          )
-            atoms.splice(0, labelEnd + 2, `${label} ${atom}`);
         }
       }
       const output: string[] = [];
