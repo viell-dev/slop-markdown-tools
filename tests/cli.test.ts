@@ -158,6 +158,110 @@ describe("CLI", () => {
     expect(run(root, ["format", "--write", "."]).status).toBe(2);
     expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("*fine*\n");
   });
+  it("selects changed and staged paths while resolving against unchanged targets", async () => {
+    const root = await fixture({
+      "changed.md": "Before.\n",
+      "staged.md": "Before.\n",
+      "deleted.md": "Delete.\n",
+      "renamed.md": "Rename.\n",
+      "target.md": "# Target\n",
+      ".gitignore": "ignored.md\n",
+      "notes/note.md": "Before.\n",
+      "notes-extra.md": "Before.\n",
+    });
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    git("init", "--quiet");
+    git("add", ".");
+    git(
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.test",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "--quiet",
+      "-m",
+      "Fixture",
+    );
+    await writeFile(path.join(root, "changed.md"), "[unchanged](target.md)\n");
+    await writeFile(path.join(root, "staged.md"), "*staged*\n");
+    git("add", "staged.md");
+    git("mv", "renamed.md", "renamed with spaces.md");
+    await rm(path.join(root, "deleted.md"));
+    await writeFile(path.join(root, "new ü.md"), "New.\n");
+    await writeFile(path.join(root, "ignored.md"), "Ignored.\n");
+    await writeFile(path.join(root, "notes/note.md"), "Changed.\n");
+    await writeFile(path.join(root, "notes-extra.md"), "Changed.\n");
+    const paths = (args: string[]) => {
+      const checked = run(root, ["lint", "--json", ...args]);
+      expect(checked.status, checked.stderr).toBe(0);
+      return JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path);
+    };
+    expect(paths(["--changed"])).toEqual([
+      "changed.md",
+      "new ü.md",
+      "notes-extra.md",
+      "notes/note.md",
+      "renamed with spaces.md",
+      "staged.md",
+    ]);
+    expect(paths(["--staged"])).toEqual(["renamed with spaces.md", "staged.md"]);
+    expect(paths(["--changed", "--exclude", "notes", "--exclude", "staged.md"])).toEqual([
+      "changed.md",
+      "new ü.md",
+      "notes-extra.md",
+      "renamed with spaces.md",
+    ]);
+    const stagedBefore = git("show", ":staged.md");
+    expect(run(root, ["format", "--staged", "--write"]).status).toBe(0);
+    expect(await readFile(path.join(root, "staged.md"), "utf8")).toBe("_staged_\n");
+    expect(git("show", ":staged.md")).toBe(stagedBefore);
+    const sub = run(path.join(root, "notes"), [
+      "lint",
+      "--root",
+      path.join(root, "notes"),
+      "--changed",
+      "--json",
+    ]);
+    expect(sub.status, sub.stderr).toBe(0);
+    expect(JSON.parse(sub.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "note.md",
+    ]);
+    expect(run(root, ["lint", "--changed", "--staged"]).status).toBe(2);
+    expect(run(root, ["lint", "--staged", "changed.md"]).status).toBe(2);
+    expect(run(root, ["lint", "--changed", "-"]).status).toBe(2);
+  }, 20_000);
+  it("handles Git selection before the first commit and empty selections", async () => {
+    const root = await fixture({ "note.md": "*note*\n" });
+    execFileSync("git", ["-C", root, "init", "--quiet"]);
+    const empty = run(root, ["format", "--staged", "--write", "--json"]);
+    expect(empty.status, empty.stderr).toBe(0);
+    expect(JSON.parse(empty.stdout).files).toEqual([]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("*note*\n");
+    expect(JSON.parse(run(root, ["lint", "--changed", "--json"]).stdout).files).toHaveLength(1);
+    execFileSync("git", ["-C", root, "add", "note.md"]);
+    expect(JSON.parse(run(root, ["lint", "--staged", "--json"]).stdout).files).toHaveLength(1);
+  });
+  it("rejects Git flags outside Git and applies literal exclusions to ordinary selections", async () => {
+    const root = await fixture({
+      "note.md": "[target](folder/target.md)\n",
+      "folder/target.md": "*target*\n",
+      "folder-extra.md": "Text.\n",
+    });
+    const bad = run(root, ["lint", "--changed"]);
+    expect(bad.status).toBe(2);
+    expect(bad.stderr).toContain("requires a Git working tree");
+    const selected = run(root, ["lint", "--json", "--exclude", "folder"]);
+    expect(selected.status, selected.stderr).toBe(0);
+    expect(JSON.parse(selected.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "folder-extra.md",
+      "note.md",
+    ]);
+    expect(run(root, ["lint", "--exclude", "../outside"]).status).toBe(2);
+    expect(run(root, ["lint", "--exclude", "note.md", "-"], "text").status).toBe(2);
+  });
   it("ships an executable CLI entry point", () => {
     expect(execFileSync(process.execPath, [cli, "--version"], { encoding: "utf8" }).trim()).toBe(
       manifest.version,
