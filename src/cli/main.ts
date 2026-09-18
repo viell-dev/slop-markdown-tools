@@ -86,7 +86,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     const selected = await gitSelection(set.root, flags.staged === true);
     set.selected = set.selected.filter((name) => selected.has(name));
   }
-  set.selected = excludeSelection(set.root, set.selected, flags.exclude ?? []);
+  set.selected = await excludeSelection(set.root, set.selected, flags.exclude ?? []);
   if (stdin) {
     const name = path
       .relative(root, path.resolve(flags.stdinFilepath ?? path.join(root, "stdin.md")))

@@ -253,7 +253,14 @@ describe("CLI", () => {
     const bad = run(root, ["lint", "--changed"]);
     expect(bad.status).toBe(2);
     expect(bad.stderr).toContain("requires a Git working tree");
-    const selected = run(root, ["lint", "--json", "--exclude", "folder"]);
+    const selected = run(root, [
+      "lint",
+      "--json",
+      "--exclude",
+      "folder",
+      "--exclude",
+      "not-created/note.md",
+    ]);
     expect(selected.status, selected.stderr).toBe(0);
     expect(JSON.parse(selected.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "folder-extra.md",
@@ -291,6 +298,27 @@ describe("filesystem safeguards", () => {
         "symbolic-link",
       );
       expect((await discover(root, [], [])).selected).toEqual(["target.md"]);
+    },
+  );
+  it.skipIf(process.platform === "win32")(
+    "canonicalizes exclusion paths through a workspace alias",
+    async () => {
+      const root = await fixture({ "note.md": "*note*\n", "other.md": "Text.\n" });
+      const aliasParent = await fixture({});
+      const alias = path.join(aliasParent, "workspace");
+      await symlink(root, alias);
+      const checked = run(root, [
+        "lint",
+        "--json",
+        "--exclude",
+        path.join(alias, "note.md"),
+        "--exclude",
+        path.join(alias, "not-created/note.md"),
+      ]);
+      expect(checked.status, checked.stderr).toBe(0);
+      expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+        "other.md",
+      ]);
     },
   );
   it("finds the vault boundary when invoked from a subdirectory", async () => {

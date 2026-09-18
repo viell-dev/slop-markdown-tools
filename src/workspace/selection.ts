@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
+import { realpath } from "node:fs/promises";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
@@ -39,13 +40,34 @@ export async function gitSelection(root: string, staged: boolean): Promise<Set<s
 }
 
 /** Exclusions are literal paths relative to cwd, never glob patterns. */
-export function excludeSelection(root: string, selected: string[], exclusions: string[]): string[] {
-  const relative = exclusions.map((input) => {
-    const name = path.relative(root, path.resolve(input)).split(path.sep).join("/");
-    if (name === ".." || name.startsWith("../") || path.isAbsolute(name))
-      throw new Error(`Excluded path is outside the workspace: ${input}`);
-    return name;
-  });
+export async function excludeSelection(
+  root: string,
+  selected: string[],
+  exclusions: string[],
+): Promise<string[]> {
+  // Resolve filesystem aliases (including Windows short names) consistently
+  // with discovery, while allowing exclusions for paths that do not exist yet.
+  async function canonical(file: string): Promise<string> {
+    try {
+      return await realpath(file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const parent = path.dirname(file);
+      if (parent === file) throw error;
+      return path.join(await canonical(parent), path.basename(file));
+    }
+  }
+  const relative = await Promise.all(
+    exclusions.map(async (input) => {
+      const name = path
+        .relative(root, await canonical(path.resolve(input)))
+        .split(path.sep)
+        .join("/");
+      if (name === ".." || name.startsWith("../") || path.isAbsolute(name))
+        throw new Error(`Excluded path is outside the workspace: ${input}`);
+      return name;
+    }),
+  );
   return selected.filter(
     (name) =>
       !relative.some(
