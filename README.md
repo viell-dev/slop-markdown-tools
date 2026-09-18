@@ -50,7 +50,7 @@ workspace, or supply `--config`. For example:
 {
   "extends": ["recommended", "github"],
   "rules": {
-    "style/wrap": ["warn", { "width": 100 }],
+    "style/wrap": ["warn", { "width": 80 }],
     "style/emphasis": ["warn", { "marker": "_" }],
     "style/strong": ["warn", { "marker": "*" }],
   },

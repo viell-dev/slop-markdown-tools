@@ -40,7 +40,7 @@ Multiple vaults with independent settings should be processed separately.
 
 | Preset        | Dialect   | Enabled rules                                                                                  |
 | ------------- | --------- | ---------------------------------------------------------------------------------------------- |
-| `recommended` | Unchanged | Wrap at 100, `_` emphasis, `**` strong, final newline, valid links                             |
+| `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
@@ -53,7 +53,7 @@ enabled. Problem rules report findings and never become formatting edits.
 
 | Rule                          | Kind    | Options                                                   |
 | ----------------------------- | ------- | --------------------------------------------------------- |
-| `style/wrap`                  | Style   | `width`: integer 20–500, default 100                      |
+| `style/wrap`                  | Style   | `width`: integer 20–500, default 80                       |
 | `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                            |
 | `style/strong`                | Style   | `marker`: `*` (default) or `_`                            |
 | `style/final-newline`         | Style   | None; adds a missing final newline                        |

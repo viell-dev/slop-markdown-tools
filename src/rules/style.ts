@@ -53,7 +53,7 @@ const wrap: Rule = {
   check({ document, options, workspace }) {
     if (document.dialect === "obsidian" && workspace?.strictLineBreaks !== true) return [];
     const findings: Finding[] = [];
-    const width = Number(options.width ?? 100);
+    const width = Number(options.width ?? 80);
     visit(document.tree, "paragraph", (node) => {
       const [start, end] = range(node);
       const original = document.source.slice(start, end);
