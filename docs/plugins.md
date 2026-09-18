@@ -1,8 +1,8 @@
 # Plugins and library API
 
-The public API is exported from `mdrefine`. Install the checkout as a local
-dependency while this prerelease is not on npm. The API is provisional until a
-stable release.
+The public API is exported from `mdrefine`. Follow the
+[installation guide](quick-start.md) to install the npm package or build a
+checkout as a local dependency. The API is provisional until a stable release.
 
 ## Library calls
 

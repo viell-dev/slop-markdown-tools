@@ -28,13 +28,37 @@ current limitations. The Markdown source lives in `docs/`.
 
 ## Getting started
 
-The CLI requires Node.js 22.12 or newer. For development and the checkout setup
-below, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or newer; Node.js 24 LTS is
-preferred. This prerelease is distributed from the repository; it has not been
-published to the npm registry. The prepared package is `mdrefine@0.1.0-beta.1`;
-the executable remains `mdtools`. See the
+The CLI requires Node.js 22.12 or newer. The npm package is `mdrefine`; the
+executable is `mdtools`. To install the beta in your document workspace:
+
+```sh
+npm install --save-dev --save-exact mdrefine@0.1.0-beta.1
+npx --no-install mdtools --help
+```
+
+See the
 [release procedure](https://viell-dev.github.io/slop-markdown-tools/releases.html)
-for publication status, preparation, and authentication requirements.
+for registry availability, preparation, and authentication requirements.
+
+Inspect your documents from the workspace where you installed the package:
+
+```sh
+npx --no-install mdtools lint --root /path/to/documents --json
+npx --no-install mdtools format --root /path/to/documents --diff
+npx --no-install mdtools format --root /path/to/documents --write
+npx --no-install mdtools format --root /path/to/documents --check
+```
+
+`lint` never writes documents. `format` previews a diff by default for file
+inputs and writes only with `--write`. For stdin, `format -` returns formatted
+Markdown on stdout. Diagnostics use stderr unless `--json` requests a structured
+report. `--no-install` prevents fetching a different package if the local
+executable is missing.
+
+## Build from source
+
+For development, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or newer; Node.js
+24 LTS is preferred.
 
 ```sh
 git clone https://github.com/viell-dev/slop-markdown-tools.git
@@ -44,20 +68,9 @@ npm run build
 node dist/cli/main.js --help
 ```
 
-From this checkout, inspect a separate document workspace:
-
-```sh
-node dist/cli/main.js lint --root /path/to/documents --json
-node dist/cli/main.js format --root /path/to/documents --diff
-node dist/cli/main.js format --root /path/to/documents --write
-node dist/cli/main.js format --root /path/to/documents --check
-```
-
-The installed command is `mdtools`; callers can install this checkout as a local
-dependency. `lint` never writes documents. `format` previews a diff by default
-for file inputs and writes only with `--write`. For stdin, `format -` returns
-formatted Markdown on stdout. Diagnostics use stderr unless `--json` requests a
-structured report.
+From the checkout, use `node dist/cli/main.js` in place of
+`npx --no-install mdtools` in the examples above. You can also install the built
+checkout as a local dependency.
 
 ## Contributions and verification
 

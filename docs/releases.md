@@ -1,15 +1,21 @@
 # Releases
 
-## Current status
+## Versions and availability
 
-`mdrefine@0.1.0-beta.1` is prepared but **not published**. No release tag or
-GitHub release has been created. The npm name returned no existing package at
-the time of preparation; availability is not a reservation or a guarantee that
-npm will accept the name. The executable remains `mdtools`.
+These documents cover `mdrefine@0.1.0-beta.1`. The executable is `mdtools`;
+prereleases use npm's `beta` channel. Read the
+[beta.1 release notes](releases/0.1.0-beta.1.md) for changes and limitations.
 
-Read the [beta.1 release notes](releases/0.1.0-beta.1.md). Before publishing,
-update this page, the README, the quick start, and plugin installation guidance
-through a PR so they describe the intended published version accurately.
+The registry is the source of truth for package availability:
+
+```sh
+npm view mdrefine@0.1.0-beta.1 version --registry=https://registry.npmjs.org/
+```
+
+An `E404` means the requested package or version is unavailable. A version in
+this repository or its documentation does not imply publication. Check
+[GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases) for
+release announcements and downloadable artifacts.
 
 ## Prepare without publishing
 
@@ -40,7 +46,7 @@ does not supply that authorization. Before the first publication:
 1. Merge the release PR with all required checks passing. Review the tarball
    manifest, release notes, version, and registry name again.
 2. Arrange npm account access, verified email, and required two-factor
-   authentication. This checkout has no authenticated npm account. Bootstrap
+   authentication. Verify the intended account with `npm whoami`. Bootstrap
    publication may need an authenticated local publish before package settings
    are available for trusted publishing.
 3. Configure npm's
