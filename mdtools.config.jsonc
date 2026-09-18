@@ -1,0 +1,4 @@
+{
+  "extends": ["recommended", "github"],
+  "ignore": ["tests/fixtures/**"],
+}

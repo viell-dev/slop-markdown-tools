@@ -2,7 +2,7 @@
   "extends": ["recommended", "obsidian"],
   "ignore": ["**/*.external.md"],
   "rules": {
-    "style/wrap": ["warn", { "width": 100 }],
+    "style/wrap": ["warn", { "width": 80 }],
     "links/path": ["warn", { "style": "root", "brackets": "angle", "extension": "preserve" }],
   },
 }

@@ -136,7 +136,14 @@ describe("configuration and plugins", () => {
     expect(formatted(code)).toContain("_change_");
   });
   it("supports defaults, overrides, and explicit empty presets", () => {
-    expect(resolveConfig({}).rules["style/wrap"]).toBeDefined();
+    expect(resolveConfig({}).rules["style/wrap"]).toEqual(["warn", { width: 80 }]);
+    const source = "word ".repeat(18).trimEnd() + "\n";
+    const expected = "word ".repeat(16).trimEnd() + "\nword word\n";
+    expect(formatted(source)).toBe(expected);
+    expect(formatted(source, { config: { rules: { "style/wrap": "warn" } } })).toBe(expected);
+    expect(
+      formatted(source, { config: { rules: { "style/wrap": ["warn", { width: 100 }] } } }),
+    ).toBe(source);
     expect(resolveConfig({ extends: [] }).rules).toEqual({});
     expect(
       resolveConfig(

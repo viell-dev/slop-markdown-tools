@@ -5,7 +5,7 @@ import type { Config, Plugin, ResolvedConfig, RuleSetting } from "../core/types.
 export const presets: Record<string, Config> = {
   recommended: {
     rules: {
-      "style/wrap": ["warn", { width: 100 }],
+      "style/wrap": ["warn", { width: 80 }],
       "style/emphasis": ["warn", { marker: "_" }],
       "style/strong": ["warn", { marker: "*" }],
       "style/final-newline": "warn",
