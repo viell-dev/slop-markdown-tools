@@ -46,27 +46,54 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
 }
 
 const wrap: Rule = {
-  description: "Reflow paragraphs using display-column width and protected inline atoms.",
+  description: "Reflow paragraphs using configurable width and protected inline atoms.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({ width: { type: "integer", minimum: 20, maximum: 500 } }),
+  schema: optionsSchema({
+    width: { type: "integer", minimum: 20, maximum: 500 },
+    measure: { enum: ["columns", "codepoints"] },
+    keepLabelWithAtom: { type: "boolean" },
+    reportUnreflowed: { type: "boolean" },
+    reportUnbreakable: { type: "boolean" },
+  }),
   check({ document, options, workspace }) {
     if (document.dialect === "obsidian" && workspace?.strictLineBreaks !== true) return [];
     const findings: Finding[] = [];
     const width = Number(options.width ?? 80);
+    const measure =
+      options.measure === "codepoints" ? (text: string) => [...text].length : stringWidth;
+    const unit = options.measure === "codepoints" ? "code points" : "columns";
     visit(document.tree, "paragraph", (node) => {
       const [start, end] = range(node);
       const original = document.source.slice(start, end);
-      // Explicit breaks, callout headers, block IDs, multiline opaque syntax, and HTML are protected.
-      if (
-        node.children.some((child) => child.type === "break" || child.type === "html") ||
-        /^\[![^\]]+\]/.test(original) ||
-        /(?:^|\s)\^[\w-]+\s*$/.test(original)
-      )
-        return;
       const lineStart = document.source.lastIndexOf("\n", start - 1) + 1;
       const prefix = document.source.slice(lineStart, start);
-      if (!/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)) return;
+      const reportSkipped = (reason: string) => {
+        if (
+          options.reportUnreflowed === true &&
+          (prefix + original).split(/\r?\n/).some((line) => measure(line) > width)
+        )
+          findings.push({
+            start,
+            end,
+            message: `Paragraph not reflowed: ${reason} (width ${width} ${unit}).`,
+          });
+      };
+      const reason = node.children.some((child) => child.type === "break")
+        ? "hard line break"
+        : node.children.some((child) => child.type === "html")
+          ? "inline HTML"
+          : /^\[![^\]]+\]/.test(original)
+            ? "callout header"
+            : /(?:^|\s)\^[\w-]+\s*$/.test(original)
+              ? "block identifier"
+              : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                ? "unsupported container prefix"
+                : undefined;
+      if (reason) {
+        reportSkipped(reason);
+        return;
+      }
       const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
         " ".repeat(value.length),
       );
@@ -91,7 +118,10 @@ const wrap: Rule = {
           words.push(value);
         }
       }
-      if (unsupported) return;
+      if (unsupported) {
+        reportSkipped("multiline inline syntax or unsupported continuation");
+        return;
+      }
       // Adjacent inline nodes without source whitespace form a single wrapping atom.
       const atoms: string[] = [];
       let current = "";
@@ -102,17 +132,38 @@ const wrap: Rule = {
         } else current += word;
       }
       if (current) atoms.push(current);
+      // Decide breaks with a marker and its preceding atom already grouped.
+      for (let i = 1; i < atoms.length; i++) {
+        if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
+          atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+          i--;
+        }
+      }
+      // Keep short metadata labels attached only when their value cannot fit on
+      // a continuation line either. Ordinary prose after the value still wraps.
+      if (options.keepLabelWithAtom === true && /(?:[-+*]|\d+[.)])\s/.test(prefix)) {
+        const labelEnd = atoms.findIndex((atom) => /:(?:\*\*|__|\*|_)?$/.test(atom));
+        if (labelEnd >= 0 && labelEnd < 4) {
+          const label = atoms.slice(0, labelEnd + 1).join(" ");
+          const atom = atoms[labelEnd + 1];
+          if (
+            measure(label) <= Math.min(40, width / 2) &&
+            atom &&
+            /^(?:!?\[|`)/.test(atom) &&
+            measure(atom) > width - measure(continuation)
+          )
+            atoms.splice(0, labelEnd + 2, `${label} ${atom}`);
+        }
+      }
       const output: string[] = [];
       let line = "";
-      let available = width - stringWidth(prefix);
+      let available = width - measure(prefix);
       for (const atom of atoms) {
         const candidate = line ? `${line} ${atom}` : atom;
-        // Never introduce a Markdown block by placing its marker at a physical line start.
-        const marker = /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atom);
-        if (line && stringWidth(candidate) > available && !marker) {
+        if (line && measure(candidate) > available) {
           output.push(line);
           line = atom;
-          available = width - stringWidth(continuation);
+          available = width - measure(continuation);
         } else line = candidate;
       }
       if (line) output.push(line);
@@ -122,8 +173,17 @@ const wrap: Rule = {
         findings.push({
           start,
           end,
-          message: `Reflow paragraph to ${width} columns.`,
+          message: `Reflow paragraph to ${width} ${unit}.`,
           edit: { start, end, text: replacement },
+        });
+      if (
+        options.reportUnbreakable === true &&
+        (prefix + replacement).split(/\r?\n/).some((line) => measure(line) > width)
+      )
+        findings.push({
+          start,
+          end,
+          message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
         });
     });
     return findings;
@@ -187,6 +247,30 @@ const table: Rule = {
 
 export const styleRules: Record<string, Rule> = {
   "style/wrap": wrap,
+  "style/inline-code": {
+    description: "Join multiline code spans using their CommonMark rendered value.",
+    kind: "style",
+    phase: "inline",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const findings: Finding[] = [];
+      visit(document.tree, "inlineCode", (node) => {
+        const [start, end] = range(node);
+        if (!/[\r\n]/.test(document.source.slice(start, end))) return;
+        const value = node.value.replace(/\r\n|\r|\n/g, " ");
+        const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
+        const marker = "`".repeat(longest + 1);
+        const pad = /^`|`$/.test(value) || (/^ .* $/.test(value) && /[^ ]/.test(value)) ? " " : "";
+        findings.push({
+          start,
+          end,
+          message: "Join the code span onto one line.",
+          edit: { start, end, text: `${marker}${pad}${value}${pad}${marker}` },
+        });
+      });
+      return findings;
+    },
+  },
   "style/emphasis": markerRule("emphasis", "_"),
   "style/strong": markerRule("strong", "*"),
   "style/table": table,

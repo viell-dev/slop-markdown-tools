@@ -166,7 +166,9 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
             (_, marker: string) => `[!${marker.toLowerCase()}]`,
           );
         result[key] = text;
-      } else result[key] = value;
+      } else if (key === "value" && node.type === "inlineCode")
+        result[key] = node.value.replace(/\r\n|\r|\n/g, " ");
+      else result[key] = value;
     }
     return result;
   }
