@@ -106,7 +106,7 @@ task branches after their work is merged or deliberately abandoned.
 
 The active main and version-tag policies are recorded in `.github/rulesets/`.
 Keep those files and GitHub settings synchronized. Required checks bind to the
-four `verify (OS, NODE)` job names in `ci.yml` and GitHub Actions app 15368;
+three `verify (OS, NODE)` job names in `ci.yml` and GitHub Actions app 15368;
 renaming a job or changing the matrix requires updating the ruleset. CI runs for
 PRs and pushes to `main`, avoiding duplicate feature-branch runs. Zero required
 approvals is deliberate for a single-account, agent-maintained repo; PRs,

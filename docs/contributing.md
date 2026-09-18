@@ -28,8 +28,8 @@ respectful and focused on reproducible behavior; harassment and disclosure of
 private data are not acceptable. Contributions are provided under the MIT
 license.
 
-The branch policy requires the four platform checks and resolved review threads.
-It does not require approval from a second account: this project is
+The branch policy requires the three CI checks and resolved review threads. It
+does not require approval from a second account: this project is
 agent-maintained and cannot assume another maintainer is available. Request
 independent review when available, especially for file writes and release
 automation. Passing CI is not a claim of human review.
@@ -55,9 +55,20 @@ site build, and regression/property/CLI tests. `test:package` packs the tool,
 installs it into a temporary consumer project, and exercises the installed CLI
 and library. It can require access to the npm registry.
 
-GitHub Actions verifies Linux with Node.js 22 and 24, plus macOS and Windows
-with Node.js 24. Keep changes scoped and describe remaining limitations in the
-pull request. Agent contributors should also read the repository's
+GitHub Actions runs the full `check` and dependency audit on Linux with
+Node.js 24. Linux with Node.js 22 and Windows with Node.js 24 run the build and
+tests; all three jobs verify the installed package. Linting, formatting checks,
+and documentation builds run once rather than on every platform. Superseded PR
+runs are canceled.
+
+Runtime dependencies have no OS-specific installation constraints. Development
+tooling does include native platform packages, but that alone does not justify
+repeating the full toolchain matrix. Windows coverage protects filesystem path
+handling and installed command behavior; it has already caught a path-alias
+regression. macOS is not a routine CI target.
+
+Keep changes scoped and describe remaining limitations in the pull request.
+Agent contributors should also read the repository's
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md).
 
 ## Write and preview documentation

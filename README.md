@@ -106,11 +106,12 @@ building the CLI before documentation checks and tests.
 
 `check` runs strict TypeScript checks, ESLint, Prettier for non-Markdown files,
 Markdown Tools for documentation, the VitePress site build, and
-regression/property/CLI tests. GitHub Actions runs checks on Linux with Node.js
-22 and 24, plus macOS and Windows with Node.js 24. Changes to formatting need
-tests for expected output, idempotence, and preserved semantics; defects should
-add a regression example. Keep fixes scoped and describe remaining limitations
-in the PR.
+regression/property/CLI tests. GitHub Actions runs full checks on Linux with
+Node.js 24, plus build and test coverage on Linux with Node.js 22 and Windows
+with Node.js 24. All three jobs verify the installed package. Changes to
+formatting need tests for expected output, idempotence, and preserved semantics;
+defects should add a regression example. Keep fixes scoped and describe
+remaining limitations in the PR.
 
 Agent contributors should read
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md)

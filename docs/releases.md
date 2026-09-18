@@ -42,7 +42,9 @@ change.
 
 The manual **Release** GitHub Actions workflow performs the same checks plus a
 dependency audit and uploads the artifact for 14 days. Leave `publish` false to
-prepare only. CI independently checks Linux, macOS, Windows, and Node.js 22/24.
+prepare only. CI runs full checks on Linux/Node.js 24, compatibility tests on
+Linux/Node.js 22 and Windows/Node.js 24, and installed-package checks on all
+three targets.
 
 ## Publication prerequisites
 
@@ -63,7 +65,7 @@ prerequisites rather than repeating the completed bootstrap:
    token is stored in GitHub.
 4. Restrict the GitHub `npm-release` environment to `main` and configure an
    approval gate if an independent approver is available. Verify branch rules
-   still require PRs and the four CI checks. The workflow uses Node.js 24 and
+   still require PRs and the three CI checks. The workflow uses Node.js 24 and
    checks that npm supports trusted publishing.
 5. Repository variable `NPM_PUBLISH_ENABLED` is `true` after verified trusted
    publisher setup. This enables the workflow's capability; it does not
