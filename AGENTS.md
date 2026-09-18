@@ -30,6 +30,10 @@ into tests, issues, or pull requests.
   logs.
 - Keep dependencies and generated state inside this repository. Commit the
   lockfile, not caches.
+- When updating `typescript-eslint`, recheck its TypeScript support and revisit
+  the TypeScript 7 ignore in `.github/dependabot.yml` (PR #3). Remove the ignore
+  once the upgrade installs and passes checks without bypassing peer
+  constraints.
 
 ## Git and attribution
 

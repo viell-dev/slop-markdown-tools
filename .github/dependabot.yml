@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Revisit when typescript-eslint supports TypeScript 7; see PR #3.
+    ignore:
+      - dependency-name: typescript
+        versions: ["7.x"]
     groups:
       development:
         dependency-type: development
