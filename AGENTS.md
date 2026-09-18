@@ -38,8 +38,11 @@ into tests, issues, or pull requests.
 ## Git and attribution
 
 Use focused commits and push completed work. Work on feature branches after
-bootstrap; stable releases must be changed through pull requests. Do not rewrite
-shared history. Force-add this file when needed because some development
+bootstrap. All changes to `main` go through pull requests, including version
+bumps, dependency updates, documentation, and agent instructions. This applies
+to prereleases as well as stable releases. Follow the release procedure linked
+from the README; preparing artifacts never authorizes publication. Do not
+rewrite shared history. Force-add this file when needed because some development
 environments globally ignore `AGENTS.md`.
 
 Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull

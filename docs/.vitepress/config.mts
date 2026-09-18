@@ -34,6 +34,7 @@ export default defineConfig({
         items: [
           { text: "Design and limitations", link: "/design" },
           { text: "Contributing and development", link: "/contributing" },
+          { text: "Releases", link: "/releases" },
         ],
       },
     ],

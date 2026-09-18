@@ -8,6 +8,7 @@ import { discover, writeAtomic } from "../src/workspace/files.js";
 import { loadConfig } from "../src/config/load.js";
 
 const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
+const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const temporary: string[] = [];
 async function fixture(files: Record<string, string>) {
   const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
@@ -114,8 +115,8 @@ describe("CLI", () => {
     expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("*fine*\n");
   });
   it("ships an executable CLI entry point", () => {
-    expect(execFileSync(process.execPath, [cli, "--version"], { encoding: "utf8" })).toMatch(
-      /^0\.1\.0-alpha\.1/,
+    expect(execFileSync(process.execPath, [cli, "--version"], { encoding: "utf8" }).trim()).toBe(
+      manifest.version,
     );
   });
 });

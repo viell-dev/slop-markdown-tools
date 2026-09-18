@@ -1,4 +1,4 @@
-# Markdown Tools
+# mdrefine — Markdown Tools
 
 Configurable linting and formatting for CommonMark, GitHub Markdown, and
 Obsidian. Separate `lint` and `format` commands share syntax, style settings,
@@ -31,7 +31,10 @@ current limitations. The Markdown source lives in `docs/`.
 The CLI requires Node.js 22.12 or newer. For development and the checkout setup
 below, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or newer; Node.js 24 LTS is
 preferred. This prerelease is distributed from the repository; it has not been
-published to the npm registry.
+published to the npm registry. The prepared package is `mdrefine@0.1.0-beta.1`;
+the executable remains `mdtools`. See the
+[release procedure](https://viell-dev.github.io/slop-markdown-tools/releases.html)
+for publication status, preparation, and authentication requirements.
 
 ```sh
 git clone https://github.com/viell-dev/slop-markdown-tools.git
@@ -57,6 +60,11 @@ formatted Markdown on stdout. Diagnostics use stderr unless `--json` requests a
 structured report.
 
 ## Contributions and verification
+
+All changes to `main` require a pull request and passing CI, including
+prerelease maintenance. Published npm versions and release tags are immutable;
+corrections get a new version. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[SECURITY.md](SECURITY.md) for contribution and vulnerability reporting.
 
 Issues and PRs from people and agents are welcome. For defects, include the
 version, command, configuration, minimal Markdown input, actual output, and

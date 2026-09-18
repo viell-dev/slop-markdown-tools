@@ -19,6 +19,21 @@ node dist/cli/main.js --help
 Run the commands below from that checkout. Replace `/path/to/documents` with
 your document folder; quoted paths work when a folder name contains spaces.
 
+## Install the beta after publication
+
+The prepared npm package is `mdrefine@0.1.0-beta.1`; it is not published yet.
+Once publication is announced, install it in your document workspace:
+
+```sh
+npm install --save-dev --save-exact mdrefine@0.1.0-beta.1
+npx --no-install mdtools --help
+```
+
+Use `npx --no-install mdtools` in place of `node dist/cli/main.js` in the
+checkout examples below. `--no-install` prevents fetching a different package
+when the executable is missing. The npm prerelease channel will be `beta`, not
+`latest`. The CLI runtime requires Node.js 22.12 or newer.
+
 ## Choose a configuration
 
 Create `mdtools.config.jsonc` in your document folder:

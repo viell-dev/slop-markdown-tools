@@ -1,13 +1,13 @@
 # Plugins and library API
 
-The public API is exported from `@viell-dev/markdown-tools`. Install the
-checkout as a local dependency while this prerelease is not on npm. The API is
-provisional until a stable release.
+The public API is exported from `mdrefine`. Install the checkout as a local
+dependency while this prerelease is not on npm. The API is provisional until a
+stable release.
 
 ## Library calls
 
 ```ts
-import { createWorkspace, format, lint } from "@viell-dev/markdown-tools";
+import { createWorkspace, format, lint } from "mdrefine";
 
 const files = {
   "note.md": "A *short* note with [a link](target.md).\n",
