@@ -106,6 +106,7 @@ would select one candidate; shortest-name/alias resolution is not a complete clo
 
 ## Suppressions
 
+<!-- prettier-ignore -->
 ```markdown
 <!-- mdtools-disable style/wrap -->
 
@@ -114,14 +115,14 @@ Keep the wrapping in this region.
 <!-- mdtools-enable style/wrap -->
 
 <!-- mdtools-disable-next-line style/emphasis -->
-
-Keep _this_ delimiter.
+Keep *this* delimiter.
 ```
 
 Omit rule names to disable all rules. A disabled region suppresses edits intersecting it; a
 paragraph spanning a disabled line is therefore preserved as a whole. An enable directive closes
 matching disabled regions; `enable` without names closes all. Directives inside code are ordinary
-code.
+code. `disable-next-line` targets the immediately following physical line, including a blank line;
+place it directly above the content to suppress.
 
 ## Selection, output, and exit codes
 
