@@ -147,6 +147,34 @@ describe("CLI", () => {
     });
     expect(run(root, ["lint", "."]).status).toBe(0);
   });
+  it("wraps a direct callout body on disk while retaining its header", async () => {
+    const header =
+      "> [!info]- A callout title that must remain entirely on its original physical line\n";
+    const source = `${header}> A body line that is long enough to be reflowed by the wrapper, so it should wrap.\n`;
+    const root = await fixture({
+      "mdtools.config.json": JSON.stringify({
+        extends: ["recommended", "obsidian"],
+        rules: {
+          "style/wrap": ["warn", { width: 60, reportUnreflowed: true, reportUnbreakable: true }],
+        },
+      }),
+      ".obsidian/app.json": '{"strictLineBreaks":true}',
+      "note.md": source,
+    });
+    const preview = run(root, ["format", "--json", "note.md"]);
+    expect(preview.status, preview.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    const applied = run(root, ["format", "--write", "--json", "note.md"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(
+      `${header}> A body line that is long enough to be reflowed by the\n> wrapper, so it should wrap.\n`,
+    );
+    const findings = JSON.parse(applied.stdout).files[0].diagnostics;
+    expect(findings).toHaveLength(1);
+    expect(findings[0].line).toBe(1);
+    expect(findings[0].message).toContain("unbreakable atom");
+    expect(run(root, ["format", "--check", "note.md"]).status).toBe(0);
+  });
   it("does not partially apply a batch when a formatter safety check fails", async () => {
     const root = await fixture({
       "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/bad":"warn"}}',
