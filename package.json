@@ -26,7 +26,7 @@
   },
   "files": [
     "dist",
-    "docs",
+    "docs/*.md",
     "examples",
     "README.md",
     "LICENSE"
@@ -43,13 +43,16 @@
     "format:docs": "run-s build format:docs:write",
     "format:docs:check": "run-s build lint:docs format:docs:verify",
     "format:check": "run-p format:code:check format:docs:check",
-    "check": "npm-run-all --parallel typecheck lint format:check --sequential test",
+    "check": "npm-run-all --parallel typecheck lint format:check docs:build --sequential test",
     "prepack": "npm run build",
     "test:package:installed": "node scripts/package-smoke.mjs",
     "format:docs:write": "node dist/cli/main.js format --write",
     "lint:docs": "node dist/cli/main.js lint --max-warnings 0",
     "format:docs:verify": "node dist/cli/main.js format --check",
-    "format:code:check": "prettier --check ."
+    "format:code:check": "prettier --check .",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "ajv": "8.20.0",
@@ -81,6 +84,8 @@
     "prettier": "3.9.8",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
+    "vitepress": "1.6.4",
     "vitest": "5.0.1"
-  }
+  },
+  "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }

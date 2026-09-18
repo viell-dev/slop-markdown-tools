@@ -1,0 +1,26 @@
+:root {
+  --vp-c-brand-1: #12776c;
+  --vp-c-brand-2: #0f655c;
+  --vp-c-brand-3: #12776c;
+  --vp-c-brand-soft: rgba(18, 119, 108, 0.12);
+  --vp-home-hero-name-color: var(--vp-c-brand-1);
+  --vp-button-brand-bg: #12776c;
+  --vp-button-brand-hover-bg: #0f655c;
+  --vp-button-brand-active-bg: #0c534b;
+}
+
+.dark {
+  --vp-c-brand-1: #79daca;
+  --vp-c-brand-2: #a1e9dd;
+  --vp-c-brand-3: #12776c;
+  --vp-c-brand-soft: rgba(121, 218, 202, 0.12);
+}
+
+.VPHome .VPHomeHero {
+  background: radial-gradient(ellipse at 80% 0, var(--vp-c-brand-soft), transparent 65%);
+}
+
+.VPHome .vp-doc {
+  max-width: 880px;
+  margin: 0 auto;
+}

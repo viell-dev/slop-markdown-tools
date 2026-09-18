@@ -17,6 +17,15 @@ expected output. Remove private content before posting examples. Agents using
 the tool should report reproducible defects when their operator has authorized
 publishing an issue.
 
+## Documentation
+
+Read the
+[quick start](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
+or browse the
+[documentation site](https://viell-dev.github.io/slop-markdown-tools/). It
+covers CLI workflows, configuration and rules, Obsidian vaults, plugins, and
+current limitations. The Markdown source lives in `docs/`.
+
 ## Getting started
 
 The CLI requires Node.js 22.12 or newer. For development and the checkout setup
@@ -47,67 +56,6 @@ for file inputs and writes only with `--write`. For stdin, `format -` returns
 formatted Markdown on stdout. Diagnostics use stderr unless `--json` requests a
 structured report.
 
-## Configuration
-
-Place `mdtools.config.jsonc`, `mdtools.config.json`, or `mdtools.config.mjs` in
-the document workspace, or supply `--config`. For example:
-
-```jsonc
-{
-  "extends": ["recommended", "github"],
-  "rules": {
-    "style/wrap": ["warn", { "width": 80 }],
-    "style/emphasis": ["warn", { "marker": "_" }],
-    "style/strong": ["warn", { "marker": "*" }],
-  },
-  "ignore": ["vendor/**", "**/*.external.md"],
-}
-```
-
-Use `"obsidian"` instead of `"github"` for a vault. The Obsidian profile
-understands wikilinks, embeds, callouts, heading references, and block
-references. It reads `.obsidian/app.json` to verify `strictLineBreaks: true`
-before reflowing prose, and never changes Obsidian settings itself.
-
-Only enabled rules govern formatting. Setting a rule to `"off"` preserves its
-syntax choices; an explicit `"extends": []` starts with no enabled rules. An
-omitted `extends` selects `recommended`. Dialect profiles and presentation
-choices are separate: selecting `--dialect obsidian` changes parsing, while the
-`obsidian` preset also enables its associated rules.
-
-```sh
-mdtools config explain notes/example.md
-mdtools rules
-```
-
-See [configuration and rules](docs/configuration.md) for presets, path
-overrides, link policies, suppression comments, and exit codes. See
-[plugins and library API](docs/plugins.md) for custom rules, presets, and syntax
-extensions.
-
-## Supported behavior
-
-- Reflow paragraphs and simple list/quote containers while protecting links,
-  code, math, and explicit hard breaks. Unbreakable atoms may exceed the
-  configured width.
-- Normalize emphasis delimiters, table alignment, ATX headings, completed task
-  markers, and GitHub/Obsidian callout marker casing when the corresponding
-  rules are enabled.
-- Validate local link destinations, GitHub heading slugs, and Obsidian
-  heading/block references.
-- Rewrite verified link paths, angle brackets, Markdown extensions, and eligible
-  Markdown/wikilink notation without guessing missing or ambiguous targets.
-- Load JavaScript rule plugins and shared presets; apply rules selectively by
-  file pattern.
-- Return JSON diagnostics suitable for agents and automation.
-
-The formatter compares parsed meaning before and after edits, rejects
-overlapping edits and nonconvergent rules, and leaves a document unchanged if
-its safety check fails. File writes use atomic replacement and check for
-concurrent modification. These checks are regression safeguards, not a proof of
-identical rendering in every Markdown application. See
-[design and limitations](docs/design.md).
-
 ## Contributions and verification
 
 Issues and PRs from people and agents are welcome. For defects, include the
@@ -133,17 +81,31 @@ from documentation passes.
 building the CLI before documentation checks and tests.
 
 `check` runs strict TypeScript checks, ESLint, Prettier for non-Markdown files,
-Markdown Tools for documentation, the build, and regression/property/CLI tests.
-GitHub Actions runs checks on Linux with Node.js 22 and 24, plus macOS and
-Windows with Node.js 24. Changes to formatting need tests for expected output,
-idempotence, and preserved semantics; defects should add a regression example.
-Keep fixes scoped and describe remaining limitations in the PR.
+Markdown Tools for documentation, the VitePress site build, and
+regression/property/CLI tests. GitHub Actions runs checks on Linux with Node.js
+22 and 24, plus macOS and Windows with Node.js 24. Changes to formatting need
+tests for expected output, idempotence, and preserved semantics; defects should
+add a regression example. Keep fixes scoped and describe remaining limitations
+in the PR.
 
 Agent contributors should read
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md)
 for maintenance-specific instructions. `test:package` packs and installs a
 temporary consumer project, then exercises the installed CLI and library; it can
 require access to the npm registry.
+
+## Documentation website
+
+```sh
+npm run docs:dev
+npm run docs:build
+npm run docs:preview
+```
+
+VitePress renders `docs/`; Markdown Tools formats its Markdown sources. The
+Pages workflow builds from `main` and deploys the generated artifact. No
+publishing branch or committed build output is needed. See the
+[documentation workflow](https://viell-dev.github.io/slop-markdown-tools/contributing.html#write-and-preview-documentation).
 
 ## License
 

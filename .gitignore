@@ -4,3 +4,5 @@ coverage/
 .npm-cache/
 *.tgz
 *.tsbuildinfo
+docs/.vitepress/cache/
+docs/.vitepress/*.timestamp-*.mjs
