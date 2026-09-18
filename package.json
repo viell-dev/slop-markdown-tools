@@ -1,13 +1,13 @@
 {
-  "name": "@viell-dev/markdown-tools",
-  "version": "0.1.0-alpha.1",
+  "name": "mdrefine",
+  "version": "0.1.0-beta.1",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, and Obsidian",
   "type": "module",
   "license": "MIT",
   "author": "viell",
   "repository": {
     "type": "git",
-    "url": "https://github.com/viell-dev/slop-markdown-tools.git"
+    "url": "git+https://github.com/viell-dev/slop-markdown-tools.git"
   },
   "bugs": {
     "url": "https://github.com/viell-dev/slop-markdown-tools/issues"
@@ -16,7 +16,12 @@
     "node": ">=22.12.0"
   },
   "bin": {
-    "mdtools": "./dist/cli/main.js"
+    "mdtools": "dist/cli/main.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "beta"
   },
   "exports": {
     ".": {
@@ -27,8 +32,11 @@
   "files": [
     "dist",
     "docs/*.md",
+    "docs/releases/*.md",
     "examples",
     "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "scripts": {
@@ -52,7 +60,9 @@
     "format:code:check": "prettier --check .",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "release:prepare": "run-s check release:pack",
+    "release:pack": "node scripts/package-smoke.mjs --retain"
   },
   "dependencies": {
     "ajv": "8.20.0",
@@ -84,7 +94,7 @@
     "prettier": "3.9.8",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
-    "vitepress": "1.6.4",
+    "vitepress": "2.0.0-alpha.20",
     "vitest": "5.0.1"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"

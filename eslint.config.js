@@ -8,6 +8,7 @@ export default tseslint.config(
       "node_modules/**",
       ".npm-cache/**",
       "coverage/**",
+      "artifacts/**",
       "docs/.vitepress/cache/**",
       "docs/.vitepress/*.timestamp-*.mjs",
     ],

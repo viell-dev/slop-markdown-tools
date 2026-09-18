@@ -19,6 +19,28 @@ Document corruption and changed rendering take priority over new style options.
 Fixes should include a synthetic regression example, preserve meaning, and
 verify that a second formatting pass leaves the output unchanged.
 
+## Pull requests and compatibility
+
+All changes to `main` require a pull request and passing CI. This includes
+prereleases, version bumps, documentation, and dependency updates. Do not push
+directly, bypass required checks, or rewrite shared history. Keep discussion
+respectful and focused on reproducible behavior; harassment and disclosure of
+private data are not acceptable. Contributions are provided under the MIT
+license.
+
+The branch policy requires the four platform checks and resolved review threads.
+It does not require approval from a second account: this project is
+agent-maintained and cannot assume another maintainer is available. Request
+independent review when available, especially for file writes and release
+automation. Passing CI is not a claim of human review.
+
+The beta API and configuration may change; record changes in versioned release
+notes and explain migration steps for incompatible behavior. Once published,
+versions and release tags are never replaced. Follow the
+[release procedure](releases.md) for preparation and publication. Security
+reports belong in the private channel described in
+[SECURITY.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
+
 ## Develop locally
 
 Follow the [checkout setup](quick-start.md#install-from-the-repository), then:
@@ -41,8 +63,10 @@ pull request. Agent contributors should also read the repository's
 ## Write and preview documentation
 
 The site source lives in `docs/` on `main`. Edit these Markdown files directly;
-VitePress supplies navigation, local search, and rendering. Markdown Tools
-formats and lints the site's own Markdown at its default 80-column width.
+VitePress supplies navigation, local search, and rendering. The site uses
+VitePress 2 alpha because the stable 1.6 line currently retains vulnerable
+development dependencies; site builds are verified in CI. Markdown Tools formats
+and lints the site's own Markdown at its default 80-column width.
 
 ```sh
 npm run format:docs

@@ -54,6 +54,11 @@ describe("formatting contracts", () => {
       "---\ntitle: '*unchanged*'\n---\n\n```md\n*code* and [link](missing.md)\n```\n\nAn explicit break.  \nAnother line.\n\n<div>\n*raw*\n</div>\n";
     expect(formatted(source)).toBe(source);
   });
+  it.each(["\n", "\r\n"])("preserves multiline inline code during reflow (%j)", (newline) => {
+    const source = `Keep this paragraph and its long command \`first line${newline}second line\` intact.${newline}`;
+    expect(formatted(source, { config: narrow })).toBe(source);
+    expect(lint(source, { config: narrow })).toEqual([]);
+  });
   it("does not lint links in multi-backtick code spans", () => {
     const source = "``[link](missing.md)``\n";
     const workspace = createWorkspace({ "note.md": source });

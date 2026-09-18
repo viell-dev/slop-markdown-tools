@@ -87,7 +87,7 @@ const wrap: Rule = {
           // Preserve escaping and entities. Split only ordinary source whitespace.
           words.push(...value.split(/([ \t]+)/).filter(Boolean));
         } else {
-          if (raw.includes("\n") && child.type !== "inlineCode") unsupported = true;
+          if (raw.includes("\n")) unsupported = true;
           words.push(value);
         }
       }
