@@ -222,7 +222,7 @@ describe("Obsidian callout overflow", () => {
   it("keeps body overflow separate from title overflow", () => {
     for (const reportUnreflowed of [false, true]) {
       for (const reportUnbreakable of [false, true]) {
-        const source = `> ${title}\n> A long body with ordinary words that remains protected by the callout header for now.\n`;
+        const source = `> ${title}\n> A long body with ordinary words that remains protected by a hard line break.  \n> Next line.\n`;
         const options = {
           config: {
             ...wrap({ width: 60, reportUnreflowed, reportUnbreakable }),
@@ -232,11 +232,11 @@ describe("Obsidian callout overflow", () => {
         };
         const diagnostics = lint(source, options);
         expect(diagnostics.map((item) => item.message)).toEqual([
-          ...(reportUnreflowed
-            ? ["Paragraph not reflowed: callout header (width 60 columns)."]
-            : []),
           ...(reportUnbreakable
             ? ["Paragraph exceeds 60 columns because of an unbreakable atom."]
+            : []),
+          ...(reportUnreflowed
+            ? ["Paragraph not reflowed: hard line break (width 60 columns)."]
             : []),
         ]);
         expect(format(source, options).output).toBe(source);

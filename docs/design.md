@@ -32,11 +32,13 @@ preservation. Tests use synthetic documents, deterministic property checks, and
 filesystem/CLI integration cases, including the list-collapse failure that
 motivated replacing heuristic reflow.
 
-Obsidian callout headers remain intact; their body paragraphs can reflow when
-supported. Highlight, comment, math, code, HTML, and front-matter contents are
-preserved. Standalone Obsidian comment blocks may span blank lines. Inline
-comments spanning multiple paragraphs are not fully modeled; suppress formatting
-around those constructs or use standalone comment blocks.
+Obsidian callout headers remain intact; supported body prose can reflow directly
+below the header or in later paragraphs. The semantic fingerprint also protects
+the title/body boundary. Lazy quote continuations and inline syntax spanning
+that boundary remain untouched. Highlight, comment, math, code, HTML, and
+front-matter contents are preserved. Standalone Obsidian comment blocks may span
+blank lines. Inline comments spanning multiple paragraphs are not fully modeled;
+suppress formatting around those constructs or use standalone comment blocks.
 
 The source-preserving wrapper supports ordinary paragraphs, list items, and
 blockquote containers. It preserves explicit hard-break paragraphs, lazy/unusual

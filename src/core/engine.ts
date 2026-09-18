@@ -1,7 +1,7 @@
 import { Ajv } from "ajv";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
-import { parse } from "../syntax/parse.js";
+import { parse, range } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
@@ -164,6 +164,18 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
       };
     }
     const result: Record<string, unknown> = {};
+    if (calloutHeader && document.dialect === "obsidian" && node.type === "paragraph") {
+      const [start, end] = range(node);
+      const header = document.source.slice(start, end).split(/\r?\n/, 1)[0]!;
+      if (/^\[![\w-]+\]/.test(header)) {
+        // CommonMark merges title and body into one paragraph. Preserve their boundary too.
+        const title = header.replace(
+          /^\[!([\w-]+)\]/,
+          (_, marker: string) => `[!${marker.toLowerCase()}]`,
+        );
+        result.calloutTitle = normalize(parse(title, document.dialect, document.path).tree);
+      }
+    }
     for (const [key, value] of Object.entries(node)) {
       if (key === "position" || key === "data") continue;
       if (key === "children" && "children" in node) {

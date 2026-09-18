@@ -84,18 +84,48 @@ const wrap: Rule = {
       options.measure === "codepoints" ? (text: string) => [...text].length : stringWidth;
     const unit = options.measure === "codepoints" ? "code points" : "columns";
     visit(document.tree, "paragraph", (node, index, parent) => {
-      const [start, end] = range(node);
-      const original = document.source.slice(start, end);
-      const calloutHeader =
+      const [paragraphStart, end] = range(node);
+      let start = paragraphStart;
+      let original = document.source.slice(start, end);
+      let children = node.children;
+      let calloutHeader =
         document.dialect === "obsidian" &&
         parent?.type === "blockquote" &&
         index === 0 &&
         /^\[![\w-]+\]/.test(original);
       const lineStart = document.source.lastIndexOf("\n", start - 1) + 1;
-      const prefix = document.source.slice(lineStart, start);
+      let prefix = document.source.slice(lineStart, start);
       const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
         " ".repeat(value.length),
       );
+      if (calloutHeader) {
+        const newline = original.indexOf("\n");
+        const headerEnd = newline < 0 ? end : start + newline;
+        const header = document.source.slice(start, headerEnd).replace(/\r$/, "");
+        const bodyStart = headerEnd + 1 + continuation.length;
+        const bodyLines = newline < 0 ? [] : original.slice(newline + 1).split(/\r?\n/);
+        const supported =
+          bodyLines.every((line) => line.startsWith(continuation)) &&
+          !children.some((child) => {
+            const [a, b] = range(child);
+            return child.type !== "text" && a < bodyStart && b > bodyStart;
+          });
+        // Keep unusual continuations and inline syntax spanning the boundary untouched.
+        if (supported) {
+          if (options.reportUnbreakable === true && measure(prefix + header) > width)
+            findings.push({
+              start,
+              end: start + header.length,
+              message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
+            });
+          if (newline < 0) return;
+          start = bodyStart;
+          original = document.source.slice(start, end);
+          children = children.filter((child) => range(child)[1] > start);
+          prefix = continuation;
+          calloutHeader = false;
+        }
+      }
       const reportUnbreakable = () =>
         findings.push({
           start,
@@ -124,13 +154,10 @@ const wrap: Rule = {
             continue;
           }
           const words: string[] = [];
-          while (
-            childIndex < node.children.length &&
-            range(node.children[childIndex]!)[1] <= offset
-          )
+          while (childIndex < children.length && range(children[childIndex]!)[1] <= offset)
             childIndex++;
-          for (let i = childIndex; i < node.children.length; i++) {
-            const child = node.children[i]!;
+          for (let i = childIndex; i < children.length; i++) {
+            const child = children[i]!;
             const [a, b] = range(child);
             if (a >= offset + content.length) break;
             if (child.type === "break") continue;
@@ -157,9 +184,9 @@ const wrap: Rule = {
           });
         if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
       };
-      const reason = node.children.some((child) => child.type === "break")
+      const reason = children.some((child) => child.type === "break")
         ? "hard line break"
-        : node.children.some((child) => child.type === "html")
+        : children.some((child) => child.type === "html")
           ? "inline HTML"
           : /^\[![^\]]+\]/.test(original)
             ? "callout header"
@@ -174,9 +201,9 @@ const wrap: Rule = {
       }
       const words: string[] = [];
       let unsupported = false;
-      for (const child of node.children) {
+      for (const child of children) {
         const [a, b] = range(child);
-        const raw = document.source.slice(a, b);
+        const raw = document.source.slice(Math.max(a, start), b);
         const lines = raw.split(/\r?\n/);
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i]!;

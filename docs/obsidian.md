@@ -34,6 +34,18 @@ and never edits the settings file itself.
 If that setting is not appropriate for your vault, disable `style/wrap`. Other
 enabled rules can still run.
 
+## Wrap callout bodies
+
+With strict line breaks verified, `style/wrap` reflows supported body prose even
+when it directly follows the callout header without a blank quote line. The
+header stays on its original physical line, including its title and folding
+marker. Existing quote and list-container prefixes are retained.
+
+Hard breaks, block IDs, inline HTML, and unsupported multiline syntax still
+protect body paragraphs. Lazy or inconsistent quote continuations and inline
+syntax spanning the title/body boundary remain untouched. Long headers follow
+`reportUnbreakable`; skipped breakable body prose follows `reportUnreflowed`.
+
 ## Choose link policies deliberately
 
 The recommended preset validates local links. To normalize verified destinations
