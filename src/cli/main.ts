@@ -8,7 +8,7 @@ import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
 import { discover, writeAtomic } from "../workspace/files.js";
-import { gitSelection, excludeSelection } from "../workspace/selection.js";
+import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
 import type { Diagnostic, Dialect, ProcessOptions } from "../core/types.js";
 
@@ -22,8 +22,6 @@ interface Flags {
   write?: boolean;
   stdinFilepath?: string;
   maxWarnings?: number;
-  changed?: boolean;
-  staged?: boolean;
   exclude?: string[];
 }
 const manifest = JSON.parse(
@@ -38,8 +36,6 @@ function common(command: Command): Command {
     .option("--config <file>", "Explicit JSON, JSONC, or .mjs configuration")
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option("--dialect <dialect>", "commonmark, github, or obsidian")
-    .option("--changed", "Select files changed from HEAD, including untracked files")
-    .option("--staged", "Select staged paths, processing their working-tree contents")
     .option(
       "--exclude <path>",
       "Exclude an exact file or directory (repeatable)",
@@ -68,10 +64,6 @@ interface Report {
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
     throw new Error("Choose only one of --check, --diff, and --write.");
-  if ((flags.changed && flags.staged) || ((flags.changed || flags.staged) && inputs.length))
-    throw new Error(
-      "--changed and --staged are mutually exclusive and cannot be combined with explicit paths.",
-    );
   if (inputs.includes("-") && flags.exclude?.length)
     throw new Error("--exclude cannot be combined with stdin.");
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
@@ -82,10 +74,6 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
   const set = await discover(root, stdin ? [] : inputs, resolved.ignore, resolved.resolve);
-  if (flags.changed || flags.staged) {
-    const selected = await gitSelection(set.root, flags.staged === true);
-    set.selected = set.selected.filter((name) => selected.has(name));
-  }
   set.selected = await excludeSelection(set.root, set.selected, flags.exclude ?? []);
   if (stdin) {
     const name = path

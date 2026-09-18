@@ -57,79 +57,41 @@ Problem rules report findings and never become formatting edits.
 
 ## Built-in rules
 
-| Rule                          | Kind    | Options                                                                                     |
-| ----------------------------- | ------- | ------------------------------------------------------------------------------------------- |
-| `style/wrap`                  | Style   | `width`, `measure`, `keepLabelWithAtom`, `reportUnreflowed`, `reportUnbreakable`; see below |
-| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                                                    |
-| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                                              |
-| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                                              |
-| `style/final-newline`         | Style   | None; adds a missing final newline                                                          |
-| `style/table`                 | Style   | None; aligns top-level GFM tables                                                           |
-| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                                              |
-| `links/valid`                 | Problem | None; local files and heading/block fragments                                               |
-| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below                                   |
-| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                                                |
-| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                                                   |
-| `github/alert-marker`         | Style   | None; known GitHub alert types become uppercase                                             |
-| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                                               |
-| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                                                |
-| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                                        |
-
-The following report-only rules are also available; none is enabled by a preset:
-
-| Rule                               | Options                                                          |
-| ---------------------------------- | ---------------------------------------------------------------- |
-| `structure/initial-heading`        | None; first content block must be a level-1 heading              |
-| `structure/title-matches-filename` | `ignore`: filename or stem glob patterns                         |
-| `structure/metadata-line`          | Required `pattern` regex string; optional `afterCallout` boolean |
-| `style/accidental-marker`          | None; heuristic for a block marker immediately after prose       |
+| Rule                          | Kind    | Options                                                                |
+| ----------------------------- | ------- | ---------------------------------------------------------------------- |
+| `style/wrap`                  | Style   | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`; see below |
+| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                               |
+| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                         |
+| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                         |
+| `style/final-newline`         | Style   | None; adds a missing final newline                                     |
+| `style/table`                 | Style   | None; aligns top-level GFM tables                                      |
+| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                         |
+| `links/valid`                 | Problem | None; local files and heading/block fragments                          |
+| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below              |
+| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
+| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
+| `github/alert-marker`         | Style   | None; known GitHub alert types become uppercase                        |
+| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
+| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
+| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
 
 ## Document structure
 
-Enable these rules explicitly with severity `warn` or `error`. They never change
-content. Use path `overrides` to exempt generated documents or trees with
-different conventions.
+Enable `structure/initial-heading` explicitly with severity `warn` or `error`;
+no preset enables it. It accepts no options and reports problems without
+changing content. Use path `overrides` to exempt generated documents or trees
+with different conventions.
 
 `structure/initial-heading` skips YAML/TOML front matter and requires a level-1
 heading as the first content block. Both ATX and Setext headings count; use
 `style/heading` separately to require ATX spelling. Empty documents are
 reported. Comments and other content before the title are not skipped.
 
-`structure/title-matches-filename` compares the rendered text of the first
-top-level level-1 heading with the filename without its extension, including
-case. A missing title is reported. `ignore: ["README", "CHANGELOG.*"]` matches
-filename stems or complete filenames, without regard to their directory. This
-rule does not enforce a single H1; it checks the title.
-
-`structure/metadata-line` requires one standalone paragraph matching `pattern`
-immediately after the initial level-1 heading, ignoring blank lines. Patterns
-are JavaScript regex strings without flags; anchor them with `^` and `$` for
-whole-line matching. For example:
-
-```jsonc
-{
-  "rules": {
-    "structure/metadata-line": ["error", {
-      "pattern": "^\\*\\*Updated:\\*\\* \\d{4}-\\d{2}-\\d{2}$",
-      "afterCallout": true,
-    }],
-  },
-}
-```
-
-With `afterCallout: true`, one Obsidian callout immediately following the title
-may precede the metadata. The default is false. Missing, duplicate, misplaced,
-and non-standalone matches in paragraph source lines are reported. Code blocks,
-comments, and front matter do not count as metadata. This validates placement
-and spelling only; it does not update dates or validate calendar dates.
-
-`style/accidental-marker` flags a top-level list, ATX heading, or blockquote
-starting on the physical line immediately after an unindented paragraph that
-does not end in a colon. Blank-separated blocks, indented blocks, and nested
-list/quote containers are excluded. This is an intent heuristic: intentional
-adjacent blocks may be reported. Add a blank line or suppress the rule when the
-block is intentional; review and rejoin the sentence yourself if it resulted
-from accidental wrapping. No automatic repair is proposed.
+Filename/title matching, metadata placement, and guesses about accidental
+Markdown markers are consumer policies. Implement those checks through
+[rule plugins](plugins.md#rule-plugins), which receive the document source,
+parsed tree, and path. Modified-date updates belong in a consumer wrapper or
+library workflow; formatting rules must preserve document meaning.
 
 ## Wrapping and inline code
 
@@ -137,12 +99,6 @@ from accidental wrapping. No automatic repair is proposed.
 `measure: "columns"` (display columns). Set `measure: "codepoints"` to count
 Unicode scalar values instead; astral characters count once and combining marks
 count separately. Container prefixes count toward the width in either mode.
-
-`keepLabelWithAtom: true` keeps a short list-item label ending in a colon with
-an immediately following link, image, or code span when that atom cannot fit on
-a continuation line either. Labels are limited to four words and at most 40
-units or half the configured width. Following prose wraps normally. This option
-defaults to false.
 
 `reportUnreflowed: true` reports over-width paragraphs protected by hard breaks,
 block IDs, inline HTML, callout headers, or unsupported multiline syntax or

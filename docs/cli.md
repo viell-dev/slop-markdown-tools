@@ -19,22 +19,17 @@ honors `.gitignore` and configuration ignore patterns, skips symlinks and nested
 repositories, and does not expand path globs itself. See the
 [selection details](configuration.md#selection-output-and-exit-codes).
 
-Use Git selections to process modified Markdown while resolving links against
-the full workspace:
+Use a caller or Git hook to choose changed or staged paths and pass them as
+explicit file arguments. The CLI processes working-tree contents, not the Git
+index. Pass paths as separate arguments (after `--` when they could begin with
+`-`), retain `--root` for workspace-wide link resolution, and skip the
+invocation when the selection is empty: no file arguments means the whole
+workspace.
 
 ```sh
-node dist/cli/main.js lint --changed --exclude generated
-node dist/cli/main.js format --staged --diff
-node dist/cli/main.js format --changed --exclude notes/archive.md --exclude vendor --write
+node dist/cli/main.js lint --exclude generated
+node dist/cli/main.js format --exclude notes/archive.md --exclude vendor --diff
 ```
-
-`--changed` selects working-tree changes relative to `HEAD`, including untracked
-non-ignored files. `--staged` selects paths changed in the Git index. Both
-process current working-tree contents, and `--write` never changes the Git
-index; review and stage the result yourself, especially for partially staged
-files. Deleted paths and non-Markdown files are omitted. A repository without a
-first commit is supported. Git flags require Git, cannot be combined with each
-other or explicit input paths, and an empty selection processes zero files.
 
 Repeat `--exclude <path>` to omit exact files or directory subtrees from any
 file selection. Exclusions are literal paths relative to the current directory
