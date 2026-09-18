@@ -35,7 +35,7 @@ into tests, issues, or pull requests.
   once the upgrade installs and passes checks without bypassing peer
   constraints.
 
-## Git and attribution
+## Git workflow
 
 Use focused commits and push completed work. Work on feature branches after
 bootstrap. All changes to `main` go through pull requests, including version
@@ -44,6 +44,82 @@ to prereleases as well as stable releases. Follow the release procedure linked
 from the README; preparing artifacts never authorizes publication. Do not
 rewrite shared history. Force-add this file when needed because some development
 environments globally ignore `AGENTS.md`.
+
+Merge PRs with a merge commit (`gh pr merge --merge --match-head-commit SHA`)
+after checking the exact PR head. Squash and rebase merging are disabled to
+preserve commit history and attribution. GitHub deletes merged source branches;
+switch back to `main` and fast-forward the local checkout before new work. Do
+not use administrator bypass or weaken protections to merge a failing PR.
+
+When closing a PR, delete its source branch by default, including rejected or
+superseded PRs. Preserve it only when the operator asks or other active work
+depends on it. Check open PRs before deleting branches; never delete `main` or
+another contributor's fork branch. Prune stale tracking refs and remove local
+task branches after their work is merged or deliberately abandoned.
+
+The active main and version-tag policies are recorded in `.github/rulesets/`.
+Keep those files and GitHub settings synchronized. Required checks bind to the
+four `verify (OS, NODE)` job names in `ci.yml` and GitHub Actions app 15368;
+renaming a job or changing the matrix requires updating the ruleset. CI runs for
+PRs and pushes to `main`, avoiding duplicate feature-branch runs. Zero required
+approvals is deliberate for a single-account, agent-maintained repo; PRs,
+passing checks, and resolved review threads remain mandatory.
+
+## Technical map
+
+- TypeScript ESM compiles with `tsc`; the package exports `dist/index.js` and
+  the `mdtools` executable at `dist/cli/main.js`. npm package, CLI, and config
+  names intentionally differ: `mdrefine`, `mdtools`, and `mdtools.config.*`.
+- `src/syntax/` owns micromark/mdast parsing and Obsidian extensions;
+  `src/config/` resolves presets, schemas, overrides, and trusted plugins.
+  `src/core/` executes rules and validates edits; `src/workspace/` resolves
+  local targets and handles discovery and atomic writes. Rules propose edits;
+  they do not write files directly.
+- Formatting applies inline, block, then document phases. Semantic fingerprints,
+  overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
+  rather than weakening the guard; preserve unsupported constructs, including
+  multiline inline code. Obsidian reflow needs verified strict line breaks.
+- Follow the README for development commands. Markdown uses this tool at 80
+  columns; Prettier excludes Markdown. VitePress builds the public docs from
+  `main`; do not commit its cache or generated site. VitePress 2 is pinned to an
+  alpha to avoid the Vite 5 vulnerabilities in the older stable line.
+
+## Release operations
+
+Follow [the release procedure](docs/releases.md) for commands and prerequisites.
+`0.1.0-beta.1` is already published and tagged; never rerun publication with
+that version. Update version metadata, the lockfile, release notes, and relevant
+examples together through a PR for each new release. Use exact SemVer tags
+without a `v` prefix, pointing to the tested merge commit.
+
+The npm trusted publisher is configured for `viell-dev/slop-markdown-tools`,
+`release.yml`, and environment `npm-release`, with direct publish permission.
+`NPM_PUBLISH_ENABLED=true` is a capability gate, not standing authorization to
+publish. The workflow still requires explicit dispatch with `publish=true`, the
+exact version, and the actual agent identity. Verify live settings when
+releasing; configuration was verified on 2026-09-18, but an end-to-end OIDC
+publication has not yet occurred. Do not store an npm token in GitHub.
+
+`npm run release:prepare` verifies and retains a tarball, manifest, and checksum
+in ignored `artifacts/`. Local artifacts are snapshots: regenerate after changes
+and compare registry integrity after publication. Never rebuild a replacement
+asset for an existing release. GitHub release immutability applies to releases
+created after it was enabled; beta.1 predates it, though its tag is protected.
+Upload all assets before publishing a future release. If npm succeeds but GitHub
+fails, finish only the missing GitHub step at the same source commit.
+
+During beta.1's first publication npm assigned `latest` despite `--tag beta`;
+authenticated removal returned E400. The owner explicitly accepted both tags. Do
+not retry removing `latest`, deprecate beta.1, or publish a placeholder to work
+around it. Future betas still use `--tag beta`; report unexpected registry
+behavior without guessing. Local publication did not produce OIDC provenance.
+
+With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
+`artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may
+be keyed by package name instead of an array. Test the installed command shim
+and public TypeScript declarations with `test:package`, not just the source CLI.
+
+## Attribution
 
 Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull
 requests, and other published prose, end with

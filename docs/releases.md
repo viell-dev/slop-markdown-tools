@@ -17,6 +17,12 @@ this repository or its documentation does not imply publication. Check
 [GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases) for
 release announcements and downloadable artifacts.
 
+The initial beta was published locally under npm account `viell`. npm assigned
+both `beta` and `latest` to `0.1.0-beta.1` despite an explicit `--tag beta`;
+removing `latest` returned E400. Both tags were accepted for that release.
+Continue using `--tag beta` for subsequent betas and verify tags after
+publishing.
+
 ## Prepare without publishing
 
 Use Node.js 24 and npm 10 or newer from a clean checkout:
@@ -41,7 +47,8 @@ prepare only. CI independently checks Linux, macOS, Windows, and Node.js 22/24.
 ## Publication prerequisites
 
 Publication requires explicit operator authorization. Preparing a PR or artifact
-does not supply that authorization. Before the first publication:
+does not supply that authorization. For subsequent releases, verify these
+prerequisites rather than repeating the completed bootstrap:
 
 1. Merge the release PR with all required checks passing. Review the tarball
    manifest, release notes, version, and registry name again.
@@ -58,8 +65,14 @@ does not supply that authorization. Before the first publication:
    approval gate if an independent approver is available. Verify branch rules
    still require PRs and the four CI checks. The workflow uses Node.js 24 and
    checks that npm supports trusted publishing.
-5. Only after authorization and authentication setup, set repository variable
-   `NPM_PUBLISH_ENABLED` to `true`. It is disabled during preparation.
+5. Repository variable `NPM_PUBLISH_ENABLED` is `true` after verified trusted
+   publisher setup. This enables the workflow's capability; it does not
+   authorize a release. Preparation uses `publish: false` regardless of this
+   variable's value.
+
+Trusted-publisher settings were verified on 2026-09-18. The first release used
+local authentication and has no OIDC provenance; the first future workflow
+publication will verify the OIDC path end to end.
 
 ## Publish an authorized beta
 
@@ -69,7 +82,8 @@ builds and checks the package again, verifies the artifact checksum, publishes
 that tarball to npm's `beta` channel with provenance, and creates a GitHub
 prerelease at the workflow's commit. Tags use exact versions without a `v`
 prefix. Stable publication deliberately needs a separate policy change; this
-workflow accepts only beta versions and never assigns npm's `latest` tag.
+workflow accepts only beta versions and requests the `beta` tag. See the
+initial-publication exception above before interpreting `latest`.
 
 For an authenticated first publication that cannot use OIDC yet, use the exact
 reviewed tarball with `npm publish <tarball> --ignore-scripts --access public
@@ -84,6 +98,12 @@ artifact and finish only the missing GitHub step at the same commit. Published
 versions, tags, and release assets must never be overwritten; corrections use a
 new version. The workflow refuses an existing npm version or tag to make a
 partial release visible instead of silently accepting it.
+
+GitHub enforces immutability for future releases and their assets. Attach all
+assets before publishing a release. The existing beta.1 release predates that
+setting, so its assets are not retroactively locked; its version tag remains
+protected by the repository ruleset. Do not replace its assets or recreate the
+release to change that history.
 
 After publication, verify registry metadata, the `beta` dist-tag, a fresh
 installation, the GitHub release and its assets, and the documentation site. All
