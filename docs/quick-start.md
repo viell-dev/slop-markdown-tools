@@ -3,10 +3,30 @@
 Get the CLI running, select a profile, and preview a formatting pass before
 writing changes.
 
+## Install the beta
+
+The CLI requires Node.js 22.12 or newer. Install the package in your document
+workspace:
+
+```sh
+npm install --save-dev --save-exact mdrefine@0.1.0-beta.1
+npx --no-install mdtools --help
+```
+
+The npm package is `mdrefine`; the executable is `mdtools`. Prereleases use the
+`beta` channel. See
+[versions and availability](releases.md#versions-and-availability) for registry
+checks and release announcements.
+
+Run the examples below from the workspace where you installed the package.
+`--no-install` prevents fetching a different package if the local executable is
+missing. Replace `/path/to/documents` with your document folder; quote paths
+containing spaces.
+
 ## Install from the repository
 
-This prerelease has not been published to npm. Use Node.js 22.22.2+ or 24.15.0+
-and npm 10 or newer to build the checkout; Node.js 24 LTS is preferred.
+To build a checkout instead, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or
+newer; Node.js 24 LTS is preferred.
 
 ```sh
 git clone https://github.com/viell-dev/slop-markdown-tools.git
@@ -16,23 +36,8 @@ npm run build
 node dist/cli/main.js --help
 ```
 
-Run the commands below from that checkout. Replace `/path/to/documents` with
-your document folder; quoted paths work when a folder name contains spaces.
-
-## Install the beta after publication
-
-The prepared npm package is `mdrefine@0.1.0-beta.1`; it is not published yet.
-Once publication is announced, install it in your document workspace:
-
-```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-beta.1
-npx --no-install mdtools --help
-```
-
-Use `npx --no-install mdtools` in place of `node dist/cli/main.js` in the
-checkout examples below. `--no-install` prevents fetching a different package
-when the executable is missing. The npm prerelease channel will be `beta`, not
-`latest`. The CLI runtime requires Node.js 22.12 or newer.
+From that checkout, use `node dist/cli/main.js` in place of
+`npx --no-install mdtools` in the examples below.
 
 ## Choose a configuration
 
@@ -56,7 +61,7 @@ For CommonMark, use only `"recommended"`. For a vault, replace `"github"` with
 ## Lint without writing
 
 ```sh
-node dist/cli/main.js lint --root /path/to/documents
+npx --no-install mdtools lint --root /path/to/documents
 ```
 
 Lint reports diagnostics and never changes files. Add `--json` for structured
@@ -65,9 +70,9 @@ output, or `--max-warnings 0` to make warnings fail an automated check.
 ## Preview and apply formatting
 
 ```sh
-node dist/cli/main.js format --root /path/to/documents --diff
-node dist/cli/main.js format --root /path/to/documents --write
-node dist/cli/main.js format --root /path/to/documents --check
+npx --no-install mdtools format --root /path/to/documents --diff
+npx --no-install mdtools format --root /path/to/documents --write
+npx --no-install mdtools format --root /path/to/documents --check
 ```
 
 Review the diff before running `--write`. The final check exits with code `1` if
