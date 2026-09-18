@@ -142,18 +142,19 @@ passing checks, and resolved review threads remain mandatory.
 ## Release operations
 
 Follow [the release procedure](docs/releases.md) for commands and prerequisites.
-`0.1.0-beta.1` is already published and tagged; never rerun publication with
-that version. Update version metadata, the lockfile, release notes, and relevant
-examples together through a PR for each new release. Use exact SemVer tags
-without a `v` prefix, pointing to the tested merge commit.
+Never rerun publication for an existing registry version or release tag. Update
+version metadata, the lockfile, release notes, and relevant examples together
+through a PR for each new release. Use exact SemVer tags without a `v` prefix,
+pointing to the tested merge commit.
 
 The npm trusted publisher is configured for `viell-dev/slop-markdown-tools`,
 `release.yml`, and environment `npm-release`, with direct publish permission.
 `NPM_PUBLISH_ENABLED=true` is a capability gate, not standing authorization to
 publish. The workflow still requires explicit dispatch with `publish=true`, the
 exact version, and the actual agent identity. Verify live settings when
-releasing; configuration was verified on 2026-09-18, but an end-to-end OIDC
-publication has not yet occurred. Do not store an npm token in GitHub.
+releasing; configuration was verified on 2026-09-18. Verify the workflow result
+and registry provenance for each authorized release. Do not store an npm token
+in GitHub.
 
 `npm run release:prepare` verifies and retains a tarball, manifest, and checksum
 in ignored `artifacts/`. Local artifacts are snapshots: regenerate after changes

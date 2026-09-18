@@ -35,7 +35,7 @@ The CLI requires Node.js 22.12 or newer. The npm package is `mdrefine`; the
 executable is `mdtools`. To install the beta in your document workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-beta.1
+npm install --save-dev --save-exact mdrefine@0.1.0-beta.2
 npx --no-install mdtools --help
 ```
 
