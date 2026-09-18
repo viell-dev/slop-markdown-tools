@@ -83,9 +83,14 @@ const wrap: Rule = {
     const measure =
       options.measure === "codepoints" ? (text: string) => [...text].length : stringWidth;
     const unit = options.measure === "codepoints" ? "code points" : "columns";
-    visit(document.tree, "paragraph", (node) => {
+    visit(document.tree, "paragraph", (node, index, parent) => {
       const [start, end] = range(node);
       const original = document.source.slice(start, end);
+      const calloutHeader =
+        document.dialect === "obsidian" &&
+        parent?.type === "blockquote" &&
+        index === 0 &&
+        /^\[![\w-]+\]/.test(original);
       const lineStart = document.source.lastIndexOf("\n", start - 1) + 1;
       const prefix = document.source.slice(lineStart, start);
       const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
@@ -112,6 +117,12 @@ const wrap: Rule = {
                 ? continuation
                 : (content.match(/^[ \t>]+/)?.[0] ?? "");
           const linePrefix = offset === start ? prefix : container;
+          // An Obsidian title occupies one physical line, even when it contains spaces.
+          if (calloutHeader && offset === start) {
+            if (measure(prefix + content) > width) unbreakable = true;
+            offset += line.length;
+            continue;
+          }
           const words: string[] = [];
           while (
             childIndex < node.children.length &&
