@@ -103,6 +103,23 @@ jobs:
         run:
           npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --ignore-scripts --access
           public --tag beta --provenance
+      - name: Record required npm tag synchronization
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Complete npm tag synchronization
+
+          Until the first stable release, keep latest synchronized with beta.
+          Wait for npm processing and verify beta points to ${EXPECTED_VERSION}, then run locally:
+
+          ~~~sh
+          npm dist-tag add mdrefine@${EXPECTED_VERSION} latest
+          npm dist-tag ls mdrefine
+          ~~~
+
+          This requires npm account authentication; OIDC publication does not authenticate dist-tag updates.
+          Verify both tags before reporting the release complete. Once stable releases exist, latest follows stable.
+          If this follow-up fails, retry only the tag update; do not rerun publication.
+          EOF
       - name: Create the GitHub prerelease at this commit
         run: |
           gh release create "$EXPECTED_VERSION" "artifacts/mdrefine-${EXPECTED_VERSION}.tgz" artifacts/SHA256SUMS \
