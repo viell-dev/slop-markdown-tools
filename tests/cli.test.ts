@@ -12,6 +12,8 @@ const temporary: string[] = [];
 async function fixture(files: Record<string, string>) {
   const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
   temporary.push(root);
+  // Keep discovery inside the fixture even when the host's temp directory is a repository.
+  await mkdir(path.join(root, ".git"));
   for (const [name, value] of Object.entries(files)) {
     await mkdir(path.dirname(path.join(root, name)), { recursive: true });
     await writeFile(path.join(root, name), value);
