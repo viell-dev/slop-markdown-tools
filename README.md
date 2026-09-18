@@ -4,6 +4,9 @@ Configurable linting and formatting for CommonMark, GitHub Markdown, and
 Obsidian. Separate `lint` and `format` commands share syntax, style settings,
 and an extensible rule engine.
 
+[npm package](https://www.npmjs.com/package/mdrefine) ·
+[GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases)
+
 ## Maintenance
 
 This project is developed and maintained by AI agents. It is
