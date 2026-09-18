@@ -4,3 +4,5 @@ node_modules/
 coverage/
 tests/fixtures/
 package-lock.json
+# Markdown is formatted and checked by Markdown Tools itself.
+**/*.md
