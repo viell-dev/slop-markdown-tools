@@ -21,9 +21,10 @@ release announcements and downloadable artifacts.
 
 The initial beta was published locally under npm account `viell`. npm assigned
 both `beta` and `latest` to `0.1.0-beta.1` despite an explicit `--tag beta`;
-removing `latest` returned E400. Both tags were accepted for that release.
-Continue using `--tag beta` for subsequent betas and verify tags after
-publishing.
+removing `latest` returned E400. Keep the tag: until the first stable release,
+`latest` and `beta` must point to the same current beta, so default
+installations receive fixes. Once a stable release exists, `latest` follows
+stable releases and `beta` remains the prerelease channel.
 
 ## Prepare without publishing
 
@@ -86,8 +87,8 @@ builds and checks the package again, verifies the artifact checksum, publishes
 that tarball to npm's `beta` channel with provenance, and creates a GitHub
 prerelease at the workflow's commit. Tags use exact versions without a `v`
 prefix. Stable publication deliberately needs a separate policy change; this
-workflow accepts only beta versions and requests the `beta` tag. See the
-initial-publication exception above before interpreting `latest`.
+workflow accepts only beta versions and requests the `beta` tag. Complete the
+npm tag synchronization below before reporting a pre-stable release complete.
 
 For an authenticated first publication that cannot use OIDC yet, use the exact
 reviewed tarball with `npm publish <tarball> --ignore-scripts --access public
@@ -109,6 +110,32 @@ setting, so its assets are not retroactively locked; its version tag remains
 protected by the repository ruleset. Do not replace its assets or recreate the
 release to change that history.
 
-After publication, verify registry metadata, the `beta` dist-tag, a fresh
-installation, the GitHub release and its assets, and the documentation site. All
-subsequent changes, including prerelease maintenance, continue through PRs.
+## Synchronize npm tags before the first stable release
+
+After each authorized beta publication, wait for npm processing to finish and
+verify that `beta` points to the expected version. Until the first stable
+release, move `latest` to that same version using an authenticated local npm
+session. For the current beta:
+
+```sh
+npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.1.0-beta.4 latest
+npm_config_cache="$PWD/.npm-cache" npm dist-tag ls mdrefine
+```
+
+Use the exact newly published version on future releases. npm's
+[OIDC authentication](https://docs.npmjs.com/trusted-publishers/) supports
+publication, but does not authenticate `dist-tag` updates. The Release workflow
+records this required follow-up in its summary; complete browser authentication
+locally if npm requests it. Keep the waiting command alive and never put
+authentication secrets in chat or repository files.
+
+Tag synchronization is part of an authorized beta release. It does not publish
+another version or change package contents. If promotion fails, retry only the
+tag update after resolving authentication; never rerun publication. Do not try
+to remove `latest`. Stop promoting betas to `latest` when the first stable
+release is published.
+
+Verify both tags, a fresh default installation, the GitHub release and its
+assets, registry provenance, and the documentation site before reporting the
+release complete. All subsequent changes, including prerelease maintenance,
+continue through PRs.
