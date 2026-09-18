@@ -5,7 +5,7 @@ on:
       version:
         description: Exact beta version in package.json (without a v prefix)
         required: true
-        default: 0.1.0-beta.2
+        default: 0.1.0-beta.3
       publish:
         description: Publish to npm and create a GitHub prerelease (requires separate authorization)
         type: boolean

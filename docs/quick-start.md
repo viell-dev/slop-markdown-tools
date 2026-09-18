@@ -9,7 +9,7 @@ The CLI requires Node.js 22.12 or newer. Install the package in your document
 workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-beta.2
+npm install --save-dev --save-exact mdrefine@0.1.0-beta.3
 npx --no-install mdtools --help
 ```
 

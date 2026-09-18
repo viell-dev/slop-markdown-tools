@@ -2,15 +2,16 @@
 
 ## Versions and availability
 
-These documents cover `mdrefine@0.1.0-beta.2`. The executable is `mdtools`;
+These documents cover `mdrefine@0.1.0-beta.3`. The executable is `mdtools`;
 prereleases use npm's `beta` channel. Read the
-[beta.2 release notes](releases/0.1.0-beta.2.md) for changes and limitations.
-The [beta.1 notes](releases/0.1.0-beta.1.md) document the initial release.
+[beta.3 release notes](releases/0.1.0-beta.3.md) for changes and limitations.
+Previous releases: [beta.2](releases/0.1.0-beta.2.md) and
+[beta.1](releases/0.1.0-beta.1.md).
 
 The registry is the source of truth for package availability:
 
 ```sh
-npm view mdrefine@0.1.0-beta.2 version --registry=https://registry.npmjs.org/
+npm view mdrefine@0.1.0-beta.3 version --registry=https://registry.npmjs.org/
 ```
 
 An `E404` means the requested package or version is unavailable. A version in
@@ -31,7 +32,7 @@ Use Node.js 24 and npm 10 or newer from a clean checkout:
 ```sh
 npm ci
 npm run release:prepare
-npm publish ./artifacts/mdrefine-0.1.0-beta.2.tgz --dry-run --ignore-scripts --access public --tag beta
+npm publish ./artifacts/mdrefine-0.1.0-beta.3.tgz --dry-run --ignore-scripts --access public --tag beta
 ```
 
 Preparation runs all checks, packs the allowlisted files, installs that exact
