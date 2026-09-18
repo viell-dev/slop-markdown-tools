@@ -194,40 +194,34 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
   const { config, rules } = prepare(options);
   let output = source;
-  const initial = parse(source, config.dialect, options.path, options.plugins);
-  const fingerprint = semanticFingerprint(initial, options.workspace);
+  let document = parse(source, config.dialect, options.path, options.plugins);
+  const fingerprint = semanticFingerprint(document, options.workspace);
   const seen = new Set([source]);
   try {
     for (let pass = 0; pass < 8; pass++) {
       const before = output;
       for (const phase of ["inline", "block", "document"]) {
-        const document = parse(output, config.dialect, options.path, options.plugins);
         const edits = inspect(document, config, rules, options.workspace, phase).flatMap((item) =>
           item.edit ? [item.edit] : [],
         );
         if (!edits.length) continue;
         const candidate = applyEdits(output, edits);
-        if (
-          semanticFingerprint(
-            parse(candidate, config.dialect, options.path, options.plugins),
-            options.workspace,
-          ) !== fingerprint
-        )
+        if (candidate === output) continue;
+        const candidateDocument = parse(candidate, config.dialect, options.path, options.plugins);
+        if (semanticFingerprint(candidateDocument, options.workspace) !== fingerprint)
           throw new Error(
             `Formatting in the ${phase} phase would change parsed meaning; the document was left unchanged.`,
           );
         output = candidate;
+        // Rules consume the document without mutating it. Reuse the validated
+        // tree until another phase changes its source, including final diagnostics.
+        document = candidateDocument;
       }
       if (output === before)
         return {
           output,
           changed: output !== source,
-          diagnostics: inspect(
-            parse(output, config.dialect, options.path, options.plugins),
-            config,
-            rules,
-            options.workspace,
-          ),
+          diagnostics: inspect(document, config, rules, options.workspace),
         };
       if (seen.has(output))
         throw new Error("Formatting rules oscillate; the document was left unchanged.");

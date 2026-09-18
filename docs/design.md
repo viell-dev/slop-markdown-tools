@@ -62,11 +62,11 @@ dimensions in their aliases remain intact.
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery
 also defers reading Markdown until it is selected or needed for a fragment.
-Rule-schema validators are reused across documents. A suffix lookup index is
-built on first use instead of scanning every path for each shortened link. There
-is no persistent cache, worker pool, watch service, editor extension, or
-language server yet. The library has a pluggable workspace interface for
-specialized hosts.
+Built-in rule-schema validators are reused across documents. A suffix lookup
+index is built on first use instead of scanning every path for each shortened
+link. There is no persistent cache, worker pool, watch service, editor
+extension, or language server yet. The library has a pluggable workspace
+interface for specialized hosts.
 
 Run `npm run build` and `node scripts/benchmark.mjs 1000` for a reproducible
 synthetic library benchmark. It reports path-index construction and lint time
@@ -74,6 +74,19 @@ separately for 1,000 short interlinked notes; pass a different count to scale
 it. These timings exclude filesystem traversal and do not predict a particular
 vault's throughput. Measure the original workload before adding caches or
 workers.
+
+Formatting retains the current parsed document within one call, reusing it
+between phases and for final diagnostics. Every changed candidate is parsed and
+checked against the original semantic fingerprint before becoming the next
+phase's input. No-op edits still undergo range and overlap validation. This
+retains the plugin contract that rules must not mutate documents.
+
+Run `node scripts/benchmark-format.mjs 100` after building to compare 100
+formatting calls on a synthetic 4.8 KB note needing edits with 100 calls on its
+already-formatted output. It warms both cases, checks output and diagnostics,
+and prints a result hash for comparing implementations. Run several times
+without competing workloads; timings exclude discovery, I/O, CLI serialization,
+and custom plugins.
 
 ## Maintenance priorities
 

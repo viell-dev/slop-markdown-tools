@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as syntax from "../src/syntax/parse.js";
 import fc from "fast-check";
 import {
   format,
@@ -9,7 +10,7 @@ import {
   applyEdits,
   semanticFingerprint,
 } from "../src/index.js";
-import type { Config, Plugin, ProcessOptions } from "../src/index.js";
+import type { Config, Plugin, ProcessOptions, RuleContext } from "../src/index.js";
 
 const narrow: Config = {
   extends: ["recommended", "github"],
@@ -22,6 +23,161 @@ function formatted(source: string, options: ProcessOptions = {}) {
   return result.output;
 }
 describe("formatting contracts", () => {
+  it("parses unchanged source once per call, including no-op edits", () => {
+    const plugin: Plugin = {
+      name: "noop",
+      rules: {
+        same: {
+          kind: "style",
+          description: "Return an edit that changes nothing",
+          check: ({ document }) => [
+            {
+              start: 0,
+              message: "Same",
+              edit: { start: 0, end: document.source.length, text: document.source },
+            },
+          ],
+        },
+      },
+    };
+    const spy = vi.spyOn(syntax, "parse");
+    try {
+      expect(format("A _short_ note.\n").output).toBe("A _short_ note.\n");
+      expect(spy).toHaveBeenCalledTimes(1);
+      const result = format("Other text.\n", {
+        config: { extends: [], rules: { "noop/same": "warn" } },
+        plugins: [plugin],
+      });
+      expect(result.output).toBe("Other text.\n");
+      expect(result.changed).toBe(false);
+      expect(result.diagnostics[0]?.rule).toBe("noop/same");
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it("gives each phase and final diagnostics the latest accepted source and tree", () => {
+    const observed: Array<[string, string]> = [];
+    const plugin: Plugin = {
+      name: "observer",
+      rules: Object.fromEntries(
+        (["inline", "block", "document"] as const).map((phase) => [
+          phase,
+          {
+            kind: "style" as const,
+            phase,
+            description: "Observe phase input",
+            check: ({ document }: RuleContext) => {
+              expect(document.tree).toEqual(
+                parse(document.source, document.dialect, document.path).tree,
+              );
+              observed.push([phase, document.source]);
+              return [];
+            },
+          },
+        ]),
+      ),
+    };
+    const source = "A `one\ntwo` and many ordinary words to wrap here.";
+    const options: ProcessOptions = {
+      path: "note.md",
+      plugins: [plugin],
+      config: {
+        extends: [],
+        rules: {
+          "style/inline-code": "warn",
+          "style/wrap": ["warn", { width: 25 }],
+          "style/final-newline": "warn",
+          "observer/inline": "warn",
+          "observer/block": "warn",
+          "observer/document": "warn",
+        },
+      },
+    };
+    plugin.rules!.position = {
+      kind: "problem",
+      description: "Report final paragraph position",
+      check: ({ document }) => {
+        const node = document.tree.children[0]!;
+        const end = node.position!.end.offset!;
+        return [{ start: end - 5, end, message: "Final word" }];
+      },
+    };
+    options.config!.rules!["observer/position"] = "warn";
+    const result = format(source, options);
+    expect(observed.slice(0, 3)).toEqual([
+      ["inline", source],
+      ["block", "A `one two` and many ordinary words to wrap here."],
+      ["document", "A `one two` and many\nordinary words to wrap\nhere."],
+    ]);
+    expect(result.output).toBe("A `one two` and many\nordinary words to wrap\nhere.\n");
+    expect(observed.slice(-3).map(([, text]) => text)).toEqual(Array(3).fill(result.output));
+    expect(result.diagnostics).toMatchObject([
+      { rule: "observer/position", line: 3, column: 1, start: result.output.indexOf("here.") },
+    ]);
+    expect(semanticFingerprint(parse(result.output, "commonmark"))).toBe(
+      semanticFingerprint(parse(source, "commonmark")),
+    );
+    expect(format(result.output, options).output).toBe(result.output);
+  });
+  it.each(["inline", "block", "document"] as const)(
+    "still rejects unsafe edits in the %s phase",
+    (phase) => {
+      const plugin: Plugin = {
+        name: "unsafe",
+        rules: {
+          replace: {
+            kind: "style",
+            phase,
+            description: "Change meaning",
+            check: () => [
+              { start: 0, message: "Replace", edit: { start: 0, end: 4, text: "other" } },
+            ],
+          },
+        },
+      };
+      const result = format("word\n", {
+        config: { extends: [], rules: { "unsafe/replace": "warn" } },
+        plugins: [plugin],
+      });
+      expect(result.output).toBe("word\n");
+      expect(result.diagnostics[0]?.message).toContain(
+        `in the ${phase} phase would change parsed meaning`,
+      );
+    },
+  );
+  it.each([false, true])("retains convergence guards (oscillation: %s)", (oscillate) => {
+    const plugin: Plugin = {
+      name: "unstable",
+      rules: {
+        change: {
+          kind: "style",
+          description: "Never stabilize",
+          check: ({ document }) => [
+            {
+              start: 0,
+              message: "Change",
+              edit: {
+                start: 0,
+                end: document.source.length,
+                text: oscillate
+                  ? document.source.startsWith("*")
+                    ? "_word_\n"
+                    : "*word*\n"
+                  : document.source + "\n",
+              },
+            },
+          ],
+        },
+      },
+    };
+    const result = format("*word*\n", {
+      config: { extends: [], rules: { "unstable/change": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe("*word*\n");
+    expect(result.diagnostics[0]?.message).toContain(oscillate ? "oscillate" : "eight passes");
+  });
   it("preserves genuine lists following prose", () => {
     const source = "Some items follow\n- First item\n- Second item\n";
     expect(formatted(source)).toBe(source);
