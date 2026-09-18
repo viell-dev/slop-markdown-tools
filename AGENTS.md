@@ -12,6 +12,53 @@ sibling `docs/` are private project material: never stage, copy, quote, or
 publish their contents. Use synthetic fixtures; do not copy real vault documents
 into tests, issues, or pull requests.
 
+## Issue triage and project scope
+
+Review requests against the README, design boundaries, and existing extension
+contracts before implementing them. A request to review or resolve issues
+requires independent maintainer judgment; it does not authorize accepting every
+reporter's proposed feature. Reports from agents receive the same scrutiny as
+reports from people. Rejecting, narrowing, splitting, or closing an issue as out
+of scope is a valid outcome.
+
+For each distinct request, separate the observed problem from its proposed
+solution and choose an appropriate home:
+
+- **Core defect or capability:** parsing, semantic preservation, supported
+  dialect behavior, generally useful lint/format operations, resolution,
+  diagnostics, or measured performance within the project's scope. A defect
+  found in one vault can still expose a generic problem.
+- **Consumer policy or workflow:** a workspace's naming conventions, document
+  templates, metadata fields, migration heuristics, or external-tool
+  orchestration. Prefer configuration, a consumer plugin, or a wrapper when
+  these can express the requirement. Obsidian support does not mean adopting
+  every vault's content conventions.
+- **Extension gap:** an otherwise appropriate consumer implementation cannot use
+  the supported API safely or practically. Identify the exact missing primitive
+  and evaluate that reusable capability separately from the original policy. Do
+  not add speculative hooks or relax semantic guards merely to accommodate one
+  consumer.
+
+Configurability, opt-in defaults, report-only behavior, safe edits, many
+findings in one corpus, and ease of implementation do not by themselves
+establish that a feature belongs in core. Conversely, plugin implementability
+alone is not a reason to reject a broadly useful built-in rule. Explain the
+general use case, why the package should own it, and the API and maintenance
+cost.
+
+Split issues containing independently decidable defects, features, or consumer
+policies before implementation when separate dispositions or validation are
+needed. Link the resulting issues and PRs, and do not let accepting one part
+implicitly accept the others. Record the scope decision and evidence in the
+issue or PR before coding. An out-of-scope request is a disposition, not a
+blocker awaiting a more detailed design. Reserve blockers for missing evidence,
+dependencies, or decisions needed by an otherwise accepted task.
+
+When asked to review existing additions without reverting them, report specific
+components to retain or remove and any genuine consumer API gaps. Preserve
+independent correctness fixes when proposing partial reversals of mixed PRs. Do
+not execute those reversals until authorized.
+
 ## Implementation and verification
 
 - Preserve source outside enabled rules. Formatting must not change document
