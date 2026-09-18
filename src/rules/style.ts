@@ -45,6 +45,27 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   };
 }
 
+// Whitespace inside an inline node is protected; only text-node whitespace can wrap.
+function wrappingAtoms(words: string[]): string[] {
+  const atoms: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (/^[ \t]+$/.test(word)) {
+      if (current) atoms.push(current);
+      current = "";
+    } else current += word;
+  }
+  if (current) atoms.push(current);
+  // Keep syntax-like markers with the preceding atom to preserve paragraph meaning.
+  for (let i = 1; i < atoms.length; i++) {
+    if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
+      atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+      i--;
+    }
+  }
+  return atoms;
+}
+
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
   kind: "style",
@@ -67,16 +88,63 @@ const wrap: Rule = {
       const original = document.source.slice(start, end);
       const lineStart = document.source.lastIndexOf("\n", start - 1) + 1;
       const prefix = document.source.slice(lineStart, start);
+      const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
+        " ".repeat(value.length),
+      );
+      const reportUnbreakable = () =>
+        findings.push({
+          start,
+          end,
+          message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
+        });
       const reportSkipped = (reason: string) => {
-        if (
-          options.reportUnreflowed === true &&
-          (prefix + original).split(/\r?\n/).some((line) => measure(line) > width)
-        )
+        if (options.reportUnreflowed !== true && options.reportUnbreakable !== true) return;
+        let breakable = false;
+        let unbreakable = false;
+        let offset = start;
+        let childIndex = 0;
+        for (const line of original.split(/(?<=\n)/)) {
+          const content = line.replace(/\r?\n$/, "");
+          const container =
+            offset === start
+              ? ""
+              : continuation && content.startsWith(continuation)
+                ? continuation
+                : (content.match(/^[ \t>]+/)?.[0] ?? "");
+          const linePrefix = offset === start ? prefix : container;
+          const words: string[] = [];
+          while (
+            childIndex < node.children.length &&
+            range(node.children[childIndex]!)[1] <= offset
+          )
+            childIndex++;
+          for (let i = childIndex; i < node.children.length; i++) {
+            const child = node.children[i]!;
+            const [a, b] = range(child);
+            if (a >= offset + content.length) break;
+            if (child.type === "break") continue;
+            const raw = document.source.slice(
+              Math.max(a, offset + container.length),
+              Math.min(b, offset + content.length),
+            );
+            if (!raw) continue;
+            words.push(...(child.type === "text" ? raw.split(/([ \t]+)/).filter(Boolean) : [raw]));
+          }
+          const atoms = wrappingAtoms(words);
+          const available = width - measure(linePrefix);
+          if (measure(words.join("").trimEnd()) > available) {
+            if (atoms.length > 1) breakable = true;
+            if (atoms.some((atom) => measure(atom) > available)) unbreakable = true;
+          }
+          offset += line.length;
+        }
+        if (options.reportUnreflowed === true && breakable)
           findings.push({
             start,
             end,
             message: `Paragraph not reflowed: ${reason} (width ${width} ${unit}).`,
           });
+        if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
       };
       const reason = node.children.some((child) => child.type === "break")
         ? "hard line break"
@@ -93,9 +161,6 @@ const wrap: Rule = {
         reportSkipped(reason);
         return;
       }
-      const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
-        " ".repeat(value.length),
-      );
       const words: string[] = [];
       let unsupported = false;
       for (const child of node.children) {
@@ -121,23 +186,7 @@ const wrap: Rule = {
         reportSkipped("multiline inline syntax or unsupported continuation");
         return;
       }
-      // Adjacent inline nodes without source whitespace form a single wrapping atom.
-      const atoms: string[] = [];
-      let current = "";
-      for (const word of words) {
-        if (/^[ \t]+$/.test(word)) {
-          if (current) atoms.push(current);
-          current = "";
-        } else current += word;
-      }
-      if (current) atoms.push(current);
-      // Decide breaks with a marker and its preceding atom already grouped.
-      for (let i = 1; i < atoms.length; i++) {
-        if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
-          atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
-          i--;
-        }
-      }
+      const atoms = wrappingAtoms(words);
       const output: string[] = [];
       let line = "";
       let available = width - measure(prefix);
@@ -163,11 +212,7 @@ const wrap: Rule = {
         options.reportUnbreakable === true &&
         (prefix + replacement).split(/\r?\n/).some((line) => measure(line) > width)
       )
-        findings.push({
-          start,
-          end,
-          message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
-        });
+        reportUnbreakable();
     });
     return findings;
   },
