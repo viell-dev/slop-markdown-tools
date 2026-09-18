@@ -1,5 +1,8 @@
 import { lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
+import { readFileSync } from "node:fs";
+import type { ResolveOptions } from "../core/types.js";
+import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
@@ -7,7 +10,8 @@ import { exists } from "../config/load.js";
 
 export interface FileSet {
   root: string;
-  files: Record<string, string | null>;
+  files: Record<string, WorkspaceSource>;
+  directories: string[];
   selected: string[];
   strictLineBreaks?: boolean;
 }
@@ -15,9 +19,11 @@ export async function discover(
   rootPath: string,
   supplied: string[],
   excluded: string[],
+  resolve: ResolveOptions = {},
 ): Promise<FileSet> {
   const root = await realpath(rootPath);
-  const files: Record<string, string | null> = {};
+  const files: Record<string, WorkspaceSource> = {};
+  const directories: string[] = [];
   const selected: string[] = [];
   const requests: string[] = [];
   for (const input of supplied.length ? supplied : [root]) {
@@ -34,7 +40,7 @@ export async function discover(
     base: string;
     matcher: ReturnType<typeof ignore>;
   }
-  async function walk(relative: string, inherited: IgnoreLayer[]) {
+  async function walk(relative: string, inherited: IgnoreLayer[], targetOnly = false) {
     const directory = path.join(root, relative);
     const layers = [...inherited];
     if (await exists(path.join(directory, ".gitignore")))
@@ -51,22 +57,26 @@ export async function discover(
       )
         continue;
       const name = relative ? `${relative}/${entry.name}` : entry.name;
-      if (
-        layers.some((layer) =>
-          layer.matcher.ignores(
-            name.slice(layer.base ? layer.base.length + 1 : 0) + (entry.isDirectory() ? "/" : ""),
-          ),
-        )
-      )
-        continue;
+      const gitIgnored = layers.some((layer) =>
+        layer.matcher.ignores(
+          name.slice(layer.base ? layer.base.length + 1 : 0) + (entry.isDirectory() ? "/" : ""),
+        ),
+      );
+      if (gitIgnored && resolve.gitIgnored !== true) continue;
       const full = path.join(root, name);
       if (entry.isDirectory()) {
-        if (!(await exists(path.join(full, ".git")))) await walk(name, layers);
+        directories.push(name);
+        const nested = await exists(path.join(full, ".git"));
+        if (!nested || resolve.nestedRepositories === true)
+          await walk(name, layers, targetOnly || gitIgnored || nested);
       } else if (entry.isFile()) {
         const markdown = /\.md$/i.test(name);
-        files[name] = markdown ? await readFile(full, "utf8") : null;
+        let cached: string | undefined;
+        files[name] = markdown ? () => (cached ??= readFileSync(full, "utf8")) : null;
         if (
           markdown &&
+          !targetOnly &&
+          !gitIgnored &&
           requests.some(
             (request) => !request || name === request || name.startsWith(`${request}/`),
           ) &&
@@ -90,6 +100,7 @@ export async function discover(
   return {
     root,
     files,
+    directories,
     selected: selected.sort(),
     ...(strictLineBreaks !== undefined ? { strictLineBreaks } : {}),
   };

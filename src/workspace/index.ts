@@ -4,6 +4,8 @@ import { visit } from "unist-util-visit";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, textContent } from "../syntax/parse.js";
 
+export type WorkspaceSource = string | null | (() => string);
+
 interface Entry {
   headings: Set<string>;
   slugs: Set<string>;
@@ -12,6 +14,8 @@ interface Entry {
 export interface WorkspaceOptions {
   dialect?: Dialect;
   strictLineBreaks?: boolean;
+  /** Existing directories, including empty ones; never treated as note targets. */
+  directories?: string[];
 }
 export function splitDestination(destination: string): { path: string; fragment: string } {
   const hash = destination.indexOf("#");
@@ -28,13 +32,34 @@ export function splitDestination(destination: string): { path: string; fragment:
   };
 }
 export function createWorkspace(
-  files: Record<string, string | null>,
+  files: Record<string, WorkspaceSource>,
   options: WorkspaceOptions = {},
 ): Workspace {
+  const sources = new Map(
+    Object.entries(files).map(([name, source]) => [
+      name.replaceAll("\\", "/").replace(/^\.\//, ""),
+      source,
+    ]),
+  );
+  const directories = new Set(
+    (options.directories ?? []).map((name) => name.replaceAll("\\", "/")),
+  );
+  directories.add(".");
+  for (const name of sources.keys()) {
+    let directory = path.posix.dirname(name);
+    while (directory !== "." && directory !== path.posix.dirname(directory)) {
+      directories.add(directory);
+      directory = path.posix.dirname(directory);
+    }
+  }
   const entries = new Map<string, Entry>();
-  for (const [name, source] of Object.entries(files)) {
+  function fragments(name: string): Entry {
+    const cached = entries.get(name);
+    if (cached) return cached;
     const entry: Entry = { headings: new Set(), slugs: new Set(), blocks: new Set() };
-    if (source !== null && /\.md$/i.test(name)) {
+    const value = sources.get(name);
+    if (value !== null && value !== undefined && /\.md$/i.test(name)) {
+      const source = typeof value === "function" ? value() : value;
       const document = parse(source, options.dialect ?? "commonmark", name);
       const slugger = new GithubSlugger();
       visit(document.tree, "heading", (node) => {
@@ -47,7 +72,25 @@ export function createWorkspace(
         if (match) entry.blocks.add(match[1]!);
       });
     }
-    entries.set(name.replaceAll("\\", "/").replace(/^\.\//, ""), entry);
+    entries.set(name, entry);
+    return entry;
+  }
+  let suffixes: Map<string, Set<string>> | undefined;
+  function suffixCandidates(target: string): Set<string> | undefined {
+    if (!suffixes) {
+      suffixes = new Map();
+      for (const name of sources.keys()) {
+        const parts = name.split("/");
+        for (let i = 0; i < parts.length; i++) {
+          const suffix = parts.slice(i).join("/");
+          for (const key of suffix.endsWith(".md") ? [suffix, suffix.slice(0, -3)] : [suffix]) {
+            if (!suffixes.has(key)) suffixes.set(key, new Set());
+            suffixes.get(key)!.add(name);
+          }
+        }
+      }
+    }
+    return suffixes.get(target);
   }
   return {
     ...(options.strictLineBreaks !== undefined
@@ -56,19 +99,22 @@ export function createWorkspace(
     resolve(source, destination, dialect): LinkResolution {
       if (/^[a-z][a-z\d+.-]*:/i.test(destination) || destination.startsWith("//"))
         return { status: "external" };
+      source = source.replaceAll("\\", "/");
       const parts = splitDestination(destination);
       const targetPath = parts.path;
       if (dialect !== "obsidian" && (targetPath.startsWith("/") || targetPath.includes("?")))
         return { status: "unavailable" };
       const candidates = new Set<string>();
+      let directory = false;
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return;
-        if (entries.has(normalized)) candidates.add(normalized);
+        if (directories.has(normalized.replace(/\/$/, ""))) directory = true;
+        if (sources.has(normalized)) candidates.add(normalized);
         if (
           dialect === "obsidian" &&
           !path.posix.extname(normalized) &&
-          entries.has(`${normalized}.md`)
+          sources.has(`${normalized}.md`)
         )
           candidates.add(`${normalized}.md`);
       };
@@ -78,32 +124,25 @@ export function createWorkspace(
           add(path.posix.join(path.posix.dirname(source), targetPath));
         else {
           add(targetPath.replace(/^\//, ""));
-          if (!targetPath.startsWith("/"))
+          if (candidates.size === 0 && !directory && !targetPath.startsWith("/"))
             add(path.posix.join(path.posix.dirname(source), targetPath));
-          if (candidates.size === 0) {
-            for (const name of entries.keys()) {
-              if (
-                name === targetPath ||
-                name.endsWith(`/${targetPath}`) ||
-                name === `${targetPath}.md` ||
-                name.endsWith(`/${targetPath}.md`)
-              )
-                candidates.add(name);
-            }
+          if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            for (const name of suffixCandidates(targetPath) ?? []) candidates.add(name);
           }
         }
       } else add(path.posix.join(path.posix.dirname(source), targetPath));
+      if (candidates.size === 0 && directory) return { status: "directory" };
       if (candidates.size !== 1) return { status: candidates.size ? "ambiguous" : "missing" };
       const target = [...candidates][0]!;
-      const entry = entries.get(target)!;
       const fragment = parts.fragment;
+      const entry = fragment ? fragments(target) : undefined;
       const fragmentExists =
         !fragment ||
         (dialect === "obsidian"
           ? fragment.startsWith("^")
-            ? entry.blocks.has(fragment.slice(1))
-            : entry.headings.has(fragment)
-          : entry.slugs.has(fragment));
+            ? entry!.blocks.has(fragment.slice(1))
+            : entry!.headings.has(fragment)
+          : entry!.slugs.has(fragment));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };

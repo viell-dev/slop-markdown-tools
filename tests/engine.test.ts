@@ -205,6 +205,38 @@ describe("configuration and plugins", () => {
     expect(result.output).toBe("word\n");
     expect(result.diagnostics[0]?.rule).toBe("engine/unsafe-format");
   });
+  it("validates changing options and scopes custom schema IDs to each invocation", () => {
+    expect(() =>
+      lint("", { config: { rules: { "style/wrap": ["warn", { width: 30 }] } } }),
+    ).not.toThrow();
+    expect(() => lint("", { config: { rules: { "style/wrap": ["warn", { width: 1 }] } } })).toThrow(
+      "Invalid options",
+    );
+    for (const field of ["first", "second"]) {
+      const plugin: Plugin = {
+        name: "local",
+        rules: {
+          check: {
+            kind: "problem",
+            description: "Schema isolation",
+            check: () => [],
+            schema: {
+              $id: "https://example.test/options",
+              type: "object",
+              required: [field],
+              properties: { [field]: { type: "boolean" } },
+            },
+          },
+        },
+      };
+      expect(() =>
+        lint("", {
+          plugins: [plugin],
+          config: { extends: [], rules: { "local/check": ["warn", { [field]: true }] } },
+        }),
+      ).not.toThrow();
+    }
+  });
   it("rejects overlapping edits", () => {
     expect(() =>
       applyEdits("abc", [

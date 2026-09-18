@@ -94,6 +94,50 @@ describe("CLI", () => {
       "note.md",
     ]);
   });
+  it("indexes ignored and nested targets only when opted in, without selecting them", async () => {
+    const root = await fixture({
+      "mdtools.config.json": JSON.stringify({
+        extends: ["recommended", "obsidian"],
+        resolve: { gitIgnored: true, nestedRepositories: true },
+      }),
+      ".obsidian/app.json": '{"strictLineBreaks":true}',
+      ".gitignore": "Ignored/\n",
+      "Doc.md":
+        "[I](Ignored/Note.md#Heading) and [N](Nested/Note.md#^id) and [A](Ignored/image.png)\n",
+      "Ignored/Note.md": "# Heading\n\n*untouched*\n",
+      "Ignored/image.png": "image",
+      "Nested/.git": "gitdir: elsewhere",
+      "Nested/Note.md": "A block. ^id\n\n*untouched*\n",
+    });
+    const checked = run(root, ["lint", "--json", "Doc.md"]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "Doc.md",
+    ]);
+    const applied = run(root, ["format", "--write", "--json"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(JSON.parse(applied.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "Doc.md",
+    ]);
+    expect(await readFile(path.join(root, "Ignored/Note.md"), "utf8")).toContain("*untouched*");
+    expect(await readFile(path.join(root, "Nested/Note.md"), "utf8")).toContain("*untouched*");
+    const defaults = await discover(root, [path.join(root, "Doc.md")], []);
+    expect(defaults.files["Ignored/Note.md"]).toBeUndefined();
+    expect(defaults.files["Nested/Note.md"]).toBeUndefined();
+    const ignoredOnly = await discover(root, [], [], { gitIgnored: true });
+    expect(ignoredOnly.files["Ignored/Note.md"]).toBeDefined();
+    expect(ignoredOnly.files["Nested/Note.md"]).toBeUndefined();
+    const nestedOnly = await discover(root, [], [], { nestedRepositories: true });
+    expect(nestedOnly.files["Nested/Note.md"]).toBeDefined();
+    expect(nestedOnly.files["Ignored/Note.md"]).toBeUndefined();
+  });
+  it("diagnoses empty directories as directories in Obsidian", async () => {
+    const root = await fixture({ "Doc.md": "[folder](Empty)\n" });
+    await mkdir(path.join(root, "Empty"));
+    const checked = run(root, ["lint", "--dialect", "obsidian", "Doc.md"]);
+    expect(checked.status).toBe(1);
+    expect(checked.stderr).toContain("Local target is a directory: Empty.");
+  });
   it("checks Obsidian settings and resolves block references on disk", async () => {
     const root = await fixture({
       "mdtools.config.json": '{"extends":["recommended","obsidian"]}',

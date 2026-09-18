@@ -43,6 +43,11 @@ export const configSchema = {
   additionalProperties: false,
   properties: {
     $schema: { type: "string" },
+    resolve: {
+      type: "object",
+      additionalProperties: false,
+      properties: { gitIgnored: { type: "boolean" }, nestedRepositories: { type: "boolean" } },
+    },
     extends: { type: "array", items: { type: "string" } },
     dialect: { enum: ["commonmark", "github", "obsidian"] },
     rules,
@@ -86,7 +91,7 @@ export function resolveConfig(
   for (const plugin of plugins)
     for (const [name, preset] of Object.entries(plugin.presets ?? {}))
       available[`${plugin.name}/${name}`] = preset;
-  const result: ResolvedConfig = { dialect: "commonmark", rules: {}, ignore: [] };
+  const result: ResolvedConfig = { dialect: "commonmark", rules: {}, ignore: [], resolve: {} };
   const overrides: NonNullable<Config["overrides"]> = [];
   function merge(part: Config, chain: string[]) {
     validateConfig(part);
@@ -99,6 +104,7 @@ export function resolveConfig(
     }
     if (part.dialect) result.dialect = part.dialect;
     Object.assign(result.rules, part.rules);
+    Object.assign(result.resolve, part.resolve);
     result.ignore.push(...(part.ignore ?? []));
     overrides.push(...(part.overrides ?? []));
   }

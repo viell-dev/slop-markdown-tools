@@ -26,10 +26,17 @@ const result = format(files["note.md"], options);
 
 Library calls do not read or write files. `path` and workspace keys use
 forward-slash paths relative to the workspace root. Use `null` values for
-non-Markdown attachments. Without a workspace, local target checks and path
-rewriting are unavailable. Obsidian reflow also requires an explicit
-`workspace.strictLineBreaks: true`; callers are responsible for verifying that
-renderer setting.
+non-Markdown attachments. A Markdown value can also be a synchronous loader
+`() => string`; `createWorkspace` calls it only when that target needs fragment
+validation, then caches its parsed heading/block index. Callers must provide a
+stable source snapshot for each workspace instance. The CLI provides its own
+per-invocation file loaders. `WorkspaceOptions.directories` can list existing
+empty directories; parent directories of file entries are inferred. Resolution
+returns `status: "directory"` for a directory instead of `"missing"`.
+
+Without a workspace, local target checks and path rewriting are unavailable.
+Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
+callers are responsible for verifying that renderer setting.
 
 `parse`, `range`, `textContent`, `resolveConfig`, `configSchema`, `presets`,
 `builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also

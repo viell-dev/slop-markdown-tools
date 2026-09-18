@@ -30,7 +30,7 @@ export interface Document {
   dialect: Dialect;
 }
 export interface LinkResolution {
-  status: "resolved" | "missing" | "ambiguous" | "external" | "unavailable";
+  status: "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory";
   target?: string;
   fragment?: string;
   fragmentExists?: boolean;
@@ -64,7 +64,12 @@ export interface Override {
   dialect?: Dialect;
   rules?: Record<string, RuleSetting>;
 }
+export interface ResolveOptions {
+  gitIgnored?: boolean;
+  nestedRepositories?: boolean;
+}
 export interface Config {
+  resolve?: ResolveOptions;
   extends?: string[];
   dialect?: Dialect;
   rules?: Record<string, RuleSetting>;
@@ -73,6 +78,7 @@ export interface Config {
   plugins?: string[];
 }
 export interface ResolvedConfig {
+  resolve: ResolveOptions;
   dialect: Dialect;
   rules: Record<string, RuleSetting>;
   ignore: string[];

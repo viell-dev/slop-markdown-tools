@@ -84,6 +84,8 @@ export const linkRules: Record<string, Rule> = {
             start: range(node)[0],
             message: `${result.status === "missing" ? "Missing" : "Ambiguous"} local target: ${url}.`,
           });
+        else if (result.status === "directory" && document.dialect === "obsidian")
+          findings.push({ start: range(node)[0], message: `Local target is a directory: ${url}.` });
         else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });
       });
@@ -145,12 +147,48 @@ export const linkRules: Record<string, Rule> = {
             target = `./${target}`;
         }
         // Encode reserved path characters before reattaching a separately parsed fragment.
-        const encodedPath = target
-          .replaceAll("%", "%25")
-          .replaceAll("#", "%23")
-          .replaceAll("?", "%3F");
+        const hash = url.indexOf("#");
+        const encodedPath =
+          target === parts.path
+            ? hash < 0
+              ? url
+              : url.slice(0, hash)
+            : target.replaceAll("%", "%25").replaceAll("#", "%23");
         let replacement =
-          encodedPath + (parts.fragment ? `#${parts.fragment.replaceAll("%", "%25")}` : "");
+          encodedPath +
+          (hash < 0
+            ? ""
+            : target === parts.path
+              ? url.slice(hash)
+              : `#${parts.fragment.replaceAll("%", "%25")}`);
+        // A relative basename can collide with a vault-root path. Make the
+        // relative spelling explicit before proposing an identity-changing edit.
+        let verified = workspace.resolve(
+          document.path,
+          replacement,
+          document.dialect,
+          node.type === "wikiLink",
+        );
+        if (
+          style === "relative" &&
+          parts.path &&
+          !replacement.startsWith(".") &&
+          (verified.status !== "resolved" || verified.target !== result.target)
+        ) {
+          replacement = `./${replacement}`;
+          verified = workspace.resolve(
+            document.path,
+            replacement,
+            document.dialect,
+            node.type === "wikiLink",
+          );
+        }
+        if (
+          verified.status !== "resolved" ||
+          verified.target !== result.target ||
+          verified.fragment !== result.fragment
+        )
+          return;
         const [start, end] = range(node);
         if (node.type === "wikiLink") {
           if (/[[\]|\r\n]/.test(replacement)) return;
