@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    labels: ["Type: Maintenance", "Status: Needs Triage"]
     schedule:
       interval: weekly
     # Revisit when typescript-eslint supports TypeScript 7; see PR #3.
@@ -13,5 +14,6 @@ updates:
         dependency-type: development
   - package-ecosystem: github-actions
     directory: /
+    labels: ["Type: Maintenance", "Status: Needs Triage"]
     schedule:
       interval: weekly

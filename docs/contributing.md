@@ -41,6 +41,77 @@ versions and release tags are never replaced. Follow the
 reports belong in the private channel described in
 [SECURITY.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
 
+## Issue and pull request labels
+
+Use one primary `Type:` label on every issue and PR, and at most one `Status:`
+label describing the current disposition or next action. The type describes what
+the item is about; a feature implementation PR also uses
+`Type: Feature Request`. For mixed historical items, choose the main purpose and
+explain separate decisions in comments. Split new requests when their parts need
+independent scope decisions. Do not add priority labels.
+
+The
+[label catalog](https://github.com/viell-dev/slop-markdown-tools/blob/main/.github/labels.json)
+is the source of truth for exact names, descriptions, and hexadecimal colors.
+Keep it, this guide, GitHub, issue templates, and Dependabot settings aligned.
+Use the GitHub UI or the existing `gh` CLI; no label-sync service is required.
+
+| Label                       | Color     | Use                                                                          |
+| --------------------------- | --------- | ---------------------------------------------------------------------------- |
+| `Type: Bug`                 | `#d73a4a` | Incorrect behavior, broken functionality, or a regression.                   |
+| `Type: Enhancement`         | `#a2eeef` | Improve an existing capability, including usability or performance.          |
+| `Type: Feature Request`     | `#0e8a16` | Add a new independently useful capability or rule.                           |
+| `Type: Maintenance`         | `#6a737d` | Dependencies, CI, releases, refactoring, or repository upkeep.               |
+| `Type: Documentation`       | `#0075ca` | Documentation, examples, or contributor instructions.                        |
+| `Type: Discussion`          | `#5319e7` | Explore a design or project direction before an actionable proposal.         |
+| `Type: Question`            | `#d876e3` | Ask how the project works or how to use it.                                  |
+| `Status: Needs Triage`      | `#ededed` | Awaiting maintainer review and a scope decision.                             |
+| `Status: Confirmed`         | `#0e8a16` | Reproduced defect or accepted actionable request; not a delivery commitment. |
+| `Status: Needs Information` | `#fbca04` | Waiting for reporter details, answers, or validation results.                |
+| `Status: Blocked`           | `#d93f0b` | Accepted work is waiting on an identified external dependency.               |
+| `Status: Can't Reproduce`   | `#fef2c0` | A documented reproduction attempt did not reproduce the report.              |
+| `Status: Duplicate`         | `#cfd3d7` | Already tracked elsewhere; link the canonical issue or PR.                   |
+| `Status: Won't Do`          | `#666666` | Declined as out of scope or unsuitable in its proposed form.                 |
+| `Good First Issue`          | `#7057ff` | A scoped, ready task with a clear approach and beginner-friendly validation. |
+| `Help Wanted`               | `#008672` | A scoped, accepted task for which outside contributions are welcome.         |
+
+Review labels whenever answering, triaging, implementing, closing, reopening, or
+otherwise updating an issue or PR:
+
+- Replace `Status: Needs Triage` after review. Use `Status: Confirmed` only for
+  a reproduced defect or an accepted request within project scope; neither
+  reproduction nor acceptance follows automatically from a report.
+- When waiting on the reporter, use `Status: Needs Information` and state what
+  evidence is needed. Use `Status: Blocked` for an identified external
+  dependency, with a link and an unblock condition. Choose the immediate next
+  action rather than stacking statuses.
+- Use `Status: Can't Reproduce` only after documenting the attempted version,
+  input, and result. An incomplete report first needs information.
+- On duplicate closure, link the canonical item and retain `Status: Duplicate`.
+  On rejection, explain the scope or suitability decision and retain
+  `Status: Won't Do`. A declined proposal can be reconsidered with new evidence.
+- On successful completion or merge, remove transient status labels and retain
+  the type. GitHub's open/closed/merged state records completion; there is no
+  redundant Done or Merged label. A closed, unmerged PR should retain its
+  applicable disposition, rather than being labeled as completed.
+- On reopening, reassess the evidence and replace the old disposition; do not
+  carry a stale rejection, duplicate, or information request forward.
+- Apply `Good First Issue` only to a ready, well-explained beginner task,
+  together with `Help Wanted`. Remove both when the item closes or is no longer
+  ready for contribution. Waiting for a reporter's private-workspace benchmark
+  is not a general help request.
+
+Colors follow familiar GitHub cues: red for defects, blue for documentation,
+green for accepted work, yellow/orange for missing information or blockers, and
+gray for neutral or declined dispositions. Names carry the meaning without
+relying on color. The unprefixed contributor labels follow
+[GitHub's label conventions](https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels);
+the readiness criteria draw on the
+[Kubernetes contributor guide](https://www.kubernetes.dev/docs/guide/help-wanted/).
+The `Type:` / `Status:` grouping also appears in
+[community label catalogs](https://gist.github.com/dysfunc/fc722e865a6a960a2d9c5ecf43f5a963);
+this repository intentionally uses a smaller set.
+
 ## Develop locally
 
 Follow the [checkout setup](quick-start.md#install-from-the-repository), then:

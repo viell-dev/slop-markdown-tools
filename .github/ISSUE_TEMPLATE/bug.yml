@@ -1,5 +1,6 @@
 name: Document or tool defect
 description: Report a reproducible linting, formatting, or execution problem
+labels: ["Type: Bug", "Status: Needs Triage"]
 body:
   - type: textarea
     id: environment
