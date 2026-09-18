@@ -29,6 +29,12 @@ current status, and no priority labels. Reassess stale dispositions, remove
 transient statuses on completion, and keep GitHub and the tracked catalog in
 sync. Label changes do not replace explanatory comments or relevant PR links.
 
+In an issue or PR's own body, comments, or reviews, refer to it as "this issue"
+or "this PR" rather than its number or a link to itself. GitHub flags these as
+self-references. Before publishing or editing, check references against the
+current issue or PR number. Preserve links to other issues and PRs, including
+fixing PRs and related work.
+
 For each distinct request, separate the observed problem from its proposed
 solution and choose an appropriate home:
 
