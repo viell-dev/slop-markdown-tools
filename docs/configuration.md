@@ -108,6 +108,9 @@ Whitespace inside a link, code span, or other protected inline node is not a
 wrapping opportunity. A protected paragraph with both breakable prose and an
 over-width atom can report both causes; an atom-only overflow does not trigger
 `reportUnreflowed`. Hard-break markers are excluded from protected-line width.
+An Obsidian callout title is one indivisible physical line: an over-width title
+follows `reportUnbreakable`, even when it contains spaces. Body prose is
+classified separately. A block ID does not make its whole paragraph indivisible.
 Both options default to false, propose no edits, and use the rule's severity.
 Use severity `error` or `--max-warnings 0` to make these diagnostics fail a
 check; `--check` does not change rule settings.

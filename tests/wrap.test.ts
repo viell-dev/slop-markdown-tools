@@ -181,3 +181,96 @@ describe("multiline code spans", () => {
     expect(format(source!, { config: { extends: [] } }).output).toBe(source);
   });
 });
+
+describe("Obsidian callout overflow", () => {
+  const workspace = createWorkspace({}, { strictLineBreaks: true });
+  const title =
+    "[!custom-type]- A long title with ordinary words that must stay on one physical line";
+
+  it("classifies the title independently of its spaces and inline markup", () => {
+    for (const newline of ["\n", "\r\n"]) {
+      for (const prefix of ["> ", "> > ", "- > "]) {
+        for (const measure of ["columns", "codepoints"]) {
+          for (const reportUnreflowed of [false, true]) {
+            for (const reportUnbreakable of [false, true]) {
+              const source = `${prefix}${title} **marked** 日本語${newline}`;
+              const config: Config = {
+                ...wrap({ width: 60, measure, reportUnreflowed, reportUnbreakable }),
+                dialect: "obsidian",
+              };
+              const options = { config, workspace };
+              const diagnostics = lint(source, options);
+              expect(diagnostics).toHaveLength(reportUnbreakable ? 1 : 0);
+              if (reportUnbreakable) {
+                expect(diagnostics[0]?.message).toContain("unbreakable atom");
+                expect(diagnostics[0]?.edit).toBeUndefined();
+              }
+              const result = format(source, options);
+              expect(result.output).toBe(source);
+              expect(result.diagnostics).toEqual(diagnostics);
+              expect(format(result.output, options).output).toBe(source);
+              expect(
+                format(source, { config: { extends: [], dialect: "obsidian" }, workspace }).output,
+              ).toBe(source);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("keeps body overflow separate from title overflow", () => {
+    for (const reportUnreflowed of [false, true]) {
+      for (const reportUnbreakable of [false, true]) {
+        const source = `> ${title}\n> A long body with ordinary words that remains protected by the callout header for now.\n`;
+        const options = {
+          config: {
+            ...wrap({ width: 60, reportUnreflowed, reportUnbreakable }),
+            dialect: "obsidian" as const,
+          },
+          workspace,
+        };
+        const diagnostics = lint(source, options);
+        expect(diagnostics.map((item) => item.message)).toEqual([
+          ...(reportUnreflowed
+            ? ["Paragraph not reflowed: callout header (width 60 columns)."]
+            : []),
+          ...(reportUnbreakable
+            ? ["Paragraph exceeds 60 columns because of an unbreakable atom."]
+            : []),
+        ]);
+        expect(format(source, options).output).toBe(source);
+      }
+    }
+  });
+
+  it("does not reclassify ordinary paragraphs, other dialects, or later quote paragraphs", () => {
+    for (const [source, dialect] of [
+      [`${title}\n`, "obsidian"],
+      [`> Earlier paragraph.\n>\n> ${title}\n`, "obsidian"],
+      [`> ${title}\n`, "commonmark"],
+      [`> ${title}\n`, "github"],
+      [
+        "An ordinary paragraph with many breakable words and a trailing block identifier. ^block\n",
+        "obsidian",
+      ],
+    ] as const) {
+      const config: Config = {
+        ...wrap({ width: 60, reportUnreflowed: true, reportUnbreakable: true }),
+        dialect,
+      };
+      const diagnostics = lint(source, { config, workspace });
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]?.message).toContain("Paragraph not reflowed");
+    }
+  });
+
+  it("does not report short titles or bypass strict line breaks", () => {
+    const config: Config = {
+      ...wrap({ reportUnreflowed: true, reportUnbreakable: true }),
+      dialect: "obsidian",
+    };
+    expect(lint("> [!info] Short title\n", { config, workspace })).toEqual([]);
+    expect(lint(`> ${title}\n`, { config })).toEqual([]);
+  });
+});
