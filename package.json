@@ -1,0 +1,76 @@
+{
+  "name": "@viell-dev/markdown-tools",
+  "version": "0.1.0-alpha.1",
+  "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, and Obsidian",
+  "type": "module",
+  "license": "MIT",
+  "author": "viell",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/viell-dev/slop-markdown-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/viell-dev/slop-markdown-tools/issues"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "bin": {
+    "mdtools": "./dist/cli/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "commander": "15.0.0",
+    "diff": "9.0.0",
+    "github-slugger": "2.0.0",
+    "ignore": "7.0.9",
+    "jsonc-parser": "3.3.1",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-frontmatter": "2.0.1",
+    "mdast-util-gfm": "3.1.0",
+    "mdast-util-math": "3.0.0",
+    "mdast-util-to-markdown": "2.1.2",
+    "micromark-extension-frontmatter": "2.0.0",
+    "micromark-extension-gfm": "3.0.0",
+    "micromark-extension-math": "3.1.0",
+    "micromark-util-types": "2.0.2",
+    "minimatch": "10.2.6",
+    "string-width": "8.2.2",
+    "unist-util-visit": "5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/mdast": "4.0.4",
+    "@types/node": "26.6.1",
+    "@types/unist": "3.0.3",
+    "eslint": "10.10.0",
+    "fast-check": "4.10.1",
+    "prettier": "3.9.8",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}
