@@ -57,22 +57,50 @@ Problem rules report findings and never become formatting edits.
 
 ## Built-in rules
 
-| Rule                          | Kind    | Options                                                   |
-| ----------------------------- | ------- | --------------------------------------------------------- |
-| `style/wrap`                  | Style   | `width`: integer 20–500, default 80                       |
-| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                            |
-| `style/strong`                | Style   | `marker`: `*` (default) or `_`                            |
-| `style/final-newline`         | Style   | None; adds a missing final newline                        |
-| `style/table`                 | Style   | None; aligns top-level GFM tables                         |
-| `style/heading`               | Style   | None; converts eligible Setext headings to ATX            |
-| `links/valid`                 | Problem | None; local files and heading/block fragments             |
-| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below |
-| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only              |
-| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                 |
-| `github/alert-marker`         | Style   | None; known GitHub alert types become uppercase           |
-| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase             |
-| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers              |
-| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings      |
+| Rule                          | Kind    | Options                                                                                     |
+| ----------------------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `style/wrap`                  | Style   | `width`, `measure`, `keepLabelWithAtom`, `reportUnreflowed`, `reportUnbreakable`; see below |
+| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                                                    |
+| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                                              |
+| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                                              |
+| `style/final-newline`         | Style   | None; adds a missing final newline                                                          |
+| `style/table`                 | Style   | None; aligns top-level GFM tables                                                           |
+| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                                              |
+| `links/valid`                 | Problem | None; local files and heading/block fragments                                               |
+| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below                                   |
+| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                                                |
+| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                                                   |
+| `github/alert-marker`         | Style   | None; known GitHub alert types become uppercase                                             |
+| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                                               |
+| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                                                |
+| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                                        |
+
+## Wrapping and inline code
+
+`style/wrap` defaults to `width: 80` and `measure: "columns"` (display columns).
+Set `measure: "codepoints"` to count Unicode scalar values instead; astral
+characters count once and combining marks count separately. Container prefixes
+count toward the width in either mode.
+
+`keepLabelWithAtom: true` keeps a short list-item label ending in a colon with
+an immediately following link, image, or code span when that atom cannot fit on
+a continuation line either. Labels are limited to four words and at most 40
+units or half the configured width. Following prose wraps normally. This option
+defaults to false.
+
+`reportUnreflowed: true` reports over-width paragraphs protected by hard breaks,
+block IDs, inline HTML, callout headers, or unsupported multiline syntax or
+containers. `reportUnbreakable: true` reports overflow remaining after reflow
+because an atom cannot be split. Both default to false, propose no edits, and
+use the rule's severity. Use severity `error` or `--max-warnings 0` to make
+these diagnostics fail a check; `--check` does not change rule settings.
+
+Enable `style/inline-code` to join multiline code spans before paragraph reflow.
+This opt-in rule handles single and multiple backticks, including list and quote
+containers. It preserves the parsed code value, converting each line ending to
+one space under CommonMark's code-span rules. Other code whitespace remains
+significant. It is useful for Obsidian editors that display split spans
+differently from Reading view.
 
 ## Link policies
 
