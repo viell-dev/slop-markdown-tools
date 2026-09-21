@@ -34,6 +34,12 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
             /\p{L}|\p{N}/u.test(document.source[end] ?? ""))
         )
           return;
+        // A new marker touching the same character, outside or inside the
+        // node, would merge into one delimiter run and change the parse.
+        const neighbours = [start - 1, end, start + size, end - size - 1].map(
+          (index) => document.source[index],
+        );
+        if (neighbours.includes(marker[0]!)) return;
         for (const [a, b] of [
           [start, start + size],
           [end - size, end],
@@ -62,15 +68,28 @@ function wrappingAtoms(words: string[]): string[] {
     } else current += word;
   }
   if (current) atoms.push(current);
-  // Keep syntax-like markers with the preceding atom to preserve paragraph meaning.
+  // Keep atoms that would open a block or underline a Setext heading at the
+  // start of a line attached to the preceding atom.
   for (let i = 1; i < atoms.length; i++) {
-    if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
+    if (lineOpener.test(atoms[i]!)) {
       atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+      i--;
+    }
+  }
+  // An atom ending in an unescaped backslash would become a hard break at the
+  // end of a line; keep it attached to the following atom.
+  for (let i = 0; i < atoms.length - 1; i++) {
+    if (/(?:^|[^\\])(?:\\\\)*\\$/.test(atoms[i]!)) {
+      atoms.splice(i, 2, `${atoms[i]} ${atoms[i + 1]}`);
       i--;
     }
   }
   return atoms;
 }
+// List markers, ATX and Setext heading markers, block quotes, thematic breaks,
+// fences, math, Obsidian comments, HTML blocks, and footnote definitions.
+const lineOpener =
+  /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
@@ -387,8 +406,11 @@ export const styleRules: Record<string, Rule> = {
         const first = node.children[0];
         const last = node.children.at(-1);
         if (!first || !last) return;
-        const text = document.source.slice(range(first)[0], range(last)[1]);
-        if (text.includes("\n")) return;
+        let text = document.source.slice(range(first)[0], range(last)[1]);
+        if (/[\r\n]/.test(text)) return;
+        // A trailing run of # after whitespace would become an ATX closing
+        // sequence and disappear from the heading; escape its first character.
+        text = text.replace(/(^|\s)(#+)$/, "$1\\$2");
         findings.push({
           start,
           end,

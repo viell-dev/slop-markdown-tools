@@ -8,6 +8,8 @@ export type WorkspaceSource = string | null | (() => string);
 
 interface Entry {
   headings: Set<string>;
+  /** Lowercased heading text; Obsidian matches heading subpaths case-insensitively. */
+  foldedHeadings: Set<string>;
   slugs: Set<string>;
   blocks: Set<string>;
 }
@@ -52,11 +54,34 @@ export function createWorkspace(
       directory = path.posix.dirname(directory);
     }
   }
+  // Obsidian resolves note names case-insensitively; these indexes are built on first use.
+  let foldedNames: Map<string, string[]> | undefined;
+  let foldedDirectories: Set<string> | undefined;
+  function namesMatching(name: string): string[] {
+    if (!foldedNames) {
+      foldedNames = new Map();
+      for (const actual of sources.keys()) {
+        const key = actual.toLowerCase();
+        foldedNames.set(key, [...(foldedNames.get(key) ?? []), actual]);
+      }
+    }
+    return foldedNames.get(name.toLowerCase()) ?? [];
+  }
+  function isDirectory(name: string, folded: boolean): boolean {
+    if (!folded) return directories.has(name);
+    foldedDirectories ??= new Set([...directories].map((directory) => directory.toLowerCase()));
+    return foldedDirectories.has(name.toLowerCase());
+  }
   const entries = new Map<string, Entry>();
   function fragments(name: string): Entry {
     const cached = entries.get(name);
     if (cached) return cached;
-    const entry: Entry = { headings: new Set(), slugs: new Set(), blocks: new Set() };
+    const entry: Entry = {
+      headings: new Set(),
+      foldedHeadings: new Set(),
+      slugs: new Set(),
+      blocks: new Set(),
+    };
     const value = sources.get(name);
     if (value !== null && value !== undefined && /\.md$/i.test(name)) {
       const source = typeof value === "function" ? value() : value;
@@ -65,6 +90,7 @@ export function createWorkspace(
       walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
+        entry.foldedHeadings.add(text.toLowerCase());
         entry.slugs.add(slugger.slug(text));
       });
       walk(document.tree, "text", (node) => {
@@ -82,7 +108,7 @@ export function createWorkspace(
       for (const name of sources.keys()) {
         const parts = name.split("/");
         for (let i = 0; i < parts.length; i++) {
-          const suffix = parts.slice(i).join("/");
+          const suffix = parts.slice(i).join("/").toLowerCase();
           for (const key of suffix.endsWith(".md") ? [suffix, suffix.slice(0, -3)] : [suffix]) {
             if (!suffixes.has(key)) suffixes.set(key, new Set());
             suffixes.get(key)!.add(name);
@@ -90,7 +116,7 @@ export function createWorkspace(
         }
       }
     }
-    return suffixes.get(target);
+    return suffixes.get(target.toLowerCase());
   }
   return {
     ...(options.strictLineBreaks !== undefined
@@ -106,17 +132,19 @@ export function createWorkspace(
         return { status: "unavailable" };
       const candidates = new Set<string>();
       let directory = false;
+      const folded = dialect === "obsidian";
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return;
-        if (directories.has(normalized.replace(/\/$/, ""))) directory = true;
-        if (sources.has(normalized)) candidates.add(normalized);
-        if (
-          dialect === "obsidian" &&
-          !path.posix.extname(normalized) &&
-          sources.has(`${normalized}.md`)
-        )
-          candidates.add(`${normalized}.md`);
+        if (isDirectory(normalized.replace(/\/$/, ""), folded)) directory = true;
+        if (!folded) {
+          if (sources.has(normalized)) candidates.add(normalized);
+          return;
+        }
+        // Names differing only by case all count, so such vaults report ambiguity.
+        for (const name of namesMatching(normalized)) candidates.add(name);
+        if (!path.posix.extname(normalized))
+          for (const name of namesMatching(`${normalized}.md`)) candidates.add(name);
       };
       if (!targetPath) add(source);
       else if (dialect === "obsidian") {
@@ -141,7 +169,7 @@ export function createWorkspace(
         (dialect === "obsidian"
           ? fragment.startsWith("^")
             ? entry!.blocks.has(fragment.slice(1))
-            : entry!.headings.has(fragment)
+            : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : entry!.slugs.has(fragment));
       return { status: "resolved", target, fragment, fragmentExists };
     },

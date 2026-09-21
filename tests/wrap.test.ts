@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   builtInRules,
@@ -29,6 +30,82 @@ describe("wrapping controls", () => {
       `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb ${marker} Its move is Happy Hour.\n`,
     );
     expect(format(source, { config: { extends: [] } }).output).toBe(source);
+  });
+  it.each(["~~~", "```", "$$", "<!--", "<div", "[^1]:", "--", "==", "="])(
+    "keeps %s attached to the preceding word instead of opening a block",
+    (atom) => {
+      const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb ${atom} more words follow here.\n`;
+      const result = verify(source, { ...wrap(), dialect: "github" });
+      expect(result.output).toBe(
+        `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb ${atom} more words follow here.\n`,
+      );
+    },
+  );
+  it("keeps an Obsidian comment opener attached to the preceding word", () => {
+    const config: Config = { ...wrap(), dialect: "obsidian" };
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    const source = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb %% more words follow here.\n";
+    const result = format(source, { config, workspace });
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(result.output).toBe(
+      "aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb %% more words follow here.\n",
+    );
+  });
+  it("keeps a trailing backslash away from the end of a line", () => {
+    const source = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa C:\\ more words follow here.\n";
+    expect(verify(source, wrap()).output).toBe(
+      "aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nC:\\ more words follow here.\n",
+    );
+    const escaped = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa C:\\\\ more words follow here.\n";
+    expect(verify(escaped, wrap()).output).toBe(
+      "aaaa aaaa aaaa aaaa aaaa aaaa aaaa C:\\\\\nmore words follow here.\n",
+    );
+  });
+  it("reflows randomly generated paragraphs with block-like atoms without rejection", () => {
+    const atoms = fc.constantFrom(
+      "word",
+      "longer-word",
+      "--",
+      "-",
+      "=",
+      "==",
+      "***",
+      "~~~",
+      "```",
+      "$$",
+      "<!--",
+      "<div",
+      "[^1]:",
+      "#",
+      ">",
+      "1.",
+      "2)",
+      "C:\\",
+      "\\",
+      "\\\\",
+      "*em*",
+      "`code`",
+      "[x]",
+    );
+    const prefixes = fc.constantFrom("", "- ", "* [x] ", "- [ ]  ", "1. ", "> ");
+    fc.assert(
+      fc.property(
+        prefixes,
+        fc.array(atoms, { minLength: 1, maxLength: 25 }),
+        fc.integer({ min: 20, max: 60 }),
+        (prefix, words, width) => {
+          const source = `${prefix}${words.join(" ")}\n`;
+          const config: Config = { ...wrap({ width }), dialect: "github" };
+          const result = format(source, { config });
+          expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+          expect(format(result.output, { config }).output).toBe(result.output);
+          expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+            semanticFingerprint(parse(source, "github")),
+          );
+        },
+      ),
+      { numRuns: 400, seed: 20260921 },
+    );
   });
   it.each([
     ["* [x]  done\n", "* [x]  done\n"],
