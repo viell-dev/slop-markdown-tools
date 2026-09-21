@@ -1,7 +1,11 @@
 # Contributing and development
 
-This project is developed and maintained by AI agents. It is **not
-human-maintained**; do not assume that a person has reviewed generated changes.
+This project is entirely agent-authored and agent-maintained. AI agents wrote
+the code, tests, documentation, and release tooling, and agents implement,
+verify, and merge every change. It is **not human-maintained**; do not assume
+that a person has reviewed generated changes. The repository owner does not
+write, read, or review code and does not use the tool directly; they read issue
+and PR descriptions to check the project's direction and assign agents to tasks.
 Issues and pull requests from people and agents are welcome.
 
 ## Report a defect
@@ -65,7 +69,6 @@ Use the GitHub UI or the existing `gh` CLI; no label-sync service is required.
 | `Type: Documentation`       | `#0075ca` | Documentation, examples, or contributor instructions.                        |
 | `Type: Discussion`          | `#5319e7` | Explore a design or project direction before an actionable proposal.         |
 | `Type: Question`            | `#d876e3` | Ask how the project works or how to use it.                                  |
-| `Status: Needs Triage`      | `#ededed` | Awaiting maintainer review and a scope decision.                             |
 | `Status: Confirmed`         | `#0e8a16` | Reproduced defect or accepted actionable request; not a delivery commitment. |
 | `Status: Needs Information` | `#fbca04` | Waiting for reporter details, answers, or validation results.                |
 | `Status: Blocked`           | `#d93f0b` | Accepted work is waiting on an identified external dependency.               |
@@ -78,9 +81,10 @@ Use the GitHub UI or the existing `gh` CLI; no label-sync service is required.
 Review labels whenever answering, triaging, implementing, closing, reopening, or
 otherwise updating an issue or PR:
 
-- Replace `Status: Needs Triage` after review. Use `Status: Confirmed` only for
-  a reproduced defect or an accepted request within project scope; neither
-  reproduction nor acceptance follows automatically from a report.
+- New items carry only a type label until an assigned agent reviews them. Use
+  `Status: Confirmed` only for a reproduced defect or an accepted request within
+  project scope; neither reproduction nor acceptance follows automatically from
+  a report.
 - When waiting on the reporter, use `Status: Needs Information` and state what
   evidence is needed. Use `Status: Blocked` for an identified external
   dependency, with a link and an unblock condition. Choose the immediate next
@@ -139,8 +143,11 @@ handling and installed command behavior; it has already caught a path-alias
 regression. macOS is not a routine CI target.
 
 Keep changes scoped and describe remaining limitations in the pull request.
-Agent contributors should also read the repository's
-[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md).
+Write the description for a reader who has not seen the code: the repository
+owner judges direction from issue and PR descriptions alone. Agent contributors
+should also read the repository's
+[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md),
+which describes the limits of an assigned agent's authority.
 
 ## Write and preview documentation
 
