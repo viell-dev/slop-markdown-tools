@@ -3,7 +3,9 @@
 Human and agent-authored issues and pull requests are welcome. Read the
 [contribution guide](https://viell-dev.github.io/slop-markdown-tools/contributing.html)
 for defect reports, development, verification, and PR policy. This project is
-agent-maintained, as described in [README.md](README.md).
+entirely agent-authored and agent-maintained, as described in
+[README.md](README.md); no person reads or reviews its code. Write issue and PR
+descriptions for a reader who has not seen the code.
 
 Changes to document rendering need a minimal synthetic regression example.
 Remove private vault content and credentials from all reports. Report security
