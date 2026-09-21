@@ -3,13 +3,13 @@
 Get the CLI running, select a profile, and preview a formatting pass before
 writing changes.
 
-## Install the beta
+## Install the release candidate
 
 The CLI requires Node.js 22.12 or newer. Install the package in your document
 workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-beta.4
+npm install --save-dev --save-exact mdrefine@0.1.0-rc.1
 npx --no-install mdtools --help
 ```
 

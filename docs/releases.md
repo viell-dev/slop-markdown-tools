@@ -2,16 +2,18 @@
 
 ## Versions and availability
 
-These documents cover `mdrefine@0.1.0-beta.4`. The executable is `mdtools`;
-prereleases use npm's `beta` channel. Read the
-[beta.4 release notes](releases/0.1.0-beta.4.md) for changes and limitations.
-Previous releases: [beta.3](releases/0.1.0-beta.3.md),
-[beta.2](releases/0.1.0-beta.2.md), and [beta.1](releases/0.1.0-beta.1.md).
+These documents cover `mdrefine@0.1.0-rc.1`. The executable is `mdtools`;
+prereleases use the npm channel named after their prerelease identifier, `rc`
+for release candidates and `beta` for betas. Read the
+[rc.1 release notes](releases/0.1.0-rc.1.md) for changes and limitations.
+Previous releases: [beta.4](releases/0.1.0-beta.4.md),
+[beta.3](releases/0.1.0-beta.3.md), [beta.2](releases/0.1.0-beta.2.md), and
+[beta.1](releases/0.1.0-beta.1.md).
 
 The registry is the source of truth for package availability:
 
 ```sh
-npm view mdrefine@0.1.0-beta.4 version --registry=https://registry.npmjs.org/
+npm view mdrefine@0.1.0-rc.1 version --registry=https://registry.npmjs.org/
 ```
 
 An `E404` means the requested package or version is unavailable. A version in
@@ -21,8 +23,8 @@ release announcements and downloadable artifacts.
 
 The npm package is published under account `viell`. Until the first stable
 release, `latest` points to the newest prerelease of any kind, alongside its
-channel tag such as `beta`, so default installations receive fixes. Once a
-stable release exists, `latest` follows stable releases and prerelease channel
+channel tag such as `rc` or `beta`, so default installations receive fixes. Once
+a stable release exists, `latest` follows stable releases and prerelease channel
 tags remain separate.
 
 ## Prepare without publishing
@@ -32,7 +34,7 @@ Use Node.js 24 and npm 10 or newer from a clean checkout:
 ```sh
 npm ci
 npm run release:prepare
-npm publish ./artifacts/mdrefine-0.1.0-beta.4.tgz --dry-run --ignore-scripts --access public --tag beta
+npm publish ./artifacts/mdrefine-0.1.0-rc.1.tgz --dry-run --ignore-scripts --access public --tag rc
 ```
 
 Preparation runs all checks, packs the allowlisted files, installs that exact
@@ -79,16 +81,17 @@ Trusted-publisher settings were verified on 2026-09-18. The first release used
 local authentication and has no OIDC provenance. For workflow releases, verify
 the publication job and the registry provenance attestations after each release.
 
-## Publish an authorized beta
+## Publish an authorized prerelease
 
 Dispatch **Release** on `main` with the exact package version, `publish: true`,
 and the actual publishing agent's identity as `model via harness`. The workflow
 builds and checks the package again, verifies the artifact checksum, publishes
-that tarball to npm's `beta` channel with provenance, and creates a GitHub
-prerelease at the workflow's commit. Tags use exact versions without a `v`
-prefix. Stable publication deliberately needs a separate policy change; this
-workflow accepts only beta versions and requests the `beta` tag. Complete the
-npm tag synchronization below before reporting a pre-stable release complete.
+that tarball to the npm channel matching its prerelease identifier (`rc` or
+`beta`) with provenance, and creates a GitHub prerelease at the workflow's
+commit. Tags use exact versions without a `v` prefix. Stable publication
+deliberately needs a separate policy change; this workflow accepts only beta and
+rc versions and derives the channel tag from the version. Complete the npm tag
+synchronization below before reporting a pre-stable release complete.
 
 For an authenticated first publication that cannot use OIDC yet, use the exact
 reviewed tarball with `npm publish <tarball> --ignore-scripts --access public
@@ -113,12 +116,12 @@ release to change that history.
 ## Synchronize npm tags before the first stable release
 
 After each authorized prerelease publication, wait for npm processing to finish
-and verify that the channel tag (`beta` today) points to the expected version.
+and verify that the channel tag (`rc` today) points to the expected version.
 Until the first stable release, move `latest` to that same version using an
-authenticated local npm session. For the current beta:
+authenticated local npm session. For the current release candidate:
 
 ```sh
-npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.1.0-beta.4 latest
+npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.1.0-rc.1 latest
 npm_config_cache="$PWD/.npm-cache" npm dist-tag ls mdrefine
 ```
 
@@ -129,7 +132,7 @@ records this required follow-up in its summary; complete browser authentication
 locally if npm requests it. Keep the waiting command alive and never put
 authentication secrets in chat or repository files.
 
-Tag synchronization is part of an authorized beta release. It does not publish
+Tag synchronization is part of an authorized prerelease. It does not publish
 another version or change package contents. If promotion fails, retry only the
 tag update after resolving authentication; never rerun publication. Stop
 promoting prereleases to `latest` when the first stable release is published.
