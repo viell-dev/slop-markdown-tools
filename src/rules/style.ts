@@ -83,6 +83,8 @@ const wrap: Rule = {
     const measure =
       options.measure === "codepoints" ? (text: string) => [...text].length : stringWidth;
     const unit = options.measure === "codepoints" ? "code points" : "columns";
+    // Detect the line ending once; scanning the whole source per paragraph is quadratic.
+    const newline = document.source.includes("\r\n") ? "\r\n" : "\n";
     visit(document.tree, "paragraph", (node, index, parent) => {
       const [paragraphStart, end] = range(node);
       let start = paragraphStart;
@@ -237,7 +239,6 @@ const wrap: Rule = {
         } else line = candidate;
       }
       if (line) output.push(line);
-      const newline = document.source.includes("\r\n") ? "\r\n" : "\n";
       const replacement = output.join(newline + continuation);
       if (replacement !== original)
         findings.push({
@@ -263,6 +264,7 @@ const table: Rule = {
   schema: optionsSchema({}),
   check({ document }) {
     const findings: Finding[] = [];
+    const newline = document.source.includes("\r\n") ? "\r\n" : "\n";
     visit(document.tree, "table", (node) => {
       const [start, end] = range(node);
       // Nested tables retain container prefixes until a dedicated container printer handles them.
@@ -299,7 +301,7 @@ const table: Rule = {
           })
           .join(" | ")} |`,
       );
-      const replacement = rendered.join(document.source.includes("\r\n") ? "\r\n" : "\n");
+      const replacement = rendered.join(newline);
       if (replacement !== document.source.slice(start, end))
         findings.push({
           start,
