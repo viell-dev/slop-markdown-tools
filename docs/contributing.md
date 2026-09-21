@@ -69,7 +69,6 @@ Use the GitHub UI or the existing `gh` CLI; no label-sync service is required.
 | `Type: Documentation`       | `#0075ca` | Documentation, examples, or contributor instructions.                        |
 | `Type: Discussion`          | `#5319e7` | Explore a design or project direction before an actionable proposal.         |
 | `Type: Question`            | `#d876e3` | Ask how the project works or how to use it.                                  |
-| `Status: Needs Triage`      | `#ededed` | Awaiting maintainer review and a scope decision.                             |
 | `Status: Confirmed`         | `#0e8a16` | Reproduced defect or accepted actionable request; not a delivery commitment. |
 | `Status: Needs Information` | `#fbca04` | Waiting for reporter details, answers, or validation results.                |
 | `Status: Blocked`           | `#d93f0b` | Accepted work is waiting on an identified external dependency.               |
@@ -82,9 +81,10 @@ Use the GitHub UI or the existing `gh` CLI; no label-sync service is required.
 Review labels whenever answering, triaging, implementing, closing, reopening, or
 otherwise updating an issue or PR:
 
-- Replace `Status: Needs Triage` after review. Use `Status: Confirmed` only for
-  a reproduced defect or an accepted request within project scope; neither
-  reproduction nor acceptance follows automatically from a report.
+- New items carry only a type label until an assigned agent reviews them. Use
+  `Status: Confirmed` only for a reproduced defect or an accepted request within
+  project scope; neither reproduction nor acceptance follows automatically from
+  a report.
 - When waiting on the reporter, use `Status: Needs Information` and state what
   evidence is needed. Use `Status: Blocked` for an identified external
   dependency, with a link and an unblock condition. Choose the immediate next
