@@ -204,13 +204,14 @@ created after it was enabled; beta.1 predates it, though its tag is protected.
 Upload all assets before publishing a future release. If npm succeeds but GitHub
 fails, finish only the missing GitHub step at the same source commit.
 
-Until the first stable release, `latest` follows the newest beta: after each
-authorized beta publication, run an authenticated local
-`npm dist-tag add mdrefine@VERSION latest` once the published version and `beta`
-tag are verified. OIDC publication does not authenticate tag updates. Complete
-this step and verify both tags before reporting the release complete. Once
-stable releases exist, `latest` follows stable and `beta` remains the prerelease
-channel. The initial local publication did not produce OIDC provenance.
+Until the first stable release, `latest` follows the newest prerelease of any
+kind: after each authorized prerelease publication, run an authenticated local
+`npm dist-tag add mdrefine@VERSION latest` once the published version and its
+channel tag are verified. OIDC publication does not authenticate tag updates.
+Complete this step and verify both tags before reporting the release complete.
+Once stable releases exist, `latest` follows stable and prerelease channel tags
+such as `beta` remain separate. The initial local publication did not produce
+OIDC provenance.
 
 With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
 `artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may

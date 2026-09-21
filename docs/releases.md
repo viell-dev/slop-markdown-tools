@@ -20,9 +20,10 @@ this repository or its documentation does not imply publication. Check
 release announcements and downloadable artifacts.
 
 The npm package is published under account `viell`. Until the first stable
-release, `latest` and `beta` point to the same current beta, so default
-installations receive fixes. Once a stable release exists, `latest` follows
-stable releases and `beta` remains the prerelease channel.
+release, `latest` points to the newest prerelease of any kind, alongside its
+channel tag such as `beta`, so default installations receive fixes. Once a
+stable release exists, `latest` follows stable releases and prerelease channel
+tags remain separate.
 
 ## Prepare without publishing
 
@@ -111,10 +112,10 @@ release to change that history.
 
 ## Synchronize npm tags before the first stable release
 
-After each authorized beta publication, wait for npm processing to finish and
-verify that `beta` points to the expected version. Until the first stable
-release, move `latest` to that same version using an authenticated local npm
-session. For the current beta:
+After each authorized prerelease publication, wait for npm processing to finish
+and verify that the channel tag (`beta` today) points to the expected version.
+Until the first stable release, move `latest` to that same version using an
+authenticated local npm session. For the current beta:
 
 ```sh
 npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.1.0-beta.4 latest
@@ -131,7 +132,7 @@ authentication secrets in chat or repository files.
 Tag synchronization is part of an authorized beta release. It does not publish
 another version or change package contents. If promotion fails, retry only the
 tag update after resolving authentication; never rerun publication. Stop
-promoting betas to `latest` when the first stable release is published.
+promoting prereleases to `latest` when the first stable release is published.
 
 Verify both tags, a fresh default installation, the GitHub release and its
 assets, registry provenance, and the documentation site before reporting the
