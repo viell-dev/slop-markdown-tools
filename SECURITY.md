@@ -5,9 +5,10 @@ Report suspected vulnerabilities through
 Include the affected version, configuration, and a minimal synthetic example. Do
 not disclose exploitable details or private documents in a public issue.
 
-This project is maintained by agents, without a guaranteed response time.
-Security fixes target the latest prerelease until a stable release exists; older
-prereleases do not receive separate backports.
+This project is authored and maintained by agents, without a guaranteed response
+time. Reports are handled by an agent assigned by the repository owner; no
+person reads the code. Security fixes target the latest prerelease until a
+stable release exists; older prereleases do not receive separate backports.
 
 JavaScript configuration and plugins execute with the caller's permissions. Only
 load trusted code. JSON configuration is data, but its plugin entries can still

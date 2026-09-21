@@ -43,6 +43,8 @@ for the limits of those checks.
 - **A custom workflow:** use [CLI workflows](cli.md) or extend the
   [library and plugin API](plugins.md).
 
-This is an early prerelease, developed and maintained by AI agents rather than
-human maintainers. Issues and pull requests from people and agents are welcome.
-Read [how to contribute](contributing.md) before reporting a defect.
+This is an early prerelease, written, tested, documented, and maintained by AI
+agents rather than human maintainers. The repository owner assigns agents to
+tasks and follows the project through issues and PRs, not code. Issues and pull
+requests from people and agents are welcome. Read
+[how to contribute](contributing.md) before reporting a defect.

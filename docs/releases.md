@@ -51,9 +51,10 @@ three targets.
 
 ## Publication prerequisites
 
-Publication requires explicit operator authorization. Preparing a PR or artifact
-does not supply that authorization. For subsequent releases, verify these
-prerequisites rather than repeating the completed bootstrap:
+Publication requires explicit authorization from the repository owner for each
+release. Preparing a PR or artifact does not supply that authorization. For
+subsequent releases, verify these prerequisites rather than repeating the
+completed bootstrap:
 
 1. Merge the release PR with all required checks passing. Review the tarball
    manifest, release notes, version, and registry name again.

@@ -5,6 +5,40 @@ maintenance policy, and contribution instructions. Keep that information there
 rather than duplicating it here. Public design and API documentation belongs in
 `docs/`.
 
+## Ownership and agent authority
+
+This project is agent-authored, agent-tested, agent-documented, and
+agent-maintained. AI agents wrote the code, tests, documentation, CI, and
+release tooling, and agents implement, verify, and merge every change. No person
+writes, reads, or reviews the code. The repository owner does not know the
+codebase, the API, or the CLI and does not run the tool directly. Their
+involvement is limited to reading issue and PR descriptions to judge whether the
+project is heading in the right direction, reading Markdown documents that other
+agents have processed with the tool, and assigning agents to tasks based on the
+overall status, open issues, and open PRs.
+
+- Issue and PR descriptions are the owner's only view of the work. Write them so
+  a reader without codebase knowledge understands the observed problem, the
+  resulting behavior, the scope decision, and anything left undecided. Do not
+  rely on the diff or on code references to carry that meaning.
+- There is no personal author voice to preserve in code, documentation, or other
+  prose. Keep terminology, structure, and formatting consistent with the
+  existing documents; do not imitate an earlier model's writing style for its
+  own sake.
+- A human-hands-off project does not grant agents open-ended decision-making
+  authority. The owner assigns each task, and the assigned agent owns the
+  judgment that task requires, including deciding whether a request is in scope
+  or applicable to the project. Record that decision and its reasoning in the
+  issue or PR. Do not extend an assignment to unrelated issues, PRs, or design
+  changes, and do not take actions with external effect, such as publishing,
+  releasing, changing repository settings, or closing work outside the
+  assignment, unless the assignment covers them. When an assignment is
+  ambiguous, state the interpretation used rather than widening the scope
+  silently.
+- No one else catches mistakes before merge. Verification, regression fixtures,
+  CI, and the complete diff review are the only review the change receives;
+  treat them as such.
+
 ## Repository boundary
 
 This directory is an independent public repository. Its parent directory and
@@ -15,11 +49,12 @@ into tests, issues, or pull requests.
 ## Issue triage and project scope
 
 Review requests against the README, design boundaries, and existing extension
-contracts before implementing them. A request to review or resolve issues
-requires independent maintainer judgment; it does not authorize accepting every
-reporter's proposed feature. Reports from agents receive the same scrutiny as
-reports from people. Rejecting, narrowing, splitting, or closing an issue as out
-of scope is a valid outcome.
+contracts before implementing them. The agent assigned to review or resolve
+issues exercises the maintainer's scope judgment for that assignment; nobody
+else will. The assignment does not authorize accepting every reporter's proposed
+feature, and it does not extend to issues outside the assignment. Reports from
+agents receive the same scrutiny as reports from people. Rejecting, narrowing,
+splitting, or closing an issue as out of scope is a valid outcome.
 
 Maintain labels as part of every issue or PR update, including answers, closure,
 and reopening. Follow the
@@ -191,8 +226,8 @@ and public TypeScript declarations with `test:package`, not just the source CLI.
 Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull
 requests, and other published prose, end with
 `🤖 Generated with <model> via <harness>`, using the actual session identity
-rather than literal placeholders. Keep existing authors' voice when editing
-prose.
+rather than literal placeholders. These trailers and footers are the project's
+authorship record: they identify which model and harness produced each change.
 
 Do not append agent attribution footers to repository documents. The README's
 maintenance disclaimer covers them; keep attribution in commits and external

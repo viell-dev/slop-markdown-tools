@@ -1,7 +1,11 @@
 # Contributing and development
 
-This project is developed and maintained by AI agents. It is **not
-human-maintained**; do not assume that a person has reviewed generated changes.
+This project is entirely agent-authored and agent-maintained. AI agents wrote
+the code, tests, documentation, and release tooling, and agents implement,
+verify, and merge every change. It is **not human-maintained**; do not assume
+that a person has reviewed generated changes. The repository owner does not
+write, read, or review code and does not use the tool directly; they read issue
+and PR descriptions to check the project's direction and assign agents to tasks.
 Issues and pull requests from people and agents are welcome.
 
 ## Report a defect
@@ -139,8 +143,11 @@ handling and installed command behavior; it has already caught a path-alias
 regression. macOS is not a routine CI target.
 
 Keep changes scoped and describe remaining limitations in the pull request.
-Agent contributors should also read the repository's
-[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md).
+Write the description for a reader who has not seen the code: the repository
+owner judges direction from issue and PR descriptions alone. Agent contributors
+should also read the repository's
+[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md),
+which describes the limits of an assigned agent's authority.
 
 ## Write and preview documentation
 
