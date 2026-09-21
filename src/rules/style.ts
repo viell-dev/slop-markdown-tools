@@ -56,15 +56,28 @@ function wrappingAtoms(words: string[]): string[] {
     } else current += word;
   }
   if (current) atoms.push(current);
-  // Keep syntax-like markers with the preceding atom to preserve paragraph meaning.
+  // Keep atoms that would open a block or underline a Setext heading at the
+  // start of a line attached to the preceding atom.
   for (let i = 1; i < atoms.length; i++) {
-    if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
+    if (lineOpener.test(atoms[i]!)) {
       atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+      i--;
+    }
+  }
+  // An atom ending in an unescaped backslash would become a hard break at the
+  // end of a line; keep it attached to the following atom.
+  for (let i = 0; i < atoms.length - 1; i++) {
+    if (/(?:^|[^\\])(?:\\\\)*\\$/.test(atoms[i]!)) {
+      atoms.splice(i, 2, `${atoms[i]} ${atoms[i + 1]}`);
       i--;
     }
   }
   return atoms;
 }
+// List markers, ATX and Setext heading markers, block quotes, thematic breaks,
+// fences, math, Obsidian comments, HTML blocks, and footnote definitions.
+const lineOpener =
+  /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
