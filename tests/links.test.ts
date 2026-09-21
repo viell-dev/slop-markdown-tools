@@ -103,6 +103,73 @@ describe("local target resolution", () => {
     expect(unused).not.toHaveBeenCalled();
   });
 });
+describe("Obsidian case-insensitive resolution", () => {
+  const files = {
+    "Doc.md": "",
+    "Note.md": "# Note\n\n## Heading Two\n\nA block. ^id\n",
+    "Folder/Inner.md": "",
+    "Dup.md": "",
+    "dup.md": "",
+    "Other/Same.md": "",
+    "Other/same.md": "",
+  };
+  const workspace = createWorkspace(files, { dialect: "obsidian" });
+  it.each([
+    ["note", "Note.md"],
+    ["NOTE.md", "Note.md"],
+    ["folder/inner", "Folder/Inner.md"],
+    ["inner", "Folder/Inner.md"],
+    ["/Folder/INNER", "Folder/Inner.md"],
+  ])("resolves %s like Obsidian", (url, target) => {
+    expect(workspace.resolve("Doc.md", url, "obsidian")).toMatchObject({
+      status: "resolved",
+      target,
+    });
+  });
+  it("matches heading subpaths case-insensitively but block identifiers exactly", () => {
+    expect(workspace.resolve("Doc.md", "note#heading two", "obsidian")).toMatchObject({
+      status: "resolved",
+      target: "Note.md",
+      fragmentExists: true,
+    });
+    expect(workspace.resolve("Doc.md", "Note#HEADING TWO", "obsidian").fragmentExists).toBe(true);
+    expect(workspace.resolve("Doc.md", "Note#Heading Three", "obsidian").fragmentExists).toBe(
+      false,
+    );
+    expect(workspace.resolve("Doc.md", "Note#^id", "obsidian").fragmentExists).toBe(true);
+    expect(workspace.resolve("Doc.md", "Note#^ID", "obsidian").fragmentExists).toBe(false);
+  });
+  it("reports names that differ only by case as ambiguous", () => {
+    for (const url of ["Dup", "dup", "DUP.md", "Other/Same", "same"])
+      expect(workspace.resolve("Doc.md", url, "obsidian").status, url).toBe("ambiguous");
+  });
+  it("keeps CommonMark and GitHub resolution case-sensitive", () => {
+    for (const dialect of ["commonmark", "github"] as const) {
+      expect(workspace.resolve("Doc.md", "note.md", dialect).status).toBe("missing");
+      expect(workspace.resolve("Doc.md", "Note.md#heading-two", dialect).fragmentExists).toBe(true);
+      expect(workspace.resolve("Doc.md", "Note.md#Heading-Two", dialect).fragmentExists).toBe(
+        false,
+      );
+    }
+    expect(workspace.resolve("Doc.md", "Dup.md", "github").status).toBe("resolved");
+  });
+  it("lints and rewrites case-insensitive links in Obsidian documents", () => {
+    const config: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "links/valid": "error", "links/path": ["warn", { style: "root" }] },
+    };
+    const source = "See [[note]], [[other/same]], and [[note#heading two|there]].\n";
+    expect(lint(source, { path: "Doc.md", config, workspace })).toMatchObject([
+      { rule: "links/valid", message: "Ambiguous local target: other/same." },
+      { rule: "links/path", message: "Normalize wikilink destination." },
+    ]);
+    const result = format(source, { path: "Doc.md", config, workspace });
+    expect(result.output).toBe("See [[note]], [[other/same]], and [[Note#heading two|there]].\n");
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+  });
+});
+
 describe("destination spelling", () => {
   it.each([
     ["What is this? A test.md", "What is this? A test.md"],

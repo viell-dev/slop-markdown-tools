@@ -61,9 +61,11 @@ to vault-relative paths wrapped in angle brackets:
 ```
 
 For example, a resolved Markdown link can become `[Note](<Folder/Note.md>)`.
-Missing or ambiguous destinations are never guessed. Unaliased wikilinks retain
-their target spelling because changing it may change their visible label. Note
-embeds remain embeds.
+Note names and heading subpaths match case-insensitively, as in Obsidian, while
+block identifiers match exactly; notes whose paths differ only by case are
+reported as ambiguous. Missing or ambiguous destinations are never guessed.
+Unaliased wikilinks retain their target spelling because changing it may change
+their visible label. Note embeds remain embeds.
 
 See [link policies](configuration.md#link-policies) for relative paths,
 extension handling, and eligible Markdown/wikilink conversion. Path rewriting
