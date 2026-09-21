@@ -41,10 +41,9 @@ overall status, open issues, and open PRs.
 
 ## Repository boundary
 
-This directory is an independent public repository. Its parent directory and
-sibling `docs/` are private project material: never stage, copy, quote, or
-publish their contents. Use synthetic fixtures; do not copy real vault documents
-into tests, issues, or pull requests.
+Everything this project needs lives in this repository. Never stage, copy,
+quote, or publish content from outside it. Use synthetic fixtures; do not copy
+real vault documents into tests, issues, or pull requests.
 
 ## Issue triage and project scope
 
