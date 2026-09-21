@@ -28,6 +28,9 @@ describe("style/heading", () => {
     ["Sub\n---\n", "## Sub\n"],
     ["*Title* with `code`\n===\n", "# *Title* with `code`\n"],
     ["C#\n---\n", "## C#\n"],
+    ["Sharp #\n---\n", "## Sharp \\#\n"],
+    ["Sharp ##\n===\n", "# Sharp \\##\n"],
+    ["Sharp \\#\n---\n", "## Sharp \\#\n"],
   ])("converts %j to an ATX heading", (source, output) => {
     expect(formatted(source, config)).toBe(output);
   });
