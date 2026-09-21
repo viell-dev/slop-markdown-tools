@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspace, format, lint, parse, semanticFingerprint } from "../src/index.js";
+import {
+  builtInRules,
+  createWorkspace,
+  format,
+  lint,
+  parse,
+  semanticFingerprint,
+} from "../src/index.js";
 import type { Config } from "../src/index.js";
 
 function wrap(options: Record<string, unknown> = {}): Config {
@@ -22,6 +29,25 @@ describe("wrapping controls", () => {
       `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb ${marker} Its move is Happy Hour.\n`,
     );
     expect(format(source, { config: { extends: [] } }).output).toBe(source);
+  });
+  it("reflows many paragraphs in linear time regardless of the line ending", () => {
+    // Exercise the rule directly: the edit application and diagnostic positioning
+    // costs of format() are measured separately.
+    const paragraph = "word ".repeat(30).trim();
+    const lf = Array.from({ length: 16000 }, () => paragraph).join("\n\n") + "\n";
+    const crlf = lf.replaceAll("\n", "\r\n");
+    const rule = builtInRules["style/wrap"]!;
+    const check = (source: string) =>
+      rule.check({ document: parse(source, "commonmark"), options: { width: 40 } });
+    const started = performance.now();
+    const lfFindings = check(lf);
+    const crlfFindings = check(crlf);
+    expect(performance.now() - started).toBeLessThan(6000);
+    expect(lfFindings).toHaveLength(16000);
+    expect(crlfFindings.map((item) => item.edit?.text)).toEqual(
+      lfFindings.map((item) => item.edit?.text.replaceAll("\n", "\r\n")),
+    );
+    expect(lfFindings[0]?.edit?.text.split("\n").every((line) => line.length <= 40)).toBe(true);
   });
   it("groups consecutive protected markers", () => {
     const result = verify("aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb # > tail\n", wrap());
