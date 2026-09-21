@@ -34,20 +34,31 @@ describe("wrapping controls", () => {
     // Exercise the rule directly: the edit application and diagnostic positioning
     // costs of format() are measured separately.
     const paragraph = "word ".repeat(30).trim();
-    const lf = Array.from({ length: 16000 }, () => paragraph).join("\n\n") + "\n";
-    const crlf = lf.replaceAll("\n", "\r\n");
     const rule = builtInRules["style/wrap"]!;
+    const build = (count: number) =>
+      Array.from({ length: count }, () => paragraph).join("\n\n") + "\n";
     const check = (source: string) =>
       rule.check({ document: parse(source, "commonmark"), options: { width: 40 } });
-    const started = performance.now();
+    const lf = build(8000);
     const lfFindings = check(lf);
-    const crlfFindings = check(crlf);
-    expect(performance.now() - started).toBeLessThan(6000);
-    expect(lfFindings).toHaveLength(16000);
-    expect(crlfFindings.map((item) => item.edit?.text)).toEqual(
+    expect(lfFindings).toHaveLength(8000);
+    expect(check(lf.replaceAll("\n", "\r\n")).map((item) => item.edit?.text)).toEqual(
       lfFindings.map((item) => item.edit?.text.replaceAll("\n", "\r\n")),
     );
     expect(lfFindings[0]?.edit?.text.split("\n").every((line) => line.length <= 40)).toBe(true);
+    // Quadrupling the input should cost about four times as much. The former
+    // per-paragraph CRLF scan cost about twelve times as much on LF sources.
+    const fastest = (source: string) => {
+      const document = parse(source, "commonmark");
+      let best = Infinity;
+      for (let run = 0; run < 3; run++) {
+        const started = performance.now();
+        rule.check({ document, options: { width: 40 } });
+        best = Math.min(best, performance.now() - started);
+      }
+      return best;
+    };
+    expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(8);
   });
   it("groups consecutive protected markers", () => {
     const result = verify("aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb # > tail\n", wrap());
