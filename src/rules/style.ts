@@ -1,4 +1,4 @@
-import { visit } from "unist-util-visit";
+import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
 import type { Nodes } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
@@ -21,7 +21,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
     schema: optionsSchema({ marker: { enum: ["*", "_"] } }),
     check({ document, options }) {
       const findings: Finding[] = [];
-      visit(document.tree, type, (node) => {
+      walk(document.tree, type, (node) => {
         const [start, end] = range(node);
         const size = type === "strong" ? 2 : 1;
         const marker = String(options.marker ?? fallback).repeat(size);
@@ -110,7 +110,7 @@ const wrap: Rule = {
     const unit = options.measure === "codepoints" ? "code points" : "columns";
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
     const newline = lineEnding(document.source);
-    visit(document.tree, "paragraph", (node, index, parent) => {
+    walk(document.tree, "paragraph", (node, index, parent) => {
       const [paragraphStart, end] = range(node);
       let start = paragraphStart;
       let children = node.children;
@@ -299,7 +299,7 @@ const table: Rule = {
   check({ document }) {
     const findings: Finding[] = [];
     const newline = lineEnding(document.source);
-    visit(document.tree, "table", (node) => {
+    walk(document.tree, "table", (node) => {
       const [start, end] = range(node);
       // Nested tables retain container prefixes until a dedicated container printer handles them.
       if (node.position!.start.column !== 1) return;
@@ -357,7 +357,7 @@ export const styleRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document }) {
       const findings: Finding[] = [];
-      visit(document.tree, "inlineCode", (node) => {
+      walk(document.tree, "inlineCode", (node) => {
         const [start, end] = range(node);
         if (!/[\r\n]/.test(document.source.slice(start, end))) return;
         const value = node.value.replace(/\r\n|\r|\n/g, " ");
@@ -400,7 +400,7 @@ export const styleRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document }) {
       const findings: Finding[] = [];
-      visit(document.tree, "heading", (node) => {
+      walk(document.tree, "heading", (node) => {
         const [start, end] = range(node);
         if (document.source[start] === "#" || node.position!.start.column !== 1) return;
         const first = node.children[0];
@@ -429,7 +429,7 @@ export function nodesOfType(
   type: Nodes["type"],
 ): Nodes[] {
   const result: Nodes[] = [];
-  visit(document.tree, (node) => {
+  walk(document.tree, (node) => {
     if (node.type === type) result.push(node);
   });
   return result;

@@ -73,15 +73,24 @@ interface for specialized hosts.
 Run `npm run build` and `node scripts/benchmark.mjs 1000` for a reproducible
 synthetic library benchmark. It reports path-index construction and lint time
 separately for 1,000 short interlinked notes; pass a different count to scale
-it. These timings exclude filesystem traversal and do not predict a particular
-vault's throughput. Measure the original workload before adding caches or
-workers.
+it. `node scripts/benchmark-vault.mjs 2000` times parsing, fingerprinting,
+linting, formatting, and re-formatting for a vault of longer interlinked notes
+that all need reflow and marker changes, and prints a result hash for comparing
+implementations. These timings exclude filesystem traversal and do not predict a
+particular vault's throughput. Measure the original workload before adding
+caches or workers.
 
 Formatting retains the current parsed document within one call, reusing it
 between phases and for final diagnostics. Every changed candidate is parsed and
 checked against the original semantic fingerprint before becoming the next
-phase's input. No-op edits still undergo range and overlap validation. This
-retains the plugin contract that rules must not mutate documents.
+phase's input; the original fingerprint is computed only once an edit produces a
+candidate. The final pass, in which no phase changes the document, reuses its
+style findings and runs only the remaining rules for the final diagnostics.
+Suppression directives are scanned only when the source contains their prefix,
+and rules traverse the tree with a plain recursive walk rather than a
+closure-per-node visitor. No-op edits still undergo range and overlap
+validation. This retains the plugin contract that rules must not mutate
+documents.
 
 Run `node scripts/benchmark-format.mjs 100` after building to compare 100
 formatting calls on a synthetic 4.8 KB note needing edits with 100 calls on its

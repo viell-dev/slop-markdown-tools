@@ -86,12 +86,14 @@ function diagnostic(
   }
   return { ...finding, rule, severity, line: low + 1, column: finding.start - starts[low]! + 1 };
 }
+const sortDiagnostics = (a: Diagnostic, b: Diagnostic) =>
+  a.start - b.start || a.rule.localeCompare(b.rule);
 function inspect(
   document: Document,
   config: ResolvedConfig,
   rules: Record<string, Rule>,
   workspace?: Workspace,
-  phase?: string,
+  include: (rule: Rule) => boolean = () => true,
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
@@ -99,11 +101,7 @@ function inspect(
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
     const rule = rules[name]!;
-    if (
-      enabled.severity === "off" ||
-      (phase && (rule.kind !== "style" || (rule.phase ?? "inline") !== phase))
-    )
-      continue;
+    if (enabled.severity === "off" || !include(rule)) continue;
     const findings = rule.check({
       document,
       options: enabled.options,
@@ -113,7 +111,7 @@ function inspect(
       if (!suppressed(name, finding))
         result.push(diagnostic(starts, name, enabled.severity, finding));
   }
-  return result.sort((a, b) => a.start - b.start || a.rule.localeCompare(b.rule));
+  return result.sort(sortDiagnostics);
 }
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
   const { config, rules } = prepare(options);
@@ -165,15 +163,16 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
       ? `${resolution.target}#${resolution.fragment ?? ""}`
       : url;
   };
+  // Keys are emitted in sorted order so the JSON text is canonical without a replacer.
   function normalize(node: Nodes, calloutHeader = false): unknown {
     if (node.type === "wikiLink") {
       if (node.embed)
-        return { type: "embed", url: canonicalUrl(node.target ?? "", true), label: node.label };
+        return { label: node.label, type: "embed", url: canonicalUrl(node.target ?? "", true) };
       return {
+        children: [{ type: "text", value: node.label ?? node.target }],
+        title: null,
         type: "link",
         url: canonicalUrl(node.target ?? "", true),
-        title: null,
-        children: [{ type: "text", value: node.label ?? node.target }],
       };
     }
     const result: Record<string, unknown> = {};
@@ -189,7 +188,8 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
         result.calloutTitle = normalize(parse(title, document.dialect, document.path).tree);
       }
     }
-    for (const [key, value] of Object.entries(node)) {
+    for (const key of Object.keys(node).sort()) {
+      const value = (node as unknown as Record<string, unknown>)[key];
       if (key === "position" || key === "data") continue;
       if (key === "children" && "children" in node) {
         result.children = node.children.map((child, index) =>
@@ -210,29 +210,34 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
     }
     return result;
   }
-  return JSON.stringify(normalize(document.tree), (_key, value: unknown) => {
-    if (value && typeof value === "object" && !Array.isArray(value))
-      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
-    return value;
-  });
+  return JSON.stringify(normalize(document.tree));
 }
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
   const { config, rules } = prepare(options);
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);
-  const fingerprint = semanticFingerprint(document, options.workspace);
+  // The original fingerprint is only needed once an edit produces a candidate.
+  let fingerprint: string | undefined;
   const seen = new Set([source]);
   try {
     for (let pass = 0; pass < 8; pass++) {
       const before = output;
+      const findings: Diagnostic[] = [];
       for (const phase of ["inline", "block", "document"]) {
-        const edits = inspect(document, config, rules, options.workspace, phase).flatMap((item) =>
-          item.edit ? [item.edit] : [],
+        const diagnostics = inspect(
+          document,
+          config,
+          rules,
+          options.workspace,
+          (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
+        findings.push(...diagnostics);
+        const edits = diagnostics.flatMap((item) => (item.edit ? [item.edit] : []));
         if (!edits.length) continue;
         const candidate = applyEdits(output, edits);
         if (candidate === output) continue;
         const candidateDocument = parse(candidate, config.dialect, options.path, options.plugins);
+        fingerprint ??= semanticFingerprint(document, options.workspace);
         if (semanticFingerprint(candidateDocument, options.workspace) !== fingerprint)
           throw new Error(
             `Formatting in the ${phase} phase would change parsed meaning; the document was left unchanged.`,
@@ -242,12 +247,22 @@ export function format(source: string, options: ProcessOptions = {}): FormatResu
         // tree until another phase changes its source, including final diagnostics.
         document = candidateDocument;
       }
-      if (output === before)
+      if (output === before) {
+        // No phase changed the document, so every style finding of this pass
+        // describes the final document; only the non-style rules still need to run.
+        const remaining = inspect(
+          document,
+          config,
+          rules,
+          options.workspace,
+          (rule) => rule.kind !== "style",
+        );
         return {
           output,
           changed: output !== source,
-          diagnostics: inspect(document, config, rules, options.workspace),
+          diagnostics: [...findings, ...remaining].sort(sortDiagnostics),
         };
+      }
       if (seen.has(output))
         throw new Error("Formatting rules oscillate; the document was left unchanged.");
       seen.add(output);
