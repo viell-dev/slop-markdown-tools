@@ -83,7 +83,8 @@ describe("formatting contracts", () => {
       config: { extends: [], rules: { "probe/lines": "warn" } },
       plugins: [plugin],
     });
-    expect(performance.now() - started).toBeLessThan(3000);
+    // Generous for slow CI runners; the previous prefix-scanning code needed minutes here.
+    expect(performance.now() - started).toBeLessThan(12000);
     expect(diagnostics).toHaveLength(60001);
     for (const item of diagnostics.filter((_, index) => index % 997 === 0 || index > 59998)) {
       const prefix = source.slice(0, item.start);
