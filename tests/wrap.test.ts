@@ -1,6 +1,13 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createWorkspace, format, lint, parse, semanticFingerprint } from "../src/index.js";
+import {
+  builtInRules,
+  createWorkspace,
+  format,
+  lint,
+  parse,
+  semanticFingerprint,
+} from "../src/index.js";
 import type { Config } from "../src/index.js";
 
 function wrap(options: Record<string, unknown> = {}): Config {
@@ -99,6 +106,54 @@ describe("wrapping controls", () => {
       ),
       { numRuns: 400, seed: 20260921 },
     );
+  });
+  it.each([
+    ["* [x]  done\n", "* [x]  done\n"],
+    ["- [x]\tdone\n", "- [x]\tdone\n"],
+    [
+      "- [x] `code` word word word word word word word word word\n",
+      "- [x] `code` word word word word word\n      word word word word\n",
+    ],
+    [
+      "1. [ ] *em* text that is long enough to need wrapping at forty\n",
+      "1. [ ] *em* text that is long enough to\n       need wrapping at forty\n",
+    ],
+    [
+      "- [x] plain text that is long enough to need wrapping at forty\n",
+      "- [x] plain text that is long enough to\n      need wrapping at forty\n",
+    ],
+  ])("keeps the checkbox and separator of task items (%j)", (source, output) => {
+    expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(output);
+  });
+  it("reflows many paragraphs in linear time regardless of the line ending", () => {
+    // Exercise the rule directly: the edit application and diagnostic positioning
+    // costs of format() are measured separately.
+    const paragraph = "word ".repeat(30).trim();
+    const rule = builtInRules["style/wrap"]!;
+    const build = (count: number) =>
+      Array.from({ length: count }, () => paragraph).join("\n\n") + "\n";
+    const check = (source: string) =>
+      rule.check({ document: parse(source, "commonmark"), options: { width: 40 } });
+    const lf = build(8000);
+    const lfFindings = check(lf);
+    expect(lfFindings).toHaveLength(8000);
+    expect(check(lf.replaceAll("\n", "\r\n")).map((item) => item.edit?.text)).toEqual(
+      lfFindings.map((item) => item.edit?.text.replaceAll("\n", "\r\n")),
+    );
+    expect(lfFindings[0]?.edit?.text.split("\n").every((line) => line.length <= 40)).toBe(true);
+    // Quadrupling the input should cost about four times as much. The former
+    // per-paragraph CRLF scan cost about twelve times as much on LF sources.
+    const fastest = (source: string) => {
+      const document = parse(source, "commonmark");
+      let best = Infinity;
+      for (let run = 0; run < 3; run++) {
+        const started = performance.now();
+        rule.check({ document, options: { width: 40 } });
+        best = Math.min(best, performance.now() - started);
+      }
+      return best;
+    };
+    expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(8);
   });
   it("groups consecutive protected markers", () => {
     const result = verify("aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb # > tail\n", wrap());
