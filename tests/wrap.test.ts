@@ -78,6 +78,26 @@ describe("wrapping controls", () => {
     };
     expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(8);
   });
+  it("keeps carriage-return line endings consistent across rules and passes", () => {
+    const config: Config = {
+      extends: ["recommended", "github"],
+      dialect: "github",
+      rules: { "style/wrap": ["warn", { width: 20 }] },
+    };
+    expect(verify("aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii\rjjjj\r", config).output).toBe(
+      "aaaa bbbb cccc dddd\reeee ffff gggg hhhh\riiii jjjj\r",
+    );
+    expect(verify("# Title\r\r| a | b |\r|---|---|\r| 1 | 2 |\r\rone two", config).output).toBe(
+      "# Title\r\r| a   | b   |\r| --- | --- |\r| 1   | 2   |\r\rone two\r",
+    );
+    // The first line ending decides for documents that mix endings.
+    expect(verify("one\r\ntwo\nthree four five six seven eight nine\n", config).output).toBe(
+      "one two three four\r\nfive six seven eight\r\nnine\n",
+    );
+    expect(verify("one\rtwo\r\nthree four five six seven eight nine", config).output).toBe(
+      "one two three four\rfive six seven eight\rnine\r",
+    );
+  });
   it("groups consecutive protected markers", () => {
     const result = verify("aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb # > tail\n", wrap());
     expect(result.output).toContain("\nbbbb # > tail");
