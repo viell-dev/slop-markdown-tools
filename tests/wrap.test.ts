@@ -30,6 +30,24 @@ describe("wrapping controls", () => {
     );
     expect(format(source, { config: { extends: [] } }).output).toBe(source);
   });
+  it.each([
+    ["* [x]  done\n", "* [x]  done\n"],
+    ["- [x]\tdone\n", "- [x]\tdone\n"],
+    [
+      "- [x] `code` word word word word word word word word word\n",
+      "- [x] `code` word word word word word\n      word word word word\n",
+    ],
+    [
+      "1. [ ] *em* text that is long enough to need wrapping at forty\n",
+      "1. [ ] *em* text that is long enough to\n       need wrapping at forty\n",
+    ],
+    [
+      "- [x] plain text that is long enough to need wrapping at forty\n",
+      "- [x] plain text that is long enough to\n      need wrapping at forty\n",
+    ],
+  ])("keeps the checkbox and separator of task items (%j)", (source, output) => {
+    expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(output);
+  });
   it("reflows many paragraphs in linear time regardless of the line ending", () => {
     // Exercise the rule directly: the edit application and diagnostic positioning
     // costs of format() are measured separately.

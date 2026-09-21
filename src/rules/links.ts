@@ -58,19 +58,9 @@ export const linkRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document, workspace }) {
       const findings: Finding[] = [];
-      const definitions = new Set<string>();
-      visit(document.tree, "definition", (node) => {
-        definitions.add(node.identifier);
-      });
+      // The parser only produces reference nodes for labels that have a
+      // definition; undefined references stay plain text.
       visit(document.tree, (node) => {
-        if (
-          (node.type === "linkReference" || node.type === "imageReference") &&
-          !definitions.has(node.identifier)
-        )
-          findings.push({
-            start: range(node)[0],
-            message: `Missing link definition: ${node.identifier}.`,
-          });
         const url = destination(node);
         if (url === undefined || !workspace) return;
         const result = workspace.resolve(

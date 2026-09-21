@@ -94,8 +94,14 @@ const wrap: Rule = {
     visit(document.tree, "paragraph", (node, index, parent) => {
       const [paragraphStart, end] = range(node);
       let start = paragraphStart;
-      let original = document.source.slice(start, end);
       let children = node.children;
+      // A task item's paragraph range can begin at the checkbox, and its first
+      // text node can begin with the separator. Wrap only the content after them.
+      if (children[0]) {
+        start = Math.max(start, range(children[0])[0]);
+        while (start < end && /[ \t]/.test(document.source[start]!)) start++;
+      }
+      let original = document.source.slice(start, end);
       let calloutHeader =
         document.dialect === "obsidian" &&
         parent?.type === "blockquote" &&
@@ -291,9 +297,10 @@ const table: Rule = {
       const widths = Array.from({ length: count }, (_, i) =>
         Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
       );
+      // Keep each row's own cell count: adding cells to a short row changes the parsed table.
       const rendered = rows.map(
         (row) =>
-          `| ${widths.map((width, i) => (row[i] ?? "") + " ".repeat(width - stringWidth(row[i] ?? ""))).join(" | ")} |`,
+          `| ${row.map((cell, i) => cell + " ".repeat(widths[i]! - stringWidth(cell))).join(" | ")} |`,
       );
       rendered.splice(
         1,
