@@ -1,12 +1,14 @@
-import { visit } from "unist-util-visit";
+import { walk } from "../syntax/walk.js";
 import type { Document, Finding } from "./types.js";
 import { range } from "../syntax/parse.js";
 
 /** Directives are recognized only in parsed HTML comments, never in code examples. */
 export function suppressions(document: Document): (rule: string, finding: Finding) => boolean {
+  // Directives can only appear in HTML comments containing this prefix.
+  if (!document.source.includes("mdtools-")) return () => false;
   const intervals: { start: number; end: number; rules: Set<string> }[] = [];
   const active = new Map<string, number>();
-  visit(document.tree, "html", (node) => {
+  walk(document.tree, "html", (node) => {
     const match = /^<!--\s*mdtools-(disable-next-line|disable|enable)(?:\s+([^]*?))?\s*-->$/.exec(
       node.value.trim(),
     );

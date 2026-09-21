@@ -1,5 +1,5 @@
 import path from "node:path";
-import { visit } from "unist-util-visit";
+import { walk } from "../syntax/walk.js";
 import type { Nodes } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
@@ -60,7 +60,7 @@ export const linkRules: Record<string, Rule> = {
       const findings: Finding[] = [];
       // The parser only produces reference nodes for labels that have a
       // definition; undefined references stay plain text.
-      visit(document.tree, (node) => {
+      walk(document.tree, (node) => {
         const url = destination(node);
         if (url === undefined || !workspace) return;
         const result = workspace.resolve(
@@ -94,7 +94,7 @@ export const linkRules: Record<string, Rule> = {
     }),
     check({ document, options, workspace }) {
       const findings: Finding[] = [];
-      visit(document.tree, (node) => {
+      walk(document.tree, (node) => {
         const url = destination(node);
         if (url === undefined || !workspace) return;
         const result = workspace.resolve(
@@ -229,7 +229,7 @@ export const linkRules: Record<string, Rule> = {
     check({ document, options, workspace }) {
       if (document.dialect !== "obsidian" || !workspace) return [];
       const findings: Finding[] = [];
-      visit(document.tree, (node) => {
+      walk(document.tree, (node) => {
         const [start, end] = range(node);
         let replacement: string | undefined;
         if (

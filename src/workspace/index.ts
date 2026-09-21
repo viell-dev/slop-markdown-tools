@@ -1,6 +1,6 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
-import { visit } from "unist-util-visit";
+import { walk } from "../syntax/walk.js";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, textContent } from "../syntax/parse.js";
 
@@ -62,12 +62,12 @@ export function createWorkspace(
       const source = typeof value === "function" ? value() : value;
       const document = parse(source, options.dialect ?? "commonmark", name);
       const slugger = new GithubSlugger();
-      visit(document.tree, "heading", (node) => {
+      walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
         entry.slugs.add(slugger.slug(text));
       });
-      visit(document.tree, "text", (node) => {
+      walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
         if (match) entry.blocks.add(match[1]!);
       });

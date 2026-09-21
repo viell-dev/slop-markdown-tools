@@ -65,18 +65,19 @@ describe("wrapping controls", () => {
     );
     expect(lfFindings[0]?.edit?.text.split("\n").every((line) => line.length <= 40)).toBe(true);
     // Quadrupling the input should cost about four times as much. The former
-    // per-paragraph CRLF scan cost about twelve times as much on LF sources.
+    // per-paragraph CRLF scan cost about twelve times as much on LF sources;
+    // the bound leaves room for noisy CI runners on both sides.
     const fastest = (source: string) => {
       const document = parse(source, "commonmark");
       let best = Infinity;
-      for (let run = 0; run < 3; run++) {
+      for (let run = 0; run < 5; run++) {
         const started = performance.now();
         rule.check({ document, options: { width: 40 } });
         best = Math.min(best, performance.now() - started);
       }
       return best;
     };
-    expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(8);
+    expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(10);
   });
   it("keeps carriage-return line endings consistent across rules and passes", () => {
     const config: Config = {

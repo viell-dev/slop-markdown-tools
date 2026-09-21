@@ -94,6 +94,33 @@ describe("formatting contracts", () => {
       ]);
     }
   });
+  it.each([
+    ["*a* and __b__ with a [missing](nowhere.md) link and ^dup\n\nText ^dup\n", "obsidian"],
+    [
+      "| a | b |\n|---|---|\n| 1 | 2 |\n\nA long paragraph that wraps twice at the narrow width used here.",
+      "github",
+    ],
+    ["Already formatted.\n", "commonmark"],
+  ] as const)(
+    "reports the same diagnostics after formatting as a lint of the output",
+    (source, dialect) => {
+      const workspace = createWorkspace(
+        { "document.md": source },
+        { dialect, strictLineBreaks: true },
+      );
+      const options: ProcessOptions = {
+        config: {
+          extends: ["recommended", dialect === "commonmark" ? "recommended" : dialect],
+          dialect,
+          rules: { "style/wrap": ["warn", { width: 30, reportUnreflowed: true }] },
+        },
+        workspace,
+      };
+      const result = format(source, options);
+      expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+      expect(result.diagnostics).toEqual(lint(result.output, options));
+    },
+  );
   it("gives each phase and final diagnostics the latest accepted source and tree", () => {
     const observed: Array<[string, string]> = [];
     const plugin: Plugin = {
