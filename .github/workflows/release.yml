@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact beta version in package.json (without a v prefix)
+        description: Exact prerelease version in package.json (without a v prefix)
         required: true
-        default: 0.1.0-beta.4
+        default: 0.1.0-rc.1
       publish:
         description: Publish to npm and create a GitHub prerelease (requires separate authorization)
         type: boolean
@@ -37,8 +37,10 @@ jobs:
           import { readFileSync } from 'node:fs';
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(pkg.version, process.env.EXPECTED_VERSION);
-          assert.match(pkg.version, /^\d+\.\d+\.\d+-beta\.\d+$/);
-          assert.equal(pkg.publishConfig.tag, 'beta');
+          // Prerelease channel tags follow the prerelease identifier: beta or rc.
+          const channel = /^\d+\.\d+\.\d+-(beta|rc)\.\d+$/.exec(pkg.version)?.[1];
+          assert(channel, 'Version must be a beta or rc prerelease');
+          assert.equal(pkg.publishConfig.tag, channel);
           readFileSync(`docs/releases/${pkg.version}.md`);
           if (process.env.PUBLISH_REQUESTED === 'true') {
             assert.equal(process.env.GITHUB_REF, 'refs/heads/main', 'Publish only from main');
@@ -49,9 +51,10 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm run release:prepare
       - name: Dry-run the tested tarball
-        run:
-          npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --dry-run --ignore-scripts
-          --access public --tag beta
+        run: |
+          channel="${EXPECTED_VERSION#*-}"
+          npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --dry-run --ignore-scripts \
+            --access public --tag "${channel%%.*}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npm-release
@@ -100,16 +103,18 @@ jobs:
         working-directory: artifacts
         run: sha256sum --check SHA256SUMS
       - name: Publish the tested tarball using npm trusted publishing
-        run:
-          npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --ignore-scripts --access
-          public --tag beta --provenance
+        run: |
+          channel="${EXPECTED_VERSION#*-}"
+          npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --ignore-scripts --access \
+            public --tag "${channel%%.*}" --provenance
       - name: Record required npm tag synchronization
         run: |
+          channel="${EXPECTED_VERSION#*-}"
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Complete npm tag synchronization
 
           Until the first stable release, latest follows the newest prerelease of any kind.
-          Wait for npm processing and verify beta points to ${EXPECTED_VERSION}, then run locally:
+          Wait for npm processing and verify the channel tag (${channel%%.*}) points to ${EXPECTED_VERSION}, then run locally:
 
           ~~~sh
           npm dist-tag add mdrefine@${EXPECTED_VERSION} latest

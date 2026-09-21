@@ -38,10 +38,11 @@ current limitations. The Markdown source lives in `docs/`.
 ## Getting started
 
 The CLI requires Node.js 22.12 or newer. The npm package is `mdrefine`; the
-executable is `mdtools`. To install the beta in your document workspace:
+executable is `mdtools`. To install the release candidate in your document
+workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-beta.4
+npm install --save-dev --save-exact mdrefine@0.1.0-rc.1
 npx --no-install mdtools --help
 ```
 
