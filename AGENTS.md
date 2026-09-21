@@ -204,16 +204,13 @@ created after it was enabled; beta.1 predates it, though its tag is protected.
 Upload all assets before publishing a future release. If npm succeeds but GitHub
 fails, finish only the missing GitHub step at the same source commit.
 
-During beta.1's first publication npm assigned `latest` despite `--tag beta`;
-authenticated removal returned E400. Do not retry removal, deprecate beta.1, or
-publish a placeholder. Until the first stable release, keep `latest`
-synchronized with `beta` after each authorized beta publication. Use an
-authenticated local `npm dist-tag add mdrefine@VERSION latest` after verifying
-the published version and `beta` tag; OIDC publication does not authenticate tag
-updates. Complete this step and verify both tags before reporting the release
-complete. Once stable releases exist, `latest` follows stable and `beta` remains
-the prerelease channel. The initial local publication did not produce OIDC
-provenance.
+Until the first stable release, `latest` follows the newest beta: after each
+authorized beta publication, run an authenticated local
+`npm dist-tag add mdrefine@VERSION latest` once the published version and `beta`
+tag are verified. OIDC publication does not authenticate tag updates. Complete
+this step and verify both tags before reporting the release complete. Once
+stable releases exist, `latest` follows stable and `beta` remains the prerelease
+channel. The initial local publication did not produce OIDC provenance.
 
 With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
 `artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may

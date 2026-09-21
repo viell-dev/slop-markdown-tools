@@ -19,10 +19,8 @@ this repository or its documentation does not imply publication. Check
 [GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases) for
 release announcements and downloadable artifacts.
 
-The initial beta was published locally under npm account `viell`. npm assigned
-both `beta` and `latest` to `0.1.0-beta.1` despite an explicit `--tag beta`;
-removing `latest` returned E400. Keep the tag: until the first stable release,
-`latest` and `beta` must point to the same current beta, so default
+The npm package is published under account `viell`. Until the first stable
+release, `latest` and `beta` point to the same current beta, so default
 installations receive fixes. Once a stable release exists, `latest` follows
 stable releases and `beta` remains the prerelease channel.
 
@@ -132,9 +130,8 @@ authentication secrets in chat or repository files.
 
 Tag synchronization is part of an authorized beta release. It does not publish
 another version or change package contents. If promotion fails, retry only the
-tag update after resolving authentication; never rerun publication. Do not try
-to remove `latest`. Stop promoting betas to `latest` when the first stable
-release is published.
+tag update after resolving authentication; never rerun publication. Stop
+promoting betas to `latest` when the first stable release is published.
 
 Verify both tags, a fresh default installation, the GitHub release and its
 assets, registry provenance, and the documentation site before reporting the
