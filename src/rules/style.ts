@@ -376,8 +376,11 @@ export const styleRules: Record<string, Rule> = {
         const first = node.children[0];
         const last = node.children.at(-1);
         if (!first || !last) return;
-        const text = document.source.slice(range(first)[0], range(last)[1]);
-        if (text.includes("\n")) return;
+        let text = document.source.slice(range(first)[0], range(last)[1]);
+        if (/[\r\n]/.test(text)) return;
+        // A trailing run of # after whitespace would become an ATX closing
+        // sequence and disappear from the heading; escape its first character.
+        text = text.replace(/(^|\s)(#+)$/, "$1\\$2");
         findings.push({
           start,
           end,
