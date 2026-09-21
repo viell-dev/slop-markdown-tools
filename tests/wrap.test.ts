@@ -23,6 +23,24 @@ describe("wrapping controls", () => {
     );
     expect(format(source, { config: { extends: [] } }).output).toBe(source);
   });
+  it.each([
+    ["* [x]  done\n", "* [x]  done\n"],
+    ["- [x]\tdone\n", "- [x]\tdone\n"],
+    [
+      "- [x] `code` word word word word word word word word word\n",
+      "- [x] `code` word word word word word\n      word word word word\n",
+    ],
+    [
+      "1. [ ] *em* text that is long enough to need wrapping at forty\n",
+      "1. [ ] *em* text that is long enough to\n       need wrapping at forty\n",
+    ],
+    [
+      "- [x] plain text that is long enough to need wrapping at forty\n",
+      "- [x] plain text that is long enough to\n      need wrapping at forty\n",
+    ],
+  ])("keeps the checkbox and separator of task items (%j)", (source, output) => {
+    expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(output);
+  });
   it("groups consecutive protected markers", () => {
     const result = verify("aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb # > tail\n", wrap());
     expect(result.output).toContain("\nbbbb # > tail");
