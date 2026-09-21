@@ -402,6 +402,26 @@ describe("configuration and plugins", () => {
     ).toThrow("overlapping");
     expect(() => applyEdits("abc", [{ start: -1, end: 2, text: "a" }])).toThrow("invalid");
   });
+  it("applies many edits in linear time with the same result as sequential splicing", () => {
+    const source = Array.from({ length: 20000 }, (_, i) => `Paragraph ${i} with *emphasis*.`).join(
+      "\n\n",
+    );
+    const edits = [];
+    for (let at = source.indexOf("*"); at >= 0; at = source.indexOf("*", at + 1))
+      edits.push({ start: at, end: at + 1, text: "_" });
+    edits.push(
+      { start: 0, end: 0, text: "# Title\n\n" },
+      { start: source.length, end: source.length, text: "\n" },
+    );
+    let expected = source;
+    for (const edit of [...edits].sort((a, b) => b.start - a.start))
+      expected = expected.slice(0, edit.start) + edit.text + expected.slice(edit.end);
+    const started = performance.now();
+    const output = applyEdits(source, edits);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(output).toBe(expected);
+    expect(applyEdits(source, [])).toBe(source);
+  });
 });
 
 describe("Obsidian and links", () => {

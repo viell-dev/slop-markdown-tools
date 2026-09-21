@@ -139,10 +139,15 @@ export function applyEdits(source: string, edits: Edit[]): string {
     accepted.push(edit);
     previous = edit;
   }
-  let output = source;
-  for (const edit of accepted.reverse())
-    output = output.slice(0, edit.start) + edit.text + output.slice(edit.end);
-  return output;
+  // Assemble the result in one pass; rebuilding the string per edit is quadratic.
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const edit of accepted) {
+    parts.push(source.slice(cursor, edit.start), edit.text);
+    cursor = edit.end;
+  }
+  parts.push(source.slice(cursor));
+  return parts.join("");
 }
 /** Compare semantic trees, with link identity supplied by the selected renderer's resolver. */
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
