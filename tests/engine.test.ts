@@ -56,6 +56,44 @@ describe("formatting contracts", () => {
       spy.mockRestore();
     }
   });
+  it("locates many findings without rescanning the source for each one", () => {
+    const source = Array.from({ length: 30000 }, (_, i) => `Paragraph ${i}.`).join("\n\n") + "\n";
+    const plugin: Plugin = {
+      name: "probe",
+      rules: {
+        lines: {
+          kind: "problem",
+          description: "Report every line start and the final offset",
+          check: ({ document }) => {
+            const findings = [{ start: 0, message: "line" }];
+            for (
+              let at = document.source.indexOf("\n");
+              at >= 0;
+              at = document.source.indexOf("\n", at + 1)
+            )
+              findings.push({ start: at + 1, message: "line" });
+            findings.push({ start: document.source.length, message: "end" });
+            return findings;
+          },
+        },
+      },
+    };
+    const started = performance.now();
+    const diagnostics = lint(source, {
+      config: { extends: [], rules: { "probe/lines": "warn" } },
+      plugins: [plugin],
+    });
+    // Generous for slow CI runners; the previous prefix-scanning code needed minutes here.
+    expect(performance.now() - started).toBeLessThan(12000);
+    expect(diagnostics).toHaveLength(60001);
+    for (const item of diagnostics.filter((_, index) => index % 997 === 0 || index > 59998)) {
+      const prefix = source.slice(0, item.start);
+      expect([item.line, item.column]).toEqual([
+        prefix.split("\n").length,
+        item.start - prefix.lastIndexOf("\n"),
+      ]);
+    }
+  });
   it("gives each phase and final diagnostics the latest accepted source and tree", () => {
     const observed: Array<[string, string]> = [];
     const plugin: Plugin = {
