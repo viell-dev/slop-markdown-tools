@@ -108,7 +108,7 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Complete npm tag synchronization
 
-          Until the first stable release, keep latest synchronized with beta.
+          Until the first stable release, latest follows the newest prerelease of any kind.
           Wait for npm processing and verify beta points to ${EXPECTED_VERSION}, then run locally:
 
           ~~~sh
