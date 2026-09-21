@@ -28,6 +28,9 @@ describe("style/heading", () => {
     ["Sub\n---\n", "## Sub\n"],
     ["*Title* with `code`\n===\n", "# *Title* with `code`\n"],
     ["C#\n---\n", "## C#\n"],
+    ["Sharp #\n---\n", "## Sharp \\#\n"],
+    ["Sharp ##\n===\n", "# Sharp \\##\n"],
+    ["Sharp \\#\n---\n", "## Sharp \\#\n"],
   ])("converts %j to an ATX heading", (source, output) => {
     expect(formatted(source, config)).toBe(output);
   });
@@ -44,6 +47,26 @@ describe("style/heading", () => {
   ])("leaves %j unchanged", (source) => {
     expect(formatted(source, config)).toBe(source);
     expect(lint(source, { config })).toEqual([]);
+  });
+});
+
+describe("style/emphasis and style/strong next to other delimiters", () => {
+  const config = only({ "style/emphasis": "warn", "style/strong": "warn" });
+  it.each(["_*foo*_", "*_foo_*", "_foo_*bar*", "*foo*_bar", "bar_*foo*", "*__foo__*", "__*foo*__"])(
+    "leaves %s alone because the new marker would touch an existing one",
+    (source) => {
+      expect(formatted(`${source}\n`, config)).toBe(`${source}\n`);
+      expect(lint(`${source}\n`, { config })).toEqual([]);
+    },
+  );
+  it.each([
+    ["***foo***\n", "_**foo**_\n"],
+    ["___foo___\n", "_**foo**_\n"],
+    ["*foo* *bar*\n", "_foo_ _bar_\n"],
+    ["**foo** __bar__\n", "**foo** **bar**\n"],
+    ["*foo*(bar)\n", "_foo_(bar)\n"],
+  ])("still converts %j", (source, output) => {
+    expect(formatted(source, config)).toBe(output);
   });
 });
 

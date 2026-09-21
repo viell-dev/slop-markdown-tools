@@ -7,6 +7,12 @@ import { range } from "../syntax/parse.js";
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
 }
+/** Any CommonMark line ending, including a lone carriage return. */
+const lineBreak = /\r\n|\r|\n/;
+/** The document's line ending, taken from its first line break. */
+function lineEnding(source: string): string {
+  return lineBreak.exec(source)?.[0] ?? "\n";
+}
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
     description: `Choose ${type} delimiters without reprinting their contents.`,
@@ -28,6 +34,12 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
             /\p{L}|\p{N}/u.test(document.source[end] ?? ""))
         )
           return;
+        // A new marker touching the same character, outside or inside the
+        // node, would merge into one delimiter run and change the parse.
+        const neighbours = [start - 1, end, start + size, end - size - 1].map(
+          (index) => document.source[index],
+        );
+        if (neighbours.includes(marker[0]!)) return;
         for (const [a, b] of [
           [start, start + size],
           [end - size, end],
@@ -56,15 +68,28 @@ function wrappingAtoms(words: string[]): string[] {
     } else current += word;
   }
   if (current) atoms.push(current);
-  // Keep syntax-like markers with the preceding atom to preserve paragraph meaning.
+  // Keep atoms that would open a block or underline a Setext heading at the
+  // start of a line attached to the preceding atom.
   for (let i = 1; i < atoms.length; i++) {
-    if (/^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,})$/.test(atoms[i]!)) {
+    if (lineOpener.test(atoms[i]!)) {
       atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+      i--;
+    }
+  }
+  // An atom ending in an unescaped backslash would become a hard break at the
+  // end of a line; keep it attached to the following atom.
+  for (let i = 0; i < atoms.length - 1; i++) {
+    if (/(?:^|[^\\])(?:\\\\)*\\$/.test(atoms[i]!)) {
+      atoms.splice(i, 2, `${atoms[i]} ${atoms[i + 1]}`);
       i--;
     }
   }
   return atoms;
 }
+// List markers, ATX and Setext heading markers, block quotes, thematic breaks,
+// fences, math, Obsidian comments, HTML blocks, and footnote definitions.
+const lineOpener =
+  /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
@@ -84,7 +109,7 @@ const wrap: Rule = {
       options.measure === "codepoints" ? (text: string) => [...text].length : stringWidth;
     const unit = options.measure === "codepoints" ? "code points" : "columns";
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
-    const newline = document.source.includes("\r\n") ? "\r\n" : "\n";
+    const newline = lineEnding(document.source);
     visit(document.tree, "paragraph", (node, index, parent) => {
       const [paragraphStart, end] = range(node);
       let start = paragraphStart;
@@ -101,17 +126,20 @@ const wrap: Rule = {
         parent?.type === "blockquote" &&
         index === 0 &&
         /^\[![\w-]+\]/.test(original);
-      const lineStart = document.source.lastIndexOf("\n", start - 1) + 1;
+      let lineStart = start;
+      while (lineStart > 0 && !/[\r\n]/.test(document.source[lineStart - 1]!)) lineStart--;
       let prefix = document.source.slice(lineStart, start);
       const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
         " ".repeat(value.length),
       );
       if (calloutHeader) {
-        const newline = original.indexOf("\n");
-        const headerEnd = newline < 0 ? end : start + newline;
-        const header = document.source.slice(start, headerEnd).replace(/\r$/, "");
-        const bodyStart = headerEnd + 1 + continuation.length;
-        const bodyLines = newline < 0 ? [] : original.slice(newline + 1).split(/\r?\n/);
+        const headerBreak = lineBreak.exec(original);
+        const headerEnd = headerBreak ? start + headerBreak.index : end;
+        const header = document.source.slice(start, headerEnd);
+        const bodyStart = headerEnd + (headerBreak?.[0].length ?? 0) + continuation.length;
+        const bodyLines = headerBreak
+          ? original.slice(headerBreak.index + headerBreak[0].length).split(lineBreak)
+          : [];
         const supported =
           bodyLines.every((line) => line.startsWith(continuation)) &&
           !children.some((child) => {
@@ -126,7 +154,7 @@ const wrap: Rule = {
               end: start + header.length,
               message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
             });
-          if (newline < 0) return;
+          if (!headerBreak) return;
           start = bodyStart;
           original = document.source.slice(start, end);
           children = children.filter((child) => range(child)[1] > start);
@@ -146,8 +174,8 @@ const wrap: Rule = {
         let unbreakable = false;
         let offset = start;
         let childIndex = 0;
-        for (const line of original.split(/(?<=\n)/)) {
-          const content = line.replace(/\r?\n$/, "");
+        for (const line of original.split(/(?<=\n|\r(?!\n))/)) {
+          const content = line.replace(/(?:\r\n|\r|\n)$/, "");
           const container =
             offset === start
               ? ""
@@ -212,7 +240,7 @@ const wrap: Rule = {
       for (const child of children) {
         const [a, b] = range(child);
         const raw = document.source.slice(Math.max(a, start), b);
-        const lines = raw.split(/\r?\n/);
+        const lines = raw.split(lineBreak);
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i]!;
           if (continuation && line.startsWith(continuation))
@@ -255,7 +283,7 @@ const wrap: Rule = {
         });
       if (
         options.reportUnbreakable === true &&
-        (prefix + replacement).split(/\r?\n/).some((line) => measure(line) > width)
+        (prefix + replacement).split(lineBreak).some((line) => measure(line) > width)
       )
         reportUnbreakable();
     });
@@ -270,7 +298,7 @@ const table: Rule = {
   schema: optionsSchema({}),
   check({ document }) {
     const findings: Finding[] = [];
-    const newline = document.source.includes("\r\n") ? "\r\n" : "\n";
+    const newline = lineEnding(document.source);
     visit(document.tree, "table", (node) => {
       const [start, end] = range(node);
       // Nested tables retain container prefixes until a dedicated container printer handles them.
@@ -355,16 +383,12 @@ export const styleRules: Record<string, Rule> = {
     phase: "document",
     schema: optionsSchema({}),
     check({ document: { source } }) {
-      if (!source || source.endsWith("\n")) return [];
+      if (!source || /[\r\n]$/.test(source)) return [];
       return [
         {
           start: source.length,
           message: "Add a final newline.",
-          edit: {
-            start: source.length,
-            end: source.length,
-            text: source.includes("\r\n") ? "\r\n" : "\n",
-          },
+          edit: { start: source.length, end: source.length, text: lineEnding(source) },
         },
       ];
     },
@@ -382,8 +406,11 @@ export const styleRules: Record<string, Rule> = {
         const first = node.children[0];
         const last = node.children.at(-1);
         if (!first || !last) return;
-        const text = document.source.slice(range(first)[0], range(last)[1]);
-        if (text.includes("\n")) return;
+        let text = document.source.slice(range(first)[0], range(last)[1]);
+        if (/[\r\n]/.test(text)) return;
+        // A trailing run of # after whitespace would become an ATX closing
+        // sequence and disappear from the heading; escape its first character.
+        text = text.replace(/(^|\s)(#+)$/, "$1\\$2");
         findings.push({
           start,
           end,
