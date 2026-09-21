@@ -245,6 +245,19 @@ describe("formatting contracts", () => {
     expect(output).toContain("`a\\|b`");
     expect(output).not.toBe(input);
   });
+  it("aligns short rows without adding cells", () => {
+    const config: Config = { extends: ["github"] };
+    expect(formatted("| a | b |\n|---|---|\n| only |\n", { config })).toBe(
+      "| a    | b   |\n| ---- | --- |\n| only |\n",
+    );
+    // A line after a table without a blank line is a one-cell row.
+    expect(formatted("| a | b |\n|---|---|\n| x | y |\nnot a row\n", { config })).toBe(
+      "| a         | b   |\n| --------- | --- |\n| x         | y   |\n| not a row |\n",
+    );
+    expect(formatted("| a | b | c |\n|---|:-:|--:|\n| 1 |\n| 1 | 22 |\n", { config })).toBe(
+      "| a   | b   | c   |\n| --- | :-: | --: |\n| 1   |\n| 1   | 22  |\n",
+    );
+  });
   it("normalizes GitHub alerts and preserves math and footnotes", () => {
     const source =
       "> [!note]\n> Some details.\n\n$x + y$ and ~~removed~~ with a note[^a].\n\n[^a]: *Reference*.\n";
