@@ -34,6 +34,12 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
             /\p{L}|\p{N}/u.test(document.source[end] ?? ""))
         )
           return;
+        // A new marker touching the same character, outside or inside the
+        // node, would merge into one delimiter run and change the parse.
+        const neighbours = [start - 1, end, start + size, end - size - 1].map(
+          (index) => document.source[index],
+        );
+        if (neighbours.includes(marker[0]!)) return;
         for (const [a, b] of [
           [start, start + size],
           [end - size, end],

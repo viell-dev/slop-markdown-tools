@@ -50,6 +50,26 @@ describe("style/heading", () => {
   });
 });
 
+describe("style/emphasis and style/strong next to other delimiters", () => {
+  const config = only({ "style/emphasis": "warn", "style/strong": "warn" });
+  it.each(["_*foo*_", "*_foo_*", "_foo_*bar*", "*foo*_bar", "bar_*foo*", "*__foo__*", "__*foo*__"])(
+    "leaves %s alone because the new marker would touch an existing one",
+    (source) => {
+      expect(formatted(`${source}\n`, config)).toBe(`${source}\n`);
+      expect(lint(`${source}\n`, { config })).toEqual([]);
+    },
+  );
+  it.each([
+    ["***foo***\n", "_**foo**_\n"],
+    ["___foo___\n", "_**foo**_\n"],
+    ["*foo* *bar*\n", "_foo_ _bar_\n"],
+    ["**foo** __bar__\n", "**foo** **bar**\n"],
+    ["*foo*(bar)\n", "_foo_(bar)\n"],
+  ])("still converts %j", (source, output) => {
+    expect(formatted(source, config)).toBe(output);
+  });
+});
+
 describe("links/path wikilink rewriting", () => {
   const workspace = createWorkspace(
     { "Doc.md": "", "Folder/Note.md": "# Heading\n", "Other/Dup.md": "", "Folder/Dup.md": "" },
