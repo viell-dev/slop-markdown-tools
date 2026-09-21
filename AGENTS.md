@@ -5,21 +5,55 @@ maintenance policy, and contribution instructions. Keep that information there
 rather than duplicating it here. Public design and API documentation belongs in
 `docs/`.
 
+## Ownership and agent authority
+
+This project is agent-authored, agent-tested, agent-documented, and
+agent-maintained. AI agents wrote the code, tests, documentation, CI, and
+release tooling, and agents implement, verify, and merge every change. No person
+writes, reads, or reviews the code. The repository owner does not know the
+codebase, the API, or the CLI and does not run the tool directly. Their
+involvement is limited to reading issue and PR descriptions to judge whether the
+project is heading in the right direction, reading Markdown documents that other
+agents have processed with the tool, and assigning agents to tasks based on the
+overall status, open issues, and open PRs.
+
+- Issue and PR descriptions are the owner's only view of the work. Write them so
+  a reader without codebase knowledge understands the observed problem, the
+  resulting behavior, the scope decision, and anything left undecided. Do not
+  rely on the diff or on code references to carry that meaning.
+- There is no personal author voice to preserve in code, documentation, or other
+  prose. Keep terminology, structure, and formatting consistent with the
+  existing documents; do not imitate an earlier model's writing style for its
+  own sake.
+- A human-hands-off project does not grant agents open-ended decision-making
+  authority. The owner assigns each task, and the assigned agent owns the
+  judgment that task requires, including deciding whether a request is in scope
+  or applicable to the project. Record that decision and its reasoning in the
+  issue or PR. Do not extend an assignment to unrelated issues, PRs, or design
+  changes, and do not take actions with external effect, such as publishing,
+  releasing, changing repository settings, or closing work outside the
+  assignment, unless the assignment covers them. When an assignment is
+  ambiguous, state the interpretation used rather than widening the scope
+  silently.
+- No one else catches mistakes before merge. Verification, regression fixtures,
+  CI, and the complete diff review are the only review the change receives;
+  treat them as such.
+
 ## Repository boundary
 
-This directory is an independent public repository. Its parent directory and
-sibling `docs/` are private project material: never stage, copy, quote, or
-publish their contents. Use synthetic fixtures; do not copy real vault documents
-into tests, issues, or pull requests.
+Everything this project needs lives in this repository. Never stage, copy,
+quote, or publish content from outside it. Use synthetic fixtures; do not copy
+real vault documents into tests, issues, or pull requests.
 
 ## Issue triage and project scope
 
 Review requests against the README, design boundaries, and existing extension
-contracts before implementing them. A request to review or resolve issues
-requires independent maintainer judgment; it does not authorize accepting every
-reporter's proposed feature. Reports from agents receive the same scrutiny as
-reports from people. Rejecting, narrowing, splitting, or closing an issue as out
-of scope is a valid outcome.
+contracts before implementing them. The agent assigned to review or resolve
+issues exercises the maintainer's scope judgment for that assignment; nobody
+else will. The assignment does not authorize accepting every reporter's proposed
+feature, and it does not extend to issues outside the assignment. Reports from
+agents receive the same scrutiny as reports from people. Rejecting, narrowing,
+splitting, or closing an issue as out of scope is a valid outcome.
 
 Maintain labels as part of every issue or PR update, including answers, closure,
 and reopening. Follow the
@@ -170,16 +204,14 @@ created after it was enabled; beta.1 predates it, though its tag is protected.
 Upload all assets before publishing a future release. If npm succeeds but GitHub
 fails, finish only the missing GitHub step at the same source commit.
 
-During beta.1's first publication npm assigned `latest` despite `--tag beta`;
-authenticated removal returned E400. Do not retry removal, deprecate beta.1, or
-publish a placeholder. Until the first stable release, keep `latest`
-synchronized with `beta` after each authorized beta publication. Use an
-authenticated local `npm dist-tag add mdrefine@VERSION latest` after verifying
-the published version and `beta` tag; OIDC publication does not authenticate tag
-updates. Complete this step and verify both tags before reporting the release
-complete. Once stable releases exist, `latest` follows stable and `beta` remains
-the prerelease channel. The initial local publication did not produce OIDC
-provenance.
+Until the first stable release, `latest` follows the newest prerelease of any
+kind: after each authorized prerelease publication, run an authenticated local
+`npm dist-tag add mdrefine@VERSION latest` once the published version and its
+channel tag are verified. OIDC publication does not authenticate tag updates.
+Complete this step and verify both tags before reporting the release complete.
+Once stable releases exist, `latest` follows stable and prerelease channel tags
+such as `beta` remain separate. The initial local publication did not produce
+OIDC provenance.
 
 With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
 `artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may
@@ -188,11 +220,21 @@ and public TypeScript declarations with `test:package`, not just the source CLI.
 
 ## Attribution
 
-Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull
-requests, and other published prose, end with
-`🤖 Generated with <model> via <harness>`, using the actual session identity
-rather than literal placeholders. Keep existing authors' voice when editing
-prose.
+Identify the agent as `<model> via <harness>`, using the most specific
+human-readable model name and version the session exposes, without guessing
+missing details and without an email address. Commit trailers use
+`Assisted-by: <model> via <harness>` after a blank line. For issues, pull
+requests, reviews, comments, release notes, and other published prose, end with
+`🤖 Generated with <model> via <harness>`. Use the actual session identity;
+never leave literal placeholders in published content.
+
+`Assisted-by:` is the only permitted agent attribution trailer. Never add a
+`Co-Authored-By:` or `Signed-off-by:` trailer identifying an agent, model,
+harness, or AI service, in any capitalization, even when an `Assisted-by:`
+trailer is also present. Replace any agent attribution supplied by a harness or
+template with `Assisted-by:`; never retain both. Before committing, check the
+complete commit message for forbidden agent trailers, including any added
+automatically by tooling.
 
 Do not append agent attribution footers to repository documents. The README's
 maintenance disclaimer covers them; keep attribution in commits and external
