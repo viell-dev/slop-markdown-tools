@@ -64,20 +64,27 @@ function prepare(options: ProcessOptions) {
   }
   return { config, rules };
 }
+/** Offsets where each line starts, computed once per source so findings locate in O(log lines). */
+function lineStarts(source: string): number[] {
+  const starts = [0];
+  for (let at = source.indexOf("\n"); at >= 0; at = source.indexOf("\n", at + 1))
+    starts.push(at + 1);
+  return starts;
+}
 function diagnostic(
-  source: string,
+  starts: number[],
   rule: string,
   severity: "warn" | "error",
   finding: Finding,
 ): Diagnostic {
-  const prefix = source.slice(0, finding.start);
-  return {
-    ...finding,
-    rule,
-    severity,
-    line: prefix.split("\n").length,
-    column: finding.start - prefix.lastIndexOf("\n"),
-  };
+  let low = 0;
+  let high = starts.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (starts[middle]! <= finding.start) low = middle;
+    else high = middle - 1;
+  }
+  return { ...finding, rule, severity, line: low + 1, column: finding.start - starts[low]! + 1 };
 }
 function inspect(
   document: Document,
@@ -88,6 +95,7 @@ function inspect(
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
+  const starts = lineStarts(document.source);
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
     const rule = rules[name]!;
@@ -103,7 +111,7 @@ function inspect(
     });
     for (const finding of findings)
       if (!suppressed(name, finding))
-        result.push(diagnostic(document.source, name, enabled.severity, finding));
+        result.push(diagnostic(starts, name, enabled.severity, finding));
   }
   return result.sort((a, b) => a.start - b.start || a.rule.localeCompare(b.rule));
 }
@@ -247,7 +255,7 @@ export function format(source: string, options: ProcessOptions = {}): FormatResu
       output: source,
       changed: false,
       diagnostics: [
-        diagnostic(source, "engine/unsafe-format", "error", {
+        diagnostic([0], "engine/unsafe-format", "error", {
           start: 0,
           message: error instanceof Error ? error.message : String(error),
         }),
