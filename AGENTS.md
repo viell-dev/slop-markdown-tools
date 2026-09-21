@@ -223,10 +223,21 @@ and public TypeScript declarations with `test:package`, not just the source CLI.
 
 ## Attribution
 
-Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull
-requests, and other published prose, end with
-`🤖 Generated with <model> via <harness>`, using the actual session identity
-rather than literal placeholders.
+Identify the agent as `<model> via <harness>`, using the most specific
+human-readable model name and version the session exposes, without guessing
+missing details and without an email address. Commit trailers use
+`Assisted-by: <model> via <harness>` after a blank line. For issues, pull
+requests, reviews, comments, release notes, and other published prose, end with
+`🤖 Generated with <model> via <harness>`. Use the actual session identity;
+never leave literal placeholders in published content.
+
+`Assisted-by:` is the only permitted agent attribution trailer. Never add a
+`Co-Authored-By:` or `Signed-off-by:` trailer identifying an agent, model,
+harness, or AI service, in any capitalization, even when an `Assisted-by:`
+trailer is also present. Replace any agent attribution supplied by a harness or
+template with `Assisted-by:`; never retain both. Before committing, check the
+complete commit message for forbidden agent trailers, including any added
+automatically by tooling.
 
 Do not append agent attribution footers to repository documents. The README's
 maintenance disclaimer covers them; keep attribution in commits and external
