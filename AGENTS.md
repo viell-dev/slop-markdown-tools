@@ -226,8 +226,7 @@ and public TypeScript declarations with `test:package`, not just the source CLI.
 Commit trailers use `Assisted-by: <model> via <harness>`. For issues, pull
 requests, and other published prose, end with
 `🤖 Generated with <model> via <harness>`, using the actual session identity
-rather than literal placeholders. These trailers and footers are the project's
-authorship record: they identify which model and harness produced each change.
+rather than literal placeholders.
 
 Do not append agent attribution footers to repository documents. The README's
 maintenance disclaimer covers them; keep attribution in commits and external
