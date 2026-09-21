@@ -208,6 +208,44 @@ describe("CLI", () => {
     expect(run(root, ["lint", "--exclude", "../outside"]).status).toBe(2);
     expect(run(root, ["lint", "--exclude", "note.md", "-"], "text").status).toBe(2);
   });
+  it("fails when warnings exceed --max-warnings and rejects invalid counts", async () => {
+    const root = await fixture({ "note.md": "A *small* note.\n" });
+    expect(run(root, ["lint", "."]).status).toBe(0);
+    expect(run(root, ["lint", "--max-warnings", "2", "."]).status).toBe(0);
+    const exceeded = run(root, ["lint", "--max-warnings", "1", "."]);
+    expect(exceeded.status).toBe(1);
+    expect(exceeded.stderr).toContain("style/emphasis");
+    expect(run(root, ["lint", "--max-warnings", "0", "."]).status).toBe(1);
+    for (const value of ["-1", "1.5", "many"]) {
+      const rejected = run(root, ["lint", "--max-warnings", value, "."]);
+      expect(rejected.status, value).toBe(2);
+      expect(rejected.stderr).toContain("--max-warnings must be a nonnegative integer.");
+    }
+  });
+  it("refuses ambiguous configuration files unless one is chosen explicitly", async () => {
+    const root = await fixture({
+      "mdtools.config.json": '{"rules":{"style/emphasis":"off"}}',
+      "mdtools.config.jsonc": '{"rules":{"style/emphasis":"warn"}}',
+      "note.md": "*keep*\n",
+    });
+    const ambiguous = run(root, ["format", "--check", "."]);
+    expect(ambiguous.status).toBe(2);
+    expect(ambiguous.stderr).toContain("Multiple mdtools configuration files");
+    expect(run(root, ["format", "--check", "--config", "mdtools.config.json", "."]).status).toBe(0);
+    expect(run(root, ["format", "--check", "--config", "mdtools.config.jsonc", "."]).status).toBe(
+      1,
+    );
+  });
+  it("rejects inputs outside the workspace and paths that do not exist", async () => {
+    const root = await fixture({ "note.md": "Text.\n", "sub/inner.md": "Text.\n" });
+    const outside = run(root, ["lint", "--root", "sub", "note.md"]);
+    expect(outside.status).toBe(2);
+    expect(outside.stderr).toContain("Input is outside the workspace: note.md");
+    const missing = run(root, ["lint", "absent.md"]);
+    expect(missing.status).toBe(2);
+    expect(missing.stderr).toContain("absent.md");
+    expect(run(root, ["lint", "--root", "sub", "sub/inner.md"]).status).toBe(0);
+  });
   it("ships an executable CLI entry point", () => {
     expect(execFileSync(process.execPath, [cli, "--version"], { encoding: "utf8" }).trim()).toBe(
       manifest.version,
@@ -221,6 +259,13 @@ describe("filesystem safeguards", () => {
       writeAtomic(path.join(root, "note.md"), "old content", "formatted"),
     ).rejects.toThrow("changed during");
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("new content");
+  });
+  it("refuses to replace anything but a regular file", async () => {
+    const root = await fixture({});
+    await mkdir(path.join(root, "folder.md"));
+    await expect(writeAtomic(path.join(root, "folder.md"), "", "text")).rejects.toThrow(
+      "Refusing non-regular file",
+    );
   });
   it("preserves file permissions", async () => {
     const root = await fixture({ "note.md": "old" });
