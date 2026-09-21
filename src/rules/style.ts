@@ -282,9 +282,10 @@ const table: Rule = {
       const widths = Array.from({ length: count }, (_, i) =>
         Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
       );
+      // Keep each row's own cell count: adding cells to a short row changes the parsed table.
       const rendered = rows.map(
         (row) =>
-          `| ${widths.map((width, i) => (row[i] ?? "") + " ".repeat(width - stringWidth(row[i] ?? ""))).join(" | ")} |`,
+          `| ${row.map((cell, i) => cell + " ".repeat(widths[i]! - stringWidth(cell))).join(" | ")} |`,
       );
       rendered.splice(
         1,
