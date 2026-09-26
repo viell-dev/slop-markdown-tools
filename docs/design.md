@@ -49,17 +49,30 @@ not a license to split protected syntax.
 
 GitHub alert support normalizes known alert type markers. Footnotes, math,
 strikethrough, and autolinks are parsed, but do not each have dedicated style
-rules. Table alignment currently applies only to top-level tables and preserves
-cell contents. Embedded code formatting, metadata mutation, document generation,
-external URL fetching, and file renames are outside this release.
+rules. Literal autolinks come from the syntax extension only; the GFM tree
+transform that re-scanned text for URLs used looser boundaries than GitHub and
+produced nodes without source positions.
+
+Forgejo documents parse as GitHub Markdown. Forgejo-only syntax is protected
+rather than modeled: paragraphs containing a definition description line or a
+`\[` display-math line are not reflowed, `\(...\)` math and `[[...]]` shortlinks
+on one line are unbreakable atoms, and a pair split across lines protects its
+paragraph because reflow could join it. Shortlinks are not resolved as links.
+Legacy `> **Note**` callouts, table-of-contents front matter, emoji
+shortcodes, color previews, and issue or commit references are preserved
+unchanged and not modeled. Table alignment currently applies only to top-level tables
+and preserves cell contents. Embedded code formatting, metadata mutation,
+document generation, external URL fetching, and file renames are outside this
+release.
 
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.
 Heading fragments use exact text; GitHub uses slugged headings including
-duplicate suffixes. Block identifiers are indexed from trailing text markers.
-Heading nesting paths, property aliases, PDF subpaths, and every Obsidian
-plugin's syntax are not fully supported. Embeds are preserved as embeds; image
-dimensions in their aliases remain intact.
+duplicate suffixes, and Forgejo uses its own anchor algorithm, which collapses
+punctuation runs and keeps Unicode letters. Block identifiers are indexed from
+trailing text markers. Heading nesting paths, property aliases, PDF subpaths,
+and every Obsidian plugin's syntax are not fully supported. Embeds are preserved
+as embeds; image dimensions in their aliases remain intact.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery

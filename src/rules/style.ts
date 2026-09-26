@@ -58,7 +58,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
 }
 
 // Whitespace inside an inline node is protected; only text-node whitespace can wrap.
-function wrappingAtoms(words: string[]): string[] {
+function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
   const atoms: string[] = [];
   let current = "";
   for (const word of words) {
@@ -71,7 +71,7 @@ function wrappingAtoms(words: string[]): string[] {
   // Keep atoms that would open a block or underline a Setext heading at the
   // start of a line attached to the preceding atom.
   for (let i = 1; i < atoms.length; i++) {
-    if (lineOpener.test(atoms[i]!)) {
+    if (lineOpener.test(atoms[i]!) || extraOpener?.test(atoms[i]!)) {
       atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
       i--;
     }
@@ -90,6 +90,63 @@ function wrappingAtoms(words: string[]): string[] {
 // fences, math, Obsidian comments, HTML blocks, and footnote definitions.
 const lineOpener =
   /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
+// Forgejo additionally opens definition descriptions with `:` and
+// display math with `\[`.
+const forgejoLineOpener = /^(?::|\\\[)/;
+
+type Range = [number, number];
+/** Split text at source whitespace, except inside protected source ranges. */
+function splitWords(text: string, base: number, ranges: Range[]): string[] {
+  if (!ranges.length) return text.split(/([ \t]+)/).filter(Boolean);
+  const words: string[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(/[ \t]+/g)) {
+    const at = base + match.index;
+    if (ranges.some(([from, to]) => at > from && at < to)) continue;
+    if (match.index > cursor) words.push(text.slice(cursor, match.index));
+    words.push(match[0]);
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) words.push(text.slice(cursor));
+  return words;
+}
+/**
+ * Forgejo syntax that GFM parses as prose. A line starting with `:`
+ * turns the preceding lines into a definition list and `\[` opens display
+ * math, so such paragraphs keep their lines. `\(...\)` math and `[[...]]`
+ * shortlinks are recognized within one physical line: a pair on one line
+ * becomes an unbreakable atom, and a pair split across lines, which reflow
+ * could join, protects the whole paragraph.
+ */
+function forgejoProtections(
+  source: string,
+  start: number,
+  end: number,
+): { ranges: Range[]; reason?: string } {
+  const ranges: Range[] = [];
+  for (const line of source.slice(start, end).split(lineBreak)) {
+    const content = line.replace(/^[ \t>]+/, "");
+    if (content.startsWith(":")) return { ranges, reason: "Forgejo definition list" };
+    if (content.startsWith("\\[")) return { ranges, reason: "Forgejo display math" };
+  }
+  for (const [open, close] of [
+    ["\\(", "\\)"],
+    ["[[", "]]"],
+  ] as const) {
+    let from = start;
+    for (;;) {
+      const opener = source.indexOf(open, from);
+      if (opener < 0 || opener >= end) break;
+      const closer = source.indexOf(close, opener + open.length);
+      if (closer < 0 || closer >= end) break;
+      if (lineBreak.test(source.slice(opener, closer)))
+        return { ranges, reason: `Forgejo ${open}...${close} syntax spanning lines` };
+      ranges.push([opener, closer + close.length]);
+      from = closer + close.length;
+    }
+  }
+  return { ranges };
+}
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
@@ -162,6 +219,8 @@ const wrap: Rule = {
           calloutHeader = false;
         }
       }
+      const extraOpener = document.dialect === "forgejo" ? forgejoLineOpener : undefined;
+      let protectedRanges: Range[] = [];
       const reportUnbreakable = () =>
         findings.push({
           start,
@@ -197,14 +256,12 @@ const wrap: Rule = {
             const [a, b] = range(child);
             if (a >= offset + content.length) break;
             if (child.type === "break") continue;
-            const raw = document.source.slice(
-              Math.max(a, offset + container.length),
-              Math.min(b, offset + content.length),
-            );
+            const from = Math.max(a, offset + container.length);
+            const raw = document.source.slice(from, Math.min(b, offset + content.length));
             if (!raw) continue;
-            words.push(...(child.type === "text" ? raw.split(/([ \t]+)/).filter(Boolean) : [raw]));
+            words.push(...(child.type === "text" ? splitWords(raw, from, protectedRanges) : [raw]));
           }
-          const atoms = wrappingAtoms(words);
+          const atoms = wrappingAtoms(words, extraOpener);
           const available = width - measure(linePrefix);
           if (measure(words.join("").trimEnd()) > available) {
             if (atoms.length > 1) breakable = true;
@@ -235,32 +292,50 @@ const wrap: Rule = {
         reportSkipped(reason);
         return;
       }
+      if (document.dialect === "forgejo") {
+        const protections = forgejoProtections(document.source, start, end);
+        protectedRanges = protections.ranges;
+        if (protections.reason) {
+          reportSkipped(protections.reason);
+          return;
+        }
+      }
       const words: string[] = [];
       let unsupported = false;
       for (const child of children) {
         const [a, b] = range(child);
-        const raw = document.source.slice(Math.max(a, start), b);
-        const lines = raw.split(lineBreak);
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i]!;
-          if (continuation && line.startsWith(continuation))
-            lines[i] = line.slice(continuation.length);
-          else if (continuation && /^[\s>]/.test(line)) unsupported = true;
-        }
-        const value = lines.join(" ");
-        if (child.type === "text") {
+        const from = Math.max(a, start);
+        const raw = document.source.slice(from, b);
+        // Odd pieces are the line breaks, so each line's source offset is known.
+        const pieces = raw.split(/(\r\n|\r|\n)/);
+        const lines: string[] = [];
+        let at = from;
+        for (let i = 0; i < pieces.length; i += 2) {
+          let line = pieces[i]!;
+          let lineAt = at;
+          at += line.length + (pieces[i + 1]?.length ?? 0);
+          if (i > 0 && continuation && line.startsWith(continuation)) {
+            line = line.slice(continuation.length);
+            lineAt += continuation.length;
+          } else if (i > 0 && continuation && /^[\s>]/.test(line)) unsupported = true;
+          if (child.type !== "text") {
+            lines.push(line);
+            continue;
+          }
           // Preserve escaping and entities. Split only ordinary source whitespace.
-          words.push(...value.split(/([ \t]+)/).filter(Boolean));
-        } else {
+          if (i > 0) words.push(" ");
+          words.push(...splitWords(line, lineAt, protectedRanges));
+        }
+        if (child.type !== "text") {
           if (raw.includes("\n")) unsupported = true;
-          words.push(value);
+          words.push(lines.join(" "));
         }
       }
       if (unsupported) {
         reportSkipped("multiline inline syntax or unsupported continuation");
         return;
       }
-      const atoms = wrappingAtoms(words);
+      const atoms = wrappingAtoms(words, extraOpener);
       const output: string[] = [];
       let line = "";
       let available = width - measure(prefix);

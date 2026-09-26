@@ -26,6 +26,9 @@ export function parse(
 ): Document {
   const extensions = [frontmatter(["yaml", "toml"])];
   const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
+  // GitHub and Forgejo share GFM tables, task lists, strikethrough, footnotes,
+  // autolinks, and dollar math. Forgejo-only syntax is protected by rules
+  // rather than parsed.
   if (dialect !== "commonmark") {
     extensions.push(gfm(), math());
     mdastExtensions.push(...gfmTree, mathFromMarkdown());

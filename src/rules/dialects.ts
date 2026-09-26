@@ -1,8 +1,9 @@
 import { walk } from "../syntax/walk.js";
-import type { Finding, Rule } from "../core/types.js";
+import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { optionsSchema } from "./style.js";
 
+const githubAlerts = new Set<Dialect>(["github", "forgejo"]);
 function calloutRule(obsidian: boolean): Rule {
   return {
     description: obsidian
@@ -12,7 +13,9 @@ function calloutRule(obsidian: boolean): Rule {
     phase: "inline",
     schema: optionsSchema({}),
     check({ document }) {
-      if (document.dialect !== (obsidian ? "obsidian" : "github")) return [];
+      // Forgejo renders the same five GitHub alert types, case-insensitively.
+      if (obsidian ? document.dialect !== "obsidian" : !githubAlerts.has(document.dialect))
+        return [];
       const findings: Finding[] = [];
       walk(document.tree, "blockquote", (node) => {
         const child = node.children[0];

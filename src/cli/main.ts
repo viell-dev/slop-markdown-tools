@@ -10,12 +10,12 @@ import { resolveConfig } from "../config/resolve.js";
 import { discover, writeAtomic } from "../workspace/files.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
-import type { Diagnostic, Dialect, ProcessOptions } from "../core/types.js";
+import type { Diagnostic, Dialect, DialectName, ProcessOptions } from "../core/types.js";
 
 interface Flags {
   config?: string;
   root?: string;
-  dialect?: Dialect;
+  dialect?: DialectName;
   json?: boolean;
   check?: boolean;
   diff?: boolean;
@@ -35,7 +35,7 @@ function common(command: Command): Command {
   return command
     .option("--config <file>", "Explicit JSON, JSONC, or .mjs configuration")
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
-    .option("--dialect <dialect>", "commonmark, github, or obsidian")
+    .option("--dialect <dialect>", "commonmark, github, forgejo (alias: codeberg), or obsidian")
     .option(
       "--exclude <path>",
       "Exclude an exact file or directory (repeatable)",
