@@ -48,6 +48,20 @@ describe("CLI", () => {
     expect(checked.stderr).toBe("");
     expect(run(root, ["lint", "--dialect", "typo", "."]).status).toBe(2);
   });
+  it("accepts the Forgejo dialect and its Codeberg alias", async () => {
+    const root = await fixture({
+      "mdtools.config.jsonc": '{ "extends": ["recommended", "codeberg"] }',
+      "note.md": "# Test.0.1\n\n[link](#test-0-1)\n\nTerm\n: Definition\n",
+    });
+    const checked = run(root, ["lint", "--json", "."]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(run(root, ["format", "--check", "."]).status).toBe(0);
+    expect(run(root, ["lint", "--dialect", "github", "."]).status).toBe(1);
+    const explained = run(root, ["config", "explain", "note.md"]);
+    expect(JSON.parse(explained.stdout).effective.dialect).toBe("forgejo");
+    const aliased = run(root, ["lint", "--dialect", "codeberg", "--json", "."]);
+    expect(aliased.status, aliased.stderr).toBe(0);
+  });
   it("loads JSONC, applies path overrides, and explains configuration", async () => {
     const root = await fixture({
       "mdtools.config.jsonc":

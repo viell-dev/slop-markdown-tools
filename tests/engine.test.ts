@@ -101,6 +101,10 @@ describe("formatting contracts", () => {
       "github",
     ],
     ["Already formatted.\n", "commonmark"],
+    [
+      "Term\n: Definition kept on its line.\n\nA long paragraph that wraps twice at the narrow width used here.",
+      "forgejo",
+    ],
   ] as const)(
     "reports the same diagnostics after formatting as a lint of the output",
     (source, dialect) => {

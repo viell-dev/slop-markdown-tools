@@ -170,6 +170,54 @@ describe("Obsidian case-insensitive resolution", () => {
   });
 });
 
+describe("Forgejo heading anchors", () => {
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      "# test.0.1",
+      "## Placeholder to force scrolling on link's click",
+      "## a啊啊b",
+      "## c🤔️🤔️d",
+      "## Same",
+      "## Same",
+      "## a-b-c----",
+      "## tes a a   a  a",
+      "## a_b_c",
+      "## ...",
+    ].join("\n\n"),
+  });
+  it.each([
+    ["test-0-1", true],
+    ["test01", false],
+    ["placeholder-to-force-scrolling-on-link-s-click", true],
+    ["a啊啊b", true],
+    ["c-d", true],
+    ["same", true],
+    ["same-1", true],
+    ["same-2", false],
+    ["a-b-c", true],
+    ["tes-a-a-a-a", true],
+    ["a_b_c", true],
+    ["heading", true],
+  ])("resolves #%s as %s", (fragment, exists) => {
+    expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "forgejo").fragmentExists).toBe(
+      exists,
+    );
+  });
+  it("keeps GitHub anchors for the GitHub dialect", () => {
+    expect(workspace.resolve("Doc.md", "Note.md#test01", "github").fragmentExists).toBe(true);
+    expect(workspace.resolve("Doc.md", "Note.md#test-0-1", "github").fragmentExists).toBe(false);
+  });
+  it("validates fragments with the document's dialect", () => {
+    const options = (dialect: "github" | "forgejo") => ({
+      config: { extends: [], dialect, rules: { "links/valid": "error" } } as Config,
+      path: "Doc.md",
+      workspace,
+    });
+    expect(lint("[x](Note.md#test-0-1)\n", options("forgejo"))).toEqual([]);
+    expect(lint("[x](Note.md#test-0-1)\n", options("github"))).toHaveLength(1);
+  });
+});
 describe("destination spelling", () => {
   it.each([
     ["What is this? A test.md", "What is this? A test.md"],

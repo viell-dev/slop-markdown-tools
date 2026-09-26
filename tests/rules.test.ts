@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   applyEdits,
+  canonicalDialect,
   createWorkspace,
   format,
   lint,
   parse,
+  resolveConfig,
   semanticFingerprint,
   textContent,
 } from "../src/index.js";
@@ -152,6 +154,27 @@ describe("dialect markers", () => {
     const obsidian = only({ "obsidian/callout-marker": "warn" }, "obsidian");
     expect(formatted("> [!Custom-Type]- Title\n", obsidian)).toBe("> [!custom-type]- Title\n");
     expect(formatted("> [!note]\n", obsidian)).toBe("> [!note]\n");
+  });
+  it("applies GitHub alert casing to Forgejo documents only among GFM dialects", () => {
+    const rules: Record<string, RuleSetting> = { "github/alert-marker": "warn" };
+    expect(formatted("> [!tip]\n> Text.\n", only(rules, "forgejo"))).toBe("> [!TIP]\n> Text.\n");
+    expect(formatted("> [!tip]\n> Text.\n", only(rules, "commonmark"))).toBe("> [!tip]\n> Text.\n");
+  });
+  it("provides Forgejo and Codeberg presets and accepts aliases in overrides", () => {
+    const rules = {
+      "github/task-marker": "warn",
+      "github/alert-marker": "warn",
+      "style/table": "warn",
+    };
+    expect(resolveConfig({ extends: ["forgejo"] })).toMatchObject({ dialect: "forgejo", rules });
+    expect(resolveConfig({ extends: ["codeberg"] })).toMatchObject({ dialect: "forgejo", rules });
+    expect(resolveConfig({ dialect: "codeberg" }).dialect).toBe("forgejo");
+    expect(
+      resolveConfig({ overrides: [{ files: ["forge/**"], dialect: "codeberg" }] }, "forge/a.md")
+        .dialect,
+    ).toBe("forgejo");
+    expect(canonicalDialect("codeberg")).toBe("forgejo");
+    expect(canonicalDialect("github")).toBe("github");
   });
 });
 

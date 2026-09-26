@@ -39,10 +39,13 @@ Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.
 
 `parse`, `range`, `textContent`, `resolveConfig`, `configSchema`, `presets`,
-`builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
-exported. `range(node)` returns `[start, end]` UTF-16 offsets into the original
-source. `configSchema` is the configuration's JSON Schema; rule-specific schemas
-live on rule objects.
+`dialects`, `dialectAliases`, `canonicalDialect`, `builtInRules`,
+`ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also exported.
+`range(node)` returns `[start, end]` UTF-16 offsets into the original source.
+`configSchema` is the configuration's JSON Schema; rule-specific schemas live on
+rule objects. `canonicalDialect(name)` maps an alias such as `codeberg` to the
+dialect that rules and the workspace see (`forgejo`); `document.dialect` is
+always canonical.
 
 ## Rule plugins
 

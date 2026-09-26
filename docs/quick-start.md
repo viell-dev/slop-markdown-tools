@@ -55,8 +55,10 @@ The recommended preset wraps prose at **80 columns**, uses `_` for emphasis and
 GitHub preset adds table, task marker, and alert marker rules. The configuration
 controls both linting and formatting.
 
-For CommonMark, use only `"recommended"`. For a vault, replace `"github"` with
-`"obsidian"` and follow the [Obsidian setup](obsidian.md).
+For CommonMark, use only `"recommended"`. For Codeberg or another Forgejo
+instance, replace `"github"` with `"forgejo"` (or its alias `"codeberg"`). For a
+vault, replace it with `"obsidian"` and follow the
+[Obsidian setup](obsidian.md).
 
 ## Lint without writing
 

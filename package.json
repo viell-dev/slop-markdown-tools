@@ -1,7 +1,7 @@
 {
   "name": "mdrefine",
   "version": "0.1.0-rc.1",
-  "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, and Obsidian",
+  "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, and Obsidian",
   "type": "module",
   "license": "MIT",
   "author": "viell",

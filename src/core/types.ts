@@ -3,7 +3,9 @@ import type { Extension as SyntaxExtension } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 import type { AnySchema } from "ajv";
 
-export type Dialect = "commonmark" | "github" | "obsidian";
+export type Dialect = "commonmark" | "github" | "forgejo" | "obsidian";
+/** A dialect or one of its aliases, accepted wherever configuration names a dialect. */
+export type DialectName = Dialect | "codeberg";
 export type Severity = "off" | "warn" | "error";
 export type RuleSetting = Severity | [Severity, Record<string, unknown>];
 export interface Edit {
@@ -61,7 +63,7 @@ export interface Plugin {
 }
 export interface Override {
   files: string[];
-  dialect?: Dialect;
+  dialect?: DialectName;
   rules?: Record<string, RuleSetting>;
 }
 export interface ResolveOptions {
@@ -71,7 +73,7 @@ export interface ResolveOptions {
 export interface Config {
   resolve?: ResolveOptions;
   extends?: string[];
-  dialect?: Dialect;
+  dialect?: DialectName;
   rules?: Record<string, RuleSetting>;
   ignore?: string[];
   overrides?: Override[];

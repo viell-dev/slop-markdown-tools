@@ -1,0 +1,8 @@
+{
+  // Codeberg and other Forgejo instances; "codeberg" is an accepted alias.
+  "extends": ["recommended", "forgejo"],
+  "rules": {
+    "style/wrap": ["warn", { "width": 80 }],
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}

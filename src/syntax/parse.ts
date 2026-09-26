@@ -9,6 +9,17 @@ import type { Nodes } from "mdast";
 import type { Dialect, Document, Plugin } from "../core/types.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 
+// GFM's tree transform performs GitHub's second, transform-time autolink pass
+// (`[www.example.com]` or a Forgejo shortlink's `|https://` in files), but its
+// nodes carry no source positions, which made the engine refuse whole documents.
+// No built-in rule acts on literal autolinks, so output is unchanged without it;
+// plugins inspecting link nodes do not see those autolinks.
+const gfmTree = gfmFromMarkdown().map((extension) => {
+  const copy = { ...extension };
+  delete copy.transforms;
+  return copy;
+});
+
 export function parse(
   source: string,
   dialect: Dialect,
@@ -17,9 +28,12 @@ export function parse(
 ): Document {
   const extensions = [frontmatter(["yaml", "toml"])];
   const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
+  // GitHub and Forgejo share GFM tables, task lists, strikethrough, footnotes,
+  // autolinks, and dollar math. Forgejo-only syntax is protected by rules
+  // rather than parsed.
   if (dialect !== "commonmark") {
     extensions.push(gfm(), math());
-    mdastExtensions.push(...gfmFromMarkdown(), mathFromMarkdown());
+    mdastExtensions.push(...gfmTree, mathFromMarkdown());
   }
   if (dialect === "obsidian") {
     extensions.push(obsidianSyntax);

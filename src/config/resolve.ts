@@ -1,6 +1,20 @@
 import { Ajv } from "ajv";
 import { minimatch } from "minimatch";
-import type { Config, Plugin, ResolvedConfig, RuleSetting } from "../core/types.js";
+import type {
+  Config,
+  Dialect,
+  DialectName,
+  Plugin,
+  ResolvedConfig,
+  RuleSetting,
+} from "../core/types.js";
+
+/** Alias names that select an existing dialect; Codeberg runs Forgejo's renderer. */
+export const dialectAliases: Record<string, Dialect> = { codeberg: "forgejo" };
+export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "obsidian"];
+export function canonicalDialect(name: DialectName): Dialect {
+  return dialectAliases[name] ?? (name as Dialect);
+}
 
 export const presets: Record<string, Config> = {
   recommended: {
@@ -16,6 +30,11 @@ export const presets: Record<string, Config> = {
     dialect: "github",
     rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
   },
+  forgejo: {
+    dialect: "forgejo",
+    rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+  },
+  codeberg: { extends: ["forgejo"] },
   obsidian: {
     dialect: "obsidian",
     rules: {
@@ -28,6 +47,7 @@ export const presets: Record<string, Config> = {
   },
 };
 const severity = { enum: ["off", "warn", "error"] };
+const dialect = { enum: [...dialects, ...Object.keys(dialectAliases)] };
 const rules = {
   type: "object",
   additionalProperties: {
@@ -49,7 +69,7 @@ export const configSchema = {
       properties: { gitIgnored: { type: "boolean" }, nestedRepositories: { type: "boolean" } },
     },
     extends: { type: "array", items: { type: "string" } },
-    dialect: { enum: ["commonmark", "github", "obsidian"] },
+    dialect,
     rules,
     ignore: { type: "array", items: { type: "string" } },
     plugins: { type: "array", items: { type: "string" } },
@@ -61,7 +81,7 @@ export const configSchema = {
         additionalProperties: false,
         properties: {
           files: { type: "array", items: { type: "string" }, minItems: 1 },
-          dialect: { enum: ["commonmark", "github", "obsidian"] },
+          dialect,
           rules,
         },
       },
@@ -102,7 +122,7 @@ export function resolveConfig(
       if (!preset) throw new Error(`Unknown preset: ${name}`);
       merge(preset, [...chain, name]);
     }
-    if (part.dialect) result.dialect = part.dialect;
+    if (part.dialect) result.dialect = canonicalDialect(part.dialect);
     Object.assign(result.rules, part.rules);
     Object.assign(result.resolve, part.resolve);
     result.ignore.push(...(part.ignore ?? []));
@@ -116,7 +136,7 @@ export function resolveConfig(
         minimatch(path.replaceAll("\\", "/"), pattern, { dot: true }),
       )
     ) {
-      if (override.dialect) result.dialect = override.dialect;
+      if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       Object.assign(result.rules, override.rules);
     }
   }
