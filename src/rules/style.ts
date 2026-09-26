@@ -90,10 +90,9 @@ function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
 // fences, math, Obsidian comments, HTML blocks, and footnote definitions.
 const lineOpener =
   /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
-// Forgejo additionally opens definition descriptions with `:` and
-// display math with `\[`.
-// A definition description is `:` followed by at least one space or tab, so
-// only a bare `:` atom could open one at the start of a reflowed line.
+// Forgejo additionally opens display math with `\[` and definition
+// descriptions with `:` followed by at least one space or tab, so only a bare
+// `:` atom could open one at the start of a reflowed line.
 const forgejoLineOpener = /^(?::$|\\\[)/;
 
 type Range = [number, number];
