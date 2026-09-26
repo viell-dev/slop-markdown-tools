@@ -51,7 +51,7 @@ resolve to the canonical name in `config explain` and plugin documents.
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo
 additionally renders definition lists (`Term` followed by a line starting with
-`:`), `\(...\)` and `\[...\]` math, and `[[target|text]]` shortlinks, and
+`: `), `\(...\)` and `\[...\]` math, and `[[target|text]]` shortlinks, and
 generates heading anchors differently: every run of characters other than
 letters, numbers, and `_` becomes one hyphen, so `## test.0.1` is `#test-0-1` on
 Forgejo and `#test01` on GitHub. The Forgejo dialect keeps those constructs on

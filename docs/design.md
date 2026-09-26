@@ -49,9 +49,12 @@ not a license to split protected syntax.
 
 GitHub alert support normalizes known alert type markers. Footnotes, math,
 strikethrough, and autolinks are parsed, but do not each have dedicated style
-rules. Literal autolinks come from the syntax extension only; the GFM tree
-transform that re-scanned text for URLs used looser boundaries than GitHub and
-produced nodes without source positions.
+rules. Literal autolinks come from the syntax extension only. GitHub applies a
+second, transform-time autolink pass to files, which links cases such as
+`[www.example.com]`, but the GFM tree transform implementing it produces nodes
+without source positions, and one such URL made the engine refuse the whole
+document. No built-in rule acts on literal autolinks, so formatted output is the
+same either way; plugins inspecting link nodes do not see those autolinks.
 
 Forgejo documents parse as GitHub Markdown. Forgejo-only syntax is protected
 rather than modeled: paragraphs containing a definition description line or a

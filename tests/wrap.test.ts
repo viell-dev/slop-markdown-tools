@@ -333,7 +333,7 @@ describe("Forgejo syntax", () => {
     );
     expect(lint(source, { config: reporting })[0]?.message).toContain("Forgejo display math");
   });
-  it.each([":", ":emoji:", "\\[", "\\[x\\]"])(
+  it.each([":", "\\[", "\\[x\\]"])(
     "keeps %s attached to the preceding word instead of opening a block",
     (atom) => {
       const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb ${atom} more words follow here.\n`;
@@ -345,6 +345,24 @@ describe("Forgejo syntax", () => {
       );
     },
   );
+  it("treats `:` without following whitespace as prose", () => {
+    const source = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb :emoji: more words follow here.\n";
+    const output = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb\n:emoji: more words follow here.\n";
+    expect(verify(source, forgejo).output).toBe(output);
+    expect(verify(source, github).output).toBe(output);
+    const lines = "Term\n:emoji: is not a definition, so this paragraph reflows at forty.\n";
+    expect(verify(lines, forgejo).output).toBe(verify(lines, github).output);
+    expect(verify(lines, forgejo).output).not.toBe(lines);
+  });
+  it("counts one-line pairs as single atoms in skipped paragraphs", () => {
+    const source = "Text \\(a formula with spaces that is wider than forty columns\\)  \nnext\n";
+    const config: Config = { ...wrap({ reportUnbreakable: true }), dialect: "forgejo" };
+    const messages = lint(source, { config }).map((item) => item.message);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("unbreakable atom");
+    expect(lint(source, { config: { ...config, dialect: "github" } })).toEqual([]);
+    expect(lint(source, { config: reporting })[0]?.message).toContain("hard line break");
+  });
   it("keeps inline math and shortlinks on one physical line", () => {
     const source = "Some words \\(a + b\\) and [[This is a link|https://codeberg.org]] end here.\n";
     expect(verify(source, forgejo).output).toBe(
@@ -371,17 +389,20 @@ describe("Forgejo syntax", () => {
   it.each([
     "Some words [[This is a link|https://codeberg.org]] end here.\n",
     "Some words x|www.example.com and [www.example.com] end here.\n",
-  ])("wraps %j, which GitHub does not linkify, in every GFM dialect", (source) => {
-    for (const config of [github, forgejo, { ...wrap(), dialect: "obsidian" as const }]) {
-      const workspace = createWorkspace({}, { strictLineBreaks: true });
-      const result = format(source, { config, workspace });
-      expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
-      expect(result.output.split("\n").length).toBeGreaterThan(2);
-    }
-    expect(verify("A plain https://example.com/path link and a@b.co mail.\n", github).output).toBe(
-      "A plain https://example.com/path link\nand a@b.co mail.\n",
-    );
-  });
+  ])(
+    "wraps %j, which only GitHub's transform-time pass linkifies, in every GFM dialect",
+    (source) => {
+      for (const config of [github, forgejo, { ...wrap(), dialect: "obsidian" as const }]) {
+        const workspace = createWorkspace({}, { strictLineBreaks: true });
+        const result = format(source, { config, workspace });
+        expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+        expect(result.output.split("\n").length).toBeGreaterThan(2);
+      }
+      expect(
+        verify("A plain https://example.com/path link and a@b.co mail.\n", github).output,
+      ).toBe("A plain https://example.com/path link\nand a@b.co mail.\n");
+    },
+  );
   it("still reflows unpaired markers", () => {
     const source = "Text \\(a b and [[c d more words that would otherwise reflow onto one line.\n";
     expect(verify(source, forgejo).output).toBe(

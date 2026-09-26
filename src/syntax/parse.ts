@@ -9,9 +9,11 @@ import type { Nodes } from "mdast";
 import type { Dialect, Document, Plugin } from "../core/types.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 
-// GFM's autolink transform re-scans text with looser boundary rules than the
-// syntax extension and GitHub itself, so `x|www.example.com` or a Forgejo
-// shortlink's `|https://` became links, and its nodes carry no source positions.
+// GFM's tree transform performs GitHub's second, transform-time autolink pass
+// (`[www.example.com]` or a Forgejo shortlink's `|https://` in files), but its
+// nodes carry no source positions, which made the engine refuse whole documents.
+// No built-in rule acts on literal autolinks, so output is unchanged without it;
+// plugins inspecting link nodes do not see those autolinks.
 const gfmTree = gfmFromMarkdown().map((extension) => {
   const copy = { ...extension };
   delete copy.transforms;

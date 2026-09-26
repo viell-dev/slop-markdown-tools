@@ -92,7 +92,9 @@ const lineOpener =
   /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
 // Forgejo additionally opens definition descriptions with `:` and
 // display math with `\[`.
-const forgejoLineOpener = /^(?::|\\\[)/;
+// A definition description is `:` followed by at least one space or tab, so
+// only a bare `:` atom could open one at the start of a reflowed line.
+const forgejoLineOpener = /^(?::$|\\\[)/;
 
 type Range = [number, number];
 /** Split text at source whitespace, except inside protected source ranges. */
@@ -111,9 +113,9 @@ function splitWords(text: string, base: number, ranges: Range[]): string[] {
   return words;
 }
 /**
- * Forgejo syntax that GFM parses as prose. A line starting with `:`
- * turns the preceding lines into a definition list and `\[` opens display
- * math, so such paragraphs keep their lines. `\(...\)` math and `[[...]]`
+ * Forgejo syntax that GFM parses as prose. A line starting with `:` and a
+ * space turns the preceding lines into a definition list and `\[` opens
+ * display math, so such paragraphs keep their lines. `\(...\)` math and `[[...]]`
  * shortlinks are recognized within one physical line: a pair on one line
  * becomes an unbreakable atom, and a pair split across lines, which reflow
  * could join, protects the whole paragraph.
@@ -126,7 +128,7 @@ function forgejoProtections(
   const ranges: Range[] = [];
   for (const line of source.slice(start, end).split(lineBreak)) {
     const content = line.replace(/^[ \t>]+/, "");
-    if (content.startsWith(":")) return { ranges, reason: "Forgejo definition list" };
+    if (/^:[ \t]/.test(content)) return { ranges, reason: "Forgejo definition list" };
     if (content.startsWith("\\[")) return { ranges, reason: "Forgejo display math" };
   }
   for (const [open, close] of [
@@ -288,17 +290,16 @@ const wrap: Rule = {
               : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
                 ? "unsupported container prefix"
                 : undefined;
-      if (reason) {
-        reportSkipped(reason);
+      // Protections are computed first so that skipped paragraphs still
+      // classify one-line math and shortlinks as single atoms in diagnostics.
+      const protections =
+        document.dialect === "forgejo"
+          ? forgejoProtections(document.source, start, end)
+          : { ranges: [] as Range[] };
+      protectedRanges = protections.ranges;
+      if (reason ?? protections.reason) {
+        reportSkipped((reason ?? protections.reason)!);
         return;
-      }
-      if (document.dialect === "forgejo") {
-        const protections = forgejoProtections(document.source, start, end);
-        protectedRanges = protections.ranges;
-        if (protections.reason) {
-          reportSkipped(protections.reason);
-          return;
-        }
       }
       const words: string[] = [];
       let unsupported = false;
