@@ -58,12 +58,11 @@ rather than modeled: paragraphs containing a definition description line or a
 `\[` display-math line are not reflowed, `\(...\)` math and `[[...]]` shortlinks
 on one line are unbreakable atoms, and a pair split across lines protects its
 paragraph because reflow could join it. Shortlinks are not resolved as links.
-Legacy `> **Note**` callouts, table-of-contents front matter, emoji
-shortcodes, color previews, and issue or commit references are preserved
-unchanged and not modeled. Table alignment currently applies only to top-level tables
-and preserves cell contents. Embedded code formatting, metadata mutation,
-document generation, external URL fetching, and file renames are outside this
-release.
+Legacy `> **Note**` callouts, table-of-contents front matter, emoji shortcodes,
+color previews, and issue or commit references are preserved unchanged and not
+modeled. Table alignment currently applies only to top-level tables and
+preserves cell contents. Embedded code formatting, metadata mutation, document
+generation, external URL fetching, and file renames are outside this release.
 
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.
