@@ -9,6 +9,15 @@ import type { Nodes } from "mdast";
 import type { Dialect, Document, Plugin } from "../core/types.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 
+// GFM's autolink transform re-scans text with looser boundary rules than the
+// syntax extension and GitHub itself, so `x|www.example.com` or a Forgejo
+// shortlink's `|https://` became links, and its nodes carry no source positions.
+const gfmTree = gfmFromMarkdown().map((extension) => {
+  const copy = { ...extension };
+  delete copy.transforms;
+  return copy;
+});
+
 export function parse(
   source: string,
   dialect: Dialect,
@@ -19,7 +28,7 @@ export function parse(
   const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
   if (dialect !== "commonmark") {
     extensions.push(gfm(), math());
-    mdastExtensions.push(...gfmFromMarkdown(), mathFromMarkdown());
+    mdastExtensions.push(...gfmTree, mathFromMarkdown());
   }
   if (dialect === "obsidian") {
     extensions.push(obsidianSyntax);
