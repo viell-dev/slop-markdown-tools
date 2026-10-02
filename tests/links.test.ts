@@ -218,6 +218,65 @@ describe("Forgejo heading anchors", () => {
     expect(lint("[x](Note.md#test-0-1)\n", options("github"))).toHaveLength(1);
   });
 });
+describe("Gitea heading anchors", () => {
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      "# test.0.1",
+      "## Placeholder to force scrolling on link's click",
+      "## a啊啊b",
+      "## c🤔️🤔️d",
+      "## a-b-c----",
+      "## tes a a   a  a",
+      "## a_b_c",
+      "## test：ad # 23 df 2*/*",
+      '## Header with "double quotes"',
+      "## tes（0）",
+      "## Cafe\u0301",
+      "## Same",
+      "## Same",
+      "## ...",
+    ].join("\n\n"),
+  });
+  it.each([
+    ["test01", true],
+    ["test-0-1", false],
+    ["placeholder-to-force-scrolling-on-links-click", true],
+    ["a啊啊b", true],
+    ["cd", true],
+    ["a-b-c----", true],
+    ["tes-a-a---a--a", true],
+    ["a_b_c", true],
+    ["testad--23-df-2", true],
+    ["header-with-double-quotes", true],
+    ["tes0", true],
+    ["cafe", true],
+    ["cafe\u0301", false],
+    ["same", true],
+    ["same-1", true],
+    ["same-2", false],
+    ["heading", true],
+  ])("resolves #%s as %s", (fragment, exists) => {
+    expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "gitea").fragmentExists).toBe(exists);
+  });
+  it("differs from GitHub only where Gitea drops marks and names empty headings", () => {
+    const resolves = (fragment: string, dialect: "github" | "gitea") =>
+      workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    expect(resolves("cafe\u0301", "github")).toBe(true);
+    expect(resolves("cafe", "github")).toBe(false);
+    expect(resolves("heading", "github")).toBe(false);
+    expect(resolves("test01", "github")).toBe(true);
+  });
+  it("validates fragments with the document's dialect", () => {
+    const options = (dialect: "forgejo" | "gitea") => ({
+      config: { extends: [], dialect, rules: { "links/valid": "error" } } as Config,
+      path: "Doc.md",
+      workspace,
+    });
+    expect(lint("[x](Note.md#test01)\n", options("gitea"))).toEqual([]);
+    expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
+  });
+});
 describe("destination spelling", () => {
   it.each([
     ["What is this? A test.md", "What is this? A test.md"],

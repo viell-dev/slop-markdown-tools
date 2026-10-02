@@ -44,9 +44,10 @@ separately.
 ## Dialects
 
 `dialect` selects the renderer whose rules apply: `commonmark`, `github`,
-`forgejo`, or `obsidian`. `codeberg` is an alias for `forgejo`, because Codeberg
-runs Forgejo's renderer; aliases are accepted wherever a dialect is named and
-resolve to the canonical name in `config explain` and plugin documents.
+`forgejo`, `gitea`, or `obsidian`. `codeberg` is an alias for `forgejo`, because
+Codeberg runs Forgejo's renderer; aliases are accepted wherever a dialect is
+named and resolve to the canonical name in `config explain` and plugin
+documents.
 
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo
@@ -58,6 +59,21 @@ Forgejo and `#test01` on GitHub. The Forgejo dialect keeps those constructs on
 their original lines and validates fragments against Forgejo anchors. The GitHub
 rules apply to both dialects.
 
+Gitea, from which Forgejo was forked, renders the same definition lists and
+shortlinks. It parses `\(...\)` and `\[...\]` math only when an administrator
+enables them with `MATH_CODE_BLOCK_DETECTION`, as was the default before
+Gitea 1.24; a document cannot reveal that setting, so the Gitea dialect keeps
+those constructs on their lines too. Gitea's heading anchors follow GitHub's:
+punctuation is deleted, so `## test.0.1` is `#test01`. Gitea 1.26 and later give
+repeated headings the same anchor; the `-1`, `-2` suffixes of earlier versions
+are still accepted. Gitea 1.26 and later also render `__init__.py` literally
+instead of as emphasis. Whether underscores delimit emphasis then depends on the
+rest of the line, so the Gitea dialect leaves emphasis markers unchanged on any
+line containing `_.py` and does not reflow such a paragraph unless all its
+underscores are inside code spans. The GitHub rules apply to Gitea as well.
+Gitea renders repository files with soft line breaks by default; if an instance
+adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable `style/wrap`.
+
 ## Presets
 
 | Preset        | Dialect   | Enabled rules                                                                                  |
@@ -66,6 +82,7 @@ rules apply to both dialects.
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
 | `forgejo`     | Forgejo   | The `github` rules                                                                             |
 | `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
+| `gitea`       | Gitea     | The `github` rules                                                                             |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
 An omitted `extends` selects `recommended`. Explicit `extends` replaces that
@@ -89,7 +106,7 @@ Problem rules report findings and never become formatting edits.
 | `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below              |
 | `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
 | `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
-| `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub and Forgejo         |
+| `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
 | `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
 | `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
 | `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
@@ -120,21 +137,22 @@ Unicode scalar values instead; astral characters count once and combining marks
 count separately. Container prefixes count toward the width in either mode.
 
 `reportUnreflowed: true` reports breakable over-width lines in paragraphs
-protected by hard breaks, block IDs, inline HTML, callout headers, Forgejo
-definition lists, display math, or line-spanning inline syntax, or unsupported
-multiline syntax or containers. `reportUnbreakable: true` reports overflow from
-an atom that cannot be split, including in protected paragraphs. Whitespace
-inside a link, code span, or other protected inline node is not a wrapping
-opportunity, nor is whitespace inside a Forgejo `\(...\)` expression or
-`[[...]]` shortlink written on one line. A protected paragraph with both
-breakable prose and an over-width atom can report both causes; an atom-only
-overflow does not trigger `reportUnreflowed`. Hard-break markers are excluded
-from protected-line width. An Obsidian callout title is one indivisible physical
-line: an over-width title follows `reportUnbreakable`, even when it contains
-spaces. Body prose is classified separately. A block ID does not make its whole
-paragraph indivisible. Both options default to false, propose no edits, and use
-the rule's severity. Use severity `error` or `--max-warnings 0` to make these
-diagnostics fail a check; `--check` does not change rule settings.
+protected by hard breaks, block IDs, inline HTML, callout headers, Forgejo or
+Gitea definition lists, display math, line-spanning inline syntax, or the Gitea
+`_.py` emphasis exception, or unsupported multiline syntax or containers.
+`reportUnbreakable: true` reports overflow from an atom that cannot be split,
+including in protected paragraphs. Whitespace inside a link, code span, or other
+protected inline node is not a wrapping opportunity, nor is whitespace inside a
+Forgejo or Gitea `\(...\)` expression or `[[...]]` shortlink written on one
+line. A protected paragraph with both breakable prose and an over-width atom can
+report both causes; an atom-only overflow does not trigger `reportUnreflowed`.
+Hard-break markers are excluded from protected-line width. An Obsidian callout
+title is one indivisible physical line: an over-width title follows
+`reportUnbreakable`, even when it contains spaces. Body prose is classified
+separately. A block ID does not make its whole paragraph indivisible. Both
+options default to false, propose no edits, and use the rule's severity. Use
+severity `error` or `--max-warnings 0` to make these diagnostics fail a check;
+`--check` does not change rule settings.
 
 Enable `style/inline-code` to join multiline code spans before paragraph reflow.
 This opt-in rule handles single and multiple backticks, including list and quote
@@ -181,14 +199,14 @@ same link in one pass: overlapping edits are reported; run those policies in
 separate passes.
 
 Network URLs are recognized but never fetched. Website-root paths and
-query-bearing destinations in CommonMark, GitHub, and Forgejo are outside local
-resolution. Missing or ambiguous targets are reported, never guessed. Obsidian
-resolution uses explicit `./` or `../` paths as source-relative; otherwise an
-exact vault-root match precedes an exact source-relative match, followed by
-unique suffix matching. Multiple candidates within the chosen tier remain
-ambiguous. Relative rewrites use `./` when needed to avoid a vault-root
+query-bearing destinations in CommonMark, GitHub, Forgejo, and Gitea are outside
+local resolution. Missing or ambiguous targets are reported, never guessed.
+Obsidian resolution uses explicit `./` or `../` paths as source-relative;
+otherwise an exact vault-root match precedes an exact source-relative match,
+followed by unique suffix matching. Multiple candidates within the chosen tier
+remain ambiguous. Relative rewrites use `./` when needed to avoid a vault-root
 collision. Existing directories get a distinct diagnostic in Obsidian; they are
-not rewritten to README or index notes. CommonMark, GitHub, and Forgejo
+not rewritten to README or index notes. CommonMark, GitHub, Forgejo, and Gitea
 directory links are accepted because a hosting site can serve them.
 Shortest-name/alias resolution is not a complete clone of Obsidian.
 

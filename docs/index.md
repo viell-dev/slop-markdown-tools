@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Markdown Tools
   text: Your Markdown. Your rules.
-  tagline: Separate lint and format commands. Shared configuration. Built for CommonMark, GitHub, Forgejo, and Obsidian.
+  tagline: Separate lint and format commands. Shared configuration. Built for CommonMark, GitHub, Forgejo, Gitea, and Obsidian.
   actions:
     - theme: brand
       text: Quick start

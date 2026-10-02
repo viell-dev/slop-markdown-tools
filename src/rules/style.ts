@@ -1,7 +1,7 @@
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
-import type { Nodes } from "mdast";
-import type { Finding, Rule } from "../core/types.js";
+import type { Nodes, Paragraph } from "mdast";
+import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
@@ -12,6 +12,20 @@ const lineBreak = /\r\n|\r|\n/;
 /** The document's line ending, taken from its first line break. */
 function lineEnding(source: string): string {
   return lineBreak.exec(source)?.[0] ?? "\n";
+}
+/**
+ * Gitea does not parse a `_` run as an emphasis delimiter when the next `_` on
+ * its physical line starts `_.py`, or when the run itself does and no `_`
+ * follows, so `__init__.py` stays literal. The outcome depends on everything
+ * else on the line, code spans included: a line containing `_.py` before or
+ * after an edit can gain or lose emphasis when markers change or lines join.
+ */
+function giteaPyLine(source: string, start: number, end: number): boolean {
+  let lineStart = start;
+  while (lineStart > 0 && !/[\r\n]/.test(source[lineStart - 1]!)) lineStart--;
+  let lineEnd = end;
+  while (lineEnd < source.length && !/[\r\n]/.test(source[lineEnd]!)) lineEnd++;
+  return source.slice(lineStart, lineEnd).includes("_.py");
 }
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
@@ -40,6 +54,13 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           (index) => document.source[index],
         );
         if (neighbours.includes(marker[0]!)) return;
+        if (
+          document.dialect === "gitea" &&
+          (giteaPyLine(document.source, start, end) ||
+            document.source.startsWith(".py", end) ||
+            document.source.startsWith(".py", start + size))
+        )
+          return;
         for (const [a, b] of [
           [start, start + size],
           [end - size, end],
@@ -90,10 +111,12 @@ function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
 // fences, math, Obsidian comments, HTML blocks, and footnote definitions.
 const lineOpener =
   /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
-// Forgejo additionally opens display math with `\[` and definition
+/** Forgejo and its upstream Gitea build on goldmark with shared extensions. */
+const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", gitea: "Gitea" };
+// Forgejo and Gitea additionally open display math with `\[` and definition
 // descriptions with `:` followed by at least one space or tab, so only a bare
 // `:` atom could open one at the start of a reflowed line.
-const forgejoLineOpener = /^(?::$|\\\[)/;
+const forgeLineOpener = /^(?::$|\\\[)/;
 
 type Range = [number, number];
 /** Split text at source whitespace, except inside protected source ranges. */
@@ -112,23 +135,26 @@ function splitWords(text: string, base: number, ranges: Range[]): string[] {
   return words;
 }
 /**
- * Forgejo syntax that GFM parses as prose. A line starting with `:` and a
- * space turns the preceding lines into a definition list and `\[` opens
- * display math, so such paragraphs keep their lines. `\(...\)` math and `[[...]]`
- * shortlinks are recognized within one physical line: a pair on one line
- * becomes an unbreakable atom, and a pair split across lines, which reflow
- * could join, protects the whole paragraph.
+ * Syntax that Forgejo and Gitea render but GFM parses as prose. A line starting
+ * with `:` and a space turns the preceding lines into a definition list and `\[`
+ * opens display math, so such paragraphs keep their lines. `\(...\)` math and
+ * `[[...]]` shortlinks are recognized within one physical line: a pair on one
+ * line becomes an unbreakable atom, and a pair split across lines, which reflow
+ * could join, protects the whole paragraph. Gitea parses the backslash math
+ * delimiters only where an administrator enables them, which a document does
+ * not reveal, so they are protected there too.
  */
-function forgejoProtections(
+function forgeProtections(
   source: string,
   start: number,
   end: number,
+  forge: string,
 ): { ranges: Range[]; reason?: string } {
   const ranges: Range[] = [];
   for (const line of source.slice(start, end).split(lineBreak)) {
     const content = line.replace(/^[ \t>]+/, "");
-    if (/^:[ \t]/.test(content)) return { ranges, reason: "Forgejo definition list" };
-    if (content.startsWith("\\[")) return { ranges, reason: "Forgejo display math" };
+    if (/^:[ \t]/.test(content)) return { ranges, reason: `${forge} definition list` };
+    if (content.startsWith("\\[")) return { ranges, reason: `${forge} display math` };
   }
   for (const [open, close] of [
     ["\\(", "\\)"],
@@ -141,12 +167,29 @@ function forgejoProtections(
       const closer = source.indexOf(close, opener + open.length);
       if (closer < 0 || closer >= end) break;
       if (lineBreak.test(source.slice(opener, closer)))
-        return { ranges, reason: `Forgejo ${open}...${close} syntax spanning lines` };
+        return { ranges, reason: `${forge} ${open}...${close} syntax spanning lines` };
       ranges.push([opener, closer + close.length]);
       from = closer + close.length;
     }
   }
   return { ranges };
+}
+/**
+ * Whether reflow could change Gitea emphasis under its `_.py` exception: the
+ * paragraph contains `_.py` and an underscore outside code spans, where
+ * Gitea's parser would consider it as a delimiter.
+ */
+function giteaPyParagraph(source: string, node: Paragraph, start: number, end: number): boolean {
+  const text = source.slice(start, end);
+  if (!text.includes("_.py")) return false;
+  const code: Range[] = [];
+  walk(node, "inlineCode", (child) => {
+    code.push(range(child));
+  });
+  for (let at = text.indexOf("_"); at >= 0; at = text.indexOf("_", at + 1)) {
+    if (!code.some(([a, b]) => start + at >= a && start + at < b)) return true;
+  }
+  return false;
 }
 
 const wrap: Rule = {
@@ -220,7 +263,8 @@ const wrap: Rule = {
           calloutHeader = false;
         }
       }
-      const extraOpener = document.dialect === "forgejo" ? forgejoLineOpener : undefined;
+      const forge = goldmarkForges[document.dialect];
+      const extraOpener = forge ? forgeLineOpener : undefined;
       let protectedRanges: Range[] = [];
       const reportUnbreakable = () =>
         findings.push({
@@ -291,13 +335,18 @@ const wrap: Rule = {
                 : undefined;
       // Protections are computed first so that skipped paragraphs still
       // classify one-line math and shortlinks as single atoms in diagnostics.
-      const protections =
-        document.dialect === "forgejo"
-          ? forgejoProtections(document.source, start, end)
-          : { ranges: [] as Range[] };
+      const protections = forge
+        ? forgeProtections(document.source, start, end, forge)
+        : { ranges: [] as Range[] };
       protectedRanges = protections.ranges;
-      if (reason ?? protections.reason) {
-        reportSkipped((reason ?? protections.reason)!);
+      const skipped =
+        reason ??
+        protections.reason ??
+        (document.dialect === "gitea" && giteaPyParagraph(document.source, node, start, end)
+          ? "Gitea `_.py` emphasis exception"
+          : undefined);
+      if (skipped) {
+        reportSkipped(skipped);
         return;
       }
       const words: string[] = [];
@@ -435,6 +484,7 @@ export const styleRules: Record<string, Rule> = {
       walk(document.tree, "inlineCode", (node) => {
         const [start, end] = range(node);
         if (!/[\r\n]/.test(document.source.slice(start, end))) return;
+        if (document.dialect === "gitea" && giteaPyLine(document.source, start, end)) return;
         const value = node.value.replace(/\r\n|\r|\n/g, " ");
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);

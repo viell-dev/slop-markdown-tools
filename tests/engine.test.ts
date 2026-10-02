@@ -105,6 +105,10 @@ describe("formatting contracts", () => {
       "Term\n: Definition kept on its line.\n\nA long paragraph that wraps twice at the narrow width used here.",
       "forgejo",
     ],
+    [
+      "See __init__.py and *config*.py.\n\nTerm\n: Definition kept on its line.\n\nA long paragraph that wraps twice at the narrow width used here.",
+      "gitea",
+    ],
   ] as const)(
     "reports the same diagnostics after formatting as a lint of the output",
     (source, dialect) => {

@@ -3,7 +3,7 @@ import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { optionsSchema } from "./style.js";
 
-const githubAlerts = new Set<Dialect>(["github", "forgejo"]);
+const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea"]);
 function calloutRule(obsidian: boolean): Rule {
   return {
     description: obsidian
@@ -13,7 +13,7 @@ function calloutRule(obsidian: boolean): Rule {
     phase: "inline",
     schema: optionsSchema({}),
     check({ document }) {
-      // Forgejo renders the same five GitHub alert types, case-insensitively.
+      // Forgejo and Gitea render the same five GitHub alert types, case-insensitively.
       if (obsidian ? document.dialect !== "obsidian" : !githubAlerts.has(document.dialect))
         return [];
       const findings: Finding[] = [];

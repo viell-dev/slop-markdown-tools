@@ -35,7 +35,10 @@ function common(command: Command): Command {
   return command
     .option("--config <file>", "Explicit JSON, JSONC, or .mjs configuration")
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
-    .option("--dialect <dialect>", "commonmark, github, forgejo (alias: codeberg), or obsidian")
+    .option(
+      "--dialect <dialect>",
+      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian",
+    )
     .option(
       "--exclude <path>",
       "Exclude an exact file or directory (repeatable)",

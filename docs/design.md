@@ -56,25 +56,33 @@ without source positions, and one such URL made the engine refuse the whole
 document. No built-in rule acts on literal autolinks, so formatted output is the
 same either way; plugins inspecting link nodes do not see those autolinks.
 
-Forgejo documents parse as GitHub Markdown. Forgejo-only syntax is protected
-rather than modeled: paragraphs containing a definition description line or a
-`\[` display-math line are not reflowed, `\(...\)` math and `[[...]]` shortlinks
-on one line are unbreakable atoms, and a pair split across lines protects its
-paragraph because reflow could join it. Shortlinks are not resolved as links.
-Legacy `> **Note**` callouts, table-of-contents front matter, emoji shortcodes,
-color previews, and issue or commit references are preserved unchanged and not
-modeled. Table alignment currently applies only to top-level tables and
-preserves cell contents. Embedded code formatting, metadata mutation, document
-generation, external URL fetching, and file renames are outside this release.
+Forgejo and Gitea documents parse as GitHub Markdown. Their additional syntax is
+protected rather than modeled: paragraphs containing a definition description
+line or a `\[` display-math line are not reflowed, `\(...\)` math and `[[...]]`
+shortlinks on one line are unbreakable atoms, and a pair split across lines
+protects its paragraph because reflow could join it. Gitea parses the backslash
+math delimiters only when its instance enables them, so they are protected
+regardless. Gitea's exception for underscores before `.py` is protected the same
+way: emphasis markers on a line containing `_.py` are left unchanged, and such a
+paragraph is reflowed only when all its underscores are inside code spans.
+Shortlinks are not resolved as links. Legacy `> **Note**` callouts,
+table-of-contents front matter, emoji shortcodes, color previews, and issue or
+commit references are preserved unchanged and not modeled. Table alignment
+currently applies only to top-level tables and preserves cell contents. Embedded
+code formatting, metadata mutation, document generation, external URL fetching,
+and file renames are outside this release.
 
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.
 Heading fragments use exact text; GitHub uses slugged headings including
 duplicate suffixes, and Forgejo uses its own anchor algorithm, which collapses
-punctuation runs and keeps Unicode letters. Block identifiers are indexed from
-trailing text markers. Heading nesting paths, property aliases, PDF subpaths,
-and every Obsidian plugin's syntax are not fully supported. Embeds are preserved
-as embeds; image dimensions in their aliases remain intact.
+punctuation runs and keeps Unicode letters. Gitea deletes punctuation like
+GitHub but also drops combining marks; Gitea fragments also accept the duplicate
+suffixes that versions before 1.26 generated. Custom Gitea heading IDs written
+as attributes (`## Title {#id}`) are not modeled. Block identifiers are indexed
+from trailing text markers. Heading nesting paths, property aliases, PDF
+subpaths, and every Obsidian plugin's syntax are not fully supported. Embeds are
+preserved as embeds; image dimensions in their aliases remain intact.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery

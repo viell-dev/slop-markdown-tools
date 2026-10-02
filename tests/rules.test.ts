@@ -72,6 +72,35 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
   });
 });
 
+describe("style/emphasis and style/strong on Gitea", () => {
+  const rules: Record<string, RuleSetting> = { "style/emphasis": "warn", "style/strong": "warn" };
+  // Gitea renders `__init__.py` literally and `*config*.py` as emphasis; GFM
+  // parses both as emphasis, so a marker change would alter Gitea's output.
+  it.each([
+    ["See __init__.py and __main__.py.\n", "See **init**.py and **main**.py.\n"],
+    ["Edit *config*.py first.\n", "Edit _config_.py first.\n"],
+    ["Use **setup**.py here.\n", "Use **setup**.py here.\n"],
+    ["*a* and b_.py\n", "_a_ and b_.py\n"],
+    ["*a* near `x_.py`\n", "_a_ near `x_.py`\n"],
+    ["*.py files*\n", "_.py files_\n"],
+  ])("leaves %j alone where `_.py` decides Gitea emphasis", (source, github) => {
+    expect(formatted(source, only(rules, "gitea"))).toBe(source);
+    expect(formatted(source, only(rules, "github"))).toBe(github);
+  });
+  it("converts markers on other lines", () => {
+    const source = "*a* and __b__\n\n*c* on __init__.py\n";
+    expect(formatted(source, only(rules, "gitea"))).toBe("_a_ and **b**\n\n*c* on __init__.py\n");
+  });
+  it("leaves multiline code spans on `_.py` lines unjoined", () => {
+    const config = only({ "style/inline-code": "warn" }, "gitea");
+    const source = "_a_ and `code\nspan` near b_.py\n";
+    expect(formatted(source, config)).toBe(source);
+    expect(formatted(source, { ...config, dialect: "github" })).toBe(
+      "_a_ and `code span` near b_.py\n",
+    );
+  });
+});
+
 describe("links/path wikilink rewriting", () => {
   const workspace = createWorkspace(
     { "Doc.md": "", "Folder/Note.md": "# Heading\n", "Other/Dup.md": "", "Folder/Dup.md": "" },
@@ -159,6 +188,17 @@ describe("dialect markers", () => {
     const rules: Record<string, RuleSetting> = { "github/alert-marker": "warn" };
     expect(formatted("> [!tip]\n> Text.\n", only(rules, "forgejo"))).toBe("> [!TIP]\n> Text.\n");
     expect(formatted("> [!tip]\n> Text.\n", only(rules, "commonmark"))).toBe("> [!tip]\n> Text.\n");
+  });
+  it("applies GitHub alert casing to Gitea documents", () => {
+    const rules: Record<string, RuleSetting> = { "github/alert-marker": "warn" };
+    expect(formatted("> [!tip]\n> Text.\n", only(rules, "gitea"))).toBe("> [!TIP]\n> Text.\n");
+  });
+  it("provides a Gitea preset with the GitHub rules", () => {
+    expect(resolveConfig({ extends: ["gitea"] })).toMatchObject({
+      dialect: "gitea",
+      rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+    });
+    expect(canonicalDialect("gitea")).toBe("gitea");
   });
   it("provides Forgejo and Codeberg presets and accepts aliases in overrides", () => {
     const rules = {

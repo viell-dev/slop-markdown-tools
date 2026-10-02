@@ -11,7 +11,7 @@ import type {
 
 /** Alias names that select an existing dialect; Codeberg runs Forgejo's renderer. */
 export const dialectAliases: Record<string, Dialect> = { codeberg: "forgejo" };
-export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "obsidian"];
+export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian"];
 export function canonicalDialect(name: DialectName): Dialect {
   return dialectAliases[name] ?? (name as Dialect);
 }
@@ -35,6 +35,10 @@ export const presets: Record<string, Config> = {
     rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
   },
   codeberg: { extends: ["forgejo"] },
+  gitea: {
+    dialect: "gitea",
+    rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+  },
   obsidian: {
     dialect: "obsidian",
     rules: {

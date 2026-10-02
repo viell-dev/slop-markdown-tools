@@ -3,7 +3,7 @@ import type { Extension as SyntaxExtension } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 import type { AnySchema } from "ajv";
 
-export type Dialect = "commonmark" | "github" | "forgejo" | "obsidian";
+export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian";
 /** A dialect or one of its aliases, accepted wherever configuration names a dialect. */
 export type DialectName = Dialect | "codeberg";
 export type Severity = "off" | "warn" | "error";
