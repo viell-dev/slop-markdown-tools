@@ -76,6 +76,20 @@ tables and preserves cell contents. Embedded code formatting, metadata mutation,
 document generation, external URL fetching, and file renames are outside this
 release.
 
+A Forgejo or Gitea heading's trailing attribute block (`## Title {#id .class}`)
+is protected from formatting, because both renderers read it before they parse
+inline content. Whether a heading ends in a valid block, and what the block
+says, depends on every character from the first `{` of the heading's last text
+line on, so emphasis markers and link destinations from there on are left
+unchanged. A code span spanning lines of a heading is not joined, because the
+block is read from the heading's last text line. A Setext heading converted to
+ATX gets a `#` run in front of its block escaped, which would otherwise close
+the heading. For these two dialects the semantic fingerprint includes each
+block's source text, so an edit from any other rule or plugin that changes a
+block, makes one invalid, or creates one is refused. That covers a block
+followed by a closing `#` sequence (`## Title {#id} ##`) as well, which only
+Gitea before 1.26 reads as attributes.
+
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.
 Heading fragments use exact text; GitHub uses slugged headings including
