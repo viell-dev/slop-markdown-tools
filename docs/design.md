@@ -117,9 +117,9 @@ without, and is matched without it; Obsidian fragments stay literal. The three
 also keep the `id` attribute of every element and the `name` of an `<a>` in a
 document's HTML, prefixed the same way, so those are fragments too, read from
 the inline and block HTML with comments dropped; GitHub lowercases them and
-matches a fragment lowercased as well. They do not number later headings. Entity
-references in such attributes and the content of `<script>` and similar elements
-are not modeled.
+matches any fragment lowercased as well, including a heading's. They do not
+number later headings. Entity references in such attributes and the content of
+`<script>` and similar elements are not modeled.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery
