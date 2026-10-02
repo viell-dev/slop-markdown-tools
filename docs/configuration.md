@@ -108,6 +108,16 @@ it is never numbered: a later `## Setup` heading is also `#setup`, not
 `#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
 keep it in heading anchors and heading names.
 
+Formatting with the Forgejo or Gitea dialect leaves a block as written:
+`{#bare data-x=__init__}` is a valid block, and `{#bare data-x=**init**}` is
+heading text without the anchor `#bare`. A change can also create a block:
+`## *Mode {.a*}` is emphasis, while `## _Mode {.a_}` is a heading with a class.
+`style/emphasis`, `style/strong`, and `links/path` therefore change nothing from
+the first `{` of a heading's last text line on. `style/inline-code` does not
+join a code span that spans lines of a heading, and `style/heading` escapes a
+`#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
+heading there.
+
 ## Presets
 
 | Preset        | Dialect   | Enabled rules                                                                                  |

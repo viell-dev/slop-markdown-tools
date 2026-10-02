@@ -3,6 +3,7 @@ import stringWidth from "string-width";
 import type { Nodes, Paragraph } from "mdast";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
+import { headingAttributeBlock, inHeadingAttributeText } from "../workspace/heading-attributes.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -74,6 +75,10 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         );
         if (neighbours.includes(marker[0]!)) return;
         if (goldmarkForges[document.dialect] && inForgeMath(document.source, start, end)) return;
+        // Forgejo and Gitea read a heading's trailing `{...}` block as attributes
+        // before they parse emphasis, so a marker there can be part of a block
+        // or be what keeps one from being read.
+        if (inHeadingAttributeText(document, start, end)) return;
         if (
           document.dialect === "gitea" &&
           (giteaPyLine(document.source, start, end) ||
@@ -501,12 +506,20 @@ export const styleRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document }) {
       const findings: Finding[] = [];
-      walk(document.tree, "inlineCode", (node) => {
+      const forge = goldmarkForges[document.dialect] !== undefined;
+      let headingEnd = 0;
+      walk(document.tree, (node) => {
+        if (node.type === "heading" && forge) headingEnd = range(node)[1];
+        if (node.type !== "inlineCode") return;
         const [start, end] = range(node);
         if (!/[\r\n]/.test(document.source.slice(start, end))) return;
+        // Forgejo and Gitea look for a heading's attribute block on its last
+        // text line, and Forgejo also builds the anchor from that line alone.
+        // Joining lines would change what that line holds.
+        if (start < headingEnd) return;
         if (document.dialect === "gitea" && giteaPyLine(document.source, start, end)) return;
         // Joining lines could put a `\(` and `\)` on one line and turn them into math.
-        if (goldmarkForges[document.dialect]) {
+        if (forge) {
           const lines = document.source.slice(...lineBounds(document.source, start, end));
           if (lines.includes("\\(") && lines.includes("\\)")) return;
         }
@@ -561,6 +574,13 @@ export const styleRules: Record<string, Rule> = {
         // A trailing run of # after whitespace would become an ATX closing
         // sequence and disappear from the heading; escape its first character.
         text = text.replace(/(^|\s)(#+)$/, "$1\\$2");
+        // Forgejo and Gitea also take such a run for a closing sequence when
+        // their attribute block follows it, and would drop it from the heading.
+        const block = goldmarkForges[document.dialect] ? headingAttributeBlock(text) : undefined;
+        if (block)
+          text =
+            text.slice(0, block.start).replace(/(^|\s)(#+)(\s*)$/, "$1\\$2$3") +
+            text.slice(block.start);
         findings.push({
           start,
           end,
