@@ -8,21 +8,40 @@ import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js
 
 export type WorkspaceSource = string | null | (() => string);
 
+/** Tags that GFM's tagfilter makes GitHub show as text instead of as HTML. */
+const filteredTag =
+  /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i;
+/**
+ * Heading text as rendered, which GitHub and Gitea 1.26 and later build anchors
+ * from: inline HTML tags and comments are left out and the text between tags
+ * stays, so `## A <span>B</span>` reads `A B`. With `tagfilter`, the tags that
+ * GitHub shows as text are kept.
+ */
+function renderedText(node: Nodes, tagfilter: boolean): string {
+  if (node.type === "html") return tagfilter && filteredTag.test(node.value) ? node.value : "";
+  if ("children" in node)
+    return node.children.map((child) => renderedText(child, tagfilter)).join("");
+  return textContent(node);
+}
 /**
  * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
  * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
+ * Without `html`, inline HTML tags and comments are left out as well.
  */
-function literalUnderscoreText(node: Nodes, source: string): string {
+function literalUnderscoreText(node: Nodes, source: string, html: boolean): string {
+  if (node.type === "html" && !html) return "";
   if (node.type === "emphasis" || node.type === "strong") {
     const [start, end] = range(node);
     if (source[start] === "_") {
       const size = node.type === "strong" ? 2 : 1;
-      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
+      const inner = node.children
+        .map((child) => literalUnderscoreText(child, source, html))
+        .join("");
       return source.slice(start, start + size) + inner + source.slice(end - size, end);
     }
   }
   if ("children" in node)
-    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
+    return node.children.map((child) => literalUnderscoreText(child, source, html)).join("");
   return textContent(node);
 }
 
@@ -120,13 +139,20 @@ export function createWorkspace(
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
-        entry.slugs.add(slugger.slug(text));
+        entry.slugs.add(slugger.slug(renderedText(node, true)));
+        // Forgejo, like Gitea before 1.26, builds anchors from the heading's
+        // source, so inline HTML tags stay part of them.
         entry.forgejoSlugs.add(forgejoSlugger.slug(text));
         entry.giteaSlugs.add(giteaSlugger.slug(text));
-        // Gitea 1.26 and later, which number no anchors, keep these underscores literal.
+        // Gitea 1.26 and later number no anchors, build them from the rendered
+        // text, and keep underscores near `_.py` literal. The source that
+        // earlier versions read keeps those underscores along with the tags.
         const [start, end] = range(node);
-        if (source.slice(start, end).includes("_.py")) {
-          const anchor = giteaAnchor(literalUnderscoreText(node, source));
+        const texts = source.slice(start, end).includes("_.py")
+          ? [literalUnderscoreText(node, source, false), literalUnderscoreText(node, source, true)]
+          : [renderedText(node, false)];
+        for (const candidate of texts) {
+          const anchor = giteaAnchor(candidate);
           if (anchor) entry.giteaSlugs.add(anchor);
         }
       });
