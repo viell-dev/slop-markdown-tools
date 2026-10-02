@@ -24,22 +24,24 @@ function renderedText(node: Nodes, tagfilter: boolean): string {
   return textContent(node);
 }
 /**
- * Rendered heading text with `_` emphasis delimiters kept, as Gitea 1.26 and
- * later show them near `_.py` (`## __init__.py` reads `__init__.py`, not
- * `init.py`).
+ * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
+ * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
+ * Without `html`, inline HTML tags and comments are left out as well.
  */
-function literalUnderscoreText(node: Nodes, source: string): string {
-  if (node.type === "html") return "";
+function literalUnderscoreText(node: Nodes, source: string, html: boolean): string {
+  if (node.type === "html" && !html) return "";
   if (node.type === "emphasis" || node.type === "strong") {
     const [start, end] = range(node);
     if (source[start] === "_") {
       const size = node.type === "strong" ? 2 : 1;
-      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
+      const inner = node.children
+        .map((child) => literalUnderscoreText(child, source, html))
+        .join("");
       return source.slice(start, start + size) + inner + source.slice(end - size, end);
     }
   }
   if ("children" in node)
-    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
+    return node.children.map((child) => literalUnderscoreText(child, source, html)).join("");
   return textContent(node);
 }
 
@@ -143,14 +145,16 @@ export function createWorkspace(
         entry.forgejoSlugs.add(forgejoSlugger.slug(text));
         entry.giteaSlugs.add(giteaSlugger.slug(text));
         // Gitea 1.26 and later number no anchors, build them from the rendered
-        // text, and keep underscores near `_.py` literal.
+        // text, and keep underscores near `_.py` literal. The source that
+        // earlier versions read keeps those underscores along with the tags.
         const [start, end] = range(node);
-        const anchor = giteaAnchor(
-          source.slice(start, end).includes("_.py")
-            ? literalUnderscoreText(node, source)
-            : renderedText(node, false),
-        );
-        if (anchor) entry.giteaSlugs.add(anchor);
+        const texts = source.slice(start, end).includes("_.py")
+          ? [literalUnderscoreText(node, source, false), literalUnderscoreText(node, source, true)]
+          : [renderedText(node, false)];
+        for (const candidate of texts) {
+          const anchor = giteaAnchor(candidate);
+          if (anchor) entry.giteaSlugs.add(anchor);
+        }
       });
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);

@@ -361,11 +361,25 @@ describe("heading anchors with inline HTML", () => {
     ["brbreak", true],
     ["com----note----ment", true],
     ["x-scripthiddenscript-y", true],
-    ["initpy-bxb", true],
+    ["__init__py-bxb", true],
     ["setext-emhtmlem-heading", true],
   ])("resolves #%s as %s on Gitea", (fragment, exists) => {
     expect(resolves(fragment, "gitea")).toBe(exists);
   });
+  it.each(["iframe", "noembed", "noframes", "script", "style", "title", "textarea", "xmp"])(
+    "keeps <%s>, which GitHub shows as text, in the GitHub anchor",
+    (tag) => {
+      const filtered = createWorkspace({
+        "Doc.md": "",
+        "Note.md": `## T <${tag}>x</${tag}> end\n\n## P <plaintext>x end\n`,
+      });
+      const exists = (fragment: string) =>
+        filtered.resolve("Doc.md", `Note.md#${fragment}`, "github").fragmentExists;
+      expect(exists(`t-${tag}x${tag}-end`)).toBe(true);
+      expect(exists("t-x-end")).toBe(false);
+      expect(exists("p-plaintextx-end")).toBe(true);
+    },
+  );
   it("keeps exact heading text for Obsidian", () => {
     expect(resolves("A <span>B</span>", "obsidian")).toBe(true);
     expect(resolves("A B", "obsidian")).toBe(false);
