@@ -13,6 +13,14 @@ const lineBreak = /\r\n|\r|\n/;
 function lineEnding(source: string): string {
   return lineBreak.exec(source)?.[0] ?? "\n";
 }
+/** Start and end of the physical lines containing a source range. */
+function lineBounds(source: string, start: number, end: number): [number, number] {
+  let lineStart = start;
+  while (lineStart > 0 && !/[\r\n]/.test(source[lineStart - 1]!)) lineStart--;
+  let lineEnd = end;
+  while (lineEnd < source.length && !/[\r\n]/.test(source[lineEnd]!)) lineEnd++;
+  return [lineStart, lineEnd];
+}
 /**
  * Gitea does not parse a `_` run as an emphasis delimiter when the next `_` on
  * its physical line starts `_.py`, or when the run itself does and no `_`
@@ -20,12 +28,23 @@ function lineEnding(source: string): string {
  * else on the line, code spans included: a line containing `_.py` before or
  * after an edit can gain or lose emphasis when markers change or lines join.
  */
-function giteaPyLine(source: string, start: number, end: number): boolean {
-  let lineStart = start;
-  while (lineStart > 0 && !/[\r\n]/.test(source[lineStart - 1]!)) lineStart--;
-  let lineEnd = end;
-  while (lineEnd < source.length && !/[\r\n]/.test(source[lineEnd]!)) lineEnd++;
-  return source.slice(lineStart, lineEnd).includes("_.py");
+export function giteaPyLine(source: string, start: number, end: number): boolean {
+  return source.slice(...lineBounds(source, start, end)).includes("_.py");
+}
+/** Forgejo and its upstream Gitea build on goldmark with shared extensions. */
+const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", gitea: "Gitea" };
+/**
+ * Whether a range lies between `\(` and `\)` on its line, which Forgejo, and
+ * Gitea where enabled, render as math. GFM parses emphasis and code spans
+ * there, and changing them would change the formula.
+ */
+function inForgeMath(source: string, start: number, end: number): boolean {
+  const [lineStart, lineEnd] = lineBounds(source, start, end);
+  const before = source.slice(lineStart, start);
+  return (
+    before.lastIndexOf("\\(") > before.lastIndexOf("\\)") &&
+    source.slice(end, lineEnd).includes("\\)")
+  );
 }
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
@@ -54,6 +73,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           (index) => document.source[index],
         );
         if (neighbours.includes(marker[0]!)) return;
+        if (goldmarkForges[document.dialect] && inForgeMath(document.source, start, end)) return;
         if (
           document.dialect === "gitea" &&
           (giteaPyLine(document.source, start, end) ||
@@ -111,8 +131,6 @@ function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
 // fences, math, Obsidian comments, HTML blocks, and footnote definitions.
 const lineOpener =
   /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
-/** Forgejo and its upstream Gitea build on goldmark with shared extensions. */
-const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", gitea: "Gitea" };
 // Forgejo and Gitea additionally open display math with `\[` and definition
 // descriptions with `:` followed by at least one space or tab, so only a bare
 // `:` atom could open one at the start of a reflowed line.
@@ -176,12 +194,14 @@ function forgeProtections(
 }
 /**
  * Whether reflow could change Gitea emphasis under its `_.py` exception: the
- * paragraph contains `_.py` and an underscore outside code spans, where
- * Gitea's parser would consider it as a delimiter.
+ * paragraph contains `_.py` and an underscore that Gitea's parser could treat
+ * as a delimiter. Underscores inside code spans are safe only without `$` or
+ * `\(` math, which can consume a backtick that GFM reads as opening a code span.
  */
 function giteaPyParagraph(source: string, node: Paragraph, start: number, end: number): boolean {
   const text = source.slice(start, end);
   if (!text.includes("_.py")) return false;
+  if (/\$|\\\(/.test(text)) return true;
   const code: Range[] = [];
   walk(node, "inlineCode", (child) => {
     code.push(range(child));
@@ -485,6 +505,11 @@ export const styleRules: Record<string, Rule> = {
         const [start, end] = range(node);
         if (!/[\r\n]/.test(document.source.slice(start, end))) return;
         if (document.dialect === "gitea" && giteaPyLine(document.source, start, end)) return;
+        // Joining lines could put a `\(` and `\)` on one line and turn them into math.
+        if (goldmarkForges[document.dialect]) {
+          const lines = document.source.slice(...lineBounds(document.source, start, end));
+          if (lines.includes("\\(") && lines.includes("\\)")) return;
+        }
         const value = node.value.replace(/\r\n|\r|\n/g, " ");
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);

@@ -56,8 +56,9 @@ additionally renders definition lists (`Term` followed by a line starting with
 generates heading anchors differently: every run of characters other than
 letters, numbers, and `_` becomes one hyphen, so `## test.0.1` is `#test-0-1` on
 Forgejo and `#test01` on GitHub. The Forgejo dialect keeps those constructs on
-their original lines and validates fragments against Forgejo anchors. The GitHub
-rules apply to both dialects.
+their original lines, leaves emphasis markers and code spans inside `\(...\)`
+unchanged, and validates fragments against Forgejo anchors. The GitHub rules
+apply to both dialects.
 
 Gitea, from which Forgejo was forked, renders the same definition lists and
 shortlinks. It parses `\(...\)` and `\[...\]` math only when an administrator
@@ -67,12 +68,15 @@ those constructs on their lines too. Gitea's heading anchors follow GitHub's:
 punctuation is deleted, so `## test.0.1` is `#test01`. Gitea 1.26 and later give
 repeated headings the same anchor; the `-1`, `-2` suffixes of earlier versions
 are still accepted. Gitea 1.26 and later also render `__init__.py` literally
-instead of as emphasis. Whether underscores delimit emphasis then depends on the
-rest of the line, so the Gitea dialect leaves emphasis markers unchanged on any
-line containing `_.py` and does not reflow such a paragraph unless all its
-underscores are inside code spans. The GitHub rules apply to Gitea as well.
-Gitea renders repository files with soft line breaks by default; if an instance
-adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable `style/wrap`.
+instead of as emphasis, including in headings, whose anchor is then
+`#__init__py`. Whether underscores delimit emphasis depends on the rest of the
+line, so on a line containing `_.py` the Gitea dialect leaves emphasis markers
+unchanged and keeps link destinations whose rewrite would change their
+underscores. It does not reflow such a paragraph unless all its underscores are
+inside code spans and it contains no `$` or `\(` math. The GitHub rules apply to
+Gitea as well. Gitea renders repository files with soft line breaks by default;
+if an instance adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable
+`style/wrap`.
 
 ## Presets
 

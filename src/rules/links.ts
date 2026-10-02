@@ -4,8 +4,16 @@ import type { Nodes } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { splitDestination } from "../workspace/index.js";
-import { optionsSchema } from "./style.js";
+import { giteaPyLine, optionsSchema } from "./style.js";
 
+/**
+ * What Gitea's `_.py` emphasis exception can see of a link destination: whether
+ * it contains `_`, and whether its first `_` starts `_.py`. A delimiter earlier
+ * on the line looks for the next `_` there.
+ */
+function giteaUnderscores(destination: string): string {
+  return `${destination.includes("_")} ${/^[^_]*_\.py/.test(destination)}`;
+}
 function destination(node: Nodes): string | undefined {
   if (node.type === "wikiLink") return node.target;
   if (node.type === "link" || node.type === "image" || node.type === "definition") return node.url;
@@ -210,6 +218,12 @@ export const linkRules: Record<string, Rule> = {
             .replaceAll(")", "%29")
             .replaceAll("<", "%3C")
             .replaceAll(">", "%3E");
+        if (
+          document.dialect === "gitea" &&
+          (giteaPyLine(document.source, start, end) || replacement.includes("_.py")) &&
+          giteaUnderscores(original) !== giteaUnderscores(replacement)
+        )
+          return;
         if (original !== replacement)
           findings.push({
             start: start + span[0],

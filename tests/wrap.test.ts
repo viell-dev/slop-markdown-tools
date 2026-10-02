@@ -437,6 +437,13 @@ describe("Gitea syntax", () => {
     expect(lint(source, { config: reporting })[0]?.message).toContain("Gitea `_.py` emphasis");
     expect(verify(source, forgejo).output).not.toBe(source);
   });
+  it.each([
+    "\\( ` \\) _a_ ` filler words here `_.py` and trailing words.\n",
+    "$x$ and `__init__.py` with more words that would otherwise reflow.\n",
+  ])("does not trust code spans in %j, which Gitea math could consume", (source) => {
+    expect(verify(source, gitea).output).toBe(source);
+    expect(lint(source, { config: reporting })[0]?.message).toContain("Gitea `_.py` emphasis");
+  });
   it("reflows `_.py` paragraphs whose underscores are all in code spans", () => {
     const source = "Some words that wrap around `__init__.py` and `my_var` in this paragraph.\n";
     expect(verify(source, gitea).output).toBe(verify(source, forgejo).output);

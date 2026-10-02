@@ -72,6 +72,28 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
   });
 });
 
+describe("Forgejo and Gitea backslash math", () => {
+  const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  it.each(["forgejo", "gitea"] as const)(
+    "leaves markers inside \\(...\\) alone on %s",
+    (dialect) => {
+      expect(formatted("\\(*x*\\) and *y*\n", only(markers, dialect))).toBe("\\(*x*\\) and _y_\n");
+      expect(formatted("\\(__x__\\)\n", only(markers, dialect))).toBe("\\(__x__\\)\n");
+      expect(formatted("\\(*x*\\)\n", only(markers, "github"))).toBe("\\(_x_\\)\n");
+    },
+  );
+  it.each(["forgejo", "gitea"] as const)(
+    "does not join a code span that would put \\( and \\) on one line on %s",
+    (dialect) => {
+      const source = "\\( `code\nspan` \\)\n";
+      expect(formatted(source, only({ "style/inline-code": "warn" }, dialect))).toBe(source);
+      expect(formatted(source, only({ "style/inline-code": "warn" }, "github"))).toBe(
+        "\\( `code span` \\)\n",
+      );
+    },
+  );
+});
+
 describe("style/emphasis and style/strong on Gitea", () => {
   const rules: Record<string, RuleSetting> = { "style/emphasis": "warn", "style/strong": "warn" };
   // Gitea renders `__init__.py` literally and `*config*.py` as emphasis; GFM

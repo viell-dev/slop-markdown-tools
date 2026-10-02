@@ -1,3 +1,8 @@
+/** Lowercase one code point with Go's simple case mapping, which keeps `İ` one `i`. */
+function lower(character: string): string {
+  return character === "\u0130" ? "i" : character.toLowerCase();
+}
+
 /**
  * Number repeated anchors `-1`, `-2`, ... checked against every anchor already
  * issued, and give a heading without anchor characters the anchor `heading`.
@@ -37,7 +42,7 @@ export function createForgejoSlugger(): { slug(text: string): string } {
       if (/[\p{L}\p{N}_]/u.test(character)) {
         if (pending && result) result += "-";
         pending = false;
-        result += character.toLowerCase();
+        result += lower(character);
       } else pending = true;
     }
     return result;
@@ -54,12 +59,14 @@ export function createForgejoSlugger(): { slug(text: string): string } {
  * as well.
  */
 export function createGiteaSlugger(): { slug(text: string): string } {
-  return createSlugger((text) => {
-    let result = "";
-    for (const character of text.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "")) {
-      if (/[\p{L}\p{N}_-]/u.test(character)) result += character.toLowerCase();
-      else if (/\p{White_Space}/u.test(character)) result += "-";
-    }
-    return result;
-  });
+  return createSlugger(giteaAnchor);
+}
+/** One Gitea anchor without numbering, as Gitea 1.26 and later generate them. */
+export function giteaAnchor(text: string): string {
+  let result = "";
+  for (const character of text.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "")) {
+    if (/[\p{L}\p{N}_-]/u.test(character)) result += lower(character);
+    else if (/\p{White_Space}/u.test(character)) result += "-";
+  }
+  return result;
 }

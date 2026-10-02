@@ -184,6 +184,7 @@ describe("Forgejo heading anchors", () => {
       "## tes a a   a  a",
       "## a_b_c",
       "## ...",
+      "## İstanbul",
     ].join("\n\n"),
   });
   it.each([
@@ -199,6 +200,7 @@ describe("Forgejo heading anchors", () => {
     ["tes-a-a-a-a", true],
     ["a_b_c", true],
     ["heading", true],
+    ["istanbul", true],
   ])("resolves #%s as %s", (fragment, exists) => {
     expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "forgejo").fragmentExists).toBe(
       exists,
@@ -236,6 +238,8 @@ describe("Gitea heading anchors", () => {
       "## Same",
       "## Same",
       "## ...",
+      "## __init__.py",
+      "## İstanbul",
     ].join("\n\n"),
   });
   it.each([
@@ -256,6 +260,9 @@ describe("Gitea heading anchors", () => {
     ["same-1", true],
     ["same-2", false],
     ["heading", true],
+    ["__init__py", true],
+    ["initpy", true],
+    ["istanbul", true],
   ])("resolves #%s as %s", (fragment, exists) => {
     expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "gitea").fragmentExists).toBe(exists);
   });
@@ -275,6 +282,21 @@ describe("Gitea heading anchors", () => {
     });
     expect(lint("[x](Note.md#test01)\n", options("gitea"))).toEqual([]);
     expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
+  });
+});
+describe("links/path on Gitea", () => {
+  const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
+  const rewrite = (source: string, dialect: "github" | "gitea") =>
+    format(source, {
+      path: "Doc.md",
+      workspace,
+      config: { extends: [], dialect, rules: { "links/path": ["warn", { style: "relative" }] } },
+    }).output;
+  it("keeps destinations whose underscores decide the `_.py` exception on that line", () => {
+    const source = "_a_ see [r](./my_dir/../readme.md) and b_.py\n";
+    expect(rewrite(source, "gitea")).toBe(source);
+    expect(rewrite(source, "github")).toBe("_a_ see [r](readme.md) and b_.py\n");
+    expect(rewrite("See [r](./my_dir/../readme.md).\n", "gitea")).toBe("See [r](readme.md).\n");
   });
 });
 describe("destination spelling", () => {

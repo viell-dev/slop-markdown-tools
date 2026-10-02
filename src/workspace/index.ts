@@ -1,11 +1,30 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { walk } from "../syntax/walk.js";
+import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
-import { parse, textContent } from "../syntax/parse.js";
-import { createForgejoSlugger, createGiteaSlugger } from "./slug.js";
+import { parse, range, textContent } from "../syntax/parse.js";
+import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
+
+/**
+ * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
+ * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
+ */
+function literalUnderscoreText(node: Nodes, source: string): string {
+  if (node.type === "emphasis" || node.type === "strong") {
+    const [start, end] = range(node);
+    if (source[start] === "_") {
+      const size = node.type === "strong" ? 2 : 1;
+      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
+      return source.slice(start, start + size) + inner + source.slice(end - size, end);
+    }
+  }
+  if ("children" in node)
+    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
+  return textContent(node);
+}
 
 interface Entry {
   headings: Set<string>;
@@ -104,6 +123,12 @@ export function createWorkspace(
         entry.slugs.add(slugger.slug(text));
         entry.forgejoSlugs.add(forgejoSlugger.slug(text));
         entry.giteaSlugs.add(giteaSlugger.slug(text));
+        // Gitea 1.26 and later, which number no anchors, keep these underscores literal.
+        const [start, end] = range(node);
+        if (source.slice(start, end).includes("_.py")) {
+          const anchor = giteaAnchor(literalUnderscoreText(node, source));
+          if (anchor) entry.giteaSlugs.add(anchor);
+        }
       });
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
