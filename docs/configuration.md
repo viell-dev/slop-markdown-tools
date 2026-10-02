@@ -109,7 +109,21 @@ followed by more text, or whose `{` is escaped with a backslash stays heading
 text. A custom anchor must be linked exactly as written, including its case, and
 it is never numbered: a later `## Setup` heading is also `#setup`, not
 `#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
-keep it in heading anchors and heading names.
+keep it in heading anchors and heading names. An `id` that is not text, such as
+`{id=5}`, `{id=true}`, or a list, has no anchor on Gitea 1.26 and later, and
+Forgejo, and Gitea before 1.26, render nothing for the whole document; the
+Forgejo and Gitea presets report it with `forgejo/heading-id`. Quote the value
+(`{id="5"}`) or use `{#5}` instead.
+
+Formatting with the Forgejo or Gitea dialect leaves a block as written:
+`{#bare data-x=__init__}` is a valid block, and `{#bare data-x=**init**}` is
+heading text without the anchor `#bare`. A change can also create a block:
+`## *Mode {.a*}` is emphasis, while `## _Mode {.a_}` is a heading with a class.
+`style/emphasis`, `style/strong`, and `links/path` therefore change nothing from
+the first `{` of a heading's last text line on. `style/inline-code` does not
+join a code span that spans lines of a heading, and `style/heading` escapes a
+`#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
+heading there.
 
 ## Presets
 
@@ -117,9 +131,9 @@ keep it in heading anchors and heading names.
 | ------------- | --------- | ---------------------------------------------------------------------------------------------- |
 | `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
-| `forgejo`     | Forgejo   | The `github` rules                                                                             |
+| `forgejo`     | Forgejo   | The `github` rules and `forgejo/heading-id`                                                    |
 | `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
-| `gitea`       | Gitea     | The `github` rules                                                                             |
+| `gitea`       | Gitea     | The `github` rules and `forgejo/heading-id`                                                    |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
 An omitted `extends` selects `recommended`. Explicit `extends` replaces that
@@ -144,6 +158,7 @@ Problem rules report findings and never become formatting edits.
 | `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
 | `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
 | `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
+| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo  |
 | `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
 | `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
 | `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
@@ -218,10 +233,13 @@ vault-relative path. `leadingDot: true` prefixes ordinary relative paths with
 `brackets` accepts `preserve` (default), `angle`, or `bare`. Spaces in bare
 Markdown destinations are percent-encoded. `extension` accepts `preserve`
 (default), `include`, or `omit`; omission is Obsidian specific. Fragments are
-resolved according to the dialect, separately from percent-decoded filenames.
-Already compliant destinations retain their percent-encoding spelling, including
-literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
-literal percent signs and hashes to preserve target identity.
+resolved according to the dialect, separately from percent-decoded filenames. On
+GitHub, Forgejo, and Gitea, a fragment written with the `user-content-` prefix
+that the renderers add to every anchor reaches the same anchor as one without,
+and is validated the same way. Already compliant destinations retain their
+percent-encoding spelling, including literal `?` and `%` in resolving Obsidian
+paths. Newly generated paths encode literal percent signs and hashes to preserve
+target identity.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the
