@@ -104,17 +104,27 @@ export const dialectRules: Record<string, Rule> = {
         const underline = breaks.at(-1);
         const previous = breaks.at(-2);
         const lineStart = previous ? start + previous.index + previous[0].length : start;
-        const lineEnd = underline ? start + underline.index : end;
-        const block = headingAttributeBlock(source.slice(lineStart, lineEnd));
+        let lineEnd = underline ? start + underline.index : end;
+        while (source[lineEnd - 1] === " " || source[lineEnd - 1] === "\t") lineEnd--;
+        let line = source.slice(lineStart, lineEnd);
+        let block = headingAttributeBlock(line);
+        // Gitea before 1.26 also reads a block followed by a closing `#` sequence.
+        if (!block && !underline) {
+          const closed = /[ \t]+#+$/.exec(line);
+          if (closed) {
+            line = line.slice(0, closed.index);
+            block = headingAttributeBlock(line);
+          }
+        }
         // goldmark hands a number, boolean, null, or list to the renderers,
         // which expect text: Gitea 1.26 and later give the heading an empty
         // id, Forgejo and earlier Gitea versions fail on the whole document.
         if (block?.id === null)
           findings.push({
             start: lineStart + block.start,
-            end: lineEnd,
+            end: lineStart + line.length,
             message:
-              'Heading id is not text: Forgejo, and Gitea before 1.26, render nothing for a document containing it. Quote it: {id="5"}.',
+              'Heading id is not text: Forgejo, and Gitea before 1.26, cannot render a document containing it. Quote it: {id="5"}.',
           });
       });
       return findings;

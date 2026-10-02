@@ -265,6 +265,14 @@ describe("forgejo/heading-id", () => {
         expect(atx[0]!.end).toBe(atx[0]!.start + block.length);
         expect(findings(`Version ${block}\n---\n`, dialect)).toHaveLength(1);
         expect(findings(`## Version ## ${block}\n`, dialect)).toHaveLength(1);
+        // Gitea before 1.26 also reads a block followed by a closing sequence, and
+        // rendered nothing for this one; the range ends with the block.
+        const closed = findings(`## Version ${block} ##\n`, dialect);
+        expect(closed).toHaveLength(1);
+        expect(closed[0]!.end).toBe(closed[0]!.start + block.length);
+        const quoted = findings(`> Version ${block}  \n> ---\n`, dialect);
+        expect(quoted).toMatchObject([{ line: 1, column: 11 }]);
+        expect(quoted[0]!.end).toBe(quoted[0]!.start + block.length);
       }
       for (const dialect of ["github", "commonmark", "obsidian"] as const)
         expect(findings(`## Version ${block}\n`, dialect)).toEqual([]);
