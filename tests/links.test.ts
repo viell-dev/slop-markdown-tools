@@ -151,13 +151,12 @@ describe("Obsidian case-insensitive resolution", () => {
     for (const url of ["Dup", "dup", "DUP.md", "Other/Same", "same"])
       expect(workspace.resolve("Doc.md", url, "obsidian").status, url).toBe("ambiguous");
   });
-  it("keeps CommonMark and GitHub resolution case-sensitive", () => {
+  it("keeps CommonMark and GitHub path resolution case-sensitive", () => {
     for (const dialect of ["commonmark", "github"] as const) {
       expect(workspace.resolve("Doc.md", "note.md", dialect).status).toBe("missing");
       expect(workspace.resolve("Doc.md", "Note.md#heading-two", dialect).fragmentExists).toBe(true);
-      expect(workspace.resolve("Doc.md", "Note.md#Heading-Two", dialect).fragmentExists).toBe(
-        false,
-      );
+      // GitHub's page script retries a fragment lowercased; see the fragment tests.
+      expect(workspace.resolve("Doc.md", "Note.md#Heading-Two", dialect).fragmentExists).toBe(true);
     }
     expect(workspace.resolve("Doc.md", "Dup.md", "github").status).toBe("resolved");
   });
@@ -1119,6 +1118,52 @@ describe("anchors of headings written as HTML", () => {
       "Missing fragment in Note.md#commented.",
     ]);
     expect(messages("forgejo")).toHaveLength(3);
+  });
+});
+
+describe("fragment case on GitHub", () => {
+  // On github.com, `#Sponsors` scrolled to `## Sponsors`: the page script looks
+  // for the anchor as written and then lowercased, and the file view lowercases
+  // it outright. Forgejo and Gitea match as written: in a browser, `#Upper`
+  // reached `<a name="Upper">` on Forgejo 16.0.5 and Gitea 1.21.11, 1.25.5, and
+  // 28.0.0, and `#upper` did not.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": '## Sponsors\n\n## Sponsors\n\n## Üben\n\n<a name="Upper"></a>\n',
+  });
+  const resolves = (fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${encodeURIComponent(fragment)}`, dialect).fragmentExists;
+  it.each([
+    "Sponsors",
+    "SPONSORS",
+    "sponsors",
+    "Sponsors-1",
+    "user-content-Sponsors",
+    "üben",
+    "ÜBEN",
+  ])("resolves #%s on GitHub", (fragment) => {
+    expect(resolves(fragment, "github")).toBe(true);
+    expect(resolves(fragment, "commonmark")).toBe(true);
+  });
+  it("still reports fragments that differ in more than case", () => {
+    expect(resolves("Sponsor", "github")).toBe(false);
+    expect(resolves("Sponsors-2", "github")).toBe(false);
+  });
+  it("keeps Forgejo and Gitea case-sensitive", () => {
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves("sponsors", dialect)).toBe(true);
+      expect(resolves("Sponsors", dialect)).toBe(false);
+      expect(resolves("Upper", dialect)).toBe(true);
+      expect(resolves("upper", dialect)).toBe(false);
+    }
+  });
+  it("reports only fragments GitHub cannot resolve", () => {
+    const messages = lint("[a](Note.md#Sponsors) [b](Note.md#Sponsor)\n", {
+      config: { extends: [], dialect: "github", rules: { "links/valid": "error" } },
+      path: "Doc.md",
+      workspace,
+    }).map((item) => item.message);
+    expect(messages).toEqual(["Missing fragment in Note.md#Sponsor."]);
   });
 });
 

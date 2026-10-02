@@ -372,7 +372,8 @@ export function createWorkspace(
       const entry = fragment ? fragments(target) : undefined;
       // GitHub, Forgejo, and Gitea store anchors with a `user-content-` prefix
       // and add it to a link's fragment unless it is already there, so a link
-      // written with the prefix reaches the same anchor as one without.
+      // written with the prefix reaches the same anchor as one without. GitHub's
+      // page script also retries a fragment lowercased, and its anchors are.
       const anchor = fragment.replace(/^user-content-/, "");
       const fragmentExists =
         !fragment ||
@@ -384,7 +385,8 @@ export function createWorkspace(
             ? entry!.forgejoSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
             : dialect === "gitea"
               ? entry!.giteaSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
-              : entry!.slugs.has(anchor) || entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
+              : entry!.slugs.has(anchor.toLowerCase()) ||
+                entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };

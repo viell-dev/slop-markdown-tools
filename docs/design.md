@@ -122,9 +122,9 @@ without, and is matched without it; Obsidian fragments stay literal. The three
 also keep the `id` attribute of every element and the `name` of an `<a>` in a
 document's HTML, prefixed the same way, so those are fragments too, read from
 the inline and block HTML with comments dropped; GitHub lowercases them and
-matches a fragment lowercased as well. They do not number later headings. Entity
-references in such attributes and the content of `<script>` and similar elements
-are not modeled. GitHub and Gitea 1.26 and later also generate anchors for
+matches any fragment lowercased as well, including a heading's. They do not
+number later headings. Entity references in such attributes and the content of
+`<script>` and similar elements are not modeled. GitHub and Gitea 1.26 and later also generate anchors for
 headings written as HTML, from their text content with inner tags removed and
 character references decoded; GitHub numbers them in document order together
 with the Markdown headings and also when the tag has an `id`, Gitea numbers
