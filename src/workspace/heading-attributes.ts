@@ -26,8 +26,9 @@ const ESCAPES: Record<string, string> = {
   t: "\t",
 };
 /**
- * goldmark nests arrays and attributes without a limit. A block nested deeper
- * than this stays heading text, so that it cannot exhaust the call stack.
+ * goldmark nests arrays and attributes in values without a limit. A block with
+ * more levels than this stays heading text, so that it cannot exhaust the call
+ * stack.
  */
 const MAX_DEPTH = 64;
 
@@ -47,7 +48,8 @@ function skipSpaces(line: string, at: number): number {
  */
 function parseValue(line: string, at: number, depth: number): Parsed<Value> | undefined {
   const first = line[at];
-  if (first === undefined || depth > MAX_DEPTH) return undefined;
+  if (first === undefined) return undefined;
+  if ((first === "{" || first === "[") && depth === MAX_DEPTH) return undefined;
   if (first === "{") {
     const nested = parseAttributes(line, at, depth + 1);
     return nested && { value: null, end: nested.end };
@@ -139,7 +141,9 @@ function parseAttributes(
 export function headingAttributeBlock(
   line: string,
 ): { start: number; id: string | undefined } | undefined {
-  line = line.replace(/[ \t]+$/, "");
+  let length = line.length;
+  while (line[length - 1] === " " || line[length - 1] === "\t") length--;
+  line = line.slice(0, length);
   for (let at = 0; at < line.length; at++) {
     if (line[at] === "\\") {
       if (PUNCTUATION.test(line[at + 1] ?? "")) at++;

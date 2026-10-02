@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkspace, format, lint, parse, semanticFingerprint } from "../src/index.js";
+import {
+  createWorkspace,
+  format,
+  lint,
+  parse,
+  semanticFingerprint,
+  textContent,
+} from "../src/index.js";
 import type { Config, Dialect } from "../src/index.js";
-import { headingAttributeBlock } from "../src/workspace/heading-attributes.js";
+import { headingAttributeBlock, headingAttributes } from "../src/workspace/heading-attributes.js";
 
 const config: Config = {
   extends: [],
@@ -439,20 +446,68 @@ describe("Forgejo and Gitea heading attributes", () => {
     expect(resolves(repeated, fragment, "gitea")).toBe(exists);
   });
   it("leaves a block nested too deeply to parse safely as heading text", () => {
-    expect(headingAttributeBlock("## Title {a=[[[1]]] b={c={#d}} #ok}")).toEqual({
-      start: 9,
-      id: "ok",
-    });
-    const nested = (depth: number) => `## Title {a=${"[".repeat(depth)}0${"]".repeat(depth)} #ok}`;
-    expect(headingAttributeBlock(nested(20000))).toBeUndefined();
+    const arrays = (depth: number, item: string) =>
+      `## Title {a=${"[".repeat(depth)}${item}${"]".repeat(depth)} #ok}`;
+    const attributes = (depth: number) =>
+      `## Title {${"a={".repeat(depth)}${"}".repeat(depth)} #ok}`;
+    for (const heading of [
+      arrays(64, ""),
+      arrays(64, "0"),
+      attributes(64),
+      arrays(3, "{b=[{#c}]}"),
+    ])
+      expect(headingAttributeBlock(heading)).toEqual({ start: 9, id: "ok" });
+    for (const heading of [arrays(65, ""), arrays(65, "0"), attributes(65), arrays(20000, "0")])
+      expect(headingAttributeBlock(heading)).toBeUndefined();
     expect(headingAttributeBlock(`## Title ${"{a=".repeat(20000)}`)).toBeUndefined();
-    const workspace = note(nested(200), "## Next {#next}");
+    const workspace = note(arrays(200, "0"), "## Next {#next}");
     for (const dialect of ["forgejo", "gitea"] as const) {
       expect(resolves(workspace, "ok", dialect)).toBe(false);
       expect(resolves(workspace, "next", dialect)).toBe(true);
     }
     expect(resolves(workspace, "next-next", "github")).toBe(true);
   });
+  it("scans a long run of spaces inside a heading once", () => {
+    const heading = `## T ${" ".repeat(200000)}x {.note}  \t`;
+    expect(headingAttributeBlock(heading)).toEqual({ start: heading.indexOf("{"), id: undefined });
+    expect(headingAttributeBlock(`## T${" ".repeat(200000)}`)).toBeUndefined();
+  });
+  it.each(["forgejo", "gitea"] as const)(
+    "reads the remaining %s heading like one written without the block",
+    (dialect) => {
+      // GFM parsing, unlike the default CommonMark parsing of the other workspaces here.
+      const text = (source: string, removed: boolean) => {
+        const document = parse(source, dialect);
+        const heading = removed
+          ? [...headingAttributes(document).values()][0]?.heading
+          : document.tree.children.find((node) => node.type === "heading");
+        return heading && textContent(heading).replace(/[\u00A0 ]+$/u, "");
+      };
+      for (const inline of [
+        "_https://example.com_",
+        "*www.example.com*",
+        "https://example.com/a_b_",
+        "me@example.com",
+        "~~del~~",
+        "_foo_",
+        "foo_bar_",
+        "`code`",
+        "[link](http://x.y)",
+        "$x_1$",
+        "a\\\\",
+        "foo &amp;",
+      ])
+        for (const [before, after] of [
+          ["## ", ""],
+          ["", "\n==="],
+        ])
+          for (const block of [" {.c}", "{.c}"]) {
+            const expected = text(`${before}${inline}${after}\n`, false);
+            expect(expected).toBeDefined();
+            expect(text(`${before}${inline}${block}${after}\n`, true), inline).toBe(expected);
+          }
+    },
+  );
   it("keeps a Setext heading whose text would read as another block without its block", () => {
     const workspace = note(
       "[ref]: /url {.note}\n---",
