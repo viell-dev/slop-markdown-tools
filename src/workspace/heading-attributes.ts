@@ -1,7 +1,8 @@
-import type { Heading } from "mdast";
+import type { Heading, Nodes } from "mdast";
 import type { Document } from "../core/types.js";
 import { parse, range } from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
+import { forgejoAnchor, giteaAnchor } from "./slug.js";
 
 /** An attribute value; `null` stands for every value that is not a string. */
 type Value = string | null;
@@ -260,12 +261,69 @@ function protectedBlock(line: string, setext: boolean): [number, number] | undef
   return block && [block.start, line.length];
 }
 
+/**
+ * The source of a heading's last text line, which Forgejo, and Gitea before
+ * 1.26, build the anchor from: goldmark generates automatic heading IDs from
+ * that line as written, before any inline syntax is read. The line excludes the
+ * opening and closing `#` sequences, the blank space around the content, the
+ * markers of the `quotes` block quotes the heading is in, list indentation,
+ * and a trailing attribute block, which starts at `blockStart`. Earlier lines
+ * of a Setext heading do not count.
+ */
+export function lastLineSource(
+  source: string,
+  node: Heading,
+  quotes: number,
+  blockStart?: number,
+): string {
+  const first = node.children[0];
+  const last = node.children.at(-1);
+  if (!first || !last) return "";
+  const start = range(first)[0];
+  const end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
+  let text = source.slice(start, end);
+  const lineBreak = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
+  if (lineBreak < 0) {
+    // goldmark's ATX special case: a `#` run after a space, followed by the
+    // block, closes the heading and is left out, as in `## Title ## {#id}`.
+    // Only the first such run is tried, and a backslash escapes punctuation.
+    // A one-line Setext heading keeps the run: `Run ## {.a}` reads `Run ##`.
+    if (blockStart !== undefined && source[range(node)[0]] === "#")
+      for (let at = 0; at < text.length; at++) {
+        if (text[at] === "\\" && PUNCTUATION.test(text[at + 1] ?? "")) at++;
+        else if ((text[at] === " " || text[at] === "\t") && text[at + 1] === "#") {
+          let run = at + 1;
+          while (text[run] === "#") run++;
+          if (text.slice(run).trim() === "") text = text.slice(0, at);
+          break;
+        }
+      }
+    return text;
+  }
+  // A continuation line starts with the block quote markers the line still
+  // has, lazily fewer, and the leading blank space of its content; a `>` after
+  // those is content.
+  text = text.slice(lineBreak + 1);
+  let at = 0;
+  for (let marker = 0; marker < quotes; marker++) {
+    while (text[at] === " " || text[at] === "\t") at++;
+    if (text[at] !== ">") break;
+    at++;
+  }
+  while (text[at] === " " || text[at] === "\t") at++;
+  return text.slice(at);
+}
+
 interface HeadingLine {
   start: number;
   end: number;
   setext: boolean;
+  /** How many block quotes the heading is in. */
+  quotes: number;
   /** The source offset of the line's first `{`, or -1. */
   brace: number;
+  /** The attribute block ending the line, by the current goldmark rules. */
+  block: ReturnType<typeof headingAttributeBlock>;
 }
 interface HeadingLines {
   byHeading: Map<Heading, HeadingLine>;
@@ -273,21 +331,37 @@ interface HeadingLines {
   lines: HeadingLine[];
 }
 const headingLines = new WeakMap<Document, HeadingLines>();
-/** The lines on which Forgejo and Gitea look for attribute blocks; none for other dialects. */
+/** The last text lines of the headings that Forgejo or Gitea render; none for other dialects. */
 function forgeHeadingLines(document: Document): HeadingLines {
   const cached = headingLines.get(document);
   if (cached) return cached;
   const result: HeadingLines = { byHeading: new Map(), lines: [] };
   headingLines.set(document, result);
-  if (document.dialect === "forgejo" || document.dialect === "gitea")
-    walk(document.tree, "heading", (node) => {
+  if (document.dialect !== "forgejo" && document.dialect !== "gitea") return result;
+  const visit = (node: Nodes, quotes: number) => {
+    if (node.type === "heading") {
       const line = lastTextLine(document.source, node);
-      const brace = document.source.slice(line.start, line.end).indexOf("{");
-      const found = { ...line, brace: brace < 0 ? -1 : line.start + brace };
+      const text = document.source.slice(line.start, line.end);
+      const brace = text.indexOf("{");
+      const found = {
+        ...line,
+        quotes,
+        brace: brace < 0 ? -1 : line.start + brace,
+        block: brace < 0 ? undefined : headingAttributeBlock(text),
+      };
       result.byHeading.set(node, found);
       result.lines.push(found);
-    });
+    }
+    if ("children" in node)
+      for (const child of node.children)
+        visit(child, quotes + (node.type === "blockquote" ? 1 : 0));
+  };
+  visit(document.tree, 0);
   return result;
+}
+/** Whether the heading's block, if any, gives it a custom `id` in place of a generated anchor. */
+function hasCustomId(line: HeadingLine): boolean {
+  return line.block?.id !== undefined;
 }
 
 /**
@@ -306,15 +380,37 @@ export function headingAttributeSource(document: Document, heading: Heading): st
 }
 
 /**
- * Whether a source range reaches the part of a Forgejo or Gitea heading where
- * the renderers may read attributes instead of Markdown: the heading's last
- * text line from its first `{` on. Whether that line ends in a valid block, and
- * what the block says, depends on every character from there on. A rewritten
- * `*` or `_` can change an attribute value, make a block invalid, which shows
- * it as heading text and drops its anchor, or make text a valid block:
- * `## *Mode {.a*}` has none, and `## _Mode {.a_}` has one.
+ * The anchors that Forgejo and Gitea before 1.26 generate for a heading from
+ * the source of its last line, as `forgejo gitea`, when the heading has no
+ * custom `id`; undefined for other dialects. Changing a marker or a link
+ * destination on that line changes the anchor although the heading reads the
+ * same, so the anchors are part of what the heading means there.
  */
-export function inHeadingAttributeText(document: Document, start: number, end: number): boolean {
+export function headingAnchorSource(document: Document, heading: Heading): string | undefined {
+  const line = forgeHeadingLines(document).byHeading.get(heading);
+  if (!line || hasCustomId(line)) return undefined;
+  const text = lastLineSource(
+    document.source,
+    heading,
+    line.quotes,
+    line.block && line.start + line.block.start,
+  );
+  return `${forgejoAnchor(text)} ${giteaAnchor(text)}`;
+}
+
+/**
+ * Whether an edit within a source range could change what Forgejo or Gitea
+ * make of a heading: its attributes or its generated anchor. Both come from the
+ * heading's last text line as written. From the line's first `{` on, every
+ * character can decide whether the line ends in a valid attribute block and
+ * what the block says: a rewritten `*` or `_` can change an attribute value,
+ * make a block invalid, which shows it as heading text and drops its anchor,
+ * or make text a valid block (`## *Mode {.a*}` has none, `## _Mode {.a_}` has
+ * one). Before that, or without a `{`, the same rewrite changes the generated
+ * anchor, which keeps underscores, drops asterisks, and includes link
+ * destinations, unless the block sets a custom `id`.
+ */
+export function changesForgeHeading(document: Document, start: number, end: number): boolean {
   const { lines } = forgeHeadingLines(document);
   let low = 0;
   let high = lines.length;
@@ -324,5 +420,7 @@ export function inHeadingAttributeText(document: Document, start: number, end: n
     else high = middle;
   }
   const line = lines[low];
-  return line !== undefined && line.brace >= 0 && end > line.brace;
+  if (line === undefined || line.start >= end) return false;
+  if (line.brace >= 0 && end > line.brace) return true;
+  return !hasCustomId(line);
 }

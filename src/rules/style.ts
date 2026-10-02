@@ -3,7 +3,7 @@ import stringWidth from "string-width";
 import type { Nodes, Paragraph } from "mdast";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
-import { headingAttributeBlock, inHeadingAttributeText } from "../workspace/heading-attributes.js";
+import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -75,10 +75,10 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         );
         if (neighbours.includes(marker[0]!)) return;
         if (goldmarkForges[document.dialect] && inForgeMath(document.source, start, end)) return;
-        // Forgejo and Gitea read a heading's trailing `{...}` block as attributes
-        // before they parse emphasis, so a marker there can be part of a block
-        // or be what keeps one from being read.
-        if (inHeadingAttributeText(document, start, end)) return;
+        // Forgejo, and Gitea before 1.26, build a heading's anchor from its last
+        // line as written, keeping `_` and dropping `*`, and both read a trailing
+        // `{...}` block as attributes before they parse emphasis.
+        if (changesForgeHeading(document, start, end)) return;
         if (
           document.dialect === "gitea" &&
           (giteaPyLine(document.source, start, end) ||

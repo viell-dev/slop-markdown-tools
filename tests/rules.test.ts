@@ -242,10 +242,10 @@ describe("Forgejo and Gitea heading attribute blocks", () => {
         source.replaceAll(from, to),
       );
     }
-    // The same edit in heading text before a block is an ordinary marker change.
+    // The same edit before a block that sets the id is an ordinary marker change.
     const plugins = [swap("*", "_")];
-    expect(format("## *Mode* {.a}\n", { config: config("forgejo"), plugins }).output).toBe(
-      "## _Mode_ {.a}\n",
+    expect(format("## *Mode* {#m}\n", { config: config("forgejo"), plugins }).output).toBe(
+      "## _Mode_ {#m}\n",
     );
   });
   it("refuses an edit that adds or removes a closing sequence after a block", () => {
@@ -288,6 +288,121 @@ describe("Forgejo and Gitea heading attribute blocks", () => {
     const start = performance.now();
     expect(formatted(source, only(markers, "forgejo"))).toBe(source.replace("*x*", "_x_"));
     expect(performance.now() - start).toBeLessThan(10000);
+  });
+});
+
+describe("Forgejo and Gitea heading anchors under formatting", () => {
+  const forges = ["forgejo", "gitea"] as const;
+  const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  // Forgejo 16.0.5 and Gitea 1.21.11, 1.23.8, and 1.25.5 build the anchor from
+  // the heading's last line as written: `## Emph *star* end` is #emph-star-end
+  // and `## Emph _star_ end` is #emph-_star_-end.
+  it.each([
+    ["## Emph *star* end\n", "## Emph _star_ end\n"],
+    ["## Strong __init__ end\n", "## Strong **init** end\n"],
+    ["Under *lined*\n===\n", "Under _lined_\n===\n"],
+    ["> ## Quoted *star*\n", "> ## Quoted _star_\n"],
+  ])("leaves the markers of the heading %j alone", (source, github) => {
+    for (const dialect of forges) expect(formatted(source, only(markers, dialect))).toBe(source);
+    expect(formatted(source, only(markers, "github"))).toBe(github);
+  });
+  it.each(forges)("still converts markers that cannot change an anchor on %s", (dialect) => {
+    const source = "*Two*\n*lines*\n===\n\n## *Custom* {#id}\n\nA *b* and __c__.\n";
+    expect(formatted(source, only(markers, dialect))).toBe(
+      "_Two_\n*lines*\n===\n\n## _Custom_ {#id}\n\nA _b_ and **c**.\n",
+    );
+  });
+  it("leaves a link destination in a heading alone", () => {
+    const rules: Record<string, RuleSetting> = {
+      "links/path": ["warn", { style: "relative", leadingDot: true }],
+    };
+    const source = "## See [x](y.md) end\n\n## See [x](y.md) {#see}\n\n[y](y.md)\n";
+    const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
+    const run = (dialect: Dialect) =>
+      formatted(source, only(rules, dialect), { path: "Doc.md", workspace });
+    for (const dialect of forges)
+      expect(run(dialect)).toBe(
+        "## See [x](y.md) end\n\n## See [x](./y.md) {#see}\n\n[y](./y.md)\n",
+      );
+    expect(run("github")).toBe(
+      "## See [x](./y.md) end\n\n## See [x](./y.md) {#see}\n\n[y](./y.md)\n",
+    );
+  });
+  it.each(forges)("keeps every link to a heading valid through the %s preset", (dialect) => {
+    const config: Config = { extends: ["recommended", dialect] };
+    const source =
+      "## Emph *star* end\n\n## Strong __init__ end\n\n[a](#emph-star-end) and [b](#strong-__init__-end) and *c*\n";
+    const workspace = createWorkspace({ "Doc.md": source });
+    const result = format(source, { config, path: "Doc.md", workspace });
+    expect(result.output).toBe(source.replace("*c*", "_c_"));
+    expect(result.diagnostics.filter((item) => item.rule !== "style/emphasis")).toEqual([]);
+    // The links still resolve against the formatted document itself.
+    const after = createWorkspace({ "Doc.md": result.output });
+    expect(lint(result.output, { config, path: "Doc.md", workspace: after })).toEqual([]);
+  });
+  it.each(forges)("formats a quoted list heading's first line on %s", (dialect) => {
+    // Rendered: Forgejo 16.0.5 and Gitea 1.25.5 give this heading `#last-keep`,
+    // Gitea 28.0.0 `#first-last-keep`; only the last line is left alone.
+    const source = "> - *First*\n>   Last *keep*\n>   ===\n\n[a](#last-keep)\n";
+    const workspace = createWorkspace({ "Doc.md": source });
+    const result = format(source, { config: only(markers, dialect), path: "Doc.md", workspace });
+    expect(result.output).toBe("> - _First_\n>   Last *keep*\n>   ===\n\n[a](#last-keep)\n");
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(
+      createWorkspace({ "Doc.md": result.output }).resolve("Doc.md", "#last-keep", dialect)
+        .fragmentExists,
+    ).toBe(true);
+  });
+  it.each(forges)("converts a Setext heading with a class block on %s", (dialect) => {
+    // The `##` is heading text on both forms: Forgejo renders `#run`, Gitea
+    // 1.25 `#run-`, before and after the conversion.
+    const config = only({ "style/heading": "warn" }, dialect);
+    expect(formatted("Run ## {.a}\n===\n", config)).toBe("# Run \\## {.a}\n");
+    for (const source of ["Run ## {.a}\n===\n", "# Run \\## {.a}\n"]) {
+      const resolves = (fragment: string, forge: Dialect) =>
+        createWorkspace({ "Doc.md": source }).resolve("Doc.md", `#${fragment}`, forge)
+          .fragmentExists;
+      expect(resolves("run", "forgejo")).toBe(true);
+      expect(resolves("run-", "gitea")).toBe(true);
+    }
+  });
+  it("checks a heading with many links in time proportional to its length", () => {
+    const source = `## ${"[x](y.md) ".repeat(10000)}{#h}\n`;
+    const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
+    const start = performance.now();
+    const result = format(source, {
+      config: only({ "links/path": ["warn", { style: "relative", leadingDot: true }] }, "forgejo"),
+      path: "Doc.md",
+      workspace,
+    });
+    expect(result.output).toBe(source.replaceAll("(y.md)", "(./y.md)"));
+    expect(performance.now() - start).toBeLessThan(10000);
+  });
+  it("refuses an edit by any rule that changes an anchor", () => {
+    const plugin: Plugin = {
+      name: "swap",
+      rules: {
+        stars: {
+          kind: "style",
+          description: "Replace every asterisk with an underscore",
+          check: ({ document }) =>
+            [...document.source.matchAll(/\*/g)].map((match) => ({
+              start: match.index,
+              message: "Swap",
+              edit: { start: match.index, end: match.index + 1, text: "_" },
+            })),
+        },
+      },
+    };
+    const run = (source: string, dialect: Dialect) =>
+      format(source, { config: only({ "swap/stars": "warn" }, dialect), plugins: [plugin] });
+    for (const dialect of forges) {
+      const result = run("## Emph *star* end\n", dialect);
+      expect(result.output).toBe("## Emph *star* end\n");
+      expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+      expect(run("*Two*\nlines\n===\n", dialect).output).toBe("_Two_\nlines\n===\n");
+    }
+    expect(run("## Emph *star* end\n", "github").output).toBe("## Emph _star_ end\n");
   });
 });
 
