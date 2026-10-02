@@ -248,6 +248,47 @@ describe("Forgejo and Gitea heading attribute blocks", () => {
       "## _Mode_ {.a}\n",
     );
   });
+  it("refuses an edit that adds or removes a closing sequence after a block", () => {
+    // `## Title {#id}` is a block on every version; `## Title {#id} ##` only on
+    // Gitea before 1.26. Both leave the same GFM tree and the same block text.
+    const closing = (text: string): Plugin => ({
+      name: "closing",
+      rules: {
+        sequence: {
+          kind: "style",
+          description: "Replace the first line",
+          check: ({ document }) => {
+            const end = document.source.indexOf("\n");
+            return document.source.slice(0, end) === text
+              ? []
+              : [{ start: 0, message: "Replace", edit: { start: 0, end, text } }];
+          },
+        },
+      },
+    });
+    for (const [source, text] of [
+      ["## Title {#id} ##\n", "## Title {#id}"],
+      ["## Title {#id}\n", "## Title {#id} ##"],
+    ] as const) {
+      for (const dialect of forges) {
+        const result = format(source, {
+          config: only({ "closing/sequence": "warn" }, dialect),
+          plugins: [closing(text)],
+        });
+        expect(result.output).toBe(source);
+        expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+      }
+      const github = only({ "closing/sequence": "warn" }, "github");
+      expect(format(source, { config: github, plugins: [closing(text)] }).output).toBe(`${text}\n`);
+    }
+  });
+  it("finds heading lines in time proportional to the document", () => {
+    // Every heading used to be searched for a `{` up to the end of the document.
+    const source = `${"## Heading\n\n".repeat(20000)}*x*\n`;
+    const start = performance.now();
+    expect(formatted(source, only(markers, "forgejo"))).toBe(source.replace("*x*", "_x_"));
+    expect(performance.now() - start).toBeLessThan(10000);
+  });
 });
 
 describe("links/path wikilink rewriting", () => {

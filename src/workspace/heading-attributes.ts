@@ -281,8 +281,8 @@ function forgeHeadingLines(document: Document): HeadingLines {
   if (document.dialect === "forgejo" || document.dialect === "gitea")
     walk(document.tree, "heading", (node) => {
       const line = lastTextLine(document.source, node);
-      const brace = document.source.indexOf("{", line.start);
-      const found = { ...line, brace: brace < line.end ? brace : -1 };
+      const brace = document.source.slice(line.start, line.end).indexOf("{");
+      const found = { ...line, brace: brace < 0 ? -1 : line.start + brace };
       result.byHeading.set(node, found);
       result.lines.push(found);
     });
@@ -290,16 +290,18 @@ function forgeHeadingLines(document: Document): HeadingLines {
 }
 
 /**
- * A Forgejo or Gitea heading's attribute block as written, if it has one. The
- * renderers read it character for character before they parse inline content,
- * so the block is part of what the heading means there.
+ * A Forgejo or Gitea heading's attribute block as written, if it has one, with
+ * whatever follows it on the line. The renderers read the block character for
+ * character before they parse inline content, and a closing `#` sequence after
+ * it decides which renderer versions read it, so both are part of what the
+ * heading means there.
  */
 export function headingAttributeSource(document: Document, heading: Heading): string | undefined {
   const line = forgeHeadingLines(document).byHeading.get(heading);
   if (!line || line.brace < 0) return undefined;
   const text = document.source.slice(line.start, line.end);
   const block = protectedBlock(text, line.setext);
-  return block && text.slice(...block);
+  return block && text.slice(block[0]);
 }
 
 /**
