@@ -790,6 +790,15 @@ describe("heading anchors built from the last source line", () => {
     ["## Dup", "dup-1", "dup-1", "dup"],
     ["## [text](url) only", "text-url-only", "texturl-only", "text-only"],
     ["## Mixed-Case_and-dash", "mixed-case_and-dash", "mixed-case_and-dash", "mixed-case_and-dash"],
+    // An indented continuation line is content from its first non-blank character,
+    // so a `>` there is text; only the markers of enclosing block quotes go.
+    ["Alpha\n    > beta\n---", "beta", "-beta", "alpha--beta"],
+    ["> Quoted\n>     > deep\n> ---", "deep", "-deep", "quoted--deep"],
+    // A closing sequence before the block closes the heading and is left out.
+    ["## Title ## {.note}", "title", "title", "title"],
+    ["## Title", "title-1", "title-1", "title"],
+    // Only the first `#` run after a space is tried, as goldmark does.
+    ["## Also #x ## {.note}", "also-x", "also-x-", "also-x"],
   ];
   const workspace = createWorkspace({
     "Doc.md": "",
