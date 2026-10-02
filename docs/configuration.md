@@ -78,6 +78,14 @@ Gitea as well. Gitea renders repository files with soft line breaks by default;
 if an instance adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable
 `style/wrap`.
 
+Inline HTML in a heading affects its anchor differently on each renderer. GitHub
+leaves tags and comments out and keeps the text between them, so
+`## A <span>B</span>` is `#a-b`; tags that GitHub shows as text, such as
+`<script>`, stay part of the anchor. Forgejo builds the anchor from the
+heading's source, giving `#a-span-b-span`. Gitea 1.26 and later use the rendered
+text, giving `#a-b`, while earlier versions use the source, giving
+`#a-spanbspan`; the Gitea dialect accepts both.
+
 Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
 of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and
 no `#install`; `## Usage {.note}` keeps the generated anchor `#usage`. The
