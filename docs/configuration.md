@@ -78,13 +78,24 @@ Gitea as well. Gitea renders repository files with soft line breaks by default;
 if an instance adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable
 `style/wrap`.
 
-Inline HTML in a heading affects its anchor differently on each renderer. GitHub
-leaves tags and comments out and keeps the text between them, so
-`## A <span>B</span>` is `#a-b`; tags that GitHub shows as text, such as
-`<script>`, stay part of the anchor. Forgejo builds the anchor from the
-heading's source, giving `#a-span-b-span`. Gitea 1.26 and later use the rendered
-text, giving `#a-b`, while earlier versions use the source, giving
-`#a-spanbspan`; the Gitea dialect accepts both.
+Forgejo, and Gitea before 1.26, build a heading's anchor from the source of its
+last line as written, before any Markdown in it is read. Link destinations,
+image syntax, emphasis markers, character references, and inline HTML tags are
+part of the anchor, and a heading underlined with `===` or `---` gets the anchor
+of its last text line only. `## Link [text](https://example.com/page) end` is
+`#link-text-https-example-com-page-end` on Forgejo and
+`#link-texthttpsexamplecompage-end` on Gitea 1.25, `## Strong __init__ end` is
+`#strong-__init__-end` on both, and `## A <span>B</span>` is `#a-span-b-span`
+and `#a-spanbspan`. The opening and closing `#` sequences, the blank space
+around the text, block quote and list prefixes, and a trailing attribute block
+are not part of the line. GitHub, and Gitea 1.26 and later, build the anchor
+from the rendered text instead: `#link-text-end`, `#strong-init-end`, and
+`#a-b`, with the text of every line of an underlined heading. GitHub keeps the
+tags that it shows as text, such as `<script>`, in the anchor; Gitea 1.26 and
+later show `<script>`, `<style>`, `<html>`, and `<head>` as text and keep them
+too, drop other tags they do not allow while keeping the text inside, and read a
+hard line break as a line break. The Gitea dialect accepts the anchors of both
+Gitea generations.
 
 Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
 of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and
@@ -98,7 +109,29 @@ followed by more text, or whose `{` is escaped with a backslash stays heading
 text. A custom anchor must be linked exactly as written, including its case, and
 it is never numbered: a later `## Setup` heading is also `#setup`, not
 `#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
-keep it in heading anchors and heading names.
+keep it in heading anchors and heading names. An `id` that is not text, such as
+`{id=5}`, `{id=true}`, or a list, has no anchor on Gitea 1.26 and later, and
+Forgejo, and Gitea before 1.26, render nothing for the whole document; the
+Forgejo and Gitea presets report it with `forgejo/heading-id`. Quote the value
+(`{id="5"}`) or use `{#5}` instead.
+
+Formatting with the Forgejo or Gitea dialect leaves a block as written:
+`{#bare data-x=__init__}` is a valid block, and `{#bare data-x=**init**}` is
+heading text without the anchor `#bare`. A change can also create a block:
+`## *Mode {.a*}` is emphasis, while `## _Mode {.a_}` is a heading with a class.
+`style/emphasis`, `style/strong`, and `links/path` therefore change nothing from
+the first `{` of a heading's last text line on. `style/inline-code` does not
+join a code span that spans lines of a heading, and `style/heading` escapes a
+`#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
+heading there.
+
+Because Forgejo, and Gitea before 1.26, build a heading's anchor from its last
+line as written, `style/emphasis`, `style/strong`, and `links/path` also leave
+that line unchanged on these dialects when the heading has no custom `id`.
+Rewriting `## Emph *star* end` to `_star_` would move its anchor from
+`#emph-star-end` to `#emph-_star_-end` and break every link to it, although the
+heading reads the same. Earlier lines of an underlined heading, headings with an
+`id`, and the rest of the document are formatted as usual.
 
 ## Presets
 
@@ -106,9 +139,9 @@ keep it in heading anchors and heading names.
 | ------------- | --------- | ---------------------------------------------------------------------------------------------- |
 | `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
-| `forgejo`     | Forgejo   | The `github` rules                                                                             |
+| `forgejo`     | Forgejo   | The `github` rules and `forgejo/heading-id`                                                    |
 | `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
-| `gitea`       | Gitea     | The `github` rules                                                                             |
+| `gitea`       | Gitea     | The `github` rules and `forgejo/heading-id`                                                    |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
 An omitted `extends` selects `recommended`. Explicit `extends` replaces that
@@ -133,6 +166,7 @@ Problem rules report findings and never become formatting edits.
 | `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
 | `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
 | `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
+| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo  |
 | `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
 | `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
 | `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
@@ -217,10 +251,11 @@ to case, Forgejo and Gitea exactly as written. A heading written as HTML
 (`<h2 align="center">Title</h2>`) gets a generated anchor on GitHub, numbered
 together with the Markdown headings, and on Gitea 1.26 and later, where it is
 not numbered and a heading with its own `id` gets none; Forgejo and earlier
-Gitea versions give it no anchor. HTML inside comments and code is not an
-anchor. Already compliant destinations retain their percent-encoding spelling,
-including literal `?` and `%` in resolving Obsidian paths. Newly generated paths
-encode literal percent signs and hashes to preserve target identity.
+Gitea versions give it no anchor. HTML inside comments, code, and `<script>`,
+`<textarea>`, and the other elements whose content is text is not an anchor.
+Already compliant destinations retain their percent-encoding spelling, including
+literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
+literal percent signs and hashes to preserve target identity.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the

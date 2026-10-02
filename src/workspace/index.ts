@@ -2,73 +2,130 @@ import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { decodeNamedCharacterReference } from "decode-named-character-reference";
 import { walk } from "../syntax/walk.js";
-import type { Nodes } from "mdast";
+import type { Heading, Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
-import { headingAttributes } from "./heading-attributes.js";
+import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
 
-/** Tags that GFM's tagfilter makes GitHub show as text instead of as HTML. */
-const filteredTag =
-  /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i;
+/** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
+interface Rendering {
+  /** Tags shown as text rather than as HTML, and so part of the anchor. */
+  shownTags: RegExp;
+  /** What a hard line break contributes. */
+  lineBreak: string;
+}
+/** GFM's tagfilter makes GitHub show these tags as text; a hard break adds nothing. */
+const github: Rendering = {
+  shownTags:
+    /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i,
+  lineBreak: "",
+};
+/**
+ * Gitea 1.26 and later show these tags as text, drop other disallowed tags
+ * while keeping their text, and read a hard break as a line break. Rendered on
+ * Gitea 1.27.3 and 28.0.0: `## X <script>a</script> Y` is `#x-scriptascript-y`
+ * and `## X <iframe>a</iframe> Y` is `#x-a-y`.
+ */
+const gitea: Rendering = {
+  shownTags: /^<\/?(?:script|style|html|head)(?=[\t\n\f\r />])/i,
+  lineBreak: "\n",
+};
 /**
  * Heading text as rendered, which GitHub and Gitea 1.26 and later build anchors
  * from: inline HTML tags and comments are left out and the text between tags
- * stays, so `## A <span>B</span>` reads `A B`. With `tagfilter`, the tags that
- * GitHub shows as text are kept.
+ * stays, so `## A <span>B</span>` reads `A B`, except for the tags that the
+ * renderer shows as text.
  */
-function renderedText(node: Nodes, tagfilter: boolean): string {
-  if (node.type === "html") return tagfilter && filteredTag.test(node.value) ? node.value : "";
+function renderedText(node: Nodes, rendering: Rendering): string {
+  if (node.type === "html") return rendering.shownTags.test(node.value) ? node.value : "";
+  if (node.type === "break") return rendering.lineBreak;
   if ("children" in node)
-    return node.children.map((child) => renderedText(child, tagfilter)).join("");
+    return node.children.map((child) => renderedText(child, rendering)).join("");
   return textContent(node);
 }
 /**
  * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
  * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
- * Without `html`, inline HTML tags and comments are left out as well.
+ * Everything else is as in Gitea's rendered text.
  */
-function literalUnderscoreText(node: Nodes, source: string, html: boolean): string {
-  if (node.type === "html" && !html) return "";
+function literalUnderscoreText(node: Nodes, source: string): string {
   if (node.type === "emphasis" || node.type === "strong") {
     const [start, end] = range(node);
     if (source[start] === "_") {
       const size = node.type === "strong" ? 2 : 1;
-      const inner = node.children
-        .map((child) => literalUnderscoreText(child, source, html))
-        .join("");
+      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
       return source.slice(start, start + size) + inner + source.slice(end - size, end);
     }
   }
   if ("children" in node)
-    return node.children.map((child) => literalUnderscoreText(child, source, html)).join("");
-  return textContent(node);
+    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
+  return renderedText(node, gitea);
 }
-
-/** An HTML comment, which the renderers drop with everything in it. */
-const comment = /<!--[\s\S]*?-->/g;
 /** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
 const openTag =
-  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/g;
+  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/y;
 const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
+/**
+ * Elements whose content HTML reads as text and that no renderer shows as an
+ * element: GitHub's tagfilter shows these tags as text, Forgejo removes them,
+ * and Gitea shows them as text or removes them. `<plaintext>` has no end.
+ */
+const rawText = new Set([
+  "iframe",
+  "noembed",
+  "noframes",
+  "plaintext",
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "xmp",
+]);
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
  * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
  * elements they allow and add their `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
- * prefix is recorded without it. Comments are dropped first; the content of
- * `<script>` and similar elements is not told apart from markup.
+ * prefix is recorded without it. The scan follows HTML tokenization in one
+ * pass: comments, which run to the end when unterminated, declarations, and
+ * raw-text elements with their content are skipped, and a `<!--` inside a
+ * tag's quoted value is part of the value. Every value of a repeated attribute
+ * counts: Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
  */
 function htmlAnchors(html: string): string[] {
   const anchors: string[] = [];
-  for (const tag of html.replace(comment, "").matchAll(openTag)) {
-    const anchor = tag[1]!.toLowerCase() === "a";
+  const lower = html.toLowerCase();
+  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at + 1)) {
+    if (html.startsWith("<!--", at)) {
+      const end = html.indexOf("-->", at + 4);
+      if (end < 0) break;
+      at = end + 2;
+      continue;
+    }
+    if (html[at + 1] === "!" || html[at + 1] === "?") {
+      const end = html.indexOf(">", at);
+      if (end < 0) break;
+      at = end;
+      continue;
+    }
+    openTag.lastIndex = at;
+    const tag = openTag.exec(html);
+    if (!tag) continue;
+    const name = tag[1]!.toLowerCase();
+    at += tag[0].length - 1;
+    if (rawText.has(name)) {
+      const end = lower.indexOf(`</${name}`, at);
+      if (end < 0) break;
+      at = end;
+      continue;
+    }
     for (const match of tag[2]!.matchAll(attribute)) {
-      const name = match[1]!.toLowerCase();
-      if (name !== "id" && !(anchor && name === "name")) continue;
+      const attributeName = match[1]!.toLowerCase();
+      if (attributeName !== "id" && !(name === "a" && attributeName === "name")) continue;
       const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
       if (value) anchors.push(value);
     }
@@ -85,9 +142,41 @@ function decodeReferences(text: string): string {
     return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : reference;
   });
 }
-/** An `<h1>` to `<h6>` element with its attributes and content, in HTML without comments. */
+/** An `<h1>` to `<h6>` element with its attributes and content. */
 const htmlHeading =
   /<h([1-6])\b((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*>([\s\S]*?)<\/h\1[ \t\r\n]*>/gi;
+/**
+ * The HTML that reaches the page as markup: without comments, which run to the
+ * end when unterminated, declarations, and raw-text elements with their
+ * content, found in one pass as `htmlAnchors` finds them.
+ */
+function visibleHtml(html: string): string {
+  const lower = html.toLowerCase();
+  let visible = "";
+  let copied = 0;
+  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at + 1)) {
+    if (at < copied) continue;
+    let skipTo: number;
+    if (html.startsWith("<!--", at)) {
+      const end = html.indexOf("-->", at + 4);
+      skipTo = end < 0 ? html.length : end + 3;
+    } else if (html[at + 1] === "!" || html[at + 1] === "?") {
+      const end = html.indexOf(">", at);
+      skipTo = end < 0 ? html.length : end + 1;
+    } else {
+      openTag.lastIndex = at;
+      const tag = openTag.exec(html);
+      if (!tag || !rawText.has(tag[1]!.toLowerCase())) continue;
+      const close = lower.indexOf(`</${tag[1]!.toLowerCase()}`, at + tag[0].length);
+      const end = close < 0 ? -1 : html.indexOf(">", close);
+      skipTo = end < 0 ? html.length : end + 1;
+    }
+    visible += html.slice(copied, at);
+    copied = skipTo;
+    at = skipTo - 1;
+  }
+  return visible + html.slice(copied);
+}
 /**
  * Headings written as HTML, as GitHub and Gitea 1.26 and later see them when
  * they generate anchors: the text content with inner tags removed and character
@@ -95,7 +184,7 @@ const htmlHeading =
  */
 function htmlHeadings(html: string): { text: string; hasId: boolean }[] {
   const headings: { text: string; hasId: boolean }[] = [];
-  for (const match of html.replace(comment, "").matchAll(htmlHeading)) {
+  for (const match of visibleHtml(html).matchAll(htmlHeading)) {
     const hasId = [...match[2]!.matchAll(attribute)].some(
       (item) => item[1]!.toLowerCase() === "id",
     );
@@ -212,6 +301,15 @@ export function createWorkspace(
       const forgejoSlugger = createForgejoSlugger();
       const giteaSlugger = createGiteaSlugger();
       const attributes = headingAttributes(document);
+      // How many block quotes each heading is in, for the markers of its last line.
+      const quotes = new Map<Heading, number>();
+      const count = (node: Nodes, depth: number) => {
+        if (node.type === "heading") quotes.set(node, depth);
+        if ("children" in node)
+          for (const child of node.children)
+            count(child, depth + (node.type === "blockquote" ? 1 : 0));
+      };
+      count(document.tree, 0);
       // GitHub numbers the anchors of Markdown and HTML headings together, in
       // document order; Gitea 1.26 and later give HTML headings without an `id`
       // an anchor from their text, and number nothing. Forgejo gives them none.
@@ -230,35 +328,32 @@ export function createWorkspace(
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
-        entry.slugs.add(slugger.slug(renderedText(node, true)));
+        // GitHub prefixes an id only when it does not already start with the prefix.
+        entry.slugs.add(slugger.slug(renderedText(node, github)).replace(/^user-content-/, ""));
         // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
         const block = attributes.get(node);
         if (block?.id !== undefined) {
-          const anchor = forgejoSlugger.custom(block.id);
+          // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
+          const anchor = forgejoSlugger.custom(block.id ?? "");
           if (anchor) entry.forgejoSlugs.add(anchor);
-          if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
+          if (giteaSlugger.custom(block.id ?? "")) entry.giteaSlugs.add(anchor);
           return;
         }
-        const shown = block?.heading ?? node;
-        const shownText = block ? textContent(shown) : text;
-        // Forgejo, like Gitea before 1.26, builds anchors from the heading's
-        // source, so inline HTML tags stay part of them.
-        entry.forgejoSlugs.add(forgejoSlugger.slug(shownText));
-        entry.giteaSlugs.add(giteaSlugger.slug(shownText));
+        // Forgejo, like Gitea before 1.26, builds anchors from the source of
+        // the heading's last line: markup, destinations, and tags are part of it.
+        const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
+        entry.forgejoSlugs.add(forgejoSlugger.slug(line));
+        entry.giteaSlugs.add(giteaSlugger.slug(line));
         // Gitea 1.26 and later number no anchors, build them from the rendered
-        // text, and keep underscores near `_.py` literal. The source that
-        // earlier versions read keeps those underscores along with the tags.
+        // text, and keep underscores near `_.py` literal.
+        const shown = block?.heading ?? node;
         const [start, end] = range(shown);
-        const texts = source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
-          ? [
-              literalUnderscoreText(shown, source, false),
-              literalUnderscoreText(shown, source, true),
-            ]
-          : [renderedText(shown, false)];
-        for (const candidate of texts) {
-          const anchor = giteaAnchor(candidate);
-          if (anchor) entry.giteaSlugs.add(anchor);
-        }
+        const anchor = giteaAnchor(
+          source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
+            ? literalUnderscoreText(shown, source)
+            : renderedText(shown, gitea),
+        );
+        if (anchor) entry.giteaSlugs.add(anchor);
       });
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
@@ -340,7 +435,9 @@ export function createWorkspace(
       const entry = fragment ? fragments(target) : undefined;
       // GitHub, Forgejo, and Gitea store anchors with a `user-content-` prefix
       // and add it to a link's fragment unless it is already there, so a link
-      // written with the prefix reaches the same anchor as one without.
+      // written with the prefix reaches the same anchor as one without. Gitea
+      // 1.26 and later prefix a generated anchor that already has the prefix
+      // again, and a browser reaches that element with the fragment as written.
       const anchor = fragment.replace(/^user-content-/, "");
       const fragmentExists =
         !fragment ||
@@ -349,9 +446,15 @@ export function createWorkspace(
             ? entry!.blocks.has(fragment.slice(1))
             : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : dialect === "forgejo"
-            ? entry!.forgejoSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
+            ? entry!.forgejoSlugs.has(anchor) ||
+              entry!.forgejoSlugs.has(fragment) ||
+              entry!.htmlAnchors.has(anchor) ||
+              entry!.htmlAnchors.has(fragment)
             : dialect === "gitea"
-              ? entry!.giteaSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
+              ? entry!.giteaSlugs.has(anchor) ||
+                entry!.giteaSlugs.has(fragment) ||
+                entry!.htmlAnchors.has(anchor) ||
+                entry!.htmlAnchors.has(fragment)
               : entry!.slugs.has(anchor) || entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
       return { status: "resolved", target, fragment, fragmentExists };
     },

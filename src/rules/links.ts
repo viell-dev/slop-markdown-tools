@@ -3,6 +3,7 @@ import { walk } from "../syntax/walk.js";
 import type { Nodes } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
+import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { splitDestination } from "../workspace/index.js";
 import { giteaPyLine, optionsSchema } from "./style.js";
 
@@ -224,6 +225,9 @@ export const linkRules: Record<string, Rule> = {
           giteaUnderscores(original) !== giteaUnderscores(replacement)
         )
           return;
+        // On Forgejo, and Gitea before 1.26, the destination is part of the
+        // heading's anchor, and text they read as attributes is no link there.
+        if (changesForgeHeading(document, start, end)) return;
         if (original !== replacement)
           findings.push({
             start: start + span[0],
