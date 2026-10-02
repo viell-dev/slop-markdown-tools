@@ -12,7 +12,8 @@ export interface Slugger {
    * issued: Forgejo 16 and Gitea before 1.26 record it without the
    * `user-content-` prefix that generated anchors are compared with, and Gitea
    * 1.26 and later number nothing. Only an id written with that prefix, which
-   * the renderers do not add twice, takes the anchor after it.
+   * the renderers do not add twice, takes the anchor after it. Links are
+   * matched without the prefix, so that anchor is reachable with and without it.
    */
   custom(id: string): string;
 }
