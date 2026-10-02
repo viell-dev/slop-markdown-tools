@@ -135,12 +135,14 @@ function parseAttributes(
  * goldmark's `parseLastLineAttributes`: the first `{`, not escaped by a
  * backslash, from which valid attributes run to the end of the line. A
  * backslash also skips any other ASCII punctuation, so `\\{#id}` is a block.
- * Returns where the block starts and its `id`: `undefined` without one, and
- * `""` for an empty or non-string one, which leaves the heading no anchor.
+ * Returns where the block starts and its `id`: `undefined` without one, `""`
+ * for an empty one, which leaves the heading no anchor, and `null` for one that
+ * is not a string (`{id=5}`), which Gitea 1.26 and later treat as empty and
+ * Forgejo, and Gitea before 1.26, cannot render at all.
  */
 export function headingAttributeBlock(
   line: string,
-): { start: number; id: string | undefined } | undefined {
+): { start: number; id: string | null | undefined } | undefined {
   let length = line.length;
   while (line[length - 1] === " " || line[length - 1] === "\t") length--;
   line = line.slice(0, length);
@@ -149,16 +151,15 @@ export function headingAttributeBlock(
       if (PUNCTUATION.test(line[at + 1] ?? "")) at++;
     } else if (line[at] === "{") {
       const attributes = parseAttributes(line, at);
-      if (attributes?.end === line.length)
-        return { start: at, id: attributes.value === null ? "" : attributes.value };
+      if (attributes?.end === line.length) return { start: at, id: attributes.value };
     }
   }
   return undefined;
 }
 
 export interface HeadingAttributes {
-  /** The custom `id`; `""` when the heading has neither it nor a generated anchor. */
-  id: string | undefined;
+  /** The custom `id`; `""` or `null` when the heading has neither it nor a generated anchor. */
+  id: string | null | undefined;
   /**
    * The heading as it parses without the block, whose text generates the anchor.
    * The text of a Setext heading ends with no-break spaces in place of the block.
@@ -210,7 +211,7 @@ function lastTextLine(
  */
 export function headingAttributes(document: Document): Map<Heading, HeadingAttributes> {
   const { source } = document;
-  const blocks = new Map<Heading, { id: string | undefined; start: number }>();
+  const blocks = new Map<Heading, { id: string | null | undefined; start: number }>();
   let stripped = "";
   let copied = 0;
   walk(document.tree, "heading", (node) => {

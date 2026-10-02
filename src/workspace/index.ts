@@ -145,9 +145,10 @@ export function createWorkspace(
         // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
         const block = attributes.get(node);
         if (block?.id !== undefined) {
-          const anchor = forgejoSlugger.custom(block.id);
+          // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
+          const anchor = forgejoSlugger.custom(block.id ?? "");
           if (anchor) entry.forgejoSlugs.add(anchor);
-          if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
+          if (giteaSlugger.custom(block.id ?? "")) entry.giteaSlugs.add(anchor);
           return;
         }
         const shown = block?.heading ?? node;

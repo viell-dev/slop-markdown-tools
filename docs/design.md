@@ -115,14 +115,15 @@ removes a block before it parses the heading's inline content. The block stays
 heading text for other dialects, rules, and plugins. An `id` written with the
 `user-content-` prefix that the renderers add themselves is matched without it.
 Not modeled are the older attribute rules of Gitea before 1.26, which for
-example also read a block followed by a closing `#` sequence; Forgejo's failure
-to render a document in which a heading's `id` is not a string (`{id=5}`), which
-is treated as on Gitea 1.26 and later, where that heading has no anchor; and
-attribute values nested more than 64 levels deep, which leave the block as
-heading text. Block identifiers are indexed from trailing text markers. Heading
-nesting paths, property aliases, PDF subpaths, and every Obsidian plugin's
-syntax are not fully supported. Embeds are preserved as embeds; image dimensions
-in their aliases remain intact.
+example also read a block followed by a closing `#` sequence, and attribute
+values nested more than 64 levels deep, which leave the block as heading text. A
+heading whose `id` is not a string (`{id=5}`) has no anchor on Gitea 1.26 and
+later and makes Forgejo, and Gitea before 1.26, render nothing for the document;
+`forgejo/heading-id` reports it on both dialects, and the anchors are those of
+Gitea 1.26 and later. Block identifiers are indexed from trailing text markers.
+Heading nesting paths, property aliases, PDF subpaths, and every Obsidian
+plugin's syntax are not fully supported. Embeds are preserved as embeds; image
+dimensions in their aliases remain intact.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery

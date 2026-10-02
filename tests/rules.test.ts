@@ -386,7 +386,12 @@ describe("dialect markers", () => {
   it("provides a Gitea preset with the GitHub rules", () => {
     expect(resolveConfig({ extends: ["gitea"] })).toMatchObject({
       dialect: "gitea",
-      rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+      rules: {
+        "github/task-marker": "warn",
+        "github/alert-marker": "warn",
+        "style/table": "warn",
+        "forgejo/heading-id": "error",
+      },
     });
     expect(canonicalDialect("gitea")).toBe("gitea");
   });
@@ -395,6 +400,7 @@ describe("dialect markers", () => {
       "github/task-marker": "warn",
       "github/alert-marker": "warn",
       "style/table": "warn",
+      "forgejo/heading-id": "error",
     };
     expect(resolveConfig({ extends: ["forgejo"] })).toMatchObject({ dialect: "forgejo", rules });
     expect(resolveConfig({ extends: ["codeberg"] })).toMatchObject({ dialect: "forgejo", rules });
@@ -405,6 +411,66 @@ describe("dialect markers", () => {
     ).toBe("forgejo");
     expect(canonicalDialect("codeberg")).toBe("forgejo");
     expect(canonicalDialect("github")).toBe("github");
+  });
+});
+
+describe("forgejo/heading-id", () => {
+  const forges = ["forgejo", "gitea"] as const;
+  const findings = (source: string, dialect: Dialect) =>
+    lint(source, { config: only({ "forgejo/heading-id": "error" }, dialect) });
+  // Rendered on local instances: Forgejo 16.0.5 and Gitea 1.21.11 showed an
+  // empty page for each of these documents, Gitea 1.23.8 and 1.25.5 showed the
+  // raw source, and Gitea 1.27.3 and 28.0.0 a heading with an empty id.
+  it.each(["{id=5}", "{id=true}", "{id=null}", "{id=[1]}", "{id=-1.5e3}", "{#x id=5}"])(
+    "reports a heading whose id is %s",
+    (block) => {
+      for (const dialect of forges) {
+        const atx = findings(`# Before\n\n## Version ${block}\n\n## After\n`, dialect);
+        expect(atx).toMatchObject([
+          { rule: "forgejo/heading-id", severity: "error", line: 3, column: 12 },
+        ]);
+        expect(atx[0]!.message).toContain("not text");
+        expect(atx[0]!.end).toBe(atx[0]!.start + block.length);
+        expect(findings(`Version ${block}\n---\n`, dialect)).toHaveLength(1);
+        expect(findings(`## Version ## ${block}\n`, dialect)).toHaveLength(1);
+        // Gitea before 1.26 also reads a block followed by a closing sequence, and
+        // rendered nothing for this one; the range ends with the block.
+        const closed = findings(`## Version ${block} ##\n`, dialect);
+        expect(closed).toHaveLength(1);
+        expect(closed[0]!.end).toBe(closed[0]!.start + block.length);
+        const quoted = findings(`> Version ${block}  \n> ---\n`, dialect);
+        expect(quoted).toMatchObject([{ line: 1, column: 11 }]);
+        expect(quoted[0]!.end).toBe(quoted[0]!.start + block.length);
+      }
+      for (const dialect of ["github", "commonmark", "obsidian"] as const)
+        expect(findings(`## Version ${block}\n`, dialect)).toEqual([]);
+    },
+  );
+  it.each([
+    '{id="5"}',
+    "{id=word}",
+    "{#5}",
+    "{.c data-level=5}",
+    "{id=5} text",
+    "\\{id=5}",
+    "{#}",
+    '{id=""}',
+  ])("does not report %s", (block) => {
+    for (const dialect of forges) expect(findings(`## Version ${block}\n`, dialect)).toEqual([]);
+  });
+  it("is an error in the Forgejo and Gitea presets and reports nothing elsewhere", () => {
+    const source = "## Version {id=5}\n";
+    for (const preset of ["forgejo", "codeberg", "gitea"]) {
+      const result = lint(source, { config: { extends: [preset] } });
+      expect(result.map((item) => `${item.rule}:${item.severity}`)).toEqual([
+        "forgejo/heading-id:error",
+      ]);
+    }
+    expect(lint(source, { config: { extends: ["github"] } })).toEqual([]);
+    // Formatting leaves the heading alone and reports the problem.
+    const result = format(source, { config: { extends: ["recommended", "forgejo"] } });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.map((item) => item.rule)).toEqual(["forgejo/heading-id"]);
   });
 });
 
