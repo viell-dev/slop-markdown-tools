@@ -1,7 +1,7 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { walk } from "../syntax/walk.js";
-import type { Nodes } from "mdast";
+import type { Heading, Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes } from "./heading-attributes.js";
@@ -27,23 +27,40 @@ function renderedText(node: Nodes, tagfilter: boolean): string {
 /**
  * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
  * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
- * Without `html`, inline HTML tags and comments are left out as well.
+ * Inline HTML tags and comments are left out, as in the rendered text.
  */
-function literalUnderscoreText(node: Nodes, source: string, html: boolean): string {
-  if (node.type === "html" && !html) return "";
+function literalUnderscoreText(node: Nodes, source: string): string {
+  if (node.type === "html") return "";
   if (node.type === "emphasis" || node.type === "strong") {
     const [start, end] = range(node);
     if (source[start] === "_") {
       const size = node.type === "strong" ? 2 : 1;
-      const inner = node.children
-        .map((child) => literalUnderscoreText(child, source, html))
-        .join("");
+      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
       return source.slice(start, start + size) + inner + source.slice(end - size, end);
     }
   }
   if ("children" in node)
-    return node.children.map((child) => literalUnderscoreText(child, source, html)).join("");
+    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
   return textContent(node);
+}
+/**
+ * The source of a heading's last text line, which Forgejo, and Gitea before
+ * 1.26, build the anchor from: goldmark generates automatic heading IDs from
+ * that line as written, before any inline syntax is read. The line excludes the
+ * opening and closing `#` sequences, the blank space around the content,
+ * block quote and list prefixes, and a trailing attribute block, which starts
+ * at `blockStart`. Earlier lines of a Setext heading do not count.
+ */
+function lastLineSource(source: string, node: Heading, blockStart?: number): string {
+  const first = node.children[0];
+  const last = node.children.at(-1);
+  if (!first || !last) return "";
+  const start = range(first)[0];
+  const end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
+  const text = source.slice(start, end);
+  const lineBreak = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
+  // Only a continuation line can start with a container's prefix.
+  return lineBreak < 0 ? text : text.slice(lineBreak + 1).replace(/^[ \t>]+/, "");
 }
 
 interface Entry {
@@ -150,26 +167,21 @@ export function createWorkspace(
           if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
           return;
         }
-        const shown = block?.heading ?? node;
-        const shownText = block ? textContent(shown) : text;
-        // Forgejo, like Gitea before 1.26, builds anchors from the heading's
-        // source, so inline HTML tags stay part of them.
-        entry.forgejoSlugs.add(forgejoSlugger.slug(shownText));
-        entry.giteaSlugs.add(giteaSlugger.slug(shownText));
+        // Forgejo, like Gitea before 1.26, builds anchors from the source of
+        // the heading's last line: markup, destinations, and tags are part of it.
+        const line = lastLineSource(source, node, block?.start);
+        entry.forgejoSlugs.add(forgejoSlugger.slug(line));
+        entry.giteaSlugs.add(giteaSlugger.slug(line));
         // Gitea 1.26 and later number no anchors, build them from the rendered
-        // text, and keep underscores near `_.py` literal. The source that
-        // earlier versions read keeps those underscores along with the tags.
+        // text, and keep underscores near `_.py` literal.
+        const shown = block?.heading ?? node;
         const [start, end] = range(shown);
-        const texts = source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
-          ? [
-              literalUnderscoreText(shown, source, false),
-              literalUnderscoreText(shown, source, true),
-            ]
-          : [renderedText(shown, false)];
-        for (const candidate of texts) {
-          const anchor = giteaAnchor(candidate);
-          if (anchor) entry.giteaSlugs.add(anchor);
-        }
+        const anchor = giteaAnchor(
+          source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
+            ? literalUnderscoreText(shown, source)
+            : renderedText(shown, false),
+        );
+        if (anchor) entry.giteaSlugs.add(anchor);
       });
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
