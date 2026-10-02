@@ -352,6 +352,7 @@ export function createWorkspace(
       // written with the prefix reaches the same anchor as one without. Gitea
       // 1.26 and later prefix a generated anchor that already has the prefix
       // again, and a browser reaches that element with the fragment as written.
+      // GitHub's page script also retries a fragment lowercased, and its anchors are.
       const anchor = fragment.replace(/^user-content-/, "");
       const fragmentExists =
         !fragment ||
@@ -369,7 +370,8 @@ export function createWorkspace(
                 entry!.giteaSlugs.has(fragment) ||
                 entry!.htmlAnchors.has(anchor) ||
                 entry!.htmlAnchors.has(fragment)
-              : entry!.slugs.has(anchor) || entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
+              : entry!.slugs.has(anchor.toLowerCase()) ||
+                entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };
