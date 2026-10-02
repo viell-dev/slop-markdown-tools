@@ -25,6 +25,11 @@ const ESCAPES: Record<string, string> = {
   r: "\r",
   t: "\t",
 };
+/**
+ * goldmark nests arrays and attributes without a limit. A block nested deeper
+ * than this stays heading text, so that it cannot exhaust the call stack.
+ */
+const MAX_DEPTH = 64;
 
 function match(pattern: RegExp, line: string, at: number): string | undefined {
   pattern.lastIndex = at;
@@ -40,11 +45,11 @@ function skipSpaces(line: string, at: number): number {
  * number, a bare word, an array, or nested attributes. `true`, `false`, and
  * `null` are not strings.
  */
-function parseValue(line: string, at: number): Parsed<Value> | undefined {
+function parseValue(line: string, at: number, depth: number): Parsed<Value> | undefined {
   const first = line[at];
-  if (first === undefined) return undefined;
+  if (first === undefined || depth > MAX_DEPTH) return undefined;
   if (first === "{") {
-    const nested = parseAttributes(line, at);
+    const nested = parseAttributes(line, at, depth + 1);
     return nested && { value: null, end: nested.end };
   }
   if (first === "[") {
@@ -52,7 +57,7 @@ function parseValue(line: string, at: number): Parsed<Value> | undefined {
     for (let item = 0; ; item++) {
       if (item > 0 && line[end] === ",") end++;
       else if (line[end] === "]") return { value: null, end: end + 1 };
-      const value = parseValue(line, skipSpaces(line, end));
+      const value = parseValue(line, skipSpaces(line, end), depth + 1);
       if (!value) return undefined;
       end = skipSpaces(line, value.end);
     }
@@ -83,7 +88,11 @@ function parseValue(line: string, at: number): Parsed<Value> | undefined {
 }
 
 /** goldmark's `parseAttribute`: `#id`, `.class`, or `name=value`. */
-function parseAttribute(line: string, at: number): (Parsed<Value> & { name: string }) | undefined {
+function parseAttribute(
+  line: string,
+  at: number,
+  depth: number,
+): (Parsed<Value> & { name: string }) | undefined {
   const marker = line[at];
   if (marker === "#" || marker === ".") {
     const value = match(SHORTHAND, line, at + 1)!;
@@ -93,7 +102,7 @@ function parseAttribute(line: string, at: number): (Parsed<Value> & { name: stri
   if (name === undefined) return undefined;
   const equals = skipSpaces(line, at + name.length);
   if (line[equals] !== "=") return undefined;
-  const value = parseValue(line, skipSpaces(line, equals + 1));
+  const value = parseValue(line, skipSpaces(line, equals + 1), depth);
   if (!value || (name === "class" && value.value === null)) return undefined;
   return { name, ...value };
 }
@@ -103,11 +112,15 @@ function parseAttribute(line: string, at: number): (Parsed<Value> & { name: stri
  * comma, then `}`. Only `id` matters for anchors; a later one replaces an
  * earlier one, and the name is case-sensitive.
  */
-function parseAttributes(line: string, at: number): Parsed<Value | undefined> | undefined {
+function parseAttributes(
+  line: string,
+  at: number,
+  depth = 0,
+): Parsed<Value | undefined> | undefined {
   if (line[at] !== "{") return undefined;
   let id: Value | undefined;
   for (at++; line[at] !== "}";) {
-    const attribute = parseAttribute(line, skipSpaces(line, at));
+    const attribute = parseAttribute(line, skipSpaces(line, at), depth);
     if (!attribute) return undefined;
     if (attribute.name === "id") id = attribute.value;
     at = skipSpaces(line, attribute.end);
@@ -142,8 +155,13 @@ export function headingAttributeBlock(
 export interface HeadingAttributes {
   /** The custom `id`; `""` when the heading has neither it nor a generated anchor. */
   id: string | undefined;
-  /** The heading as it parses without the block, whose text generates the anchor. */
+  /**
+   * The heading as it parses without the block, whose text generates the anchor.
+   * The text of a Setext heading ends with no-break spaces in place of the block.
+   */
   heading: Heading;
+  /** The source offset at which the block starts. */
+  start: number;
 }
 
 /**
@@ -157,10 +175,19 @@ export interface HeadingAttributes {
  * `## _Install {#setup_}` has no emphasis there. The remaining heading text is
  * therefore taken from a second parse of the document with every block blanked
  * out, which keeps offsets, link reference definitions, and containers intact.
+ *
+ * goldmark removes the block after it has settled which lines form the heading.
+ * An ATX heading stays one whatever follows its opening sequence, and spaces
+ * let a closing sequence before the block end the heading. Lines above a Setext
+ * underline could read as another block without the block's text
+ * (`[ref]: /url {.note}` is no link reference definition, `[ref]: /url` is one),
+ * so there the block becomes no-break spaces: text that keeps the line a
+ * paragraph, delimits emphasis like the end of the line, and adds nothing to a
+ * Forgejo or Gitea anchor at the end of a heading.
  */
 export function headingAttributes(document: Document): Map<Heading, HeadingAttributes> {
   const { source } = document;
-  const ids = new Map<Heading, string | undefined>();
+  const blocks = new Map<Heading, { id: string | undefined; start: number }>();
   let stripped = "";
   let copied = 0;
   walk(document.tree, "heading", (node) => {
@@ -173,23 +200,24 @@ export function headingAttributes(document: Document): Map<Heading, HeadingAttri
     const lineEnd = underline ? start + underline.index : end;
     const block = headingAttributeBlock(source.slice(lineStart, lineEnd));
     if (!block) return;
-    ids.set(node, block.id);
-    stripped += source.slice(copied, lineStart + block.start);
-    stripped += " ".repeat(lineEnd - lineStart - block.start);
+    const blockStart = lineStart + block.start;
+    blocks.set(node, { id: block.id, start: blockStart });
+    stripped += source.slice(copied, blockStart);
+    stripped += (underline ? "\u00A0" : " ").repeat(lineEnd - blockStart);
     copied = lineEnd;
   });
   const result = new Map<Heading, HeadingAttributes>();
-  if (ids.size === 0) return result;
+  if (blocks.size === 0) return result;
   const headings = new Map<number, Heading>();
   walk(
     parse(stripped + source.slice(copied), document.dialect, document.path).tree,
     "heading",
     (node) => headings.set(range(node)[0], node),
   );
-  for (const [node, id] of ids) {
-    // A Setext heading whose only text was the block is no heading without it.
+  for (const [node, block] of blocks) {
+    // Rarely, a blanked block opens another construct that takes in a heading.
     const heading = headings.get(range(node)[0]) ?? { ...node, children: [] };
-    result.set(node, { id, heading });
+    result.set(node, { ...block, heading });
   }
   return result;
 }

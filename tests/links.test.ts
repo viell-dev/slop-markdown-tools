@@ -419,6 +419,7 @@ describe("Forgejo and Gitea heading attributes", () => {
     ["foo", true],
     ["foo-1", true],
     ["foo-2", false],
+    // Links use the bare anchor; the prefixed spelling is not modeled for any heading.
     ["user-content-foo", false],
   ])("resolves repeated #%s as %s", (fragment, exists) => {
     const repeated = note(
@@ -436,6 +437,44 @@ describe("Forgejo and Gitea heading attributes", () => {
     // Gitea 1.26 and later number nothing; the numbered anchors are earlier versions'.
     expect(resolves(repeated, fragment, "forgejo")).toBe(exists);
     expect(resolves(repeated, fragment, "gitea")).toBe(exists);
+  });
+  it("leaves a block nested too deeply to parse safely as heading text", () => {
+    expect(headingAttributeBlock("## Title {a=[[[1]]] b={c={#d}} #ok}")).toEqual({
+      start: 9,
+      id: "ok",
+    });
+    const nested = (depth: number) => `## Title {a=${"[".repeat(depth)}0${"]".repeat(depth)} #ok}`;
+    expect(headingAttributeBlock(nested(20000))).toBeUndefined();
+    expect(headingAttributeBlock(`## Title ${"{a=".repeat(20000)}`)).toBeUndefined();
+    const workspace = note(nested(200), "## Next {#next}");
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves(workspace, "ok", dialect)).toBe(false);
+      expect(resolves(workspace, "next", dialect)).toBe(true);
+    }
+    expect(resolves(workspace, "next-next", "github")).toBe(true);
+  });
+  it("keeps a Setext heading whose text would read as another block without its block", () => {
+    const workspace = note(
+      "[ref]: /url {.note}\n---",
+      "*** {.x}\n---",
+      "_Mode_{.a}\n===",
+      "_A_ B {.x_.py}\n===",
+      "Two lines\n{.alone}\n===",
+      "## After {#after}",
+    );
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves(workspace, "ref-url", dialect)).toBe(true);
+      expect(resolves(workspace, "ref-url-note", dialect)).toBe(false);
+      // A heading that reads `***` has no anchor characters.
+      expect(resolves(workspace, "heading", dialect)).toBe(true);
+      expect(resolves(workspace, "mode", dialect)).toBe(true);
+      expect(resolves(workspace, "mode-a", dialect)).toBe(false);
+      expect(resolves(workspace, "a-b", dialect)).toBe(true);
+      expect(resolves(workspace, "two-lines", dialect)).toBe(true);
+      expect(resolves(workspace, "after", dialect)).toBe(true);
+    }
+    // The removed block's `_.py` does not make Gitea keep these underscores.
+    expect(resolves(workspace, "_a_-b", "gitea")).toBe(false);
   });
   it("removes the block before reading inline HTML", () => {
     const mixed = note("## A <span>B</span> {.c}", "## C <b>D</b> {#e}");

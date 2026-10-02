@@ -160,7 +160,7 @@ export function createWorkspace(
         // text, and keep underscores near `_.py` literal. The source that
         // earlier versions read keeps those underscores along with the tags.
         const [start, end] = range(shown);
-        const texts = source.slice(start, end).includes("_.py")
+        const texts = source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
           ? [
               literalUnderscoreText(shown, source, false),
               literalUnderscoreText(shown, source, true),
