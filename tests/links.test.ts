@@ -655,7 +655,8 @@ describe("heading anchors with inline HTML", () => {
     ["kbd-ctrlc", true],
     ["break", true],
     ["com--ment", true],
-    ["x-hidden-y", true],
+    // Gitea 1.26 and later show `<script>` as text; `x-scripthiddenscript-y` is below.
+    ["x-hidden-y", false],
     ["__init__py-x", true],
     ["setext-html-heading", true],
     // Gitea 1.21 to 1.25: the heading's source, numbered.
@@ -775,8 +776,7 @@ describe("heading anchors built from the last source line", () => {
     // Later Gitea versions give `#footnote1--end`, which is not modeled.
     ["## Footnote[^1] end", "footnote-1-end", "footnote1-end", undefined],
     ["## Emoji :smile: end", "emoji-smile-end", "emoji-smile-end", "emoji-smile-end"],
-    // Later Gitea versions give `#setext-trailing-continued`, which is not modeled.
-    ["Setext trailing   \ncontinued  \n===", "continued", "continued", undefined],
+    ["Setext trailing   \ncontinued  \n===", "continued", "continued", "setext-trailing-continued"],
     [
       "   Indented setext\n   indented last\n---",
       "indented-last",
@@ -790,6 +790,26 @@ describe("heading anchors built from the last source line", () => {
     ["## Dup", "dup-1", "dup-1", "dup"],
     ["## [text](url) only", "text-url-only", "texturl-only", "text-only"],
     ["## Mixed-Case_and-dash", "mixed-case_and-dash", "mixed-case_and-dash", "mixed-case_and-dash"],
+    // Gitea 1.26 and later show `<script>`, `<style>`, `<html>`, and `<head>` as
+    // text, keep the text of other tags they drop, and leave allowed tags out.
+    [
+      "## S <script>a</script> end",
+      "s-script-a-script-end",
+      "s-scriptascript-end",
+      "s-scriptascript-end",
+    ],
+    ["## S <style>a</style> end", "s-style-a-style-end", "s-styleastyle-end", "s-styleastyle-end"],
+    ["## S <head>a</head> end", "s-head-a-head-end", "s-headahead-end", "s-headahead-end"],
+    [
+      '## S <SCRIPT type="x">a</SCRIPT> end',
+      "s-script-type-x-a-script-end",
+      "s-script-typexascript-end",
+      "s-script-typexascript-end",
+    ],
+    ["## S <iframe>a</iframe> end", "s-iframe-a-iframe-end", "s-iframeaiframe-end", "s-a-end"],
+    ["## S <foo>a</foo> end", "s-foo-a-foo-end", "s-fooafoo-end", "s-a-end"],
+    ["## S <kbd>a</kbd> end", "s-kbd-a-kbd-end", "s-kbdakbd-end", "s-a-end"],
+    ["## S <title>a</title> end", "s-title-a-title-end", "s-titleatitle-end", "s-a-end"],
   ];
   const workspace = createWorkspace({
     "Doc.md": "",

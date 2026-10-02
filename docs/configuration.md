@@ -91,8 +91,11 @@ around the text, block quote and list prefixes, and a trailing attribute block
 are not part of the line. GitHub, and Gitea 1.26 and later, build the anchor
 from the rendered text instead: `#link-text-end`, `#strong-init-end`, and
 `#a-b`, with the text of every line of an underlined heading. GitHub keeps the
-tags that it shows as text, such as `<script>`, in the anchor. The Gitea dialect
-accepts the anchors of both Gitea generations.
+tags that it shows as text, such as `<script>`, in the anchor; Gitea 1.26 and
+later show `<script>`, `<style>`, `<html>`, and `<head>` as text and keep them
+too, drop other tags they do not allow while keeping the text inside, and read a
+hard line break as a line break. The Gitea dialect accepts the anchors of both
+Gitea generations.
 
 Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
 of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and

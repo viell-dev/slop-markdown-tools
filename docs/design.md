@@ -89,12 +89,14 @@ except for the tags that GitHub's tag filter shows as text, such as `<script>`.
 Forgejo, and Gitea before 1.26, build anchors from the source of the heading's
 last line, with link destinations, emphasis markers, character references, and
 tags included and `#` sequences, container prefixes, and a trailing attribute
-block left out; Gitea 1.26 and later use the rendered text of every line, so
-Gitea fragments accept both. Character references inside a filtered tag on
-GitHub are not modeled. Nor, on Gitea, are tags or Markdown syntax inside
-`<script>`, `<textarea>`, and the other elements whose content HTML reads as
-plain text, including an unclosed one, which takes in the rest of the document.
-Forgejo and Gitea fragments read a heading's trailing attribute block
+block left out; Gitea 1.26 and later use the rendered text of every line, in
+which `<script>`, `<style>`, `<html>`, and `<head>` tags are shown as text and a
+hard line break is a line break, so Gitea fragments accept both. Character
+references inside a filtered tag on GitHub are not modeled. Nor, on Gitea, are
+the number a footnote reference shows in a heading, or tags or Markdown syntax
+inside `<textarea>`, `<plaintext>`, and the other elements whose content HTML
+reads as plain text, including an unclosed one, which takes in the rest of the
+document. Forgejo and Gitea fragments read a heading's trailing attribute block
 (`## Title {#id .class}`) by the rules of goldmark 1.8, which Forgejo 16 and
 Gitea 1.26 and later use: an `id` is the heading's only anchor, matched as
 written and never numbered, and any other valid block is left out of the text
