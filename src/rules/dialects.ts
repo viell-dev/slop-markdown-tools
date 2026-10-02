@@ -1,6 +1,7 @@
 import { walk } from "../syntax/walk.js";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
+import { headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { optionsSchema } from "./style.js";
 
 const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea"]);
@@ -82,6 +83,49 @@ export const dialectRules: Record<string, Rule> = {
         if (seen.has(id))
           findings.push({ start: range(node)[0], message: `Duplicate block identifier ^${id}.` });
         seen.add(id);
+      });
+      return findings;
+    },
+  },
+  "forgejo/heading-id": {
+    description:
+      "Report heading attribute ids that are not text, which Forgejo and Gitea before 1.26 cannot render.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      if (document.dialect !== "forgejo" && document.dialect !== "gitea") return [];
+      const findings: Finding[] = [];
+      const { source } = document;
+      walk(document.tree, "heading", (node) => {
+        const [start, end] = range(node);
+        // The block ends an ATX heading's line or the last text line of a
+        // Setext heading, whose last line is its underline.
+        const breaks = [...source.slice(start, end).matchAll(/\r\n?|\n/g)];
+        const underline = breaks.at(-1);
+        const previous = breaks.at(-2);
+        const lineStart = previous ? start + previous.index + previous[0].length : start;
+        let lineEnd = underline ? start + underline.index : end;
+        while (source[lineEnd - 1] === " " || source[lineEnd - 1] === "\t") lineEnd--;
+        let line = source.slice(lineStart, lineEnd);
+        let block = headingAttributeBlock(line);
+        // Gitea before 1.26 also reads a block followed by a closing `#` sequence.
+        if (!block && !underline) {
+          const closed = /[ \t]+#+$/.exec(line);
+          if (closed) {
+            line = line.slice(0, closed.index);
+            block = headingAttributeBlock(line);
+          }
+        }
+        // goldmark hands a number, boolean, null, or list to the renderers,
+        // which expect text: Gitea 1.26 and later give the heading an empty
+        // id, Forgejo and earlier Gitea versions fail on the whole document.
+        if (block?.id === null)
+          findings.push({
+            start: lineStart + block.start,
+            end: lineStart + line.length,
+            message:
+              'Heading id is not text: Forgejo, and Gitea before 1.26, cannot render a document containing it. Quote it: {id="5"}.',
+          });
       });
       return findings;
     },
