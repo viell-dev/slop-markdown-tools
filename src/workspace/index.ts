@@ -95,28 +95,68 @@ function lastLineSource(
   return text.slice(at);
 }
 
-/** An HTML comment, which the renderers drop with everything in it. */
-const comment = /<!--[\s\S]*?-->/g;
 /** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
 const openTag =
-  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/g;
+  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/y;
 const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
+/**
+ * Elements whose content HTML reads as text and that no renderer shows as an
+ * element: GitHub's tagfilter shows these tags as text, Forgejo removes them,
+ * and Gitea shows them as text or removes them. `<plaintext>` has no end.
+ */
+const rawText = new Set([
+  "iframe",
+  "noembed",
+  "noframes",
+  "plaintext",
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "xmp",
+]);
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
  * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
  * elements they allow and add their `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
- * prefix is recorded without it. Comments are dropped first; the content of
- * `<script>` and similar elements is not told apart from markup.
+ * prefix is recorded without it. The scan follows HTML tokenization in one
+ * pass: comments, which run to the end when unterminated, declarations, and
+ * raw-text elements with their content are skipped, and a `<!--` inside a
+ * tag's quoted value is part of the value. Every value of a repeated attribute
+ * counts: Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
  */
 function htmlAnchors(html: string): string[] {
   const anchors: string[] = [];
-  for (const tag of html.replace(comment, "").matchAll(openTag)) {
-    const anchor = tag[1]!.toLowerCase() === "a";
+  const lower = html.toLowerCase();
+  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at + 1)) {
+    if (html.startsWith("<!--", at)) {
+      const end = html.indexOf("-->", at + 4);
+      if (end < 0) break;
+      at = end + 2;
+      continue;
+    }
+    if (html[at + 1] === "!" || html[at + 1] === "?") {
+      const end = html.indexOf(">", at);
+      if (end < 0) break;
+      at = end;
+      continue;
+    }
+    openTag.lastIndex = at;
+    const tag = openTag.exec(html);
+    if (!tag) continue;
+    const name = tag[1]!.toLowerCase();
+    at += tag[0].length - 1;
+    if (rawText.has(name)) {
+      const end = lower.indexOf(`</${name}`, at);
+      if (end < 0) break;
+      at = end;
+      continue;
+    }
     for (const match of tag[2]!.matchAll(attribute)) {
-      const name = match[1]!.toLowerCase();
-      if (name !== "id" && !(anchor && name === "name")) continue;
+      const attributeName = match[1]!.toLowerCase();
+      if (attributeName !== "id" && !(name === "a" && attributeName === "name")) continue;
       const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
       if (value) anchors.push(value);
     }

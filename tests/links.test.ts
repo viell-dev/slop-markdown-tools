@@ -967,6 +967,12 @@ describe("anchors from HTML in the document", () => {
       '<span name="not-an-anchor">n</span>',
       '<!-- <a name="hidden"></a> <span id="hidden-id">x</span> -->',
       'Text <!-- <a name="inline-hidden"></a> --> more',
+      '<div title="<!--" id="real">--></div>',
+      '<script id="ghost">var a = "<a id=\'script-text\'></a>";</script>',
+      '<textarea><a id="textarea-text"></a></textarea>',
+      '<style id="style-ghost">a {}</style>',
+      '<a id="first" id="second"></a>',
+      '<!DOCTYPE html><a id="after-doctype"></a>',
       '`<span id="in-code">`',
       '    <span id="indented-code">',
       '```html\n<span id="fenced">\n```',
@@ -996,6 +1002,13 @@ describe("anchors from HTML in the document", () => {
     "td-id",
     "det-id",
     "sum-id",
+    // A `<!--` inside a quoted attribute value is part of the value, not a comment.
+    "real",
+    // Forgejo 16.0.5 and Gitea 28.0.0 keep the first of repeated attributes,
+    // Gitea 1.25.5 the last; both are accepted.
+    "first",
+    "second",
+    "after-doctype",
   ])("resolves #%s on GitHub, Forgejo, and Gitea", (fragment) => {
     for (const dialect of github) expect(resolves(fragment, dialect)).toBe(true);
     // Obsidian has no such anchors; `install` is also a heading's text there.
@@ -1010,6 +1023,11 @@ describe("anchors from HTML in the document", () => {
     "indented-code",
     "fenced",
     "getting-started-1",
+    // Raw-text elements are shown as text or removed; nothing in them is an element.
+    "ghost",
+    "script-text",
+    "textarea-text",
+    "style-ghost",
   ])("does not resolve #%s anywhere", (fragment) => {
     for (const dialect of [...github, "obsidian"] as const)
       expect(resolves(fragment, dialect)).toBe(false);
@@ -1042,14 +1060,58 @@ describe("anchors from HTML in the document", () => {
     for (const dialect of github)
       expect(messages(dialect)).toEqual(["Missing fragment in Note.md#hidden."]);
   });
+  it("hides anchors in a comment that is never closed", () => {
+    // A comment block without `-->` runs to the end of the document, and a
+    // browser treats an unterminated comment the same way.
+    const unclosed = createWorkspace({
+      "Doc.md": "",
+      "Note.md": '<a id="before"></a>\n\n<!--\n<a id="ghost"></a>\n\n<a id="after"></a>\n',
+    });
+    const exists = (fragment: string) =>
+      unclosed.resolve("Doc.md", `Note.md#${fragment}`, "forgejo").fragmentExists;
+    expect(exists("before")).toBe(true);
+    expect(exists("ghost")).toBe(false);
+    expect(exists("after")).toBe(false);
+  });
+  it("reaches a doubly prefixed id with the fragment as written on the forges", () => {
+    // Forgejo's and Gitea's page scripts add the prefix to a fragment unconditionally
+    // first, so `#user-content-x` finds `user-content-user-content-x`, as a browser
+    // showed for a heading with the same id on Gitea 28.0.0. GitHub adds it only
+    // when absent, so there the fragment must carry both.
+    const doubled = createWorkspace({
+      "Doc.md": "",
+      "Note.md": '<a id="user-content-user-content-x"></a>\n',
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      doubled.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(exists("user-content-x", dialect)).toBe(true);
+      expect(exists("user-content-user-content-x", dialect)).toBe(true);
+      expect(exists("x", dialect)).toBe(false);
+    }
+    expect(exists("user-content-user-content-x", "github")).toBe(true);
+    expect(exists("user-content-x", "github")).toBe(false);
+  });
   it("scans unusual HTML in linear time", () => {
     const hostile = createWorkspace({
       "Doc.md": "",
-      "Note.md": `<a ${"x ".repeat(100000)}\n\n${"<a ".repeat(50000)}\n\n<a id="${"x".repeat(200000)}\n\n<a ${'id="a" '.repeat(20000)}${"'".repeat(20000)}\n`,
+      "Note.md": [
+        `<a ${"x ".repeat(100000)}`,
+        "<a ".repeat(50000),
+        `<a id="${"x".repeat(200000)}`,
+        `<a ${'id="a" '.repeat(20000)}${"'".repeat(20000)}`,
+        // Real HTML blocks: many tags, a raw-text element that never closes,
+        // and, last because it swallows the rest, a comment opener on every line.
+        '<div>\n<span id="s"></span>\n'.repeat(20000),
+        `<div>\n<textarea>${"<a id='t'></a>\n".repeat(20000)}`,
+        "<!--\n".repeat(50000),
+      ].join("\n\n"),
     });
     const start = performance.now();
     expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
-    expect(performance.now() - start).toBeLessThan(2000);
+    expect(hostile.resolve("Doc.md", "Note.md#t", "forgejo").fragmentExists).toBe(false);
+    expect(hostile.resolve("Doc.md", "Note.md#s", "forgejo").fragmentExists).toBe(true);
+    expect(performance.now() - start).toBeLessThan(4000);
   });
 });
 
