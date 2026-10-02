@@ -106,7 +106,11 @@ followed by more text, or whose `{` is escaped with a backslash stays heading
 text. A custom anchor must be linked exactly as written, including its case, and
 it is never numbered: a later `## Setup` heading is also `#setup`, not
 `#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
-keep it in heading anchors and heading names.
+keep it in heading anchors and heading names. An `id` that is not text, such as
+`{id=5}`, `{id=true}`, or a list, has no anchor on Gitea 1.26 and later, and
+Forgejo, and Gitea before 1.26, render nothing for the whole document; the
+Forgejo and Gitea presets report it with `forgejo/heading-id`. Quote the value
+(`{id="5"}`) or use `{#5}` instead.
 
 Formatting with the Forgejo or Gitea dialect leaves a block as written:
 `{#bare data-x=__init__}` is a valid block, and `{#bare data-x=**init**}` is
@@ -132,9 +136,9 @@ heading reads the same. Earlier lines of an underlined heading, headings with an
 | ------------- | --------- | ---------------------------------------------------------------------------------------------- |
 | `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
-| `forgejo`     | Forgejo   | The `github` rules                                                                             |
+| `forgejo`     | Forgejo   | The `github` rules and `forgejo/heading-id`                                                    |
 | `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
-| `gitea`       | Gitea     | The `github` rules                                                                             |
+| `gitea`       | Gitea     | The `github` rules and `forgejo/heading-id`                                                    |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
 An omitted `extends` selects `recommended`. Explicit `extends` replaces that
@@ -159,6 +163,7 @@ Problem rules report findings and never become formatting edits.
 | `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
 | `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
 | `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
+| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo  |
 | `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
 | `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
 | `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |

@@ -1,7 +1,7 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { walk } from "../syntax/walk.js";
-import type { Nodes } from "mdast";
+import type { Heading, Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
@@ -134,6 +134,15 @@ export function createWorkspace(
       const forgejoSlugger = createForgejoSlugger();
       const giteaSlugger = createGiteaSlugger();
       const attributes = headingAttributes(document);
+      // How many block quotes each heading is in, for the markers of its last line.
+      const quotes = new Map<Heading, number>();
+      const count = (node: Nodes, depth: number) => {
+        if (node.type === "heading") quotes.set(node, depth);
+        if ("children" in node)
+          for (const child of node.children)
+            count(child, depth + (node.type === "blockquote" ? 1 : 0));
+      };
+      count(document.tree, 0);
       walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
@@ -142,14 +151,15 @@ export function createWorkspace(
         // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
         const block = attributes.get(node);
         if (block?.id !== undefined) {
-          const anchor = forgejoSlugger.custom(block.id);
+          // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
+          const anchor = forgejoSlugger.custom(block.id ?? "");
           if (anchor) entry.forgejoSlugs.add(anchor);
-          if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
+          if (giteaSlugger.custom(block.id ?? "")) entry.giteaSlugs.add(anchor);
           return;
         }
         // Forgejo, like Gitea before 1.26, builds anchors from the source of
         // the heading's last line: markup, destinations, and tags are part of it.
-        const line = lastLineSource(source, node, block?.start);
+        const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
         entry.forgejoSlugs.add(forgejoSlugger.slug(line));
         entry.giteaSlugs.add(giteaSlugger.slug(line));
         // Gitea 1.26 and later number no anchors, build them from the rendered
