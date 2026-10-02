@@ -12,7 +12,8 @@ export interface Slugger {
    * issued: Forgejo 16 and Gitea before 1.26 record it without the
    * `user-content-` prefix that generated anchors are compared with, and Gitea
    * 1.26 and later number nothing. Only an id written with that prefix, which
-   * the renderers do not add twice, takes the anchor after it.
+   * the renderers do not add twice, takes the anchor after it. Links are
+   * matched without the prefix, so that anchor is reachable with and without it.
    */
   custom(id: string): string;
 }
@@ -21,7 +22,9 @@ export interface Slugger {
  * Number repeated anchors `-1`, `-2`, ... checked against every anchor already
  * issued, and give a heading without anchor characters the anchor `heading`.
  * The renderers prefix `user-content-`, which their page scripts hide from
- * authors, so links use the bare anchor.
+ * authors, so links use the bare anchor. A generated anchor that already starts
+ * with the prefix is not prefixed again: `## user-content-setup` is reached as
+ * `#setup`, and a later `## Setup` becomes `#setup-1`.
  */
 function createSlugger(clean: (text: string) => string): Slugger {
   const seen = new Set<string>();
@@ -32,7 +35,7 @@ function createSlugger(clean: (text: string) => string): Slugger {
       return anchor;
     },
     slug(text) {
-      const result = clean(text) || "heading";
+      const result = (clean(text) || "heading").replace(/^user-content-/, "");
       if (!seen.has(result)) {
         seen.add(result);
         return result;

@@ -238,10 +238,13 @@ vault-relative path. `leadingDot: true` prefixes ordinary relative paths with
 `brackets` accepts `preserve` (default), `angle`, or `bare`. Spaces in bare
 Markdown destinations are percent-encoded. `extension` accepts `preserve`
 (default), `include`, or `omit`; omission is Obsidian specific. Fragments are
-resolved according to the dialect, separately from percent-decoded filenames.
-Already compliant destinations retain their percent-encoding spelling, including
-literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
-literal percent signs and hashes to preserve target identity.
+resolved according to the dialect, separately from percent-decoded filenames. On
+GitHub, Forgejo, and Gitea, a fragment written with the `user-content-` prefix
+that the renderers add to every anchor reaches the same anchor as one without,
+and is validated the same way. Already compliant destinations retain their
+percent-encoding spelling, including literal `?` and `%` in resolving Obsidian
+paths. Newly generated paths encode literal percent signs and hashes to preserve
+target identity.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the

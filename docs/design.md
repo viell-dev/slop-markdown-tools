@@ -132,6 +132,11 @@ property aliases, PDF subpaths, and every Obsidian plugin's syntax are not fully
 supported. Embeds are preserved as embeds; image dimensions in their aliases
 remain intact.
 
+GitHub, Forgejo, and Gitea store every anchor with the prefix `user-content-`
+and add it to a link's fragment unless the fragment already starts with it. A
+fragment written with the prefix therefore reaches the same anchor as one
+without, and is matched without it; Obsidian fragments stay literal.
+
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery
 also defers reading Markdown until it is selected or needed for a fragment.
