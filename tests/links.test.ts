@@ -284,6 +284,105 @@ describe("Gitea heading anchors", () => {
     expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
   });
 });
+describe("heading anchors with inline HTML", () => {
+  // The GitHub and Forgejo anchors were read from github.com and codeberg.org
+  // renderings of these headings; the Gitea anchors follow its source.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      "## A <span>B</span>",
+      "## A <span>B</span>",
+      "## Kbd <kbd>Ctrl</kbd>+<kbd>C</kbd>",
+      "## Br<br>eak",
+      "## Com <!-- note --> ment",
+      '## Img <img src="x.png" alt="Alt"> end',
+      "## Open <span>only",
+      "## X <script>hidden</script> Y",
+      "## T <SCRIPT>x</SCRIPT> end",
+      "## U <scripty>x</scripty> end",
+      "## Code `<span>` literal",
+      "## Auto <https://example.com> link",
+      "## A <b>B</b> &amp; C &copy;",
+      "## __init__.py <b>x</b>",
+      "Setext <em>HTML</em> heading\n---",
+    ].join("\n\n"),
+  });
+  const resolves = (fragment: string, dialect: "github" | "forgejo" | "gitea" | "obsidian") =>
+    workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+  it.each([
+    ["a-b", true],
+    ["a-b-1", true],
+    ["a-spanbspan", false],
+    ["kbd-ctrlc", true],
+    ["break", true],
+    ["com--ment", true],
+    ["img--end", true],
+    ["open-only", true],
+    // GFM's tagfilter makes GitHub show these tags as text.
+    ["x-scripthiddenscript-y", true],
+    ["x-hidden-y", false],
+    ["t-scriptxscript-end", true],
+    ["u-x-end", true],
+    ["code-span-literal", true],
+    ["auto-httpsexamplecom-link", true],
+    ["a-b--c-", true],
+    ["setext-html-heading", true],
+  ])("resolves #%s as %s on GitHub", (fragment, exists) => {
+    expect(resolves(fragment, "github")).toBe(exists);
+  });
+  it.each([
+    ["a-span-b-span", true],
+    ["a-span-b-span-1", true],
+    ["a-b", false],
+    ["kbd-kbd-ctrl-kbd-kbd-c-kbd", true],
+    ["br-br-eak", true],
+    ["com-note-ment", true],
+    ["img-img-src-x-png-alt-alt-end", true],
+    ["open-span-only", true],
+    ["x-script-hidden-script-y", true],
+    ["setext-em-html-em-heading", true],
+  ])("keeps the tags in #%s on Forgejo (%s)", (fragment, exists) => {
+    expect(resolves(fragment, "forgejo")).toBe(exists);
+  });
+  it.each([
+    // Gitea 1.26 and later: the rendered text, without numbering.
+    ["a-b", true],
+    ["a-b-1", false],
+    ["kbd-ctrlc", true],
+    ["break", true],
+    ["com--ment", true],
+    ["x-hidden-y", true],
+    ["__init__py-x", true],
+    ["setext-html-heading", true],
+    // Gitea 1.21 to 1.25: the heading's source, numbered.
+    ["a-spanbspan", true],
+    ["a-spanbspan-1", true],
+    ["kbd-kbdctrlkbdkbdckbd", true],
+    ["brbreak", true],
+    ["com----note----ment", true],
+    ["x-scripthiddenscript-y", true],
+    ["initpy-bxb", true],
+    ["setext-emhtmlem-heading", true],
+  ])("resolves #%s as %s on Gitea", (fragment, exists) => {
+    expect(resolves(fragment, "gitea")).toBe(exists);
+  });
+  it("keeps exact heading text for Obsidian", () => {
+    expect(resolves("A <span>B</span>", "obsidian")).toBe(true);
+    expect(resolves("A B", "obsidian")).toBe(false);
+  });
+  it("reports only links to anchors the renderer does not generate", () => {
+    const options = (dialect: "github" | "forgejo" | "gitea") => ({
+      config: { extends: [], dialect, rules: { "links/valid": "error" } } as Config,
+      path: "Doc.md",
+      workspace,
+    });
+    expect(lint("[x](Note.md#a-b)\n", options("github"))).toEqual([]);
+    expect(lint("[x](Note.md#a-spanbspan)\n", options("github"))).toHaveLength(1);
+    expect(lint("[x](Note.md#a-b)\n", options("gitea"))).toEqual([]);
+    expect(lint("[x](Note.md#a-b)\n", options("forgejo"))).toHaveLength(1);
+    expect(lint("[x](Note.md#a-span-b-span)\n", options("forgejo"))).toEqual([]);
+  });
+});
 describe("links/path on Gitea", () => {
   const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
   const rewrite = (source: string, dialect: "github" | "gitea") =>
