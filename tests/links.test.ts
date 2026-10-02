@@ -726,6 +726,35 @@ describe("fragments written with the user-content- prefix", () => {
       expect(resolves("user-content-", dialect)).toBe(false);
     },
   );
+  it("does not prefix a heading whose own anchor starts with the prefix again", () => {
+    // Rendered on Forgejo 16.0.5 and Gitea 1.25.5: `## user-content-setup` has
+    // the id `user-content-setup` and a later `## Setup` is `user-content-setup-1`.
+    // Gitea 28.0.0 gives the first `user-content-user-content-setup` and the
+    // second `user-content-setup`; in a browser, `#user-content-setup` reached
+    // the second and `#user-content-user-content-setup` the first there.
+    const prefixed = createWorkspace({
+      "Doc.md": "",
+      "Note.md":
+        "## user-content-setup\n\n## Setup\n\n## user-content-dup\n\n## user-content-dup\n",
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      prefixed.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["forgejo", "gitea", "github"] as const) {
+      expect(exists("setup", dialect)).toBe(true);
+      expect(exists("user-content-setup", dialect)).toBe(true);
+      expect(exists("user-content-dup", dialect)).toBe(true);
+    }
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(exists("setup-1", dialect)).toBe(true);
+      expect(exists("dup-1", dialect)).toBe(true);
+      expect(exists("user-content-dup-1", dialect)).toBe(true);
+    }
+    expect(exists("setup-1", "github")).toBe(false);
+    // Gitea 1.26 and later also have the doubly prefixed element.
+    expect(exists("user-content-user-content-setup", "gitea")).toBe(true);
+    expect(exists("user-content-user-content-setup", "forgejo")).toBe(false);
+    expect(exists("user-content-user-content-setup", "github")).toBe(false);
+  });
   it("accepts a numbered anchor with the prefix only where it is generated", () => {
     expect(resolves("user-content-setup-1", "forgejo")).toBe(true);
     expect(resolves("user-content-setup-1", "gitea")).toBe(true);

@@ -141,7 +141,8 @@ export function createWorkspace(
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
-        entry.slugs.add(slugger.slug(renderedText(node, true)));
+        // GitHub prefixes an id only when it does not already start with the prefix.
+        entry.slugs.add(slugger.slug(renderedText(node, true)).replace(/^user-content-/, ""));
         // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
         const block = attributes.get(node);
         if (block?.id !== undefined) {
@@ -244,7 +245,9 @@ export function createWorkspace(
       const entry = fragment ? fragments(target) : undefined;
       // GitHub, Forgejo, and Gitea store anchors with a `user-content-` prefix
       // and add it to a link's fragment unless it is already there, so a link
-      // written with the prefix reaches the same anchor as one without.
+      // written with the prefix reaches the same anchor as one without. Gitea
+      // 1.26 and later prefix a generated anchor that already has the prefix
+      // again, and a browser reaches that element with the fragment as written.
       const anchor = fragment.replace(/^user-content-/, "");
       const fragmentExists =
         !fragment ||
@@ -253,9 +256,9 @@ export function createWorkspace(
             ? entry!.blocks.has(fragment.slice(1))
             : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : dialect === "forgejo"
-            ? entry!.forgejoSlugs.has(anchor)
+            ? entry!.forgejoSlugs.has(anchor) || entry!.forgejoSlugs.has(fragment)
             : dialect === "gitea"
-              ? entry!.giteaSlugs.has(anchor)
+              ? entry!.giteaSlugs.has(anchor) || entry!.giteaSlugs.has(fragment)
               : entry!.slugs.has(anchor));
       return { status: "resolved", target, fragment, fragmentExists };
     },
