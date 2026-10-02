@@ -376,9 +376,9 @@ describe("Forgejo and Gitea heading attributes", () => {
     ['{#z id="q"}', "q"],
     ['{id="q" #z}', "z"],
     ["{a=[1 2, x] b={#c} d=-1.5e3}", undefined],
-    ["{id=true}", ""],
-    ["{id=null}", ""],
-    ["{id=[a]}", ""],
+    ["{id=true}", null],
+    ["{id=null}", null],
+    ["{id=[a]}", null],
     ["{#}", ""],
   ])("reads %s as attributes", (block, id) => {
     expect(headingAttributeBlock(`## Title ${block}  `)).toEqual({ start: 9, id });

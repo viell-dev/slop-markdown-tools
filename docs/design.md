@@ -76,6 +76,20 @@ tables and preserves cell contents. Embedded code formatting, metadata mutation,
 document generation, external URL fetching, and file renames are outside this
 release.
 
+A Forgejo or Gitea heading's trailing attribute block (`## Title {#id .class}`)
+is protected from formatting, because both renderers read it before they parse
+inline content. Whether a heading ends in a valid block, and what the block
+says, depends on every character from the first `{` of the heading's last text
+line on, so emphasis markers and link destinations from there on are left
+unchanged. A code span spanning lines of a heading is not joined, because the
+block is read from the heading's last text line. A Setext heading converted to
+ATX gets a `#` run in front of its block escaped, which would otherwise close
+the heading. For these two dialects the semantic fingerprint includes each
+block's source text, so an edit from any other rule or plugin that changes a
+block, makes one invalid, or creates one is refused. That covers a block
+followed by a closing `#` sequence (`## Title {#id} ##`) as well, which only
+Gitea before 1.26 reads as attributes.
+
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.
 Heading fragments use exact text; GitHub uses slugged headings including
@@ -104,10 +118,11 @@ the heading's inline content. The block stays heading text for other dialects,
 rules, and plugins. An `id` written with the `user-content-` prefix that the
 renderers add themselves is matched without it. Not modeled are the older
 attribute rules of Gitea before 1.26, which for example also read a block
-followed by a closing `#` sequence; Forgejo's failure to render a document in
-which a heading's `id` is not a string (`{id=5}`), which is treated as on
-Gitea 1.26 and later, where that heading has no anchor; and attribute values
-nested more than 64 levels deep, which leave the block as heading text. Block
+followed by a closing `#` sequence, and attribute values nested more than 64
+levels deep, which leave the block as heading text. A heading whose `id` is not
+a string (`{id=5}`) has no anchor on Gitea 1.26 and later and makes Forgejo, and
+Gitea before 1.26, render nothing for the document; `forgejo/heading-id` reports
+it on both dialects, and the anchors are those of Gitea 1.26 and later. Block
 identifiers are indexed from trailing text markers. Heading nesting paths,
 property aliases, PDF subpaths, and every Obsidian plugin's syntax are not fully
 supported. Embeds are preserved as embeds; image dimensions in their aliases
