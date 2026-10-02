@@ -157,7 +157,9 @@ describe("wrapping controls", () => {
       return best;
     };
     expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(10);
-  });
+    // Only the ratio above is asserted, so the time limit merely stops a hung
+    // run. Windows CI runners need 6 to 15 seconds, around the 15-second default.
+  }, 60_000);
   it("keeps carriage-return line endings consistent across rules and passes", () => {
     const config: Config = {
       extends: ["recommended", "github"],
