@@ -426,8 +426,11 @@ describe("Forgejo and Gitea heading attributes", () => {
     ["foo", true],
     ["foo-1", true],
     ["foo-2", false],
-    // Links use the bare anchor; the prefixed spelling is not modeled for any heading.
-    ["user-content-foo", false],
+    // A link written with the prefix reaches the same anchor as one without.
+    ["user-content-foo", true],
+    ["user-content-setup", true],
+    ["user-content-same-1", true],
+    ["user-content-user-content-foo", false],
   ])("resolves repeated #%s as %s", (fragment, exists) => {
     const repeated = note(
       "## Install {#setup}",
@@ -693,6 +696,58 @@ describe("heading anchors with inline HTML", () => {
     expect(lint("[x](Note.md#a-span-b-span)\n", options("forgejo"))).toEqual([]);
   });
 });
+describe("fragments written with the user-content- prefix", () => {
+  // GitHub, Forgejo, and Gitea store every anchor as `user-content-<anchor>`
+  // and add the prefix to a link's fragment unless it is already there. In a
+  // browser, `#user-content-setup` reached `## Setup` on Forgejo 16.0.5 and
+  // Gitea 1.21.11, 1.25.5, and 28.0.0, and a prefixed link reached an HTML
+  // heading on github.com.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": "## Setup\n\n## Setup\n\n## Install {#custom}\n\nText ^block\n",
+  });
+  const resolves = (fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+  it.each(["github", "forgejo", "gitea", "commonmark"] as const)(
+    "accepts the prefixed spelling of every anchor on %s",
+    (dialect) => {
+      // The custom id is text on GitHub, where the heading is #install-custom.
+      const anchors = [
+        "setup",
+        dialect === "forgejo" || dialect === "gitea" ? "custom" : "install-custom",
+      ];
+      for (const anchor of anchors) {
+        expect(resolves(anchor, dialect)).toBe(true);
+        expect(resolves(`user-content-${anchor}`, dialect)).toBe(true);
+      }
+      // The renderers add the prefix once, so a second one is part of the fragment.
+      expect(resolves("user-content-user-content-setup", dialect)).toBe(false);
+      expect(resolves("user-content-missing", dialect)).toBe(false);
+      expect(resolves("user-content-", dialect)).toBe(false);
+    },
+  );
+  it("accepts a numbered anchor with the prefix only where it is generated", () => {
+    expect(resolves("user-content-setup-1", "forgejo")).toBe(true);
+    expect(resolves("user-content-setup-1", "gitea")).toBe(true);
+    expect(resolves("user-content-setup-1", "github")).toBe(true);
+  });
+  it("keeps Obsidian fragments literal", () => {
+    expect(resolves("Setup", "obsidian")).toBe(true);
+    expect(resolves("user-content-Setup", "obsidian")).toBe(false);
+    expect(resolves("^block", "obsidian")).toBe(true);
+  });
+  it("reports only fragments that reach no anchor", () => {
+    const messages = (dialect: Dialect) =>
+      lint("[a](Note.md#user-content-setup) [b](Note.md#user-content-nothing)\n", {
+        config: { extends: [], dialect, rules: { "links/valid": "error" } },
+        path: "Doc.md",
+        workspace,
+      }).map((item) => item.message);
+    for (const dialect of ["github", "forgejo", "gitea"] as const)
+      expect(messages(dialect)).toEqual(["Missing fragment in Note.md#user-content-nothing."]);
+  });
+});
+
 describe("links/path on Gitea", () => {
   const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
   const rewrite = (source: string, dialect: "github" | "gitea") =>

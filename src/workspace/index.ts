@@ -242,6 +242,10 @@ export function createWorkspace(
       const target = [...candidates][0]!;
       const fragment = parts.fragment;
       const entry = fragment ? fragments(target) : undefined;
+      // GitHub, Forgejo, and Gitea store anchors with a `user-content-` prefix
+      // and add it to a link's fragment unless it is already there, so a link
+      // written with the prefix reaches the same anchor as one without.
+      const anchor = fragment.replace(/^user-content-/, "");
       const fragmentExists =
         !fragment ||
         (dialect === "obsidian"
@@ -249,10 +253,10 @@ export function createWorkspace(
             ? entry!.blocks.has(fragment.slice(1))
             : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : dialect === "forgejo"
-            ? entry!.forgejoSlugs.has(fragment)
+            ? entry!.forgejoSlugs.has(anchor)
             : dialect === "gitea"
-              ? entry!.giteaSlugs.has(fragment)
-              : entry!.slugs.has(fragment));
+              ? entry!.giteaSlugs.has(anchor)
+              : entry!.slugs.has(anchor));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };
