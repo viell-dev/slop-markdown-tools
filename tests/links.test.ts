@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkspace, format, lint, parse, semanticFingerprint } from "../src/index.js";
-import type { Config } from "../src/index.js";
+import {
+  createWorkspace,
+  format,
+  lint,
+  parse,
+  semanticFingerprint,
+  textContent,
+} from "../src/index.js";
+import type { Config, Dialect } from "../src/index.js";
+import { headingAttributeBlock, headingAttributes } from "../src/workspace/heading-attributes.js";
 
 const config: Config = {
   extends: [],
@@ -282,6 +290,294 @@ describe("Gitea heading anchors", () => {
     });
     expect(lint("[x](Note.md#test01)\n", options("gitea"))).toEqual([]);
     expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
+  });
+});
+describe("Forgejo and Gitea heading attributes", () => {
+  const note = (...headings: string[]) =>
+    createWorkspace({ "Doc.md": "", "Note.md": `${headings.join("\n\n")}\n` });
+  const resolves = (workspace: ReturnType<typeof note>, fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+  const recognized = note(
+    "## More tests {#custom-id}",
+    "## Usage {.note}",
+    "Overview {#intro}\n========",
+    "Two lines\nof text {#setext}\n---",
+    "### Closed ### {#closed}",
+    "## Trailing {#after} ##",
+    "## Escaped \\{#escaped}",
+    "## Double \\\\{#double}",
+    "## Spaced { #spaced .wide data-x=1 }",
+    '## Quoted {id="Quoted ID"}',
+    "## Last {#first #last}",
+    "## Upper {ID=shout}",
+    "## Invalid {#in valid}",
+    "## Empty {}",
+    "## _Mode {.a_}",
+    "## Case {#Case-ID}",
+    "> ## Quote {#in-quote}",
+    "## Unusable {#}",
+    "## __init__.py {.file}",
+  );
+  it.each([
+    // Forgejo's and Gitea's own renderer tests use this heading.
+    ["custom-id", true, true],
+    ["more-tests", false, false],
+    ["more-tests-custom-id", false, false],
+    ["usage", true, true],
+    ["usage-note", false, false],
+    ["intro", true, true],
+    ["overview", false, false],
+    ["setext", true, true],
+    ["closed", true, true],
+    // The block must end the line. Gitea before 1.26 also read one followed by a
+    // closing sequence, which is not modeled.
+    ["trailing-after", true, true],
+    ["after", false, false],
+    ["escaped-escaped", true, true],
+    ["escaped", false, false],
+    ["double", true, true],
+    ["spaced", true, true],
+    ["Quoted%20ID", true, true],
+    ["last", true, true],
+    ["first", false, false],
+    ["upper", true, true],
+    ["shout", false, false],
+    ["invalid-in-valid", true, true],
+    ["in", false, false],
+    ["empty", true, true],
+    // goldmark removes the block before parsing emphasis, so this underscore stays text.
+    ["_mode", true, true],
+    ["mode-a", false, false],
+    ["Case-ID", true, true],
+    ["case-id", false, false],
+    ["in-quote", true, true],
+    // An empty id replaces the generated anchor with an unusable one.
+    ["unusable", false, false],
+    ["initpy", false, true],
+    ["__init__py", false, true],
+    ["__init__py-file", false, false],
+  ])("resolves #%s as %s on Forgejo and %s on Gitea", (fragment, forgejo, gitea) => {
+    expect(resolves(recognized, fragment, "forgejo")).toBe(forgejo);
+    expect(resolves(recognized, fragment, "gitea")).toBe(gitea);
+  });
+  it.each([
+    ["{#a}", "a"],
+    ["{}", undefined],
+    ["{ #a }", "a"],
+    ["{.a.b#c}", "c"],
+    ["{#a:b_c-d.e}", "a:b_c-d.e"],
+    ["{#é日}", "é日"],
+    ["{#a,}", "a"],
+    ["{#a, .b, c=d}", "a"],
+    ["{id=bare}", "bare"],
+    ['{id = "a \\"b\\""}', 'a "b"'],
+    ['{#z id="q"}', "q"],
+    ['{id="q" #z}', "z"],
+    ["{a=[1 2, x] b={#c} d=-1.5e3}", undefined],
+    ["{id=true}", ""],
+    ["{id=null}", ""],
+    ["{id=[a]}", ""],
+    ["{#}", ""],
+  ])("reads %s as attributes", (block, id) => {
+    expect(headingAttributeBlock(`## Title ${block}  `)).toEqual({ start: 9, id });
+    expect(headingAttributeBlock(`Title ${block}`)).toEqual({ start: 6, id });
+  });
+  it.each([
+    "{ }",
+    "{#a b}",
+    "{#a!b}",
+    "{#a/b}",
+    "{,#a}",
+    "{#a,,.b}",
+    "{a}",
+    "{a=}",
+    "{1a=2}",
+    "{a=[ ]}",
+    "{a=[1,]}",
+    "{a=1e}",
+    "{a=1e999}",
+    "{a=.5}",
+    '{a="b}',
+    '{a="b\\"}',
+    "{class=1}",
+    "{a={ }}",
+    "{#a} text",
+    "{#a}}",
+    "\\{#a}",
+  ])("leaves %s as heading text", (block) => {
+    expect(headingAttributeBlock(`## Title ${block}`)).toBeUndefined();
+  });
+  it("takes the first block that reaches the end of the line", () => {
+    expect(headingAttributeBlock("## Title {#a} {#b}")).toEqual({ start: 14, id: "b" });
+    expect(headingAttributeBlock("## Title { {#a}")).toEqual({ start: 11, id: "a" });
+    expect(headingAttributeBlock("## Title \\x{#a}")).toEqual({ start: 11, id: "a" });
+  });
+  it.each([
+    ["setup", true],
+    // A custom id is not numbered and does not count as issued for later headings.
+    ["setup-1", true],
+    ["setup-2", false],
+    ["same", true],
+    ["same-1", true],
+    ["same-2", false],
+    ["twice", true],
+    ["twice-1", false],
+    // Written with the prefix the renderers add, it does take the generated anchor.
+    ["foo", true],
+    ["foo-1", true],
+    ["foo-2", false],
+    // Links use the bare anchor; the prefixed spelling is not modeled for any heading.
+    ["user-content-foo", false],
+  ])("resolves repeated #%s as %s", (fragment, exists) => {
+    const repeated = note(
+      "## Install {#setup}",
+      "## Setup",
+      "## Setup",
+      "## Same {.a}",
+      "## Same {.b}",
+      "## Twice {#twice}",
+      "## Twice",
+      "## Again {#twice}",
+      "## Prefixed {#user-content-foo}",
+      "## Foo",
+    );
+    // Gitea 1.26 and later number nothing; the numbered anchors are earlier versions'.
+    expect(resolves(repeated, fragment, "forgejo")).toBe(exists);
+    expect(resolves(repeated, fragment, "gitea")).toBe(exists);
+  });
+  it("leaves a block nested too deeply to parse safely as heading text", () => {
+    const arrays = (depth: number, item: string) =>
+      `## Title {a=${"[".repeat(depth)}${item}${"]".repeat(depth)} #ok}`;
+    const attributes = (depth: number) =>
+      `## Title {${"a={".repeat(depth)}${"}".repeat(depth)} #ok}`;
+    for (const heading of [
+      arrays(64, ""),
+      arrays(64, "0"),
+      attributes(64),
+      arrays(3, "{b=[{#c}]}"),
+    ])
+      expect(headingAttributeBlock(heading)).toEqual({ start: 9, id: "ok" });
+    for (const heading of [arrays(65, ""), arrays(65, "0"), attributes(65), arrays(20000, "0")])
+      expect(headingAttributeBlock(heading)).toBeUndefined();
+    expect(headingAttributeBlock(`## Title ${"{a=".repeat(20000)}`)).toBeUndefined();
+    const workspace = note(arrays(200, "0"), "## Next {#next}");
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves(workspace, "ok", dialect)).toBe(false);
+      expect(resolves(workspace, "next", dialect)).toBe(true);
+    }
+    expect(resolves(workspace, "next-next", "github")).toBe(true);
+  });
+  it("scans a long run of spaces inside a heading once", () => {
+    const heading = `## T ${" ".repeat(200000)}x {.note}  \t`;
+    expect(headingAttributeBlock(heading)).toEqual({ start: heading.indexOf("{"), id: undefined });
+    expect(headingAttributeBlock(`## T${" ".repeat(200000)}`)).toBeUndefined();
+  });
+  it.each(["forgejo", "gitea"] as const)(
+    "reads the remaining %s heading like one written without the block",
+    (dialect) => {
+      // GFM parsing, unlike the default CommonMark parsing of the other workspaces here.
+      const text = (source: string, removed: boolean) => {
+        const document = parse(source, dialect);
+        const heading = removed
+          ? [...headingAttributes(document).values()][0]?.heading
+          : document.tree.children.find((node) => node.type === "heading");
+        return heading && textContent(heading).replace(/[\u00A0 ]+$/u, "");
+      };
+      for (const inline of [
+        "_https://example.com_",
+        "*www.example.com*",
+        "https://example.com/a_b_",
+        "me@example.com",
+        "~~del~~",
+        "_foo_",
+        "foo_bar_",
+        "`code`",
+        "[link](http://x.y)",
+        "$x_1$",
+        "a\\\\",
+        "foo &amp;",
+      ])
+        for (const [before, after] of [
+          ["## ", ""],
+          ["", "\n==="],
+        ])
+          for (const block of [" {.c}", "{.c}"]) {
+            const expected = text(`${before}${inline}${after}\n`, false);
+            expect(expected).toBeDefined();
+            expect(text(`${before}${inline}${block}${after}\n`, true), inline).toBe(expected);
+          }
+    },
+  );
+  it("keeps a Setext heading whose text would read as another block without its block", () => {
+    const workspace = note(
+      "[ref]: /url {.note}\n---",
+      "*** {.x}\n---",
+      "_Mode_{.a}\n===",
+      "_A_ B {.x_.py}\n===",
+      "Two lines\n{.alone}\n===",
+      "## After {#after}",
+    );
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves(workspace, "ref-url", dialect)).toBe(true);
+      expect(resolves(workspace, "ref-url-note", dialect)).toBe(false);
+      // A heading that reads `***` has no anchor characters.
+      expect(resolves(workspace, "heading", dialect)).toBe(true);
+      expect(resolves(workspace, "mode", dialect)).toBe(true);
+      expect(resolves(workspace, "mode-a", dialect)).toBe(false);
+      expect(resolves(workspace, "a-b", dialect)).toBe(true);
+      expect(resolves(workspace, "two-lines", dialect)).toBe(true);
+      expect(resolves(workspace, "after", dialect)).toBe(true);
+    }
+    // The removed block's `_.py` does not make Gitea keep these underscores.
+    expect(resolves(workspace, "_a_-b", "gitea")).toBe(false);
+  });
+  it("removes the block before reading inline HTML", () => {
+    const mixed = note("## A <span>B</span> {.c}", "## C <b>D</b> {#e}");
+    expect(resolves(mixed, "a-span-b-span", "forgejo")).toBe(true);
+    expect(resolves(mixed, "a-span-b-span-c", "forgejo")).toBe(false);
+    // Gitea 1.26 and later read the rendered text; earlier versions read the source.
+    expect(resolves(mixed, "a-b", "gitea")).toBe(true);
+    expect(resolves(mixed, "a-spanbspan", "gitea")).toBe(true);
+    expect(resolves(mixed, "a-b-c", "gitea")).toBe(false);
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves(mixed, "e", dialect)).toBe(true);
+      expect(resolves(mixed, "c-d", dialect)).toBe(false);
+    }
+    expect(resolves(mixed, "a-b-c", "github")).toBe(true);
+    expect(resolves(mixed, "c-d-e", "github")).toBe(true);
+  });
+  it("keeps the block as heading text for other dialects", () => {
+    for (const dialect of ["commonmark", "github"] as const) {
+      expect(resolves(recognized, "more-tests-custom-id", dialect)).toBe(true);
+      expect(resolves(recognized, "custom-id", dialect)).toBe(false);
+      expect(resolves(recognized, "usage-note", dialect)).toBe(true);
+      expect(resolves(recognized, "usage", dialect)).toBe(false);
+      expect(resolves(recognized, "overview-intro", dialect)).toBe(true);
+    }
+    expect(resolves(recognized, "More tests {%23custom-id}", "obsidian")).toBe(true);
+    expect(resolves(recognized, "usage {.note}", "obsidian")).toBe(true);
+    expect(resolves(recognized, "More tests", "obsidian")).toBe(false);
+    expect(resolves(recognized, "Usage", "obsidian")).toBe(false);
+  });
+  it("reports only links that miss the anchors Forgejo and Gitea render", () => {
+    const workspace = createWorkspace({
+      "Doc.md": "",
+      "Note.md": "## Install {#setup}\n\n## Usage {.note}\n\nOverview {#intro}\n========\n",
+    });
+    const messages = (source: string, dialect: Dialect) =>
+      lint(source, {
+        config: { extends: [], dialect, rules: { "links/valid": "error" } },
+        path: "Doc.md",
+        workspace,
+      }).map((item) => item.message);
+    const source =
+      "[a](Note.md#setup) [b](Note.md#install) [c](Note.md#usage) [d](Note.md#intro)\n";
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(messages(source, dialect)).toEqual(["Missing fragment in Note.md#install."]);
+      expect(messages("[x](Note.md#install-setup)\n", dialect)).toHaveLength(1);
+    }
+    expect(messages(source, "github")).toHaveLength(4);
+    expect(messages("[x](Note.md#install-setup)\n", "github")).toEqual([]);
   });
 });
 describe("heading anchors with inline HTML", () => {

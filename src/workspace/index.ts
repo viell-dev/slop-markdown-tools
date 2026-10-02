@@ -4,6 +4,7 @@ import { walk } from "../syntax/walk.js";
 import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
+import { headingAttributes } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
@@ -135,22 +136,36 @@ export function createWorkspace(
       const slugger = new GithubSlugger();
       const forgejoSlugger = createForgejoSlugger();
       const giteaSlugger = createGiteaSlugger();
+      const attributes = headingAttributes(document);
       walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
         entry.slugs.add(slugger.slug(renderedText(node, true)));
+        // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
+        const block = attributes.get(node);
+        if (block?.id !== undefined) {
+          const anchor = forgejoSlugger.custom(block.id);
+          if (anchor) entry.forgejoSlugs.add(anchor);
+          if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
+          return;
+        }
+        const shown = block?.heading ?? node;
+        const shownText = block ? textContent(shown) : text;
         // Forgejo, like Gitea before 1.26, builds anchors from the heading's
         // source, so inline HTML tags stay part of them.
-        entry.forgejoSlugs.add(forgejoSlugger.slug(text));
-        entry.giteaSlugs.add(giteaSlugger.slug(text));
+        entry.forgejoSlugs.add(forgejoSlugger.slug(shownText));
+        entry.giteaSlugs.add(giteaSlugger.slug(shownText));
         // Gitea 1.26 and later number no anchors, build them from the rendered
         // text, and keep underscores near `_.py` literal. The source that
         // earlier versions read keeps those underscores along with the tags.
-        const [start, end] = range(node);
-        const texts = source.slice(start, end).includes("_.py")
-          ? [literalUnderscoreText(node, source, false), literalUnderscoreText(node, source, true)]
-          : [renderedText(node, false)];
+        const [start, end] = range(shown);
+        const texts = source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
+          ? [
+              literalUnderscoreText(shown, source, false),
+              literalUnderscoreText(shown, source, true),
+            ]
+          : [renderedText(shown, false)];
         for (const candidate of texts) {
           const anchor = giteaAnchor(candidate);
           if (anchor) entry.giteaSlugs.add(anchor);

@@ -91,11 +91,24 @@ included; Gitea 1.26 and later use the rendered text, so Gitea fragments accept
 both. Character references inside a filtered tag on GitHub are not modeled. Nor,
 on Gitea, are tags or Markdown syntax inside `<script>`, `<textarea>`, and the
 other elements whose content HTML reads as plain text, including an unclosed
-one, which takes in the rest of the document. Custom Gitea heading IDs written
-as attributes (`## Title {#id}`) are not modeled. Block identifiers are indexed
-from trailing text markers. Heading nesting paths, property aliases, PDF
-subpaths, and every Obsidian plugin's syntax are not fully supported. Embeds are
-preserved as embeds; image dimensions in their aliases remain intact.
+one, which takes in the rest of the document. Forgejo and Gitea fragments read a
+heading's trailing attribute block (`## Title {#id .class}`) by the rules of
+goldmark 1.8, which Forgejo 16 and Gitea 1.26 and later use: an `id` is the
+heading's only anchor, matched as written and never numbered, and any other
+valid block is left out of the text that generates the anchor. That text comes
+from a second parse of the target with the blocks blanked out, because goldmark
+removes a block before it parses the heading's inline content. The block stays
+heading text for other dialects, rules, and plugins. An `id` written with the
+`user-content-` prefix that the renderers add themselves is matched without it.
+Not modeled are the older attribute rules of Gitea before 1.26, which for
+example also read a block followed by a closing `#` sequence; Forgejo's failure
+to render a document in which a heading's `id` is not a string (`{id=5}`), which
+is treated as on Gitea 1.26 and later, where that heading has no anchor; and
+attribute values nested more than 64 levels deep, which leave the block as
+heading text. Block identifiers are indexed from trailing text markers. Heading
+nesting paths, property aliases, PDF subpaths, and every Obsidian plugin's
+syntax are not fully supported. Embeds are preserved as embeds; image dimensions
+in their aliases remain intact.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery
