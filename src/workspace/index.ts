@@ -4,6 +4,7 @@ import { walk } from "../syntax/walk.js";
 import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
+import { headingAttributes } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
@@ -116,17 +117,28 @@ export function createWorkspace(
       const slugger = new GithubSlugger();
       const forgejoSlugger = createForgejoSlugger();
       const giteaSlugger = createGiteaSlugger();
+      const attributes = headingAttributes(document);
       walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
         entry.slugs.add(slugger.slug(text));
-        entry.forgejoSlugs.add(forgejoSlugger.slug(text));
-        entry.giteaSlugs.add(giteaSlugger.slug(text));
+        // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
+        const block = attributes.get(node);
+        if (block?.id !== undefined) {
+          const anchor = forgejoSlugger.custom(block.id);
+          if (anchor) entry.forgejoSlugs.add(anchor);
+          if (giteaSlugger.custom(block.id)) entry.giteaSlugs.add(anchor);
+          return;
+        }
+        const shown = block?.heading ?? node;
+        const shownText = block ? textContent(shown) : text;
+        entry.forgejoSlugs.add(forgejoSlugger.slug(shownText));
+        entry.giteaSlugs.add(giteaSlugger.slug(shownText));
         // Gitea 1.26 and later, which number no anchors, keep these underscores literal.
-        const [start, end] = range(node);
+        const [start, end] = range(shown);
         if (source.slice(start, end).includes("_.py")) {
-          const anchor = giteaAnchor(literalUnderscoreText(node, source));
+          const anchor = giteaAnchor(literalUnderscoreText(shown, source));
           if (anchor) entry.giteaSlugs.add(anchor);
         }
       });

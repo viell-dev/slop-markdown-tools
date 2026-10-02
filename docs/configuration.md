@@ -78,6 +78,20 @@ Gitea as well. Gitea renders repository files with soft line breaks by default;
 if an instance adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable
 `style/wrap`.
 
+Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
+of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and
+no `#install`; `## Usage {.note}` keeps the generated anchor `#usage`. The
+Forgejo and Gitea dialects validate fragments against those anchors. A block
+holds `#id`, `.class`, and `name=value` items, such as
+`{#setup .note data-level=2}`, and ends the heading's line or, in a heading
+underlined with `===` or `---`, its last text line; after a closing `#` sequence
+it still counts (`## Install ## {#setup}`). A block that is not valid, that is
+followed by more text, or whose `{` is escaped with a backslash stays heading
+text. A custom anchor must be linked exactly as written, including its case, and
+it is never numbered: a later `## Setup` heading is also `#setup`, not
+`#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
+keep it in heading anchors and heading names.
+
 ## Presets
 
 | Preset        | Dialect   | Enabled rules                                                                                  |
