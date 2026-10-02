@@ -119,7 +119,14 @@ document's HTML, prefixed the same way, so those are fragments too, read from
 the inline and block HTML with comments dropped; GitHub lowercases them and
 matches a fragment lowercased as well. They do not number later headings. Entity
 references in such attributes and the content of `<script>` and similar elements
-are not modeled.
+are not modeled. GitHub and Gitea 1.26 and later also generate anchors for
+headings written as HTML, from their text content with inner tags removed and
+character references decoded; GitHub numbers them in document order together
+with the Markdown headings and also when the tag has an `id`, Gitea numbers
+nothing and skips a tag with an `id`, and Forgejo generates none. Headings
+inside HTML blocks and inline in a paragraph both count. GitHub's treatment was
+taken from a live README and from the heading filter its rendering derives from,
+not from a page with repeated or `id`-bearing HTML headings.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery

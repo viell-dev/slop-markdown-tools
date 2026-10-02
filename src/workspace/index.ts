@@ -1,5 +1,6 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
+import { decodeNamedCharacterReference } from "decode-named-character-reference";
 import { walk } from "../syntax/walk.js";
 import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
@@ -73,6 +74,45 @@ function htmlAnchors(html: string): string[] {
     }
   }
   return anchors;
+}
+
+/** A character reference, which HTML decodes in an element's text. */
+const characterReference = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([A-Za-z][A-Za-z\d]*));/g;
+function decodeReferences(text: string): string {
+  return text.replace(characterReference, (reference, decimal, hex, name) => {
+    if (name) return decodeNamedCharacterReference(name) || reference;
+    const code = Number.parseInt(decimal ?? hex, decimal ? 10 : 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+  });
+}
+/** An `<h1>` to `<h6>` element with its attributes and content, in HTML without comments. */
+const htmlHeading =
+  /<h([1-6])\b((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*>([\s\S]*?)<\/h\1[ \t\r\n]*>/gi;
+/**
+ * Headings written as HTML, as GitHub and Gitea 1.26 and later see them when
+ * they generate anchors: the text content with inner tags removed and character
+ * references decoded, and whether the tag sets its own `id`.
+ */
+function htmlHeadings(html: string): { text: string; hasId: boolean }[] {
+  const headings: { text: string; hasId: boolean }[] = [];
+  for (const match of html.replace(comment, "").matchAll(htmlHeading)) {
+    const hasId = [...match[2]!.matchAll(attribute)].some(
+      (item) => item[1]!.toLowerCase() === "id",
+    );
+    headings.push({ text: decodeReferences(match[3]!.replace(/<[^>]*>/g, "")), hasId });
+  }
+  return headings;
+}
+/**
+ * A paragraph as HTML, for headings that are written inline: the HTML tags as
+ * written around the text that the renderers put between them, with the text's
+ * own `<` and `&` escaped so that only real tags are read.
+ */
+function htmlView(node: Nodes): string {
+  if (node.type === "html") return node.value;
+  if (node.type === "break") return "\n";
+  if ("children" in node) return node.children.map(htmlView).join("");
+  return textContent(node).replaceAll("&", "&amp;").replaceAll("<", "&lt;");
 }
 
 interface Entry {
@@ -172,7 +212,21 @@ export function createWorkspace(
       const forgejoSlugger = createForgejoSlugger();
       const giteaSlugger = createGiteaSlugger();
       const attributes = headingAttributes(document);
-      walk(document.tree, "heading", (node) => {
+      // GitHub numbers the anchors of Markdown and HTML headings together, in
+      // document order; Gitea 1.26 and later give HTML headings without an `id`
+      // an anchor from their text, and number nothing. Forgejo gives them none.
+      const addHtmlHeadings = (html: string) => {
+        for (const heading of htmlHeadings(html)) {
+          entry.slugs.add(slugger.slug(heading.text));
+          const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
+          if (anchor) entry.giteaSlugs.add(anchor);
+        }
+      };
+      walk(document.tree, (node) => {
+        if (node.type === "html") return addHtmlHeadings(node.value);
+        if (node.type === "paragraph" && node.children.some((child) => child.type === "html"))
+          return addHtmlHeadings(htmlView(node));
+        if (node.type !== "heading") return;
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
