@@ -69,7 +69,7 @@
     "commander": "15.0.0",
     "diff": "9.0.0",
     "github-slugger": "2.0.0",
-    "ignore": "7.0.10",
+    "ignore": "7.0.12",
     "jsonc-parser": "3.3.1",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-frontmatter": "2.0.1",
@@ -85,7 +85,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/mdast": "4.0.4",
-    "@types/node": "26.6.3",
+    "@types/node": "26.6.4",
     "@types/unist": "3.0.3",
     "eslint": "10.11.0",
     "fast-check": "4.10.2",
@@ -94,7 +94,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.0",
     "vitepress": "2.0.0-alpha.20",
-    "vitest": "5.0.2"
+    "vitest": "5.0.3"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }
