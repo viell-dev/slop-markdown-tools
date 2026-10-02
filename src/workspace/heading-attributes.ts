@@ -287,7 +287,8 @@ export function lastLineSource(
     // goldmark's ATX special case: a `#` run after a space, followed by the
     // block, closes the heading and is left out, as in `## Title ## {#id}`.
     // Only the first such run is tried, and a backslash escapes punctuation.
-    if (blockStart !== undefined)
+    // A one-line Setext heading keeps the run: `Run ## {.a}` reads `Run ##`.
+    if (blockStart !== undefined && source[range(node)[0]] === "#")
       for (let at = 0; at < text.length; at++) {
         if (text[at] === "\\" && PUNCTUATION.test(text[at + 1] ?? "")) at++;
         else if ((text[at] === " " || text[at] === "\t") && text[at + 1] === "#") {
@@ -321,6 +322,8 @@ interface HeadingLine {
   quotes: number;
   /** The source offset of the line's first `{`, or -1. */
   brace: number;
+  /** The attribute block ending the line, by the current goldmark rules. */
+  block: ReturnType<typeof headingAttributeBlock>;
 }
 interface HeadingLines {
   byHeading: Map<Heading, HeadingLine>;
@@ -338,8 +341,14 @@ function forgeHeadingLines(document: Document): HeadingLines {
   const visit = (node: Nodes, quotes: number) => {
     if (node.type === "heading") {
       const line = lastTextLine(document.source, node);
-      const brace = document.source.slice(line.start, line.end).indexOf("{");
-      const found = { ...line, quotes, brace: brace < 0 ? -1 : line.start + brace };
+      const text = document.source.slice(line.start, line.end);
+      const brace = text.indexOf("{");
+      const found = {
+        ...line,
+        quotes,
+        brace: brace < 0 ? -1 : line.start + brace,
+        block: brace < 0 ? undefined : headingAttributeBlock(text),
+      };
       result.byHeading.set(node, found);
       result.lines.push(found);
     }
@@ -351,10 +360,8 @@ function forgeHeadingLines(document: Document): HeadingLines {
   return result;
 }
 /** Whether the heading's block, if any, gives it a custom `id` in place of a generated anchor. */
-function hasCustomId(document: Document, line: HeadingLine): boolean {
-  if (line.brace < 0) return false;
-  const block = headingAttributeBlock(document.source.slice(line.start, line.end));
-  return block?.id !== undefined;
+function hasCustomId(line: HeadingLine): boolean {
+  return line.block?.id !== undefined;
 }
 
 /**
@@ -381,14 +388,12 @@ export function headingAttributeSource(document: Document, heading: Heading): st
  */
 export function headingAnchorSource(document: Document, heading: Heading): string | undefined {
   const line = forgeHeadingLines(document).byHeading.get(heading);
-  if (!line || hasCustomId(document, line)) return undefined;
-  const block =
-    line.brace < 0 ? undefined : headingAttributeBlock(document.source.slice(line.start, line.end));
+  if (!line || hasCustomId(line)) return undefined;
   const text = lastLineSource(
     document.source,
     heading,
     line.quotes,
-    block && line.start + block.start,
+    line.block && line.start + line.block.start,
   );
   return `${forgejoAnchor(text)} ${giteaAnchor(text)}`;
 }
@@ -417,5 +422,5 @@ export function changesForgeHeading(document: Document, start: number, end: numb
   const line = lines[low];
   if (line === undefined || line.start >= end) return false;
   if (line.brace >= 0 && end > line.brace) return true;
-  return !hasCustomId(document, line);
+  return !hasCustomId(line);
 }

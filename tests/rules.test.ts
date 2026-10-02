@@ -336,6 +336,47 @@ describe("Forgejo and Gitea heading anchors under formatting", () => {
     const result = format(source, { config, path: "Doc.md", workspace });
     expect(result.output).toBe(source.replace("*c*", "_c_"));
     expect(result.diagnostics.filter((item) => item.rule !== "style/emphasis")).toEqual([]);
+    // The links still resolve against the formatted document itself.
+    const after = createWorkspace({ "Doc.md": result.output });
+    expect(lint(result.output, { config, path: "Doc.md", workspace: after })).toEqual([]);
+  });
+  it.each(forges)("formats a quoted list heading's first line on %s", (dialect) => {
+    // Rendered: Forgejo 16.0.5 and Gitea 1.25.5 give this heading `#last-keep`,
+    // Gitea 28.0.0 `#first-last-keep`; only the last line is left alone.
+    const source = "> - *First*\n>   Last *keep*\n>   ===\n\n[a](#last-keep)\n";
+    const workspace = createWorkspace({ "Doc.md": source });
+    const result = format(source, { config: only(markers, dialect), path: "Doc.md", workspace });
+    expect(result.output).toBe("> - _First_\n>   Last *keep*\n>   ===\n\n[a](#last-keep)\n");
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(
+      createWorkspace({ "Doc.md": result.output }).resolve("Doc.md", "#last-keep", dialect)
+        .fragmentExists,
+    ).toBe(true);
+  });
+  it.each(forges)("converts a Setext heading with a class block on %s", (dialect) => {
+    // The `##` is heading text on both forms: Forgejo renders `#run`, Gitea
+    // 1.25 `#run-`, before and after the conversion.
+    const config = only({ "style/heading": "warn" }, dialect);
+    expect(formatted("Run ## {.a}\n===\n", config)).toBe("# Run \\## {.a}\n");
+    for (const source of ["Run ## {.a}\n===\n", "# Run \\## {.a}\n"]) {
+      const resolves = (fragment: string, forge: Dialect) =>
+        createWorkspace({ "Doc.md": source }).resolve("Doc.md", `#${fragment}`, forge)
+          .fragmentExists;
+      expect(resolves("run", "forgejo")).toBe(true);
+      expect(resolves("run-", "gitea")).toBe(true);
+    }
+  });
+  it("checks a heading with many links in time proportional to its length", () => {
+    const source = `## ${"[x](y.md) ".repeat(10000)}{#h}\n`;
+    const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
+    const start = performance.now();
+    const result = format(source, {
+      config: only({ "links/path": ["warn", { style: "relative", leadingDot: true }] }, "forgejo"),
+      path: "Doc.md",
+      workspace,
+    });
+    expect(result.output).toBe(source.replaceAll("(y.md)", "(./y.md)"));
+    expect(performance.now() - start).toBeLessThan(10000);
   });
   it("refuses an edit by any rule that changes an anchor", () => {
     const plugin: Plugin = {
