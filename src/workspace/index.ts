@@ -1,11 +1,30 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { walk } from "../syntax/walk.js";
+import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
-import { parse, textContent } from "../syntax/parse.js";
-import { createForgejoSlugger } from "./slug.js";
+import { parse, range, textContent } from "../syntax/parse.js";
+import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
+
+/**
+ * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
+ * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
+ */
+function literalUnderscoreText(node: Nodes, source: string): string {
+  if (node.type === "emphasis" || node.type === "strong") {
+    const [start, end] = range(node);
+    if (source[start] === "_") {
+      const size = node.type === "strong" ? 2 : 1;
+      const inner = node.children.map((child) => literalUnderscoreText(child, source)).join("");
+      return source.slice(start, start + size) + inner + source.slice(end - size, end);
+    }
+  }
+  if ("children" in node)
+    return node.children.map((child) => literalUnderscoreText(child, source)).join("");
+  return textContent(node);
+}
 
 interface Entry {
   headings: Set<string>;
@@ -15,6 +34,8 @@ interface Entry {
   slugs: Set<string>;
   /** Forgejo heading anchors; punctuation runs collapse differently. */
   forgejoSlugs: Set<string>;
+  /** Gitea heading anchors; GitHub-like, but combining marks are dropped. */
+  giteaSlugs: Set<string>;
   blocks: Set<string>;
 }
 export interface WorkspaceOptions {
@@ -85,6 +106,7 @@ export function createWorkspace(
       foldedHeadings: new Set(),
       slugs: new Set(),
       forgejoSlugs: new Set(),
+      giteaSlugs: new Set(),
       blocks: new Set(),
     };
     const value = sources.get(name);
@@ -93,12 +115,20 @@ export function createWorkspace(
       const document = parse(source, options.dialect ?? "commonmark", name);
       const slugger = new GithubSlugger();
       const forgejoSlugger = createForgejoSlugger();
+      const giteaSlugger = createGiteaSlugger();
       walk(document.tree, "heading", (node) => {
         const text = textContent(node);
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
         entry.slugs.add(slugger.slug(text));
         entry.forgejoSlugs.add(forgejoSlugger.slug(text));
+        entry.giteaSlugs.add(giteaSlugger.slug(text));
+        // Gitea 1.26 and later, which number no anchors, keep these underscores literal.
+        const [start, end] = range(node);
+        if (source.slice(start, end).includes("_.py")) {
+          const anchor = giteaAnchor(literalUnderscoreText(node, source));
+          if (anchor) entry.giteaSlugs.add(anchor);
+        }
       });
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
@@ -179,7 +209,9 @@ export function createWorkspace(
             : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : dialect === "forgejo"
             ? entry!.forgejoSlugs.has(fragment)
-            : entry!.slugs.has(fragment));
+            : dialect === "gitea"
+              ? entry!.giteaSlugs.has(fragment)
+              : entry!.slugs.has(fragment));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };

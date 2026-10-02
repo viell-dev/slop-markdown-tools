@@ -184,6 +184,7 @@ describe("Forgejo heading anchors", () => {
       "## tes a a   a  a",
       "## a_b_c",
       "## ...",
+      "## İstanbul",
     ].join("\n\n"),
   });
   it.each([
@@ -199,6 +200,7 @@ describe("Forgejo heading anchors", () => {
     ["tes-a-a-a-a", true],
     ["a_b_c", true],
     ["heading", true],
+    ["istanbul", true],
   ])("resolves #%s as %s", (fragment, exists) => {
     expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "forgejo").fragmentExists).toBe(
       exists,
@@ -216,6 +218,85 @@ describe("Forgejo heading anchors", () => {
     });
     expect(lint("[x](Note.md#test-0-1)\n", options("forgejo"))).toEqual([]);
     expect(lint("[x](Note.md#test-0-1)\n", options("github"))).toHaveLength(1);
+  });
+});
+describe("Gitea heading anchors", () => {
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      "# test.0.1",
+      "## Placeholder to force scrolling on link's click",
+      "## a啊啊b",
+      "## c🤔️🤔️d",
+      "## a-b-c----",
+      "## tes a a   a  a",
+      "## a_b_c",
+      "## test：ad # 23 df 2*/*",
+      '## Header with "double quotes"',
+      "## tes（0）",
+      "## Cafe\u0301",
+      "## Same",
+      "## Same",
+      "## ...",
+      "## __init__.py",
+      "## İstanbul",
+    ].join("\n\n"),
+  });
+  it.each([
+    ["test01", true],
+    ["test-0-1", false],
+    ["placeholder-to-force-scrolling-on-links-click", true],
+    ["a啊啊b", true],
+    ["cd", true],
+    ["a-b-c----", true],
+    ["tes-a-a---a--a", true],
+    ["a_b_c", true],
+    ["testad--23-df-2", true],
+    ["header-with-double-quotes", true],
+    ["tes0", true],
+    ["cafe", true],
+    ["cafe\u0301", false],
+    ["same", true],
+    ["same-1", true],
+    ["same-2", false],
+    ["heading", true],
+    ["__init__py", true],
+    ["initpy", true],
+    ["istanbul", true],
+  ])("resolves #%s as %s", (fragment, exists) => {
+    expect(workspace.resolve("Doc.md", `Note.md#${fragment}`, "gitea").fragmentExists).toBe(exists);
+  });
+  it("differs from GitHub only where Gitea drops marks and names empty headings", () => {
+    const resolves = (fragment: string, dialect: "github" | "gitea") =>
+      workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    expect(resolves("cafe\u0301", "github")).toBe(true);
+    expect(resolves("cafe", "github")).toBe(false);
+    expect(resolves("heading", "github")).toBe(false);
+    expect(resolves("test01", "github")).toBe(true);
+  });
+  it("validates fragments with the document's dialect", () => {
+    const options = (dialect: "forgejo" | "gitea") => ({
+      config: { extends: [], dialect, rules: { "links/valid": "error" } } as Config,
+      path: "Doc.md",
+      workspace,
+    });
+    expect(lint("[x](Note.md#test01)\n", options("gitea"))).toEqual([]);
+    expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
+  });
+});
+describe("links/path on Gitea", () => {
+  const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
+  const rewrite = (source: string, dialect: "github" | "gitea") =>
+    format(source, {
+      path: "Doc.md",
+      workspace,
+      config: { extends: [], dialect, rules: { "links/path": ["warn", { style: "relative" }] } },
+    }).output;
+  it("keeps destinations whose underscores decide the `_.py` exception on that line", () => {
+    const source = "_a_ see [r](./my_dir/../readme.md) and b_.py\n";
+    expect(rewrite(source, "gitea")).toBe(source);
+    expect(rewrite(source, "github")).toBe("_a_ see [r](readme.md) and b_.py\n");
+    expect(rewrite("See [r](./my_dir/../readme.md).\n", "gitea")).toBe("See [r](readme.md).\n");
   });
 });
 describe("destination spelling", () => {

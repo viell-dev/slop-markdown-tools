@@ -410,6 +410,46 @@ describe("Forgejo syntax", () => {
     );
   });
 });
+describe("Gitea syntax", () => {
+  const gitea: Config = { ...wrap(), dialect: "gitea" };
+  const forgejo: Config = { ...wrap(), dialect: "forgejo" };
+  const reporting: Config = { ...wrap({ reportUnreflowed: true }), dialect: "gitea" };
+  it.each([
+    ["Term\n: A definition that is long enough to reflow at forty columns.\n", "definition list"],
+    ["\\[\na + b + a sum that is long enough to reflow\n\\]\n", "display math"],
+    ["Text \\(a\nb\\) more words that would otherwise reflow onto one line.\n", "\\(...\\) syntax"],
+    ["Text [[a\nb]] more words that would otherwise reflow onto one line.\n", "[[...]] syntax"],
+  ])("keeps the lines of %j like Forgejo and reports Gitea", (source, reason) => {
+    expect(verify(source, gitea).output).toBe(source);
+    expect(lint(source, { config: reporting })[0]?.message).toContain(`Gitea ${reason}`);
+  });
+  it("keeps one-line math, shortlinks, and block openers like Forgejo", () => {
+    for (const source of [
+      "Some words \\(a + b\\) and [[This is a link|https://gitea.com]] end here.\n",
+      "aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb : more words follow here.\n",
+      "aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb \\[x\\] more words follow here.\n",
+    ])
+      expect(verify(source, gitea).output).toBe(verify(source, forgejo).output);
+  });
+  it("leaves paragraphs alone where reflow could change the `_.py` exception", () => {
+    const source = "Some words that wrap around __init__.py and my_var in this paragraph.\n";
+    expect(verify(source, gitea).output).toBe(source);
+    expect(lint(source, { config: reporting })[0]?.message).toContain("Gitea `_.py` emphasis");
+    expect(verify(source, forgejo).output).not.toBe(source);
+  });
+  it.each([
+    "\\( ` \\) _a_ ` filler words here `_.py` and trailing words.\n",
+    "$x$ and `__init__.py` with more words that would otherwise reflow.\n",
+  ])("does not trust code spans in %j, which Gitea math could consume", (source) => {
+    expect(verify(source, gitea).output).toBe(source);
+    expect(lint(source, { config: reporting })[0]?.message).toContain("Gitea `_.py` emphasis");
+  });
+  it("reflows `_.py` paragraphs whose underscores are all in code spans", () => {
+    const source = "Some words that wrap around `__init__.py` and `my_var` in this paragraph.\n";
+    expect(verify(source, gitea).output).toBe(verify(source, forgejo).output);
+    expect(verify(source, gitea).output).not.toBe(source);
+  });
+});
 describe("multiline code spans", () => {
   const config: Config = {
     extends: [],

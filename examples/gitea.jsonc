@@ -1,0 +1,8 @@
+{
+  // Gitea instances; Forgejo and Codeberg have their own "forgejo" preset.
+  "extends": ["recommended", "gitea"],
+  "rules": {
+    "style/wrap": ["warn", { "width": 80 }],
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}
