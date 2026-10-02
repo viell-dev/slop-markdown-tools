@@ -157,7 +157,10 @@ describe("wrapping controls", () => {
       return best;
     };
     expect(fastest(build(32000)) / fastest(lf)).toBeLessThan(10);
-  });
+    // The performance assertion is the ratio above, not a duration, so slow
+    // runners get a longer limit than the 15-second default. Windows CI runners
+    // have needed 6 to 15 seconds.
+  }, 60_000);
   it("keeps carriage-return line endings consistent across rules and passes", () => {
     const config: Config = {
       extends: ["recommended", "github"],
