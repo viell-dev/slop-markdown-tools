@@ -4,33 +4,53 @@ import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
-import { headingAttributes } from "./heading-attributes.js";
+import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
 
-/** Tags that GFM's tagfilter makes GitHub show as text instead of as HTML. */
-const filteredTag =
-  /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i;
+/** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
+interface Rendering {
+  /** Tags shown as text rather than as HTML, and so part of the anchor. */
+  shownTags: RegExp;
+  /** What a hard line break contributes. */
+  lineBreak: string;
+}
+/** GFM's tagfilter makes GitHub show these tags as text; a hard break adds nothing. */
+const github: Rendering = {
+  shownTags:
+    /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i,
+  lineBreak: "",
+};
+/**
+ * Gitea 1.26 and later show these tags as text, drop other disallowed tags
+ * while keeping their text, and read a hard break as a line break. Rendered on
+ * Gitea 1.27.3 and 28.0.0: `## X <script>a</script> Y` is `#x-scriptascript-y`
+ * and `## X <iframe>a</iframe> Y` is `#x-a-y`.
+ */
+const gitea: Rendering = {
+  shownTags: /^<\/?(?:script|style|html|head)(?=[\t\n\f\r />])/i,
+  lineBreak: "\n",
+};
 /**
  * Heading text as rendered, which GitHub and Gitea 1.26 and later build anchors
  * from: inline HTML tags and comments are left out and the text between tags
- * stays, so `## A <span>B</span>` reads `A B`. With `tagfilter`, the tags that
- * GitHub shows as text are kept.
+ * stays, so `## A <span>B</span>` reads `A B`, except for the tags that the
+ * renderer shows as text.
  */
-function renderedText(node: Nodes, tagfilter: boolean): string {
-  if (node.type === "html") return tagfilter && filteredTag.test(node.value) ? node.value : "";
+function renderedText(node: Nodes, rendering: Rendering): string {
+  if (node.type === "html") return rendering.shownTags.test(node.value) ? node.value : "";
+  if (node.type === "break") return rendering.lineBreak;
   if ("children" in node)
-    return node.children.map((child) => renderedText(child, tagfilter)).join("");
+    return node.children.map((child) => renderedText(child, rendering)).join("");
   return textContent(node);
 }
 /**
  * Heading text with `_` emphasis delimiters kept, as Gitea 1.26 and later show
  * them near `_.py` (`## __init__.py` reads `__init__.py`, not `init.py`).
- * Inline HTML tags and comments are left out, as in the rendered text.
+ * Everything else is as in Gitea's rendered text.
  */
 function literalUnderscoreText(node: Nodes, source: string): string {
-  if (node.type === "html") return "";
   if (node.type === "emphasis" || node.type === "strong") {
     const [start, end] = range(node);
     if (source[start] === "_") {
@@ -41,60 +61,8 @@ function literalUnderscoreText(node: Nodes, source: string): string {
   }
   if ("children" in node)
     return node.children.map((child) => literalUnderscoreText(child, source)).join("");
-  return textContent(node);
+  return renderedText(node, gitea);
 }
-/**
- * The source of a heading's last text line, which Forgejo, and Gitea before
- * 1.26, build the anchor from: goldmark generates automatic heading IDs from
- * that line as written, before any inline syntax is read. The line excludes the
- * opening and closing `#` sequences, the blank space around the content, the
- * markers of the `quotes` block quotes the heading is in, list indentation,
- * and a trailing attribute block, which starts at `blockStart`. Earlier lines
- * of a Setext heading do not count.
- */
-function lastLineSource(
-  source: string,
-  node: Heading,
-  quotes: number,
-  blockStart?: number,
-): string {
-  const first = node.children[0];
-  const last = node.children.at(-1);
-  if (!first || !last) return "";
-  const start = range(first)[0];
-  const end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
-  let text = source.slice(start, end);
-  const lineBreak = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
-  if (lineBreak < 0) {
-    // goldmark's ATX special case: a `#` run after a space, followed by the
-    // block, closes the heading and is left out, as in `## Title ## {#id}`.
-    // Only the first such run is tried, and a backslash escapes punctuation.
-    if (blockStart !== undefined)
-      for (let at = 0; at < text.length; at++) {
-        if (text[at] === "\\" && /[!-/:-@[-`{-~]/.test(text[at + 1] ?? "")) at++;
-        else if ((text[at] === " " || text[at] === "\t") && text[at + 1] === "#") {
-          let run = at + 1;
-          while (text[run] === "#") run++;
-          if (text.slice(run).trim() === "") text = text.slice(0, at);
-          break;
-        }
-      }
-    return text;
-  }
-  // A continuation line starts with the block quote markers the line still
-  // has, lazily fewer, and the leading blank space of its content; a `>` after
-  // those is content.
-  text = text.slice(lineBreak + 1);
-  let at = 0;
-  for (let marker = 0; marker < quotes; marker++) {
-    while (text[at] === " " || text[at] === "\t") at++;
-    if (text[at] !== ">") break;
-    at++;
-  }
-  while (text[at] === " " || text[at] === "\t") at++;
-  return text.slice(at);
-}
-
 /** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
 const openTag =
   /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/y;
@@ -275,7 +243,7 @@ export function createWorkspace(
         entry.headings.add(text);
         entry.foldedHeadings.add(text.toLowerCase());
         // GitHub prefixes an id only when it does not already start with the prefix.
-        entry.slugs.add(slugger.slug(renderedText(node, true)).replace(/^user-content-/, ""));
+        entry.slugs.add(slugger.slug(renderedText(node, github)).replace(/^user-content-/, ""));
         // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
         const block = attributes.get(node);
         if (block?.id !== undefined) {
@@ -297,7 +265,7 @@ export function createWorkspace(
         const anchor = giteaAnchor(
           source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
             ? literalUnderscoreText(shown, source)
-            : renderedText(shown, false),
+            : renderedText(shown, gitea),
         );
         if (anchor) entry.giteaSlugs.add(anchor);
       });

@@ -91,8 +91,11 @@ around the text, block quote and list prefixes, and a trailing attribute block
 are not part of the line. GitHub, and Gitea 1.26 and later, build the anchor
 from the rendered text instead: `#link-text-end`, `#strong-init-end`, and
 `#a-b`, with the text of every line of an underlined heading. GitHub keeps the
-tags that it shows as text, such as `<script>`, in the anchor. The Gitea dialect
-accepts the anchors of both Gitea generations.
+tags that it shows as text, such as `<script>`, in the anchor; Gitea 1.26 and
+later show `<script>`, `<style>`, `<html>`, and `<head>` as text and keep them
+too, drop other tags they do not allow while keeping the text inside, and read a
+hard line break as a line break. The Gitea dialect accepts the anchors of both
+Gitea generations.
 
 Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
 of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and
@@ -121,6 +124,14 @@ the first `{` of a heading's last text line on. `style/inline-code` does not
 join a code span that spans lines of a heading, and `style/heading` escapes a
 `#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
 heading there.
+
+Because Forgejo, and Gitea before 1.26, build a heading's anchor from its last
+line as written, `style/emphasis`, `style/strong`, and `links/path` also leave
+that line unchanged on these dialects when the heading has no custom `id`.
+Rewriting `## Emph *star* end` to `_star_` would move its anchor from
+`#emph-star-end` to `#emph-_star_-end` and break every link to it, although the
+heading reads the same. Earlier lines of an underlined heading, headings with an
+`id`, and the rest of the document are formatted as usual.
 
 ## Presets
 
