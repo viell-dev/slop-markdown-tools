@@ -6,7 +6,7 @@ import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
-import { headingAttributeSource } from "../workspace/heading-attributes.js";
+import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
 import { suppressions } from "./directives.js";
 import type {
   Diagnostic,
@@ -178,10 +178,13 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
     }
     const result: Record<string, unknown> = {};
     // Forgejo and Gitea read a heading's trailing `{...}` block as attributes,
-    // character for character, where the tree holds ordinary inline content.
+    // character for character, where the tree holds ordinary inline content,
+    // and generate the anchor from the heading's last line as written.
     if (node.type === "heading") {
       const attributes = headingAttributeSource(document, node);
       if (attributes !== undefined) result.attributes = attributes;
+      const anchors = headingAnchorSource(document, node);
+      if (anchors !== undefined) result.anchors = anchors;
     }
     if (calloutHeader && document.dialect === "obsidian" && node.type === "paragraph") {
       const [start, end] = range(node);

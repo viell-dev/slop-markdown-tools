@@ -88,7 +88,11 @@ the heading. For these two dialects the semantic fingerprint includes each
 block's source text, so an edit from any other rule or plugin that changes a
 block, makes one invalid, or creates one is refused. That covers a block
 followed by a closing `#` sequence (`## Title {#id} ##`) as well, which only
-Gitea before 1.26 reads as attributes.
+Gitea before 1.26 reads as attributes. Forgejo, and Gitea before 1.26, also
+generate the anchor from that line as written, so the marker and link
+destination rules leave the last line of a heading without a custom `id`
+unchanged on these dialects, and the fingerprint includes the Forgejo and Gitea
+anchors generated from it.
 
 Obsidian links resolve against indexed paths, extensionless Markdown candidates,
 and unique suffixes for internal links. Duplicate candidates remain ambiguous.

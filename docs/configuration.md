@@ -118,6 +118,14 @@ join a code span that spans lines of a heading, and `style/heading` escapes a
 `#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
 heading there.
 
+Because Forgejo, and Gitea before 1.26, build a heading's anchor from its last
+line as written, `style/emphasis`, `style/strong`, and `links/path` also leave
+that line unchanged on these dialects when the heading has no custom `id`.
+Rewriting `## Emph *star* end` to `_star_` would move its anchor from
+`#emph-star-end` to `#emph-_star_-end` and break every link to it, although the
+heading reads the same. Earlier lines of an underlined heading, headings with an
+`id`, and the rest of the document are formatted as usual.
+
 ## Presets
 
 | Preset        | Dialect   | Enabled rules                                                                                  |

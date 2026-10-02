@@ -1,10 +1,10 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { walk } from "../syntax/walk.js";
-import type { Heading, Nodes } from "mdast";
+import type { Nodes } from "mdast";
 import type { Dialect, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
-import { headingAttributes } from "./heading-attributes.js";
+import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 
 export type WorkspaceSource = string | null | (() => string);
@@ -43,26 +43,6 @@ function literalUnderscoreText(node: Nodes, source: string): string {
     return node.children.map((child) => literalUnderscoreText(child, source)).join("");
   return textContent(node);
 }
-/**
- * The source of a heading's last text line, which Forgejo, and Gitea before
- * 1.26, build the anchor from: goldmark generates automatic heading IDs from
- * that line as written, before any inline syntax is read. The line excludes the
- * opening and closing `#` sequences, the blank space around the content,
- * block quote and list prefixes, and a trailing attribute block, which starts
- * at `blockStart`. Earlier lines of a Setext heading do not count.
- */
-function lastLineSource(source: string, node: Heading, blockStart?: number): string {
-  const first = node.children[0];
-  const last = node.children.at(-1);
-  if (!first || !last) return "";
-  const start = range(first)[0];
-  const end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
-  const text = source.slice(start, end);
-  const lineBreak = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
-  // Only a continuation line can start with a container's prefix.
-  return lineBreak < 0 ? text : text.slice(lineBreak + 1).replace(/^[ \t>]+/, "");
-}
-
 interface Entry {
   headings: Set<string>;
   /** Lowercased heading text; Obsidian matches heading subpaths case-insensitively. */
