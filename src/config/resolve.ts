@@ -32,12 +32,22 @@ export const presets: Record<string, Config> = {
   },
   forgejo: {
     dialect: "forgejo",
-    rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+    rules: {
+      "github/task-marker": "warn",
+      "github/alert-marker": "warn",
+      "style/table": "warn",
+      "forgejo/heading-id": "error",
+    },
   },
   codeberg: { extends: ["forgejo"] },
   gitea: {
     dialect: "gitea",
-    rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+    rules: {
+      "github/task-marker": "warn",
+      "github/alert-marker": "warn",
+      "style/table": "warn",
+      "forgejo/heading-id": "error",
+    },
   },
   obsidian: {
     dialect: "obsidian",
