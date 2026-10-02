@@ -813,6 +813,14 @@ describe("heading anchors built from the last source line", () => {
     ["## S <foo>a</foo> end", "s-foo-a-foo-end", "s-fooafoo-end", "s-a-end"],
     ["## S <kbd>a</kbd> end", "s-kbd-a-kbd-end", "s-kbdakbd-end", "s-a-end"],
     ["## S <title>a</title> end", "s-title-a-title-end", "s-titleatitle-end", "s-a-end"],
+    // The two Gitea generations differ here only in the emphasis, which tells
+    // the rendered-text path apart from the source-line path.
+    [
+      "## S __x__ <script>a</script> end",
+      "s-__x__-script-a-script-end",
+      "s-__x__-scriptascript-end",
+      "s-x-scriptascript-end",
+    ],
     // An indented continuation line is content from its first non-blank character,
     // so a `>` there is text; only the markers of enclosing block quotes go.
     ["Alpha\n    > beta\n---", "beta", "-beta", "alpha--beta"],
