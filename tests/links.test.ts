@@ -10,6 +10,12 @@ import {
 import type { Config, Dialect } from "../src/index.js";
 import { headingAttributeBlock, headingAttributes } from "../src/workspace/heading-attributes.js";
 
+// Count the attribute-block reads that only the Forgejo and Gitea anchors need.
+vi.mock("../src/workspace/heading-attributes.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/workspace/heading-attributes.js")>();
+  return { ...actual, headingAttributes: vi.fn(actual.headingAttributes) };
+});
+
 const config: Config = {
   extends: [],
   dialect: "obsidian",
@@ -109,6 +115,26 @@ describe("local target resolution", () => {
     expect(index.resolve("Doc.md", "Target.md#Missing", "obsidian").fragmentExists).toBe(false);
     expect(read).toHaveBeenCalledTimes(1);
     expect(unused).not.toHaveBeenCalled();
+  });
+  it("computes a dialect's anchors only when a link is checked against it", () => {
+    const reads = vi.mocked(headingAttributes);
+    reads.mockClear();
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Target.md": '## Install {#setup}\n\n<a name="explicit"></a>\n',
+    });
+    // GitHub and Obsidian never read attribute blocks, which need a second parse.
+    expect(index.resolve("Doc.md", "Target.md#install-setup", "github").fragmentExists).toBe(true);
+    expect(index.resolve("Doc.md", "Target.md#explicit", "github").fragmentExists).toBe(true);
+    expect(index.resolve("Doc.md", "Target.md#Install {%23setup}", "obsidian").fragmentExists).toBe(
+      true,
+    );
+    expect(reads).not.toHaveBeenCalled();
+    // The forges read them once, for both dialects and every later link.
+    expect(index.resolve("Doc.md", "Target.md#setup", "forgejo").fragmentExists).toBe(true);
+    expect(index.resolve("Doc.md", "Target.md#setup", "gitea").fragmentExists).toBe(true);
+    expect(index.resolve("Doc.md", "Target.md#install", "forgejo").fragmentExists).toBe(false);
+    expect(reads).toHaveBeenCalledTimes(1);
   });
 });
 describe("Obsidian case-insensitive resolution", () => {
