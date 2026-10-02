@@ -748,6 +748,116 @@ describe("fragments written with the user-content- prefix", () => {
   });
 });
 
+describe("anchors from HTML in the document", () => {
+  // Rendered through GitHub's Markdown API and on local Forgejo 16.0.5 and
+  // Gitea 1.21.11, 1.25.5, and 28.0.0: all three keep `id` on every element
+  // and `name` on `<a>`, prefixed with `user-content-`; GitHub also lowercases
+  // them, and its page script lowercases a fragment it cannot find as written.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      '<a name="install"></a>',
+      "## Getting started",
+      '<a id="note-1"></a>Text with a marked spot.',
+      '<span id="span-id">span</span> and <div id="div-id">block</div>',
+      '<h2 id="explicit">Explicit</h2>',
+      '<p id="para">para</p>',
+      '<a name="Mixed Case"></a>',
+      '<a id="user-content-pre"></a>',
+      '<p id="MixedId">mixed</p>',
+      '<A NAME="Caps" ID="CapsId"></A>',
+      "<span id='single'>s</span> <span id=bare>b</span> <span id=\"\">empty</span>",
+      '<img id="img-id" src="x.png"> <table id="t-id"><tr><td id="td-id">x</td></tr></table>',
+      '<details id="det-id"><summary id="sum-id">s</summary>body</details>',
+      '<span name="not-an-anchor">n</span>',
+      '<!-- <a name="hidden"></a> <span id="hidden-id">x</span> -->',
+      'Text <!-- <a name="inline-hidden"></a> --> more',
+      '`<span id="in-code">`',
+      '    <span id="indented-code">',
+      '```html\n<span id="fenced">\n```',
+      "## install",
+    ].join("\n\n"),
+  });
+  const resolves = (fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${encodeURIComponent(fragment)}`, dialect).fragmentExists;
+  const github = ["github", "forgejo", "gitea"] as const;
+  it.each([
+    "install",
+    "note-1",
+    "span-id",
+    "div-id",
+    "explicit",
+    "para",
+    "Mixed Case",
+    "pre",
+    "user-content-pre",
+    "MixedId",
+    "Caps",
+    "CapsId",
+    "single",
+    "bare",
+    "img-id",
+    "t-id",
+    "td-id",
+    "det-id",
+    "sum-id",
+  ])("resolves #%s on GitHub, Forgejo, and Gitea", (fragment) => {
+    for (const dialect of github) expect(resolves(fragment, dialect)).toBe(true);
+    // Obsidian has no such anchors; `install` is also a heading's text there.
+    expect(resolves(fragment, "obsidian")).toBe(fragment === "install");
+  });
+  it.each([
+    "not-an-anchor",
+    "hidden",
+    "hidden-id",
+    "inline-hidden",
+    "in-code",
+    "indented-code",
+    "fenced",
+    "getting-started-1",
+  ])("does not resolve #%s anywhere", (fragment) => {
+    for (const dialect of [...github, "obsidian"] as const)
+      expect(resolves(fragment, dialect)).toBe(false);
+  });
+  it("matches case-insensitively on GitHub only", () => {
+    expect(resolves("mixedid", "github")).toBe(true);
+    expect(resolves("MIXEDID", "github")).toBe(true);
+    expect(resolves("mixed case", "github")).toBe(true);
+    expect(resolves("caps", "github")).toBe(true);
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      expect(resolves("mixedid", dialect)).toBe(false);
+      expect(resolves("mixed case", dialect)).toBe(false);
+      expect(resolves("caps", dialect)).toBe(false);
+    }
+  });
+  it("does not let an explicit anchor number a later heading", () => {
+    // `<a name="install">` and `## install` both exist; the heading is not `install-1`.
+    for (const dialect of github) {
+      expect(resolves("install", dialect)).toBe(true);
+      expect(resolves("install-1", dialect)).toBe(false);
+    }
+  });
+  it("reports only links to anchors the page does not have", () => {
+    const messages = (dialect: Dialect) =>
+      lint("[a](Note.md#install) [b](Note.md#note-1) [c](Note.md#hidden)\n", {
+        config: { extends: [], dialect, rules: { "links/valid": "error" } },
+        path: "Doc.md",
+        workspace,
+      }).map((item) => item.message);
+    for (const dialect of github)
+      expect(messages(dialect)).toEqual(["Missing fragment in Note.md#hidden."]);
+  });
+  it("scans unusual HTML in linear time", () => {
+    const hostile = createWorkspace({
+      "Doc.md": "",
+      "Note.md": `<a ${"x ".repeat(100000)}\n\n${"<a ".repeat(50000)}\n\n<a id="${"x".repeat(200000)}\n\n<a ${'id="a" '.repeat(20000)}${"'".repeat(20000)}\n`,
+    });
+    const start = performance.now();
+    expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
+    expect(performance.now() - start).toBeLessThan(2000);
+  });
+});
+
 describe("links/path on Gitea", () => {
   const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
   const rewrite = (source: string, dialect: "github" | "gitea") =>

@@ -46,6 +46,35 @@ function literalUnderscoreText(node: Nodes, source: string, html: boolean): stri
   return textContent(node);
 }
 
+/** An HTML comment, which the renderers drop with everything in it. */
+const comment = /<!--[\s\S]*?-->/g;
+/** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
+const openTag =
+  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/g;
+const attribute =
+  /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
+/**
+ * The anchors that HTML in a document adds: the `id` of any element and the
+ * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
+ * elements they allow and add their `user-content-` prefix to them unless it is
+ * already there, as they do to a link's fragment, so an `id` written with the
+ * prefix is recorded without it. Comments are dropped first; the content of
+ * `<script>` and similar elements is not told apart from markup.
+ */
+function htmlAnchors(html: string): string[] {
+  const anchors: string[] = [];
+  for (const tag of html.replace(comment, "").matchAll(openTag)) {
+    const anchor = tag[1]!.toLowerCase() === "a";
+    for (const match of tag[2]!.matchAll(attribute)) {
+      const name = match[1]!.toLowerCase();
+      if (name !== "id" && !(anchor && name === "name")) continue;
+      const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
+      if (value) anchors.push(value);
+    }
+  }
+  return anchors;
+}
+
 interface Entry {
   headings: Set<string>;
   /** Lowercased heading text; Obsidian matches heading subpaths case-insensitively. */
@@ -56,6 +85,10 @@ interface Entry {
   forgejoSlugs: Set<string>;
   /** Gitea heading anchors; GitHub-like, but combining marks are dropped. */
   giteaSlugs: Set<string>;
+  /** `id` and `<a name>` values from the document's HTML, which Forgejo and Gitea match as written. */
+  htmlAnchors: Set<string>;
+  /** The same lowercased, as GitHub stores and matches them. */
+  foldedHtmlAnchors: Set<string>;
   blocks: Set<string>;
 }
 export interface WorkspaceOptions {
@@ -127,6 +160,8 @@ export function createWorkspace(
       slugs: new Set(),
       forgejoSlugs: new Set(),
       giteaSlugs: new Set(),
+      htmlAnchors: new Set(),
+      foldedHtmlAnchors: new Set(),
       blocks: new Set(),
     };
     const value = sources.get(name);
@@ -174,6 +209,13 @@ export function createWorkspace(
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
         if (match) entry.blocks.add(match[1]!);
+      });
+      // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
+      walk(document.tree, "html", (node) => {
+        for (const anchor of htmlAnchors(node.value)) {
+          entry.htmlAnchors.add(anchor);
+          entry.foldedHtmlAnchors.add(anchor.toLowerCase());
+        }
       });
     }
     entries.set(name, entry);
@@ -253,10 +295,10 @@ export function createWorkspace(
             ? entry!.blocks.has(fragment.slice(1))
             : entry!.headings.has(fragment) || entry!.foldedHeadings.has(fragment.toLowerCase())
           : dialect === "forgejo"
-            ? entry!.forgejoSlugs.has(anchor)
+            ? entry!.forgejoSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
             : dialect === "gitea"
-              ? entry!.giteaSlugs.has(anchor)
-              : entry!.slugs.has(anchor));
+              ? entry!.giteaSlugs.has(anchor) || entry!.htmlAnchors.has(anchor)
+              : entry!.slugs.has(anchor) || entry!.foldedHtmlAnchors.has(anchor.toLowerCase()));
       return { status: "resolved", target, fragment, fragmentExists };
     },
   };
