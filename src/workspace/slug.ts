@@ -55,18 +55,20 @@ function createSlugger(clean: (text: string) => string): Slugger {
  * characters becomes a single hyphen, with none leading or trailing.
  */
 export function createForgejoSlugger(): Slugger {
-  return createSlugger((text) => {
-    let result = "";
-    let pending = false;
-    for (const character of text) {
-      if (/[\p{L}\p{N}_]/u.test(character)) {
-        if (pending && result) result += "-";
-        pending = false;
-        result += lower(character);
-      } else pending = true;
-    }
-    return result;
-  });
+  return createSlugger(forgejoAnchor);
+}
+/** One Forgejo anchor without numbering. */
+export function forgejoAnchor(text: string): string {
+  let result = "";
+  let pending = false;
+  for (const character of text) {
+    if (/[\p{L}\p{N}_]/u.test(character)) {
+      if (pending && result) result += "-";
+      pending = false;
+      result += lower(character);
+    } else pending = true;
+  }
+  return result;
 }
 
 /**

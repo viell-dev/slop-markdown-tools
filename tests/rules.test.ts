@@ -123,6 +123,207 @@ describe("style/emphasis and style/strong on Gitea", () => {
   });
 });
 
+describe("Forgejo and Gitea heading attribute blocks", () => {
+  const forges = ["forgejo", "gitea"] as const;
+  const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  // Forgejo and Gitea read the trailing `{...}` block before they parse
+  // emphasis; GFM parses the same characters as heading text. Rendered on
+  // Forgejo 16.0.5 and Gitea 1.25.5, 1.27.3, and 28.0.0, each source below
+  // differs from its GitHub-style rewrite in heading text, attributes, or anchor.
+  it.each([
+    // The rewritten block would be invalid: heading text and no `#bare` anchor.
+    ["## Bare {#bare data-x=__init__}\n", "## Bare {#bare data-x=**init**}\n"],
+    // The rewritten block would set another title.
+    ['## Star {title="*x*"}\n', '## Star {title="_x_"}\n'],
+    // No emphasis on the forges: it would start in the text and end in the block.
+    ["## __Mode {.a__}\n", "## **Mode {.a**}\n"],
+    // Emphasis and no block on the forges: `{.a*}` is invalid and `{.a_}` is not.
+    ["## *Mode {.a*}\n", "## _Mode {.a_}\n"],
+    ["Under *lined {.a*}\n===\n", "Under _lined {.a_}\n===\n"],
+    // Each of the two nested emphases alone would leave the block invalid.
+    ["## **Lead {.c* .d*}\n", "## __Lead {.c_ .d_}\n"],
+    // Gitea before 1.26 also reads a block that a closing sequence follows.
+    ["## Old {#old data-x=__init__} ##\n", "## Old {#old data-x=**init**} ##\n"],
+    // From the first `{` on, every character can decide whether a block follows.
+    ["## Use {braces} in *text*\n", "## Use {braces} in _text_\n"],
+  ])("leaves the markers of %j alone", (source, github) => {
+    for (const dialect of forges) expect(formatted(source, only(markers, dialect))).toBe(source);
+    expect(formatted(source, only(markers, "github"))).toBe(github);
+  });
+  it.each(forges)("still converts markers outside a block on %s", (dialect) => {
+    expect(
+      formatted(
+        "## *Install* and __run__ {#setup}\n\nA *b* {.c*}\n\n*Two*\nlines {#two}\n---\n",
+        only(markers, dialect),
+      ),
+    ).toBe("## _Install_ and **run** {#setup}\n\nA _b_ {.c*}\n\n_Two_\nlines {#two}\n---\n");
+  });
+  it.each(forges)("keeps a heading's custom anchor through the %s preset", (dialect) => {
+    const config: Config = { extends: ["recommended", dialect] };
+    const source = "## Bare {#bare data-x=__init__}\n\n[link](#bare) and *text*\n";
+    const workspace = createWorkspace({ "Doc.md": source });
+    const result = format(source, { config, path: "Doc.md", workspace });
+    expect(result.output).toBe("## Bare {#bare data-x=__init__}\n\n[link](#bare) and _text_\n");
+    expect(result.diagnostics.filter((item) => item.rule !== "style/emphasis")).toEqual([]);
+  });
+  it.each([
+    // A `#` run before the block would close the ATX heading on the forges.
+    ["Run ## {#sid}\n===\n", "# Run \\## {#sid}\n", "# Run ## {#sid}\n"],
+    ["Tight ##{#tid}\n---\n", "## Tight \\##{#tid}\n", "## Tight ##{#tid}\n"],
+    ["Plain {#pid}\n---\n", "## Plain {#pid}\n", "## Plain {#pid}\n"],
+    ["C# {#cs}\n---\n", "## C# {#cs}\n", "## C# {#cs}\n"],
+    ["Run ## {#sid} #\n===\n", "# Run ## {#sid} \\#\n", "# Run ## {#sid} \\#\n"],
+  ])("converts the Setext heading %j without changing its text", (source, forge, github) => {
+    const config = { "style/heading": "warn" } as const;
+    for (const dialect of forges) expect(formatted(source, only(config, dialect))).toBe(forge);
+    expect(formatted(source, only(config, "github"))).toBe(github);
+  });
+  it.each([
+    // Joined, the last line would hold a valid block.
+    ['Join {title="`c\nd`"}\n---\n', 'Join {title="`c d`"}\n---\n'],
+    // Forgejo builds the anchor from the last line alone: `#b-end`.
+    ["Multi `a\nb` end\n===\n", "Multi `a b` end\n===\n"],
+  ])("leaves the multiline code span of the heading %j unjoined", (source, github) => {
+    const config = { "style/inline-code": "warn" } as const;
+    for (const dialect of forges) {
+      expect(formatted(source, only(config, dialect))).toBe(source);
+      expect(formatted(`Text \`a\nb\` end\n\n${source}`, only(config, dialect))).toBe(
+        `Text \`a b\` end\n\n${source}`,
+      );
+    }
+    expect(formatted(source, only(config, "github"))).toBe(github);
+  });
+  it("leaves a link destination inside a block alone", () => {
+    const rules: Record<string, RuleSetting> = {
+      "links/path": ["warn", { style: "relative", leadingDot: true }],
+    };
+    const source = '## Link {title="[x](y.md)"}\n\n[y](y.md)\n';
+    const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
+    const run = (dialect: Dialect) =>
+      formatted(source, only(rules, dialect), { path: "Doc.md", workspace });
+    for (const dialect of forges)
+      expect(run(dialect)).toBe('## Link {title="[x](y.md)"}\n\n[y](./y.md)\n');
+    expect(run("github")).toBe('## Link {title="[x](./y.md)"}\n\n[y](./y.md)\n');
+  });
+  it("refuses an edit by any rule that changes a block", () => {
+    // In the GFM tree both spellings are the same emphasis, so only the
+    // block's own text can tell them apart.
+    const swap = (from: string, to: string): Plugin => ({
+      name: "swap",
+      rules: {
+        markers: {
+          kind: "style",
+          description: "Replace the emphasis markers of the first heading",
+          check: ({ document }) =>
+            [...document.source.split("\n")[0]!.matchAll(/[*_]/g)]
+              .filter((match) => match[0] === from)
+              .map((match) => ({
+                start: match.index,
+                message: "Swap",
+                edit: { start: match.index, end: match.index + 1, text: to },
+              })),
+        },
+      },
+    });
+    const config = (dialect: Dialect) => only({ "swap/markers": "warn" }, dialect);
+    for (const [source, from, to] of [
+      ['## Star {title="*x*"}\n', "*", "_"],
+      ["## *Mode {.a*}\n", "*", "_"],
+      ["## _Mode {.a_}\n", "_", "*"],
+      ["## Old {#old data-x=_i_} ##\n", "_", "*"],
+    ] as const) {
+      const plugins = [swap(from, to)];
+      for (const dialect of forges) {
+        const result = format(source, { config: config(dialect), plugins });
+        expect(result.output).toBe(source);
+        expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+      }
+      expect(format(source, { config: config("github"), plugins }).output).toBe(
+        source.replaceAll(from, to),
+      );
+    }
+    // The same edit before a block that sets the id is an ordinary marker change.
+    const plugins = [swap("*", "_")];
+    expect(format("## *Mode* {#m}\n", { config: config("forgejo"), plugins }).output).toBe(
+      "## _Mode_ {#m}\n",
+    );
+  });
+});
+
+describe("Forgejo and Gitea heading anchors under formatting", () => {
+  const forges = ["forgejo", "gitea"] as const;
+  const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  // Forgejo 16.0.5 and Gitea 1.21.11, 1.23.8, and 1.25.5 build the anchor from
+  // the heading's last line as written: `## Emph *star* end` is #emph-star-end
+  // and `## Emph _star_ end` is #emph-_star_-end.
+  it.each([
+    ["## Emph *star* end\n", "## Emph _star_ end\n"],
+    ["## Strong __init__ end\n", "## Strong **init** end\n"],
+    ["Under *lined*\n===\n", "Under _lined_\n===\n"],
+    ["> ## Quoted *star*\n", "> ## Quoted _star_\n"],
+  ])("leaves the markers of the heading %j alone", (source, github) => {
+    for (const dialect of forges) expect(formatted(source, only(markers, dialect))).toBe(source);
+    expect(formatted(source, only(markers, "github"))).toBe(github);
+  });
+  it.each(forges)("still converts markers that cannot change an anchor on %s", (dialect) => {
+    const source = "*Two*\n*lines*\n===\n\n## *Custom* {#id}\n\nA *b* and __c__.\n";
+    expect(formatted(source, only(markers, dialect))).toBe(
+      "_Two_\n*lines*\n===\n\n## _Custom_ {#id}\n\nA _b_ and **c**.\n",
+    );
+  });
+  it("leaves a link destination in a heading alone", () => {
+    const rules: Record<string, RuleSetting> = {
+      "links/path": ["warn", { style: "relative", leadingDot: true }],
+    };
+    const source = "## See [x](y.md) end\n\n## See [x](y.md) {#see}\n\n[y](y.md)\n";
+    const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
+    const run = (dialect: Dialect) =>
+      formatted(source, only(rules, dialect), { path: "Doc.md", workspace });
+    for (const dialect of forges)
+      expect(run(dialect)).toBe(
+        "## See [x](y.md) end\n\n## See [x](./y.md) {#see}\n\n[y](./y.md)\n",
+      );
+    expect(run("github")).toBe(
+      "## See [x](./y.md) end\n\n## See [x](./y.md) {#see}\n\n[y](./y.md)\n",
+    );
+  });
+  it.each(forges)("keeps every link to a heading valid through the %s preset", (dialect) => {
+    const config: Config = { extends: ["recommended", dialect] };
+    const source =
+      "## Emph *star* end\n\n## Strong __init__ end\n\n[a](#emph-star-end) and [b](#strong-__init__-end) and *c*\n";
+    const workspace = createWorkspace({ "Doc.md": source });
+    const result = format(source, { config, path: "Doc.md", workspace });
+    expect(result.output).toBe(source.replace("*c*", "_c_"));
+    expect(result.diagnostics.filter((item) => item.rule !== "style/emphasis")).toEqual([]);
+  });
+  it("refuses an edit by any rule that changes an anchor", () => {
+    const plugin: Plugin = {
+      name: "swap",
+      rules: {
+        stars: {
+          kind: "style",
+          description: "Replace every asterisk with an underscore",
+          check: ({ document }) =>
+            [...document.source.matchAll(/\*/g)].map((match) => ({
+              start: match.index,
+              message: "Swap",
+              edit: { start: match.index, end: match.index + 1, text: "_" },
+            })),
+        },
+      },
+    };
+    const run = (source: string, dialect: Dialect) =>
+      format(source, { config: only({ "swap/stars": "warn" }, dialect), plugins: [plugin] });
+    for (const dialect of forges) {
+      const result = run("## Emph *star* end\n", dialect);
+      expect(result.output).toBe("## Emph *star* end\n");
+      expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+      expect(run("*Two*\nlines\n===\n", dialect).output).toBe("_Two_\nlines\n===\n");
+    }
+    expect(run("## Emph *star* end\n", "github").output).toBe("## Emph _star_ end\n");
+  });
+});
+
 describe("links/path wikilink rewriting", () => {
   const workspace = createWorkspace(
     { "Doc.md": "", "Folder/Note.md": "# Heading\n", "Other/Dup.md": "", "Folder/Dup.md": "" },
