@@ -62,7 +62,7 @@ function lastLineSource(
   const last = node.children.at(-1);
   if (!first || !last) return "";
   const start = range(first)[0];
-  let end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
+  const end = blockStart === undefined ? range(last)[1] : Math.max(start, blockStart);
   let text = source.slice(start, end);
   const lineBreak = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
   if (lineBreak < 0) {
