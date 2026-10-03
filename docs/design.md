@@ -141,20 +141,20 @@ without, and is matched without it; Obsidian fragments stay literal. The three
 also keep the `id` attribute of every element and the `name` of an `<a>` in a
 document's HTML, prefixed the same way, so those are fragments too, read from
 the inline and block HTML with comments dropped; GitHub lowercases them and
-matches a fragment lowercased as well. They do not number later headings. The
-scan follows HTML tokenization: comments, unclosed ones to the end of their
-block, declarations, and the content of `<script>`, `<textarea>`, and the other
-raw-text elements are skipped, a `<!--` inside a quoted attribute value is part
-of the value, and every value of a repeated attribute counts, since the
-renderers disagree on which one they keep. Entity references in such attributes
-are not decoded. GitHub and Gitea 1.26 and later also generate anchors for
-headings written as HTML, from their text content with inner tags removed and
-character references decoded; GitHub numbers them in document order together
-with the Markdown headings and also when the tag has an `id`, Gitea numbers
-nothing and skips a tag with an `id`, and Forgejo generates none. Headings
-inside HTML blocks and inline in a paragraph both count. GitHub's treatment was
-taken from a live README and from the heading filter its rendering derives from,
-not from a page with repeated or `id`-bearing HTML headings.
+matches any fragment lowercased as well, including a heading's. They do not
+number later headings. The scan follows HTML tokenization: comments, unclosed
+ones to the end of their block, declarations, and the content of `<script>`,
+`<textarea>`, and the other raw-text elements are skipped, a `<!--` inside a
+quoted attribute value is part of the value, and every value of a repeated
+attribute counts, since the renderers disagree on which one they keep. Entity
+references in such attributes are not decoded. GitHub and Gitea 1.26 and later
+also generate anchors for headings written as HTML, from their text content with
+inner tags removed and character references decoded; GitHub numbers them in
+document order together with the Markdown headings and also when the tag has an
+`id`, Gitea numbers nothing and skips a tag with an `id`, and Forgejo generates
+none. Headings inside HTML blocks and inline in a paragraph both count. GitHub's
+treatment was taken from a live README and from the heading filter its rendering
+derives from, not from a page with repeated or `id`-bearing HTML headings.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery
