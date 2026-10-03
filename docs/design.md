@@ -161,13 +161,17 @@ README and from the heading filter its rendering derives from, not from a page
 with repeated or `id`-bearing HTML headings.
 
 The workspace indexes eligible paths first and parses target Markdown only when
-a fragment is checked, caching the result for that invocation. CLI discovery
-also defers reading Markdown until it is selected or needed for a fragment.
-Built-in rule-schema validators are reused across documents. A suffix lookup
-index is built on first use instead of scanning every path for each shortened
-link. There is no persistent cache, worker pool, watch service, editor
-extension, or language server yet. The library has a pluggable workspace
-interface for specialized hosts.
+a fragment is checked, caching the result for that invocation. A target's
+anchors are computed per renderer the first time a link is checked against a
+dialect that uses them, so a GitHub or Obsidian workspace never reads attribute
+blocks, which need a second parse, or the Forgejo and Gitea anchors, and the
+forges never number anchors GitHub's way; the target's HTML is tokenized once
+for whichever of them read it. CLI discovery also defers reading Markdown until
+it is selected or needed for a fragment. Built-in rule-schema validators are
+reused across documents. A suffix lookup index is built on first use instead of
+scanning every path for each shortened link. There is no persistent cache,
+worker pool, watch service, editor extension, or language server yet. The
+library has a pluggable workspace interface for specialized hosts.
 
 Run `npm run build` and `node scripts/benchmark.mjs 1000` for a reproducible
 synthetic library benchmark. It reports path-index construction and lint time
