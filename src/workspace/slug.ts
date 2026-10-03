@@ -22,7 +22,9 @@ export interface Slugger {
  * Number repeated anchors `-1`, `-2`, ... checked against every anchor already
  * issued, and give a heading without anchor characters the anchor `heading`.
  * The renderers prefix `user-content-`, which their page scripts hide from
- * authors, so links use the bare anchor.
+ * authors, so links use the bare anchor. A generated anchor that already starts
+ * with the prefix is not prefixed again: `## user-content-setup` is reached as
+ * `#setup`, and a later `## Setup` becomes `#setup-1`.
  */
 function createSlugger(clean: (text: string) => string): Slugger {
   const seen = new Set<string>();
@@ -33,7 +35,7 @@ function createSlugger(clean: (text: string) => string): Slugger {
       return anchor;
     },
     slug(text) {
-      const result = clean(text) || "heading";
+      const result = (clean(text) || "heading").replace(/^user-content-/, "");
       if (!seen.has(result)) {
         seen.add(result);
         return result;

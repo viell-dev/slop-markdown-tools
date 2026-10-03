@@ -252,10 +252,11 @@ Gitea match exactly as written. A heading written as HTML
 (`<h2 align="center">Title</h2>`) gets a generated anchor on GitHub, numbered
 together with the Markdown headings, and on Gitea 1.26 and later, where it is
 not numbered and a heading with its own `id` gets none; Forgejo and earlier
-Gitea versions give it no anchor. HTML inside comments and code is not an
-anchor. Already compliant destinations retain their percent-encoding spelling,
-including literal `?` and `%` in resolving Obsidian paths. Newly generated paths
-encode literal percent signs and hashes to preserve target identity.
+Gitea versions give it no anchor. HTML inside comments, code, and `<script>`,
+`<textarea>`, and the other elements whose content is text is not an anchor.
+Already compliant destinations retain their percent-encoding spelling, including
+literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
+literal percent signs and hashes to preserve target identity.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the

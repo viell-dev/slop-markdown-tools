@@ -2,7 +2,7 @@ import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { decodeNamedCharacterReference } from "decode-named-character-reference";
 import { walk } from "../syntax/walk.js";
-import type { Nodes } from "mdast";
+import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
@@ -64,29 +64,94 @@ function literalUnderscoreText(node: Nodes, source: string): string {
     return node.children.map((child) => literalUnderscoreText(child, source)).join("");
   return renderedText(node, gitea);
 }
-
-/** An HTML comment, which the renderers drop with everything in it. */
-const comment = /<!--[\s\S]*?-->/g;
 /** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
 const openTag =
-  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/g;
+  /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/y;
+const closeTag = /<\/([A-Za-z][A-Za-z0-9-]*)[ \t\r\n]*>/y;
 const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
+/**
+ * Elements whose content HTML reads as text and that no renderer shows as an
+ * element: GitHub's tagfilter shows these tags as text, Forgejo removes them,
+ * and Gitea shows them as text or removes them. `<plaintext>` has no end.
+ */
+const rawText = new Set([
+  "iframe",
+  "noembed",
+  "noframes",
+  "plaintext",
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "xmp",
+]);
+/** A tag that becomes an element, or the text between tags. */
+type HtmlToken =
+  { name: string; attributes: string; close: boolean } | { name?: undefined; text: string };
+/**
+ * HTML as a browser tokenizes it, in one forward pass: comments, which run to
+ * the end when unterminated, declarations, and raw-text elements with their
+ * content are left out, and a tag is read whole, so a `<!--` or `<h2>` inside
+ * a quoted attribute value is part of the value.
+ */
+function htmlTokens(html: string): HtmlToken[] {
+  const tokens: HtmlToken[] = [];
+  const lower = html.toLowerCase();
+  let copied = 0;
+  const text = (end: number) => {
+    if (end > copied) tokens.push({ text: html.slice(copied, end) });
+  };
+  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at)) {
+    let end: number;
+    if (html.startsWith("<!--", at)) {
+      const close = html.indexOf("-->", at + 4);
+      end = close < 0 ? html.length : close + 3;
+      text(at);
+    } else if (html[at + 1] === "!" || html[at + 1] === "?") {
+      const close = html.indexOf(">", at);
+      end = close < 0 ? html.length : close + 1;
+      text(at);
+    } else {
+      openTag.lastIndex = closeTag.lastIndex = at;
+      const open = openTag.exec(html);
+      const tag = open ?? closeTag.exec(html);
+      if (!tag) {
+        // A `<` that starts no tag is text.
+        at++;
+        continue;
+      }
+      const name = tag[1]!.toLowerCase();
+      end = at + tag[0].length;
+      text(at);
+      if (!open) tokens.push({ name, attributes: "", close: true });
+      else if (!rawText.has(name)) tokens.push({ name, attributes: tag[2]!, close: false });
+      else {
+        const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
+        const after = close < 0 ? -1 : html.indexOf(">", close);
+        end = after < 0 ? html.length : after + 1;
+      }
+    }
+    copied = at = end;
+  }
+  text(html.length);
+  return tokens;
+}
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
  * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
  * elements they allow and add their `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
- * prefix is recorded without it. Comments are dropped first; the content of
- * `<script>` and similar elements is not told apart from markup.
+ * prefix is recorded without it. Every value of a repeated attribute counts:
+ * Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
  */
-function htmlAnchors(html: string): string[] {
+function htmlAnchors(tokens: HtmlToken[]): string[] {
   const anchors: string[] = [];
-  for (const tag of html.replace(comment, "").matchAll(openTag)) {
-    const anchor = tag[1]!.toLowerCase() === "a";
-    for (const match of tag[2]!.matchAll(attribute)) {
-      const name = match[1]!.toLowerCase();
-      if (name !== "id" && !(anchor && name === "name")) continue;
+  for (const token of tokens) {
+    if (token.name === undefined || token.close) continue;
+    for (const match of token.attributes.matchAll(attribute)) {
+      const attributeName = match[1]!.toLowerCase();
+      if (attributeName !== "id" && !(token.name === "a" && attributeName === "name")) continue;
       const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
       if (value) anchors.push(value);
     }
@@ -94,30 +159,48 @@ function htmlAnchors(html: string): string[] {
   return anchors;
 }
 
-/** A character reference, which HTML decodes in an element's text. */
-const characterReference = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([A-Za-z][A-Za-z\d]*));/g;
+/**
+ * A character reference, which HTML decodes in an element's text. A numeric one
+ * needs no semicolon, and one that names no character becomes U+FFFD.
+ */
+const characterReference = /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z][A-Za-z\d]*);)/g;
 function decodeReferences(text: string): string {
   return text.replace(characterReference, (reference, decimal, hex, name) => {
     if (name) return decodeNamedCharacterReference(name) || reference;
     const code = Number.parseInt(decimal ?? hex, decimal ? 10 : 16);
-    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    return valid ? String.fromCodePoint(code) : "�";
   });
 }
-/** An `<h1>` to `<h6>` element with its attributes and content, in HTML without comments. */
-const htmlHeading =
-  /<h([1-6])\b((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*>([\s\S]*?)<\/h\1[ \t\r\n]*>/gi;
+const headingTag = /^h[1-6]$/;
 /**
  * Headings written as HTML, as GitHub and Gitea 1.26 and later see them when
  * they generate anchors: the text content with inner tags removed and character
- * references decoded, and whether the tag sets its own `id`.
+ * references decoded, and whether the tag sets its own `id`. As in HTML, a
+ * heading's start tag also ends an open heading, and any heading's end tag
+ * closes it. A heading left open at the end is not reported: the renderers
+ * continue it through the Markdown that follows, which is not modeled.
  */
-function htmlHeadings(html: string): { text: string; hasId: boolean }[] {
+function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
   const headings: { text: string; hasId: boolean }[] = [];
-  for (const match of html.replace(comment, "").matchAll(htmlHeading)) {
-    const hasId = [...match[2]!.matchAll(attribute)].some(
-      (item) => item[1]!.toLowerCase() === "id",
-    );
-    headings.push({ text: decodeReferences(match[3]!.replace(/<[^>]*>/g, "")), hasId });
+  let open: { text: string; hasId: boolean } | undefined;
+  const close = () => {
+    if (open) headings.push({ text: decodeReferences(open.text), hasId: open.hasId });
+    open = undefined;
+  };
+  for (const token of tokens) {
+    if (token.name === undefined) {
+      if (open) open.text += token.text;
+    } else if (headingTag.test(token.name)) {
+      close();
+      if (!token.close)
+        open = {
+          text: "",
+          hasId: [...token.attributes.matchAll(attribute)].some(
+            (item) => item[1]!.toLowerCase() === "id",
+          ),
+        };
+    }
   }
   return headings;
 }
@@ -139,10 +222,6 @@ interface ObsidianAnchors {
   foldedHeadings: Set<string>;
   blocks: Set<string>;
 }
-/** What GitHub, and CommonMark in its stead, links to: numbered heading anchors. */
-interface GithubAnchors {
-  slugs: Set<string>;
-}
 /** What Forgejo and Gitea link to; each reads attribute blocks and its own anchor rules. */
 interface ForgeAnchors {
   /** Forgejo heading anchors; punctuation runs collapse differently. */
@@ -150,24 +229,35 @@ interface ForgeAnchors {
   /** Gitea heading anchors; GitHub-like, but combining marks are dropped. */
   giteaSlugs: Set<string>;
 }
-/** `id` and `<a name>` values from the document's HTML, as written and lowercased. */
-interface HtmlAnchors {
+/** `id` and `<a name>` values from the document's HTML. */
+interface ExplicitAnchors {
+  /** As written, which is how Forgejo and Gitea match them. */
   exact: Set<string>;
+  /** Lowercased, as GitHub stores and matches them. */
   folded: Set<string>;
 }
+/** What one HTML node, or one paragraph holding an inline heading, adds to the page. */
+interface HtmlPart {
+  anchors: string[];
+  headings: { text: string; hasId: boolean }[];
+}
 /**
- * A link target's anchors, each group computed the first time a link is checked
- * against a dialect that uses it, so that a GitHub or Obsidian workspace never
- * reads attribute blocks or Forgejo and Gitea anchors, and the forges never
- * number anchors GitHub's way.
+ * A link target and its anchors. The document is parsed once; each group of
+ * anchors is computed the first time a link is checked against a dialect that
+ * uses it, so a GitHub or Obsidian workspace never reads attribute blocks,
+ * which need a second parse, or the Forgejo and Gitea anchors, and the forges
+ * never number anchors GitHub's way.
  */
 interface Target {
   /** The parsed document, or null for a target that is not Markdown source. */
   document: Document | null;
+  /** The document's HTML, tokenized once for every group that reads it. */
+  html?: Map<Nodes, HtmlPart>;
   obsidian?: ObsidianAnchors;
-  github?: GithubAnchors;
+  /** GitHub's numbered heading anchors, which CommonMark uses in its stead. */
+  github?: Set<string>;
   forge?: ForgeAnchors;
-  html?: HtmlAnchors;
+  explicit?: ExplicitAnchors;
 }
 export interface WorkspaceOptions {
   dialect?: Dialect;
@@ -229,7 +319,7 @@ export function createWorkspace(
     return foldedDirectories.has(name.toLowerCase());
   }
   const targets = new Map<string, Target>();
-  /** The target parsed once, on the first fragment check against it. */
+  /** The target, parsed on the first fragment check against it. */
   function target(name: string): Target {
     const cached = targets.get(name);
     if (cached) return cached;
@@ -242,6 +332,23 @@ export function createWorkspace(
     const result: Target = { document };
     targets.set(name, result);
     return result;
+  }
+  function htmlParts(target: Target): Map<Nodes, HtmlPart> {
+    if (target.html) return target.html;
+    const parts = new Map<Nodes, HtmlPart>();
+    target.html = parts;
+    if (!target.document) return parts;
+    const { source, tree } = target.document;
+    walk(tree, (node) => {
+      if (node.type === "html") {
+        const tokens = htmlTokens(node.value);
+        parts.set(node, { anchors: htmlAnchors(tokens), headings: htmlHeadings(tokens) });
+      } else if (node.type === "paragraph" && /<h[1-6]/i.test(source.slice(...range(node))))
+        // An inline heading's tags and text are separate nodes, at any depth;
+        // their explicit anchors come from the tags' own nodes.
+        parts.set(node, { anchors: [], headings: htmlHeadings(htmlTokens(htmlView(node))) });
+    });
+    return parts;
   }
   function obsidianAnchors(target: Target): ObsidianAnchors {
     if (target.obsidian) return target.obsidian;
@@ -263,24 +370,23 @@ export function createWorkspace(
     });
     return anchors;
   }
-  function githubAnchors(target: Target): GithubAnchors {
+  function githubAnchors(target: Target): Set<string> {
     if (target.github) return target.github;
-    const anchors: GithubAnchors = { slugs: new Set() };
-    target.github = anchors;
-    if (!target.document) return anchors;
+    const slugs = new Set<string>();
+    target.github = slugs;
+    if (!target.document) return slugs;
     const slugger = new GithubSlugger();
+    const parts = htmlParts(target);
     // GitHub numbers the anchors of Markdown and HTML headings together, in
-    // document order.
-    const addHtmlHeadings = (html: string) => {
-      for (const heading of htmlHeadings(html)) anchors.slugs.add(slugger.slug(heading.text));
-    };
+    // document order, and prefixes an id only when it does not already start
+    // with the prefix.
+    const add = (text: string) => slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
     walk(target.document.tree, (node) => {
-      if (node.type === "html") addHtmlHeadings(node.value);
-      else if (node.type === "paragraph" && node.children.some((child) => child.type === "html"))
-        addHtmlHeadings(htmlView(node));
-      else if (node.type === "heading") anchors.slugs.add(slugger.slug(renderedText(node, github)));
+      const part = parts.get(node);
+      if (part) for (const heading of part.headings) add(heading.text);
+      else if (node.type === "heading") add(renderedText(node, github));
     });
-    return anchors;
+    return slugs;
   }
   function forgeAnchors(target: Target): ForgeAnchors {
     if (target.forge) return target.forge;
@@ -292,18 +398,23 @@ export function createWorkspace(
     const forgejoSlugger = createForgejoSlugger();
     const giteaSlugger = createGiteaSlugger();
     const attributes = headingAttributes(document);
-    // Gitea 1.26 and later give HTML headings without an `id` an anchor from
-    // their text, and number nothing. Forgejo gives them none.
-    const addHtmlHeadings = (html: string) => {
-      for (const heading of htmlHeadings(html)) {
+    const parts = htmlParts(target);
+    // How many block quotes each heading is in, for the markers of its last line.
+    const quotes = new Map<Heading, number>();
+    const count = (node: Nodes, depth: number) => {
+      if (node.type === "heading") quotes.set(node, depth);
+      if ("children" in node)
+        for (const child of node.children)
+          count(child, depth + (node.type === "blockquote" ? 1 : 0));
+    };
+    count(document.tree, 0);
+    walk(document.tree, (node) => {
+      // Gitea 1.26 and later give HTML headings without an `id` an anchor from
+      // their text, and number nothing. Forgejo gives them none.
+      for (const heading of parts.get(node)?.headings ?? []) {
         const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
         if (anchor) anchors.giteaSlugs.add(anchor);
       }
-    };
-    walk(document.tree, (node) => {
-      if (node.type === "html") return addHtmlHeadings(node.value);
-      if (node.type === "paragraph" && node.children.some((child) => child.type === "html"))
-        return addHtmlHeadings(htmlView(node));
       if (node.type !== "heading") return;
       // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
       const block = attributes.get(node);
@@ -316,7 +427,7 @@ export function createWorkspace(
       }
       // Forgejo, like Gitea before 1.26, builds anchors from the source of
       // the heading's last line: markup, destinations, and tags are part of it.
-      const line = lastLineSource(source, node, block?.start);
+      const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
       anchors.forgejoSlugs.add(forgejoSlugger.slug(line));
       anchors.giteaSlugs.add(giteaSlugger.slug(line));
       // Gitea 1.26 and later number no anchors, build them from the rendered
@@ -332,19 +443,43 @@ export function createWorkspace(
     });
     return anchors;
   }
-  function htmlAnchorsOf(target: Target): HtmlAnchors {
-    if (target.html) return target.html;
-    const anchors: HtmlAnchors = { exact: new Set(), folded: new Set() };
-    target.html = anchors;
-    if (!target.document) return anchors;
+  function explicitAnchors(target: Target): ExplicitAnchors {
+    if (target.explicit) return target.explicit;
+    const anchors: ExplicitAnchors = { exact: new Set(), folded: new Set() };
+    target.explicit = anchors;
     // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
-    walk(target.document.tree, "html", (node) => {
-      for (const anchor of htmlAnchors(node.value)) {
+    for (const part of htmlParts(target).values())
+      for (const anchor of part.anchors) {
         anchors.exact.add(anchor);
         anchors.folded.add(anchor.toLowerCase());
       }
-    });
     return anchors;
+  }
+  /**
+   * Whether the target has the anchor a fragment names. GitHub, Forgejo, and
+   * Gitea store anchors with a `user-content-` prefix and add it to a link's
+   * fragment unless it is already there, so `anchor` is the fragment with one
+   * prefix removed. Gitea 1.26 and later prefix a generated anchor that already
+   * has the prefix again, and a browser reaches that element with the fragment
+   * as written. GitHub's page script also retries a fragment lowercased, and
+   * its anchors are.
+   */
+  function hasAnchor(target: Target, dialect: Dialect, fragment: string, anchor: string): boolean {
+    if (dialect === "obsidian") {
+      const anchors = obsidianAnchors(target);
+      return fragment.startsWith("^")
+        ? anchors.blocks.has(fragment.slice(1))
+        : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
+    }
+    if (dialect === "forgejo" || dialect === "gitea") {
+      const forge = forgeAnchors(target);
+      const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
+      if (slugs.has(anchor) || slugs.has(fragment)) return true;
+      const explicit = explicitAnchors(target).exact;
+      return explicit.has(anchor) || explicit.has(fragment);
+    }
+    const folded = anchor.toLowerCase();
+    return githubAnchors(target).has(folded) || explicitAnchors(target).folded.has(folded);
   }
   let suffixes: Map<string, Set<string>> | undefined;
   function suffixCandidates(target: string): Set<string> | undefined {
@@ -362,22 +497,6 @@ export function createWorkspace(
       }
     }
     return suffixes.get(target.toLowerCase());
-  }
-  function hasAnchor(target: Target, dialect: Dialect, fragment: string, anchor: string): boolean {
-    if (dialect === "obsidian") {
-      const anchors = obsidianAnchors(target);
-      return fragment.startsWith("^")
-        ? anchors.blocks.has(fragment.slice(1))
-        : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
-    }
-    if (dialect === "forgejo")
-      return (
-        forgeAnchors(target).forgejoSlugs.has(anchor) || htmlAnchorsOf(target).exact.has(anchor)
-      );
-    if (dialect === "gitea")
-      return forgeAnchors(target).giteaSlugs.has(anchor) || htmlAnchorsOf(target).exact.has(anchor);
-    const folded = anchor.toLowerCase();
-    return githubAnchors(target).slugs.has(folded) || htmlAnchorsOf(target).folded.has(folded);
   }
   return {
     ...(options.strictLineBreaks !== undefined
@@ -424,12 +543,9 @@ export function createWorkspace(
       if (candidates.size !== 1) return { status: candidates.size ? "ambiguous" : "missing" };
       const resolved = [...candidates][0]!;
       const fragment = parts.fragment;
-      // GitHub, Forgejo, and Gitea store anchors with a `user-content-` prefix
-      // and add it to a link's fragment unless it is already there, so a link
-      // written with the prefix reaches the same anchor as one without. GitHub's
-      // page script also retries a fragment lowercased, and its anchors are.
-      const anchor = fragment.replace(/^user-content-/, "");
-      const fragmentExists = !fragment || hasAnchor(target(resolved), dialect, fragment, anchor);
+      const fragmentExists =
+        !fragment ||
+        hasAnchor(target(resolved), dialect, fragment, fragment.replace(/^user-content-/, ""));
       return { status: "resolved", target: resolved, fragment, fragmentExists };
     },
   };
