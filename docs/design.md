@@ -147,7 +147,18 @@ ones to the end of their block, declarations, and the content of `<script>`,
 `<textarea>`, and the other raw-text elements are skipped, a `<!--` inside a
 quoted attribute value is part of the value, and every value of a repeated
 attribute counts, since the renderers disagree on which one they keep. Entity
-references in such attributes are not decoded.
+references in such attributes are not decoded. GitHub and Gitea 1.26 and later
+also generate anchors for headings written as HTML, from their text content with
+inner tags removed and character references decoded; GitHub numbers them in
+document order together with the Markdown headings and also when the tag has an
+`id`, Gitea numbers nothing and skips a tag with an `id`, and Forgejo generates
+none. Headings inside HTML blocks and inline in a paragraph both count, a
+heading's start tag ends a heading that is still open, and one left open at the
+end of its HTML is not reported, although the renderers continue it through the
+Markdown that follows. Numeric character references are decoded with or without
+a semicolon; named ones only with it. GitHub's treatment was taken from a live
+README and from the heading filter its rendering derives from, not from a page
+with repeated or `id`-bearing HTML headings.
 
 The workspace indexes eligible paths first and parses target Markdown only when
 a fragment is checked, caching the result for that invocation. CLI discovery

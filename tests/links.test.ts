@@ -1188,6 +1188,164 @@ describe("fragment case on GitHub", () => {
   });
 });
 
+describe("anchors of headings written as HTML", () => {
+  // GitHub generates an anchor for an HTML heading as for a Markdown one
+  // (`<h3 align="center">Special Sponsor</h3>` is #special-sponsor on a live
+  // README). Gitea 1.27.3 and 28.0.0, run locally, do the same for headings
+  // without an `id`; Forgejo 16.0.5 and Gitea 1.21.11 to 1.25.5 give them none.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": [
+      '<h2 align="center">Special Thanks</h2>',
+      '<div align="center">\n<h3>Inside div</h3>\n</div>',
+      "<h2>Same</h2>",
+      "## Same",
+      "<h2>Same</h2>",
+      "<h2>Rich <em>text</em> &amp; <code>code</code> here</h2>",
+      '<h2 id="given">Given id</h2>',
+      "<h2>Multi\nline</h2>",
+      "<h4>  Spaced  </h4>",
+      "<H2>Upper Tag</H2>",
+      "<h2>A &lt;b&gt; entity</h2>",
+      "Inline <h2>inline heading</h2> text",
+      "Inline <h2>with *emphasis* and `<h2>code</h2>`</h2> text",
+      "<h2>Caf&eacute; &#233; &#xE9;</h2>",
+      "<!-- <h2>Commented</h2> -->",
+      "<script><h2>Scripted</h2></script>",
+      "<textarea><h2>Typed</h2></textarea>",
+      "<!DOCTYPE html><h2>Declared</h2>",
+      "`<h2>In code</h2>`",
+      "```html\n<h2>Fenced</h2>\n```",
+      "<h7>Not a heading</h7>",
+      "<h2>Unclosed",
+    ].join("\n\n"),
+  });
+  const resolves = (fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${encodeURIComponent(fragment)}`, dialect).fragmentExists;
+  it.each([
+    ["special-thanks", true, true],
+    ["inside-div", true, true],
+    ["same", true, true],
+    // GitHub numbers Markdown and HTML headings together, Gitea numbers nothing.
+    ["same-1", true, false],
+    ["same-2", true, false],
+    ["same-3", false, false],
+    ["rich-text--code-here", true, true],
+    // GitHub's filter also generates an anchor for a heading that has an id; Gitea keeps the id only.
+    ["given", true, true],
+    ["given-id", true, false],
+    // GitHub replaces spaces alone, as its slugger does for Markdown headings.
+    ["multi-line", false, true],
+    ["multiline", true, false],
+    ["spaced", false, true],
+    ["--spaced--", true, false],
+    ["upper-tag", true, true],
+    ["a-b-entity", true, true],
+    ["inline-heading", true, true],
+    ["with-emphasis-and-h2codeh2", true, true],
+    ["café-é-é", true, true],
+    ["commented", false, false],
+    // Raw-text elements are shown as text or removed, so nothing in them is a heading.
+    ["scripted", false, false],
+    ["typed", false, false],
+    ["declared", true, true],
+    ["in-code", false, false],
+    ["fenced", false, false],
+    ["not-a-heading", false, false],
+    ["unclosed", false, false],
+  ])("resolves #%s as %s on GitHub and %s on Gitea", (fragment, github, gitea) => {
+    expect(resolves(fragment, "github")).toBe(github);
+    expect(resolves(fragment, "commonmark")).toBe(github);
+    expect(resolves(fragment, "gitea")).toBe(gitea);
+  });
+  it("hides headings in a comment that is never closed", () => {
+    const unclosed = createWorkspace({
+      "Doc.md": "",
+      "Note.md": "<h2>Before</h2>\n\n<!--\n<h2>Ghost</h2>\n\n<h2>After</h2>\n",
+    });
+    const exists = (fragment: string) =>
+      unclosed.resolve("Doc.md", `Note.md#${fragment}`, "github").fragmentExists;
+    expect(exists("before")).toBe(true);
+    expect(exists("ghost")).toBe(false);
+    expect(exists("after")).toBe(false);
+  });
+  it("reads headings the way HTML is tokenized", () => {
+    // Each heading was rendered on Gitea 28.0.0, whose anchors are in the comments.
+    const tokenized = createWorkspace({
+      "Doc.md": "",
+      "Note.md": [
+        // #a and #b: a heading's start tag ends the heading that is open.
+        "<h2>A<h3>B</h3></h2>",
+        // #c-d: a `>` inside a quoted attribute value does not end the tag.
+        '<h2>C <span title=">wrong">D</span></h2>',
+        // #real: a `<!--` inside a quoted value starts no comment.
+        '<div title="<!--"><h2>Real</h2></div>',
+        // No heading: the tags are an attribute's value.
+        '<div title="<h2>Ghost</h2>"></div>',
+        // #title: the tags are inside emphasis, not direct children of the paragraph.
+        "*before <h2>Title</h2> after*",
+        // #nul: a reference to no character becomes U+FFFD, which no anchor keeps.
+        "<h2>N&#0;ul</h2>",
+        // #a-semicolonless: a numeric reference needs no semicolon.
+        "<h2>&#65 semicolonless</h2>",
+      ].join("\n\n"),
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      tokenized.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["github", "gitea"] as const) {
+      for (const fragment of ["a", "b", "c-d", "real", "title", "nul", "a-semicolonless"])
+        expect(exists(fragment, dialect), `${fragment} on ${dialect}`).toBe(true);
+      for (const fragment of ["ab", "c-wrongd", "ghost", "n0ul", "65-semicolonless"])
+        expect(exists(fragment, dialect), `${fragment} on ${dialect}`).toBe(false);
+    }
+  });
+  it("does not prefix an HTML heading whose text starts with the prefix again on GitHub", () => {
+    // Gitea 28.0.0 renders `<h2>user-content-setup</h2>` with the id
+    // `user-content-user-content-setup`, as it does for the Markdown heading.
+    const prefixed = createWorkspace({ "Doc.md": "", "Note.md": "<h2>user-content-setup</h2>\n" });
+    const exists = (fragment: string, dialect: Dialect) =>
+      prefixed.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    expect(exists("setup", "github")).toBe(true);
+    expect(exists("user-content-setup", "github")).toBe(true);
+    expect(exists("user-content-user-content-setup", "github")).toBe(false);
+    expect(exists("user-content-setup", "gitea")).toBe(true);
+    expect(exists("user-content-user-content-setup", "gitea")).toBe(true);
+    expect(exists("setup", "gitea")).toBe(false);
+  });
+  it("reads many unclosed headings in linear time", () => {
+    const hostile = createWorkspace({
+      "Doc.md": "",
+      "Note.md": `${"<h2>x\n".repeat(50000)}\n\n<div>\n${'<div title="<h2>">\n'.repeat(20000)}`,
+    });
+    const start = performance.now();
+    expect(hostile.resolve("Doc.md", "Note.md#x", "github").fragmentExists).toBe(true);
+    expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github").fragmentExists).toBe(false);
+    expect(performance.now() - start).toBeLessThan(4000);
+  });
+  it("gives HTML headings no anchor on Forgejo or Obsidian", () => {
+    for (const fragment of ["special-thanks", "inside-div", "same-1", "inline-heading"]) {
+      expect(resolves(fragment, "forgejo")).toBe(false);
+      expect(resolves(fragment, "obsidian")).toBe(false);
+    }
+    expect(resolves("same", "forgejo")).toBe(true);
+    expect(resolves("given", "forgejo")).toBe(true);
+  });
+  it("reports only links to anchors the renderer does not generate", () => {
+    const messages = (dialect: Dialect) =>
+      lint("[a](Note.md#special-thanks) [b](Note.md#same-1) [c](Note.md#commented)\n", {
+        config: { extends: [], dialect, rules: { "links/valid": "error" } },
+        path: "Doc.md",
+        workspace,
+      }).map((item) => item.message);
+    expect(messages("github")).toEqual(["Missing fragment in Note.md#commented."]);
+    expect(messages("gitea")).toEqual([
+      "Missing fragment in Note.md#same-1.",
+      "Missing fragment in Note.md#commented.",
+    ]);
+    expect(messages("forgejo")).toHaveLength(3);
+  });
+});
+
 describe("links/path on Gitea", () => {
   const workspace = createWorkspace({ "Doc.md": "", "readme.md": "# R\n" });
   const rewrite = (source: string, dialect: "github" | "gitea") =>
