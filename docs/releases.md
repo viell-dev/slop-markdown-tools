@@ -2,18 +2,18 @@
 
 ## Versions and availability
 
-These documents cover `mdrefine@0.1.0-rc.1`. The executable is `mdtools`;
+These documents cover `mdrefine@0.2.0-rc.1`. The executable is `mdtools`;
 prereleases use the npm channel named after their prerelease identifier, `rc`
 for release candidates and `beta` for betas. Read the
-[rc.1 release notes](releases/0.1.0-rc.1.md) for changes and limitations.
-Previous releases: [beta.4](releases/0.1.0-beta.4.md),
-[beta.3](releases/0.1.0-beta.3.md), [beta.2](releases/0.1.0-beta.2.md), and
-[beta.1](releases/0.1.0-beta.1.md).
+[0.2.0-rc.1 release notes](releases/0.2.0-rc.1.md) for changes and limitations.
+Previous releases: [0.1.0-rc.1](releases/0.1.0-rc.1.md),
+[beta.4](releases/0.1.0-beta.4.md), [beta.3](releases/0.1.0-beta.3.md),
+[beta.2](releases/0.1.0-beta.2.md), and [beta.1](releases/0.1.0-beta.1.md).
 
 The registry is the source of truth for package availability:
 
 ```sh
-npm view mdrefine@0.1.0-rc.1 version --registry=https://registry.npmjs.org/
+npm view mdrefine@0.2.0-rc.1 version --registry=https://registry.npmjs.org/
 ```
 
 An `E404` means the requested package or version is unavailable. A version in
@@ -34,7 +34,7 @@ Use Node.js 24 and npm 10 or newer from a clean checkout:
 ```sh
 npm ci
 npm run release:prepare
-npm publish ./artifacts/mdrefine-0.1.0-rc.1.tgz --dry-run --ignore-scripts --access public --tag rc
+npm publish ./artifacts/mdrefine-0.2.0-rc.1.tgz --dry-run --ignore-scripts --access public --tag rc
 ```
 
 Preparation runs all checks, packs the allowlisted files, installs that exact
@@ -121,7 +121,7 @@ Until the first stable release, move `latest` to that same version using an
 authenticated local npm session. For the current release candidate:
 
 ```sh
-npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.1.0-rc.1 latest
+npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.2.0-rc.1 latest
 npm_config_cache="$PWD/.npm-cache" npm dist-tag ls mdrefine
 ```
 

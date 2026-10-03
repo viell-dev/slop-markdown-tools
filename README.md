@@ -42,7 +42,7 @@ executable is `mdtools`. To install the release candidate in your document
 workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.1.0-rc.1
+npm install --save-dev --save-exact mdrefine@0.2.0-rc.1
 npx --no-install mdtools --help
 ```
 
