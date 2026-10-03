@@ -1269,6 +1269,59 @@ describe("anchors of headings written as HTML", () => {
     expect(exists("ghost")).toBe(false);
     expect(exists("after")).toBe(false);
   });
+  it("reads headings the way HTML is tokenized", () => {
+    // Each heading was rendered on Gitea 28.0.0, whose anchors are in the comments.
+    const tokenized = createWorkspace({
+      "Doc.md": "",
+      "Note.md": [
+        // #a and #b: a heading's start tag ends the heading that is open.
+        "<h2>A<h3>B</h3></h2>",
+        // #c-d: a `>` inside a quoted attribute value does not end the tag.
+        '<h2>C <span title=">wrong">D</span></h2>',
+        // #real: a `<!--` inside a quoted value starts no comment.
+        '<div title="<!--"><h2>Real</h2></div>',
+        // No heading: the tags are an attribute's value.
+        '<div title="<h2>Ghost</h2>"></div>',
+        // #title: the tags are inside emphasis, not direct children of the paragraph.
+        "*before <h2>Title</h2> after*",
+        // #nul: a reference to no character becomes U+FFFD, which no anchor keeps.
+        "<h2>N&#0;ul</h2>",
+        // #a-semicolonless: a numeric reference needs no semicolon.
+        "<h2>&#65 semicolonless</h2>",
+      ].join("\n\n"),
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      tokenized.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["github", "gitea"] as const) {
+      for (const fragment of ["a", "b", "c-d", "real", "title", "nul", "a-semicolonless"])
+        expect(exists(fragment, dialect), `${fragment} on ${dialect}`).toBe(true);
+      for (const fragment of ["ab", "c-wrongd", "ghost", "n0ul", "65-semicolonless"])
+        expect(exists(fragment, dialect), `${fragment} on ${dialect}`).toBe(false);
+    }
+  });
+  it("does not prefix an HTML heading whose text starts with the prefix again on GitHub", () => {
+    // Gitea 28.0.0 renders `<h2>user-content-setup</h2>` with the id
+    // `user-content-user-content-setup`, as it does for the Markdown heading.
+    const prefixed = createWorkspace({ "Doc.md": "", "Note.md": "<h2>user-content-setup</h2>\n" });
+    const exists = (fragment: string, dialect: Dialect) =>
+      prefixed.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+    expect(exists("setup", "github")).toBe(true);
+    expect(exists("user-content-setup", "github")).toBe(true);
+    expect(exists("user-content-user-content-setup", "github")).toBe(false);
+    expect(exists("user-content-setup", "gitea")).toBe(true);
+    expect(exists("user-content-user-content-setup", "gitea")).toBe(true);
+    expect(exists("setup", "gitea")).toBe(false);
+  });
+  it("reads many unclosed headings in linear time", () => {
+    const hostile = createWorkspace({
+      "Doc.md": "",
+      "Note.md": `${"<h2>x\n".repeat(50000)}\n\n<div>\n${'<div title="<h2>">\n'.repeat(20000)}`,
+    });
+    const start = performance.now();
+    expect(hostile.resolve("Doc.md", "Note.md#x", "github").fragmentExists).toBe(true);
+    expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github").fragmentExists).toBe(false);
+    expect(performance.now() - start).toBeLessThan(4000);
+  });
   it("gives HTML headings no anchor on Forgejo or Obsidian", () => {
     for (const fragment of ["special-thanks", "inside-div", "same-1", "inline-heading"]) {
       expect(resolves(fragment, "forgejo")).toBe(false);

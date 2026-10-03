@@ -67,6 +67,7 @@ function literalUnderscoreText(node: Nodes, source: string): string {
 /** An HTML open tag with its attributes, by CommonMark's grammar for raw HTML. */
 const openTag =
   /<([A-Za-z][A-Za-z0-9-]*)((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*\/?>/y;
+const closeTag = /<\/([A-Za-z][A-Za-z0-9-]*)[ \t\r\n]*>/y;
 const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
 /**
@@ -85,47 +86,72 @@ const rawText = new Set([
   "title",
   "xmp",
 ]);
+/** A tag that becomes an element, or the text between tags. */
+type HtmlToken =
+  { name: string; attributes: string; close: boolean } | { name?: undefined; text: string };
+/**
+ * HTML as a browser tokenizes it, in one forward pass: comments, which run to
+ * the end when unterminated, declarations, and raw-text elements with their
+ * content are left out, and a tag is read whole, so a `<!--` or `<h2>` inside
+ * a quoted attribute value is part of the value.
+ */
+function htmlTokens(html: string): HtmlToken[] {
+  const tokens: HtmlToken[] = [];
+  const lower = html.toLowerCase();
+  let copied = 0;
+  const text = (end: number) => {
+    if (end > copied) tokens.push({ text: html.slice(copied, end) });
+  };
+  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at)) {
+    let end: number;
+    if (html.startsWith("<!--", at)) {
+      const close = html.indexOf("-->", at + 4);
+      end = close < 0 ? html.length : close + 3;
+      text(at);
+    } else if (html[at + 1] === "!" || html[at + 1] === "?") {
+      const close = html.indexOf(">", at);
+      end = close < 0 ? html.length : close + 1;
+      text(at);
+    } else {
+      openTag.lastIndex = closeTag.lastIndex = at;
+      const open = openTag.exec(html);
+      const tag = open ?? closeTag.exec(html);
+      if (!tag) {
+        // A `<` that starts no tag is text.
+        at++;
+        continue;
+      }
+      const name = tag[1]!.toLowerCase();
+      end = at + tag[0].length;
+      text(at);
+      if (!open) tokens.push({ name, attributes: "", close: true });
+      else if (!rawText.has(name)) tokens.push({ name, attributes: tag[2]!, close: false });
+      else {
+        const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
+        const after = close < 0 ? -1 : html.indexOf(">", close);
+        end = after < 0 ? html.length : after + 1;
+      }
+    }
+    copied = at = end;
+  }
+  text(html.length);
+  return tokens;
+}
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
  * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
  * elements they allow and add their `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
- * prefix is recorded without it. The scan follows HTML tokenization in one
- * pass: comments, which run to the end when unterminated, declarations, and
- * raw-text elements with their content are skipped, and a `<!--` inside a
- * tag's quoted value is part of the value. Every value of a repeated attribute
- * counts: Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
+ * prefix is recorded without it. Every value of a repeated attribute counts:
+ * Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
  */
-function htmlAnchors(html: string): string[] {
+function htmlAnchors(tokens: HtmlToken[]): string[] {
   const anchors: string[] = [];
-  const lower = html.toLowerCase();
-  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at + 1)) {
-    if (html.startsWith("<!--", at)) {
-      const end = html.indexOf("-->", at + 4);
-      if (end < 0) break;
-      at = end + 2;
-      continue;
-    }
-    if (html[at + 1] === "!" || html[at + 1] === "?") {
-      const end = html.indexOf(">", at);
-      if (end < 0) break;
-      at = end;
-      continue;
-    }
-    openTag.lastIndex = at;
-    const tag = openTag.exec(html);
-    if (!tag) continue;
-    const name = tag[1]!.toLowerCase();
-    at += tag[0].length - 1;
-    if (rawText.has(name)) {
-      const end = lower.indexOf(`</${name}`, at);
-      if (end < 0) break;
-      at = end;
-      continue;
-    }
-    for (const match of tag[2]!.matchAll(attribute)) {
+  for (const token of tokens) {
+    if (token.name === undefined || token.close) continue;
+    for (const match of token.attributes.matchAll(attribute)) {
       const attributeName = match[1]!.toLowerCase();
-      if (attributeName !== "id" && !(name === "a" && attributeName === "name")) continue;
+      if (attributeName !== "id" && !(token.name === "a" && attributeName === "name")) continue;
       const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
       if (value) anchors.push(value);
     }
@@ -133,62 +159,48 @@ function htmlAnchors(html: string): string[] {
   return anchors;
 }
 
-/** A character reference, which HTML decodes in an element's text. */
-const characterReference = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([A-Za-z][A-Za-z\d]*));/g;
+/**
+ * A character reference, which HTML decodes in an element's text. A numeric one
+ * needs no semicolon, and one that names no character becomes U+FFFD.
+ */
+const characterReference = /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z][A-Za-z\d]*);)/g;
 function decodeReferences(text: string): string {
   return text.replace(characterReference, (reference, decimal, hex, name) => {
     if (name) return decodeNamedCharacterReference(name) || reference;
     const code = Number.parseInt(decimal ?? hex, decimal ? 10 : 16);
-    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    return valid ? String.fromCodePoint(code) : "�";
   });
 }
-/** An `<h1>` to `<h6>` element with its attributes and content. */
-const htmlHeading =
-  /<h([1-6])\b((?:[ \t\r\n]+[A-Za-z_:][\w.:-]*(?:[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'|[^ \t\r\n"'=<>`]+))?)*)[ \t\r\n]*>([\s\S]*?)<\/h\1[ \t\r\n]*>/gi;
-/**
- * The HTML that reaches the page as markup: without comments, which run to the
- * end when unterminated, declarations, and raw-text elements with their
- * content, found in one pass as `htmlAnchors` finds them.
- */
-function visibleHtml(html: string): string {
-  const lower = html.toLowerCase();
-  let visible = "";
-  let copied = 0;
-  for (let at = html.indexOf("<"); at >= 0; at = html.indexOf("<", at + 1)) {
-    if (at < copied) continue;
-    let skipTo: number;
-    if (html.startsWith("<!--", at)) {
-      const end = html.indexOf("-->", at + 4);
-      skipTo = end < 0 ? html.length : end + 3;
-    } else if (html[at + 1] === "!" || html[at + 1] === "?") {
-      const end = html.indexOf(">", at);
-      skipTo = end < 0 ? html.length : end + 1;
-    } else {
-      openTag.lastIndex = at;
-      const tag = openTag.exec(html);
-      if (!tag || !rawText.has(tag[1]!.toLowerCase())) continue;
-      const close = lower.indexOf(`</${tag[1]!.toLowerCase()}`, at + tag[0].length);
-      const end = close < 0 ? -1 : html.indexOf(">", close);
-      skipTo = end < 0 ? html.length : end + 1;
-    }
-    visible += html.slice(copied, at);
-    copied = skipTo;
-    at = skipTo - 1;
-  }
-  return visible + html.slice(copied);
-}
+const headingTag = /^h[1-6]$/;
 /**
  * Headings written as HTML, as GitHub and Gitea 1.26 and later see them when
  * they generate anchors: the text content with inner tags removed and character
- * references decoded, and whether the tag sets its own `id`.
+ * references decoded, and whether the tag sets its own `id`. As in HTML, a
+ * heading's start tag also ends an open heading, and any heading's end tag
+ * closes it. A heading left open at the end is not reported: the renderers
+ * continue it through the Markdown that follows, which is not modeled.
  */
-function htmlHeadings(html: string): { text: string; hasId: boolean }[] {
+function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
   const headings: { text: string; hasId: boolean }[] = [];
-  for (const match of visibleHtml(html).matchAll(htmlHeading)) {
-    const hasId = [...match[2]!.matchAll(attribute)].some(
-      (item) => item[1]!.toLowerCase() === "id",
-    );
-    headings.push({ text: decodeReferences(match[3]!.replace(/<[^>]*>/g, "")), hasId });
+  let open: { text: string; hasId: boolean } | undefined;
+  const close = () => {
+    if (open) headings.push({ text: decodeReferences(open.text), hasId: open.hasId });
+    open = undefined;
+  };
+  for (const token of tokens) {
+    if (token.name === undefined) {
+      if (open) open.text += token.text;
+    } else if (headingTag.test(token.name)) {
+      close();
+      if (!token.close)
+        open = {
+          text: "",
+          hasId: [...token.attributes.matchAll(attribute)].some(
+            (item) => item[1]!.toLowerCase() === "id",
+          ),
+        };
+    }
   }
   return headings;
 }
@@ -313,17 +325,26 @@ export function createWorkspace(
       // GitHub numbers the anchors of Markdown and HTML headings together, in
       // document order; Gitea 1.26 and later give HTML headings without an `id`
       // an anchor from their text, and number nothing. Forgejo gives them none.
-      const addHtmlHeadings = (html: string) => {
-        for (const heading of htmlHeadings(html)) {
-          entry.slugs.add(slugger.slug(heading.text));
+      const addHtml = (html: string, anchors: boolean) => {
+        const tokens = htmlTokens(html);
+        // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
+        if (anchors)
+          for (const anchor of htmlAnchors(tokens)) {
+            entry.htmlAnchors.add(anchor);
+            entry.foldedHtmlAnchors.add(anchor.toLowerCase());
+          }
+        for (const heading of htmlHeadings(tokens)) {
+          // GitHub prefixes an id only when it does not already start with the prefix.
+          entry.slugs.add(slugger.slug(heading.text).replace(/^user-content-/, ""));
           const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
           if (anchor) entry.giteaSlugs.add(anchor);
         }
       };
       walk(document.tree, (node) => {
-        if (node.type === "html") return addHtmlHeadings(node.value);
-        if (node.type === "paragraph" && node.children.some((child) => child.type === "html"))
-          return addHtmlHeadings(htmlView(node));
+        if (node.type === "html") return addHtml(node.value, true);
+        // An inline heading's tags and text are separate nodes, at any depth.
+        if (node.type === "paragraph" && /<h[1-6]/i.test(source.slice(...range(node))))
+          return addHtml(htmlView(node), false);
         if (node.type !== "heading") return;
         const text = textContent(node);
         entry.headings.add(text);
@@ -358,13 +379,6 @@ export function createWorkspace(
       walk(document.tree, "text", (node) => {
         const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
         if (match) entry.blocks.add(match[1]!);
-      });
-      // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
-      walk(document.tree, "html", (node) => {
-        for (const anchor of htmlAnchors(node.value)) {
-          entry.htmlAnchors.add(anchor);
-          entry.foldedHtmlAnchors.add(anchor.toLowerCase());
-        }
       });
     }
     entries.set(name, entry);
