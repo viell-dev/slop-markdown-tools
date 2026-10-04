@@ -6,4 +6,5 @@ artifacts/
 *.tgz
 *.tsbuildinfo
 docs/.vitepress/cache/
+docs/.vitepress/.temp/
 docs/.vitepress/*.timestamp-*.mjs

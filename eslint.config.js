@@ -10,6 +10,7 @@ export default tseslint.config(
       "coverage/**",
       "artifacts/**",
       "docs/.vitepress/cache/**",
+      "docs/.vitepress/.temp/**",
       "docs/.vitepress/*.timestamp-*.mjs",
     ],
   },
