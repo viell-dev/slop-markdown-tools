@@ -11,9 +11,11 @@ npm run test:integration    # build, then the CLI, examples, and documentation
 npm run test:package        # pack, install into a temporary project, and use it
 ```
 
-`npm run check` runs both suites after the type, lint, formatting, and
-documentation-site checks. GitHub Actions runs them on Linux with Node.js 22 and
-24 and on Windows with Node.js 24.
+The two suites run one after the other, never at the same time: integration
+tests start many processes, and that load would make the time limits of a few
+unit tests unreliable. `npm run check` runs both suites after the type, lint,
+formatting, and documentation-site checks. GitHub Actions runs them on Linux
+with Node.js 22 and 24 and on Windows with Node.js 24.
 
 ## Unit tests
 
