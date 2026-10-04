@@ -91,7 +91,7 @@ function repositoryPage(index, count, seed) {
 }
 /** Documentation of a repository on GitHub: `count` pages that link to each other. */
 export function repositoryDocs(count, seed = 1) {
-  const files = { "README.md": `# Project\n\nStart with [page 0](docs/area-0/page-0.md).\n` };
+  const files = { "README.md": "# Project\n\nStart with *[page 0](docs/area-0/page-0.md)*.\n" };
   for (let index = 0; index < count; index++)
     files[repositoryPath(index)] = repositoryPage(index, count, seed);
   return {

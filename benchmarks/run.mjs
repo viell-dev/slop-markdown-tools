@@ -59,13 +59,13 @@ function record(group, id, label, measured, extra = {}) {
   progress(`  ${label}: ${Math.round(measured.median)} ms`);
 }
 
-/** Format every file of a corpus once, checking that the corpus behaves as intended. */
+/** Format every file of a corpus once, checking that each one changes, or does not, as intended. */
 function formatAll(corpus, files, expectChanges) {
   const workspace = createWorkspace(files, corpus.workspace);
   const outputs = {};
   for (const [name, source] of Object.entries(files)) {
     const result = format(source, { path: name, config: corpus.config, workspace });
-    if (result.diagnostics.length || (result.changed && !expectChanges))
+    if (result.diagnostics.length || result.changed !== expectChanges)
       throw new Error(`Unexpected formatting result for ${name}.`);
     outputs[name] = result.output;
   }

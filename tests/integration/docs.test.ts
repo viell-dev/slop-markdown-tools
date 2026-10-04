@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parse as parseJsonc } from "jsonc-parser";
+import type { ParseError } from "jsonc-parser";
 import type { Code, RootContent } from "mdast";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
@@ -46,9 +47,17 @@ describe("configuration snippets", () => {
   const snippets = [...pages, "README.md", "examples/README.md"].flatMap((file) =>
     blocks(file)
       .filter((node) => isCode(node, "json") || isCode(node, "jsonc"))
-      .map((node) => ({ file, value: parseJsonc((node as Code).value) as unknown }))
+      .map((node) => {
+        // Parse as the loader does: comments only in JSONC, trailing commas in both.
+        const errors: ParseError[] = [];
+        const value = parseJsonc((node as Code).value, errors, {
+          allowTrailingComma: true,
+          disallowComments: (node as Code).lang === "json",
+        }) as unknown;
+        return { file, value, errors };
+      })
       .filter(
-        (snippet): snippet is { file: string; value: library.Config } =>
+        (snippet): snippet is { file: string; value: library.Config; errors: ParseError[] } =>
           typeof snippet.value === "object" &&
           snippet.value !== null &&
           Object.keys(snippet.value).some((key) => keys.includes(key)),
@@ -58,7 +67,8 @@ describe("configuration snippets", () => {
     expect(snippets.length).toBeGreaterThan(5);
     expect(new Set(snippets.map((snippet) => snippet.file))).toContain("docs/quick-start.md");
   });
-  it.each(snippets)("in $file are accepted by the tool: $value", ({ value }) => {
+  it.each(snippets)("in $file are accepted by the tool: $value", ({ value, errors }) => {
+    expect(errors).toEqual([]);
     library.validateConfig(value);
     // Rule names and options are only checked when a document is processed. A snippet
     // that loads a plugin names rules and presets that exist only with that plugin.

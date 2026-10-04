@@ -24,7 +24,7 @@ for (const entry of await readdir(folder, { recursive: true, withFileTypes: true
   if (!entry.isFile()) continue;
   const absolute = path.join(entry.parentPath, entry.name);
   const name = path.relative(folder, absolute).split(path.sep).join("/");
-  files[name] = name.endsWith(".md") ? await readFile(absolute, "utf8") : null;
+  files[name] = /\.md$/i.test(name) ? await readFile(absolute, "utf8") : null;
 }
 const workspace = createWorkspace(files, { dialect: "github" });
 

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse, semanticFingerprint } from "../../src/index.js";
@@ -269,28 +269,31 @@ describe("commands that must not write", () => {
     };
     const root = await fixture(files);
     const before = await tree(root);
-    for (const command of [
-      ["lint"],
-      ["lint", "--json"],
-      ["format"],
-      ["format", "--diff"],
-      ["format", "--check"],
-      ["format", "--json"],
-      ["config", "explain", "a.md"],
-    ])
-      run(root, command);
+    // Each command has to do its work for an unchanged tree to mean anything.
+    for (const [command, status, stream, printed] of [
+      [["lint"], 0, "stderr", "a.md:1:3: warn style/emphasis"],
+      [["lint", "--json"], 0, "stdout", '"mode": "lint"'],
+      [["format"], 0, "stdout", "+A _note_."],
+      [["format", "--diff"], 0, "stdout", "+- [x] done"],
+      [["format", "--check"], 1, "stderr", "2 file(s) processed; 2 would change."],
+      [["format", "--json"], 0, "stdout", '"changed": true'],
+      [["config", "explain", "a.md"], 0, "stdout", '"dialect": "github"'],
+    ] as const) {
+      const result = run(root, [...command]);
+      expect(result.status, command.join(" ")).toBe(status);
+      expect(result[stream], command.join(" ")).toContain(printed);
+    }
     expect(run(root, ["format", "-", "--stdin-filepath", "a.md"], "B *note*.\n").stdout).toBe(
       "B _note_.\n",
     );
     expect(await tree(root)).toEqual(before);
+    // A write changes the two documents and leaves no temporary file behind.
     expect(run(root, ["format", "--write"]).status).toBe(0);
     expect(await tree(root)).toEqual({
       ...before,
       "a.md": "A _note_.\n",
       "nested/b.md": "- [x] done\n",
     });
-    // A file that changes between reading and writing is reported, not overwritten.
-    await writeFile(path.join(root, "a.md"), "A *note*.\n");
-    expect(run(root, ["format", "--check"]).status).toBe(1);
+    expect(run(root, ["format", "--check"]).status).toBe(0);
   });
 });

@@ -167,20 +167,33 @@ describe("plugin", () => {
     expect(preview.stderr).not.toContain("engine/");
   });
   it("proposes no edit where three hyphens would change the document's meaning", () => {
-    const source = "***\n\nA paragraph\n***\n\nMore prose.\n\n* * *\n";
-    const formatted = run(
-      root,
-      ["format", "-", "--stdin-filepath", "notes/draft.md", "--json"],
-      source,
-    );
-    expect(formatted.status, formatted.stderr).toBe(0);
-    const file = (
-      JSON.parse(formatted.stdout) as { files: (Report["files"][0] & { output: string })[] }
-    ).files[0]!;
-    expect(file.output).toBe("***\n\nA paragraph\n***\n\nMore prose.\n\n---\n");
-    expect(file.diagnostics.map((item) => `${item.line} ${item.rule}`)).toEqual([
+    const format = (source: string) => {
+      const formatted = run(
+        root,
+        ["format", "-", "--stdin-filepath", path.join(root, "notes/draft.md"), "--json"],
+        source,
+      );
+      expect(formatted.status, formatted.stderr).toBe(0);
+      const file = (
+        JSON.parse(formatted.stdout) as { files: (Report["files"][0] & { output: string })[] }
+      ).files[0]!;
+      return [file.output, ...file.diagnostics.map((item) => `${item.line} ${item.rule}`)];
+    };
+    // At the start of a document, and directly below a paragraph, which "---" would
+    // turn into a heading: reported, not edited. After a blank line: edited.
+    expect(format("***\n\nA paragraph\n***\n\nMore prose.\n\n* * *\n")).toEqual([
+      "***\n\nA paragraph\n***\n\nMore prose.\n\n---\n",
       "1 house/thematic-break",
       "4 house/thematic-break",
+    ]);
+    // Below a first line of "---", another "---" would turn the lines between into front matter.
+    expect(format("---\n\nText\n\n***\n")).toEqual([
+      "---\n\nText\n\n***\n",
+      "5 house/thematic-break",
+    ]);
+    // Real front matter is already closed, so a later break is safe to rewrite.
+    expect(format("---\ntitle: Draft\n---\n\nText\n\n***\n")).toEqual([
+      "---\ntitle: Draft\n---\n\nText\n\n---\n",
     ]);
   });
   it("validates options against the schema the rule declares", async () => {
@@ -191,11 +204,18 @@ describe("plugin", () => {
       extends: [],
       rules: { "house/no-placeholder": ["error", { words }] as ["error", { words: unknown }] },
     });
-    expect(
-      lint("Still TBD, see `TBD`.\n", { config: config(["TBD"]), plugins: [plugin] }).map(
-        (item) => [item.start, item.end],
-      ),
-    ).toEqual([[6, 9]]);
+    const ranges = (source: string, words: string[]) =>
+      lint(source, { config: config(words), plugins: [plugin] }).map((item) => [
+        item.start,
+        item.end,
+      ]);
+    expect(ranges("Still TBD, see `TBD`. TBD\n", ["TBD"])).toEqual([
+      [6, 9],
+      [22, 25],
+    ]);
+    // The rule searches the text a reader sees: a character reference can spell a
+    // word, and the name of one is not a word. Such a finding covers the whole text.
+    expect(ranges("&#84;BD &amp; done\n", ["TBD", "amp"])).toEqual([[0, 18]]);
     for (const words of ["TBD", [], [""]])
       expect(() => lint("Text.\n", { config: config(words), plugins: [plugin] })).toThrow(
         "Invalid options for house/no-placeholder",
@@ -223,23 +243,61 @@ describe("library scripts", () => {
     expect(other.stdout).toContain("docs/guide.md:4:1 warn style/wrap");
     expect(other.stdout).toContain("\n1 error(s)\n");
   });
+  it("lint-folder.mjs treats any spelling of the .md extension as Markdown", async () => {
+    const root = await fixture({
+      "README.MD": "A *note* with a [link](other.Md#title).\n",
+      "other.Md": "# Title\n",
+    });
+    const result = node("examples/library/lint-folder.mjs", [root]);
+    expect(result.stdout).toBe(
+      'README.MD:1:3 warn style/emphasis: Use "_" for emphasis.\n' +
+        'README.MD:1:8 warn style/emphasis: Use "_" for emphasis.\n' +
+        "0 error(s)\n",
+    );
+  });
 });
 
 describe("automation", () => {
   it("summarize-report.mjs counts the diagnostics of a JSON report per rule", () => {
-    const linted = run(path.join(examples, "plugin"), ["lint", "--json"]);
-    const summarized = node("examples/automation/summarize-report.mjs", [], linted.stdout);
-    expect(summarized.status, summarized.stderr).toBe(0);
-    expect(summarized.stdout).toBe(
+    const summarize = (report: string) => {
+      const summarized = node("examples/automation/summarize-report.mjs", [], report);
+      expect(summarized.status, summarized.stderr).toBe(0);
+      return summarized.stdout;
+    };
+    expect(summarize(run(path.join(examples, "plugin"), ["lint", "--json"]).stdout)).toBe(
       "lint: 1 file(s), 2 diagnostic(s)\n" +
         "1 error house/no-placeholder in 1 file(s)\n" +
         "1 warn house/thematic-break in 1 file(s)\n",
     );
-    const formatted = run(path.join(examples, "plugin"), ["format", "--check", "--json"]);
-    expect(node("examples/automation/summarize-report.mjs", [], formatted.stdout).stdout).toBe(
+    const checked = run(path.join(examples, "plugin"), ["format", "--check", "--json"]);
+    expect(summarize(checked.stdout)).toBe(
       "format: 1 file(s), 1 diagnostic(s)\n" +
         "1 file(s) need formatting\n" +
         "1 error house/no-placeholder in 1 file(s)\n",
+    );
+  });
+  it("summarize-report.mjs keeps severities apart and knows a write from a preview", async () => {
+    // An override makes the same rule an error in one folder and a warning elsewhere.
+    const root = await fixture({
+      "mdtools.config.jsonc": `{
+        "overrides": [{ "files": ["strict/**"], "rules": { "style/emphasis": "error" } }],
+      }`,
+      "a.md": "An *emphasized* word.\n",
+      "strict/b.md": "An *emphasized* word.\n",
+    });
+    const written = run(root, ["format", "--write", "--json"]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(node("examples/automation/summarize-report.mjs", [], written.stdout).stdout).toBe(
+      "format: 2 file(s), 0 diagnostic(s)\n2 file(s) were formatted\n",
+    );
+    await writeFile(path.join(root, "a.md"), "An *emphasized* word.\n");
+    await writeFile(path.join(root, "strict/b.md"), "An *emphasized* word.\n");
+    const linted = run(root, ["lint", "--json"]);
+    expect(linted.status).toBe(1);
+    expect(node("examples/automation/summarize-report.mjs", [], linted.stdout).stdout).toBe(
+      "lint: 2 file(s), 4 diagnostic(s)\n" +
+        "2 warn style/emphasis in 1 file(s)\n" +
+        "2 error style/emphasis in 1 file(s)\n",
     );
   });
   it("github-actions.yml runs commands that pass on clean documents and fail otherwise", async () => {

@@ -267,20 +267,25 @@ export default {
       check({ document, options }) {
         const words = options.words ?? ["TODO", "TBD"];
         const findings = [];
-        // Only `text` nodes are prose; code spans and code blocks are other node types.
+        // Only plain text is searched. Code is skipped on purpose, and so is syntax
+        // that a dialect parses into a node of its own, such as an Obsidian highlight.
         visit(document.tree, (node) => {
           if (node.type !== "text") return;
-          // Search the source rather than `node.value`, so offsets stay exact
-          // when the text contains escapes or character references.
           const start = node.position.start.offset;
-          const source = document.source.slice(start, node.position.end.offset);
+          const end = node.position.end.offset;
+          // `node.value` is the text a reader sees. Where the source spells it with
+          // escapes or character references, offsets into it do not fit the source,
+          // so the finding then covers the whole run of text.
+          const exact = document.source.slice(start, end) === node.value;
           for (const word of words) {
-            for (let at = source.indexOf(word); at >= 0; at = source.indexOf(word, at + 1)) {
+            let at = node.value.indexOf(word);
+            while (at >= 0) {
               findings.push({
-                start: start + at,
-                end: start + at + word.length,
+                start: exact ? start + at : start,
+                end: exact ? start + at + word.length : end,
                 message: `Replace the placeholder "${word}" before publishing.`,
               });
+              at = exact ? node.value.indexOf(word, at + word.length) : -1;
             }
           }
         });
@@ -294,16 +299,22 @@ export default {
       check({ document }) {
         const findings = [];
         const blocks = document.tree.children;
+        // In a document whose first line is the thematic break "---", a later
+        // "---" would close it as front matter, so no break is rewritten there.
+        const opensFrontMatter =
+          blocks[0]?.type === "thematicBreak" && document.source.startsWith("---");
         for (const [index, node] of blocks.entries()) {
           if (node.type !== "thematicBreak") continue;
           const start = node.position.start.offset;
           const end = node.position.end.offset;
           if (document.source.slice(start, end) === "---") continue;
           // "---" directly below a paragraph would turn that paragraph into a
-          // heading, and at the top of a document it could open front matter.
-          // Only propose the edit after a blank line, where neither can happen.
+          // heading. Only propose the edit after a blank line, where it cannot.
           const previous = blocks[index - 1];
-          const safe = previous && previous.position.end.line < node.position.start.line - 1;
+          const safe =
+            !opensFrontMatter &&
+            previous &&
+            previous.position.end.line < node.position.start.line - 1;
           findings.push({
             start,
             end,
@@ -461,7 +472,7 @@ for (const entry of await readdir(folder, { recursive: true, withFileTypes: true
   if (!entry.isFile()) continue;
   const absolute = path.join(entry.parentPath, entry.name);
   const name = path.relative(folder, absolute).split(path.sep).join("/");
-  files[name] = name.endsWith(".md") ? await readFile(absolute, "utf8") : null;
+  files[name] = /\.md$/i.test(name) ? await readFile(absolute, "utf8") : null;
 }
 const workspace = createWorkspace(files, { dialect: "github" });
 
