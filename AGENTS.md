@@ -186,7 +186,12 @@ passing checks, and resolved review threads remain mandatory.
 - `npm run benchmark` is not part of `check` and never fails on a slow result.
   The reference results in `docs/benchmarks.md` come from the Benchmark workflow
   on a GitHub-hosted runner; replace them from a new run of that workflow, never
-  from a local machine, so that successive results stay comparable.
+  from a local machine. Runners differ in speed by almost a factor of two
+  between runs, so compare absolute times only between reports whose headers
+  name the same processor, and judge a change by the ratio columns or by
+  before-and-after runs on one machine.
+- The Vitest projects run one after the other (`sequence.groupOrder`), so that
+  process-heavy integration tests do not disturb the unit tests' time limits.
 - Follow the README for development commands. Markdown uses this tool at 80
   columns; Prettier excludes Markdown. VitePress builds the public docs from
   `main`; do not commit its cache or generated site. VitePress 2 is pinned to an
