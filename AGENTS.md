@@ -174,6 +174,19 @@ passing checks, and resolved review threads remain mandatory.
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including
   multiline inline code. Obsidian reflow needs verified strict line breaks.
+- `tests/unit/` calls `src/` directly; `tests/integration/` runs the built CLI
+  on real files and checks `examples/`, `benchmarks/`, and the documentation
+  against the tool. `docs/testing.md` says where a new test belongs. The
+  examples page, the rule and preset tables, and the benchmark page's row labels
+  are compared with the code, so update them in the same change.
+- `examples/` ships in the package. Each workspace's `after/` tree is exactly
+  what `format --write` makes of `before/`; regenerate it when formatting
+  behavior changes on purpose, and treat an unexpected difference as a
+  regression.
+- `npm run benchmark` is not part of `check` and never fails on a slow result.
+  The reference results in `docs/benchmarks.md` come from the Benchmark workflow
+  on a GitHub-hosted runner; replace them from a new run of that workflow, never
+  from a local machine, so that successive results stay comparable.
 - Follow the README for development commands. Markdown uses this tool at 80
   columns; Prettier excludes Markdown. VitePress builds the public docs from
   `main`; do not commit its cache or generated site. VitePress 2 is pinned to an

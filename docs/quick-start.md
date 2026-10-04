@@ -14,7 +14,7 @@ npx --no-install mdtools --help
 ```
 
 The npm package is `mdrefine`; the executable is `mdtools`. Prereleases use the
-`beta` channel. See
+npm channel named after their kind, `rc` or `beta`. See
 [versions and availability](releases.md#versions-and-availability) for registry
 checks and release announcements.
 
@@ -100,4 +100,5 @@ This wraps at 100 columns and preserves existing emphasis delimiters. Use
 
 Continue with [CLI workflows](cli.md) for automation and file selection, or
 [configuration and rules](configuration.md) for presets, links, overrides, and
-suppression comments.
+suppression comments. The [examples](examples.md) show complete workspaces
+before and after formatting.

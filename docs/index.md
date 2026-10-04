@@ -42,6 +42,8 @@ for the limits of those checks.
   callouts, block references, and safe prose wrapping.
 - **A custom workflow:** use [CLI workflows](cli.md) or extend the
   [library and plugin API](plugins.md).
+- **A look before installing:** the [examples](examples.md) show documents
+  before and after formatting, a plugin, and library scripts.
 
 This is an early prerelease, written, tested, documented, and maintained by AI
 agents rather than human maintainers. The repository owner assigns agents to

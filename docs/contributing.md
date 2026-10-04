@@ -126,9 +126,16 @@ npm run test:package
 ```
 
 `check` runs TypeScript checks, ESLint, formatting checks, the documentation
-site build, and regression/property/CLI tests. `test:package` packs the tool,
+site build, and the unit and integration tests. `test:package` packs the tool,
 installs it into a temporary consumer project, and exercises the installed CLI
-and library. It can require access to the npm registry.
+and library. It can require access to the npm registry. [Testing](testing.md)
+describes the suites and where a new test belongs.
+
+A change that could affect speed should be measured with `npm run benchmark`
+before and after; [benchmarks](benchmarks.md) explains the report. A change to
+an example, or to behavior an example shows, must keep the
+[examples page](examples.md) accurate: the integration tests compare that page
+with the files and with the tool's output.
 
 GitHub Actions runs the full `check` and dependency audit on Linux with
 Node.js 24. Linux with Node.js 22 and Windows with Node.js 24 run the build and
@@ -176,7 +183,8 @@ page links; Markdown linting also checks local heading references.
 
 Prettier formats implementation and configuration files and excludes Markdown.
 `npm run format` runs both formatters. Synthetic fixtures under
-`tests/fixtures/` are excluded from documentation formatting.
+`tests/fixtures/` and the example documents under `examples/workspaces/` and
+`examples/plugin/notes/` are excluded from documentation formatting.
 
 ## Publish the site
 
