@@ -1,0 +1,10 @@
+{
+  // An Obsidian vault; this file sits at the vault root, next to .obsidian/.
+  "extends": ["recommended", "obsidian"],
+  // Templates contain placeholders, not prose. They stay valid link targets.
+  "ignore": ["Templates/**"],
+  "rules": {
+    // Spell Markdown links as vault-root paths in angle brackets.
+    "links/path": ["warn", { "style": "root", "brackets": "angle" }],
+  },
+}

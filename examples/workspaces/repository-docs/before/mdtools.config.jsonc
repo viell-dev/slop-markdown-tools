@@ -1,0 +1,10 @@
+{
+  // Documentation for a repository hosted on GitHub.
+  "extends": ["recommended", "github"],
+  "rules": {
+    // Not part of a preset: turn underlined headings into "#" headings.
+    "style/heading": "warn",
+    // Write local links as ./relative paths, which editors can follow too.
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}

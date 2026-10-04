@@ -1,4 +1,5 @@
 {
   "extends": ["recommended", "github"],
-  "ignore": ["tests/fixtures/**"],
+  // Fixtures and example documents are deliberately unformatted or in another dialect.
+  "ignore": ["tests/fixtures/**", "examples/workspaces/**", "examples/plugin/notes/**"],
 }
