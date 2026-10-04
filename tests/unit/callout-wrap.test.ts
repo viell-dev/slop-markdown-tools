@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspace, format, lint, parse, semanticFingerprint } from "../src/index.js";
-import type { Config, Plugin } from "../src/index.js";
+import { createWorkspace, format, lint, parse, semanticFingerprint } from "../../src/index.js";
+import type { Config, Plugin } from "../../src/index.js";
 
 const workspace = createWorkspace({}, { strictLineBreaks: true });
 const config: Config = {
