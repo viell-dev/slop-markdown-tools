@@ -25,7 +25,9 @@ export default {
       schema: {
         type: "object",
         additionalProperties: false,
-        properties: { words: { type: "array", items: { type: "string" }, minItems: 1 } },
+        properties: {
+          words: { type: "array", items: { type: "string", minLength: 1 }, minItems: 1 },
+        },
       },
       check({ document, options }) {
         const words = options.words ?? ["TODO", "TBD"];

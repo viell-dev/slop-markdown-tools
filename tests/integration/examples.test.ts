@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { lint } from "../../src/index.js";
+import { dialects, lint } from "../../src/index.js";
 import type { Diagnostic, Plugin } from "../../src/index.js";
 import { copyOf, fixture, node, repository, run, tree } from "./support.js";
 
@@ -22,17 +22,15 @@ function summary(stdout: string): string[] {
 }
 
 // New files in these folders are picked up automatically and must meet the same contract.
-const configurations = readdirSync(examples).filter((name) => name.endsWith(".jsonc"));
-const workspaces = readdirSync(path.join(examples, "workspaces"));
+const configurations = readdirSync(examples)
+  .filter((name) => name.endsWith(".jsonc"))
+  .sort();
+const workspaces = readdirSync(path.join(examples, "workspaces")).sort();
 
 describe("starting configurations", () => {
-  it("cover every supported hosting profile", () => {
-    expect(configurations).toEqual([
-      "forgejo.jsonc",
-      "gitea.jsonc",
-      "github.jsonc",
-      "obsidian.jsonc",
-    ]);
+  it("exist for every dialect that names a hosting profile", () => {
+    for (const dialect of dialects)
+      if (dialect !== "commonmark") expect(configurations).toContain(`${dialect}.jsonc`);
   });
   it.each(configurations)("%s loads and selects the dialect it is named after", async (name) => {
     const root = await fixture({
@@ -198,9 +196,10 @@ describe("plugin", () => {
         (item) => [item.start, item.end],
       ),
     ).toEqual([[6, 9]]);
-    expect(() => lint("Text.\n", { config: config("TBD"), plugins: [plugin] })).toThrow(
-      "Invalid options for house/no-placeholder",
-    );
+    for (const words of ["TBD", [], [""]])
+      expect(() => lint("Text.\n", { config: config(words), plugins: [plugin] })).toThrow(
+        "Invalid options for house/no-placeholder",
+      );
   });
 });
 

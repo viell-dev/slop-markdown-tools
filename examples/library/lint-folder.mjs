@@ -2,6 +2,8 @@
 //
 // The library never reads or writes files. The host reads them and hands them
 // to createWorkspace(), which is what lets rules check links between documents.
+// This script reads everything below the folder; a real host would skip folders
+// such as .git and node_modules, as the CLI does.
 //
 //   node examples/library/lint-folder.mjs [folder]
 import { readdir, readFile } from "node:fs/promises";
