@@ -145,6 +145,50 @@ describe("documentation site", () => {
       for (const version of versions) expect(version, file).toBe(manifest.version);
     }
   });
+  it("fits a line of the default wrap width into a code block", () => {
+    // The site shows formatted output, so a code block must hold a line of the default wrap
+    // width without scrolling sideways. Only a browser shows the real layout. This checks the
+    // arithmetic of the site's stylesheet for a text column at its full width, and that the
+    // theme still has every rule the stylesheet overrides or relies on. When a VitePress update
+    // changes one of them, measure the site in a browser again before changing what is
+    // expected here.
+    const squash = (text: string) => text.replace(/\s+/g, " ");
+    const style = squash(read("docs/.vitepress/theme/style.css"));
+    const theme = (file: string) =>
+      squash(read(`node_modules/vitepress/dist/client/theme-default/${file}`));
+    const wrap = presets.recommended?.rules?.["style/wrap"];
+    const width = Array.isArray(wrap) ? Number(wrap[1]?.width) : Number.NaN;
+    expect(width).toBeGreaterThan(0);
+
+    // In rem: the text column, less the padding on both sides of a code block, divided by the
+    // width of a character. The code font size is in em of the 1rem body text. The widest font
+    // of the theme's monospace stack is SF Mono, which Safari uses for `ui-monospace`; its
+    // characters are 1266/2048 em wide.
+    const value = (pattern: RegExp) => Number(pattern.exec(style)?.[1]);
+    const fontSize = value(/div\[class\*="language-"\] \{ --vp-code-font-size: ([\d.]+)em; \}/);
+    const column = value(/> \.content > \.content-container \{ max-width: ([\d.]+)rem; \}/);
+    const padding = 1.5;
+    const columns = Math.floor((column - 2 * padding) / (fontSize * (1266 / 2048)));
+    expect(columns).toBeGreaterThanOrEqual(width);
+
+    const expected: [file: string, rule: string][] = [
+      ["styles/vars.css", "--vp-code-font-size: 0.875em;"],
+      ["styles/vars.css", "--vp-font-family-mono: ui-monospace, 'Menlo', 'Monaco', 'Consolas',"],
+      [
+        "styles/components/vp-doc.css",
+        ".vp-doc [class*='language-'] code { display: block; padding: 0 1.5rem;",
+      ],
+      ["styles/components/vp-doc.css", "font-size: var(--vp-code-font-size); color: var(--vp-code"],
+      ["components/VPDoc.vue", "'has-sidebar': hasSidebar, 'has-aside': hasAside"],
+      ["components/VPDoc.vue", '<div class="container"> <div v-if="hasAside" class="aside"'],
+      ["components/VPDoc.vue", '<div class="content"> <div class="content-container">'],
+      ["components/VPDoc.vue", "@media (min-width: 60rem) { .VPDoc { padding: 3rem 2rem 0; }"],
+      ["components/VPDoc.vue", "@media (min-width: 60rem) { .content { padding: 0 2rem 8rem; } }"],
+      ["components/VPDoc.vue", "padding-left: 2rem; width: 100%; max-width: 16rem; }"],
+      ["components/VPDoc.vue", ".VPDoc.has-aside .content-container { max-width: 43rem; }"],
+    ];
+    for (const [file, rule] of expected) expect(theme(file), file).toContain(rule);
+  });
 });
 
 describe("library API", () => {
