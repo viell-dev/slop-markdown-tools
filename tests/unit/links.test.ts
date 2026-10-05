@@ -1,3 +1,6 @@
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
+import type { Nodes } from "mdast";
 import { describe, expect, it, vi } from "vitest";
 import {
   createWorkspace,
@@ -7,7 +10,7 @@ import {
   semanticFingerprint,
   textContent,
 } from "../../src/index.js";
-import type { Config, Dialect } from "../../src/index.js";
+import type { Config, Dialect, Document } from "../../src/index.js";
 import {
   headingAttributeBlock,
   headingAttributes,
@@ -18,6 +21,26 @@ vi.mock("../../src/workspace/heading-attributes.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/workspace/heading-attributes.js")>();
   return { ...actual, headingAttributes: vi.fn(actual.headingAttributes) };
 });
+// Let a test follow every document that is parsed, to check that the workspace lets go of them.
+const parses = vi.hoisted(() => ({
+  watch: undefined as ((document: Document) => void) | undefined,
+}));
+vi.mock("../../src/syntax/parse.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/syntax/parse.js")>();
+  const parse: typeof actual.parse = (...parameters) => {
+    const document = actual.parse(...parameters);
+    parses.watch?.(document);
+    return document;
+  };
+  return { ...actual, parse };
+});
+/** Collect garbage now. Node.js offers that only behind a flag, which can be set while running. */
+async function collectGarbage(): Promise<void> {
+  // A WeakRef keeps its target alive until the task that created it has ended.
+  await new Promise((resolve) => setImmediate(resolve));
+  setFlagsFromString("--expose-gc");
+  (runInNewContext("gc") as () => void)();
+}
 
 const config: Config = {
   extends: [],
@@ -101,7 +124,7 @@ describe("local target resolution", () => {
       ).toEqual([]);
     }
   });
-  it("does not load target contents until a fragment is checked, then caches them", () => {
+  it("does not load target contents until a fragment is checked, then caches its anchors", () => {
     const read = vi.fn(() => "# Heading\n\n## Heading\n\nA block. ^id\n");
     const unused = vi.fn(() => {
       throw new Error("must not read");
@@ -110,14 +133,64 @@ describe("local target resolution", () => {
       { "Target.md": read, "Unused.md": unused },
       { dialect: "obsidian" },
     );
+    const exists = (fragment: string, dialect: Dialect) =>
+      index.resolve("Doc.md", `Target.md#${fragment}`, dialect).fragmentExists;
     expect(index.resolve("Doc.md", "Target.md", "obsidian").status).toBe("resolved");
     expect(read).not.toHaveBeenCalled();
-    expect(index.resolve("Doc.md", "Target.md#Heading", "obsidian").fragmentExists).toBe(true);
-    expect(index.resolve("Doc.md", "Target.md#^id", "obsidian").fragmentExists).toBe(true);
-    expect(index.resolve("Doc.md", "Target.md#heading-1", "github").fragmentExists).toBe(true);
-    expect(index.resolve("Doc.md", "Target.md#Missing", "obsidian").fragmentExists).toBe(false);
+    expect(exists("Heading", "obsidian")).toBe(true);
+    expect(exists("^id", "obsidian")).toBe(true);
+    expect(exists("Missing", "obsidian")).toBe(false);
     expect(read).toHaveBeenCalledTimes(1);
+    // Only anchors are kept, so the first link of a dialect with other anchors
+    // loads the target once more, for all the dialects that share them.
+    expect(exists("heading-1", "github")).toBe(true);
+    expect(exists("heading-1", "commonmark")).toBe(true);
+    expect(exists("Heading", "obsidian")).toBe(true);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(exists("heading-1", "forgejo")).toBe(true);
+    expect(exists("heading", "gitea")).toBe(true);
+    expect(exists("heading", "github")).toBe(true);
+    expect(exists("^id", "obsidian")).toBe(true);
+    expect(read).toHaveBeenCalledTimes(3);
     expect(unused).not.toHaveBeenCalled();
+  });
+  it("keeps a target's anchors without its parsed document", async () => {
+    const parsed: WeakRef<object>[] = [];
+    const follow = (node: Nodes) => {
+      parsed.push(new WeakRef(node));
+      if ("children" in node) node.children.forEach(follow);
+    };
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Target.md": '## Install {#setup}\n\n<a name="explicit"></a>\n\n<h2>Html</h2>\n\nText. ^id\n',
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      index.resolve("Doc.md", `Target.md#${fragment}`, dialect).fragmentExists;
+    const check = () => {
+      expect(exists("^id", "obsidian")).toBe(true);
+      expect(exists("html", "github")).toBe(true);
+      expect(exists("explicit", "commonmark")).toBe(true);
+      expect(exists("setup", "forgejo")).toBe(true);
+      expect(exists("html", "gitea")).toBe(true);
+    };
+    parses.watch = (document) => {
+      parsed.push(new WeakRef(document));
+      follow(document.tree);
+    };
+    try {
+      check();
+      expect(parsed.length).toBeGreaterThan(0);
+      // The counting mock above records the document it was called with.
+      vi.mocked(headingAttributes).mockClear();
+      await collectGarbage();
+      expect(parsed.filter((node) => node.deref() !== undefined)).toEqual([]);
+      // The anchors answer later links without another parse.
+      parsed.length = 0;
+      check();
+      expect(parsed).toEqual([]);
+    } finally {
+      parses.watch = undefined;
+    }
   });
   it("computes a dialect's anchors only when a link is checked against it", () => {
     const reads = vi.mocked(headingAttributes);

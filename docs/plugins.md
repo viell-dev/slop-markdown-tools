@@ -30,8 +30,12 @@ folder and builds the workspace from it. `path` and workspace keys use
 forward-slash paths relative to the workspace root. Use `null` values for
 non-Markdown attachments. A Markdown value can also be a synchronous loader
 `() => string`; `createWorkspace` calls it only when that target needs fragment
-validation, then caches its parsed heading/block index. Callers must provide a
-stable source snapshot for each workspace instance. The CLI provides its own
+validation, then keeps the target's anchors, not its text or its parsed form.
+The anchors of Obsidian, of GitHub and CommonMark, and of Forgejo and Gitea
+differ, so the loader is called once more when a later link to that target is
+checked for a dialect of another of these groups; `0.2.0-rc.1` and earlier
+called it at most once and kept the parsed target. Callers must provide a stable
+source snapshot for each workspace instance. The CLI provides its own
 per-invocation file loaders. `WorkspaceOptions.directories` can list existing
 empty directories; parent directories of file entries are inferred. Resolution
 returns `status: "directory"` for a directory instead of `"missing"`.

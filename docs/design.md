@@ -162,14 +162,21 @@ README and from the heading filter its rendering derives from, not from a page
 with repeated or `id`-bearing HTML headings.
 
 The workspace indexes eligible paths first and parses target Markdown only when
-a fragment is checked, caching the result for that invocation. A target's
-anchors are computed per renderer the first time a link is checked against a
-dialect that uses them, so a GitHub or Obsidian workspace never reads attribute
-blocks, which need a second parse, or the Forgejo and Gitea anchors, and the
-forges never number anchors GitHub's way; the target's HTML is tokenized once
-for whichever of them read it. CLI discovery also defers reading Markdown until
-it is selected or needed for a fragment. Built-in rule-schema validators are
-reused across documents. A suffix lookup index is built on first use instead of
+a fragment is checked. For the rest of that invocation it keeps the target's
+anchors and nothing else: the parsed document, which takes many times the memory
+of its source, is released as soon as the anchors are known. Versions up to
+`0.2.0-rc.1` kept every parsed target until the run ended, so memory grew with
+the number of linked documents. Anchors form three groups, one for Obsidian, one
+for GitHub and CommonMark, and one for Forgejo and Gitea. A group is computed
+the first time a link is checked against one of its dialects, so a GitHub or
+Obsidian workspace never reads attribute blocks, which need a second parse, or
+the Forgejo and Gitea anchors, and the forges never number anchors GitHub's way.
+The command line checks each target against one group. A library host that
+checks a target against a second group has it read and parsed once more, which
+is cheaper overall than keeping every parsed document or computing every group
+for every target. CLI discovery also defers reading Markdown until it is
+selected or needed for a fragment. Built-in rule-schema validators are reused
+across documents. A suffix lookup index is built on first use instead of
 scanning every path for each shortened link. There is no persistent cache,
 worker pool, watch service, editor extension, or language server yet. The
 library has a pluggable workspace interface for specialized hosts.
