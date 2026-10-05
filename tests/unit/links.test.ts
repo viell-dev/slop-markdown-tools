@@ -6,13 +6,16 @@ import {
   parse,
   semanticFingerprint,
   textContent,
-} from "../src/index.js";
-import type { Config, Dialect } from "../src/index.js";
-import { headingAttributeBlock, headingAttributes } from "../src/workspace/heading-attributes.js";
+} from "../../src/index.js";
+import type { Config, Dialect } from "../../src/index.js";
+import {
+  headingAttributeBlock,
+  headingAttributes,
+} from "../../src/workspace/heading-attributes.js";
 
 // Count the attribute-block reads that only the Forgejo and Gitea anchors need.
-vi.mock("../src/workspace/heading-attributes.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/workspace/heading-attributes.js")>();
+vi.mock("../../src/workspace/heading-attributes.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/workspace/heading-attributes.js")>();
   return { ...actual, headingAttributes: vi.fn(actual.headingAttributes) };
 });
 

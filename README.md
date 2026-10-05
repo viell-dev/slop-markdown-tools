@@ -33,7 +33,10 @@ Read the
 or browse the
 [documentation site](https://viell-dev.github.io/slop-markdown-tools/). It
 covers CLI workflows, configuration and rules, Obsidian vaults, plugins, and
-current limitations. The Markdown source lives in `docs/`.
+current limitations. The Markdown source lives in `docs/`. Working
+[examples](https://viell-dev.github.io/slop-markdown-tools/examples.html) live
+in `examples/` and ship with the package: starting configurations, workspaces
+before and after formatting, a plugin, and library scripts.
 
 ## Getting started
 
@@ -105,20 +108,25 @@ The project uses Markdown Tools to lint and format its own Markdown at the
 default 80-column width. `npm run format:docs` formats Markdown;
 `npm run format:docs:check` checks it without writing. Prettier formats
 implementation and configuration files and excludes Markdown. `npm run format`
-runs both formatters. Markdown fixtures under `tests/fixtures/` are excluded
-from documentation passes.
+runs both formatters. Markdown fixtures under `tests/fixtures/` and the example
+documents under `examples/workspaces/` and `examples/plugin/notes/` are excluded
+from documentation passes, because they are deliberately unformatted.
 
 `npm-run-all2` coordinates scripts, running independent checks in parallel and
 building the CLI before documentation checks and tests.
 
 `check` runs strict TypeScript checks, ESLint, Prettier for non-Markdown files,
-Markdown Tools for documentation, the VitePress site build, and
-regression/property/CLI tests. GitHub Actions runs full checks on Linux with
-Node.js 24, plus build and test coverage on Linux with Node.js 22 and Windows
-with Node.js 24. All three jobs verify the installed package. Changes to
-formatting need tests for expected output, idempotence, and preserved semantics;
-defects should add a regression example. Keep fixes scoped and describe
-remaining limitations in the PR.
+Markdown Tools for documentation, the VitePress site build, and both test
+suites. Unit tests in `tests/unit/` call the library's source; integration tests
+in `tests/integration/` run the built CLI on real files and check the examples
+and documentation against the tool. `npm run test:unit` and
+`npm run test:integration` run one suite; see
+[testing](https://viell-dev.github.io/slop-markdown-tools/testing.html). GitHub
+Actions runs full checks on Linux with Node.js 24, plus build and test coverage
+on Linux with Node.js 22 and Windows with Node.js 24. All three jobs verify the
+installed package. Changes to formatting need tests for expected output,
+idempotence, and preserved semantics; defects should add a regression example.
+Keep fixes scoped and describe remaining limitations in the PR.
 
 Agent contributors should read
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md)
@@ -126,6 +134,18 @@ for maintenance-specific instructions, including the limits of an assigned
 agent's authority. `test:package` packs and installs a temporary consumer
 project, then exercises the installed CLI and library; it can require access to
 the npm registry.
+
+## Benchmarks
+
+```sh
+npm run benchmark
+```
+
+The benchmark times parsing, linting, and formatting of synthetic documents
+through the library and the CLI, with Prettier on the same files for comparison.
+It takes a few minutes and is not part of `check`.
+[Benchmarks](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html)
+explains what each number means and whether it is good.
 
 ## Documentation website
 

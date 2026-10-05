@@ -44,6 +44,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "pretest": "npm run build",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "pretest:integration": "npm run build",
     "test:package": "run-s build test:package:installed",
     "lint": "eslint .",
     "format": "run-s format:code format:docs",
@@ -61,6 +64,8 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "benchmark": "node benchmarks/run.mjs",
+    "prebenchmark": "npm run build",
     "release:prepare": "run-s check release:pack",
     "release:pack": "node scripts/package-smoke.mjs --retain"
   },

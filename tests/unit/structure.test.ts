@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { format, lint } from "../src/index.js";
-import type { Config } from "../src/index.js";
+import { format, lint } from "../../src/index.js";
+import type { Config } from "../../src/index.js";
 
 function check(
   source: string,

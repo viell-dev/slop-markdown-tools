@@ -35,6 +35,8 @@ try {
     "README.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
+    "examples/README.md",
+    "examples/workspaces/obsidian-vault/before/.obsidian/app.json",
   ])
     assert(
       result.files.some((file) => file.path === required),
@@ -88,6 +90,15 @@ try {
     { encoding: "utf8", cwd: directory },
   );
   assert.equal(output, "A _small_ note.\n");
+  // A shipped example imports the package by name from inside the installed package.
+  assert.equal(
+    execFileSync(
+      process.execPath,
+      [path.join(installed, "examples", "library", "format-string.mjs")],
+      { encoding: "utf8", cwd: directory },
+    ),
+    "A _short_ note with **strong** words and\nno final newline.\n\nchanged: true; remaining diagnostics: 0\n",
+  );
   const consumer = path.join(directory, "consumer.mts");
   await writeFile(
     consumer,

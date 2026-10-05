@@ -79,5 +79,7 @@ not reproduce every Obsidian link-resolution behavior, and unsupported syntax
 may need an ignore pattern or a
 [suppression comment](configuration.md#suppressions).
 
-Read the [current limitations](design.md#safety-boundaries) before a broad
-vault-wide formatting pass.
+The [vault example](examples.md#format-an-obsidian-vault) shows a small vault
+before and after formatting. Read the
+[current limitations](design.md#safety-boundaries) before a broad vault-wide
+formatting pass.

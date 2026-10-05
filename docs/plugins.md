@@ -24,7 +24,9 @@ const result = format(files["note.md"], options);
 // result: { output, changed, diagnostics }
 ```
 
-Library calls do not read or write files. `path` and workspace keys use
+Library calls do not read or write files; the
+[library examples](examples.md#call-the-library) include a script that reads a
+folder and builds the workspace from it. `path` and workspace keys use
 forward-slash paths relative to the workspace root. Use `null` values for
 non-Markdown attachments. A Markdown value can also be a synchronous loader
 `() => string`; `createWorkspace` calls it only when that target needs fragment
@@ -38,14 +40,15 @@ Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.
 
-`parse`, `range`, `textContent`, `resolveConfig`, `configSchema`, `presets`,
-`dialects`, `dialectAliases`, `canonicalDialect`, `builtInRules`,
-`ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also exported.
-`range(node)` returns `[start, end]` UTF-16 offsets into the original source.
-`configSchema` is the configuration's JSON Schema; rule-specific schemas live on
-rule objects. `canonicalDialect(name)` maps an alias such as `codeberg` to the
-dialect that rules and the workspace see (`forgejo`); `document.dialect` is
-always canonical.
+`parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
+`configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
+`builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
+exported. `range(node)` returns `[start, end]` UTF-16 offsets into the original
+source. `configSchema` is the configuration's JSON Schema, and
+`validateConfig(value)` throws when a value does not match it; rule-specific
+schemas live on rule objects. `canonicalDialect(name)` maps an alias such as
+`codeberg` to the dialect that rules and the workspace see (`forgejo`);
+`document.dialect` is always canonical.
 
 ## Rule plugins
 
@@ -103,9 +106,11 @@ by `format`. Formatting runs phases repeatedly until stable, with a limit of
 eight passes. Conflicting edits, oscillation, or a semantic change reject the
 entire document's output.
 
-Use built-in test helpers and fixture examples to verify custom style rules.
-Plugins execute within the host process and are not sandboxed. Semantic checking
-constrains the returned text, not arbitrary JavaScript behavior.
+The [plugin example](examples.md#write-a-plugin) is a complete plugin with a
+problem rule and a style rule to start from. Verify a style rule by formatting
+its output again: a correct rule leaves it unchanged. Plugins execute within the
+host process and are not sandboxed. Semantic checking constrains the returned
+text, not arbitrary JavaScript behavior.
 
 ## Syntax extensions
 

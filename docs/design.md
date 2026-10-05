@@ -30,7 +30,8 @@ callout-marker casing. It does not run Obsidian or GitHub's renderer. Syntax
 extensions require regression tests for their own meaning and source
 preservation. Tests use synthetic documents, deterministic property checks, and
 filesystem/CLI integration cases, including the list-collapse failure that
-motivated replacing heuristic reflow.
+motivated replacing heuristic reflow; [testing](testing.md) describes the
+suites.
 
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects
@@ -173,15 +174,12 @@ scanning every path for each shortened link. There is no persistent cache,
 worker pool, watch service, editor extension, or language server yet. The
 library has a pluggable workspace interface for specialized hosts.
 
-Run `npm run build` and `node scripts/benchmark.mjs 1000` for a reproducible
-synthetic library benchmark. It reports path-index construction and lint time
-separately for 1,000 short interlinked notes; pass a different count to scale
-it. `node scripts/benchmark-vault.mjs 2000` times parsing, fingerprinting,
-linting, formatting, and re-formatting for a vault of longer interlinked notes
-that all need reflow and marker changes, and prints a result hash for comparing
-implementations. These timings exclude filesystem traversal and do not predict a
-particular vault's throughput. Measure the original workload before adding
-caches or workers.
+`npm run benchmark` measures parsing, linting, and formatting of synthetic
+repository documentation and a synthetic vault, through the library and through
+the CLI, and prints an output hash for comparing implementations.
+[Benchmarks](benchmarks.md) explains each measurement and records reference
+results. They do not predict a particular workspace's throughput. Measure the
+original workload before adding caches or workers.
 
 Formatting retains the current parsed document within one call, reusing it
 between phases and for final diagnostics. Every changed candidate is parsed and
@@ -195,12 +193,11 @@ closure-per-node visitor. No-op edits still undergo range and overlap
 validation. This retains the plugin contract that rules must not mutate
 documents.
 
-Run `node scripts/benchmark-format.mjs 100` after building to compare 100
-formatting calls on a synthetic 4.8 KB note needing edits with 100 calls on its
-already-formatted output. It warms both cases, checks output and diagnostics,
-and prints a result hash for comparing implementations. Run several times
-without competing workloads; timings exclude discovery, I/O, CLI serialization,
-and custom plugins.
+The benchmark's library measurements compare formatting documents that need
+edits with formatting their already-formatted output. They follow a warm-up run,
+check outputs and diagnostics, and exclude discovery, I/O, CLI serialization,
+and custom plugins; the command-line measurements include them. Run the
+benchmark without competing workloads.
 
 ## Maintenance priorities
 

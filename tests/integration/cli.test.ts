@@ -1,32 +1,11 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { mkdir, readFile, symlink, stat } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { discover, writeAtomic } from "../src/workspace/files.js";
-import { loadConfig } from "../src/config/load.js";
+import { describe, expect, it } from "vitest";
+import { discover, writeAtomic } from "../../src/workspace/files.js";
+import { loadConfig } from "../../src/config/load.js";
+import { cli, fixture, manifest, run } from "./support.js";
 
-const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
-const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-const temporary: string[] = [];
-async function fixture(files: Record<string, string>) {
-  const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
-  temporary.push(root);
-  // Keep discovery inside the fixture even when the host's temp directory is a repository.
-  await mkdir(path.join(root, ".git"));
-  for (const [name, value] of Object.entries(files)) {
-    await mkdir(path.dirname(path.join(root, name)), { recursive: true });
-    await writeFile(path.join(root, name), value);
-  }
-  return root;
-}
-afterEach(async () => {
-  for (const root of temporary.splice(0)) await rm(root, { recursive: true, force: true });
-});
-function run(root: string, args: string[], input?: string) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd: root, input, encoding: "utf8" });
-}
 describe("CLI", () => {
   it("previews, writes, then verifies formatting without changing unrelated syntax", async () => {
     const root = await fixture({ "note.md": "A *small* note.\n" });

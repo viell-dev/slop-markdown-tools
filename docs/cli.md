@@ -61,6 +61,9 @@ node dist/cli/main.js format --root /path/to/documents --check
 
 Lint catches enabled problem and style rules. Format checking verifies that the
 formatter would leave the selected documents unchanged. Neither command writes.
+The [examples](examples.md#automate-checks) include a GitHub Actions workflow
+that runs both checks on every pull request, and a script that summarizes a JSON
+report.
 
 ## Work with agents and scripts
 

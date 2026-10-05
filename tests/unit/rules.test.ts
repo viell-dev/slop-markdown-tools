@@ -9,8 +9,8 @@ import {
   resolveConfig,
   semanticFingerprint,
   textContent,
-} from "../src/index.js";
-import type { Config, Dialect, Plugin, RuleSetting } from "../src/index.js";
+} from "../../src/index.js";
+import type { Config, Dialect, Plugin, RuleSetting } from "../../src/index.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
   return { extends: [], dialect, rules };

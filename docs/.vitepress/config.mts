@@ -2,7 +2,8 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Markdown Tools",
-  description: "Configurable Markdown linting and formatting for CommonMark, GitHub, and Obsidian.",
+  description:
+    "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian.",
   lang: "en",
   base: "/slop-markdown-tools/",
   head: [["meta", { name: "theme-color", content: "#12776c" }]],
@@ -10,6 +11,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Quick start", link: "/quick-start" },
+      { text: "Examples", link: "/examples" },
       { text: "Reference", link: "/configuration" },
       { text: "Contribute", link: "/contributing" },
     ],
@@ -18,6 +20,7 @@ export default defineConfig({
         text: "Start here",
         items: [
           { text: "Quick start", link: "/quick-start" },
+          { text: "Examples", link: "/examples" },
           { text: "CLI workflows", link: "/cli" },
           { text: "Obsidian vaults", link: "/obsidian" },
         ],
@@ -33,7 +36,9 @@ export default defineConfig({
         text: "Project",
         items: [
           { text: "Design and limitations", link: "/design" },
+          { text: "Benchmarks", link: "/benchmarks" },
           { text: "Contributing and development", link: "/contributing" },
+          { text: "Testing", link: "/testing" },
           { text: "Releases", link: "/releases" },
         ],
       },

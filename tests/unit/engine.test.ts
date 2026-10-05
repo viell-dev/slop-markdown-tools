@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import * as syntax from "../src/syntax/parse.js";
+import * as syntax from "../../src/syntax/parse.js";
 import fc from "fast-check";
 import {
   format,
@@ -9,8 +9,8 @@ import {
   createWorkspace,
   applyEdits,
   semanticFingerprint,
-} from "../src/index.js";
-import type { Config, Plugin, ProcessOptions, RuleContext } from "../src/index.js";
+} from "../../src/index.js";
+import type { Config, Plugin, ProcessOptions, RuleContext } from "../../src/index.js";
 
 const narrow: Config = {
   extends: ["recommended", "github"],

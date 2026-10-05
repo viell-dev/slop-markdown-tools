@@ -1,0 +1,9 @@
+{
+  // Load the plugin beside this file, then enable its preset after the built-in one.
+  "plugins": ["./rules.mjs"],
+  "extends": ["recommended", "house/recommended"],
+  "rules": {
+    // Options are checked against the schema the rule declares.
+    "house/no-placeholder": ["error", { "words": ["TODO", "TBD", "FIXME"] }],
+  },
+}

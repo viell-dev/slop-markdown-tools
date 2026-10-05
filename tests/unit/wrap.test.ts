@@ -8,8 +8,8 @@ import {
   lint,
   parse,
   semanticFingerprint,
-} from "../src/index.js";
-import type { Config } from "../src/index.js";
+} from "../../src/index.js";
+import type { Config } from "../../src/index.js";
 
 function wrap(options: Record<string, unknown> = {}): Config {
   return { extends: [], rules: { "style/wrap": ["warn", { width: 40, ...options }] } };
