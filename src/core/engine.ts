@@ -45,7 +45,12 @@ export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
 const ruleValidator = new Ajv({ allErrors: true });
 const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.schema));
 function prepare(options: ProcessOptions) {
-  const config = resolveConfig(options.config, options.path, options.plugins);
+  const config = resolveConfig(
+    options.config,
+    options.path,
+    options.plugins,
+    options.defaultDialect,
+  );
   const rules = ruleRegistry(options.plugins);
   let pluginValidator: Ajv | undefined;
   for (const [name, value] of Object.entries(config.rules)) {
@@ -160,7 +165,9 @@ export function applyEdits(source: string, edits: Edit[]): string {
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   const canonicalUrl = (url: string, wiki = false) => {
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
-    return resolution?.status === "resolved"
+    // A target that is uncertain, because a directory could not be read, is not
+    // an identity: only the same spelling is known to name the same note.
+    return resolution?.status === "resolved" && !resolution.unreadable
       ? `${resolution.target}#${resolution.fragment ?? ""}`
       : url;
   };

@@ -2,11 +2,11 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   builtInRules,
-  canonicalDialect,
   createWorkspace,
   format,
   lint,
   parse,
+  resolveConfig,
   semanticFingerprint,
 } from "../../src/index.js";
 import type { Config } from "../../src/index.js";
@@ -17,7 +17,7 @@ function wrap(options: Record<string, unknown> = {}): Config {
 function verify(source: string, config: Config) {
   const result = format(source, { config });
   expect(result.diagnostics.some((item) => item.rule.startsWith("engine/"))).toBe(false);
-  const dialect = canonicalDialect(config.dialect ?? "commonmark");
+  const { dialect } = resolveConfig(config);
   expect(semanticFingerprint(parse(result.output, dialect))).toBe(
     semanticFingerprint(parse(source, dialect)),
   );

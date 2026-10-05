@@ -4,10 +4,18 @@ import { decodeNamedCharacterReference } from "decode-named-character-reference"
 import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
+import { fallbackDialect } from "../config/resolve.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
+import { refusal } from "./access.js";
 
+/**
+ * A Markdown file's text, null for a file that is not Markdown, or a loader
+ * that returns the text when a fragment check needs it. A loader that throws an
+ * error whose `code` is `EACCES` or `EPERM` marks the file as unreadable; any
+ * other error propagates.
+ */
 export type WorkspaceSource = string | null | (() => string);
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
@@ -257,6 +265,8 @@ interface HtmlPart {
  * a check against another one parses the target once more.
  */
 interface Target {
+  /** Whether the system refused to let the target's source be read. */
+  unreadable?: true;
   obsidian?: ObsidianAnchors;
   github?: GithubAnchors;
   forge?: ForgeAnchors;
@@ -375,10 +385,17 @@ function forgeAnchors(document: Document | null): ForgeAnchors {
   return anchors;
 }
 export interface WorkspaceOptions {
+  /** The dialect that link targets are parsed in; `github` when omitted. */
   dialect?: Dialect;
   strictLineBreaks?: boolean;
   /** Existing directories, including empty ones; never treated as note targets. */
   directories?: string[];
+  /**
+   * Existing directories whose contents could not be read. A link that leads
+   * into one, or that an Obsidian name search finds nowhere else, resolves as
+   * `unreadable` instead of `missing`.
+   */
+  unreadable?: string[];
 }
 export function splitDestination(destination: string): { path: string; fragment: string } {
   const hash = destination.indexOf("#");
@@ -408,12 +425,42 @@ export function createWorkspace(
     (options.directories ?? []).map((name) => name.replaceAll("\\", "/")),
   );
   directories.add(".");
-  for (const name of sources.keys()) {
+  /** The directories above a path, nearest first, up to the workspace root. */
+  function* parents(name: string): Generator<string> {
     let directory = path.posix.dirname(name);
     while (directory !== "." && directory !== path.posix.dirname(directory)) {
-      directories.add(directory);
+      yield directory;
       directory = path.posix.dirname(directory);
     }
+  }
+  for (const name of sources.keys())
+    for (const directory of parents(name)) directories.add(directory);
+  const unreadable = [
+    ...new Set(
+      (options.unreadable ?? []).map((name) =>
+        path.posix.normalize(name.replaceAll("\\", "/")).replace(/\/$/, ""),
+      ),
+    ),
+  ].sort();
+  for (const name of unreadable) {
+    directories.add(name);
+    for (const directory of parents(name)) directories.add(directory);
+  }
+  const unreadableNames = new Set(unreadable);
+  // Obsidian matches paths without regard to case.
+  const unreadableFolded = new Map(unreadable.map((name) => [name.toLowerCase(), name]));
+  /** The unreadable directory that a path lies in, if any. */
+  function unreadableAbove(name: string, folded: boolean): string | undefined {
+    if (unreadable.length)
+      for (const directory of parents(name)) {
+        const found = folded
+          ? unreadableFolded.get(directory.toLowerCase())
+          : unreadableNames.has(directory)
+            ? directory
+            : undefined;
+        if (found !== undefined) return found;
+      }
+    return undefined;
   }
   // Obsidian resolves note names case-insensitively; these indexes are built on first use.
   let foldedNames: Map<string, string[]> | undefined;
@@ -435,41 +482,66 @@ export function createWorkspace(
   }
   const targets = new Map<string, Target>();
   /**
-   * The target, read and parsed for the caller to compute one group of anchors
-   * from; null for a target that is not Markdown source. Nothing keeps the
-   * result.
+   * One group of a target's anchors, from the target read and parsed for it;
+   * nothing keeps the parsed document. A target that is not Markdown source has
+   * no anchors. Undefined for a target that the system refuses to let be read,
+   * which is marked and not read again.
    */
-  function parseTarget(name: string): Document | null {
+  function compute<Anchors>(
+    target: Target,
+    name: string,
+    anchors: (document: Document | null) => Anchors,
+  ): Anchors | undefined {
+    if (target.unreadable) return undefined;
     const value = sources.get(name);
-    if (value === null || value === undefined || !/\.md$/i.test(name)) return null;
-    const source = typeof value === "function" ? value() : value;
-    return parse(source, options.dialect ?? "commonmark", name);
+    if (value === null || value === undefined || !/\.md$/i.test(name)) return anchors(null);
+    let source: string;
+    try {
+      source = typeof value === "function" ? value() : value;
+    } catch (error) {
+      // The file exists, but its anchors are unknown; any other error is a fault.
+      if (!refusal(error)) throw error;
+      target.unreadable = true;
+      return undefined;
+    }
+    return anchors(parse(source, options.dialect ?? fallbackDialect, name));
   }
   /**
-   * Whether the target has the anchor a fragment names. GitHub, Forgejo, and
-   * Gitea store anchors with a `user-content-` prefix and add it to a link's
-   * fragment unless it is already there, so `anchor` is the fragment with one
-   * prefix removed. Gitea 1.26 and later prefix a generated anchor that already
-   * has the prefix again, and a browser reaches that element with the fragment
-   * as written. GitHub's page script also retries a fragment lowercased, and
-   * its anchors are.
+   * Whether the target has the anchor a fragment names, or undefined when the
+   * target's source could not be read. GitHub, Forgejo, and Gitea store anchors
+   * with a `user-content-` prefix and add it to a link's fragment unless it is
+   * already there, so `anchor` is the fragment with one prefix removed. Gitea
+   * 1.26 and later prefix a generated anchor that already has the prefix again,
+   * and a browser reaches that element with the fragment as written. GitHub's
+   * page script also retries a fragment lowercased, and its anchors are.
    */
-  function hasAnchor(name: string, dialect: Dialect, fragment: string, anchor: string): boolean {
+  function hasAnchor(
+    name: string,
+    dialect: Dialect,
+    fragment: string,
+    anchor: string,
+  ): boolean | undefined {
     let target = targets.get(name);
     if (!target) targets.set(name, (target = {}));
     if (dialect === "obsidian") {
-      const anchors = (target.obsidian ??= obsidianAnchors(parseTarget(name)));
+      const anchors = target.obsidian ?? compute(target, name, obsidianAnchors);
+      if (!anchors) return undefined;
+      target.obsidian = anchors;
       return fragment.startsWith("^")
         ? anchors.blocks.has(fragment.slice(1))
         : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
     }
     if (dialect === "forgejo" || dialect === "gitea") {
-      const forge = (target.forge ??= forgeAnchors(parseTarget(name)));
+      const forge = target.forge ?? compute(target, name, forgeAnchors);
+      if (!forge) return undefined;
+      target.forge = forge;
       const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
       return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
-    const anchors = (target.github ??= githubAnchors(parseTarget(name)));
+    const anchors = target.github ?? compute(target, name, githubAnchors);
+    if (!anchors) return undefined;
+    target.github = anchors;
     const folded = anchor.toLowerCase();
     return anchors.slugs.has(folded) || anchors.explicit.has(folded);
   }
@@ -503,12 +575,21 @@ export function createWorkspace(
       if (dialect !== "obsidian" && (targetPath.startsWith("/") || targetPath.includes("?")))
         return { status: "unavailable" };
       const candidates = new Set<string>();
+      // Unreadable directories that the link's path leads into.
+      const blocking = new Set<string>();
       let directory = false;
+      // Whether Obsidian's search by name was used, which looks in every directory.
+      let searched = false;
+      // Whether a place that Obsidian tries first could not be looked in.
+      let obstructed = false;
       const folded = dialect === "obsidian";
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return;
-        if (isDirectory(normalized.replace(/\/$/, ""), folded)) directory = true;
+        const bare = normalized.replace(/\/$/, "");
+        if (isDirectory(bare, folded)) directory = true;
+        const above = unreadableAbove(bare, folded);
+        if (above !== undefined) blocking.add(above);
         if (!folded) {
           if (sources.has(normalized)) candidates.add(normalized);
           return;
@@ -524,20 +605,52 @@ export function createWorkspace(
           add(path.posix.join(path.posix.dirname(source), targetPath));
         else {
           add(targetPath.replace(/^\//, ""));
-          if (candidates.size === 0 && !directory && !targetPath.startsWith("/"))
-            add(path.posix.join(path.posix.dirname(source), targetPath));
           if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            // The vault root comes first: a note there, unseen, would be the target.
+            obstructed = blocking.size > 0;
+            add(path.posix.join(path.posix.dirname(source), targetPath));
+          }
+          if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            searched = true;
             for (const name of suffixCandidates(targetPath) ?? []) candidates.add(name);
           }
         }
       } else add(path.posix.join(path.posix.dirname(source), targetPath));
       if (candidates.size === 0 && directory) return { status: "directory" };
+      // A search by name covers the readable files only: an unreadable directory
+      // may hold the note that is missing, or a second one of a name found once.
+      const unsearched = searched && unreadable.length > 0;
+      // A match is uncertain when a directory that could not be read may hold a
+      // note that Obsidian would choose instead, or as well.
+      const uncertain = unsearched ? unreadable : obstructed ? [...blocking] : undefined;
+      if (candidates.size === 0 && (blocking.size > 0 || unsearched))
+        return {
+          status: "unreadable",
+          unreadable: blocking.size ? [...blocking] : [...unreadable],
+        };
       if (candidates.size !== 1) return { status: candidates.size ? "ambiguous" : "missing" };
       const resolved = [...candidates][0]!;
       const fragment = parts.fragment;
-      const fragmentExists =
-        !fragment || hasAnchor(resolved, dialect, fragment, fragment.replace(/^user-content-/, ""));
-      return { status: "resolved", target: resolved, fragment, fragmentExists };
+      let fragmentExists = true;
+      if (fragment) {
+        const found = hasAnchor(
+          resolved,
+          dialect,
+          fragment,
+          fragment.replace(/^user-content-/, ""),
+        );
+        // The file is there, but what it contains could not be read.
+        if (found === undefined)
+          return { status: "unreadable", target: resolved, fragment, unreadable: [resolved] };
+        fragmentExists = found;
+      }
+      return {
+        status: "resolved",
+        target: resolved,
+        fragment,
+        fragmentExists,
+        ...(uncertain ? { unreadable: [...uncertain] } : {}),
+      };
     },
   };
 }

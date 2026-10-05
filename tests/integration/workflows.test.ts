@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse, semanticFingerprint } from "../../src/index.js";
@@ -217,45 +217,240 @@ describe("reports for scripts and agents", () => {
   });
 });
 
-describe("plugins installed as packages", () => {
-  const plugin = (name: string) =>
-    `export default {name:"${name}",rules:{report:{kind:"problem",description:"Example",check:()=>[{start:0,message:"From ${name}"}]}}};`;
-  const config = (specifier: string, name: string) =>
-    JSON.stringify({ plugins: [specifier], rules: { [`${name}/report`]: "warn" } });
-  it.each([
-    ["a main field", "sample-plugin", { main: "index.js" }],
-    ["a string exports field", "sample-plugin", { exports: "./index.js" }],
-    ["a scoped name", "@scope/sample-plugin", { exports: { ".": { default: "./index.js" } } }],
-  ])("loads a plugin package that declares %s", async (_label, specifier, fields) => {
-    const root = await fixture({
-      "mdtools.config.json": config(specifier, "sample"),
-      [`node_modules/${specifier}/package.json`]: JSON.stringify({
-        name: specifier,
-        type: "module",
-        ...fields,
-      }),
-      [`node_modules/${specifier}/index.js`]: plugin("sample"),
-      "note.md": "A note.\n",
-    });
-    const checked = run(root, ["lint"]);
-    expect(checked.status, checked.stderr).toBe(0);
-    expect(checked.stderr).toContain("note.md:1:1: warn sample/report: From sample\n");
+describe("plugins named in a configuration", () => {
+  // A plugin whose rule reports `message` on every document, as an ES module or as CommonJS.
+  const plugin = (message: string) =>
+    `{name:"sample",rules:{report:{kind:"problem",description:"Example",check:()=>[{start:0,message:"${message}"}]}}}`;
+  const esm = (message = "Loaded") => `export default ${plugin(message)};`;
+  const cjs = (message = "Loaded") => `module.exports = ${plugin(message)};`;
+  const config = (specifier: string) =>
+    JSON.stringify({ plugins: [specifier], rules: { "sample/report": "warn" } });
+  /** Files of a package installed in `directory`, with its `package.json` built from `fields`. */
+  const installed = (
+    name: string,
+    fields: object,
+    files: Record<string, string>,
+    directory = "",
+  ) => ({
+    [`${directory}node_modules/${name}/package.json`]: JSON.stringify({ name, ...fields }),
+    ...Object.fromEntries(
+      Object.entries(files).map(([file, value]) => [
+        `${directory}node_modules/${name}/${file}`,
+        value,
+      ]),
+    ),
   });
-  // Known defect, issue 112: the loader resolves package names with CommonJS conditions,
-  // so a package that only declares an "import" condition is rejected with 'No "exports"
-  // main defined'. Remove `.fails` when the loader resolves such packages.
-  it.fails("loads a plugin package that only declares an import condition", async () => {
+  /** What the plugin's rule reported for the note, once the run succeeded. */
+  const reported = (checked: ReturnType<typeof run>) => {
+    expect(checked.status, checked.stderr).toBe(0);
+    return /^note\.md:1:1: warn sample\/report: (.*)$/m.exec(checked.stderr)?.[1];
+  };
+
+  it.each([
+    ["a main field", "sample-plugin", { type: "module", main: "index.js" }, esm()],
+    ["a main field and CommonJS code", "sample-plugin", { main: "index.js" }, cjs()],
+    ["a string exports field", "sample-plugin", { type: "module", exports: "./index.js" }, esm()],
+    [
+      "a default condition and a scoped name",
+      "@scope/sample-plugin",
+      { type: "module", exports: { ".": { default: "./index.js" } } },
+      esm(),
+    ],
+    // Issue 112: only the CommonJS conditions were followed, so this entry was not found.
+    [
+      "only an import condition",
+      "sample-plugin",
+      { type: "module", exports: { ".": { import: "./index.js" } } },
+      esm(),
+    ],
+    [
+      "only an import condition and a scoped name",
+      "@scope/sample-plugin",
+      { type: "module", exports: { ".": { import: "./index.js" } } },
+      esm(),
+    ],
+    // No import can find this entry; the CommonJS lookup does.
+    [
+      "only a require condition",
+      "sample-plugin",
+      { exports: { ".": { require: "./index.js" } } },
+      cjs(),
+    ],
+  ])("loads a plugin package that declares %s", async (_label, name, fields, code) => {
     const root = await fixture({
-      "mdtools.config.json": config("sample-plugin", "sample"),
-      "node_modules/sample-plugin/package.json": JSON.stringify({
-        name: "sample-plugin",
-        type: "module",
-        exports: { ".": { import: "./index.js" } },
-      }),
-      "node_modules/sample-plugin/index.js": plugin("sample"),
+      "mdtools.config.json": config(name),
+      ...installed(name, fields, { "index.js": code }),
       "note.md": "A note.\n",
     });
-    expect(run(root, ["lint"]).status).toBe(0);
+    expect(reported(run(root, ["lint"]))).toBe("Loaded");
+  });
+  it.each([
+    [{ import: "./index.mjs", require: "./index.cjs" }],
+    [{ require: "./index.cjs", import: "./index.mjs" }],
+    [{ require: "./index.cjs", default: "./index.mjs" }],
+  ])(
+    "loads what an import finds in a package that also has a require entry: %j",
+    async (entries) => {
+      const root = await fixture({
+        "mdtools.config.json": config("sample-plugin"),
+        ...installed(
+          "sample-plugin",
+          { exports: { ".": entries } },
+          { "index.mjs": esm("From the import entry"), "index.cjs": cjs("From the require entry") },
+        ),
+        "note.md": "A note.\n",
+      });
+      expect(reported(run(root, ["lint"]))).toBe("From the import entry");
+    },
+  );
+  it.each([
+    [
+      "an exported subpath with only an import condition",
+      "sample-plugin/rules",
+      "sample-plugin",
+      { type: "module", exports: { "./rules": { import: "./lib/rules.js" } } },
+      { "lib/rules.js": esm() },
+    ],
+    [
+      "an exported subpath of a scoped package",
+      "@scope/sample-plugin/rules",
+      "@scope/sample-plugin",
+      { type: "module", exports: { "./rules": "./lib/rules.js" } },
+      { "lib/rules.js": esm() },
+    ],
+    [
+      "a file of a package without exports",
+      "sample-plugin/lib/rules.js",
+      "sample-plugin",
+      {},
+      { "lib/rules.js": cjs() },
+    ],
+    // An import needs the extension and cannot name a directory; the CommonJS lookup adds both.
+    [
+      "a file named without its extension",
+      "sample-plugin/lib/rules",
+      "sample-plugin",
+      {},
+      { "lib/rules.js": cjs() },
+    ],
+    [
+      "a directory with an index file",
+      "sample-plugin/lib",
+      "sample-plugin",
+      {},
+      { "lib/index.js": cjs() },
+    ],
+  ])(
+    "loads a plugin named by a package subpath: %s",
+    async (_label, specifier, name, fields, files) => {
+      const root = await fixture({
+        "mdtools.config.json": config(specifier),
+        ...installed(name, fields, files),
+        "note.md": "A note.\n",
+      });
+      expect(reported(run(root, ["lint"]))).toBe("Loaded");
+    },
+  );
+  it("looks a package up from the configuration file, not from the workspace root", async () => {
+    const root = await fixture({
+      "settings/mdtools.config.json": config("sample-plugin"),
+      ...installed("sample-plugin", { main: "index.js" }, { "index.js": cjs("From the root") }),
+      ...installed(
+        "sample-plugin",
+        { type: "module", exports: { ".": { import: "./index.js" } } },
+        { "index.js": esm("From beside the configuration") },
+        "settings/",
+      ),
+      "note.md": "A note.\n",
+    });
+    const checked = run(root, ["lint", "--config", "settings/mdtools.config.json", "--root", "."]);
+    expect(reported(checked)).toBe("From beside the configuration");
+  });
+  it("loads a plugin named by a relative path, taking the path literally", async () => {
+    // As a URL, "%20" would mean a space and "#" would start a fragment.
+    const root = await fixture({
+      "mdtools.config.json": config("./local rules/100%20 #1.mjs"),
+      "local rules/100%20 #1.mjs": esm(),
+      "note.md": "A note.\n",
+    });
+    expect(reported(run(root, ["lint"]))).toBe("Loaded");
+  });
+  it("loads a plugin named by an absolute path", async () => {
+    const root = await fixture({ "rules.mjs": esm(), "note.md": "A note.\n" });
+    // On Windows this path has a drive letter and backslashes.
+    await writeFile(path.join(root, "mdtools.config.json"), config(path.join(root, "rules.mjs")));
+    expect(reported(run(root, ["lint"]))).toBe("Loaded");
+  });
+
+  /**
+   * Run with a plugin that cannot be used and return the reason given, after checking that
+   * the message names the plugin as written and the configuration file.
+   */
+  const refused = async (
+    specifier: string,
+    files: Record<string, string>,
+    start = "Cannot load plugin",
+  ) => {
+    const root = await fixture({ ...files, "note.md": "A note.\n" });
+    // Naming the file makes its path in the message the one written here on every platform.
+    const file = path.join(root, "mdtools.config.json");
+    await writeFile(file, config(specifier));
+    const checked = run(root, ["lint", "--config", file]);
+    expect(checked.status).toBe(2);
+    expect(checked.stdout).toBe("");
+    const prefix = `mdtools: ${start} "${specifier}" named in ${file}: `;
+    expect(checked.stderr.slice(0, prefix.length)).toBe(prefix);
+    return checked.stderr.slice(prefix.length);
+  };
+  it("names the plugin and the configuration file when a package is not installed", async () => {
+    expect(await refused("missing-plugin", {})).toContain("Cannot find package 'missing-plugin'");
+    expect(await refused("@scope/missing-plugin/rules", {})).toContain(
+      "Cannot find package '@scope/missing-plugin'",
+    );
+  });
+  it("names the plugin and the configuration file when a file does not exist", async () => {
+    expect(await refused("./missing.mjs", {})).toContain("Cannot find module");
+  });
+  it("gives the reason an import fails when a package has no entry to load", async () => {
+    const types = installed("sample-plugin", { exports: { ".": { types: "./index.d.ts" } } }, {});
+    expect(await refused("sample-plugin", types)).toContain('No "exports" main defined');
+    const subpaths = installed(
+      "sample-plugin",
+      { exports: { ".": "./index.js" } },
+      { "index.js": cjs() },
+    );
+    expect(await refused("sample-plugin/rules", subpaths)).toContain(
+      "Package subpath './rules' is not defined by \"exports\"",
+    );
+  });
+  it("gives the plugin's own error when its module fails to load", async () => {
+    // The require entry would load, but a package with both entries is loaded by import.
+    const files = installed(
+      "sample-plugin",
+      { exports: { ".": { import: "./index.mjs", require: "./index.cjs" } } },
+      { "index.mjs": 'throw new Error("Setup failed in the plugin");', "index.cjs": cjs() },
+    );
+    expect(await refused("sample-plugin", files)).toBe("Setup failed in the plugin\n");
+    expect(
+      await refused("./rules.mjs", { "rules.mjs": 'import "not-installed-package";' }),
+    ).toContain("Cannot find package 'not-installed-package'");
+  });
+  it.each([
+    ["no default export", 'export const name = "sample";'],
+    ["a default export without a name", "export default { rules: {} };"],
+    ["a default export that is not an object", 'export default "sample";'],
+  ])("rejects a plugin module with %s", async (_label, code) => {
+    expect(await refused("./rules.mjs", { "rules.mjs": code }, "Invalid plugin")).toBe(
+      'its default export must be an object with a string "name".\n',
+    );
+    const files = installed(
+      "sample-plugin",
+      { type: "module", exports: "./index.js" },
+      { "index.js": code },
+    );
+    expect(await refused("sample-plugin", files, "Invalid plugin")).toBe(
+      'its default export must be an object with a string "name".\n',
+    );
   });
 });
 

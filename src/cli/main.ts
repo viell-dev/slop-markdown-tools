@@ -7,9 +7,10 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { discover, writeAtomic } from "../workspace/files.js";
+import { discover, isVault, writeAtomic } from "../workspace/files.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
+import { refusal, refusalText } from "../workspace/access.js";
 import type { Diagnostic, Dialect, DialectName, ProcessOptions } from "../core/types.js";
 
 interface Flags {
@@ -37,7 +38,7 @@ function common(command: Command): Command {
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",
-      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian",
+      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian (when none is named: github, or obsidian at a vault root)",
     )
     .option(
       "--exclude <path>",
@@ -64,6 +65,15 @@ interface Report {
   diagnostics: Diagnostic[];
   output?: string;
 }
+/**
+ * The dialect to assume for the workspace at `root` when nothing names one, or
+ * undefined for the library's own default. An Obsidian vault shows a single
+ * line break as a line break and holds wikilinks, both of which any other
+ * dialect lets reflow change.
+ */
+async function assumedDialect(root: string): Promise<Dialect | undefined> {
+  return (await isVault(root)) ? "obsidian" : undefined;
+}
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
     throw new Error("Choose only one of --check, --diff, and --write.");
@@ -72,7 +82,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
   const root = path.resolve(flags.root ?? loaded.root);
   if (flags.dialect) loaded.config.dialect = flags.dialect;
-  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins);
+  const assumed = await assumedDialect(root);
+  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins, assumed);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
@@ -91,18 +102,23 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     set.files[name] = source;
     set.selected = [name];
   }
+  // Links into a directory that could not be read are reported as unchecked, not as missing.
+  const unreadable = set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : []));
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
+  // Selected files that the system refused to let the tool read.
+  const unread: string[] = [];
   // One index per active dialect; build lazily for mixed documentation workspaces.
   const indexes = new Map<Dialect, ReturnType<typeof createWorkspace>>();
   for (const name of set.selected) {
-    const config = resolveConfig(loaded.config, name, loaded.plugins);
+    const config = resolveConfig(loaded.config, name, loaded.plugins, assumed);
     if (!indexes.has(config.dialect))
       indexes.set(
         config.dialect,
         createWorkspace(set.files, {
           dialect: config.dialect,
           directories: set.directories,
+          unreadable,
           ...(set.strictLineBreaks !== undefined ? { strictLineBreaks: set.strictLineBreaks } : {}),
         }),
       );
@@ -111,9 +127,33 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       config: loaded.config,
       plugins: loaded.plugins,
       workspace: indexes.get(config.dialect)!,
+      ...(assumed ? { defaultDialect: assumed } : {}),
     };
     const value = set.files[name]!;
-    const source = typeof value === "function" ? value() : value;
+    let source: string | null;
+    try {
+      source = typeof value === "function" ? value() : value;
+    } catch (error) {
+      // Report the file and carry on with the others; any other error is a fault.
+      const code = refusal(error);
+      if (!code) throw error;
+      unread.push(name);
+      reports.push({
+        path: name,
+        ...(mode === "format" ? { changed: false } : {}),
+        diagnostics: [
+          {
+            start: 0,
+            message: `The file could not be read (${refusalText(code)}) and was not ${mode === "lint" ? "linted" : "formatted"}.`,
+            rule: "engine/unreadable-file",
+            severity: "error",
+            line: 1,
+            column: 1,
+          },
+        ],
+      });
+      continue;
+    }
     if (source === null) continue;
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
@@ -127,9 +167,13 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       if (result.changed) changes.push({ file: name, before: source, after: result.output });
     }
   }
-  const unsafe = reports.some((report) =>
-    report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
-  );
+  // A file that could not be formatted safely, or not be read at all, is a failure
+  // to operate: nothing of the batch is written, and the run ends with status 2.
+  const unsafe =
+    unread.length > 0 ||
+    reports.some((report) =>
+      report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
+    );
   if (flags.write && !unsafe)
     for (const change of changes)
       await writeAtomic(path.join(set.root, change.file), change.before, change.after);
@@ -141,12 +185,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           mode,
           files: reports,
           written: flags.write === true && !unsafe,
+          ...(set.skipped.length ? { skipped: set.skipped } : {}),
         },
         null,
         2,
       ) + "\n",
     );
   else {
+    // Warnings about the run, not about a document: they do not change the exit status.
+    for (const item of set.skipped) process.stderr.write(`mdtools: warning: ${item.message}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)
@@ -161,7 +208,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         );
     if (!stdin)
       process.stderr.write(
-        `${set.selected.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${changes.length} ${flags.write && !unsafe ? "written" : "would change"}.\n`,
+        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${changes.length} ${flags.write && !unsafe ? "written" : "would change"}${unread.length ? `; ${unread.length} could not be read` : ""}.\n`,
       );
   }
   const diagnostics = reports.flatMap((report) => report.diagnostics);
@@ -201,6 +248,7 @@ common(program.command("config").description("Inspect effective configuration"))
             loaded.config,
             path.relative(root, path.resolve(file)).split(path.sep).join("/"),
             loaded.plugins,
+            await assumedDialect(root),
           ),
         },
         null,

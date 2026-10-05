@@ -33,6 +33,27 @@ filesystem/CLI integration cases, including the list-collapse failure that
 motivated replacing heuristic reflow; [testing](testing.md) describes the
 suites.
 
+The fingerprint is computed in the document's dialect, so it cannot notice that
+the dialect itself is wrong. In CommonMark a table, or a run of footnote
+definitions, is an ordinary paragraph: reflow joins its lines, and the
+CommonMark meaning of the result is unchanged although no site renders the table
+any more. When nothing names a dialect, the tool therefore assumes `github`,
+whose syntax the Forgejo, Gitea, and Obsidian dialects build on, and not
+CommonMark. For a document that really is plain CommonMark this only makes
+formatting more careful: constructs that would have been reflowed or restyled,
+such as a table or text between two `$` signs, are left alone. A vault is the
+exception, because no other dialect knows that Obsidian shows a single line
+break unless the vault's settings say otherwise: when the workspace root
+contains a `.obsidian` folder, the CLI assumes `obsidian`. It already looks for
+that folder to find the workspace root and the line-break setting, so no new
+guess about a document's content is involved. Only the root is examined: a vault
+in a folder of a larger workspace, or a folder of a vault passed as `--root`, is
+not recognized. Version 0.2.0-rc.1 and earlier assumed CommonMark in both cases.
+The assumption is made in one place, where configuration is resolved: the
+library takes the dialect to assume as an argument, since it does not read
+files, and anything that names a dialect replaces it. The workspace index uses
+`github` for link targets when a library caller gives it no dialect.
+
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects
 the title/body boundary. Lazy quote continuations and inline syntax spanning
@@ -180,6 +201,24 @@ across documents. A suffix lookup index is built on first use instead of
 scanning every path for each shortened link. There is no persistent cache,
 worker pool, watch service, editor extension, or language server yet. The
 library has a pluggable workspace interface for specialized hosts.
+
+Discovery skips a directory that the system refuses to let it read (`EACCES` or
+`EPERM`) and carries on; every other read error is treated as a fault and stops
+the run. A directory is read as a whole or not at all: one that can be listed
+but not entered, or entered but not listed, is skipped like one that allows
+neither, although the first reveals file names and the second would open a file
+whose name is known. The index then holds the readable files only. Links whose
+path leads into a skipped directory resolve as unreadable rather than missing.
+Obsidian's search by note name cannot be made exact: a name with no readable
+match is reported as unchecked, a name with one readable match is accepted but
+not rewritten, like a note found in a place that Obsidian tries only after a
+skipped directory, and a name with several is ambiguous either way. A file is
+read only when it is processed or when a link's fragment needs its content, so a
+refusal is met late: a selected file becomes an `engine/unreadable-file`
+diagnostic that blocks the batch's write phase, and a link target makes the
+fragment unchecked for the documents that link to it.
+[Paths that cannot be read](configuration.md#paths-that-cannot-be-read)
+describes the behavior.
 
 `npm run benchmark` measures parsing, linting, and formatting of synthetic
 repository documentation and a synthetic vault, through the library and through

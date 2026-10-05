@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cp, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,9 +13,27 @@ export const manifest = JSON.parse(
 ) as { name: string; version: string };
 
 const temporary: string[] = [];
+const restricted: string[] = [];
 afterEach(async () => {
+  // Give permissions back first, also after a failed test: a directory that may
+  // not be read cannot be emptied, and its workspace could not be removed.
+  for (const file of restricted.splice(0).reverse())
+    await chmod(file, 0o700).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
   for (const root of temporary.splice(0)) await rm(root, { recursive: true, force: true });
 });
+/**
+ * Whether permissions can be taken away from this process: not on Windows,
+ * where a file mode only holds the read-only flag, and not for root, who may
+ * read anything. Tests that need an unreadable path are skipped otherwise.
+ */
+export const canRestrict = process.platform !== "win32" && process.getuid?.() !== 0;
+/** Change a path's permissions (by default to none) until the current test ends. */
+export async function restrict(file: string, mode = 0o000): Promise<void> {
+  restricted.push(file);
+  await chmod(file, mode);
+}
 /** Create a temporary workspace holding `files`; it is removed after the current test. */
 export async function fixture(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));

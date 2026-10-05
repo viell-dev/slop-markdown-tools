@@ -40,9 +40,53 @@ per-invocation file loaders. `WorkspaceOptions.directories` can list existing
 empty directories; parent directories of file entries are inferred. Resolution
 returns `status: "directory"` for a directory instead of `"missing"`.
 
+`WorkspaceOptions.unreadable` lists existing directories whose contents the host
+could not read. A link that leads into one resolves with `status: "unreadable"`
+instead of `"missing"`, and the result's `unreadable` field names the
+directories that stand in the way. In the Obsidian dialect, a search by note
+name that finds nothing also resolves as `"unreadable"`. One that finds a single
+note is `"resolved"` with `unreadable` set, because those directories may hold
+another note of that name. The same marks a note found beside the linking note
+when the vault-root path of that spelling leads into an unreadable directory,
+where Obsidian would look first. A rule must not rewrite such a link:
+`links/path` and `links/notation` leave it as written, and the engine refuses an
+edit by any rule that changes its destination, because only the same spelling is
+known to name the same note. The CLI passes the directories it
+[skipped](configuration.md#paths-that-cannot-be-read). A loader that throws an
+error whose `code` is `EACCES` or `EPERM`, as Node.js does for a file the
+process is not permitted to read, makes a link to a heading or block in that
+file resolve as `"unreadable"` too, with `target` set and `unreadable` naming
+the file; a link to the file without a fragment still resolves. Any other error
+from a loader propagates. Versions up to `0.2.0-rc.1` have neither the option
+nor the status, and let every loader error through.
+
 Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.
+
+A document is read in the dialect its configuration names: through `dialect`, a
+preset, or a matching override. When none of them does, including when `config`
+is omitted, `lint`, `format`, and `resolveConfig` assume `github`, and
+`createWorkspace` parses link targets as `github` when
+`WorkspaceOptions.dialect` is omitted. Version 0.2.0-rc.1 and earlier assumed
+`commonmark` in both places; name it to keep that reading. Give the workspace
+the dialect of the documents that link into it.
+
+A host that knows more than the configuration says can change what is assumed,
+without overriding a dialect that the configuration does name. Pass
+`defaultDialect` in the options of `lint` and `format`, or as the fourth
+argument of `resolveConfig(config, path, plugins, defaultDialect)`; it accepts a
+dialect or an alias. The library reads no files and so recognizes nothing by
+itself: the CLI passes `obsidian` when the workspace root contains a `.obsidian`
+folder, and a host for vaults should do the same.
+
+```ts
+// The host found `.obsidian/` at the root of the folder it read `files` from.
+const defaultDialect = "obsidian";
+const { dialect } = resolveConfig(config, "Note.md", [], defaultDialect);
+const workspace = createWorkspace(files, { dialect, strictLineBreaks });
+const result = format(files["Note.md"], { path: "Note.md", config, workspace, defaultDialect });
+```
 
 `parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
 `configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
@@ -90,12 +134,35 @@ Load it with:
 }
 ```
 
-Plugin module specifiers resolve relative to the config file, including npm
-package names. Export a default plugin object. Library callers pass plugin
-objects directly through `plugins`; a string list in a library configuration
-does not perform module loading. Plugin names must be unique lowercase
-identifiers beginning with a letter, using letters, digits, and hyphens. Rule
-IDs are namespaced as `plugin-name/rule-name`; collisions are rejected.
+Each `plugins` entry names a module whose default export is a plugin object. An
+entry that starts with `.` or is an absolute path names a file, relative to the
+configuration file's directory. Any other entry is resolved the way Node.js
+resolves an `import` written in the configuration file, with Node.js's default
+conditions; conditions added with `--conditions` are not applied. Usually such
+an entry names an installed package, optionally with a subpath: `sample-plugin`,
+`@scope/sample-plugin`, or `sample-plugin/rules`. The package's entry can be an
+`import` or `default` condition of its `exports`, or its `main` file. When an
+import finds no entry, the lookup falls back to Node.js's CommonJS rules, so a
+package that declares only a `require` condition loads too. A package with both
+an `import` and a `require` entry is loaded through its `import` entry.
+`0.2.0-rc.1` and earlier used only the CommonJS rules, so they could not load a
+package that declares only an `import` condition, and loaded a package with both
+entries through `require`.
+
+A plugin that cannot be found or loaded stops the command with exit status `2`
+and a message of the form
+`Cannot load plugin "sample-plugin" named in FILE: REASON`. `FILE` is the
+configuration file and `REASON` is Node.js's own, such as
+`Cannot find package 'sample-plugin' imported from FILE`. A module whose default
+export is not an object with a string `name` is reported as
+`Invalid plugin "sample-plugin" named in FILE`. `0.2.0-rc.1` and earlier printed
+Node.js's reason alone.
+
+Library callers pass plugin objects directly through `plugins`; a string list in
+a library configuration does not perform module loading. Plugin names must be
+unique lowercase identifiers beginning with a letter, using letters, digits, and
+hyphens. Rule IDs are namespaced as `plugin-name/rule-name`; collisions are
+rejected.
 
 `check` receives the parsed `document`, configured `options`, and optional
 `workspace`. Return a list of findings containing `start`, optional `end`,
