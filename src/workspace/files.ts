@@ -1,4 +1,4 @@
-import { lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, open, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
@@ -29,6 +29,26 @@ export interface FileSet {
   skipped: Skipped[];
   selected: string[];
   strictLineBreaks?: boolean;
+}
+/**
+ * Whether `root` is the root of an Obsidian vault: Obsidian keeps a vault's
+ * settings in a `.obsidian` folder there. Only `root` itself is examined, so a
+ * vault in a folder of a larger workspace is not one.
+ */
+export async function isVault(root: string): Promise<boolean> {
+  try {
+    return (await stat(path.join(root, ".obsidian"))).isDirectory();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    // Only a root that cannot be entered refuses this. It stays an error: assuming
+    // that the root is no vault could format a vault as another dialect.
+    const code = refusal(error);
+    if (code)
+      throw new Error(`Workspace root cannot be read: ${root} (${refusalText(code)})`, {
+        cause: error,
+      });
+    throw error;
+  }
 }
 export async function discover(
   rootPath: string,
@@ -70,6 +90,7 @@ export async function discover(
     if (!directory)
       throw new Error(
         `Workspace root cannot be read: ${rootPath} (${reason({ reading, code }, "")})`,
+        { cause: error },
       );
     refused.push({ directory, reading, code });
   }

@@ -89,6 +89,11 @@ export interface ResolveOptions {
 export interface Config {
   resolve?: ResolveOptions;
   extends?: string[];
+  /**
+   * The dialect documents are read in. When neither this setting, a preset, nor
+   * a matching override names one, the caller's default dialect is assumed, and
+   * `github` when the caller gives none.
+   */
   dialect?: DialectName;
   rules?: Record<string, RuleSetting>;
   ignore?: string[];
@@ -106,6 +111,13 @@ export interface ProcessOptions {
   config?: Config;
   plugins?: Plugin[];
   workspace?: Workspace;
+  /**
+   * The dialect to assume when the configuration names none for the document;
+   * `github` when omitted. A dialect named by the configuration, a preset, or a
+   * matching override takes precedence. The CLI passes `obsidian` when the
+   * workspace root is an Obsidian vault.
+   */
+  defaultDialect?: DialectName;
 }
 export interface FormatResult {
   output: string;

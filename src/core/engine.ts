@@ -45,7 +45,12 @@ export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
 const ruleValidator = new Ajv({ allErrors: true });
 const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.schema));
 function prepare(options: ProcessOptions) {
-  const config = resolveConfig(options.config, options.path, options.plugins);
+  const config = resolveConfig(
+    options.config,
+    options.path,
+    options.plugins,
+    options.defaultDialect,
+  );
   const rules = ruleRegistry(options.plugins);
   let pluginValidator: Ajv | undefined;
   for (const [name, value] of Object.entries(config.rules)) {

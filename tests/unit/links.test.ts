@@ -885,7 +885,7 @@ describe("Forgejo and Gitea heading attributes", () => {
   it.each(["forgejo", "gitea"] as const)(
     "reads the remaining %s heading like one written without the block",
     (dialect) => {
-      // GFM parsing, unlike the default CommonMark parsing of the other workspaces here.
+      // GFM parsing, as in the workspaces here, which name no dialect and so parse as GitHub.
       const text = (source: string, removed: boolean) => {
         const document = parse(source, dialect);
         const heading = removed
@@ -1544,7 +1544,10 @@ describe("anchors from HTML in the document", () => {
     expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
     expect(hostile.resolve("Doc.md", "Note.md#t", "forgejo").fragmentExists).toBe(false);
     expect(hostile.resolve("Doc.md", "Note.md#s", "forgejo").fragmentExists).toBe(true);
-    expect(performance.now() - start).toBeLessThan(4000);
+    // The bound tells linear from quadratic growth, which would take minutes here. It leaves
+    // room for a slow CI runner and for GFM parsing, which the workspace now uses when no
+    // dialect is named and which takes about half as long again as CommonMark on this input.
+    expect(performance.now() - start).toBeLessThan(10000);
   });
 });
 

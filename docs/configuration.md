@@ -20,8 +20,8 @@ relative to the workspace root. Presets can extend other presets; cycles are
 rejected. Config files do not implicitly cascade or merge across directories.
 
 `--dialect` replaces the top-level dialect; an explicit file override still
-takes precedence. `config explain <file>` prints the resolved configuration and
-its source file.
+takes precedence. `config explain <file>` prints the resolved configuration,
+including the dialect in use for that file, and its source file.
 
 ```jsonc
 {
@@ -39,7 +39,8 @@ its source file.
 
 For Obsidian reflow, use a workspace rooted at the vault so `.obsidian/app.json`
 can be inspected. Multiple vaults with independent settings should be processed
-separately.
+separately. A vault in a folder of a larger workspace, as in the example above,
+is read in the Obsidian dialect only through such an override.
 
 ## Dialects
 
@@ -48,6 +49,27 @@ separately.
 Codeberg runs Forgejo's renderer; aliases are accepted wherever a dialect is
 named and resolve to the canonical name in `config explain` and plugin
 documents.
+
+When nothing names a dialect, the tool assumes one. That is the case without a
+configuration file, and with a configuration in which no `dialect` setting,
+preset, or matching override names one, unless `--dialect` is passed. A named
+dialect always takes precedence. Version 0.2.0-rc.1 and earlier assumed
+`commonmark` everywhere.
+
+- At the root of an Obsidian vault, the assumed dialect is `obsidian`. A
+  workspace root that contains a `.obsidian` folder is a vault. Obsidian shows a
+  single line break as a line break unless the vault's "Strict line breaks"
+  setting is on, so no other dialect can reflow a note safely. A vault in a
+  folder of a larger workspace is not recognized, and neither is a folder of a
+  vault passed as `--root`; use an override or the vault root.
+- Everywhere else, it is `github`. GitHub's syntax is the common base of the
+  Forgejo, Gitea, and Obsidian dialects, so tables and footnotes are recognized
+  instead of being reflowed as ordinary paragraphs.
+
+Only the dialect is assumed: the rules of the `github` and `obsidian` presets,
+such as table alignment, still need the preset. For documents that are plain
+CommonMark, name the dialect with `"dialect": "commonmark"` or
+`--dialect commonmark`.
 
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo

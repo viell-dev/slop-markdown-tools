@@ -253,6 +253,12 @@ passing checks, and resolved review threads remain mandatory.
   import from another file's location without a flag or a warning. The list of
   conditions there copies Node.js's defaults for an import; recheck it when the
   supported Node.js range changes.
+- The dialect assumed when nothing names one is chosen in `resolveConfig`: the
+  caller's `defaultDialect`, which the CLI sets to `obsidian` when the workspace
+  root is a vault, and otherwise `fallbackDialect` (`github`), which
+  `createWorkspace` also uses for link targets. Do not add another fallback; a
+  dialect that reads a construct as an ordinary paragraph lets reflow destroy it
+  without tripping the semantic check.
 - Formatting applies inline, block, then document phases. Semantic fingerprints,
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including

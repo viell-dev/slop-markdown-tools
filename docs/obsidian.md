@@ -24,6 +24,17 @@ node dist/cli/main.js lint --root "/path/to/vault" --json
 node dist/cli/main.js format --root "/path/to/vault" --diff
 ```
 
+Before that file exists, or when it names no dialect, the CLI still reads the
+notes in the Obsidian dialect: a workspace root that contains a `.obsidian`
+folder is recognized as a vault. Line breaks and wikilinks are then safe on a
+first run, but only the dialect is assumed. The rules of the `obsidian` preset,
+including the report that reflow is disabled, need the configuration above.
+Version 0.2.0-rc.1 and earlier read such a vault as CommonMark, joined the lines
+of its paragraphs, and could split a wikilink; with those versions, create the
+configuration first. A vault in a folder of a larger workspace is not
+recognized; give it an [override](configuration.md#loading-and-precedence) in
+that workspace's configuration.
+
 ## Enable source wrapping
 
 Obsidian reflow requires `"strictLineBreaks": true` in `.obsidian/app.json` so

@@ -60,6 +60,30 @@ Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.
 
+A document is read in the dialect its configuration names: through `dialect`, a
+preset, or a matching override. When none of them does, including when `config`
+is omitted, `lint`, `format`, and `resolveConfig` assume `github`, and
+`createWorkspace` parses link targets as `github` when
+`WorkspaceOptions.dialect` is omitted. Version 0.2.0-rc.1 and earlier assumed
+`commonmark` in both places; name it to keep that reading. Give the workspace
+the dialect of the documents that link into it.
+
+A host that knows more than the configuration says can change what is assumed,
+without overriding a dialect that the configuration does name. Pass
+`defaultDialect` in the options of `lint` and `format`, or as the fourth
+argument of `resolveConfig(config, path, plugins, defaultDialect)`; it accepts a
+dialect or an alias. The library reads no files and so recognizes nothing by
+itself: the CLI passes `obsidian` when the workspace root contains a `.obsidian`
+folder, and a host for vaults should do the same.
+
+```ts
+// The host found `.obsidian/` at the root of the folder it read `files` from.
+const defaultDialect = "obsidian";
+const { dialect } = resolveConfig(config, "Note.md", [], defaultDialect);
+const workspace = createWorkspace(files, { dialect, strictLineBreaks });
+const result = format(files["Note.md"], { path: "Note.md", config, workspace, defaultDialect });
+```
+
 `parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
 `configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
 `builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also

@@ -24,3 +24,46 @@
   max-width: 880px;
   margin: 0 auto;
 }
+
+/*
+ * A code block must hold a line of the tool's default wrap width, 80 columns, without scrolling
+ * sideways: the site shows formatted output. Code blocks therefore use a 13px font; inline code
+ * keeps the theme's size. The widest font in the theme's monospace stack is the one Safari
+ * uses, at 0.618em per character. 80 columns of it, plus the block's 1.5rem of padding on each
+ * side, need a text column of 691px, so the column may grow to 44rem instead of 43rem.
+ *
+ * The layout rules below override rules of the theme's VPDoc component. Its class names are
+ * not a documented interface, and a VitePress update can rename them; a test in
+ * tests/integration/docs.test.ts fails when the overridden rules change.
+ */
+.vp-doc div[class*="language-"] {
+  --vp-code-font-size: 0.8125em;
+}
+
+.VPDoc.has-sidebar.has-aside > .container > .content > .content-container {
+  max-width: 44rem;
+}
+
+/*
+ * From 60rem the sidebar, and from 80rem also the page outline, stand beside the text, and
+ * below 90rem they leave less room than the text column wants. The theme keeps 4rem free on
+ * each side of the text and 2rem at the right edge of the window. In this range each of those
+ * gaps becomes 1.5rem, the theme's page margin on a phone, so that the column narrows only
+ * when no free space is left to give up.
+ */
+@media (60rem <= width < 90rem) {
+  .VPDoc.has-sidebar.has-aside {
+    padding-right: 1.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .VPDoc.has-sidebar.has-aside > .container > .content {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .VPDoc.has-sidebar.has-aside > .container > .aside {
+    padding-left: 1.5rem;
+    max-width: 15.5rem;
+  }
+}

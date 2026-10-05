@@ -102,12 +102,14 @@ try {
   const consumer = path.join(directory, "consumer.mts");
   await writeFile(
     consumer,
-    `import { format, parse, type Plugin } from ${JSON.stringify(manifest.name)};
+    `import { format, parse, resolveConfig, type Dialect, type Plugin, type ProcessOptions } from ${JSON.stringify(manifest.name)};
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem",
   check: ({ document }) => document.tree.children.length ? [] : [{ start: 0, message: "Empty" }],
 } } };
-const output: string = format("Text", { plugins: [plugin] }).output;
+const options: ProcessOptions = { plugins: [plugin], defaultDialect: "obsidian" };
+const output: string = format("Text", options).output;
+const assumed: Dialect = resolveConfig({}, "note.md", [plugin], "codeberg").dialect; void assumed;
 for (const node of parse(output, "obsidian").tree.children) {
   if (node.type === "paragraph") for (const child of node.children) {
     if (child.type === "wikiLink") { const target: string | undefined = child.target; void target; }

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { discover, writeAtomic } from "../workspace/files.js";
+import { discover, isVault, writeAtomic } from "../workspace/files.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
 import { refusal, refusalText } from "../workspace/access.js";
@@ -38,7 +38,7 @@ function common(command: Command): Command {
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",
-      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian",
+      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian (when none is named: github, or obsidian at a vault root)",
     )
     .option(
       "--exclude <path>",
@@ -65,6 +65,15 @@ interface Report {
   diagnostics: Diagnostic[];
   output?: string;
 }
+/**
+ * The dialect to assume for the workspace at `root` when nothing names one, or
+ * undefined for the library's own default. An Obsidian vault shows a single
+ * line break as a line break and holds wikilinks, both of which any other
+ * dialect lets reflow change.
+ */
+async function assumedDialect(root: string): Promise<Dialect | undefined> {
+  return (await isVault(root)) ? "obsidian" : undefined;
+}
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
     throw new Error("Choose only one of --check, --diff, and --write.");
@@ -73,7 +82,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
   const root = path.resolve(flags.root ?? loaded.root);
   if (flags.dialect) loaded.config.dialect = flags.dialect;
-  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins);
+  const assumed = await assumedDialect(root);
+  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins, assumed);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
@@ -101,7 +111,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   // One index per active dialect; build lazily for mixed documentation workspaces.
   const indexes = new Map<Dialect, ReturnType<typeof createWorkspace>>();
   for (const name of set.selected) {
-    const config = resolveConfig(loaded.config, name, loaded.plugins);
+    const config = resolveConfig(loaded.config, name, loaded.plugins, assumed);
     if (!indexes.has(config.dialect))
       indexes.set(
         config.dialect,
@@ -117,6 +127,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       config: loaded.config,
       plugins: loaded.plugins,
       workspace: indexes.get(config.dialect)!,
+      ...(assumed ? { defaultDialect: assumed } : {}),
     };
     const value = set.files[name]!;
     let source: string | null;
@@ -237,6 +248,7 @@ common(program.command("config").description("Inspect effective configuration"))
             loaded.config,
             path.relative(root, path.resolve(file)).split(path.sep).join("/"),
             loaded.plugins,
+            await assumedDialect(root),
           ),
         },
         null,
