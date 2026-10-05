@@ -91,6 +91,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     set.files[name] = source;
     set.selected = [name];
   }
+  // Links into a directory that could not be read are reported as unchecked, not as missing.
+  const unreadable = set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : []));
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
   // One index per active dialect; build lazily for mixed documentation workspaces.
@@ -103,6 +105,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         createWorkspace(set.files, {
           dialect: config.dialect,
           directories: set.directories,
+          unreadable,
           ...(set.strictLineBreaks !== undefined ? { strictLineBreaks: set.strictLineBreaks } : {}),
         }),
       );
@@ -141,12 +144,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           mode,
           files: reports,
           written: flags.write === true && !unsafe,
+          ...(set.skipped.length ? { skipped: set.skipped } : {}),
         },
         null,
         2,
       ) + "\n",
     );
   else {
+    // Warnings about the run, not about a document: they do not change the exit status.
+    for (const item of set.skipped) process.stderr.write(`mdtools: warning: ${item.message}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)

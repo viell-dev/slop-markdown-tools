@@ -272,15 +272,18 @@ separate passes.
 
 Network URLs are recognized but never fetched. Website-root paths and
 query-bearing destinations in CommonMark, GitHub, Forgejo, and Gitea are outside
-local resolution. Missing or ambiguous targets are reported, never guessed.
-Obsidian resolution uses explicit `./` or `../` paths as source-relative;
-otherwise an exact vault-root match precedes an exact source-relative match,
-followed by unique suffix matching. Multiple candidates within the chosen tier
-remain ambiguous. Relative rewrites use `./` when needed to avoid a vault-root
-collision. Existing directories get a distinct diagnostic in Obsidian; they are
-not rewritten to README or index notes. CommonMark, GitHub, Forgejo, and Gitea
-directory links are accepted because a hosting site can serve them.
-Shortest-name/alias resolution is not a complete clone of Obsidian.
+local resolution. Missing or ambiguous targets are reported, never guessed. A
+target that could not be checked, because it lies in a directory the tool was
+not permitted to read, is reported as such and not as missing; see
+[paths that cannot be read](#paths-that-cannot-be-read). Obsidian resolution
+uses explicit `./` or `../` paths as source-relative; otherwise an exact
+vault-root match precedes an exact source-relative match, followed by unique
+suffix matching. Multiple candidates within the chosen tier remain ambiguous.
+Relative rewrites use `./` when needed to avoid a vault-root collision. Existing
+directories get a distinct diagnostic in Obsidian; they are not rewritten to
+README or index notes. CommonMark, GitHub, Forgejo, and Gitea directory links
+are accepted because a hosting site can serve them. Shortest-name/alias
+resolution is not a complete clone of Obsidian.
 
 ## Suppressions
 
@@ -326,7 +329,8 @@ targets only when opted in. Explicit symlink inputs are rejected. Shell-expanded
 globs work; the CLI does not expand path globs.
 
 `lint --json` and `format --json` print a single object with `version`, `mode`,
-`files`, and `written`. Each file carries diagnostics with rule ID, severity,
+`files`, and `written`, and with `skipped` when the run left out something it
+was not permitted to read. Each file carries diagnostics with rule ID, severity,
 message, offsets, and one-based line/column locations. Source offsets and
 columns use JavaScript UTF-16 units; wrapping widths use display columns.
 Formatting diagnostics refer to the resulting source. `written` records whether
@@ -349,3 +353,44 @@ formatting command can still report remaining lint problems. Inspect its exit
 code and diagnostics. An unsafe-format diagnostic blocks the complete batch's
 write phase. An I/O error during writing can leave earlier files written;
 replacement is atomic per file, not a workspace-wide transaction.
+
+## Paths that cannot be read
+
+A directory that the system does not permit the tool to read is skipped. The
+tool reports it once as a warning that names it, indexes nothing below it, and
+processes the rest of the workspace. The warning alone does not change the exit
+code and is not counted by `--max-warnings`. It is printed on stderr as
+`mdtools: warning: ...`; with `--json` it is an entry of the report's `skipped`
+list instead, with the directory's `path`, `type`, the system's error `code`,
+and a `message`. This applies to a directory that can be neither listed nor
+entered, to one that can only be listed, and to one that can only be entered. It
+also applies to a directory whose `.gitignore` cannot be read, because without
+the ignore rules nothing tells which of its files may be processed. Versions up
+to `0.2.0-rc.1` stopped every command, with exit code `2`, when the workspace
+contained such a directory.
+
+A link that leads into a skipped directory cannot be checked. `links/valid`
+reports it as `Local target could not be checked`, naming the directory, with
+the rule's configured severity. The target is not called missing, and the link
+is never rewritten. An Obsidian link that names a note without a path is
+searched for in every directory, so when no readable file matches, it is
+reported the same way, naming the skipped directories. A note that such a search
+does find is accepted, but `links/path` leaves the link as written, because a
+skipped directory may hold a second note of that name.
+
+Naming a skipped directory, or a path inside it, as an input is an error with
+exit code `2`, and so is a workspace root that cannot be read. Configuration
+`ignore` patterns and `--exclude` choose which documents are processed; they do
+not keep the tool out of a directory, because an ignored document remains a link
+target. To leave a directory out without a warning, list it in a `.gitignore`:
+Git-ignored content is not indexed unless `resolve.gitIgnored` asks for it.
+
+If `.obsidian/app.json` cannot be read, the tool warns in the same way and
+treats `strictLineBreaks` as unverified, so Obsidian documents are not reflowed.
+A configuration file that cannot be read still stops the run, as does a
+directory that refuses the search for one: default rules must not take the place
+of a configuration that exists.
+
+Only the system errors `EACCES` and `EPERM` count as not permitted. Any other
+read error, such as a path that disappeared during the run or a failing device,
+stops the run with exit code `2`.

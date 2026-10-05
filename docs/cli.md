@@ -19,6 +19,12 @@ honors `.gitignore` and configuration ignore patterns, skips symlinks and nested
 repositories, and does not expand path globs itself. See the
 [selection details](configuration.md#selection-output-and-exit-codes).
 
+A directory that the tool is not permitted to read is skipped with a warning
+that names it, and the rest of the workspace is processed. Naming such a
+directory as an input is an error. See
+[paths that cannot be read](configuration.md#paths-that-cannot-be-read).
+Versions up to `0.2.0-rc.1` stopped every command instead.
+
 Use a caller or Git hook to choose changed or staged paths and pass them as
 explicit file arguments. The CLI processes working-tree contents, not the Git
 index. Pass paths as separate arguments (after `--` when they could begin with
@@ -73,7 +79,12 @@ node dist/cli/main.js format --root /path/to/documents --check --json
 ```
 
 JSON output contains file results and diagnostics with rule IDs, severity,
-messages, and source positions. Exit code `0` means success, `1` means a lint or
+messages, and source positions. When the run skipped a directory or a settings
+file that it was not permitted to read, the report also has a `skipped` list.
+Each entry has the `path` relative to the workspace root, a `type` of
+`directory` or `file`, the system's error `code`, and a `message` saying what
+follows from it. The field is absent when nothing was skipped, and versions up
+to `0.2.0-rc.1` never print it. Exit code `0` means success, `1` means a lint or
 formatting check failed, and `2` means a configuration, execution, or safety
 failure. Warnings fail only when they exceed `--max-warnings`.
 

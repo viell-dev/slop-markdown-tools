@@ -36,6 +36,16 @@ per-invocation file loaders. `WorkspaceOptions.directories` can list existing
 empty directories; parent directories of file entries are inferred. Resolution
 returns `status: "directory"` for a directory instead of `"missing"`.
 
+`WorkspaceOptions.unreadable` lists existing directories whose contents the host
+could not read. A link that leads into one resolves with `status: "unreadable"`
+instead of `"missing"`, and the result's `unreadable` field names the
+directories that stand in the way. In the Obsidian dialect, a search by note
+name that finds nothing also resolves as `"unreadable"`. One that finds a single
+note is `"resolved"` with `unreadable` set, because those directories may hold
+another note of that name; a rule must not rewrite such a link. The CLI passes
+the directories it [skipped](configuration.md#paths-that-cannot-be-read).
+Versions up to `0.2.0-rc.1` have neither the option nor the status.
+
 Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.

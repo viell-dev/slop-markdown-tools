@@ -2,8 +2,9 @@
 //
 //   npx --no-install mdtools lint --json | node summarize-report.mjs
 //
-// The report is one object: { version, mode, files, written }. Each file has a
-// `path`, its `diagnostics`, and for `format` a `changed` flag.
+// The report is one object: { version, mode, files, written }, with a `skipped`
+// list when the run left out a path it was not permitted to read. Each file has
+// a `path`, its `diagnostics`, and for `format` a `changed` flag.
 let input = "";
 process.stdin.setEncoding("utf8");
 for await (const chunk of process.stdin) input += chunk;

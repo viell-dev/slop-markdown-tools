@@ -60,6 +60,13 @@ function destinationRange(raw: string): [number, number] | undefined {
   return undefined;
 }
 
+/** Names the first few of the paths that could not be read, and counts the rest. */
+function named(paths: string[]): string {
+  return paths.length > 3
+    ? `${paths.slice(0, 3).join(", ")}, and ${paths.length - 3} more`
+    : paths.join(", ");
+}
+
 export const linkRules: Record<string, Rule> = {
   "links/valid": {
     description: "Check local link destinations and dialect-specific heading/block references.",
@@ -85,6 +92,12 @@ export const linkRules: Record<string, Rule> = {
           });
         else if (result.status === "directory" && document.dialect === "obsidian")
           findings.push({ start: range(node)[0], message: `Local target is a directory: ${url}.` });
+        else if (result.status === "unreadable")
+          // Neither found nor known to be missing: say what stood in the way.
+          findings.push({
+            start: range(node)[0],
+            message: `Local target could not be checked: ${url} (no readable match; cannot read ${named(result.unreadable ?? [])}).`,
+          });
         else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });
       });
@@ -113,6 +126,9 @@ export const linkRules: Record<string, Rule> = {
           node.type === "wikiLink",
         );
         if (result.status !== "resolved" || !result.target || !result.fragmentExists) return;
+        // Found by name among the readable files only: a directory that could not
+        // be read may hold another match, and a rewrite would choose between them.
+        if (result.unreadable) return;
         const parts = splitDestination(url);
         let target = parts.path;
         const style = options.style ?? "preserve";
@@ -130,7 +146,9 @@ export const linkRules: Record<string, Rule> = {
             const basename = path.posix.basename(result.target);
             const resolved = workspace.resolve(document.path, basename, document.dialect, true);
             target =
-              resolved.status === "resolved" && resolved.target === result.target
+              resolved.status === "resolved" &&
+              resolved.target === result.target &&
+              !resolved.unreadable
                 ? basename
                 : result.target;
           }
@@ -185,7 +203,8 @@ export const linkRules: Record<string, Rule> = {
         if (
           verified.status !== "resolved" ||
           verified.target !== result.target ||
-          verified.fragment !== result.fragment
+          verified.fragment !== result.fragment ||
+          verified.unreadable
         )
           return;
         const [start, end] = range(node);

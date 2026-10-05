@@ -209,6 +209,187 @@ describe("Obsidian case-insensitive resolution", () => {
   });
 });
 
+describe("directories that could not be read", () => {
+  const files = {
+    "Doc.md": "",
+    "Home.md": "",
+    "Notes/Known.md": "# Known\n",
+    "Sub/Doc.md": "",
+  };
+  const unreadable = ["locked", "Sub/Private"];
+  const workspace = createWorkspace(files, { unreadable });
+  const vault = createWorkspace(files, { unreadable, dialect: "obsidian" });
+  const valid = (dialect: Dialect, severity: "warn" | "error" = "error"): Config => ({
+    extends: [],
+    dialect,
+    rules: { "links/valid": severity },
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "resolves a %s path into one as unreadable instead of missing",
+    (dialect) => {
+      for (const [source, url, directory] of [
+        ["Doc.md", "locked/file.md", "locked"],
+        ["Doc.md", "locked/deep/file.md#part", "locked"],
+        ["Doc.md", "./locked/image.png", "locked"],
+        ["Sub/Doc.md", "../locked/file.md", "locked"],
+        ["Sub/Doc.md", "Private/file.md", "Sub/Private"],
+      ] as const)
+        expect(workspace.resolve(source, url, dialect), url).toEqual({
+          status: "unreadable",
+          unreadable: [directory],
+        });
+      // The directory itself is known to exist, and so are the directories above it.
+      for (const url of ["locked", "locked/", "Sub/Private", "Sub"])
+        expect(workspace.resolve("Doc.md", url, dialect).status, url).toBe("directory");
+      // Everything outside it is still known to be missing or present.
+      for (const url of ["gone.md", "Notes/gone.md", "lockedness/file.md", "Locked/file.md"])
+        expect(workspace.resolve("Doc.md", url, dialect), url).toEqual({ status: "missing" });
+      expect(workspace.resolve("Doc.md", "Notes/Known.md#known", dialect)).toEqual({
+        status: "resolved",
+        target: "Notes/Known.md",
+        fragment: "known",
+        fragmentExists: true,
+      });
+    },
+  );
+  it("accepts the directory names in any spelling of the same path", () => {
+    const index = createWorkspace(files, { unreadable: ["./locked/", "Sub\\Private", "locked"] });
+    expect(index.resolve("Doc.md", "locked/file.md", "github").unreadable).toEqual(["locked"]);
+    expect(index.resolve("Doc.md", "Sub/Private/file.md", "github").unreadable).toEqual([
+      "Sub/Private",
+    ]);
+  });
+  it("resolves a file that is listed although its directory is called unreadable", () => {
+    const index = createWorkspace({ "locked/Known.md": "" }, { unreadable: ["locked"] });
+    expect(index.resolve("Doc.md", "locked/Known.md", "github").status).toBe("resolved");
+    expect(index.resolve("Doc.md", "locked/Other.md", "github").status).toBe("unreadable");
+  });
+  it("matches the directory without regard to case in Obsidian", () => {
+    for (const url of ["locked/Note", "LOCKED/Note.md", "/Locked/deep/Note", "sub/private/Note"])
+      expect(vault.resolve("Doc.md", url, "obsidian").status, url).toBe("unreadable");
+    expect(vault.resolve("Doc.md", "LOCKED/Note", "obsidian").unreadable).toEqual(["locked"]);
+    expect(vault.resolve("Doc.md", "Locked", "obsidian").status).toBe("directory");
+  });
+  it("does not call a note missing that an Obsidian name search could not look for everywhere", () => {
+    // A name alone is searched for in every directory, so every unreadable one may hold it.
+    expect(vault.resolve("Doc.md", "Diary", "obsidian")).toEqual({
+      status: "unreadable",
+      unreadable: ["Sub/Private", "locked"],
+    });
+    expect(vault.resolve("Sub/Doc.md", "Folder/Diary.md#Heading", "obsidian").status).toBe(
+      "unreadable",
+    );
+    // A path from the vault root or from the note names one place, which is readable.
+    for (const url of ["/Diary", "./Diary", "../Diary", "/Notes/Diary"])
+      expect(vault.resolve("Sub/Doc.md", url, "obsidian"), url).toEqual({ status: "missing" });
+    const complete = createWorkspace(files, { dialect: "obsidian" });
+    expect(complete.resolve("Doc.md", "Diary", "obsidian")).toEqual({ status: "missing" });
+  });
+  it("marks a note that only an Obsidian name search found, because it may not be the only one", () => {
+    expect(vault.resolve("Doc.md", "Known", "obsidian")).toEqual({
+      status: "resolved",
+      target: "Notes/Known.md",
+      fragment: "",
+      fragmentExists: true,
+      unreadable: ["Sub/Private", "locked"],
+    });
+    // An exact path from the vault root or from the note is not a search.
+    for (const [source, url] of [
+      ["Doc.md", "Notes/Known"],
+      ["Doc.md", "Home"],
+      ["Sub/Doc.md", "Doc"],
+      ["Sub/Doc.md", "../Notes/Known.md"],
+    ] as const)
+      expect(vault.resolve(source, url, "obsidian"), url).not.toHaveProperty("unreadable");
+    expect(
+      lint("[[Known]] and [[Known#Known]]\n", { config: valid("obsidian"), workspace: vault }),
+    ).toEqual([]);
+  });
+  it("does not rewrite a link whose target only a name search found", () => {
+    const rewrite = (style: string, source: string, index = vault) => {
+      const config: Config = {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "links/valid": "error", "links/path": ["warn", { style }] },
+      };
+      const result = format(source, { path: "Doc.md", config, workspace: index });
+      expect(result.diagnostics).toEqual([]);
+      return result.output;
+    };
+    const complete = createWorkspace(files, { dialect: "obsidian" });
+    // Another `Known` in an unreadable directory would make the name ambiguous:
+    // a full path must not replace it, and the name must not replace a full path.
+    expect(rewrite("root", "[[Known|label]]\n")).toBe("[[Known|label]]\n");
+    expect(rewrite("root", "[[Known|label]]\n", complete)).toBe("[[Notes/Known|label]]\n");
+    expect(rewrite("relative", "[[Known|label]]\n")).toBe("[[Known|label]]\n");
+    expect(rewrite("shortest", "[[Notes/Known|label]]\n")).toBe("[[Notes/Known|label]]\n");
+    expect(rewrite("shortest", "[[Notes/Known|label]]\n", complete)).toBe("[[Known|label]]\n");
+    // Exact paths are rewritten as usual.
+    expect(rewrite("root", "[[notes/known|label]]\n")).toBe("[[Notes/Known|label]]\n");
+    expect(rewrite("shortest", "[[/Home.md|label]]\n")).toBe("[[Home.md|label]]\n");
+  });
+  it("reports an unchecked link through links/valid at the rule's severity", () => {
+    const source = "[in](locked/file.md), [dir](locked), [out](gone.md), and [ok](Home.md).\n";
+    expect(lint(source, { path: "Doc.md", config: valid("github"), workspace })).toMatchObject([
+      {
+        rule: "links/valid",
+        severity: "error",
+        message:
+          "Local target could not be checked: locked/file.md (no readable match; cannot read locked).",
+        column: 1,
+      },
+      { rule: "links/valid", severity: "error", message: "Missing local target: gone.md." },
+    ]);
+    expect(
+      lint("[in](locked/file.md)\n", {
+        path: "Doc.md",
+        config: valid("github", "warn"),
+        workspace,
+      }),
+    ).toMatchObject([
+      { severity: "warn", message: expect.stringContaining("could not be checked") },
+    ]);
+    expect(
+      lint("[[Diary]] and ![[locked/image.png]]\n", {
+        path: "Doc.md",
+        config: valid("obsidian"),
+        workspace: vault,
+      }).map((item) => item.message),
+    ).toEqual([
+      "Local target could not be checked: Diary (no readable match; cannot read Sub/Private, locked).",
+      "Local target could not be checked: locked/image.png (no readable match; cannot read locked).",
+    ]);
+    // A long list of directories is cut short.
+    const many = createWorkspace(
+      {},
+      { unreadable: ["e", "d", "c", "b", "a"], dialect: "obsidian" },
+    );
+    expect(lint("[[Diary]]\n", { config: valid("obsidian"), workspace: many })[0]?.message).toBe(
+      "Local target could not be checked: Diary (no readable match; cannot read a, b, c, and 2 more).",
+    );
+  });
+  it("can be suppressed like any other finding", () => {
+    const source = "<!-- mdtools-disable-next-line links/valid -->\n[in](locked/file.md)\n";
+    expect(lint(source, { path: "Doc.md", config: valid("github"), workspace })).toEqual([]);
+  });
+  it.each([
+    ["github", "[in](locked/file.md) and [frag](<locked/file.md#part>)\n"],
+    ["obsidian", "[[locked/Note|label]] and [in](locked/Note.md) and [[Diary|label]]\n"],
+  ] as const)("leaves unchecked %s links as written when formatting", (dialect, source) => {
+    const config: Config = {
+      extends: [],
+      dialect,
+      rules: {
+        "links/path": ["warn", { style: "relative", brackets: "angle", leadingDot: true }],
+        ...(dialect === "obsidian" ? { "links/notation": ["warn", { style: "markdown" }] } : {}),
+      },
+    };
+    const index = dialect === "obsidian" ? vault : workspace;
+    const result = format(source, { path: "Doc.md", config, workspace: index });
+    expect(result).toEqual({ output: source, changed: false, diagnostics: [] });
+  });
+});
+
 describe("Forgejo heading anchors", () => {
   const workspace = createWorkspace({
     "Doc.md": "",

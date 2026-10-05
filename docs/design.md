@@ -174,6 +174,19 @@ scanning every path for each shortened link. There is no persistent cache,
 worker pool, watch service, editor extension, or language server yet. The
 library has a pluggable workspace interface for specialized hosts.
 
+Discovery skips a directory that the system refuses to let it read (`EACCES` or
+`EPERM`) and carries on; every other read error is treated as a fault and stops
+the run. A directory is read as a whole or not at all: one that can be listed
+but not entered, or entered but not listed, is skipped like one that allows
+neither, although the first reveals file names and the second would open a file
+whose name is known. The index then holds the readable files only. Links whose
+path leads into a skipped directory resolve as unreadable rather than missing.
+Obsidian's search by note name cannot be made exact: a name with no readable
+match is reported as unchecked, a name with one readable match is accepted but
+not rewritten, and a name with several is ambiguous either way.
+[Paths that cannot be read](configuration.md#paths-that-cannot-be-read)
+describes the behavior.
+
 `npm run benchmark` measures parsing, linting, and formatting of synthetic
 repository documentation and a synthetic vault, through the library and through
 the CLI, and prints an output hash for comparing implementations.
