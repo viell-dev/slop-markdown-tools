@@ -1170,7 +1170,10 @@ describe("anchors from HTML in the document", () => {
     expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
     expect(hostile.resolve("Doc.md", "Note.md#t", "forgejo").fragmentExists).toBe(false);
     expect(hostile.resolve("Doc.md", "Note.md#s", "forgejo").fragmentExists).toBe(true);
-    expect(performance.now() - start).toBeLessThan(4000);
+    // The bound tells linear from quadratic growth, which would take minutes here. It leaves
+    // room for a slow CI runner and for GFM parsing, which the workspace now uses when no
+    // dialect is named and which takes about half as long again as CommonMark on this input.
+    expect(performance.now() - start).toBeLessThan(10000);
   });
 });
 
