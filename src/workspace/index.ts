@@ -271,6 +271,26 @@ interface Target {
   github?: GithubAnchors;
   forge?: ForgeAnchors;
 }
+/**
+ * A copy of a string that shares no memory with the text it was cut from. An
+ * engine may store a substring, such as a regular expression's match or a slice
+ * of the source, as a reference into the whole string, so a kept heading name
+ * or `id` would keep its document's text alive after the parsed document is
+ * gone. Joining the string's code units builds a new string of the same
+ * content. `text + ""`, a template literal, `String()`, and `substring()` return
+ * the same string and detach nothing; measured on Node.js 22 and 24.
+ */
+function detach(text: string): string {
+  return text.split("").join("");
+}
+/** Replace every string of the sets, which are all a target keeps, by a detached copy. */
+function detachAll(...sets: Set<string>[]): void {
+  for (const set of sets) {
+    const copies = Array.from(set, detach);
+    set.clear();
+    for (const copy of copies) set.add(copy);
+  }
+}
 /** The document's HTML, tokenized once for the headings and the explicit anchors of a group. */
 function htmlParts(document: Document): Map<Nodes, HtmlPart> {
   const parts = new Map<Nodes, HtmlPart>();
@@ -303,6 +323,7 @@ function obsidianAnchors(document: Document | null): ObsidianAnchors {
     const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
     if (match) anchors.blocks.add(match[1]!);
   });
+  detachAll(anchors.headings, anchors.foldedHeadings, anchors.blocks);
   return anchors;
 }
 /** A target's anchors for GitHub and CommonMark; none for a target that is not Markdown source. */
@@ -323,6 +344,7 @@ function githubAnchors(document: Document | null): GithubAnchors {
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
   for (const part of parts.values())
     for (const anchor of part.anchors) anchors.explicit.add(anchor.toLowerCase());
+  detachAll(anchors.slugs, anchors.explicit);
   return anchors;
 }
 /** A target's anchors for Forgejo and Gitea; none for a target that is not Markdown source. */
@@ -382,6 +404,7 @@ function forgeAnchors(document: Document | null): ForgeAnchors {
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
   for (const part of parts.values())
     for (const anchor of part.anchors) anchors.explicit.add(anchor);
+  detachAll(anchors.forgejoSlugs, anchors.giteaSlugs, anchors.explicit);
   return anchors;
 }
 export interface WorkspaceOptions {

@@ -192,6 +192,94 @@ describe("local target resolution", () => {
       parses.watch = undefined;
     }
   });
+  it("does not keep a target's text alive through its anchors", async () => {
+    // An engine may store a substring as a reference into the string it was cut
+    // from, so a kept anchor could keep megabytes of text. Each target here is
+    // large, its anchors are few and long enough to be stored that way, and
+    // nothing but the index can hold its text: a loader builds it anew on every
+    // call. One target of each kind is plain ASCII and one is not, because the
+    // engine stores and lowercases the two differently.
+    const marks = ["plain", "é-𝒳"];
+    const workspace = (scale: number) => {
+      const long = (words: string, times: number) => `${words} `.repeat(times * scale);
+      const html = (mark: string) => `<p>${long(`filler ${mark} in an HTML block`, 80)}</p>`;
+      const prose = (mark: string) => long(`prose ${mark} in one paragraph`, 40);
+      const files: Record<string, () => string> = {};
+      marks.forEach((mark, target) => {
+        files[`Wide ${target}.md`] = () =>
+          [
+            `## A heading of target ${target} that is long {#custom-heading-id-${mark}}`,
+            "",
+            `<div id="Explicit-Anchor-${mark}">`,
+            html(mark),
+            `<a name="lowercase-anchor-${mark}"></a>`,
+            "</div>",
+            "",
+            "```",
+            long(`code ${mark} in a block that makes the file larger than its parts`, 20),
+            "```",
+            "",
+          ].join("\n");
+        files[`Block ${target}.md`] = () => `${prose(mark)} ^block-identifier-${target}\n`;
+      });
+      return { files, smallest: Math.min(html("plain").length, prose("plain").length) };
+    };
+    const anchors: [Dialect, string, (mark: string, target: number) => string][] = [
+      ["obsidian", "Block", (_, target) => `^block-identifier-${target}`],
+      [
+        "obsidian",
+        "Wide",
+        (mark, target) =>
+          `a heading of target ${target} that is long {%23custom-heading-id-${mark}}`,
+      ],
+      ["github", "Wide", (mark) => `explicit-anchor-${mark}`],
+      ["commonmark", "Wide", (mark) => `EXPLICIT-ANCHOR-${mark.toUpperCase()}`],
+      ["github", "Wide", (mark) => `lowercase-anchor-${mark}`],
+      ["forgejo", "Wide", (mark) => `Explicit-Anchor-${mark}`],
+      ["gitea", "Wide", (mark) => `lowercase-anchor-${mark}`],
+      ["forgejo", "Wide", (mark) => `custom-heading-id-${mark}`],
+      ["gitea", "Wide", (mark) => `custom-heading-id-${mark}`],
+    ];
+    const check = (files: Record<string, () => string>) => {
+      const index = createWorkspace(files);
+      for (const [dialect, file, anchor] of anchors)
+        marks.forEach((mark, target) => {
+          const link = `${file} ${target}.md#${anchor(mark, target)}`;
+          expect(index.resolve("Doc.md", link, dialect).fragmentExists, link).toBe(true);
+          expect(index.resolve("Doc.md", `${link}x`, dialect).fragmentExists, link).toBe(false);
+        });
+      vi.mocked(headingAttributes).mockClear();
+      return index;
+    };
+    const settle = async () => {
+      // The last string that a regular expression was run on stays referenced.
+      /-/.test("-");
+      await collectGarbage();
+      return process.memoryUsage().heapUsed;
+    };
+    // The engine compiles code on the first runs, which also takes memory.
+    check(workspace(1).files);
+    check(workspace(1).files);
+    const { files, smallest } = workspace(1000);
+    expect(smallest).toBeGreaterThan(1_000_000);
+    const documents: WeakRef<object>[] = [];
+    const before = await settle();
+    parses.watch = (document) => documents.push(new WeakRef(document), new WeakRef(document.tree));
+    let index: ReturnType<typeof createWorkspace>;
+    try {
+      index = check(files);
+    } finally {
+      parses.watch = undefined;
+    }
+    const held = (await settle()) - before;
+    expect(documents.length).toBeGreaterThan(0);
+    expect(documents.filter((document) => document.deref() !== undefined)).toEqual([]);
+    // The anchors alone are a few kilobytes. Any one kind of them that kept its
+    // text alive would hold at least the smallest of the large blocks.
+    expect(held).toBeLessThan(smallest / 3);
+    // The anchors are still there.
+    expect(index.resolve("Doc.md", "Wide 0.md#missing", "github").fragmentExists).toBe(false);
+  }, 60_000);
   it("computes a dialect's anchors only when a link is checked against it", () => {
     const reads = vi.mocked(headingAttributes);
     reads.mockClear();
