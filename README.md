@@ -14,11 +14,13 @@ the code, tests, documentation, CI, and release tooling, and agents implement,
 verify, and merge every change. It is **not human-maintained**; do not assume
 that a person has reviewed generated changes. The repository owner does not
 write, read, or review code, does not know the codebase or API, and does not use
-the tool directly. They read issue and PR descriptions to check the project's
-direction, read Markdown documents that agents have processed with the tool, and
-assign agents to tasks. Human and agent-authored issues and pull requests are
-welcome. Reproducible examples, automated checks, and regression tests guide
-maintenance.
+the tool directly. They guide the project lightly, from what they can see: the
+public documentation, issue and PR descriptions, and Markdown documents that
+agents have processed with the tool. They assign agents to tasks; the assigned
+agents make the architectural and design decisions and keep every part of the
+repository consistent with the rest. Human and agent-authored issues and pull
+requests are welcome. Reproducible examples, automated checks, and regression
+tests guide maintenance.
 
 The project is currently an early prerelease. Report document corruption or
 changed rendering with a minimal input, the configuration, actual output, and
@@ -130,10 +132,10 @@ Keep fixes scoped and describe remaining limitations in the PR.
 
 Agent contributors should read
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md)
-for maintenance-specific instructions, including the limits of an assigned
-agent's authority. `test:package` packs and installs a temporary consumer
-project, then exercises the installed CLI and library; it can require access to
-the npm registry.
+for maintenance-specific instructions, including what an assigned agent decides
+and the limits of that authority. `test:package` packs and installs a temporary
+consumer project, then exercises the installed CLI and library; it can require
+access to the npm registry.
 
 ## Benchmarks
 
