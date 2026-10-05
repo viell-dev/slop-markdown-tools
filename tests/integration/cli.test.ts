@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, symlink, stat } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { discover, writeAtomic } from "../../src/workspace/files.js";
+import { discover, isVault, writeAtomic } from "../../src/workspace/files.js";
 import { loadConfig } from "../../src/config/load.js";
 import { cli, fixture, manifest, run } from "./support.js";
 
@@ -257,6 +257,246 @@ describe("CLI", () => {
     );
   });
 });
+describe("without a named dialect", () => {
+  // Tables and footnotes on GitHub, Forgejo, Gitea, and in Obsidian. CommonMark, which
+  // was assumed up to 0.2.0-rc.1, reads the tables and the consecutive definitions as
+  // paragraphs, which the default rules reflow, and a definition as a link to a file.
+  const table = "| Sensor | Unit |\n|---|---|\n| Temperature | °C |\n";
+  const files = {
+    "outer-pipes.md": table,
+    "no-outer-pipes.md": "Sensor | Unit\n---|---\nTemperature | °C\n",
+    "wide.md":
+      "| Sensor name in a long header cell | Unit of measurement in a long header cell | Notes |\n" +
+      "|---|---|---|\n" +
+      "| Temperature measured at the north wall | Degrees Celsius, to one decimal place | Calibrated yearly |\n",
+    "footnotes.md": "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n",
+    "footnote.md": "Text with a note.[^1]\n\n[^1]: Text.\n",
+  };
+  const dialect = (root: string, file: string, ...flags: string[]) => {
+    const explained = run(root, ["config", ...flags, "explain", file]);
+    expect(explained.status, explained.stderr).toBe(0);
+    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+  };
+  it("assumes GitHub Markdown and says so", async () => {
+    const root = await fixture(files);
+    expect(dialect(root, "outer-pipes.md")).toBe("github");
+    // Only the dialect is assumed: the rules are those of the recommended preset.
+    const explained = JSON.parse(run(root, ["config", "explain", "outer-pipes.md"]).stdout);
+    expect(explained.file).toBeNull();
+    expect(Object.keys(explained.effective.rules)).not.toContain("style/table");
+    // A configuration that names no dialect is read the same way.
+    const configured = await fixture({
+      ...files,
+      "mdtools.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
+    });
+    expect(dialect(configured, "outer-pipes.md")).toBe("github");
+    expect(run(configured, ["format", "--check"]).status).toBe(0);
+  });
+  it.each(Object.keys(files).filter((name) => name !== "footnote.md"))(
+    "formats %s without changing it",
+    async (name) => {
+      const source = files[name as keyof typeof files];
+      const root = await fixture({ [name]: source });
+      const checked = run(root, ["format", "--check"]);
+      expect(checked.status, checked.stderr).toBe(0);
+      expect(checked.stderr).toBe("1 file(s) processed; 0 would change.\n");
+      expect(run(root, ["format", "--write"]).status).toBe(0);
+      expect(await readFile(path.join(root, name), "utf8")).toBe(source);
+      const piped = run(root, ["format", "-"], source);
+      expect(piped.status, piped.stderr).toBe(0);
+      expect(piped.stdout).toBe(source);
+    },
+  );
+  it("lints a footnote definition without reporting a missing file", async () => {
+    const root = await fixture(files);
+    const linted = run(root, ["lint"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe("5 file(s) linted; 0 would change.\n");
+    const piped = run(root, ["lint", "-"], files["footnote.md"]);
+    expect(piped.status, piped.stderr).toBe(0);
+    expect(piped.stderr).toBe("");
+  });
+  it("still reads CommonMark when --dialect or the configuration names it", async () => {
+    const joined = "| Sensor | Unit | |---|---| | Temperature | °C |\n";
+    const root = await fixture(files);
+    expect(dialect(root, "outer-pipes.md", "--dialect", "commonmark")).toBe("commonmark");
+    expect(run(root, ["format", "-", "--dialect", "commonmark"], table).stdout).toBe(joined);
+    const linted = run(root, ["lint", "--dialect", "commonmark", "footnote.md"]);
+    expect(linted.status).toBe(1);
+    expect(linted.stderr).toContain(
+      "footnote.md:3:1: error links/valid: Missing local target: Text..",
+    );
+    const configured = await fixture({
+      ...files,
+      "mdtools.config.jsonc": '{ "dialect": "commonmark" }',
+    });
+    expect(dialect(configured, "outer-pipes.md")).toBe("commonmark");
+    expect(run(configured, ["format", "-"], table).stdout).toBe(joined);
+    expect(run(configured, ["format", "--write", "outer-pipes.md"]).status).toBe(0);
+    expect(await readFile(path.join(configured, "outer-pipes.md"), "utf8")).toBe(joined);
+    // --dialect replaces the configuration's dialect, in this direction as well.
+    expect(run(configured, ["format", "-", "--dialect", "github"], table).stdout).toBe(table);
+  });
+  it("leaves the choice to a preset or an override that names a dialect", async () => {
+    const root = await fixture({
+      "mdtools.config.jsonc": `{
+        "extends": ["recommended", "forgejo"],
+        "overrides": [{ "files": ["plain/**"], "dialect": "commonmark" }],
+      }`,
+      "docs/table.md": table,
+      "plain/table.md": table,
+    });
+    expect(dialect(root, "docs/table.md")).toBe("forgejo");
+    expect(dialect(root, "plain/table.md")).toBe("commonmark");
+    const previewed = run(root, ["format", "--json"]);
+    expect(previewed.status, previewed.stderr).toBe(0);
+    const changed = (JSON.parse(previewed.stdout) as { files: { path: string }[] }).files;
+    expect(changed).toMatchObject([
+      // The forgejo preset aligns the table; CommonMark reflows its lines as prose.
+      { path: "docs/table.md", changed: true },
+      { path: "plain/table.md", changed: true },
+    ]);
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(await readFile(path.join(root, "docs/table.md"), "utf8")).toBe(
+      "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n",
+    );
+    expect(await readFile(path.join(root, "plain/table.md"), "utf8")).toBe(
+      "| Sensor | Unit | |---|---| | Temperature | °C |\n",
+    );
+  });
+});
+describe("at the root of an Obsidian vault, without a named dialect", () => {
+  // Obsidian shows the first two lines on separate lines unless the vault's "Strict
+  // line breaks" setting is on, and a wikilink must stay on one line. Up to 0.2.0-rc.1
+  // the note was read as CommonMark: the lines were joined and the wikilink was split.
+  const link =
+    "[[A fairly long note name that sits near the wrap column of this paragraph|alias text]]";
+  const note = `Shopping list\nMilk and eggs\n\nSee ${link} here.\n`;
+  const reflowed = `Shopping list Milk and eggs\n\nSee\n${link}\nhere.\n`;
+  const asGithub =
+    "Shopping list Milk and eggs\n\nSee [[A fairly long note name that sits near the wrap column of this\nparagraph|alias text]] here.\n";
+  const files = {
+    "Note.md": note,
+    "A fairly long note name that sits near the wrap column of this paragraph.md": "# Target\n",
+  };
+  const dialect = (root: string, file: string, ...flags: string[]) => {
+    const explained = run(root, ["config", ...flags, "explain", file]);
+    expect(explained.status, explained.stderr).toBe(0);
+    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+  };
+  /** A vault: Obsidian creates `.obsidian/` at its root, with or without settings in `app.json`. */
+  async function vault(settings: string | undefined, extra: Record<string, string> = {}) {
+    const root = await fixture({
+      ...files,
+      ...(settings === undefined ? {} : { ".obsidian/app.json": settings }),
+      ...extra,
+    });
+    await mkdir(path.join(root, ".obsidian"), { recursive: true });
+    return root;
+  }
+  it.each([
+    ["no settings file", undefined],
+    ["a settings file without the setting", "{}"],
+    ["strict line breaks off", '{"strictLineBreaks":false}'],
+  ])("assumes the Obsidian dialect and reflows nothing with %s", async (_, settings) => {
+    const root = await vault(settings);
+    expect(dialect(root, "Note.md")).toBe("obsidian");
+    const linted = run(root, ["lint"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe("2 file(s) linted; 0 would change.\n");
+    const previewed = run(root, ["format", "--diff"]);
+    expect(previewed.status, previewed.stderr).toBe(0);
+    expect(previewed.stdout).toBe("");
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(note);
+    // The same holds for stdin, and from a folder of the vault.
+    expect(run(root, ["format", "-"], note).stdout).toBe(note);
+    await mkdir(path.join(root, "Folder"));
+    expect(run(path.join(root, "Folder"), ["format", "-"], note).stdout).toBe(note);
+    expect(run(root, ["format", "--check", "--dialect", "obsidian"]).status).toBe(0);
+  });
+  it("reflows as the Obsidian dialect does once strict line breaks are on", async () => {
+    const root = await vault('{"strictLineBreaks":true}');
+    expect(dialect(root, "Note.md")).toBe("obsidian");
+    // Obsidian then shows the two lines as one, so joining them is safe; the wikilink stays whole.
+    expect(run(root, ["format", "-", "--stdin-filepath", "Note.md"], note).stdout).toBe(reflowed);
+    expect(
+      run(root, ["format", "-", "--stdin-filepath", "Note.md", "--dialect", "obsidian"], note)
+        .stdout,
+    ).toBe(reflowed);
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(reflowed);
+    expect(run(root, ["format", "--check"]).status).toBe(0);
+    expect(run(root, ["lint", "--max-warnings", "0"]).status).toBe(0);
+  });
+  it("assumes the dialect only, so the rules of the obsidian preset still need the preset", async () => {
+    const source = "> [!TIP] Title\n> Text.\n";
+    const root = await vault(undefined, { "Callout.md": source });
+    const explained = JSON.parse(run(root, ["config", "explain", "Callout.md"]).stdout);
+    expect(explained.file).toBeNull();
+    expect(explained.effective.dialect).toBe("obsidian");
+    expect(Object.keys(explained.effective.rules)).not.toContain("obsidian/callout-marker");
+    expect(run(root, ["format", "-"], source).stdout).toBe(source);
+    const preset = await vault(undefined, {
+      "Callout.md": source,
+      "mdtools.config.jsonc": '{ "extends": ["recommended", "obsidian"] }',
+    });
+    expect(run(preset, ["format", "-"], source).stdout).toBe("> [!tip] Title\n> Text.\n");
+  });
+  it("gives way to --dialect and to a dialect named by a setting, a preset, or an override", async () => {
+    const root = await vault(undefined);
+    expect(dialect(root, "Note.md", "--dialect", "github")).toBe("github");
+    expect(run(root, ["format", "-", "--dialect", "github"], note).stdout).toBe(asGithub);
+    for (const [config, expected, output] of [
+      ['{ "dialect": "commonmark" }', "commonmark", asGithub],
+      ['{ "extends": ["recommended", "github"] }', "github", asGithub],
+      // Gitea joins the lines too, and keeps a `[[...]]` shortlink on one line.
+      ['{ "overrides": [{ "files": ["Note.md"], "dialect": "gitea" }] }', "gitea", reflowed],
+    ] as const) {
+      const configured = await vault(undefined, { "mdtools.config.jsonc": config });
+      expect(dialect(configured, "Note.md"), config).toBe(expected);
+      expect(
+        run(configured, ["format", "-", "--stdin-filepath", "Note.md"], note).stdout,
+        config,
+      ).toBe(output);
+    }
+    // A configuration that names no dialect leaves the vault's in place, also for
+    // the files that an override naming another dialect does not match.
+    const unnamed = await vault(undefined, {
+      "mdtools.config.jsonc":
+        '{ "rules": { "style/emphasis": "off" }, "overrides": [{ "files": ["docs/**"], "dialect": "github" }] }',
+      "docs/page.md": "A page.\n",
+    });
+    expect(dialect(unnamed, "Note.md")).toBe("obsidian");
+    expect(dialect(unnamed, "docs/page.md")).toBe("github");
+    expect(run(unnamed, ["format", "--check"]).status).toBe(0);
+  });
+  it("does not recognize a vault in a folder of a larger workspace", async () => {
+    const root = await fixture({
+      "README.md": "# Project\n",
+      "vault/.obsidian/app.json": "{}",
+      "vault/Note.md": note,
+    });
+    // The workspace root is the repository, whose documents are not Obsidian notes.
+    expect(dialect(root, "vault/Note.md")).toBe("github");
+    expect(run(root, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
+      asGithub,
+    );
+    // Run on the vault itself, or with an override as documented, it is read as Obsidian.
+    expect(dialect(root, "vault/Note.md", "--root", "vault")).toBe("obsidian");
+    expect(dialect(path.join(root, "vault"), "Note.md")).toBe("obsidian");
+    const overridden = await fixture({
+      "mdtools.config.jsonc": '{ "overrides": [{ "files": ["vault/**"], "dialect": "obsidian" }] }',
+      "vault/.obsidian/app.json": "{}",
+      "vault/Note.md": note,
+    });
+    expect(dialect(overridden, "vault/Note.md")).toBe("obsidian");
+    expect(run(overridden, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
+      note,
+    );
+  });
+});
 describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
     const root = await fixture({ "note.md": "new content" });
@@ -313,5 +553,18 @@ describe("filesystem safeguards", () => {
   it("finds the vault boundary when invoked from a subdirectory", async () => {
     const root = await fixture({ ".obsidian/app.json": "{}", "sub/note.md": "text" });
     expect((await loadConfig(path.join(root, "sub"))).root).toBe(root);
+  });
+  it("recognizes a vault by a .obsidian folder at the root, and nowhere else", async () => {
+    const root = await fixture({
+      ".obsidian/app.json": "{}",
+      "nested/vault/.obsidian/app.json": "{}",
+      "plain/note.md": "text",
+      "file/.obsidian": "not a folder",
+    });
+    expect(await isVault(root)).toBe(true);
+    expect(await isVault(path.join(root, "nested/vault"))).toBe(true);
+    expect(await isVault(path.join(root, "nested"))).toBe(false);
+    expect(await isVault(path.join(root, "plain"))).toBe(false);
+    expect(await isVault(path.join(root, "file"))).toBe(false);
   });
 });

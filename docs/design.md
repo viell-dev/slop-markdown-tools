@@ -33,6 +33,27 @@ filesystem/CLI integration cases, including the list-collapse failure that
 motivated replacing heuristic reflow; [testing](testing.md) describes the
 suites.
 
+The fingerprint is computed in the document's dialect, so it cannot notice that
+the dialect itself is wrong. In CommonMark a table, or a run of footnote
+definitions, is an ordinary paragraph: reflow joins its lines, and the
+CommonMark meaning of the result is unchanged although no site renders the table
+any more. When nothing names a dialect, the tool therefore assumes `github`,
+whose syntax the Forgejo, Gitea, and Obsidian dialects build on, and not
+CommonMark. For a document that really is plain CommonMark this only makes
+formatting more careful: constructs that would have been reflowed or restyled,
+such as a table or text between two `$` signs, are left alone. A vault is the
+exception, because no other dialect knows that Obsidian shows a single line
+break unless the vault's settings say otherwise: when the workspace root
+contains a `.obsidian` folder, the CLI assumes `obsidian`. It already looks for
+that folder to find the workspace root and the line-break setting, so no new
+guess about a document's content is involved. Only the root is examined: a vault
+in a folder of a larger workspace, or a folder of a vault passed as `--root`, is
+not recognized. Version 0.2.0-rc.1 and earlier assumed CommonMark in both cases.
+The assumption is made in one place, where configuration is resolved: the
+library takes the dialect to assume as an argument, since it does not read
+files, and anything that names a dialect replaces it. The workspace index uses
+`github` for link targets when a library caller gives it no dialect.
+
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects
 the title/body boundary. Lazy quote continuations and inline syntax spanning

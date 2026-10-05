@@ -414,8 +414,9 @@ import { format } from "mdrefine";
 
 const source = "A *short* note with __strong__ words and no final newline.";
 
-// Without `config`, the recommended preset applies. Pass the same object you
-// would write in mdtools.config.jsonc to choose a dialect or change rules.
+// Without `config`, the recommended preset applies and the GitHub dialect is
+// assumed. Pass the same object you would write in mdtools.config.jsonc to
+// choose a dialect or change rules.
 const result = format(source, {
   config: {
     extends: ["recommended", "github"],
