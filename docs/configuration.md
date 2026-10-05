@@ -342,17 +342,19 @@ file's `changed` field.
 reads stdin with configuration and resolution context; it cannot be used with
 `--write`.
 
-| Exit | Meaning                                                                         |
-| ---- | ------------------------------------------------------------------------------- |
-| `0`  | Completed; no errors or failed formatting check                                 |
-| `1`  | Lint errors, exceeded `--max-warnings`, or changes required by `format --check` |
-| `2`  | Configuration, execution, or formatting safety failure                          |
+| Exit | Meaning                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------- |
+| `0`  | Completed; no errors or failed formatting check                                              |
+| `1`  | Lint errors, exceeded `--max-warnings`, or changes required by `format --check`              |
+| `2`  | Configuration, execution, or formatting safety failure, or a document that could not be read |
 
 Warnings do not fail a command unless `--max-warnings` is supplied. A successful
 formatting command can still report remaining lint problems. Inspect its exit
 code and diagnostics. An unsafe-format diagnostic blocks the complete batch's
-write phase. An I/O error during writing can leave earlier files written;
-replacement is atomic per file, not a workspace-wide transaction.
+write phase, and so does a selected document that
+[cannot be read](#paths-that-cannot-be-read). An I/O error during writing can
+leave earlier files written; replacement is atomic per file, not a
+workspace-wide transaction.
 
 ## Paths that cannot be read
 
@@ -390,6 +392,18 @@ treats `strictLineBreaks` as unverified, so Obsidian documents are not reflowed.
 A configuration file that cannot be read still stops the run, as does a
 directory that refuses the search for one: default rules must not take the place
 of a configuration that exists.
+
+A selected document that cannot be read is reported for that file, as an error
+diagnostic with the rule ID `engine/unreadable-file` at line 1, in the text
+output and in the file's entry of the JSON report. The other files are processed
+and reported, and the run ends with exit code `2`. As with an unsafe-format
+diagnostic, `format --write` then writes none of the batch; pass `--exclude` for
+the file to format the rest. A link to a heading or block in a file that cannot
+be read is reported by `links/valid` as `Fragment could not be checked`, naming
+the file, with the rule's configured severity, and is never rewritten. A link to
+the file without a fragment is valid, because the file is known to exist.
+Versions up to `0.2.0-rc.1` stopped at the first such file or link without
+reporting anything else.
 
 Only the system errors `EACCES` and `EPERM` count as not permitted. Any other
 read error, such as a path that disappeared during the run or a failing device,

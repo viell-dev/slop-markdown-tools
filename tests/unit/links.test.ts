@@ -390,6 +390,106 @@ describe("directories that could not be read", () => {
   });
 });
 
+describe("files that could not be read", () => {
+  const refuse = (code: string) =>
+    vi.fn((): string => {
+      throw Object.assign(new Error(`${code}: refused, open 'Secret.md'`), { code });
+    });
+  const valid = (dialect: Dialect, severity: "warn" | "error" = "error"): Config => ({
+    extends: [],
+    dialect,
+    rules: { "links/valid": severity },
+  });
+  it.each(["EACCES", "EPERM"])(
+    "resolves a fragment in a file whose loader fails with %s as unreadable",
+    (code) => {
+      const load = refuse(code);
+      const index = createWorkspace({ "Doc.md": "", "Secret.md": load, "Open.md": "# Open\n" });
+      // The file is known to exist; only a fragment needs what it contains.
+      expect(index.resolve("Doc.md", "Secret.md", "github")).toMatchObject({
+        status: "resolved",
+        target: "Secret.md",
+        fragmentExists: true,
+      });
+      expect(load).not.toHaveBeenCalled();
+      for (const dialect of ["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)
+        expect(index.resolve("Doc.md", "Secret.md#section", dialect), dialect).toEqual({
+          status: "unreadable",
+          target: "Secret.md",
+          fragment: "section",
+          unreadable: ["Secret.md"],
+        });
+      // The refusal is remembered like a parsed target, and other files are unaffected.
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(index.resolve("Doc.md", "Open.md#open", "github").fragmentExists).toBe(true);
+    },
+  );
+  it("lets any other loader error through", () => {
+    for (const error of [
+      Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" }),
+      Object.assign(new Error("EIO: i/o error"), { code: "EIO" }),
+      new Error("no code"),
+    ]) {
+      const index = createWorkspace({
+        "Secret.md": () => {
+          throw error;
+        },
+      });
+      expect(() => index.resolve("Doc.md", "Secret.md#section", "github")).toThrow(error);
+      expect(() =>
+        lint("[a](Secret.md#section)\n", { config: valid("github"), workspace: index }),
+      ).toThrow(error);
+    }
+  });
+  it("reports the fragment through links/valid at the rule's severity, naming the file", () => {
+    const index = createWorkspace({ "Notes/Secret.md": refuse("EACCES"), "Doc.md": "" });
+    const source = "[plain](Notes/Secret.md) and [section](Notes/Secret.md#section)\n";
+    expect(lint(source, { path: "Doc.md", config: valid("github"), workspace: index })).toEqual([
+      {
+        rule: "links/valid",
+        severity: "error",
+        message:
+          "Fragment could not be checked: Notes/Secret.md#section (cannot read Notes/Secret.md).",
+        start: source.indexOf("[section]"),
+        line: 1,
+        column: source.indexOf("[section]") + 1,
+      },
+    ]);
+    expect(
+      lint("[[Secret#Section]]\n", {
+        path: "Doc.md",
+        config: valid("obsidian", "warn"),
+        workspace: index,
+      }),
+    ).toMatchObject([
+      {
+        severity: "warn",
+        message: "Fragment could not be checked: Secret#Section (cannot read Notes/Secret.md).",
+      },
+    ]);
+  });
+  it("formats the linking document without rewriting the link or failing", () => {
+    const index = createWorkspace({ "Notes/Secret.md": refuse("EACCES"), "Doc.md": "" });
+    const config: Config = {
+      extends: [],
+      dialect: "github",
+      rules: {
+        "style/emphasis": "warn",
+        "links/valid": "error",
+        "links/path": ["warn", { style: "relative", leadingDot: true }],
+      },
+    };
+    const result = format("A *link* to [a section](Notes/Secret.md#section).\n", {
+      path: "Doc.md",
+      config,
+      workspace: index,
+    });
+    // Without the fix the refusal surfaced as an `engine/unsafe-format` error.
+    expect(result.output).toBe("A _link_ to [a section](Notes/Secret.md#section).\n");
+    expect(result.diagnostics.map((item) => item.rule)).toEqual(["links/valid"]);
+  });
+});
+
 describe("Forgejo heading anchors", () => {
   const workspace = createWorkspace({
     "Doc.md": "",

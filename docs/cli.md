@@ -86,7 +86,11 @@ Each entry has the `path` relative to the workspace root, a `type` of
 follows from it. The field is absent when nothing was skipped, and versions up
 to `0.2.0-rc.1` never print it. Exit code `0` means success, `1` means a lint or
 formatting check failed, and `2` means a configuration, execution, or safety
-failure. Warnings fail only when they exceed `--max-warnings`.
+failure. Warnings fail only when they exceed `--max-warnings`. A selected
+document that the tool is not permitted to read is reported with an
+`engine/unreadable-file` error for that file; the other files are processed,
+nothing is written, and the exit code is `2`. Versions up to `0.2.0-rc.1`
+stopped without a report.
 
 For a formatting pass, inspect a diff, apply it with `--write`, then run the
 checks again. Report reproducible document defects using a synthetic example;

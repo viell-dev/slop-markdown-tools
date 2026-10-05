@@ -7,7 +7,14 @@ import type { Dialect, Document, LinkResolution, Workspace } from "../core/types
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
+import { refusal } from "./access.js";
 
+/**
+ * A Markdown file's text, null for a file that is not Markdown, or a loader
+ * that returns the text when a fragment check needs it. A loader that throws an
+ * error whose `code` is `EACCES` or `EPERM` marks the file as unreadable; any
+ * other error propagates.
+ */
 export type WorkspaceSource = string | null | (() => string);
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
@@ -251,6 +258,8 @@ interface HtmlPart {
 interface Target {
   /** The parsed document, or null for a target that is not Markdown source. */
   document: Document | null;
+  /** Whether the system refused to let the target's source be read. */
+  unreadable?: true;
   /** The document's HTML, tokenized once for every group that reads it. */
   html?: Map<Nodes, HtmlPart>;
   obsidian?: ObsidianAnchors;
@@ -361,11 +370,19 @@ export function createWorkspace(
     if (cached) return cached;
     const value = sources.get(name);
     let document: Document | null = null;
+    let unreadable = false;
     if (value !== null && value !== undefined && /\.md$/i.test(name)) {
-      const source = typeof value === "function" ? value() : value;
-      document = parse(source, options.dialect ?? "commonmark", name);
+      let source: string | undefined;
+      try {
+        source = typeof value === "function" ? value() : value;
+      } catch (error) {
+        // The file exists, but its anchors are unknown; any other error is a fault.
+        if (!refusal(error)) throw error;
+        unreadable = true;
+      }
+      if (source !== undefined) document = parse(source, options.dialect ?? "commonmark", name);
     }
-    const result: Target = { document };
+    const result: Target = { document, ...(unreadable ? { unreadable } : {}) };
     targets.set(name, result);
     return result;
   }
@@ -595,9 +612,19 @@ export function createWorkspace(
       if (candidates.size !== 1) return { status: candidates.size ? "ambiguous" : "missing" };
       const resolved = [...candidates][0]!;
       const fragment = parts.fragment;
-      const fragmentExists =
-        !fragment ||
-        hasAnchor(target(resolved), dialect, fragment, fragment.replace(/^user-content-/, ""));
+      let fragmentExists = true;
+      if (fragment) {
+        const found = target(resolved);
+        // The file is there, but what it contains could not be read.
+        if (found.unreadable)
+          return { status: "unreadable", target: resolved, fragment, unreadable: [resolved] };
+        fragmentExists = hasAnchor(
+          found,
+          dialect,
+          fragment,
+          fragment.replace(/^user-content-/, ""),
+        );
+      }
       return {
         status: "resolved",
         target: resolved,

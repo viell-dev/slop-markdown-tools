@@ -96,7 +96,10 @@ export const linkRules: Record<string, Rule> = {
           // Neither found nor known to be missing: say what stood in the way.
           findings.push({
             start: range(node)[0],
-            message: `Local target could not be checked: ${url} (no readable match; cannot read ${named(result.unreadable ?? [])}).`,
+            message:
+              result.target === undefined
+                ? `Local target could not be checked: ${url} (no readable match; cannot read ${named(result.unreadable ?? [])}).`
+                : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
           });
         else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });

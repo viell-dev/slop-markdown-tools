@@ -43,10 +43,12 @@ export interface LinkResolution {
   fragment?: string;
   fragmentExists?: boolean;
   /**
-   * The directories that could not be read and limit the result. With status
-   * `unreadable` the target may be in one of them. With status `resolved` the
-   * target was found by an Obsidian name search among the readable files, and
-   * one of them may hold another match, so the link must not be rewritten.
+   * What could not be read and limits the result. With status `unreadable` it
+   * is the target file itself, when `target` is set and its content was needed
+   * to check the fragment, or else the directories that may hold the target.
+   * With status `resolved` the target was found by an Obsidian name search
+   * among the readable files, and one of these directories may hold another
+   * match, so the link must not be rewritten.
    */
   unreadable?: string[];
 }

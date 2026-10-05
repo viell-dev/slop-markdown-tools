@@ -608,3 +608,117 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     ]);
   });
 });
+
+// Skipped on Windows and for root for the same reason as the directory tests above.
+describe.skipIf(!canRestrict)("files that may not be read", () => {
+  const files = {
+    "linking.md": "See [the section](secret.md#section) of [the file](secret.md).\n",
+    "note.md": "A *note*.\n",
+    "secret.md": "# Section\n",
+  };
+  const unchecked =
+    "linking.md:1:5: error links/valid: Fragment could not be checked: secret.md#section (cannot read secret.md).\n";
+  const unread = (verb: string) =>
+    `secret.md:1:1: error engine/unreadable-file: The file could not be read (EACCES: permission denied) and was not ${verb}.\n`;
+  it("reports the file, processes the others, and ends with status 2", async () => {
+    const root = await fixture(files);
+    await restrict(path.join(root, "secret.md"));
+    const linted = run(root, ["lint"]);
+    expect(linted.status).toBe(2);
+    expect(linted.stdout).toBe("");
+    expect(linted.stderr).toBe(
+      unchecked +
+        'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
+        'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
+        unread("linted") +
+        "2 file(s) linted; 0 would change; 1 could not be read.\n",
+    );
+    const checked = run(root, ["format", "--check"]);
+    expect(checked.status).toBe(2);
+    expect(checked.stderr).toBe(
+      unchecked +
+        unread("formatted") +
+        "2 file(s) processed; 1 would change; 1 could not be read.\n",
+    );
+    const previewed = run(root, ["format"]);
+    expect(previewed.status).toBe(2);
+    expect(previewed.stdout).toContain("+A _note_.");
+    // Naming the file is no different: it was to be processed.
+    const named = run(root, ["lint", "secret.md"]);
+    expect(named.status).toBe(2);
+    expect(named.stderr).toBe(
+      unread("linted") + "0 file(s) linted; 0 would change; 1 could not be read.\n",
+    );
+  });
+  it("reports a link to a heading in the file as unchecked without stopping", async () => {
+    const root = await fixture(files);
+    await restrict(path.join(root, "secret.md"));
+    // The run read every file it was asked to process, so the status is that of the findings.
+    const linted = run(root, ["lint", "linking.md"]);
+    expect(linted.status).toBe(1);
+    expect(linted.stderr).toBe(unchecked + "1 file(s) linted; 0 would change.\n");
+    const checked = run(root, ["format", "--check", "linking.md"]);
+    expect(checked.status).toBe(1);
+    expect(checked.stderr).not.toContain("engine/");
+    const piped = run(root, ["format", "-"], "A *link* to [it](secret.md#section).\n");
+    expect(piped.status).toBe(1);
+    expect(piped.stdout).toBe("A _link_ to [it](secret.md#section).\n");
+    // Nothing leads the tool to open the file here.
+    const other = run(root, ["lint", "note.md"]);
+    expect(other.status, other.stderr).toBe(0);
+    expect(run(root, ["lint", "--exclude", "secret.md", "--exclude", "linking.md"]).status).toBe(0);
+  });
+  it("describes the file in the JSON report like any other diagnostic", async () => {
+    const root = await fixture(files);
+    await restrict(path.join(root, "secret.md"));
+    const linted = run(root, ["lint", "--json"]);
+    expect(linted.status).toBe(2);
+    expect(linted.stderr).toBe("");
+    const report = JSON.parse(linted.stdout);
+    expect(Object.keys(report)).toEqual(["version", "mode", "files", "written"]);
+    expect(report.files.map((file: { path: string }) => file.path)).toEqual([
+      "linking.md",
+      "note.md",
+      "secret.md",
+    ]);
+    expect(report.files[2]).toEqual({
+      path: "secret.md",
+      diagnostics: [
+        {
+          rule: "engine/unreadable-file",
+          severity: "error",
+          message: "The file could not be read (EACCES: permission denied) and was not linted.",
+          start: 0,
+          line: 1,
+          column: 1,
+        },
+      ],
+    });
+    expect(report.files[0].diagnostics).toMatchObject([
+      { rule: "links/valid", severity: "error", line: 1, column: 5 },
+    ]);
+  });
+  it("writes nothing when a file of the batch could not be read", async () => {
+    const root = await fixture(files);
+    await restrict(path.join(root, "secret.md"));
+    const applied = run(root, ["format", "--write", "--json"]);
+    expect(applied.status).toBe(2);
+    const report = JSON.parse(applied.stdout);
+    expect(report.written).toBe(false);
+    expect(report.files).toMatchObject([
+      { path: "linking.md", changed: false },
+      { path: "note.md", changed: true },
+      { path: "secret.md", changed: false, diagnostics: [{ rule: "engine/unreadable-file" }] },
+    ]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    const text = run(root, ["format", "--write"]);
+    expect(text.status).toBe(2);
+    expect(text.stderr).toContain("2 file(s) processed; 1 would change; 1 could not be read.\n");
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    // Leaving the file out of the selection makes the batch complete again.
+    const excluded = run(root, ["format", "--write", "--exclude", "secret.md"]);
+    expect(excluded.status).toBe(1);
+    expect(excluded.stderr).toBe(unchecked + "2 file(s) processed; 1 written.\n");
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+  });
+});
