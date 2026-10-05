@@ -70,6 +70,11 @@ Markdown on stdout. Diagnostics use stderr unless `--json` requests a structured
 report. `--no-install` prevents fetching a different package if the local
 executable is missing.
 
+Without a configuration file, the commands apply the `recommended` preset and
+assume GitHub Markdown; version 0.2.0-rc.1 and earlier assumed CommonMark, in
+which formatting reflows tables. The quick start shows how to choose a profile
+for GitHub, Forgejo, Gitea, Obsidian, or plain CommonMark.
+
 ## Build from source
 
 For development, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or newer; Node.js

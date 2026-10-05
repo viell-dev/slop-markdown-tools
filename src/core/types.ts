@@ -73,6 +73,10 @@ export interface ResolveOptions {
 export interface Config {
   resolve?: ResolveOptions;
   extends?: string[];
+  /**
+   * The dialect documents are read in. When neither this setting, a preset, nor
+   * a matching override names one, `github` is assumed.
+   */
   dialect?: DialectName;
   rules?: Record<string, RuleSetting>;
   ignore?: string[];

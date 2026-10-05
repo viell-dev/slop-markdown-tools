@@ -12,6 +12,12 @@ import type {
 /** Alias names that select an existing dialect; Codeberg runs Forgejo's renderer. */
 export const dialectAliases: Record<string, Dialect> = { codeberg: "forgejo" };
 export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian"];
+/**
+ * The dialect assumed when nothing names one. GitHub's syntax is the common
+ * base of the Forgejo, Gitea, and Obsidian dialects, so a table or a footnote
+ * written for any of them is not read as an ordinary paragraph and reflowed.
+ */
+export const defaultDialect: Dialect = "github";
 export function canonicalDialect(name: DialectName): Dialect {
   return dialectAliases[name] ?? (name as Dialect);
 }
@@ -125,7 +131,7 @@ export function resolveConfig(
   for (const plugin of plugins)
     for (const [name, preset] of Object.entries(plugin.presets ?? {}))
       available[`${plugin.name}/${name}`] = preset;
-  const result: ResolvedConfig = { dialect: "commonmark", rules: {}, ignore: [], resolve: {} };
+  const result: ResolvedConfig = { dialect: defaultDialect, rules: {}, ignore: [], resolve: {} };
   const overrides: NonNullable<Config["overrides"]> = [];
   function merge(part: Config, chain: string[]) {
     validateConfig(part);

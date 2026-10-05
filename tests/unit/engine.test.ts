@@ -5,6 +5,7 @@ import {
   format,
   lint,
   parse,
+  presets,
   resolveConfig,
   createWorkspace,
   applyEdits,
@@ -188,8 +189,9 @@ describe("formatting contracts", () => {
     expect(result.diagnostics).toMatchObject([
       { rule: "observer/position", line: 3, column: 1, start: result.output.indexOf("here.") },
     ]);
-    expect(semanticFingerprint(parse(result.output, "commonmark"))).toBe(
-      semanticFingerprint(parse(source, "commonmark")),
+    const { dialect } = resolveConfig(options.config);
+    expect(semanticFingerprint(parse(result.output, dialect))).toBe(
+      semanticFingerprint(parse(source, dialect)),
     );
     expect(format(result.output, options).output).toBe(result.output);
   });
@@ -361,8 +363,9 @@ describe("formatting contracts", () => {
             config: { extends: ["recommended"], rules: { "style/wrap": ["warn", { width }] } },
           } satisfies ProcessOptions;
           const output = formatted(source, options);
-          expect(semanticFingerprint(parse(output, "commonmark"))).toBe(
-            semanticFingerprint(parse(source, "commonmark")),
+          const { dialect } = resolveConfig(options.config);
+          expect(semanticFingerprint(parse(output, dialect))).toBe(
+            semanticFingerprint(parse(source, dialect)),
           );
         },
       ),
@@ -506,6 +509,97 @@ describe("configuration and plugins", () => {
     expect(performance.now() - started).toBeLessThan(5000);
     expect(output).toBe(expected);
     expect(applyEdits(source, [])).toBe(source);
+  });
+});
+
+describe("the dialect assumed when none is named", () => {
+  // Every document here is a table or a footnote on GitHub, Forgejo, Gitea, and
+  // in Obsidian. CommonMark, which was assumed up to 0.2.0-rc.1, reads the
+  // tables and the consecutive definitions as ordinary paragraphs, which
+  // `style/wrap` then reflowed, and a footnote definition as a link definition.
+  const table = "| Sensor | Unit |\n|---|---|\n| Temperature | °C |\n";
+  const bareTable = "Sensor | Unit\n---|---\nTemperature | °C\n";
+  const wideTable =
+    "| Sensor name in a long header cell | Unit of measurement in a long header cell | Notes |\n" +
+    "|---|---|---|\n" +
+    "| Temperature measured at the north wall | Degrees Celsius, to one decimal place | Calibrated yearly |\n";
+  const footnotes = "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n";
+  const footnote = "Text with a note.[^1]\n\n[^1]: Text.\n";
+  const commonmark: Config = { dialect: "commonmark" };
+  it("is GitHub, for a configuration, a preset, or a workspace that names none", () => {
+    expect(resolveConfig().dialect).toBe("github");
+    expect(resolveConfig({ extends: ["recommended"] }).dialect).toBe("github");
+    expect(resolveConfig({ extends: [], rules: { "style/wrap": "warn" } }).dialect).toBe("github");
+    const spy = vi.spyOn(syntax, "parse");
+    try {
+      const workspace = createWorkspace({ "note.md": "", "target.md": "# Title\n" });
+      expect(workspace.resolve("note.md", "target.md#title", "github").fragmentExists).toBe(true);
+      expect(spy).toHaveBeenCalledExactlyOnceWith("# Title\n", "github", "target.md");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it.each([
+    ["a table with outer pipes", table],
+    ["a table without outer pipes", bareTable],
+    ["a table wider than 80 columns", wideTable],
+    ["two consecutive footnote definitions", footnotes],
+  ])("leaves %s as written", (_, source) => {
+    // No configuration: the `recommended` preset, which wraps prose at 80 columns.
+    const result = format(source);
+    expect(result).toEqual({ output: source, changed: false, diagnostics: [] });
+    expect(format(source, { config: { dialect: "github" } })).toEqual(result);
+    expect(lint(source)).toEqual([]);
+  });
+  it("reads a footnote definition as a footnote, not as a link to a missing file", () => {
+    const workspace = createWorkspace({ "note.md": footnote });
+    expect(lint(footnote, { path: "note.md", workspace })).toEqual([]);
+    expect(format(footnote, { path: "note.md", workspace })).toEqual({
+      output: footnote,
+      changed: false,
+      diagnostics: [],
+    });
+  });
+  it("still reads CommonMark, tables and footnotes included, when CommonMark is named", () => {
+    expect(resolveConfig(commonmark).dialect).toBe("commonmark");
+    // A table is a paragraph in CommonMark, so its lines are prose to wrap.
+    expect(formatted(table, { config: commonmark })).toBe(
+      "| Sensor | Unit | |---|---| | Temperature | °C |\n",
+    );
+    expect(formatted(bareTable, { config: commonmark })).toBe(
+      "Sensor | Unit ---|--- Temperature | °C\n",
+    );
+    expect(formatted(wideTable, { config: commonmark })).toBe(
+      "| Sensor name in a long header cell | Unit of measurement in a long header cell\n" +
+        "| Notes | |---|---|---| | Temperature measured at the north wall | Degrees\n" +
+        "Celsius, to one decimal place | Calibrated yearly |\n",
+    );
+    expect(formatted(footnotes, { config: commonmark })).toBe(
+      "Text with two notes.[^1][^2]\n\n[^1]: First note. [^2]: Second note.\n",
+    );
+    // `[^1]: Text.` defines a link named `^1` to the file `Text.` in CommonMark.
+    const workspace = createWorkspace({ "note.md": footnote }, { dialect: "commonmark" });
+    expect(lint(footnote, { path: "note.md", config: commonmark, workspace })).toMatchObject([
+      { rule: "links/valid", severity: "error", line: 3, message: "Missing local target: Text.." },
+    ]);
+  });
+  it("assumes the dialect only; the rules of the github preset still need the preset", () => {
+    expect(Object.keys(resolveConfig().rules)).toEqual(Object.keys(presets.recommended!.rules!));
+    const source = `${table}\n- [X] Done\n\n> [!note]\n> Text.\n`;
+    expect(formatted(source)).toBe(source);
+    expect(formatted(source, { config: { extends: ["recommended", "github"] } })).toBe(
+      "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n\n- [x] Done\n\n> [!NOTE]\n> Text.\n",
+    );
+  });
+  it("gives way to a dialect named by the configuration, a preset, or an override", () => {
+    expect(resolveConfig({ dialect: "forgejo" }).dialect).toBe("forgejo");
+    expect(resolveConfig({ extends: ["recommended", "obsidian"] }).dialect).toBe("obsidian");
+    expect(resolveConfig({ extends: ["gitea"], dialect: "commonmark" }).dialect).toBe("commonmark");
+    const config: Config = { overrides: [{ files: ["plain/**"], dialect: "commonmark" }] };
+    expect(resolveConfig(config, "plain/a.md").dialect).toBe("commonmark");
+    expect(resolveConfig(config, "docs/a.md").dialect).toBe("github");
+    expect(formatted(table, { config, path: "plain/a.md" })).not.toBe(table);
+    expect(formatted(table, { config, path: "docs/a.md" })).toBe(table);
   });
 });
 

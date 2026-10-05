@@ -257,6 +257,114 @@ describe("CLI", () => {
     );
   });
 });
+describe("without a named dialect", () => {
+  // Tables and footnotes on GitHub, Forgejo, Gitea, and in Obsidian. CommonMark, which
+  // was assumed up to 0.2.0-rc.1, reads the tables and the consecutive definitions as
+  // paragraphs, which the default rules reflow, and a definition as a link to a file.
+  const table = "| Sensor | Unit |\n|---|---|\n| Temperature | °C |\n";
+  const files = {
+    "outer-pipes.md": table,
+    "no-outer-pipes.md": "Sensor | Unit\n---|---\nTemperature | °C\n",
+    "wide.md":
+      "| Sensor name in a long header cell | Unit of measurement in a long header cell | Notes |\n" +
+      "|---|---|---|\n" +
+      "| Temperature measured at the north wall | Degrees Celsius, to one decimal place | Calibrated yearly |\n",
+    "footnotes.md": "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n",
+    "footnote.md": "Text with a note.[^1]\n\n[^1]: Text.\n",
+  };
+  const dialect = (root: string, file: string, ...flags: string[]) => {
+    const explained = run(root, ["config", ...flags, "explain", file]);
+    expect(explained.status, explained.stderr).toBe(0);
+    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+  };
+  it("assumes GitHub Markdown and says so", async () => {
+    const root = await fixture(files);
+    expect(dialect(root, "outer-pipes.md")).toBe("github");
+    // Only the dialect is assumed: the rules are those of the recommended preset.
+    const explained = JSON.parse(run(root, ["config", "explain", "outer-pipes.md"]).stdout);
+    expect(explained.file).toBeNull();
+    expect(Object.keys(explained.effective.rules)).not.toContain("style/table");
+    // A configuration that names no dialect is read the same way.
+    const configured = await fixture({
+      ...files,
+      "mdtools.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
+    });
+    expect(dialect(configured, "outer-pipes.md")).toBe("github");
+    expect(run(configured, ["format", "--check"]).status).toBe(0);
+  });
+  it.each(Object.keys(files).filter((name) => name !== "footnote.md"))(
+    "formats %s without changing it",
+    async (name) => {
+      const source = files[name as keyof typeof files];
+      const root = await fixture({ [name]: source });
+      const checked = run(root, ["format", "--check"]);
+      expect(checked.status, checked.stderr).toBe(0);
+      expect(checked.stderr).toBe("1 file(s) processed; 0 would change.\n");
+      expect(run(root, ["format", "--write"]).status).toBe(0);
+      expect(await readFile(path.join(root, name), "utf8")).toBe(source);
+      const piped = run(root, ["format", "-"], source);
+      expect(piped.status, piped.stderr).toBe(0);
+      expect(piped.stdout).toBe(source);
+    },
+  );
+  it("lints a footnote definition without reporting a missing file", async () => {
+    const root = await fixture(files);
+    const linted = run(root, ["lint"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe("5 file(s) linted; 0 would change.\n");
+    const piped = run(root, ["lint", "-"], files["footnote.md"]);
+    expect(piped.status, piped.stderr).toBe(0);
+    expect(piped.stderr).toBe("");
+  });
+  it("still reads CommonMark when --dialect or the configuration names it", async () => {
+    const joined = "| Sensor | Unit | |---|---| | Temperature | °C |\n";
+    const root = await fixture(files);
+    expect(dialect(root, "outer-pipes.md", "--dialect", "commonmark")).toBe("commonmark");
+    expect(run(root, ["format", "-", "--dialect", "commonmark"], table).stdout).toBe(joined);
+    const linted = run(root, ["lint", "--dialect", "commonmark", "footnote.md"]);
+    expect(linted.status).toBe(1);
+    expect(linted.stderr).toContain(
+      "footnote.md:3:1: error links/valid: Missing local target: Text..",
+    );
+    const configured = await fixture({
+      ...files,
+      "mdtools.config.jsonc": '{ "dialect": "commonmark" }',
+    });
+    expect(dialect(configured, "outer-pipes.md")).toBe("commonmark");
+    expect(run(configured, ["format", "-"], table).stdout).toBe(joined);
+    expect(run(configured, ["format", "--write", "outer-pipes.md"]).status).toBe(0);
+    expect(await readFile(path.join(configured, "outer-pipes.md"), "utf8")).toBe(joined);
+    // --dialect replaces the configuration's dialect, in this direction as well.
+    expect(run(configured, ["format", "-", "--dialect", "github"], table).stdout).toBe(table);
+  });
+  it("leaves the choice to a preset or an override that names a dialect", async () => {
+    const root = await fixture({
+      "mdtools.config.jsonc": `{
+        "extends": ["recommended", "forgejo"],
+        "overrides": [{ "files": ["plain/**"], "dialect": "commonmark" }],
+      }`,
+      "docs/table.md": table,
+      "plain/table.md": table,
+    });
+    expect(dialect(root, "docs/table.md")).toBe("forgejo");
+    expect(dialect(root, "plain/table.md")).toBe("commonmark");
+    const previewed = run(root, ["format", "--json"]);
+    expect(previewed.status, previewed.stderr).toBe(0);
+    const changed = (JSON.parse(previewed.stdout) as { files: { path: string }[] }).files;
+    expect(changed).toMatchObject([
+      // The forgejo preset aligns the table; CommonMark reflows its lines as prose.
+      { path: "docs/table.md", changed: true },
+      { path: "plain/table.md", changed: true },
+    ]);
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(await readFile(path.join(root, "docs/table.md"), "utf8")).toBe(
+      "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n",
+    );
+    expect(await readFile(path.join(root, "plain/table.md"), "utf8")).toBe(
+      "| Sensor | Unit | |---|---| | Temperature | °C |\n",
+    );
+  });
+});
 describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
     const root = await fixture({ "note.md": "new content" });

@@ -33,6 +33,19 @@ filesystem/CLI integration cases, including the list-collapse failure that
 motivated replacing heuristic reflow; [testing](testing.md) describes the
 suites.
 
+The fingerprint is computed in the document's dialect, so it cannot notice that
+the dialect itself is wrong. In CommonMark a table, or a run of footnote
+definitions, is an ordinary paragraph: reflow joins its lines, and the
+CommonMark meaning of the result is unchanged although no site renders the table
+any more. When nothing names a dialect, the tool therefore assumes `github`,
+whose syntax the Forgejo, Gitea, and Obsidian dialects build on, and not
+CommonMark. For a document that really is plain CommonMark this only makes
+formatting more careful: constructs that would have been reflowed or restyled,
+such as a table or text between two `$` signs, are left alone.
+Version 0.2.0-rc.1 and earlier assumed CommonMark. The assumption is made in one
+place, where configuration is resolved, and the workspace index uses the same
+dialect for link targets when a library caller gives it none.
+
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects
 the title/body boundary. Lazy quote continuations and inline syntax spanning

@@ -37,7 +37,7 @@ function common(command: Command): Command {
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",
-      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian",
+      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian (when none is named: github)",
     )
     .option(
       "--exclude <path>",

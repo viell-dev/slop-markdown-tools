@@ -4,6 +4,7 @@ import { decodeNamedCharacterReference } from "decode-named-character-reference"
 import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
+import { defaultDialect } from "../config/resolve.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
@@ -260,6 +261,7 @@ interface Target {
   explicit?: ExplicitAnchors;
 }
 export interface WorkspaceOptions {
+  /** The dialect that link targets are parsed in; `github` when omitted. */
   dialect?: Dialect;
   strictLineBreaks?: boolean;
   /** Existing directories, including empty ones; never treated as note targets. */
@@ -327,7 +329,7 @@ export function createWorkspace(
     let document: Document | null = null;
     if (value !== null && value !== undefined && /\.md$/i.test(name)) {
       const source = typeof value === "function" ? value() : value;
-      document = parse(source, options.dialect ?? "commonmark", name);
+      document = parse(source, options.dialect ?? defaultDialect, name);
     }
     const result: Target = { document };
     targets.set(name, result);

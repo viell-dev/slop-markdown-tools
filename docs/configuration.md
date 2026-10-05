@@ -20,8 +20,8 @@ relative to the workspace root. Presets can extend other presets; cycles are
 rejected. Config files do not implicitly cascade or merge across directories.
 
 `--dialect` replaces the top-level dialect; an explicit file override still
-takes precedence. `config explain <file>` prints the resolved configuration and
-its source file.
+takes precedence. `config explain <file>` prints the resolved configuration,
+including the dialect in use for that file, and its source file.
 
 ```jsonc
 {
@@ -48,6 +48,16 @@ separately.
 Codeberg runs Forgejo's renderer; aliases are accepted wherever a dialect is
 named and resolve to the canonical name in `config explain` and plugin
 documents.
+
+When nothing names a dialect, the tool assumes `github`. That is the case
+without a configuration file, and with a configuration in which no `dialect`
+setting, preset, or matching override names one, unless `--dialect` is passed.
+GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian dialects,
+so tables and footnotes are recognized instead of being reflowed as ordinary
+paragraphs. Only the dialect is assumed: the rules of the `github` preset, such
+as table alignment, still need the preset. For documents that are plain
+CommonMark, name the dialect with `"dialect": "commonmark"` or
+`--dialect commonmark`. Version 0.2.0-rc.1 and earlier assumed `commonmark`.
 
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo

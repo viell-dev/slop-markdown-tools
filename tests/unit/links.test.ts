@@ -511,7 +511,7 @@ describe("Forgejo and Gitea heading attributes", () => {
   it.each(["forgejo", "gitea"] as const)(
     "reads the remaining %s heading like one written without the block",
     (dialect) => {
-      // GFM parsing, unlike the default CommonMark parsing of the other workspaces here.
+      // GFM parsing, as in the workspaces here, which name no dialect and so parse as GitHub.
       const text = (source: string, removed: boolean) => {
         const document = parse(source, dialect);
         const heading = removed

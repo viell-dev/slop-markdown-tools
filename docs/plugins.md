@@ -40,6 +40,14 @@ Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.
 
+A document is read in the dialect its configuration names: through `dialect`, a
+preset, or a matching override. When none of them does, including when `config`
+is omitted, `lint`, `format`, and `resolveConfig` assume `github`, and
+`createWorkspace` parses link targets as `github` when
+`WorkspaceOptions.dialect` is omitted. Version 0.2.0-rc.1 and earlier assumed
+`commonmark` in both places; name it to keep that reading. Give the workspace
+the dialect of the documents that link into it.
+
 `parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
 `configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
 `builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
