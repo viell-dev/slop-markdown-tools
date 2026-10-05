@@ -54,7 +54,9 @@ label describing the current disposition or next action. The type describes what
 the item is about; a feature implementation PR also uses
 `Type: Feature Request`. For mixed historical items, choose the main purpose and
 explain separate decisions in comments. Split new requests when their parts need
-independent scope decisions. Do not add priority labels.
+independent scope decisions. Do not add priority labels. Assignees, milestones,
+and projects are not used; labels, comments, and links between issues and pull
+requests carry the state.
 
 The
 [label catalog](https://github.com/viell-dev/slop-markdown-tools/blob/main/.github/labels.json)
@@ -87,6 +89,12 @@ otherwise updating an issue or PR:
   `Status: Confirmed` only for a reproduced defect or an accepted request within
   project scope; neither reproduction nor acceptance follows automatically from
   a report.
+- Correct the type when review shows the item to be a different kind than it was
+  filed as. A discussion that ends in an accepted change becomes a bug, an
+  enhancement, or a feature request. Keep the title accurate as well: it names
+  the confirmed problem or the accepted request.
+- When a report contains a second problem that could be accepted, declined, or
+  validated on its own, move that problem to its own issue and link the two.
 - When waiting on the reporter, use `Status: Needs Information` and state what
   evidence is needed. Use `Status: Blocked` for an identified external
   dependency, with a link and an unblock condition. Choose the immediate next
@@ -96,6 +104,9 @@ otherwise updating an issue or PR:
 - On duplicate closure, link the canonical item and retain `Status: Duplicate`.
   On rejection, explain the scope or suitability decision and retain
   `Status: Won't Do`. A declined proposal can be reconsidered with new evidence.
+- An accepted issue stays open until its fix merges. The fixing pull request
+  names the issue with a closing keyword such as `Fixes #123` and carries the
+  same type label.
 - On successful completion or merge, remove transient status labels and retain
   the type. GitHub's open/closed/merged state records completion; there is no
   redundant Done or Merged label. A closed, unmerged PR should retain its

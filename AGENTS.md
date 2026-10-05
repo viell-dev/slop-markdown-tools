@@ -97,6 +97,41 @@ splitting, or closing an issue as out of scope is a valid outcome. Triage also
 settles an issue's open design questions as far as the evidence allows, so that
 an accepted issue states the direction its fix will take.
 
+Take each assigned issue through these steps, and leave the issue accurate after
+each one. The issue is the record of how it was handled; the session that
+handled it is not.
+
+1. **Validate.** Reproduce a defect, or measure a performance or presentation
+   claim, on current `main`. Post the commands, inputs, and results in a
+   comment, and say where the evidence differs from the report.
+2. **Decide.** Accept, narrow, or decline, and settle the open design questions.
+   Post the decision, its reasoning, and the alternatives rejected.
+3. **Split.** A further input that shows the same problem stays in the issue. A
+   different problem found while validating or fixing, one that could be
+   accepted, declined, or validated on its own, gets its own issue, even when
+   the same PR will fix both. Link the issues to each other, and remove the
+   split-off part from the original issue's decision.
+4. **Label and retitle.** Set the status that the evidence supports. Correct the
+   type when the item turns out to be a different kind than it was filed as: a
+   discussion that ends in an accepted change becomes a bug, an enhancement, or
+   a feature request. Make the title name the confirmed problem or the accepted
+   request. Leave the reporter's description as the record and put corrections
+   in comments; when a later step makes one of your own comments wrong, edit it
+   and say that it was edited.
+5. **Close or keep open.** Close a declined or duplicate issue as not planned
+   and keep its disposition label. Keep an accepted issue open until its fix
+   merges. The fixing PR names it with a closing keyword such as `Fixes #123`,
+   carries the same type label, and describes each issue separately when it
+   resolves more than one. After the merge, confirm that the issue closed and
+   remove its transient status.
+
+File an issue for every defect or limit found during assigned work in this
+repository, instead of only mentioning it in a comment or PR description. Filing
+it is part of the assignment; resolving it is not. Give it a type label, and add
+a status only once it has been validated as above. Assignees, milestones, and
+projects are not used: labels, comments, and the links between issues and PRs
+carry the state.
+
 Maintain labels as part of every issue or PR update, including answers, closure,
 and reopening. Follow the
 [contributor label policy](docs/contributing.md#issue-and-pull-request-labels)
