@@ -45,13 +45,13 @@ These tests catch what unit tests cannot: file discovery, configuration loading,
 exit codes, output streams, line endings and file names on disk, and
 documentation that no longer matches the tool.
 
-| File                 | Covers                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `cli.test.ts`        | Commands, flags, exit codes, discovery, ignore rules, and safeguards around writing files         |
-| `workflows.test.ts`  | Whole tasks: mixed-dialect workspaces, CRLF files, non-ASCII paths, JSON reports, plugin loading  |
-| `examples.test.ts`   | Every example: configurations load, `before/` formats into `after/`, scripts print what is shown  |
-| `docs.test.ts`       | Documentation against the code: rule and preset tables, configuration snippets, the examples page |
-| `benchmarks.test.ts` | The benchmark suite runs, and its synthetic documents format cleanly                              |
+| File                 | Covers                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `cli.test.ts`        | Commands, flags, exit codes, discovery, ignore rules, and safeguards around writing files                           |
+| `workflows.test.ts`  | Whole tasks: mixed-dialect workspaces, CRLF files, non-ASCII paths, JSON reports, plugin loading                    |
+| `examples.test.ts`   | Every example: configurations load, `before/` formats into `after/`, scripts print what is shown                    |
+| `docs.test.ts`       | Documentation against the code: rule and preset tables, configuration snippets, the examples page, code block width |
+| `benchmarks.test.ts` | The benchmark suite runs, and its synthetic documents format cleanly                                                |
 
 `support.ts` holds the shared helpers: `fixture()` writes a temporary workspace
 that is removed after the test, `copyOf()` copies a folder of the repository
