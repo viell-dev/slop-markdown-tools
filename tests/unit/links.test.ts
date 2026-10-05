@@ -7,7 +7,7 @@ import {
   semanticFingerprint,
   textContent,
 } from "../../src/index.js";
-import type { Config, Dialect } from "../../src/index.js";
+import type { Config, Dialect, Plugin } from "../../src/index.js";
 import {
   headingAttributeBlock,
   headingAttributes,
@@ -327,6 +327,99 @@ describe("directories that could not be read", () => {
     // Exact paths are rewritten as usual.
     expect(rewrite("root", "[[notes/known|label]]\n")).toBe("[[Notes/Known|label]]\n");
     expect(rewrite("shortest", "[[/Home.md|label]]\n")).toBe("[[Home.md|label]]\n");
+  });
+  it("does not let a later place stand in for one that could not be looked in", () => {
+    // Obsidian looks at the vault root first: `locked/Note.md` there would win, unseen.
+    const index = createWorkspace(
+      { "Sub/Doc.md": "", "Sub/locked/Note.md": "" },
+      { unreadable: ["locked"], dialect: "obsidian" },
+    );
+    expect(index.resolve("Sub/Doc.md", "locked/Note", "obsidian")).toEqual({
+      status: "resolved",
+      target: "Sub/locked/Note.md",
+      fragment: "",
+      fragmentExists: true,
+      unreadable: ["locked"],
+    });
+    // A path from the note itself names one place.
+    expect(index.resolve("Sub/Doc.md", "./locked/Note", "obsidian")).not.toHaveProperty(
+      "unreadable",
+    );
+    const rewrite = (style: string, source: string) => {
+      const config: Config = {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "links/valid": "error", "links/path": ["warn", { style }] },
+      };
+      const result = format(source, { path: "Sub/Doc.md", config, workspace: index });
+      expect(result.diagnostics).toEqual([]);
+      return result.output;
+    };
+    for (const style of ["root", "relative", "shortest"])
+      expect(rewrite(style, "[[locked/Note|label]]\n"), style).toBe("[[locked/Note|label]]\n");
+    // A destination that the rule generates must not meet the same obstruction.
+    expect(rewrite("relative", "[[../Sub/locked/Note|label]]\n")).toBe("[[./locked/Note|label]]\n");
+    expect(rewrite("relative", "[[./locked/Note|label]]\n")).toBe("[[./locked/Note|label]]\n");
+    expect(rewrite("root", "[[./locked/Note|label]]\n")).toBe("[[Sub/locked/Note|label]]\n");
+  });
+  it("does not convert the notation of a link whose target is uncertain", () => {
+    const complete = createWorkspace(files, { dialect: "obsidian" });
+    const convert = (style: string, source: string, index = vault) =>
+      format(source, {
+        path: "Doc.md",
+        config: {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "links/notation": ["warn", { style }] },
+        },
+        workspace: index,
+      }).output;
+    expect(convert("markdown", "[[Known|label]]\n")).toBe("[[Known|label]]\n");
+    expect(convert("wiki", "[label](Known)\n")).toBe("[label](Known)\n");
+    expect(convert("markdown", "[[Known|label]]\n", complete)).toBe("[label](<Known>)\n");
+    expect(convert("wiki", "[label](Known)\n", complete)).toBe("[[Known|label]]\n");
+    // Exact paths are converted as usual.
+    expect(convert("markdown", "[[Notes/Known|label]]\n")).toBe("[label](<Notes/Known>)\n");
+    expect(convert("wiki", "[label](Notes/Known)\n")).toBe("[[Notes/Known|label]]\n");
+  });
+  it("refuses an edit by any rule that respells a link whose target is uncertain", () => {
+    const plugin: Plugin = {
+      name: "respell",
+      rules: {
+        full: {
+          description: "Spell a link to Known with its folder.",
+          kind: "style",
+          check({ document }) {
+            const start = document.source.indexOf("[[Known") + 2;
+            return start < 2
+              ? []
+              : [
+                  {
+                    start,
+                    message: "Respell",
+                    edit: { start, end: start + "Known".length, text: "Notes/Known" },
+                  },
+                ];
+          },
+        },
+      },
+    };
+    const run = (index: typeof vault) =>
+      format("[[Known|label]]\n", {
+        path: "Doc.md",
+        config: { extends: [], dialect: "obsidian", rules: { "respell/full": "warn" } },
+        plugins: [plugin],
+        workspace: index,
+      });
+    // With every directory readable the two spellings are known to name one note.
+    expect(run(createWorkspace(files, { dialect: "obsidian" })).output).toBe(
+      "[[Notes/Known|label]]\n",
+    );
+    expect(run(vault)).toMatchObject({
+      output: "[[Known|label]]\n",
+      changed: false,
+      diagnostics: [{ rule: "engine/unsafe-format" }],
+    });
   });
   it("reports an unchecked link through links/valid at the rule's severity", () => {
     const source = "[in](locked/file.md), [dir](locked), [out](gone.md), and [ok](Home.md).\n";

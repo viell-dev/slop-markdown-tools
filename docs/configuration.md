@@ -377,8 +377,11 @@ the rule's configured severity. The target is not called missing, and the link
 is never rewritten. An Obsidian link that names a note without a path is
 searched for in every directory, so when no readable file matches, it is
 reported the same way, naming the skipped directories. A note that such a search
-does find is accepted, but `links/path` leaves the link as written, because a
-skipped directory may hold a second note of that name.
+does find is accepted, and so is a note found beside the linking note when the
+vault-root path of the same spelling leads into a skipped directory.
+`links/path` and `links/notation` leave such a link as written, and an edit by a
+plugin that changes its destination is refused, because a skipped directory may
+hold a second note of that name, or the one that Obsidian would choose.
 
 Naming a skipped directory, or a path inside it, as an input is an error with
 exit code `2`, and so is a workspace root that cannot be read. Configuration

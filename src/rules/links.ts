@@ -193,7 +193,9 @@ export const linkRules: Record<string, Rule> = {
           style === "relative" &&
           parts.path &&
           !replacement.startsWith(".") &&
-          (verified.status !== "resolved" || verified.target !== result.target)
+          (verified.status !== "resolved" ||
+            verified.target !== result.target ||
+            verified.unreadable)
         ) {
           replacement = `./${replacement}`;
           verified = workspace.resolve(
@@ -292,13 +294,15 @@ export const linkRules: Record<string, Rule> = {
           replacement = `[[${node.url}|${label}]]`;
         }
         const url = destination(node);
-        if (
-          !replacement ||
-          url === undefined ||
-          workspace.resolve(document.path, url, document.dialect, node.type === "wikiLink")
-            .status !== "resolved"
-        )
-          return;
+        if (!replacement || url === undefined) return;
+        const result = workspace.resolve(
+          document.path,
+          url,
+          document.dialect,
+          node.type === "wikiLink",
+        );
+        // A target that is uncertain, because a directory could not be read, is left as written.
+        if (result.status !== "resolved" || result.unreadable) return;
         findings.push({
           start,
           end,

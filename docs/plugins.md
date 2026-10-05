@@ -42,14 +42,19 @@ instead of `"missing"`, and the result's `unreadable` field names the
 directories that stand in the way. In the Obsidian dialect, a search by note
 name that finds nothing also resolves as `"unreadable"`. One that finds a single
 note is `"resolved"` with `unreadable` set, because those directories may hold
-another note of that name; a rule must not rewrite such a link. The CLI passes
-the directories it [skipped](configuration.md#paths-that-cannot-be-read). A
-loader that throws an error whose `code` is `EACCES` or `EPERM`, as Node.js does
-for a file the process is not permitted to read, makes a link to a heading or
-block in that file resolve as `"unreadable"` too, with `target` set and
-`unreadable` naming the file; a link to the file without a fragment still
-resolves. Any other error from a loader propagates. Versions up to `0.2.0-rc.1`
-have neither the option nor the status, and let every loader error through.
+another note of that name. The same marks a note found beside the linking note
+when the vault-root path of that spelling leads into an unreadable directory,
+where Obsidian would look first. A rule must not rewrite such a link:
+`links/path` and `links/notation` leave it as written, and the engine refuses an
+edit by any rule that changes its destination, because only the same spelling is
+known to name the same note. The CLI passes the directories it
+[skipped](configuration.md#paths-that-cannot-be-read). A loader that throws an
+error whose `code` is `EACCES` or `EPERM`, as Node.js does for a file the
+process is not permitted to read, makes a link to a heading or block in that
+file resolve as `"unreadable"` too, with `target` set and `unreadable` naming
+the file; a link to the file without a fragment still resolves. Any other error
+from a loader propagates. Versions up to `0.2.0-rc.1` have neither the option
+nor the status, and let every loader error through.
 
 Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;

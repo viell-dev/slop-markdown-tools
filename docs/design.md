@@ -183,8 +183,9 @@ whose name is known. The index then holds the readable files only. Links whose
 path leads into a skipped directory resolve as unreadable rather than missing.
 Obsidian's search by note name cannot be made exact: a name with no readable
 match is reported as unchecked, a name with one readable match is accepted but
-not rewritten, and a name with several is ambiguous either way. A file is read
-only when it is processed or when a link's fragment needs its content, so a
+not rewritten, like a note found in a place that Obsidian tries only after a
+skipped directory, and a name with several is ambiguous either way. A file is
+read only when it is processed or when a link's fragment needs its content, so a
 refusal is met late: a selected file becomes an `engine/unreadable-file`
 diagnostic that blocks the batch's write phase, and a link target makes the
 fragment unchecked for the documents that link to it.

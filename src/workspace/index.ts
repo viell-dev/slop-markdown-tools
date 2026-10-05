@@ -569,6 +569,8 @@ export function createWorkspace(
       let directory = false;
       // Whether Obsidian's search by name was used, which looks in every directory.
       let searched = false;
+      // Whether a place that Obsidian tries first could not be looked in.
+      let obstructed = false;
       const folded = dialect === "obsidian";
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
@@ -592,8 +594,11 @@ export function createWorkspace(
           add(path.posix.join(path.posix.dirname(source), targetPath));
         else {
           add(targetPath.replace(/^\//, ""));
-          if (candidates.size === 0 && !directory && !targetPath.startsWith("/"))
+          if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            // The vault root comes first: a note there, unseen, would be the target.
+            obstructed = blocking.size > 0;
             add(path.posix.join(path.posix.dirname(source), targetPath));
+          }
           if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
             searched = true;
             for (const name of suffixCandidates(targetPath) ?? []) candidates.add(name);
@@ -604,6 +609,9 @@ export function createWorkspace(
       // A search by name covers the readable files only: an unreadable directory
       // may hold the note that is missing, or a second one of a name found once.
       const unsearched = searched && unreadable.length > 0;
+      // A match is uncertain when a directory that could not be read may hold a
+      // note that Obsidian would choose instead, or as well.
+      const uncertain = unsearched ? unreadable : obstructed ? [...blocking] : undefined;
       if (candidates.size === 0 && (blocking.size > 0 || unsearched))
         return {
           status: "unreadable",
@@ -630,7 +638,7 @@ export function createWorkspace(
         target: resolved,
         fragment,
         fragmentExists,
-        ...(unsearched ? { unreadable: [...unreadable] } : {}),
+        ...(uncertain ? { unreadable: [...uncertain] } : {}),
       };
     },
   };
