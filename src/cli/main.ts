@@ -10,6 +10,7 @@ import { resolveConfig } from "../config/resolve.js";
 import { discover, isVault, writeAtomic } from "../workspace/files.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
+import { refusal, refusalText } from "../workspace/access.js";
 import type { Diagnostic, Dialect, DialectName, ProcessOptions } from "../core/types.js";
 
 interface Flags {
@@ -101,8 +102,12 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     set.files[name] = source;
     set.selected = [name];
   }
+  // Links into a directory that could not be read are reported as unchecked, not as missing.
+  const unreadable = set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : []));
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
+  // Selected files that the system refused to let the tool read.
+  const unread: string[] = [];
   // One index per active dialect; build lazily for mixed documentation workspaces.
   const indexes = new Map<Dialect, ReturnType<typeof createWorkspace>>();
   for (const name of set.selected) {
@@ -113,6 +118,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         createWorkspace(set.files, {
           dialect: config.dialect,
           directories: set.directories,
+          unreadable,
           ...(set.strictLineBreaks !== undefined ? { strictLineBreaks: set.strictLineBreaks } : {}),
         }),
       );
@@ -124,7 +130,30 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       ...(assumed ? { defaultDialect: assumed } : {}),
     };
     const value = set.files[name]!;
-    const source = typeof value === "function" ? value() : value;
+    let source: string | null;
+    try {
+      source = typeof value === "function" ? value() : value;
+    } catch (error) {
+      // Report the file and carry on with the others; any other error is a fault.
+      const code = refusal(error);
+      if (!code) throw error;
+      unread.push(name);
+      reports.push({
+        path: name,
+        ...(mode === "format" ? { changed: false } : {}),
+        diagnostics: [
+          {
+            start: 0,
+            message: `The file could not be read (${refusalText(code)}) and was not ${mode === "lint" ? "linted" : "formatted"}.`,
+            rule: "engine/unreadable-file",
+            severity: "error",
+            line: 1,
+            column: 1,
+          },
+        ],
+      });
+      continue;
+    }
     if (source === null) continue;
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
@@ -138,9 +167,13 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       if (result.changed) changes.push({ file: name, before: source, after: result.output });
     }
   }
-  const unsafe = reports.some((report) =>
-    report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
-  );
+  // A file that could not be formatted safely, or not be read at all, is a failure
+  // to operate: nothing of the batch is written, and the run ends with status 2.
+  const unsafe =
+    unread.length > 0 ||
+    reports.some((report) =>
+      report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
+    );
   if (flags.write && !unsafe)
     for (const change of changes)
       await writeAtomic(path.join(set.root, change.file), change.before, change.after);
@@ -152,12 +185,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           mode,
           files: reports,
           written: flags.write === true && !unsafe,
+          ...(set.skipped.length ? { skipped: set.skipped } : {}),
         },
         null,
         2,
       ) + "\n",
     );
   else {
+    // Warnings about the run, not about a document: they do not change the exit status.
+    for (const item of set.skipped) process.stderr.write(`mdtools: warning: ${item.message}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)
@@ -172,7 +208,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         );
     if (!stdin)
       process.stderr.write(
-        `${set.selected.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${changes.length} ${flags.write && !unsafe ? "written" : "would change"}.\n`,
+        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${changes.length} ${flags.write && !unsafe ? "written" : "would change"}${unread.length ? `; ${unread.length} could not be read` : ""}.\n`,
       );
   }
   const diagnostics = reports.flatMap((report) => report.diagnostics);

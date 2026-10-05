@@ -165,7 +165,9 @@ export function applyEdits(source: string, edits: Edit[]): string {
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   const canonicalUrl = (url: string, wiki = false) => {
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
-    return resolution?.status === "resolved"
+    // A target that is uncertain, because a directory could not be read, is not
+    // an identity: only the same spelling is known to name the same note.
+    return resolution?.status === "resolved" && !resolution.unreadable
       ? `${resolution.target}#${resolution.fragment ?? ""}`
       : url;
   };

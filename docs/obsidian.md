@@ -40,7 +40,9 @@ that workspace's configuration.
 Obsidian reflow requires `"strictLineBreaks": true` in `.obsidian/app.json` so
 soft line breaks in source do not become visible line breaks in Reading view.
 Preserve the file's other settings when changing this value. The CLI checks it
-and never edits the settings file itself.
+and never edits the settings file itself. If it is not permitted to read the
+file, it warns and leaves paragraphs as written; see
+[paths that cannot be read](configuration.md#paths-that-cannot-be-read).
 
 If that setting is not appropriate for your vault, disable `style/wrap`. Other
 enabled rules can still run.

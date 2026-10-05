@@ -8,7 +8,14 @@ import { fallbackDialect } from "../config/resolve.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
+import { refusal } from "./access.js";
 
+/**
+ * A Markdown file's text, null for a file that is not Markdown, or a loader
+ * that returns the text when a fragment check needs it. A loader that throws an
+ * error whose `code` is `EACCES` or `EPERM` marks the file as unreadable; any
+ * other error propagates.
+ */
 export type WorkspaceSource = string | null | (() => string);
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
@@ -252,6 +259,8 @@ interface HtmlPart {
 interface Target {
   /** The parsed document, or null for a target that is not Markdown source. */
   document: Document | null;
+  /** Whether the system refused to let the target's source be read. */
+  unreadable?: true;
   /** The document's HTML, tokenized once for every group that reads it. */
   html?: Map<Nodes, HtmlPart>;
   obsidian?: ObsidianAnchors;
@@ -266,6 +275,12 @@ export interface WorkspaceOptions {
   strictLineBreaks?: boolean;
   /** Existing directories, including empty ones; never treated as note targets. */
   directories?: string[];
+  /**
+   * Existing directories whose contents could not be read. A link that leads
+   * into one, or that an Obsidian name search finds nowhere else, resolves as
+   * `unreadable` instead of `missing`.
+   */
+  unreadable?: string[];
 }
 export function splitDestination(destination: string): { path: string; fragment: string } {
   const hash = destination.indexOf("#");
@@ -295,12 +310,42 @@ export function createWorkspace(
     (options.directories ?? []).map((name) => name.replaceAll("\\", "/")),
   );
   directories.add(".");
-  for (const name of sources.keys()) {
+  /** The directories above a path, nearest first, up to the workspace root. */
+  function* parents(name: string): Generator<string> {
     let directory = path.posix.dirname(name);
     while (directory !== "." && directory !== path.posix.dirname(directory)) {
-      directories.add(directory);
+      yield directory;
       directory = path.posix.dirname(directory);
     }
+  }
+  for (const name of sources.keys())
+    for (const directory of parents(name)) directories.add(directory);
+  const unreadable = [
+    ...new Set(
+      (options.unreadable ?? []).map((name) =>
+        path.posix.normalize(name.replaceAll("\\", "/")).replace(/\/$/, ""),
+      ),
+    ),
+  ].sort();
+  for (const name of unreadable) {
+    directories.add(name);
+    for (const directory of parents(name)) directories.add(directory);
+  }
+  const unreadableNames = new Set(unreadable);
+  // Obsidian matches paths without regard to case.
+  const unreadableFolded = new Map(unreadable.map((name) => [name.toLowerCase(), name]));
+  /** The unreadable directory that a path lies in, if any. */
+  function unreadableAbove(name: string, folded: boolean): string | undefined {
+    if (unreadable.length)
+      for (const directory of parents(name)) {
+        const found = folded
+          ? unreadableFolded.get(directory.toLowerCase())
+          : unreadableNames.has(directory)
+            ? directory
+            : undefined;
+        if (found !== undefined) return found;
+      }
+    return undefined;
   }
   // Obsidian resolves note names case-insensitively; these indexes are built on first use.
   let foldedNames: Map<string, string[]> | undefined;
@@ -327,11 +372,19 @@ export function createWorkspace(
     if (cached) return cached;
     const value = sources.get(name);
     let document: Document | null = null;
+    let unreadable = false;
     if (value !== null && value !== undefined && /\.md$/i.test(name)) {
-      const source = typeof value === "function" ? value() : value;
-      document = parse(source, options.dialect ?? fallbackDialect, name);
+      let source: string | undefined;
+      try {
+        source = typeof value === "function" ? value() : value;
+      } catch (error) {
+        // The file exists, but its anchors are unknown; any other error is a fault.
+        if (!refusal(error)) throw error;
+        unreadable = true;
+      }
+      if (source !== undefined) document = parse(source, options.dialect ?? fallbackDialect, name);
     }
-    const result: Target = { document };
+    const result: Target = { document, ...(unreadable ? { unreadable } : {}) };
     targets.set(name, result);
     return result;
   }
@@ -513,12 +566,21 @@ export function createWorkspace(
       if (dialect !== "obsidian" && (targetPath.startsWith("/") || targetPath.includes("?")))
         return { status: "unavailable" };
       const candidates = new Set<string>();
+      // Unreadable directories that the link's path leads into.
+      const blocking = new Set<string>();
       let directory = false;
+      // Whether Obsidian's search by name was used, which looks in every directory.
+      let searched = false;
+      // Whether a place that Obsidian tries first could not be looked in.
+      let obstructed = false;
       const folded = dialect === "obsidian";
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return;
-        if (isDirectory(normalized.replace(/\/$/, ""), folded)) directory = true;
+        const bare = normalized.replace(/\/$/, "");
+        if (isDirectory(bare, folded)) directory = true;
+        const above = unreadableAbove(bare, folded);
+        if (above !== undefined) blocking.add(above);
         if (!folded) {
           if (sources.has(normalized)) candidates.add(normalized);
           return;
@@ -534,21 +596,52 @@ export function createWorkspace(
           add(path.posix.join(path.posix.dirname(source), targetPath));
         else {
           add(targetPath.replace(/^\//, ""));
-          if (candidates.size === 0 && !directory && !targetPath.startsWith("/"))
-            add(path.posix.join(path.posix.dirname(source), targetPath));
           if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            // The vault root comes first: a note there, unseen, would be the target.
+            obstructed = blocking.size > 0;
+            add(path.posix.join(path.posix.dirname(source), targetPath));
+          }
+          if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
+            searched = true;
             for (const name of suffixCandidates(targetPath) ?? []) candidates.add(name);
           }
         }
       } else add(path.posix.join(path.posix.dirname(source), targetPath));
       if (candidates.size === 0 && directory) return { status: "directory" };
+      // A search by name covers the readable files only: an unreadable directory
+      // may hold the note that is missing, or a second one of a name found once.
+      const unsearched = searched && unreadable.length > 0;
+      // A match is uncertain when a directory that could not be read may hold a
+      // note that Obsidian would choose instead, or as well.
+      const uncertain = unsearched ? unreadable : obstructed ? [...blocking] : undefined;
+      if (candidates.size === 0 && (blocking.size > 0 || unsearched))
+        return {
+          status: "unreadable",
+          unreadable: blocking.size ? [...blocking] : [...unreadable],
+        };
       if (candidates.size !== 1) return { status: candidates.size ? "ambiguous" : "missing" };
       const resolved = [...candidates][0]!;
       const fragment = parts.fragment;
-      const fragmentExists =
-        !fragment ||
-        hasAnchor(target(resolved), dialect, fragment, fragment.replace(/^user-content-/, ""));
-      return { status: "resolved", target: resolved, fragment, fragmentExists };
+      let fragmentExists = true;
+      if (fragment) {
+        const found = target(resolved);
+        // The file is there, but what it contains could not be read.
+        if (found.unreadable)
+          return { status: "unreadable", target: resolved, fragment, unreadable: [resolved] };
+        fragmentExists = hasAnchor(
+          found,
+          dialect,
+          fragment,
+          fragment.replace(/^user-content-/, ""),
+        );
+      }
+      return {
+        status: "resolved",
+        target: resolved,
+        fragment,
+        fragmentExists,
+        ...(uncertain ? { unreadable: [...uncertain] } : {}),
+      };
     },
   };
 }

@@ -32,10 +32,26 @@ export interface Document {
   dialect: Dialect;
 }
 export interface LinkResolution {
-  status: "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory";
+  /**
+   * `unreadable` means that the target could not be checked, because the
+   * workspace could not read what it would have to; it is neither found nor
+   * known to be missing.
+   */
+  status:
+    "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory" | "unreadable";
   target?: string;
   fragment?: string;
   fragmentExists?: boolean;
+  /**
+   * What could not be read and limits the result. With status `unreadable` it
+   * is the target file itself, when `target` is set and its content was needed
+   * to check the fragment, or else the directories that may hold the target.
+   * With status `resolved` the target was found among the readable files, by an
+   * Obsidian name search or in a place that Obsidian tries after one of these
+   * directories. They may hold another match, or the one Obsidian would choose,
+   * so the link must not be rewritten.
+   */
+  unreadable?: string[];
 }
 export interface Workspace {
   resolve(source: string, destination: string, dialect: Dialect, wiki?: boolean): LinkResolution;
