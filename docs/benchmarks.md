@@ -25,7 +25,8 @@ what is measured, records reference results, and says how good they are.
   runs, so every run repeats all the work, and formatting several thousand files
   takes tens of seconds. Its start-up is slow beside the 19 ms that Node.js
   itself needs. Memory grows with the workspace: linting peaks near 175 MB for
-  126 pages and near 500 MB for 2,000.
+  126 pages and near 500 MB for 2,000. These figures predate a change that
+  releases the largest part of what a run held; see [more files](#more-files).
 
 ## What is measured
 
@@ -145,11 +146,13 @@ estimated by multiplying.
 Memory is different. The last column is the most memory a `mdtools lint` process
 held for a workspace of that size, including the roughly 90 MB that the tool
 needs before it reads a document. It grows with the number of files. Until a run
-finishes, it keeps the parsed form of every document that a link to a heading or
-block points to, and every file's text and diagnostics; how much each
-contributes has not been measured. The figure also depends on when Node.js
-reclaims memory, so it is an upper bound on what the run needed, not an exact
-amount.
+finishes, it keeps every file's text and diagnostics, and the anchors of every
+document that a link to a heading or block points to. The figures in this column
+were recorded with `0.2.0-rc.1`, which also kept the parsed form of each of
+those documents, many times the size of its text. That was the largest part of
+what a run held, and the current code releases it, so a run now needs less than
+this column says. The figure also depends on when Node.js reclaims memory, so it
+is an upper bound on what the run needed, not an exact amount.
 
 ### Larger documents
 
@@ -181,9 +184,11 @@ meaning, and that guarantee matters more to this project than speed. The real
 limits are start-up time, memory, and the lack of any reuse between runs. None
 is a problem at the sizes measured here; they would be the place to start if the
 tool had to serve an editor, or workspaces of tens of thousands of files.
-Start-up time and memory are tracked as
-[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116) and
-[issue 114](https://github.com/viell-dev/slop-markdown-tools/issues/114).
+Start-up time is tracked as
+[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116). The
+largest part of the memory a run held, reported as
+[issue 114](https://github.com/viell-dev/slop-markdown-tools/issues/114), has
+been released since these results were recorded.
 
 ## Limits of these numbers
 
