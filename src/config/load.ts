@@ -65,22 +65,58 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
   validateConfig(value);
   const root = file ? path.dirname(file) : fallbackRoot;
   const plugins: Plugin[] = [];
-  const require = createRequire(path.join(root, "mdtools.config.mjs"));
-  for (const specifier of value.plugins ?? []) {
-    const location =
-      specifier.startsWith(".") || path.isAbsolute(specifier)
-        ? path.resolve(root, specifier)
-        : require.resolve(specifier);
-    const plugin: unknown = ((await import(pathToFileURL(location).href)) as { default: unknown })
-      .default;
-    if (
-      !plugin ||
-      typeof plugin !== "object" ||
-      !("name" in plugin) ||
-      typeof plugin.name !== "string"
-    )
-      throw new Error(`Invalid plugin export: ${specifier}`);
-    plugins.push(plugin as Plugin);
-  }
+  // Only a configuration file can name plugins, so there is a file to resolve them from.
+  if (file)
+    for (const specifier of value.plugins ?? []) plugins.push(await loadPlugin(specifier, file));
   return { config: value, plugins, root, ...(file ? { file } : {}) };
+}
+
+/**
+ * The conditions Node.js applies to the `exports` of a package it imports, as of Node.js
+ * 22.12. Node.js has no supported way to ask for them or to resolve from another file.
+ */
+const importConditions = new Set(["node", "import", "module-sync", "node-addons"]);
+
+/** The URL of the module that `specifier` names in the configuration file `file`. */
+async function locatePlugin(specifier: string, file: string): Promise<string> {
+  // A path is taken as written, not as a URL, so "%", "#", and "?" in a file name stay literal.
+  if (specifier.startsWith(".") || path.isAbsolute(specifier))
+    return pathToFileURL(path.resolve(path.dirname(file), specifier)).href;
+  // Loaded only here, so that a run that names no package does not pay for the resolver.
+  const { moduleResolve } = await import("import-meta-resolve");
+  try {
+    // The module is imported, so its name is resolved as an import written in the
+    // configuration file would be: a package's `import` entry wins over its `require` entry.
+    return moduleResolve(specifier, pathToFileURL(file), importConditions).href;
+  } catch (error) {
+    // CommonJS resolution finds what an import does not: an entry that is only declared for
+    // `require`, a file named without its extension, a directory, and NODE_PATH.
+    try {
+      return pathToFileURL(createRequire(file).resolve(specifier)).href;
+    } catch {
+      throw error;
+    }
+  }
+}
+
+async function loadPlugin(specifier: string, file: string): Promise<Plugin> {
+  let plugin: unknown;
+  try {
+    plugin = ((await import(await locatePlugin(specifier, file))) as { default?: unknown }).default;
+  } catch (error) {
+    throw new Error(
+      `Cannot load plugin "${specifier}" named in ${file}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  if (
+    !plugin ||
+    typeof plugin !== "object" ||
+    !("name" in plugin) ||
+    typeof plugin.name !== "string"
+  )
+    throw new Error(
+      `Invalid plugin "${specifier}" named in ${file}: its default export must be an object with a string "name".`,
+    );
+  return plugin as Plugin;
 }
