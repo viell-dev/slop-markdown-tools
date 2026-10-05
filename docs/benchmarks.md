@@ -144,11 +144,12 @@ estimated by multiplying.
 
 Memory is different. The last column is the most memory a `mdtools lint` process
 held for a workspace of that size, including the roughly 90 MB that the tool
-needs before it reads a document. It grows with the number of files. A run keeps
-every file's text and diagnostics until it finishes, which accounts for part of
-the growth; the rest has not been investigated. The figure also depends on when
-Node.js reclaims memory, so it is an upper bound on what the run needed, not an
-exact amount.
+needs before it reads a document. It grows with the number of files. Until a run
+finishes, it keeps the parsed form of every document that a link to a heading or
+block points to, and every file's text and diagnostics; how much each
+contributes has not been measured. The figure also depends on when Node.js
+reclaims memory, so it is an upper bound on what the run needed, not an exact
+amount.
 
 ### Larger documents
 
@@ -176,16 +177,27 @@ large document is slower than its size alone suggests.
 
 The design accepts some slowness on purpose. Parsing every changed document
 again is what lets the tool refuse an edit that would alter a document's
-meaning, and that guarantee matters more to this project than speed. The two
-real limits are start-up time and the lack of any reuse between runs. Neither is
-a problem at the sizes measured here; both would be the place to start if the
+meaning, and that guarantee matters more to this project than speed. The real
+limits are start-up time, memory, and the lack of any reuse between runs. None
+is a problem at the sizes measured here; they would be the place to start if the
 tool had to serve an editor, or workspaces of tens of thousands of files.
+Start-up time and memory are tracked as
+[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116) and
+[issue 114](https://github.com/viell-dev/slop-markdown-tools/issues/114).
 
 ## Limits of these numbers
 
 - The documents are synthetic. Real documents have a different mix of syntax,
   and a document with many links to check or many long tables costs more per
   kilobyte.
+- The synthetic workspaces are small. A check against a large real-world vault
+  of several thousand notes, about 40 MB of Markdown, matched the synthetic
+  throughput per megabyte within about 15% on the same machine, which supports
+  estimating time by multiplying. It also showed what small sets cannot: peak
+  memory of about 2.4 GB, and a few seconds spent finding files before the first
+  document was read, because that workspace also held well over 100,000 files
+  that are not Markdown. In a simple tree, finding files costs about a third of
+  a second per 100,000 files.
 - Only the built-in rules run. Plugins add their own time.
 - The runner is shared. GitHub assigns runs to machines with different
   processors: two runs of this benchmark on the same day differed by a factor of

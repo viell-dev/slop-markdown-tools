@@ -72,9 +72,11 @@ types. It can need access to the npm registry, so it is separate from
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet. It
 passes while the defect exists and fails once the defect is gone, which is the
-signal to remove the marker. Each one has a comment describing the defect. There
-is currently one, in `workflows.test.ts`: a plugin package that declares only an
-`import` condition in its `exports` cannot be loaded.
+signal to remove the marker. Each one has a comment describing the defect and
+naming its issue. There is currently one, in `workflows.test.ts`: a plugin
+package that declares only an `import` condition in its `exports` cannot be
+loaded
+([issue 112](https://github.com/viell-dev/slop-markdown-tools/issues/112)).
 
 ## Speed
 

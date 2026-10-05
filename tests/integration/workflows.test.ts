@@ -241,8 +241,8 @@ describe("plugins installed as packages", () => {
     expect(checked.status, checked.stderr).toBe(0);
     expect(checked.stderr).toContain("note.md:1:1: warn sample/report: From sample\n");
   });
-  // Known defect: the loader resolves package names with CommonJS conditions, so a
-  // package that only declares an "import" condition is rejected with 'No "exports"
+  // Known defect, issue 112: the loader resolves package names with CommonJS conditions,
+  // so a package that only declares an "import" condition is rejected with 'No "exports"
   // main defined'. Remove `.fails` when the loader resolves such packages.
   it.fails("loads a plugin package that only declares an import condition", async () => {
     const root = await fixture({
