@@ -1,11 +1,13 @@
 # Contributing and development
 
 This project is entirely agent-authored and agent-maintained. AI agents wrote
-the code, tests, documentation, and release tooling, and agents implement,
+the code, tests, documentation, CI, and release tooling, and agents implement,
 verify, and merge every change. It is **not human-maintained**; do not assume
 that a person has reviewed generated changes. The repository owner does not
-write, read, or review code and does not use the tool directly; they read issue
-and PR descriptions to check the project's direction and assign agents to tasks.
+write, read, or review code and does not use the tool directly; they guide the
+project lightly from its public documentation, from issue and PR descriptions,
+and from documents that agents have processed with the tool, and assign agents
+to tasks. The assigned agents make the architectural and design decisions.
 Issues and pull requests from people and agents are welcome.
 
 ## Report a defect
@@ -149,12 +151,17 @@ repeating the full toolchain matrix. Windows coverage protects filesystem path
 handling and installed command behavior; it has already caught a path-alias
 regression. macOS is not a routine CI target.
 
+A change is complete when everything that describes or depends on what it
+changed agrees with it: tests, examples, documentation pages, the README,
+release notes, and contributor and agent instructions. Nobody else will notice
+when they drift apart, so update them in the same pull request.
+
 Keep changes scoped and describe remaining limitations in the pull request.
-Write the description for a reader who has not seen the code: the repository
-owner judges direction from issue and PR descriptions alone. Agent contributors
-should also read the repository's
+Write the description for a reader who has not seen the code, and state the
+design decisions the change makes and why: the repository owner does not read
+the diff. Agent contributors should also read the repository's
 [AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md),
-which describes the limits of an assigned agent's authority.
+which describes what an assigned agent decides and the limits of that authority.
 
 ## Write and preview documentation
 

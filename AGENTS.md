@@ -11,30 +11,40 @@ This project is agent-authored, agent-tested, agent-documented, and
 agent-maintained. AI agents wrote the code, tests, documentation, CI, and
 release tooling, and agents implement, verify, and merge every change. No person
 writes, reads, or reviews the code. The repository owner does not know the
-codebase, the API, or the CLI and does not run the tool directly. Their
-involvement is limited to reading issue and PR descriptions to judge whether the
-project is heading in the right direction, reading Markdown documents that other
-agents have processed with the tool, and assigning agents to tasks based on the
-overall status, open issues, and open PRs.
+codebase, the API, or the CLI and does not run the tool directly. They guide the
+project lightly, from what they can see: the public documentation, issue and PR
+descriptions, and Markdown documents that other agents have processed with the
+tool, including the problems those agents meet. They assign agents to tasks
+based on the overall status, open issues, and open PRs.
 
-- Issue and PR descriptions are the owner's only view of the work. Write them so
+- Architectural, design, API, and implementation decisions belong to agents. The
+  owner does not know the codebase and cannot weigh them. The agent assigned to
+  a task makes every such decision the task needs, including the ones an issue
+  lists as open questions: gather the evidence, choose, and record the choice,
+  its reasoning, and the alternatives rejected in the issue or PR. Do not hand a
+  design question back to the owner, wait for a ruling, or leave accepted work
+  undecided because the choice is hard. Ask the owner only for what only the
+  owner can give: which work to assign, a change in the project's direction, and
+  authorization for actions with external effect.
+- Issue and PR descriptions are the owner's main view of the work. Write them so
   a reader without codebase knowledge understands the observed problem, the
-  resulting behavior, the scope decision, and anything left undecided. Do not
-  rely on the diff or on code references to carry that meaning.
+  resulting behavior, the scope decision, and the design decisions made. Do not
+  rely on the diff or on code references to carry that meaning. When filing an
+  issue for something found during other work, record what a later assignee will
+  have to decide as decisions for that agent, not as questions for the owner.
 - There is no personal author voice to preserve in code, documentation, or other
   prose. Keep terminology, structure, and formatting consistent with the
   existing documents; do not imitate an earlier model's writing style for its
   own sake.
-- A human-hands-off project does not grant agents open-ended decision-making
-  authority. The owner assigns each task, and the assigned agent owns the
-  judgment that task requires, including deciding whether a request is in scope
-  or applicable to the project. Record that decision and its reasoning in the
-  issue or PR. Do not extend an assignment to unrelated issues, PRs, or design
-  changes, and do not take actions with external effect, such as publishing,
-  releasing, changing repository settings, or closing work outside the
-  assignment, unless the assignment covers them. When an assignment is
-  ambiguous, state the interpretation used rather than widening the scope
-  silently.
+- Deciding how the project is built is not deciding what to work on. The owner
+  assigns each task, and the assigned agent owns the judgment that task
+  requires, including deciding whether a request is in scope or applicable to
+  the project. Record that decision and its reasoning in the issue or PR. Do not
+  extend an assignment to unrelated issues, PRs, or design changes, and do not
+  take actions with external effect, such as publishing, releasing, changing
+  repository settings, or closing work outside the assignment, unless the
+  assignment covers them. When an assignment is ambiguous, state the
+  interpretation used rather than widening the scope silently.
 - No one else catches mistakes before merge. Verification, regression fixtures,
   CI, and the complete diff review are the only review the change receives;
   treat them as such.
@@ -45,6 +55,36 @@ Everything this project needs lives in this repository. Never stage, copy,
 quote, or publish content from outside it. Use synthetic fixtures; do not copy
 real vault documents into tests, issues, or pull requests.
 
+## Keeping the repository consistent
+
+Agents maintain every part of this repository: source, tests and fixtures,
+examples, benchmarks, the documentation site, the README and contributor
+documents, these instructions, issue and PR templates, the label catalog, CI and
+release workflows, rulesets, and package metadata. Many of these describe or
+depend on one another, and no one else will notice when they drift apart. A
+change is complete only when everything that describes or depends on what it
+changed agrees with it, in the same PR.
+
+Before committing, search the repository for other statements of whatever the
+change touches: behavior, option names, defaults, commands, file locations,
+version and Node.js requirements, and policy. Known couplings include:
+
+- Behavior and its descriptions: the `docs/` pages, the README, `examples/` and
+  each workspace's `after/` tree, CLI help text, and release notes. The
+  integration tests compare some of these with the code, not all of them.
+- The ownership and maintenance statement: the README, `CONTRIBUTING.md`,
+  `docs/contributing.md`, the PR template, and this file.
+- Labels: `.github/labels.json`, the table in `docs/contributing.md`, GitHub,
+  the issue templates, and `.github/dependabot.yml`.
+- Branch and tag policy: `.github/rulesets/`, GitHub's settings, and the job
+  names in `ci.yml`.
+- Versions and requirements: `package.json`, the lockfile, the install commands
+  in the README and quick start, the CI matrix, and release notes.
+
+Existing drift found along the way is a defect. Correct it in the same PR when
+it lies in what the PR already changes; otherwise file an issue for it rather
+than widening the assignment.
+
 ## Issue triage and project scope
 
 Review requests against the README, design boundaries, and existing extension
@@ -53,7 +93,9 @@ issues exercises the maintainer's scope judgment for that assignment; nobody
 else will. The assignment does not authorize accepting every reporter's proposed
 feature, and it does not extend to issues outside the assignment. Reports from
 agents receive the same scrutiny as reports from people. Rejecting, narrowing,
-splitting, or closing an issue as out of scope is a valid outcome.
+splitting, or closing an issue as out of scope is a valid outcome. Triage also
+settles an issue's open design questions as far as the evidence allows, so that
+an accepted issue states the direction its fix will take.
 
 Maintain labels as part of every issue or PR update, including answers, closure,
 and reopening. Follow the
