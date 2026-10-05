@@ -212,6 +212,12 @@ passing checks, and resolved review threads remain mandatory.
   `src/core/` executes rules and validates edits; `src/workspace/` resolves
   local targets and handles discovery and atomic writes. Rules propose edits;
   they do not write files directly.
+- The dialect assumed when nothing names one is chosen in `resolveConfig`: the
+  caller's `defaultDialect`, which the CLI sets to `obsidian` when the workspace
+  root is a vault, and otherwise `fallbackDialect` (`github`), which
+  `createWorkspace` also uses for link targets. Do not add another fallback; a
+  dialect that reads a construct as an ordinary paragraph lets reflow destroy it
+  without tripping the semantic check.
 - Formatting applies inline, block, then document phases. Semantic fingerprints,
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including

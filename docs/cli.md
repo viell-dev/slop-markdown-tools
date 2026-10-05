@@ -52,8 +52,9 @@ trusted code only.
 
 `--dialect <name>` selects the dialect for one invocation of `lint`, `format`,
 or `config`, replacing the configuration's top-level dialect. When neither the
-configuration nor `--dialect` names a dialect, the commands assume `github`,
-also for stdin; version 0.2.0-rc.1 and earlier assumed `commonmark`. See
+configuration nor `--dialect` names a dialect, the commands assume `obsidian` if
+the workspace root is an Obsidian vault and `github` otherwise, also for stdin;
+version 0.2.0-rc.1 and earlier assumed `commonmark`. See
 [dialects](configuration.md#dialects).
 
 ## Check documents in CI

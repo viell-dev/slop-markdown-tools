@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, symlink, stat } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { discover, writeAtomic } from "../../src/workspace/files.js";
+import { discover, isVault, writeAtomic } from "../../src/workspace/files.js";
 import { loadConfig } from "../../src/config/load.js";
 import { cli, fixture, manifest, run } from "./support.js";
 
@@ -365,6 +365,138 @@ describe("without a named dialect", () => {
     );
   });
 });
+describe("at the root of an Obsidian vault, without a named dialect", () => {
+  // Obsidian shows the first two lines on separate lines unless the vault's "Strict
+  // line breaks" setting is on, and a wikilink must stay on one line. Up to 0.2.0-rc.1
+  // the note was read as CommonMark: the lines were joined and the wikilink was split.
+  const link =
+    "[[A fairly long note name that sits near the wrap column of this paragraph|alias text]]";
+  const note = `Shopping list\nMilk and eggs\n\nSee ${link} here.\n`;
+  const reflowed = `Shopping list Milk and eggs\n\nSee\n${link}\nhere.\n`;
+  const asGithub =
+    "Shopping list Milk and eggs\n\nSee [[A fairly long note name that sits near the wrap column of this\nparagraph|alias text]] here.\n";
+  const files = {
+    "Note.md": note,
+    "A fairly long note name that sits near the wrap column of this paragraph.md": "# Target\n",
+  };
+  const dialect = (root: string, file: string, ...flags: string[]) => {
+    const explained = run(root, ["config", ...flags, "explain", file]);
+    expect(explained.status, explained.stderr).toBe(0);
+    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+  };
+  /** A vault: Obsidian creates `.obsidian/` at its root, with or without settings in `app.json`. */
+  async function vault(settings: string | undefined, extra: Record<string, string> = {}) {
+    const root = await fixture({
+      ...files,
+      ...(settings === undefined ? {} : { ".obsidian/app.json": settings }),
+      ...extra,
+    });
+    await mkdir(path.join(root, ".obsidian"), { recursive: true });
+    return root;
+  }
+  it.each([
+    ["no settings file", undefined],
+    ["a settings file without the setting", "{}"],
+    ["strict line breaks off", '{"strictLineBreaks":false}'],
+  ])("assumes the Obsidian dialect and reflows nothing with %s", async (_, settings) => {
+    const root = await vault(settings);
+    expect(dialect(root, "Note.md")).toBe("obsidian");
+    const linted = run(root, ["lint"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe("2 file(s) linted; 0 would change.\n");
+    const previewed = run(root, ["format", "--diff"]);
+    expect(previewed.status, previewed.stderr).toBe(0);
+    expect(previewed.stdout).toBe("");
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(note);
+    // The same holds for stdin, and from a folder of the vault.
+    expect(run(root, ["format", "-"], note).stdout).toBe(note);
+    await mkdir(path.join(root, "Folder"));
+    expect(run(path.join(root, "Folder"), ["format", "-"], note).stdout).toBe(note);
+    expect(run(root, ["format", "--check", "--dialect", "obsidian"]).status).toBe(0);
+  });
+  it("reflows as the Obsidian dialect does once strict line breaks are on", async () => {
+    const root = await vault('{"strictLineBreaks":true}');
+    expect(dialect(root, "Note.md")).toBe("obsidian");
+    // Obsidian then shows the two lines as one, so joining them is safe; the wikilink stays whole.
+    expect(run(root, ["format", "-", "--stdin-filepath", "Note.md"], note).stdout).toBe(reflowed);
+    expect(
+      run(root, ["format", "-", "--stdin-filepath", "Note.md", "--dialect", "obsidian"], note)
+        .stdout,
+    ).toBe(reflowed);
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(reflowed);
+    expect(run(root, ["format", "--check"]).status).toBe(0);
+    expect(run(root, ["lint", "--max-warnings", "0"]).status).toBe(0);
+  });
+  it("assumes the dialect only, so the rules of the obsidian preset still need the preset", async () => {
+    const source = "> [!TIP] Title\n> Text.\n";
+    const root = await vault(undefined, { "Callout.md": source });
+    const explained = JSON.parse(run(root, ["config", "explain", "Callout.md"]).stdout);
+    expect(explained.file).toBeNull();
+    expect(explained.effective.dialect).toBe("obsidian");
+    expect(Object.keys(explained.effective.rules)).not.toContain("obsidian/callout-marker");
+    expect(run(root, ["format", "-"], source).stdout).toBe(source);
+    const preset = await vault(undefined, {
+      "Callout.md": source,
+      "mdtools.config.jsonc": '{ "extends": ["recommended", "obsidian"] }',
+    });
+    expect(run(preset, ["format", "-"], source).stdout).toBe("> [!tip] Title\n> Text.\n");
+  });
+  it("gives way to --dialect and to a dialect named by a setting, a preset, or an override", async () => {
+    const root = await vault(undefined);
+    expect(dialect(root, "Note.md", "--dialect", "github")).toBe("github");
+    expect(run(root, ["format", "-", "--dialect", "github"], note).stdout).toBe(asGithub);
+    for (const [config, expected, output] of [
+      ['{ "dialect": "commonmark" }', "commonmark", asGithub],
+      ['{ "extends": ["recommended", "github"] }', "github", asGithub],
+      // Gitea joins the lines too, and keeps a `[[...]]` shortlink on one line.
+      ['{ "overrides": [{ "files": ["Note.md"], "dialect": "gitea" }] }', "gitea", reflowed],
+    ] as const) {
+      const configured = await vault(undefined, { "mdtools.config.jsonc": config });
+      expect(dialect(configured, "Note.md"), config).toBe(expected);
+      expect(
+        run(configured, ["format", "-", "--stdin-filepath", "Note.md"], note).stdout,
+        config,
+      ).toBe(output);
+    }
+    // A configuration that names no dialect leaves the vault's in place, also for
+    // the files that an override naming another dialect does not match.
+    const unnamed = await vault(undefined, {
+      "mdtools.config.jsonc":
+        '{ "rules": { "style/emphasis": "off" }, "overrides": [{ "files": ["docs/**"], "dialect": "github" }] }',
+      "docs/page.md": "A page.\n",
+    });
+    expect(dialect(unnamed, "Note.md")).toBe("obsidian");
+    expect(dialect(unnamed, "docs/page.md")).toBe("github");
+    expect(run(unnamed, ["format", "--check"]).status).toBe(0);
+  });
+  it("does not recognize a vault in a folder of a larger workspace", async () => {
+    const root = await fixture({
+      "README.md": "# Project\n",
+      "vault/.obsidian/app.json": "{}",
+      "vault/Note.md": note,
+    });
+    // The workspace root is the repository, whose documents are not Obsidian notes.
+    expect(dialect(root, "vault/Note.md")).toBe("github");
+    expect(run(root, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
+      asGithub,
+    );
+    // Run on the vault itself, or with an override as documented, it is read as Obsidian.
+    expect(dialect(root, "vault/Note.md", "--root", "vault")).toBe("obsidian");
+    expect(dialect(path.join(root, "vault"), "Note.md")).toBe("obsidian");
+    const overridden = await fixture({
+      "mdtools.config.jsonc": '{ "overrides": [{ "files": ["vault/**"], "dialect": "obsidian" }] }',
+      "vault/.obsidian/app.json": "{}",
+      "vault/Note.md": note,
+    });
+    expect(dialect(overridden, "vault/Note.md")).toBe("obsidian");
+    expect(run(overridden, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
+      note,
+    );
+  });
+});
 describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
     const root = await fixture({ "note.md": "new content" });
@@ -421,5 +553,18 @@ describe("filesystem safeguards", () => {
   it("finds the vault boundary when invoked from a subdirectory", async () => {
     const root = await fixture({ ".obsidian/app.json": "{}", "sub/note.md": "text" });
     expect((await loadConfig(path.join(root, "sub"))).root).toBe(root);
+  });
+  it("recognizes a vault by a .obsidian folder at the root, and nowhere else", async () => {
+    const root = await fixture({
+      ".obsidian/app.json": "{}",
+      "nested/vault/.obsidian/app.json": "{}",
+      "plain/note.md": "text",
+      "file/.obsidian": "not a folder",
+    });
+    expect(await isVault(root)).toBe(true);
+    expect(await isVault(path.join(root, "nested/vault"))).toBe(true);
+    expect(await isVault(path.join(root, "nested"))).toBe(false);
+    expect(await isVault(path.join(root, "plain"))).toBe(false);
+    expect(await isVault(path.join(root, "file"))).toBe(false);
   });
 });

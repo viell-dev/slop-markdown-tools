@@ -4,7 +4,7 @@ import { decodeNamedCharacterReference } from "decode-named-character-reference"
 import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
-import { defaultDialect } from "../config/resolve.js";
+import { fallbackDialect } from "../config/resolve.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
@@ -329,7 +329,7 @@ export function createWorkspace(
     let document: Document | null = null;
     if (value !== null && value !== undefined && /\.md$/i.test(name)) {
       const source = typeof value === "function" ? value() : value;
-      document = parse(source, options.dialect ?? defaultDialect, name);
+      document = parse(source, options.dialect ?? fallbackDialect, name);
     }
     const result: Target = { document };
     targets.set(name, result);

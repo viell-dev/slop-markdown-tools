@@ -13,11 +13,12 @@ import type {
 export const dialectAliases: Record<string, Dialect> = { codeberg: "forgejo" };
 export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian"];
 /**
- * The dialect assumed when nothing names one. GitHub's syntax is the common
- * base of the Forgejo, Gitea, and Obsidian dialects, so a table or a footnote
- * written for any of them is not read as an ordinary paragraph and reflowed.
+ * The dialect assumed when nothing names one and the caller knows no better.
+ * GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian
+ * dialects, so a table or a footnote written for any of them is not read as an
+ * ordinary paragraph and reflowed.
  */
-export const defaultDialect: Dialect = "github";
+export const fallbackDialect: Dialect = "github";
 export function canonicalDialect(name: DialectName): Dialect {
   return dialectAliases[name] ?? (name as Dialect);
 }
@@ -121,17 +122,31 @@ export function setting(value: RuleSetting): {
     ? { severity: value[0], options: value[1] }
     : { severity: value, options: {} };
 }
+/**
+ * The configuration in effect for the document at `path`. `defaultDialect` is
+ * the dialect to assume when neither the configuration, a preset, nor a
+ * matching override names one: `github` unless the caller knows better, as the
+ * CLI does at the root of an Obsidian vault.
+ */
 export function resolveConfig(
   config: Config = {},
   path = "document.md",
   plugins: Plugin[] = [],
+  defaultDialect: DialectName = fallbackDialect,
 ): ResolvedConfig {
   validateConfig(config);
+  if (!dialects.includes(canonicalDialect(defaultDialect)))
+    throw new Error(`Unknown default dialect: ${String(defaultDialect)}`);
   const available = { ...presets };
   for (const plugin of plugins)
     for (const [name, preset] of Object.entries(plugin.presets ?? {}))
       available[`${plugin.name}/${name}`] = preset;
-  const result: ResolvedConfig = { dialect: defaultDialect, rules: {}, ignore: [], resolve: {} };
+  const result: ResolvedConfig = {
+    dialect: canonicalDialect(defaultDialect),
+    rules: {},
+    ignore: [],
+    resolve: {},
+  };
   const overrides: NonNullable<Config["overrides"]> = [];
   function merge(part: Config, chain: string[]) {
     validateConfig(part);

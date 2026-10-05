@@ -71,9 +71,10 @@ report. `--no-install` prevents fetching a different package if the local
 executable is missing.
 
 Without a configuration file, the commands apply the `recommended` preset and
-assume GitHub Markdown; version 0.2.0-rc.1 and earlier assumed CommonMark, in
-which formatting reflows tables. The quick start shows how to choose a profile
-for GitHub, Forgejo, Gitea, Obsidian, or plain CommonMark.
+assume GitHub Markdown, or the Obsidian dialect at the root of a vault.
+Version 0.2.0-rc.1 and earlier assumed CommonMark, in which formatting reflows
+tables and joins the lines of a note. The quick start shows how to choose a
+profile for GitHub, Forgejo, Gitea, Obsidian, or plain CommonMark.
 
 ## Build from source
 
