@@ -230,19 +230,21 @@ interface ObsidianAnchors {
   foldedHeadings: Set<string>;
   blocks: Set<string>;
 }
+/** What GitHub links to, and CommonMark in its stead. */
+interface GithubAnchors {
+  /** GitHub's numbered heading anchors. */
+  slugs: Set<string>;
+  /** `id` and `<a name>` values from the document's HTML, lowercased, as GitHub stores and matches them. */
+  explicit: Set<string>;
+}
 /** What Forgejo and Gitea link to; each reads attribute blocks and its own anchor rules. */
 interface ForgeAnchors {
   /** Forgejo heading anchors; punctuation runs collapse differently. */
   forgejoSlugs: Set<string>;
   /** Gitea heading anchors; GitHub-like, but combining marks are dropped. */
   giteaSlugs: Set<string>;
-}
-/** `id` and `<a name>` values from the document's HTML. */
-interface ExplicitAnchors {
-  /** As written, which is how Forgejo and Gitea match them. */
-  exact: Set<string>;
-  /** Lowercased, as GitHub stores and matches them. */
-  folded: Set<string>;
+  /** `id` and `<a name>` values from the document's HTML, as written, which is how both match them. */
+  explicit: Set<string>;
 }
 /** What one HTML node, or one paragraph holding an inline heading, adds to the page. */
 interface HtmlPart {
@@ -250,24 +252,160 @@ interface HtmlPart {
   headings: { text: string; hasId: boolean }[];
 }
 /**
- * A link target and its anchors. The document is parsed once; each group of
- * anchors is computed the first time a link is checked against a dialect that
- * uses it, so a GitHub or Obsidian workspace never reads attribute blocks,
- * which need a second parse, or the Forgejo and Gitea anchors, and the forges
- * never number anchors GitHub's way.
+ * What link checks read from a target: its anchors, in one group per set of
+ * dialects that share them. A group is computed the first time a link is
+ * checked against one of its dialects, so a GitHub or Obsidian workspace never
+ * reads attribute blocks, which need a second parse, or the Forgejo and Gitea
+ * anchors, and the forges never number anchors GitHub's way.
+ *
+ * Nothing else is kept. A parsed document takes many times the memory of its
+ * source, and a workspace held one for every target until the run ended, so
+ * each group is computed from a document that is parsed for it and released
+ * with it. A workspace's links are almost always checked against one group, and
+ * a check against another one parses the target once more.
  */
 interface Target {
-  /** The parsed document, or null for a target that is not Markdown source. */
-  document: Document | null;
   /** Whether the system refused to let the target's source be read. */
   unreadable?: true;
-  /** The document's HTML, tokenized once for every group that reads it. */
-  html?: Map<Nodes, HtmlPart>;
   obsidian?: ObsidianAnchors;
-  /** GitHub's numbered heading anchors, which CommonMark uses in its stead. */
-  github?: Set<string>;
+  github?: GithubAnchors;
   forge?: ForgeAnchors;
-  explicit?: ExplicitAnchors;
+}
+/**
+ * A copy of a string that shares no memory with the text it was cut from. An
+ * engine may store a substring, such as a regular expression's match or a slice
+ * of the source, as a reference into the whole string, so a kept heading name
+ * or `id` would keep its document's text alive after the parsed document is
+ * gone. Joining the string's code units builds a new string of the same
+ * content. `text + ""`, a template literal, `String()`, and `substring()` return
+ * the same string and detach nothing; measured on Node.js 22 and 24.
+ */
+function detach(text: string): string {
+  return text.split("").join("");
+}
+/** Replace every string of the sets, which are all a target keeps, by a detached copy. */
+function detachAll(...sets: Set<string>[]): void {
+  for (const set of sets) {
+    const copies = Array.from(set, detach);
+    set.clear();
+    for (const copy of copies) set.add(copy);
+  }
+}
+/** The document's HTML, tokenized once for the headings and the explicit anchors of a group. */
+function htmlParts(document: Document): Map<Nodes, HtmlPart> {
+  const parts = new Map<Nodes, HtmlPart>();
+  const { source, tree } = document;
+  walk(tree, (node) => {
+    if (node.type === "html") {
+      const tokens = htmlTokens(node.value);
+      parts.set(node, { anchors: htmlAnchors(tokens), headings: htmlHeadings(tokens) });
+    } else if (node.type === "paragraph" && /<h[1-6]/i.test(source.slice(...range(node))))
+      // An inline heading's tags and text are separate nodes, at any depth;
+      // their explicit anchors come from the tags' own nodes.
+      parts.set(node, { anchors: [], headings: htmlHeadings(htmlTokens(htmlView(node))) });
+  });
+  return parts;
+}
+/** A target's anchors for Obsidian; none for a target that is not Markdown source. */
+function obsidianAnchors(document: Document | null): ObsidianAnchors {
+  const anchors: ObsidianAnchors = {
+    headings: new Set(),
+    foldedHeadings: new Set(),
+    blocks: new Set(),
+  };
+  if (!document) return anchors;
+  walk(document.tree, "heading", (node) => {
+    const text = textContent(node);
+    anchors.headings.add(text);
+    anchors.foldedHeadings.add(text.toLowerCase());
+  });
+  walk(document.tree, "text", (node) => {
+    const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
+    if (match) anchors.blocks.add(match[1]!);
+  });
+  detachAll(anchors.headings, anchors.foldedHeadings, anchors.blocks);
+  return anchors;
+}
+/** A target's anchors for GitHub and CommonMark; none for a target that is not Markdown source. */
+function githubAnchors(document: Document | null): GithubAnchors {
+  const anchors: GithubAnchors = { slugs: new Set(), explicit: new Set() };
+  if (!document) return anchors;
+  const slugger = new GithubSlugger();
+  const parts = htmlParts(document);
+  // GitHub numbers the anchors of Markdown and HTML headings together, in
+  // document order, and prefixes an id only when it does not already start
+  // with the prefix.
+  const add = (text: string) => anchors.slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
+  walk(document.tree, (node) => {
+    const part = parts.get(node);
+    if (part) for (const heading of part.headings) add(heading.text);
+    else if (node.type === "heading") add(renderedText(node, github));
+  });
+  // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
+  for (const part of parts.values())
+    for (const anchor of part.anchors) anchors.explicit.add(anchor.toLowerCase());
+  detachAll(anchors.slugs, anchors.explicit);
+  return anchors;
+}
+/** A target's anchors for Forgejo and Gitea; none for a target that is not Markdown source. */
+function forgeAnchors(document: Document | null): ForgeAnchors {
+  const anchors: ForgeAnchors = {
+    forgejoSlugs: new Set(),
+    giteaSlugs: new Set(),
+    explicit: new Set(),
+  };
+  if (!document) return anchors;
+  const { source } = document;
+  const forgejoSlugger = createForgejoSlugger();
+  const giteaSlugger = createGiteaSlugger();
+  const attributes = headingAttributes(document);
+  const parts = htmlParts(document);
+  // How many block quotes each heading is in, for the markers of its last line.
+  const quotes = new Map<Heading, number>();
+  const count = (node: Nodes, depth: number) => {
+    if (node.type === "heading") quotes.set(node, depth);
+    if ("children" in node)
+      for (const child of node.children) count(child, depth + (node.type === "blockquote" ? 1 : 0));
+  };
+  count(document.tree, 0);
+  walk(document.tree, (node) => {
+    // Gitea 1.26 and later give HTML headings without an `id` an anchor from
+    // their text, and number nothing. Forgejo gives them none.
+    for (const heading of parts.get(node)?.headings ?? []) {
+      const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
+      if (anchor) anchors.giteaSlugs.add(anchor);
+    }
+    if (node.type !== "heading") return;
+    // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
+    const block = attributes.get(node);
+    if (block?.id !== undefined) {
+      // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
+      const anchor = forgejoSlugger.custom(block.id ?? "");
+      if (anchor) anchors.forgejoSlugs.add(anchor);
+      if (giteaSlugger.custom(block.id ?? "")) anchors.giteaSlugs.add(anchor);
+      return;
+    }
+    // Forgejo, like Gitea before 1.26, builds anchors from the source of
+    // the heading's last line: markup, destinations, and tags are part of it.
+    const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
+    anchors.forgejoSlugs.add(forgejoSlugger.slug(line));
+    anchors.giteaSlugs.add(giteaSlugger.slug(line));
+    // Gitea 1.26 and later number no anchors, build them from the rendered
+    // text, and keep underscores near `_.py` literal.
+    const shown = block?.heading ?? node;
+    const [start, end] = range(shown);
+    const anchor = giteaAnchor(
+      source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
+        ? literalUnderscoreText(shown, source)
+        : renderedText(shown, gitea),
+    );
+    if (anchor) anchors.giteaSlugs.add(anchor);
+  });
+  // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
+  for (const part of parts.values())
+    for (const anchor of part.anchors) anchors.explicit.add(anchor);
+  detachAll(anchors.forgejoSlugs, anchors.giteaSlugs, anchors.explicit);
+  return anchors;
 }
 export interface WorkspaceOptions {
   /** The dialect that link targets are parsed in; `github` when omitted. */
@@ -366,175 +504,69 @@ export function createWorkspace(
     return foldedDirectories.has(name.toLowerCase());
   }
   const targets = new Map<string, Target>();
-  /** The target, parsed on the first fragment check against it. */
-  function target(name: string): Target {
-    const cached = targets.get(name);
-    if (cached) return cached;
+  /**
+   * One group of a target's anchors, from the target read and parsed for it;
+   * nothing keeps the parsed document. A target that is not Markdown source has
+   * no anchors. Undefined for a target that the system refuses to let be read,
+   * which is marked and not read again.
+   */
+  function compute<Anchors>(
+    target: Target,
+    name: string,
+    anchors: (document: Document | null) => Anchors,
+  ): Anchors | undefined {
+    if (target.unreadable) return undefined;
     const value = sources.get(name);
-    let document: Document | null = null;
-    let unreadable = false;
-    if (value !== null && value !== undefined && /\.md$/i.test(name)) {
-      let source: string | undefined;
-      try {
-        source = typeof value === "function" ? value() : value;
-      } catch (error) {
-        // The file exists, but its anchors are unknown; any other error is a fault.
-        if (!refusal(error)) throw error;
-        unreadable = true;
-      }
-      if (source !== undefined) document = parse(source, options.dialect ?? fallbackDialect, name);
+    if (value === null || value === undefined || !/\.md$/i.test(name)) return anchors(null);
+    let source: string;
+    try {
+      source = typeof value === "function" ? value() : value;
+    } catch (error) {
+      // The file exists, but its anchors are unknown; any other error is a fault.
+      if (!refusal(error)) throw error;
+      target.unreadable = true;
+      return undefined;
     }
-    const result: Target = { document, ...(unreadable ? { unreadable } : {}) };
-    targets.set(name, result);
-    return result;
-  }
-  function htmlParts(target: Target): Map<Nodes, HtmlPart> {
-    if (target.html) return target.html;
-    const parts = new Map<Nodes, HtmlPart>();
-    target.html = parts;
-    if (!target.document) return parts;
-    const { source, tree } = target.document;
-    walk(tree, (node) => {
-      if (node.type === "html") {
-        const tokens = htmlTokens(node.value);
-        parts.set(node, { anchors: htmlAnchors(tokens), headings: htmlHeadings(tokens) });
-      } else if (node.type === "paragraph" && /<h[1-6]/i.test(source.slice(...range(node))))
-        // An inline heading's tags and text are separate nodes, at any depth;
-        // their explicit anchors come from the tags' own nodes.
-        parts.set(node, { anchors: [], headings: htmlHeadings(htmlTokens(htmlView(node))) });
-    });
-    return parts;
-  }
-  function obsidianAnchors(target: Target): ObsidianAnchors {
-    if (target.obsidian) return target.obsidian;
-    const anchors: ObsidianAnchors = {
-      headings: new Set(),
-      foldedHeadings: new Set(),
-      blocks: new Set(),
-    };
-    target.obsidian = anchors;
-    if (!target.document) return anchors;
-    walk(target.document.tree, "heading", (node) => {
-      const text = textContent(node);
-      anchors.headings.add(text);
-      anchors.foldedHeadings.add(text.toLowerCase());
-    });
-    walk(target.document.tree, "text", (node) => {
-      const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
-      if (match) anchors.blocks.add(match[1]!);
-    });
-    return anchors;
-  }
-  function githubAnchors(target: Target): Set<string> {
-    if (target.github) return target.github;
-    const slugs = new Set<string>();
-    target.github = slugs;
-    if (!target.document) return slugs;
-    const slugger = new GithubSlugger();
-    const parts = htmlParts(target);
-    // GitHub numbers the anchors of Markdown and HTML headings together, in
-    // document order, and prefixes an id only when it does not already start
-    // with the prefix.
-    const add = (text: string) => slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
-    walk(target.document.tree, (node) => {
-      const part = parts.get(node);
-      if (part) for (const heading of part.headings) add(heading.text);
-      else if (node.type === "heading") add(renderedText(node, github));
-    });
-    return slugs;
-  }
-  function forgeAnchors(target: Target): ForgeAnchors {
-    if (target.forge) return target.forge;
-    const anchors: ForgeAnchors = { forgejoSlugs: new Set(), giteaSlugs: new Set() };
-    target.forge = anchors;
-    if (!target.document) return anchors;
-    const { document } = target;
-    const { source } = document;
-    const forgejoSlugger = createForgejoSlugger();
-    const giteaSlugger = createGiteaSlugger();
-    const attributes = headingAttributes(document);
-    const parts = htmlParts(target);
-    // How many block quotes each heading is in, for the markers of its last line.
-    const quotes = new Map<Heading, number>();
-    const count = (node: Nodes, depth: number) => {
-      if (node.type === "heading") quotes.set(node, depth);
-      if ("children" in node)
-        for (const child of node.children)
-          count(child, depth + (node.type === "blockquote" ? 1 : 0));
-    };
-    count(document.tree, 0);
-    walk(document.tree, (node) => {
-      // Gitea 1.26 and later give HTML headings without an `id` an anchor from
-      // their text, and number nothing. Forgejo gives them none.
-      for (const heading of parts.get(node)?.headings ?? []) {
-        const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
-        if (anchor) anchors.giteaSlugs.add(anchor);
-      }
-      if (node.type !== "heading") return;
-      // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
-      const block = attributes.get(node);
-      if (block?.id !== undefined) {
-        // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
-        const anchor = forgejoSlugger.custom(block.id ?? "");
-        if (anchor) anchors.forgejoSlugs.add(anchor);
-        if (giteaSlugger.custom(block.id ?? "")) anchors.giteaSlugs.add(anchor);
-        return;
-      }
-      // Forgejo, like Gitea before 1.26, builds anchors from the source of
-      // the heading's last line: markup, destinations, and tags are part of it.
-      const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
-      anchors.forgejoSlugs.add(forgejoSlugger.slug(line));
-      anchors.giteaSlugs.add(giteaSlugger.slug(line));
-      // Gitea 1.26 and later number no anchors, build them from the rendered
-      // text, and keep underscores near `_.py` literal.
-      const shown = block?.heading ?? node;
-      const [start, end] = range(shown);
-      const anchor = giteaAnchor(
-        source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
-          ? literalUnderscoreText(shown, source)
-          : renderedText(shown, gitea),
-      );
-      if (anchor) anchors.giteaSlugs.add(anchor);
-    });
-    return anchors;
-  }
-  function explicitAnchors(target: Target): ExplicitAnchors {
-    if (target.explicit) return target.explicit;
-    const anchors: ExplicitAnchors = { exact: new Set(), folded: new Set() };
-    target.explicit = anchors;
-    // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
-    for (const part of htmlParts(target).values())
-      for (const anchor of part.anchors) {
-        anchors.exact.add(anchor);
-        anchors.folded.add(anchor.toLowerCase());
-      }
-    return anchors;
+    return anchors(parse(source, options.dialect ?? fallbackDialect, name));
   }
   /**
-   * Whether the target has the anchor a fragment names. GitHub, Forgejo, and
-   * Gitea store anchors with a `user-content-` prefix and add it to a link's
-   * fragment unless it is already there, so `anchor` is the fragment with one
-   * prefix removed. Gitea 1.26 and later prefix a generated anchor that already
-   * has the prefix again, and a browser reaches that element with the fragment
-   * as written. GitHub's page script also retries a fragment lowercased, and
-   * its anchors are.
+   * Whether the target has the anchor a fragment names, or undefined when the
+   * target's source could not be read. GitHub, Forgejo, and Gitea store anchors
+   * with a `user-content-` prefix and add it to a link's fragment unless it is
+   * already there, so `anchor` is the fragment with one prefix removed. Gitea
+   * 1.26 and later prefix a generated anchor that already has the prefix again,
+   * and a browser reaches that element with the fragment as written. GitHub's
+   * page script also retries a fragment lowercased, and its anchors are.
    */
-  function hasAnchor(target: Target, dialect: Dialect, fragment: string, anchor: string): boolean {
+  function hasAnchor(
+    name: string,
+    dialect: Dialect,
+    fragment: string,
+    anchor: string,
+  ): boolean | undefined {
+    let target = targets.get(name);
+    if (!target) targets.set(name, (target = {}));
     if (dialect === "obsidian") {
-      const anchors = obsidianAnchors(target);
+      const anchors = target.obsidian ?? compute(target, name, obsidianAnchors);
+      if (!anchors) return undefined;
+      target.obsidian = anchors;
       return fragment.startsWith("^")
         ? anchors.blocks.has(fragment.slice(1))
         : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
     }
     if (dialect === "forgejo" || dialect === "gitea") {
-      const forge = forgeAnchors(target);
+      const forge = target.forge ?? compute(target, name, forgeAnchors);
+      if (!forge) return undefined;
+      target.forge = forge;
       const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
-      const explicit = explicitAnchors(target).exact;
-      return explicit.has(anchor) || explicit.has(fragment);
+      return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
+    const anchors = target.github ?? compute(target, name, githubAnchors);
+    if (!anchors) return undefined;
+    target.github = anchors;
     const folded = anchor.toLowerCase();
-    return githubAnchors(target).has(folded) || explicitAnchors(target).folded.has(folded);
+    return anchors.slugs.has(folded) || anchors.explicit.has(folded);
   }
   let suffixes: Map<string, Set<string>> | undefined;
   function suffixCandidates(target: string): Set<string> | undefined {
@@ -624,16 +656,16 @@ export function createWorkspace(
       const fragment = parts.fragment;
       let fragmentExists = true;
       if (fragment) {
-        const found = target(resolved);
-        // The file is there, but what it contains could not be read.
-        if (found.unreadable)
-          return { status: "unreadable", target: resolved, fragment, unreadable: [resolved] };
-        fragmentExists = hasAnchor(
-          found,
+        const found = hasAnchor(
+          resolved,
           dialect,
           fragment,
           fragment.replace(/^user-content-/, ""),
         );
+        // The file is there, but what it contains could not be read.
+        if (found === undefined)
+          return { status: "unreadable", target: resolved, fragment, unreadable: [resolved] };
+        fragmentExists = found;
       }
       return {
         status: "resolved",
