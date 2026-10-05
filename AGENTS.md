@@ -212,6 +212,12 @@ passing checks, and resolved review threads remain mandatory.
   `src/core/` executes rules and validates edits; `src/workspace/` resolves
   local targets and handles discovery and atomic writes. Rules propose edits;
   they do not write files directly.
+- `src/config/load.ts` locates a plugin that is not named by path with
+  `import-meta-resolve`, a port of Node.js's own import resolution, and then
+  with CommonJS resolution. Node.js has no supported call that resolves an
+  import from another file's location without a flag or a warning. The list of
+  conditions there copies Node.js's defaults for an import; recheck it when the
+  supported Node.js range changes.
 - Formatting applies inline, block, then document phases. Semantic fingerprints,
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including

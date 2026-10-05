@@ -86,12 +86,35 @@ Load it with:
 }
 ```
 
-Plugin module specifiers resolve relative to the config file, including npm
-package names. Export a default plugin object. Library callers pass plugin
-objects directly through `plugins`; a string list in a library configuration
-does not perform module loading. Plugin names must be unique lowercase
-identifiers beginning with a letter, using letters, digits, and hyphens. Rule
-IDs are namespaced as `plugin-name/rule-name`; collisions are rejected.
+Each `plugins` entry names a module whose default export is a plugin object. An
+entry that starts with `.` or is an absolute path names a file, relative to the
+configuration file's directory. Any other entry is resolved the way Node.js
+resolves an `import` written in the configuration file, with Node.js's default
+conditions; conditions added with `--conditions` are not applied. Usually such
+an entry names an installed package, optionally with a subpath: `sample-plugin`,
+`@scope/sample-plugin`, or `sample-plugin/rules`. The package's entry can be an
+`import` or `default` condition of its `exports`, or its `main` file. When an
+import finds no entry, the lookup falls back to Node.js's CommonJS rules, so a
+package that declares only a `require` condition loads too. A package with both
+an `import` and a `require` entry is loaded through its `import` entry.
+`0.2.0-rc.1` and earlier used only the CommonJS rules, so they could not load a
+package that declares only an `import` condition, and loaded a package with both
+entries through `require`.
+
+A plugin that cannot be found or loaded stops the command with exit status `2`
+and a message of the form
+`Cannot load plugin "sample-plugin" named in FILE: REASON`. `FILE` is the
+configuration file and `REASON` is Node.js's own, such as
+`Cannot find package 'sample-plugin' imported from FILE`. A module whose default
+export is not an object with a string `name` is reported as
+`Invalid plugin "sample-plugin" named in FILE`. `0.2.0-rc.1` and earlier printed
+Node.js's reason alone.
+
+Library callers pass plugin objects directly through `plugins`; a string list in
+a library configuration does not perform module loading. Plugin names must be
+unique lowercase identifiers beginning with a letter, using letters, digits, and
+hyphens. Rule IDs are namespaced as `plugin-name/rule-name`; collisions are
+rejected.
 
 `check` receives the parsed `document`, configured `options`, and optional
 `workspace`. Return a list of findings containing `start`, optional `end`,
