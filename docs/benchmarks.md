@@ -26,7 +26,8 @@ what is measured, records reference results, and says how good they are.
   takes tens of seconds. Its start-up is slow beside the 28 ms that Node.js
   itself needs. Memory grows with the workspace, though more slowly than the
   number of files: linting peaks near 170 MB for 126 pages and near 410 MB for
-  2,000.
+  2,000. One very large document needs a multiple of its own size while it is
+  parsed, up to about a hundred times for a long list of links.
 
 ## What is measured
 
@@ -173,6 +174,27 @@ rises by about a third from a short document to one of a megabyte, which is far
 larger than documents usually are. The growth is mild, but it is growth: a very
 large document is slower than its size alone suggests.
 
+Memory for one document is a different matter. While a document is parsed, the
+parser holds a list of every token it found, and that list is many times larger
+than the text. These figures are the largest amount of memory still in use
+during a `lint` of one generated document, measured once on one machine; they
+depend on the document, not on the processor:
+
+| Document                                        | Size   | Memory in use while parsing |
+| ----------------------------------------------- | ------ | --------------------------- |
+| Documentation prose                             | 0.3 MB | 37 MB                       |
+| The same                                        | 2.0 MB | 83 MB                       |
+| An index note: 13,400 list items, each one link | 2.3 MB | 250 MB                      |
+
+For the index note, the parser's token list alone holds 240 MB, about 18 kB for
+each list item; the syntax tree that the tool keeps afterwards is 40 MB. The
+list belongs to the parser the tool builds on, and no rule or setting changes
+it. Each document is parsed by itself and its token list is released before the
+next one, so a run needs the memory of its largest document, not the sum.
+Node.js allows a few gigabytes by default, which is enough for documents of
+several megabytes; under a tighter limit, such as `--max-old-space-size=256`, a
+document like the index note is what fails.
+
 ## Is it any good?
 
 | Situation                               | Reference result                                                                | Verdict                                                                                            |
@@ -212,6 +234,15 @@ run still holds is every file's text and diagnostics.
   files: a generated index note of 2.3 MB, a list of 13,400 links, takes about
   250 MB to parse. In a simple tree, finding files costs about a third of a
   second per 100,000 files.
+- One paragraph is not one document. The times above grow in step with size
+  because long documents are made of many paragraphs, and each is parsed by
+  itself. A single paragraph of 100 kB or more that is full of inline code,
+  links, or emphasis takes much longer than its size suggests: measured once,
+  doubling such a paragraph from 96 kB to 192 kB tripled the time, and it took
+  about twenty times as long as the same text read as CommonMark. The cause is
+  in the parser, which merges the pieces of text between the inline constructs
+  one by one, and it shows with GitHub's literal autolinks, which every dialect
+  but CommonMark includes. A list or a table of that size is not affected.
 - Only the built-in rules run. Plugins add their own time.
 - The runner is shared. GitHub assigns runs to machines with different
   processors: two runs of this benchmark on the same day differed by a factor of
