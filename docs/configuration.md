@@ -366,6 +366,15 @@ Formatting diagnostics refer to the resulting source. `written` records whether
 the requested write phase was allowed, not how many files changed; inspect each
 file's `changed` field.
 
+Without `--json`, a command that processed files ends with one summary line on
+stderr. `lint` counts the files and the findings it reported, as in
+`3 file(s) linted; 1 error(s), 2 warning(s).` `format` counts the files and
+those it changed or would change, as in `3 file(s) processed; 1 would change.`
+Both add `; 1 could not be read` when a selected document
+[could not be read](#paths-that-cannot-be-read). Versions up to `0.2.0-rc.1`
+ended `lint` with `0 would change`, whatever it found. The line is meant for
+people; a script should read the JSON report or the exit code.
+
 `format --diff` is the default for file input. `--check`, `--diff`, and
 `--write` are mutually exclusive. `format - --stdin-filepath notes/example.md`
 reads stdin with configuration and resolution context; it cannot be used with
@@ -412,6 +421,17 @@ vault-root path of the same spelling leads into a skipped directory.
 plugin that changes its destination is refused, because a skipped directory may
 hold a second note of that name, or the one that Obsidian would choose.
 
+A path named on the command line that cannot be used stops the command with exit
+code `2`. The message says what the path was named as and what is wrong with it:
+a workspace root, a configuration file, or an input that `does not exist` or
+`cannot be read`, a workspace root that `is not a directory`, a configuration
+file that `is not a file`, as in `Input does not exist: notes/absent.md`. An
+input and a file given with `--config` are named as they were given, the
+workspace root with its full path. Versions up to `0.2.0-rc.1` printed the
+system's own message, which named an internal step. An `--exclude` path that
+does not exist excludes nothing; one that the tool is not permitted to examine
+is an error, because it cannot tell which file the path stands for.
+
 Naming a skipped directory, or a path inside it, as an input is an error with
 exit code `2`, and so is a workspace root that cannot be read. Configuration
 `ignore` patterns and `--exclude` choose which documents are processed; they do
@@ -431,7 +451,9 @@ does not let the tool find out whether a folder is a vault, which takes a
 command stops with exit code `2`: reading a vault's notes as another dialect is
 not a safe fallback. A configuration file that cannot be read still stops the
 run, as does a directory that refuses the search for one: default rules must not
-take the place of a configuration that exists.
+take the place of a configuration that exists. An error about a configuration
+file names the file, also when its content is not valid JSON, does not fit the
+configuration format, or is a script that fails to load.
 
 A selected document that cannot be read is reported for that file, as an error
 diagnostic with the rule ID `engine/unreadable-file` at line 1, in the text

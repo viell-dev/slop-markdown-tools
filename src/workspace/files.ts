@@ -7,7 +7,7 @@ import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
-import { exists, refusal, refusalText } from "./access.js";
+import { exists, pathError, refusal, refusalText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
@@ -97,9 +97,14 @@ export async function discover(
   const vaultFolders = new Map<string, string>();
   for (const input of supplied.length ? supplied : [root]) {
     const absolute = path.resolve(input);
-    if ((await lstat(absolute)).isSymbolicLink())
-      throw new Error(`Refusing symbolic-link input: ${input}`);
-    const resolved = await realpath(absolute);
+    let resolved: string;
+    try {
+      if ((await lstat(absolute)).isSymbolicLink())
+        throw new Error(`Refusing symbolic-link input: ${input}`);
+      resolved = await realpath(absolute);
+    } catch (error) {
+      throw pathError("Input", input, error);
+    }
     const relative = path.relative(root, resolved).split(path.sep).join("/");
     if (relative.startsWith("../") || relative === ".." || path.isAbsolute(relative))
       throw new Error(`Input is outside the workspace: ${input}`);

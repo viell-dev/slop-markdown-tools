@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { createTwoFilesPatch } from "diff";
-import { readFile, realpath } from "node:fs/promises";
+import { access, constants, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
@@ -11,7 +11,7 @@ import { discover, vaultFor, writeAtomic } from "../workspace/files.js";
 import { enclosingVault, vaultOf } from "../workspace/vault.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
-import { refusal, refusalText } from "../workspace/access.js";
+import { pathError, refusal, refusalText } from "../workspace/access.js";
 import type { Diagnostic, Dialect, DialectName, ProcessOptions, Workspace } from "../core/types.js";
 import type { Vault } from "../workspace/vault.js";
 
@@ -76,11 +76,28 @@ interface Report {
 function assumedDialect(vault: Vault | string | undefined): Dialect | undefined {
   return vault ? "obsidian" : undefined;
 }
+/**
+ * Stops when the folder given as `--root` cannot serve as a workspace root.
+ * Without this check the first thing to fail would be the search for a
+ * configuration file in it, with a message about a file the user never named.
+ */
+async function checkRoot(given: string | undefined): Promise<void> {
+  if (given === undefined) return;
+  const root = path.resolve(given);
+  try {
+    if (!(await stat(root)).isDirectory())
+      throw new Error(`Workspace root is not a directory: ${root}`);
+    await access(root, constants.R_OK | constants.X_OK);
+  } catch (error) {
+    throw pathError("Workspace root", root, error);
+  }
+}
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
     throw new Error("Choose only one of --check, --diff, and --write.");
   if (inputs.includes("-") && flags.exclude?.length)
     throw new Error("--exclude cannot be combined with stdin.");
+  await checkRoot(flags.root);
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
   const root = path.resolve(flags.root ?? loaded.root);
   if (flags.dialect) loaded.config.dialect = flags.dialect;
@@ -188,6 +205,9 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   }
   // A file that could not be formatted safely, or not be read at all, is a failure
   // to operate: nothing of the batch is written, and the run ends with status 2.
+  const diagnostics = reports.flatMap((report) => report.diagnostics);
+  const count = (severity: Diagnostic["severity"]) =>
+    diagnostics.filter((item) => item.severity === severity).length;
   const unsafe =
     unread.length > 0 ||
     reports.some((report) =>
@@ -225,16 +245,19 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         process.stderr.write(
           `${report.path}:${item.line}:${item.column}: ${item.severity} ${item.rule}: ${item.message}\n`,
         );
-    if (!stdin)
+    if (!stdin) {
+      // Lint changes nothing, so its summary counts what it reported instead.
+      const outcome =
+        mode === "lint"
+          ? `${count("error")} error(s), ${count("warn")} warning(s)`
+          : `${changes.length} ${flags.write && !unsafe ? "written" : "would change"}`;
       process.stderr.write(
-        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${changes.length} ${flags.write && !unsafe ? "written" : "would change"}${unread.length ? `; ${unread.length} could not be read` : ""}.\n`,
+        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}.\n`,
       );
+    }
   }
-  const diagnostics = reports.flatMap((report) => report.diagnostics);
-  const errors = diagnostics.some((item) => item.severity === "error");
-  const tooManyWarnings =
-    flags.maxWarnings !== undefined &&
-    diagnostics.filter((item) => item.severity === "warn").length > flags.maxWarnings;
+  const errors = count("error") > 0;
+  const tooManyWarnings = flags.maxWarnings !== undefined && count("warn") > flags.maxWarnings;
   process.exitCode = unsafe
     ? 2
     : errors || tooManyWarnings || (flags.check && changes.length > 0)
@@ -255,6 +278,7 @@ common(program.command("config").description("Inspect effective configuration"))
   .command("explain <file>")
   .action(async (file: string, _flags: unknown, command: Command) => {
     const flags = command.parent!.opts<Flags>();
+    await checkRoot(flags.root);
     const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
     if (flags.dialect) loaded.config.dialect = flags.dialect;
     const root = path.resolve(flags.root ?? loaded.root);

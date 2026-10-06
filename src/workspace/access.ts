@@ -21,6 +21,24 @@ export function refusalText(code: RefusalCode): string {
   return `${code}: ${refusals[code]}`;
 }
 /**
+ * The error to report for a path that the user named and that cannot be used:
+ * what the path was named as, the path as it was given, and whether nothing is
+ * there or the system refuses to let it be read. The system's own message names
+ * the internal step that failed, which tells the user nothing. Any other error
+ * is a fault and is returned as it is.
+ */
+export function pathError(role: string, given: string, error: unknown): unknown {
+  const code =
+    typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  // A path through something that is not a directory leads nowhere either.
+  if (code === "ENOENT" || code === "ENOTDIR")
+    return new Error(`${role} does not exist: ${given}`, { cause: error });
+  const refused = refusal(error);
+  return refused
+    ? new Error(`${role} cannot be read: ${given} (${refusalText(refused)})`, { cause: error })
+    : error;
+}
+/**
  * Whether something exists at `file`. A path through something that is not a
  * directory leads nowhere; a refusal, or any other error, is not an answer.
  */

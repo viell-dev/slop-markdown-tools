@@ -110,9 +110,13 @@ export const configSchema = {
   },
 };
 const validate = new Ajv({ allErrors: true }).compile(configSchema);
+/** What is wrong with `value` as a configuration, or undefined when it is valid. */
+export function configProblem(value: unknown): string | undefined {
+  return validate(value) ? undefined : new Ajv().errorsText(validate.errors);
+}
 export function validateConfig(value: unknown): asserts value is Config {
-  if (!validate(value))
-    throw new Error(`Invalid configuration: ${new Ajv().errorsText(validate.errors)}`);
+  const problem = configProblem(value);
+  if (problem) throw new Error(`Invalid configuration: ${problem}`);
 }
 export function setting(value: RuleSetting): {
   severity: "off" | "warn" | "error";

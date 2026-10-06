@@ -312,7 +312,7 @@ describe("without a named dialect", () => {
     const root = await fixture(files);
     const linted = run(root, ["lint"]);
     expect(linted.status, linted.stderr).toBe(0);
-    expect(linted.stderr).toBe("5 file(s) linted; 0 would change.\n");
+    expect(linted.stderr).toBe("5 file(s) linted; 0 error(s), 0 warning(s).\n");
     const piped = run(root, ["lint", "-"], files["footnote.md"]);
     expect(piped.status, piped.stderr).toBe(0);
     expect(piped.stderr).toBe("");
@@ -402,7 +402,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(dialect(root, "Note.md")).toBe("obsidian");
     const linted = run(root, ["lint"]);
     expect(linted.status, linted.stderr).toBe(0);
-    expect(linted.stderr).toBe("2 file(s) linted; 0 would change.\n");
+    expect(linted.stderr).toBe("2 file(s) linted; 0 error(s), 0 warning(s).\n");
     const previewed = run(root, ["format", "--diff"]);
     expect(previewed.status, previewed.stderr).toBe(0);
     expect(previewed.stdout).toBe("");
@@ -606,7 +606,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
       "private/.obsidian/app.json": "{}",
       "private/Note.md": note,
     });
-    expect(run(root, ["lint"]).stderr).toBe("1 file(s) linted; 0 would change.\n");
+    expect(run(root, ["lint"]).stderr).toBe("1 file(s) linted; 0 error(s), 0 warning(s).\n");
     expect(dialect(root, "private/Note.md")).toBe("obsidian");
     expect(run(root, ["format", "-", "--stdin-filepath", "private/Note.md"], note).stdout).toBe(
       note,
@@ -671,7 +671,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     const above = run(root, ["lint", "--root", "docs/vault/Folder"]);
     expect(above.status, above.stderr).toBe(0);
     expect(above.stderr).toBe(
-      `mdtools: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 would change.\n`,
+      `mdtools: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
   });
   it.skipIf(process.platform === "win32")(
@@ -795,6 +795,133 @@ describe("filesystem safeguards", () => {
     expect(await enclosingVault(root)).toBeUndefined();
   });
 });
+describe("paths and configuration files that cannot be used", () => {
+  const fails = (root: string, args: string[], message: string) => {
+    const result = run(root, args);
+    expect(result.status, args.join(" ")).toBe(2);
+    expect(result.stdout, args.join(" ")).toBe("");
+    expect(result.stderr, args.join(" ")).toBe(`mdtools: ${message}\n`);
+  };
+  it("says what is wrong with a workspace root, an input, and a configuration file", async () => {
+    const root = await fixture({ "note.md": "A note.\n", "folder/other.md": "Text.\n" });
+    // The root is named with its full path, as discovery names it.
+    for (const command of [["lint"], ["format", "--write"], ["config", "explain", "note.md"]]) {
+      const [name, ...rest] = command as [string, ...string[]];
+      fails(
+        root,
+        [name, "--root", "absent", ...rest],
+        `Workspace root does not exist: ${path.join(root, "absent")}`,
+      );
+      fails(
+        root,
+        [name, "--root", "note.md", ...rest],
+        `Workspace root is not a directory: ${path.join(root, "note.md")}`,
+      );
+    }
+    // An input and a configuration file are named as they were given.
+    fails(root, ["lint", "absent.md"], "Input does not exist: absent.md");
+    fails(root, ["lint", "note.md", "folder/absent"], "Input does not exist: folder/absent");
+    fails(root, ["format", "--write", "note.md/inside"], "Input does not exist: note.md/inside");
+    fails(
+      root,
+      ["lint", "--config", "absent.json"],
+      "Configuration file does not exist: absent.json",
+    );
+    fails(
+      root,
+      ["lint", "--config", "absent.mjs"],
+      "Configuration file does not exist: absent.mjs",
+    );
+    fails(root, ["lint", "--config", "folder"], "Configuration file is not a file: folder");
+    fails(
+      root,
+      ["config", "--config", "absent.jsonc", "explain", "note.md"],
+      "Configuration file does not exist: absent.jsonc",
+    );
+    // An excluded path that does not exist excludes nothing, also below a file.
+    for (const excluded of ["absent.md", "note.md/inside"]) {
+      const linted = run(root, ["lint", "--exclude", excluded]);
+      expect(linted.status, linted.stderr).toBe(0);
+      expect(linted.stderr).toBe("2 file(s) linted; 0 error(s), 0 warning(s).\n");
+    }
+  });
+  it("names the configuration file whose content is at fault", async () => {
+    const cut = await fixture({ "mdtools.config.json": '{ "rules": ', "sub/note.md": "A note.\n" });
+    // Found by searching upward, the file is named with its full path.
+    fails(
+      path.join(cut, "sub"),
+      ["lint"],
+      `Invalid JSON configuration in ${path.join(cut, "mdtools.config.json")}: ValueExpected at offset 11, CloseBraceExpected at offset 11`,
+    );
+    const wrong = await fixture({ "odd.jsonc": '{ "rules": 5 }', "note.md": "A note.\n" });
+    fails(
+      wrong,
+      ["lint", "--config", "odd.jsonc"],
+      "Invalid configuration in odd.jsonc: data/rules must be object",
+    );
+    const script = await fixture({
+      "mdtools.config.mjs": "export default {\n",
+      "wrong.mjs": "export default { rules: 5 };\n",
+      "throws.mjs": 'throw new Error("no settings today");\n',
+      "note.md": "A note.\n",
+    });
+    const broken = run(script, ["lint"]);
+    expect(broken.status).toBe(2);
+    expect(broken.stderr).toMatch(
+      new RegExp(
+        `^mdtools: Cannot load configuration file ${path.join(script, "mdtools.config.mjs").replaceAll("\\", "\\\\")}: .+\\n$`,
+      ),
+    );
+    fails(
+      script,
+      ["lint", "--config", "wrong.mjs"],
+      "Invalid configuration in wrong.mjs: data/rules must be object",
+    );
+    fails(
+      script,
+      ["lint", "--config", "throws.mjs"],
+      "Cannot load configuration file throws.mjs: no settings today",
+    );
+    // A folder with the name of a configuration file is found, and is not one.
+    const folder = await fixture({ "note.md": "A note.\n" });
+    await mkdir(path.join(folder, "mdtools.config.jsonc"));
+    fails(
+      folder,
+      ["lint"],
+      `Configuration file is not a file: ${path.join(folder, "mdtools.config.jsonc")}`,
+    );
+  });
+  it("counts the findings in the lint summary and the changes in the format summary", async () => {
+    const root = await fixture({
+      "clean.md": "A clean note.\n",
+      "note.md": "A *note* with a [missing link](absent.md).\n",
+    });
+    const linted = run(root, ["lint"]);
+    expect(linted.status).toBe(1);
+    expect(linted.stderr).toBe(
+      'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
+        'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
+        "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
+        "2 file(s) linted; 1 error(s), 2 warning(s).\n",
+    );
+    expect(run(root, ["lint", "clean.md"]).stderr).toBe(
+      "1 file(s) linted; 0 error(s), 0 warning(s).\n",
+    );
+    // Formatting still says what it changed or would change.
+    expect(run(root, ["format", "--check"]).stderr).toBe(
+      "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
+        "2 file(s) processed; 1 would change.\n",
+    );
+    expect(run(root, ["format", "--write"]).stderr).toBe(
+      "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
+        "2 file(s) processed; 1 written.\n",
+    );
+    // The summary is not part of a JSON report.
+    const report = run(root, ["lint", "--json"]);
+    expect(report.stderr).toBe("");
+    expect(Object.keys(JSON.parse(report.stdout))).toEqual(["version", "mode", "files", "written"]);
+  });
+});
 // Permissions cannot be taken away on Windows or from root, so these tests are skipped
 // there; tests/unit/links.test.ts covers what the library does with an unreadable path.
 describe.skipIf(!canRestrict)("directories that may not be read", () => {
@@ -813,7 +940,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       warning("locked") +
         'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
         'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
-        "1 file(s) linted; 0 would change.\n",
+        "1 file(s) linted; 0 error(s), 2 warning(s).\n",
     );
     const piped = run(root, ["format", "-"], "B *note*.\n");
     expect(piped.status, piped.stderr).toBe(0);
@@ -827,7 +954,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
     const strict = run(root, ["lint", "--max-warnings", "0"]);
     expect(strict.status, strict.stderr).toBe(0);
-    expect(strict.stderr).toBe(warning("locked") + "1 file(s) linted; 0 would change.\n");
+    expect(strict.stderr).toBe(warning("locked") + "1 file(s) linted; 0 error(s), 0 warning(s).\n");
   });
   it("lists the directory in the JSON report and keeps stderr empty", async () => {
     const root = await fixture(files);
@@ -876,7 +1003,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       warning("locked") +
         "note.md:1:1: error links/valid: Local target could not be checked: locked/inner.md#part (no readable match; cannot read locked).\n" +
         "note.md:1:48: error links/valid: Missing local target: gone.md.\n" +
-        "1 file(s) linted; 0 would change.\n",
+        "1 file(s) linted; 2 error(s), 0 warning(s).\n",
     );
     // The finding has the rule's severity, so a warning does not fail the run.
     const config = path.join(root, "mdtools.config.json");
@@ -928,8 +1055,16 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
     const inside = run(root, ["lint", "locked/inner.md"]);
     expect(inside.status).toBe(2);
-    expect(inside.stderr).toContain("EACCES");
-    expect(inside.stderr).toContain("inner.md");
+    expect(inside.stderr).toBe(
+      "mdtools: Input cannot be read: locked/inner.md (EACCES: permission denied)\n",
+    );
+    // An excluded path in it cannot be told from a link to a file that should be left out.
+    const excluded = run(root, ["format", "--write", "--exclude", "locked/inner.md"]);
+    expect(excluded.status).toBe(2);
+    expect(excluded.stderr).toBe(
+      "mdtools: Excluded path cannot be read: locked/inner.md (EACCES: permission denied)\n",
+    );
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
   });
   it.each([
     ["neither listed nor entered", 0o000],
@@ -970,7 +1105,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const linted = run(root, ["lint", "docs"]);
     expect(linted.status, linted.stderr).toBe(0);
     expect(linted.stderr).toBe(
-      warning("docs/private") + warning("volume") + "1 file(s) linted; 0 would change.\n",
+      warning("docs/private") + warning("volume") + "1 file(s) linted; 0 error(s), 0 warning(s).\n",
     );
   });
   it("keeps `ignore` and `--exclude` from pruning discovery, unlike `.gitignore`", async () => {
@@ -991,7 +1126,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(gitIgnored.status).toBe(1);
     expect(gitIgnored.stderr).toBe(
       "note.md:1:1: error links/valid: Missing local target: locked/inner.md.\n" +
-        "1 file(s) linted; 0 would change.\n",
+        "1 file(s) linted; 1 error(s), 0 warning(s).\n",
     );
     // Unless it is indexed on request, which needs to read it.
     await writeFile(
@@ -1053,12 +1188,24 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     await expect(discover(closed, [], [])).rejects.toThrow(
       `Workspace root cannot be read: ${closed} (EACCES: permission denied)`,
     );
-    // From the command line, the search for a configuration file is refused first.
-    const searching = run(path.dirname(closed), ["lint", "--root", closed]);
-    expect(searching.status).toBe(2);
-    expect(searching.stderr).toContain("EACCES");
-    expect(searching.stderr).toContain("mdtools.config");
-    // With a configuration named, the check for a vault is refused first, and says the same.
+    // The command line says the same, with or without a configuration named, and
+    // does not speak of the configuration file it would have looked for in the root.
+    for (const command of [
+      ["lint", "--root", closed],
+      ["config", "--root", closed, "explain", "note.md"],
+    ]) {
+      const searching = run(path.dirname(closed), command);
+      expect(searching.status).toBe(2);
+      expect(searching.stderr).toBe(
+        `mdtools: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
+      );
+    }
+    // A directory that is not named as the root, such as the one the tool runs in,
+    // refuses the search for a configuration file. No process can start in such a
+    // directory, so the search is called directly.
+    await expect(loadConfig(closed)).rejects.toThrow(
+      `Cannot look for a configuration file in ${closed} (EACCES: permission denied)`,
+    );
     const elsewhere = await fixture({ "mdtools.config.json": "{}" });
     const configured = run(elsewhere, [
       "lint",
@@ -1139,6 +1286,26 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     "linking.md:1:5: error links/valid: Fragment could not be checked: secret.md#section (cannot read secret.md).\n";
   const unread = (verb: string) =>
     `secret.md:1:1: error engine/unreadable-file: The file could not be read (EACCES: permission denied) and was not ${verb}.\n`;
+  it("stops for a configuration file that may not be read, and names it", async () => {
+    const root = await fixture({
+      ...files,
+      "mdtools.config.json": "{}",
+      "other.mjs": "export default {};\n",
+    });
+    await restrict(path.join(root, "mdtools.config.json"));
+    await restrict(path.join(root, "other.mjs"));
+    const found = run(root, ["format", "--write"]);
+    expect(found.status).toBe(2);
+    expect(found.stderr).toBe(
+      `mdtools: Configuration file cannot be read: ${path.join(root, "mdtools.config.json")} (EACCES: permission denied)\n`,
+    );
+    const named = run(root, ["lint", "--config", "other.mjs"]);
+    expect(named.status).toBe(2);
+    expect(named.stderr).toBe(
+      "mdtools: Configuration file cannot be read: other.mjs (EACCES: permission denied)\n",
+    );
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+  });
   it("reports the file, processes the others, and ends with status 2", async () => {
     const root = await fixture(files);
     await restrict(path.join(root, "secret.md"));
@@ -1150,7 +1317,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
         'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
         'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
         unread("linted") +
-        "2 file(s) linted; 0 would change; 1 could not be read.\n",
+        "2 file(s) linted; 2 error(s), 2 warning(s); 1 could not be read.\n",
     );
     const checked = run(root, ["format", "--check"]);
     expect(checked.status).toBe(2);
@@ -1166,7 +1333,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     const named = run(root, ["lint", "secret.md"]);
     expect(named.status).toBe(2);
     expect(named.stderr).toBe(
-      unread("linted") + "0 file(s) linted; 0 would change; 1 could not be read.\n",
+      unread("linted") + "0 file(s) linted; 1 error(s), 0 warning(s); 1 could not be read.\n",
     );
   });
   it("reports a link to a heading in the file as unchecked without stopping", async () => {
@@ -1175,7 +1342,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     // The run read every file it was asked to process, so the status is that of the findings.
     const linted = run(root, ["lint", "linking.md"]);
     expect(linted.status).toBe(1);
-    expect(linted.stderr).toBe(unchecked + "1 file(s) linted; 0 would change.\n");
+    expect(linted.stderr).toBe(unchecked + "1 file(s) linted; 1 error(s), 0 warning(s).\n");
     const checked = run(root, ["format", "--check", "linking.md"]);
     expect(checked.status).toBe(1);
     expect(checked.stderr).not.toContain("engine/");
