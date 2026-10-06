@@ -154,6 +154,12 @@ those documents, and the previous reference run, made with that version, peaked
 at 496 MB for the 2,001 files. The figure also depends on when Node.js reclaims
 memory, so it is an upper bound on what the run needed, not an exact amount.
 
+These rows use the GitHub profile. For the Obsidian dialect the tool also keeps
+a table for finding a note by its name, with one entry for each file of the
+workspace, attachments included: about 70 bytes per file. Versions up to
+`0.2.0-rc.1` kept two tables that together held about 1.6 kB per file, 160 MB
+for a vault with 100,000 attachments, once a link had been searched for by name.
+
 ### Larger documents
 
 | Document size | Format with changes | Per kilobyte |
@@ -201,8 +207,11 @@ run still holds is every file's text and diagnostics.
   estimating time by multiplying. It also showed what small sets cannot: peak
   memory of about 1.2 GB, half of what `0.2.0-rc.1` needed, and a few seconds
   spent finding files before the first document was read, because that workspace
-  also held well over 100,000 files that are not Markdown. In a simple tree,
-  finding files costs about a third of a second per 100,000 files.
+  also held well over 100,000 files that are not Markdown. How much heap such a
+  run needs at the least is set by its largest document, not by the number of
+  files: a generated index note of 2.3 MB, a list of 13,400 links, takes about
+  250 MB to parse. In a simple tree, finding files costs about a third of a
+  second per 100,000 files.
 - Only the built-in rules run. Plugins add their own time.
 - The runner is shared. GitHub assigns runs to machines with different
   processors: two runs of this benchmark on the same day differed by a factor of
