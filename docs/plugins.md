@@ -214,6 +214,74 @@ its output again: a correct rule leaves it unchanged. Plugins execute within the
 host process and are not sandboxed. Semantic checking constrains the returned
 text, not arbitrary JavaScript behavior.
 
+## Resolve links in a rule
+
+A rule asks the workspace where a link leads with
+`workspace.resolve(source, destination, dialect)`: `source` is the path of the
+linking document (`document.path`), `destination` the link's destination as
+written, and `dialect` the document's dialect. The built-in link rules use this
+call and nothing else, so a plugin sees links exactly as they do. `workspace` is
+undefined when the host gave none; a rule should then report nothing.
+
+```js
+export default {
+  name: "local",
+  rules: {
+    "no-dead-links": {
+      description: "Report links to files that are not in the workspace.",
+      kind: "problem",
+      check({ document, workspace }) {
+        if (!workspace) return [];
+        const findings = [];
+        const visit = (node) => {
+          if (node.type === "link") {
+            const result = workspace.resolve(document.path, node.url, document.dialect);
+            if (result.status === "missing")
+              findings.push({
+                start: node.position.start.offset,
+                message: `No file at ${node.url}.`,
+              });
+          }
+          for (const child of node.children ?? []) visit(child);
+        };
+        visit(document.tree);
+        return findings;
+      },
+    },
+  },
+};
+```
+
+The result's `status` is one of:
+
+| Status        | Meaning                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `resolved`    | One file matches. `target` is its path from the workspace root.                                               |
+| `missing`     | No file matches.                                                                                              |
+| `ambiguous`   | Several files match and nothing decides between them, such as two notes whose names differ only by case.      |
+| `directory`   | The destination names a folder.                                                                               |
+| `external`    | The destination is a URL with a scheme, or starts with `//`. It is not checked.                               |
+| `unavailable` | The destination cannot be judged from files: it starts with `/` or holds a `?`, outside the Obsidian dialect. |
+| `unreadable`  | The target could not be checked, because something that may hold it could not be read.                        |
+
+The other fields are present when they apply:
+
+- `target`: the file found, with status `resolved`, and with `unreadable` when
+  the file is there but its content could not be read.
+- `fragment`: the part after `#`, decoded, or an empty string.
+- `fragmentExists`: with status `resolved`, whether the target has the heading,
+  block, or anchor that the fragment names, by the rules of `dialect`. It is
+  true when there is no fragment.
+- `unreadable`: what stood in the way; see the paragraphs on
+  `WorkspaceOptions.unreadable` and `rootInVault` above. When it is set on a
+  `resolved` link, the match is uncertain and a rule must not rewrite the link.
+- `vault`, `rooted`, and `outside`: for Obsidian links in a vault that is not
+  the workspace root; see `WorkspaceOptions.vaults` above.
+
+A style rule that rewrites a destination should resolve its replacement as well
+and propose the edit only when both lead to the same `target`. The engine checks
+this again and refuses an edit that changes where a link leads.
+
 ## Syntax extensions
 
 An advanced plugin can provide `syntax: { micromark, mdast }`, containing
