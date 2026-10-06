@@ -147,6 +147,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           dialect: config.dialect,
           directories: set.directories,
           unreadable,
+          // The vault at or above the root holds the whole workspace and needs no entry.
+          vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
         })),
       );
     // Whether a note may be reflowed is a setting of its own vault.

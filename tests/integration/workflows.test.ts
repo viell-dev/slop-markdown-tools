@@ -35,11 +35,54 @@ describe("a repository with an embedded vault", () => {
     expect(await readFile(path.join(root, "docs/guide.md"), "utf8")).toBe(
       files["docs/guide.md"].replace("[!tip]", "[!TIP]"),
     );
-    // Reflow needs Obsidian's strict line breaks, which only a vault root can verify.
+    // Reflow needs Obsidian's strict line breaks, which only a vault's settings can
+    // verify; this folder is read as Obsidian by an override and has none.
     expect(await readFile(path.join(root, "vault/Note.md"), "utf8")).toBe(
       files["vault/Note.md"].replace("[!TIP]", "[!tip]").replace("*guide*", "_guide_"),
     );
     expect(run(root, ["lint", "--max-warnings", "0"]).status).toBe(0);
+  });
+  it("resolves the links of a vault in the repository as a run on the vault alone does", async () => {
+    const note =
+      "A [[Target|note]], [a path](../Other/Target.md), [[README]], and [the project](../../../README.md).\n";
+    const tree = {
+      "mdtools.config.jsonc": '{ "rules": { "links/path": ["warn", { "style": "root" }] } }',
+      "README.md": "# Project\n\nSee [the vault](docs/vault/Home.md).\n",
+      "docs/vault/.obsidian/app.json": "{}",
+      "docs/vault/Home.md": "# Home\n",
+      "docs/vault/Other/Target.md": "# Target\n",
+      "docs/vault/Folder/Note.md": note,
+    };
+    const formatted =
+      "A [[Other/Target|note]], [a path](Other/Target.md), [[README]], and [the project](../../../README.md).\n";
+    // What `links/valid` says about the vault's notes, with paths from the vault's folder.
+    const invalid = (root: string, ...flags: string[]) =>
+      report(
+        run(root, ["lint", "--json", "--config", "mdtools.config.jsonc", ...flags]).stdout,
+      ).files.flatMap((file) =>
+        file.diagnostics
+          .filter((item) => item.rule === "links/valid")
+          .map((item) => `${file.path.replace(/^docs\/vault\//, "")}: ${item.message}`),
+      );
+    const whole = await fixture(tree);
+    expect(invalid(whole)).toEqual([
+      "Folder/Note.md: Missing local target: README.",
+      // The file exists, so the repository run says why Obsidian does not reach it.
+      "Folder/Note.md: Local target is outside the vault: ../../../README.md (README.md is not in docs/vault, where Obsidian looks).",
+    ]);
+    expect(invalid(whole, "--root", "docs/vault")).toEqual([
+      "Folder/Note.md: Missing local target: README.",
+      "Folder/Note.md: Missing local target: ../../../README.md.",
+    ]);
+    // Formatting writes the same paths either way: from the vault's folder.
+    const alone = await fixture(tree);
+    run(whole, ["format", "--write"]);
+    run(alone, ["format", "--write", "--config", "mdtools.config.jsonc", "--root", "docs/vault"]);
+    for (const root of [whole, alone])
+      expect(await readFile(path.join(root, "docs/vault/Folder/Note.md"), "utf8")).toBe(formatted);
+    // The repository's own document still links into the vault from the outside.
+    expect(await readFile(path.join(whole, "README.md"), "utf8")).toBe(tree["README.md"]);
+    expect(run(whole, ["format", "--check"]).stderr).not.toContain("README.md:");
   });
   it("validates a fragment by the dialect of the document that links to it", async () => {
     const root = await fixture({

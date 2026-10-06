@@ -52,12 +52,20 @@ vault:
 A dialect named by the configuration or by `--dialect` still takes precedence
 over all of this.
 
-Links are a different matter: they are resolved within the workspace root, not
-within the vault. A root that is a folder of a vault cannot see the notes
-outside it and reports links to them as missing. In a vault below the root, a
-link can be matched with a file outside the vault, and `links/path` with
-`"style": "root"` writes paths from the workspace root, not from the vault's
-folder. Check and rewrite a vault's links with the vault as the root.
+Links follow the vault as well. In a vault below the workspace root, a link in a
+note reaches only the vault's files, as it does in Obsidian: a path is counted
+from the vault's folder, a search by note name looks inside the vault, and
+`links/path` writes `"style": "root"` paths from the vault's folder. The
+findings and edits are the ones a run with the vault as the root produces. A
+path that leads out of the vault to a file that exists, such as
+`[the project](../../README.md)`, is reported as
+`Local target is outside the vault`, because Obsidian cannot follow it.
+Documents outside the vault link into it as into any other folder. Versions up
+to `0.2.0-rc.1` resolved such a vault's links from the workspace root.
+
+The opposite layout is still limited: a root that is a folder of a vault cannot
+see the notes outside it and reports links to them as missing. Check and rewrite
+such a vault's links with the vault as the root.
 
 ## Enable source wrapping
 

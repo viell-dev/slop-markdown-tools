@@ -54,11 +54,13 @@ contains `.git`. Discovery leaves a repository inside a workspace alone, so a
 repository checked out inside a vault is not read as notes from the inside
 either; without a boundary, every project below a vault would be.
 Version 0.2.0-rc.1 and earlier assumed CommonMark everywhere. Link resolution
-does not follow the vault: links are resolved within the workspace root. The
-assumption is made in one place, where configuration is resolved: the library
-takes the dialect to assume as an argument, since it does not read files, and
-anything that names a dialect replaces it. The workspace index uses `github` for
-link targets when a library caller gives it no dialect.
+follows the vault too: an Obsidian link in a vault below the workspace root
+reaches only that vault's files, by paths counted from the vault's folder. A
+workspace root inside a vault is the one layout where the tool sees only part of
+a vault. The assumption is made in one place, where configuration is resolved:
+the library takes the dialect to assume as an argument, since it does not read
+files, and anything that names a dialect replaces it. The workspace index uses
+`github` for link targets when a library caller gives it no dialect.
 
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects
