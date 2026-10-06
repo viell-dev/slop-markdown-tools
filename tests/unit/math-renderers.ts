@@ -9,7 +9,8 @@
  *   The two Gitea versions agreed on every case.
  *
  * Each case is one paragraph or block. `math` lists the renderers whose output
- * for it contained a formula. To observe again, render the sources separated by
+ * for it contained a formula. A case with `observed` was rendered by those
+ * renderers only, and says nothing about the others. To observe again, render the sources separated by
  * thematic breaks and look for `math-renderer` (GitHub) or `language-math`
  * (Forgejo, Gitea) in each part.
  */
@@ -18,6 +19,7 @@ export interface MathCase {
   name: string;
   source: string;
   math: MathRenderer[];
+  observed?: MathRenderer[];
 }
 export const mathCases: MathCase[] = [
   { name: "basic", source: "A $x$ d.", math: ["github", "forgejo", "gitea"] },
@@ -174,4 +176,48 @@ export const mathCases: MathCase[] = [
     source: "It costs $5 but $x$ is math and $6 is not.",
     math: ["github", "forgejo", "gitea"],
   },
+  // A tab next to a dollar, observed on GitHub alone.
+  { name: "tab-after-open", source: "A $\tx$ d.", math: [], observed: ["github"] },
+  { name: "tab-before-close", source: "A $x\t$ d.", math: ["github"], observed: ["github"] },
+  { name: "tab-both", source: "A $\tx\t$ d.", math: [], observed: ["github"] },
+];
+
+/**
+ * What Obsidian showed as a formula for dollar signs in running text, observed
+ * by the repository owner on 2026-10-06 and reported with screenshots in issue
+ * 162. Each case was one item of a numbered list in a note. `reading` and `live`
+ * hold the source of each formula that Reading view and Live Preview showed.
+ * The two views differ twice: on which dollar opens the formula when an earlier
+ * one cannot be closed, and on a formula that runs over a line break. Doubled
+ * dollars inside a line were shown as a block in both views.
+ */
+export interface ObsidianMathCase {
+  line: number;
+  source: string;
+  reading: string[];
+  live: string[];
+}
+export const obsidianMathCases: ObsidianMathCase[] = [
+  { line: 1, source: "A $x$ d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 2, source: "A $ x$ d.", reading: [], live: [] },
+  { line: 3, source: "A $x $ d.", reading: [], live: [] },
+  { line: 4, source: "A $ x $ d.", reading: [], live: [] },
+  { line: 5, source: "A $x$5 d.", reading: [], live: [] },
+  { line: 6, source: "A $x$a d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 7, source: "A a$x$ d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 8, source: "A 5$x$ d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 9, source: "A ($x$) d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 10, source: 'A "$x$" d.', reading: ["$x$"], live: ["$x$"] },
+  { line: 11, source: "Costs $5 and $6 d.", reading: [], live: [] },
+  { line: 12, source: "Costs $5 *per* item and $6 *per* box.", reading: [], live: [] },
+  { line: 13, source: "From $5 to 10$ d.", reading: ["$5 to 10$"], live: ["$5 to 10$"] },
+  { line: 14, source: "Costs 5$ and 10$ d.", reading: [], live: [] },
+  { line: 15, source: "A $5 and $x$ d.", reading: ["$5 and $x$"], live: ["$x$"] },
+  { line: 16, source: "A $a *b* c$ d.", reading: ["$a *b* c$"], live: ["$a *b* c$"] },
+  { line: 17, source: "A $a \\$ b$ d.", reading: ["$a \\$ b$"], live: ["$a \\$ b$"] },
+  { line: 18, source: "A \\$x$ d.", reading: [], live: [] },
+  { line: 19, source: "A $$x$$ d.", reading: ["$$x$$"], live: ["$$x$$"] },
+  { line: 20, source: "A $$ x $$ d.", reading: ["$$ x $$"], live: ["$$ x $$"] },
+  { line: 21, source: "A $x$$ d.", reading: ["$x$"], live: ["$x$"] },
+  { line: 22, source: "A $x +\ny$ d.", reading: ["$x +\ny$"], live: [] },
 ];

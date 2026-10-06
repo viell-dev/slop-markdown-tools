@@ -89,8 +89,10 @@ its `*` restyled. A condition is therefore applied to a dialect only when its
 renderer was seen to apply it, and where a renderer is stricter still, the tool
 keeps protecting the text. The observations, about 125 cases rendered by GitHub,
 Forgejo, and Gitea, are kept with the tests and are compared with the tokenizer
-on every run. Obsidian was not observed, so its dialect keeps the widest
-reading.
+on every run. Obsidian has no renderer that a test or a script can ask, so its
+conditions rest on 22 cases that a person looked at in Reading view and in Live
+Preview. Where those two views disagree, the dialect follows the one that shows
+more as a formula, and what was not looked at is still read as math.
 
 GitHub alert support normalizes known alert type markers. Footnotes, math,
 strikethrough, and autolinks are parsed, but do not each have dedicated style

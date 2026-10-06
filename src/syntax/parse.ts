@@ -22,15 +22,15 @@ const gfmTree = gfmFromMarkdown().map((extension) => {
 });
 
 /**
- * What each renderer asks of `$…$` in running text, as probed on GitHub's file
- * view, Forgejo 16, and Gitea 1.25 and 28. Obsidian could not be probed, so it
- * keeps the reading that takes the most for math. CommonMark has no math.
+ * Whose conditions for `$…$` in running text each dialect follows, as observed
+ * on GitHub's file view, on Forgejo 16 and Gitea 1.25 and 28, and in Obsidian's
+ * Reading view and Live Preview. CommonMark has no math.
  */
 const mathConditions: Record<Exclude<Dialect, "commonmark">, MathConditions> = {
-  github: "tight",
-  forgejo: "bounded",
-  gitea: "bounded",
-  obsidian: "loose",
+  github: "github",
+  forgejo: "forge",
+  gitea: "forge",
+  obsidian: "obsidian",
 };
 
 export function parse(
