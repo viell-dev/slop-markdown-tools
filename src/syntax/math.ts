@@ -9,7 +9,12 @@
  * begin and end. The conditions below are what the renderers were seen to apply.
  */
 import { factorySpace } from "micromark-factory-space";
-import { asciiAlphanumeric, markdownLineEnding, markdownSpace } from "micromark-util-character";
+import {
+  asciiAlphanumeric,
+  asciiDigit,
+  markdownLineEnding,
+  markdownSpace,
+} from "micromark-util-character";
 import type {
   Code,
   Construct,
@@ -36,48 +41,58 @@ declare module "micromark-util-types" {
 }
 
 /**
- * How much a renderer asks of `$…$` in running text before it is math. Each
- * level only refuses what its renderers were verified to refuse, so that the
- * tool reads as math at least what they render as math: text wrongly taken for
- * math is merely left alone, while a formula taken for prose could be rewrapped
- * or restyled.
+ * Whose conditions apply to `$…$` in running text. Each set only refuses what
+ * its renderer was observed to refuse, so that the tool reads as math at least
+ * what the renderer renders as math: text wrongly taken for math is merely left
+ * alone, while a formula taken for prose could be rewrapped or restyled.
  *
- * - `loose`: any text between two runs of as many dollars, as a code span is
- *   delimited by backticks. For Obsidian, whose conditions are not verified.
- * - `bounded`: the opening dollars do not follow a letter or digit, the formula
- *   ends at the next dollars, and those are not followed by a letter, a digit,
- *   or an underscore. Otherwise there is no formula. Forgejo and Gitea.
- * - `tight`: as `bounded`, and a single dollar hugs the formula: no space or
- *   line ending after the opening one, no space before the closing one. GitHub.
+ * - `forge` (Forgejo and Gitea): the opening dollars do not follow a letter or
+ *   digit, the formula ends at the next dollars, and those are not followed by
+ *   a letter, a digit, or an underscore. Otherwise there is no formula. An
+ *   escaped dollar is part of the formula.
+ * - `github`: as `forge`, except that an escaped dollar ends the formula like
+ *   any other, and a single dollar hugs the formula: no space, tab, or line
+ *   ending after the opening one, and no space before the closing one.
+ * - `obsidian`: a single opening dollar is not followed by a space, and the
+ *   formula ends at the first dollar that has no space before it and no digit
+ *   after it. A dollar that cannot end it is part of it, which is how Reading
+ *   view has it, and so is an escaped one. Doubled dollars delimit any text up
+ *   to the next doubled dollars.
  */
-export type MathConditions = "loose" | "bounded" | "tight";
+export type MathConditions = "forge" | "github" | "obsidian";
 
+const space = 32;
 const dollar = 36;
 const backslash = 92;
 const underscore = 95;
 
 function mathText(conditions: MathConditions): Construct {
-  const strict = conditions !== "loose";
+  const obsidian = conditions === "obsidian";
+  // In Obsidian, a single dollar that opened nothing was read to the end of its
+  // text, and every later dollar was refused as its close. A dollar between the
+  // two would be refused the same closes, so it opens nothing either. Without
+  // this note, a paragraph of many prices is read to its end once for each.
+  let barren: [from: number, to: number] | undefined;
   const previous: Previous = function (code) {
     // Like a code span, math does not start in the middle of a run of dollars,
     // unless the dollar before was escaped. Forgejo and Gitea do start it there
     // when the run as a whole opened nothing: `$$x$` is a dollar and `$x$`.
     if (
       code === dollar &&
-      conditions !== "bounded" &&
+      conditions !== "forge" &&
       this.events[this.events.length - 1]?.[1].type !== "characterEscape"
     )
       return false;
-    return !strict || !asciiAlphanumeric(code);
+    // Obsidian alone starts math right after a letter or a digit.
+    return obsidian || !asciiAlphanumeric(code);
   };
   const tokenize: Tokenizer = function (effects, ok, nok) {
+    const opened = this.now().offset;
     let sizeOpen = 0;
     let size = 0;
     let token: Token;
     // The character before the current one, to judge a closing dollar by.
     let before: Code = null;
-    /** Whether a single dollar must hug the formula, as on GitHub. */
-    const hugging = () => conditions === "tight" && sizeOpen === 1;
 
     const start: State = (code) => {
       effects.enter("mathText");
@@ -91,19 +106,30 @@ function mathText(conditions: MathConditions): Construct {
         return sequenceOpen;
       }
       effects.exit("mathTextSequence");
-      if (hugging() && (markdownSpace(code) || markdownLineEnding(code))) return nok(code);
+      if (sizeOpen === 1) {
+        // GitHub wants a single dollar to hug the formula; Obsidian was only
+        // seen to refuse a space after it.
+        if (conditions === "github" && (markdownSpace(code) || markdownLineEnding(code)))
+          return nok(code);
+        if (obsidian && code === space) return nok(code);
+        if (obsidian && barren && opened > barren[0] && opened < barren[1]) return nok(code);
+      }
       before = dollar;
       return between(code);
     };
     const between: State = (code) => {
-      if (code === null) return nok(code);
+      if (code === null) {
+        if (obsidian && sizeOpen === 1) barren = [opened, this.now().offset];
+        return nok(code);
+      }
       if (code === dollar) {
         token = effects.enter("mathTextSequence");
         size = 0;
-        return strict ? sequenceCloseStrict(code) : sequenceClose(code);
+        if (!obsidian) return sequenceCloseNext(code);
+        return sizeOpen === 1 ? sequenceCloseFitting(code) : sequenceCloseSame(code);
       }
       // Tabs don't work, and virtual spaces don't make sense.
-      if (code === 32) {
+      if (code === space) {
         effects.enter("space");
         effects.consume(code);
         effects.exit("space");
@@ -121,15 +147,15 @@ function mathText(conditions: MathConditions): Construct {
       return data(code);
     };
     const data: State = (code) => {
-      if (code === null || code === 32 || code === dollar || markdownLineEnding(code)) {
+      if (code === null || code === space || code === dollar || markdownLineEnding(code)) {
         effects.exit("mathTextData");
         return between(code);
       }
       effects.consume(code);
       before = code;
-      // Forgejo and Gitea keep an escaped dollar in the formula. For GitHub an
-      // escaped dollar is a dollar like any other, and ends it.
-      return conditions === "bounded" && code === backslash ? escaped : data;
+      // Forgejo, Gitea, and Obsidian keep an escaped dollar in the formula. For
+      // GitHub an escaped dollar is a dollar like any other, and ends it.
+      return conditions !== "github" && code === backslash ? escaped : data;
     };
     const escaped: State = (code) => {
       // A backslash takes a dollar or another backslash with it; before anything
@@ -139,40 +165,48 @@ function mathText(conditions: MathConditions): Construct {
       before = code;
       return data;
     };
-    /** Any text up to a run of exactly as many dollars as opened the math. */
-    const sequenceClose: State = (code) => {
-      if (code === dollar) {
-        effects.consume(code);
-        size++;
-        return sequenceClose;
-      }
-      if (size === sizeOpen) {
-        effects.exit("mathTextSequence");
-        effects.exit("mathText");
-        return ok(code);
-      }
-      // More or fewer dollars: they are part of the math.
+    /** The dollars just read are part of the formula after all. */
+    const asData: State = (code) => {
       token.type = "mathTextData";
+      before = dollar;
       return data(code);
     };
-    /** The formula ends at the next dollars; what surrounds them decides whether it was one. */
-    const sequenceCloseStrict: State = (code) => {
-      if (code === dollar && size < sizeOpen) {
-        effects.consume(code);
-        size++;
-        return sequenceCloseStrict;
-      }
-      if (size < sizeOpen) {
-        // A single dollar between doubled ones: no renderer was seen to end there.
-        token.type = "mathTextData";
-        before = dollar;
-        return data(code);
-      }
-      if (asciiAlphanumeric(code) || code === underscore) return nok(code);
-      if (hugging() && markdownSpace(before)) return nok(code);
+    const close: State = (code) => {
       effects.exit("mathTextSequence");
       effects.exit("mathText");
       return ok(code);
+    };
+    /** Obsidian's doubled dollars: any text up to a run of exactly as many dollars. */
+    const sequenceCloseSame: State = (code) => {
+      if (code === dollar) {
+        effects.consume(code);
+        size++;
+        return sequenceCloseSame;
+      }
+      return size === sizeOpen ? close(code) : asData(code);
+    };
+    /** Obsidian's single dollar: the first one that fits ends the formula; the others are in it. */
+    const sequenceCloseFitting: State = (code) => {
+      if (size === 0) {
+        effects.consume(code);
+        size++;
+        return sequenceCloseFitting;
+      }
+      return before !== space && !asciiDigit(code) ? close(code) : asData(code);
+    };
+    /** GitHub, Forgejo, Gitea: the formula ends at the next dollars, or there was none. */
+    const sequenceCloseNext: State = (code) => {
+      if (code === dollar && size < sizeOpen) {
+        effects.consume(code);
+        size++;
+        return sequenceCloseNext;
+      }
+      // A single dollar between doubled ones: no renderer was seen to end there.
+      if (size < sizeOpen) return asData(code);
+      if (asciiAlphanumeric(code) || code === underscore) return nok(code);
+      // GitHub was seen to refuse a space before the closing dollar, and to accept a tab.
+      if (conditions === "github" && sizeOpen === 1 && before === space) return nok(code);
+      return close(code);
     };
     return start;
   };
