@@ -644,6 +644,221 @@ describe("directories that could not be read", () => {
   });
 });
 
+describe("an Obsidian vault below the workspace root", () => {
+  // A repository with two vaults; `Shared` is a note in each, `Only` in the first alone.
+  const files = {
+    "README.md": "# Project\n",
+    "Shared.md": "# Outside\n",
+    "docs/guide.md": "",
+    "docs/vault/Home.md": "",
+    "docs/vault/Shared.md": "# First\n",
+    "docs/vault/Only.md": "# Only\n",
+    "docs/vault/Folder/Note.md": "",
+    "docs/vault/Other/Target.md": "# Target\n\nA block. ^block\n",
+    "docs/vault/inner/Deep.md": "",
+    "docs/vault/inner/Shared.md": "# Inner\n",
+    "notes/Shared.md": "# Second\n",
+    "notes/Daily/Today.md": "",
+    "notes/image.png": null,
+  };
+  const vaults = ["docs/vault", "notes", "docs/vault/inner"];
+  const workspace = createWorkspace(files, { dialect: "obsidian", vaults });
+  const note = "docs/vault/Folder/Note.md";
+  const resolve = (url: string, source = note, dialect: Dialect = "obsidian") =>
+    workspace.resolve(source, url, dialect);
+  const found = (target: string, vault: string, fragment = "") => ({
+    status: "resolved",
+    target,
+    fragment,
+    fragmentExists: true,
+    vault,
+  });
+  it("searches for a note by name in the linking note's vault only", () => {
+    // Each vault finds its own `Shared`, although the name exists four times.
+    expect(resolve("Shared")).toEqual(found("docs/vault/Shared.md", "docs/vault"));
+    expect(resolve("Shared", "notes/Daily/Today.md")).toEqual(found("notes/Shared.md", "notes"));
+    expect(resolve("Shared", "docs/vault/inner/Deep.md")).toEqual(
+      found("docs/vault/inner/Shared.md", "docs/vault/inner"),
+    );
+    // A note of another vault, or of the repository around them, is not found.
+    expect(resolve("Only")).toEqual(found("docs/vault/Only.md", "docs/vault"));
+    expect(resolve("Only", "notes/Daily/Today.md")).toEqual({ status: "missing", vault: "notes" });
+    expect(resolve("README")).toEqual({ status: "missing", vault: "docs/vault" });
+    expect(resolve("guide")).toEqual({ status: "missing", vault: "docs/vault" });
+    expect(resolve("Target#Target")).toEqual(
+      found("docs/vault/Other/Target.md", "docs/vault", "Target"),
+    );
+    expect(resolve("Target#^block").status).toBe("resolved");
+    expect(resolve("Target#Absent")).toMatchObject({ status: "resolved", fragmentExists: false });
+  });
+  it("counts a path from the vault's folder, not from the workspace root", () => {
+    for (const url of ["Other/Target.md", "Other/Target", "/Other/Target.md", "other/target"])
+      expect(resolve(url), url).toEqual(found("docs/vault/Other/Target.md", "docs/vault"));
+    expect(resolve("../Other/Target.md")).toEqual(
+      found("docs/vault/Other/Target.md", "docs/vault"),
+    );
+    expect(resolve("image.png", "notes/Daily/Today.md")).toEqual(found("notes/image.png", "notes"));
+    // The path from the workspace root is not one that Obsidian knows, whole or in part.
+    for (const url of ["docs/vault/Other/Target.md", "vault/Other/Target", "docs/vault/Only"])
+      expect(resolve(url), url).toEqual({ status: "missing", vault: "docs/vault" });
+    // Folders are told apart inside the vault as elsewhere.
+    expect(resolve("Other")).toEqual({ status: "directory" });
+  });
+  it("names what a path reaches outside the vault instead of calling it missing", () => {
+    for (const [url, outside] of [
+      ["../../../README.md", "README.md"],
+      ["../../../README", "README.md"],
+      ["../../guide.md", "docs/guide.md"],
+      ["../../../notes/Shared.md", "notes/Shared.md"],
+      ["../../../notes/Daily", "notes/Daily"],
+      ["../..", "docs"],
+    ] as const)
+      expect(resolve(url), url).toEqual({ status: "missing", vault: "docs/vault", outside });
+    // Nothing is there, inside or outside: an ordinary missing target.
+    expect(resolve("../../absent.md")).toEqual({ status: "missing", vault: "docs/vault" });
+    // A path that leaves the workspace altogether is not looked at, as before.
+    expect(resolve("../../../../elsewhere.md")).toEqual({ status: "missing", vault: "docs/vault" });
+    const config: Config = { extends: [], dialect: "obsidian", rules: { "links/valid": "error" } };
+    expect(
+      lint("[the project](../../../README.md) and [[README]] and [[Shared]]\n", {
+        path: note,
+        config,
+        workspace,
+      }).map((item) => item.message),
+    ).toEqual([
+      "Local target is outside the vault: ../../../README.md (README.md is not in docs/vault, where Obsidian looks).",
+      "Missing local target: README.",
+    ]);
+  });
+  it("gives the notes of a vault around another vault the inner vault's notes too", () => {
+    // Obsidian indexes every folder of a vault, also one that is a vault itself.
+    expect(resolve("Deep")).toEqual(found("docs/vault/inner/Deep.md", "docs/vault"));
+    expect(resolve("inner/Shared")).toEqual(found("docs/vault/inner/Shared.md", "docs/vault"));
+    // The inner vault does not see out.
+    expect(resolve("Only", "docs/vault/inner/Deep.md")).toEqual({
+      status: "missing",
+      vault: "docs/vault/inner",
+    });
+    expect(resolve("../Only.md", "docs/vault/inner/Deep.md")).toEqual({
+      status: "missing",
+      vault: "docs/vault/inner",
+      outside: "docs/vault/Only.md",
+    });
+  });
+  it("leaves notes outside these vaults, and other dialects, as they were", () => {
+    // An Obsidian note outside the vaults reaches the whole workspace.
+    expect(resolve("Only", "docs/guide.md")).toEqual({
+      status: "resolved",
+      target: "docs/vault/Only.md",
+      fragment: "",
+      fragmentExists: true,
+    });
+    // There, a name is first tried as a path from the workspace root.
+    expect(resolve("Shared", "docs/guide.md")).toMatchObject({ target: "Shared.md" });
+    expect(resolve("Deep", "docs/guide.md")).toMatchObject({ target: "docs/vault/inner/Deep.md" });
+    // A document of another dialect in the vault's folder follows its own rules.
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const) {
+      expect(resolve("../../../README.md", note, dialect), dialect).toEqual({
+        status: "resolved",
+        target: "README.md",
+        fragment: "",
+        fragmentExists: true,
+      });
+      expect(resolve("Other/Target.md", note, dialect), dialect).toEqual({ status: "missing" });
+    }
+    // Without the option nothing changes: the note reaches files outside its vault.
+    const plain = createWorkspace(files, { dialect: "obsidian" });
+    expect(plain.resolve(note, "README", "obsidian")).toMatchObject({ target: "README.md" });
+    expect(plain.resolve(note, "Shared", "obsidian")).toMatchObject({ target: "Shared.md" });
+  });
+  it("accepts the folders in any spelling of the same path, and ignores the root", () => {
+    const spelled = createWorkspace(files, {
+      dialect: "obsidian",
+      vaults: ["docs\\vault\\", "./notes/", ".", ""],
+    });
+    expect(spelled.resolve(note, "Shared", "obsidian")).toEqual(
+      found("docs/vault/Shared.md", "docs/vault"),
+    );
+    expect(spelled.resolve("notes/Daily/Today.md", "Shared", "obsidian")).toEqual(
+      found("notes/Shared.md", "notes"),
+    );
+    expect(spelled.resolve("docs/guide.md", "Only", "obsidian")).toEqual({
+      status: "resolved",
+      target: "docs/vault/Only.md",
+      fragment: "",
+      fragmentExists: true,
+    });
+  });
+  it("lets only an unreadable directory of the same vault make a search uncertain", () => {
+    const elsewhere = createWorkspace(files, {
+      dialect: "obsidian",
+      vaults,
+      unreadable: ["notes/Private", "locked"],
+    });
+    // Nothing in this vault is hidden, so the answers are certain.
+    expect(elsewhere.resolve(note, "Only", "obsidian")).toEqual(
+      found("docs/vault/Only.md", "docs/vault"),
+    );
+    expect(elsewhere.resolve(note, "Absent", "obsidian")).toEqual({
+      status: "missing",
+      vault: "docs/vault",
+    });
+    // In the vault with the unreadable directory, what a search by name finds is not.
+    expect(elsewhere.resolve("notes/Shared.md", "Today", "obsidian")).toEqual({
+      ...found("notes/Daily/Today.md", "notes"),
+      unreadable: ["notes/Private"],
+    });
+    // A note at the path that Obsidian tries first is certain there too.
+    expect(elsewhere.resolve("notes/Daily/Today.md", "Shared", "obsidian")).toEqual(
+      found("notes/Shared.md", "notes"),
+    );
+    expect(elsewhere.resolve("notes/Daily/Today.md", "Absent", "obsidian")).toEqual({
+      status: "unreadable",
+      unreadable: ["notes/Private"],
+      vault: "notes",
+    });
+  });
+  it("writes paths from the vault's folder, and the same ones as with the vault as the root", () => {
+    const source =
+      "[a](../Other/Target.md) [b](Other/Target.md#Target) [[Target|c]] [[Other/Target|d]] [e](../../../README.md)\n";
+    // The same vault as a workspace of its own.
+    const alone = createWorkspace(
+      Object.fromEntries(
+        Object.entries(files).flatMap(([name, value]) =>
+          name.startsWith("docs/vault/") ? [[name.slice("docs/vault/".length), value]] : [],
+        ),
+      ),
+      { dialect: "obsidian" },
+    );
+    for (const [style, expected] of [
+      [
+        "root",
+        "[a](Other/Target.md) [b](Other/Target.md#Target) [[Other/Target|c]] [[Other/Target|d]] [e](../../../README.md)\n",
+      ],
+      [
+        "shortest",
+        "[a](Target.md) [b](Target.md#Target) [[Target|c]] [[Target|d]] [e](../../../README.md)\n",
+      ],
+      [
+        "relative",
+        "[a](../Other/Target.md) [b](../Other/Target.md#Target) [[../Other/Target|c]] [[../Other/Target|d]] [e](../../../README.md)\n",
+      ],
+    ] as const) {
+      const config: Config = {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "links/path": ["warn", { style }] },
+      };
+      const below = format(source, { path: note, config, workspace });
+      expect(below.output, style).toBe(expected);
+      expect(format(below.output, { path: note, config, workspace }).changed, style).toBe(false);
+      expect(
+        format(source, { path: "Folder/Note.md", config, workspace: alone }).output,
+        style,
+      ).toBe(expected);
+    }
+  });
+});
 describe("files that could not be read", () => {
   const refuse = (code: string) =>
     vi.fn((): string => {

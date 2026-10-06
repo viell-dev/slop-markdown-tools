@@ -60,6 +60,18 @@ the file; a link to the file without a fragment still resolves. Any other error
 from a loader propagates. Versions up to `0.2.0-rc.1` have neither the option
 nor the status, and let every loader error through.
 
+`WorkspaceOptions.vaults` lists folders below the workspace root that are
+Obsidian vaults of their own. An Obsidian link in a note of such a vault is
+resolved within it: a path is counted from the vault's folder, and a search by
+name looks only at the vault's files. The result's `vault` field then names the
+folder, also when nothing was found; `target` stays relative to the workspace
+root, so a rule that writes a path from the vault removes that prefix. A path
+that names an existing file or folder outside the vault resolves as `"missing"`
+with that file in `outside`. Notes outside the listed folders, and all other
+dialects, resolve as without the option. The CLI passes the vaults it found
+below the root. Versions up to `0.2.0-rc.1` have neither the option nor the
+fields.
+
 Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.

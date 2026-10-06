@@ -42,8 +42,8 @@ is read for the vault that holds each note. A workspace can hold several vaults
 with different settings. An override like the one above is not needed to have a
 vault's notes read in the Obsidian dialect, which is assumed for them when
 nothing names a dialect; it is the place for rules that only the vault should
-follow. Links are resolved within the workspace root, so check a vault's links
-with the vault as the root; see [Obsidian vaults](obsidian.md).
+follow. Links in such a vault's notes are resolved within the vault; see
+[Obsidian vaults](obsidian.md#vaults-that-are-not-the-workspace-root).
 
 ## Dialects
 
