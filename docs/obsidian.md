@@ -63,9 +63,24 @@ path that leads out of the vault to a file that exists, such as
 Documents outside the vault link into it as into any other folder. Versions up
 to `0.2.0-rc.1` resolved such a vault's links from the workspace root.
 
-The opposite layout is still limited: a root that is a folder of a vault cannot
-see the notes outside it and reports links to them as missing. Check and rewrite
-such a vault's links with the vault as the root.
+In the opposite layout, a root that is a folder of a vault, the tool sees only a
+part of the vault and reads nothing outside the root. It therefore treats a link
+as uncertain whenever the rest of the vault could matter:
+
+- A link with no match below the root is reported as
+  `Local target could not be checked`, with the reason that the workspace root
+  is only a part of the vault. It is not called missing.
+- A link found by note name, or by a path that Obsidian would first look for at
+  the top of the vault, is accepted but never rewritten by `links/path` or
+  `links/notation`: another note outside the root could be the one Obsidian
+  chooses.
+- A link written as an explicit relative path (`./Sub/Note.md`), or as a path
+  from the vault's folder that leads through the root, is certain and is
+  rewritten as usual. `"style": "root"` writes it from the vault's folder.
+
+For complete link checks and shortest-path rewriting, run with the vault as the
+root. Versions up to `0.2.0-rc.1` took the folder for the whole vault, which
+could shorten a link until it named a different note.
 
 ## Enable source wrapping
 

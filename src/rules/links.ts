@@ -98,16 +98,24 @@ export const linkRules: Record<string, Rule> = {
           });
         else if (result.status === "directory" && document.dialect === "obsidian")
           findings.push({ start: range(node)[0], message: `Local target is a directory: ${url}.` });
-        else if (result.status === "unreadable")
+        else if (result.status === "unreadable") {
           // Neither found nor known to be missing: say what stood in the way.
+          const limits = result.unreadable ?? [];
+          // The rest of a vault that the workspace root is only a folder of.
+          const outsideRoot = (name: string) => name === ".." || name.startsWith("../");
+          const directories = limits.filter((name) => !outsideRoot(name));
+          const reasons = [
+            ...(directories.length ? [`cannot read ${named(directories)}`] : []),
+            ...(limits.some(outsideRoot) ? ["the workspace root is only a part of the vault"] : []),
+          ];
           findings.push({
             start: range(node)[0],
             message:
               result.target === undefined
-                ? `Local target could not be checked: ${url} (no readable match; cannot read ${named(result.unreadable ?? [])}).`
+                ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
                 : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
           });
-        else if (result.status === "resolved" && !result.fragmentExists)
+        } else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });
       });
       return findings;
@@ -148,10 +156,8 @@ export const linkRules: Record<string, Rule> = {
         )
           return;
         if (parts.path) {
-          // Obsidian counts a path from the note's vault, which can lie below the root.
-          const rooted = result.vault
-            ? result.target.slice(result.vault.length + 1)
-            : result.target;
+          // Obsidian counts a path from the note's vault, which need not be the root.
+          const rooted = result.rooted ?? result.target;
           if (style === "root") target = rooted;
           else if (style === "relative")
             target = path.posix.relative(path.posix.dirname(document.path), result.target);

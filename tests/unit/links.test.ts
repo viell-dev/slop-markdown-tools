@@ -666,12 +666,14 @@ describe("an Obsidian vault below the workspace root", () => {
   const note = "docs/vault/Folder/Note.md";
   const resolve = (url: string, source = note, dialect: Dialect = "obsidian") =>
     workspace.resolve(source, url, dialect);
+  /** A target found in `vault`, with its path as Obsidian counts it from there. */
   const found = (target: string, vault: string, fragment = "") => ({
     status: "resolved",
     target,
     fragment,
     fragmentExists: true,
     vault,
+    rooted: target.slice(vault.length + 1),
   });
   it("searches for a note by name in the linking note's vault only", () => {
     // Each vault finds its own `Shared`, although the name exists four times.
@@ -857,6 +859,192 @@ describe("an Obsidian vault below the workspace root", () => {
         style,
       ).toBe(expected);
     }
+  });
+});
+describe("a workspace root that is a folder of an Obsidian vault", () => {
+  // The vault holds `Area/Folder`, which is the workspace root; the rest is out of sight.
+  const files = {
+    "Index.md": "# Index\n",
+    "Home.md": "",
+    "Sub/Note.md": "# Deep\n",
+    "Sub/Other.md": "",
+    "inner/Own.md": "",
+    "inner/Sub/Note.md": "",
+  };
+  const workspace = createWorkspace(files, {
+    dialect: "obsidian",
+    rootInVault: "Area/Folder",
+    vaults: ["inner"],
+  });
+  const resolve = (url: string, source = "Index.md", dialect: Dialect = "obsidian") =>
+    workspace.resolve(source, url, dialect);
+  /** A target found where nothing outside the workspace could take its place. */
+  const certain = (target: string, fragment = "") => ({
+    status: "resolved",
+    target,
+    fragment,
+    fragmentExists: true,
+    rooted: `Area/Folder/${target}`,
+  });
+  /** A target found, while the rest of the vault may hold another or a better match. */
+  const uncertain = (target: string) => ({ ...certain(target), unreadable: ["../.."] });
+  const unchecked = { status: "unreadable", unreadable: ["../.."] };
+  it("is certain of an explicit relative path and of a vault path through the root", () => {
+    for (const url of ["./Sub/Note.md", "./Sub/Note", "./sub/note.md"])
+      expect(resolve(url), url).toEqual(certain("Sub/Note.md"));
+    expect(resolve("../Home.md", "Sub/Note.md")).toEqual(certain("Home.md"));
+    // Obsidian counts these from the vault's folder, two levels above the root.
+    for (const url of ["Area/Folder/Sub/Note.md", "/Area/Folder/Sub/Note", "area/folder/sub/note"])
+      expect(resolve(url), url).toEqual(certain("Sub/Note.md"));
+    expect(resolve("#Index")).toEqual(certain("Index.md", "Index"));
+    expect(resolve("./Sub/Note.md#Deep")).toEqual(certain("Sub/Note.md", "Deep"));
+    // What an explicit path names inside the workspace is known to be missing.
+    expect(resolve("./Sub/Gone.md")).toEqual({ status: "missing" });
+    expect(resolve("../Gone.md", "Sub/Note.md")).toEqual({ status: "missing" });
+  });
+  it("marks a match that the rest of the vault could outdo", () => {
+    // A path without `./` is first counted from the vault's folder, which is out of sight.
+    expect(resolve("Sub/Note.md")).toEqual(uncertain("Sub/Note.md"));
+    expect(resolve("Home")).toEqual(uncertain("Home.md"));
+    // A search by name may find a second note elsewhere in the vault.
+    expect(resolve("Other")).toEqual(uncertain("Sub/Other.md"));
+    // A searched path can start in the folders above the root.
+    expect(resolve("Folder/Sub/Other")).toEqual(uncertain("Sub/Other.md"));
+    expect(resolve("folder/home.md")).toEqual(uncertain("Home.md"));
+    // Two matches inside the workspace are ambiguous whatever lies outside.
+    expect(resolve("Note", "Home.md")).toEqual({ status: "ambiguous" });
+  });
+  it("does not call a note missing that may be elsewhere in the vault", () => {
+    for (const url of [
+      "Elsewhere",
+      "Elsewhere.md",
+      "Topics/Elsewhere.md",
+      "/Top.md",
+      "../Sibling.md",
+      "../../Top.md",
+      "Area/Other/Note.md",
+      "Folder/Note",
+      "Area/Folder/Gone.md",
+    ])
+      expect(resolve(url), url).toEqual(unchecked);
+    // Further up than the vault's folder there is no vault.
+    expect(resolve("../../../Outside.md")).toEqual({ status: "missing" });
+    const config: Config = { extends: [], dialect: "obsidian", rules: { "links/valid": "warn" } };
+    expect(
+      lint("[[Elsewhere]] [up](../Sibling.md) [gone](./Sub/Gone.md) [[Other]]\n", {
+        path: "Index.md",
+        config,
+        workspace,
+      }).map((item) => `${item.severity}: ${item.message}`),
+    ).toEqual([
+      "warn: Local target could not be checked: Elsewhere (no readable match; the workspace root is only a part of the vault).",
+      "warn: Local target could not be checked: ../Sibling.md (no readable match; the workspace root is only a part of the vault).",
+      "warn: Missing local target: ./Sub/Gone.md.",
+    ]);
+    // Together with a directory that could not be read, both reasons are given.
+    const locked = createWorkspace(files, {
+      dialect: "obsidian",
+      rootInVault: "Area/Folder",
+      unreadable: ["Private"],
+    });
+    expect(
+      lint("[[Elsewhere]]\n", { path: "Index.md", config, workspace: locked }).map(
+        (item) => item.message,
+      ),
+    ).toEqual([
+      "Local target could not be checked: Elsewhere (no readable match; cannot read Private; the workspace root is only a part of the vault).",
+    ]);
+  });
+  it("rewrites only the links it is certain of, with root paths from the vault's folder", () => {
+    const source =
+      "[a](Sub/Note.md) [[Sub/Note|b]] [[Other|c]] [d](./Sub/Note.md) [e](Area/Folder/Sub/Note.md) [[Elsewhere|f]]\n";
+    for (const [style, expected] of [
+      // The first three could name another note seen from the whole vault.
+      [
+        "shortest",
+        "[a](Sub/Note.md) [[Sub/Note|b]] [[Other|c]] [d](Area/Folder/Sub/Note.md) [e](Area/Folder/Sub/Note.md) [[Elsewhere|f]]\n",
+      ],
+      [
+        "root",
+        "[a](Sub/Note.md) [[Sub/Note|b]] [[Other|c]] [d](Area/Folder/Sub/Note.md) [e](Area/Folder/Sub/Note.md) [[Elsewhere|f]]\n",
+      ],
+      [
+        "relative",
+        "[a](Sub/Note.md) [[Sub/Note|b]] [[Other|c]] [d](./Sub/Note.md) [e](./Sub/Note.md) [[Elsewhere|f]]\n",
+      ],
+    ] as const) {
+      const config: Config = {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "links/path": ["warn", { style }] },
+      };
+      const result = format(source, { path: "Index.md", config, workspace });
+      expect(result.output, style).toBe(expected);
+      expect(result.diagnostics, style).toEqual([]);
+      expect(format(result.output, { path: "Index.md", config, workspace }).changed, style).toBe(
+        false,
+      );
+    }
+    // Notation is converted for certain links only, as with an unreadable directory.
+    const notation: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "links/notation": ["warn", { style: "wiki" }] },
+    };
+    expect(
+      format("[a](Sub/Note.md) [b](./Sub/Note.md)\n", {
+        path: "Index.md",
+        config: notation,
+        workspace,
+      }).output,
+    ).toBe("[a](Sub/Note.md) [[./Sub/Note.md|b]]\n");
+  });
+  it("sees the whole of a vault that lies below the root, and leaves other dialects alone", () => {
+    // The inner vault is complete, so its answers are certain and counted from its folder.
+    expect(resolve("Note", "inner/Own.md")).toEqual({
+      status: "resolved",
+      target: "inner/Sub/Note.md",
+      fragment: "",
+      fragmentExists: true,
+      vault: "inner",
+      rooted: "Sub/Note.md",
+    });
+    expect(resolve("Elsewhere", "inner/Own.md")).toEqual({ status: "missing", vault: "inner" });
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const) {
+      expect(resolve("Sub/Note.md", "Index.md", dialect), dialect).toEqual({
+        status: "resolved",
+        target: "Sub/Note.md",
+        fragment: "",
+        fragmentExists: true,
+      });
+      expect(resolve("Elsewhere.md", "Index.md", dialect), dialect).toEqual({ status: "missing" });
+    }
+    // Without the option the root is taken for the vault's folder, as before.
+    const whole = createWorkspace(files, { dialect: "obsidian" });
+    expect(whole.resolve("Index.md", "Sub/Note.md", "obsidian")).toEqual({
+      status: "resolved",
+      target: "Sub/Note.md",
+      fragment: "",
+      fragmentExists: true,
+    });
+    expect(whole.resolve("Index.md", "Elsewhere", "obsidian")).toEqual({ status: "missing" });
+    for (const rootInVault of ["", ".", "./"])
+      expect(
+        createWorkspace(files, { dialect: "obsidian", rootInVault }).resolve(
+          "Index.md",
+          "Elsewhere",
+          "obsidian",
+        ),
+        rootInVault,
+      ).toEqual({ status: "missing" });
+    // Backslashes and a trailing slash spell the same path.
+    expect(
+      createWorkspace(files, { dialect: "obsidian", rootInVault: "Area\\Folder\\" }).resolve(
+        "Index.md",
+        "./Sub/Note.md",
+        "obsidian",
+      ),
+    ).toEqual(certain("Sub/Note.md"));
   });
 });
 describe("files that could not be read", () => {

@@ -49,9 +49,16 @@ export interface LinkResolution {
    * With status `resolved` the target was found among the readable files, by an
    * Obsidian name search or in a place that Obsidian tries after one of these
    * directories. They may hold another match, or the one Obsidian would choose,
-   * so the link must not be rewritten.
+   * so the link must not be rewritten. An entry that starts with `..` stands
+   * for the part of an Obsidian vault that lies outside the workspace root.
    */
   unreadable?: string[];
+  /**
+   * With status `resolved` in the Obsidian dialect: the target's path as
+   * Obsidian counts it, from the folder of the linking note's vault, when that
+   * folder is not the workspace root and the path so differs from `target`.
+   */
+  rooted?: string;
   /**
    * The folder of the linking note's vault, relative to the workspace root, when
    * an Obsidian link was resolved inside a vault that lies below the root. A

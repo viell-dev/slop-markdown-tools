@@ -131,6 +131,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const changes: { file: string; before: string; after: string }[] = [];
   // Selected files that the system refused to let the tool read.
   const unread: string[] = [];
+  // The vault that the root is a folder of, if it is one: links may lead out of sight.
+  const enclosing = set.vaults.find((item) => item.rootInVault);
   // One index per active dialect; build lazily for mixed documentation workspaces.
   const indexes = new Map<Dialect, Workspace>();
   // The same index with the line-break setting of each vault that has documents in it.
@@ -149,6 +151,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           unreadable,
           // The vault at or above the root holds the whole workspace and needs no entry.
           vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
+          ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),
         })),
       );
     // Whether a note may be reflowed is a setting of its own vault.
