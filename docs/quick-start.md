@@ -62,7 +62,7 @@ plain CommonMark, use only `"recommended"` and add `"dialect": "commonmark"`.
 
 Without a configuration file, the tool applies the recommended preset and
 assumes the GitHub dialect, so that tables and footnotes are left as they are,
-or the Obsidian dialect at the root of a vault, so that line breaks and
+or the Obsidian dialect for documents inside a vault, so that line breaks and
 wikilinks are. A configuration that names no dialect is read the same way.
 Version 0.2.0-rc.1 and earlier assumed CommonMark, in which formatting reflows a
 table and the lines of a note as an ordinary paragraph, so with those versions

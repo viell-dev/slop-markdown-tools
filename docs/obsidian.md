@@ -15,8 +15,8 @@ Create `mdtools.config.jsonc` at the vault root:
 }
 ```
 
-Use the vault root as `--root` so the CLI can inspect `.obsidian/app.json` and
-resolve links across notes. Run these commands from a
+Use the vault root as `--root` so the CLI can resolve links across all notes and
+from the vault's folder, as Obsidian does. Run these commands from a
 [built checkout](quick-start.md):
 
 ```sh
@@ -25,23 +25,48 @@ node dist/cli/main.js format --root "/path/to/vault" --diff
 ```
 
 Before that file exists, or when it names no dialect, the CLI still reads the
-notes in the Obsidian dialect: a workspace root that contains a `.obsidian`
-folder is recognized as a vault. Line breaks and wikilinks are then safe on a
-first run, but only the dialect is assumed. The rules of the `obsidian` preset,
-including the report that reflow is disabled, need the configuration above.
+notes in the Obsidian dialect: a folder that contains a `.obsidian` folder is
+recognized as a vault. Line breaks and wikilinks are then safe on a first run,
+but only the dialect is assumed. The rules of the `obsidian` preset, including
+the report that reflow is disabled, need the configuration above.
 Version 0.2.0-rc.1 and earlier read such a vault as CommonMark, joined the lines
 of its paragraphs, and could split a wikilink; with those versions, create the
-configuration first. A vault in a folder of a larger workspace is not
-recognized; give it an [override](configuration.md#loading-and-precedence) in
-that workspace's configuration.
+configuration first.
+
+## Vaults that are not the workspace root
+
+A note belongs to the nearest vault at or above its folder, wherever the
+workspace root is. Its assumed dialect and its line-break setting come from that
+vault:
+
+- **A vault in a folder of a larger workspace**, such as `docs/vault/` in a
+  repository: its notes are read in the Obsidian dialect and the documents
+  around it as GitHub Markdown. Each vault in a workspace follows its own
+  `.obsidian/app.json`.
+- **A folder of a vault used as the root**, with `--root` or through a
+  configuration file in that folder: the vault is found above the root.
+- **A repository inside a vault** is not part of the vault. The tool leaves a
+  repository inside a workspace alone, and when it runs in that repository it
+  reads the documents as GitHub Markdown.
+
+A dialect named by the configuration or by `--dialect` still takes precedence
+over all of this.
+
+Links are a different matter: they are resolved within the workspace root, not
+within the vault. A root that is a folder of a vault cannot see the notes
+outside it and reports links to them as missing. In a vault below the root, a
+link can be matched with a file outside the vault, and `links/path` with
+`"style": "root"` writes paths from the workspace root, not from the vault's
+folder. Check and rewrite a vault's links with the vault as the root.
 
 ## Enable source wrapping
 
-Obsidian reflow requires `"strictLineBreaks": true` in `.obsidian/app.json` so
-soft line breaks in source do not become visible line breaks in Reading view.
-Preserve the file's other settings when changing this value. The CLI checks it
-and never edits the settings file itself. If it is not permitted to read the
-file, it warns and leaves paragraphs as written; see
+Obsidian reflow requires `"strictLineBreaks": true` in the vault's
+`.obsidian/app.json` so soft line breaks in source do not become visible line
+breaks in Reading view. Preserve the file's other settings when changing this
+value. The CLI checks it and never edits the settings file itself. If it is not
+permitted to read the file, or the file is not valid JSON, it warns and leaves
+paragraphs as written; see
 [paths that cannot be read](configuration.md#paths-that-cannot-be-read).
 
 If that setting is not appropriate for your vault, disable `style/wrap`. Other

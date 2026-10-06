@@ -37,10 +37,13 @@ including the dialect in use for that file, and its source file.
 }
 ```
 
-For Obsidian reflow, use a workspace rooted at the vault so `.obsidian/app.json`
-can be inspected. Multiple vaults with independent settings should be processed
-separately. A vault in a folder of a larger workspace, as in the example above,
-is read in the Obsidian dialect only through such an override.
+Obsidian reflow depends on a setting in the vault's `.obsidian/app.json`, which
+is read for the vault that holds each note. A workspace can hold several vaults
+with different settings. An override like the one above is not needed to have a
+vault's notes read in the Obsidian dialect, which is assumed for them when
+nothing names a dialect; it is the place for rules that only the vault should
+follow. Links are resolved within the workspace root, so check a vault's links
+with the vault as the root; see [Obsidian vaults](obsidian.md).
 
 ## Dialects
 
@@ -56,15 +59,19 @@ preset, or matching override names one, unless `--dialect` is passed. A named
 dialect always takes precedence. Version 0.2.0-rc.1 and earlier assumed
 `commonmark` everywhere.
 
-- At the root of an Obsidian vault, the assumed dialect is `obsidian`. A
-  workspace root that contains a `.obsidian` folder is a vault. Obsidian shows a
-  single line break as a line break unless the vault's "Strict line breaks"
-  setting is on, so no other dialect can reflow a note safely. A vault in a
-  folder of a larger workspace is not recognized, and neither is a folder of a
-  vault passed as `--root`; use an override or the vault root.
-- Everywhere else, it is `github`. GitHub's syntax is the common base of the
-  Forgejo, Gitea, and Obsidian dialects, so tables and footnotes are recognized
-  instead of being reflowed as ordinary paragraphs.
+- For a document inside an Obsidian vault, the assumed dialect is `obsidian`.
+  Obsidian shows a single line break as a line break unless the vault's "Strict
+  line breaks" setting is on, so no other dialect can reflow a note safely. A
+  vault is a folder that contains a `.obsidian` folder, and a document belongs
+  to the nearest vault at or above its own folder. That can be the workspace
+  root, a folder below it, or a folder above it when a folder of a vault is used
+  as the root. The search upward ends at a repository, a folder that contains
+  `.git`: documents of a repository checked out inside a vault are not read as
+  the vault's notes, just as the tool leaves a repository inside a workspace
+  alone.
+- For every other document, it is `github`. GitHub's syntax is the common base
+  of the Forgejo, Gitea, and Obsidian dialects, so tables and footnotes are
+  recognized instead of being reflowed as ordinary paragraphs.
 
 Only the dialect is assumed: the rules of the `github` and `obsidian` presets,
 such as table alignment, still need the preset. For documents that are plain
@@ -412,11 +419,19 @@ not keep the tool out of a directory, because an ignored document remains a link
 target. To leave a directory out without a warning, list it in a `.gitignore`:
 Git-ignored content is not indexed unless `resolve.gitIgnored` asks for it.
 
-If `.obsidian/app.json` cannot be read, the tool warns in the same way and
-treats `strictLineBreaks` as unverified, so Obsidian documents are not reflowed.
-A configuration file that cannot be read still stops the run, as does a
-directory that refuses the search for one: default rules must not take the place
-of a configuration that exists.
+If a vault's `.obsidian/app.json` cannot be read, the tool warns in the same way
+and treats `strictLineBreaks` as unverified for that vault, so its documents are
+not reflowed. The same holds when the file's content cannot be used, because it
+is not valid JSON or is not a file; the entry's `code` is then `INVALID`.
+Versions up to `0.2.0-rc.1` stopped every command in that case. A file named
+`.obsidian` is not a vault's settings folder and is ignored. When the system
+does not let the tool find out whether a folder is a vault, which takes a
+`.obsidian` that is a link into a place it may not read, or a document named for
+`config explain` or `--stdin-filepath` in a directory it may not enter, the
+command stops with exit code `2`: reading a vault's notes as another dialect is
+not a safe fallback. A configuration file that cannot be read still stops the
+run, as does a directory that refuses the search for one: default rules must not
+take the place of a configuration that exists.
 
 A selected document that cannot be read is reported for that file, as an error
 diagnostic with the rule ID `engine/unreadable-file` at line 1, in the text
