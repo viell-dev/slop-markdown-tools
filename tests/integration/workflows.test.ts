@@ -202,7 +202,7 @@ describe("reports for scripts and agents", () => {
       'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
         'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
         "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
-        "1 file(s) linted; 0 would change.\n",
+        "1 file(s) linted; 1 error(s), 2 warning(s).\n",
     );
     const previewed = run(root, ["format", "--diff"]);
     expect(previewed.stdout).toContain("--- a/note.md\n+++ b/note.md\n");

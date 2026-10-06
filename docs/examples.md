@@ -139,7 +139,7 @@ node dist/cli/main.js lint --root examples/workspaces/repository-docs/after
 
 ```text
 README.md:13:1: error links/valid: Missing local target: docs/calibration.md.
-3 file(s) linted; 0 would change.
+3 file(s) linted; 1 error(s), 0 warning(s).
 ```
 
 ## Format an Obsidian vault
@@ -371,7 +371,7 @@ node dist/cli/main.js lint --root examples/plugin
 ```text
 notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
 notes/release-checklist.md:7:1: warn house/thematic-break: Write this thematic break as ---.
-1 file(s) linted; 0 would change.
+1 file(s) linted; 1 error(s), 1 warning(s).
 ```
 
 Formatting applies the style rule's edit and leaves the placeholder for a

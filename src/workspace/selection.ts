@@ -1,5 +1,6 @@
 import path from "node:path";
 import { realpath } from "node:fs/promises";
+import { pathError, refusal } from "./access.js";
 
 /** Exclusions are literal paths relative to cwd, never glob patterns. */
 export async function excludeSelection(
@@ -13,7 +14,8 @@ export async function excludeSelection(
     try {
       return await realpath(file);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
       const parent = path.dirname(file);
       if (parent === file) throw error;
       return path.join(await canonical(parent), path.basename(file));
@@ -21,10 +23,15 @@ export async function excludeSelection(
   }
   const relative = await Promise.all(
     exclusions.map(async (input) => {
-      const name = path
-        .relative(root, await canonical(path.resolve(input)))
-        .split(path.sep)
-        .join("/");
+      let actual: string;
+      try {
+        actual = await canonical(path.resolve(input));
+      } catch (error) {
+        // Without the real path nothing tells which file the exclusion stands for,
+        // so the run must not carry on and process it.
+        throw refusal(error) ? pathError("Excluded path", input, error) : error;
+      }
+      const name = path.relative(root, actual).split(path.sep).join("/");
       if (name === ".." || name.startsWith("../") || path.isAbsolute(name))
         throw new Error(`Excluded path is outside the workspace: ${input}`);
       return name;

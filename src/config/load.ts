@@ -1,12 +1,12 @@
-import { readFile } from "node:fs/promises";
+import { access, constants, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { parse, printParseErrorCode } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Config, Plugin } from "../core/types.js";
-import { validateConfig } from "./resolve.js";
-import { exists } from "../workspace/access.js";
+import { configProblem, validateConfig } from "./resolve.js";
+import { exists, pathError, refusal, refusalText } from "../workspace/access.js";
 import { isVault } from "../workspace/vault.js";
 
 export interface LoadedConfig {
@@ -22,16 +22,30 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
     let directory = path.resolve(start);
     for (;;) {
       const found: string[] = [];
-      for (const name of ["mdtools.config.jsonc", "mdtools.config.json", "mdtools.config.mjs"])
-        if (await exists(path.join(directory, name))) found.push(path.join(directory, name));
+      let boundary: boolean;
+      try {
+        for (const name of ["mdtools.config.jsonc", "mdtools.config.json", "mdtools.config.mjs"])
+          if (await exists(path.join(directory, name))) found.push(path.join(directory, name));
+        // A repository or an Obsidian vault is a workspace of its own.
+        boundary =
+          !found.length &&
+          ((await exists(path.join(directory, ".git"))) || (await isVault(directory)));
+      } catch (error) {
+        // Default rules must not take the place of a configuration that may be there.
+        const code = refusal(error);
+        if (!code) throw error;
+        throw new Error(
+          `Cannot look for a configuration file in ${directory} (${refusalText(code)})`,
+          { cause: error },
+        );
+      }
       if (found.length > 1)
         throw new Error(`Multiple mdtools configuration files in ${directory}. Use --config.`);
       if (found.length) {
         file = found[0];
         break;
       }
-      // A repository or an Obsidian vault is a workspace of its own.
-      if ((await exists(path.join(directory, ".git"))) || (await isVault(directory))) {
+      if (boundary) {
         fallbackRoot = directory;
         break;
       }
@@ -39,19 +53,42 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
       directory = path.dirname(directory);
     }
   }
+  // The file as the user named it, or where the search found it.
+  const shown = explicit ?? file;
   let value: unknown = {};
-  if (file?.endsWith(".mjs"))
-    value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
-  else if (file) {
-    const errors: ParseError[] = [];
-    value = parse(await readFile(file, "utf8"), errors, {
-      allowTrailingComma: true,
-      disallowComments: file.endsWith(".json"),
-    });
-    if (errors.length)
-      throw new Error(
-        `Invalid JSON configuration: ${errors.map((error) => `${printParseErrorCode(error.error)} at offset ${error.offset}`).join(", ")}`,
-      );
+  if (file && shown) {
+    let text = "";
+    try {
+      if (!(await stat(file)).isFile())
+        throw new Error(`Configuration file is not a file: ${shown}`);
+      // A script is read by Node.js itself; its refusal would not name the file.
+      if (file.endsWith(".mjs")) await access(file, constants.R_OK);
+      else text = await readFile(file, "utf8");
+    } catch (error) {
+      throw pathError("Configuration file", shown, error);
+    }
+    if (file.endsWith(".mjs")) {
+      try {
+        value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
+      } catch (error) {
+        throw new Error(
+          `Cannot load configuration file ${shown}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+    } else {
+      const errors: ParseError[] = [];
+      value = parse(text, errors, {
+        allowTrailingComma: true,
+        disallowComments: file.endsWith(".json"),
+      });
+      if (errors.length)
+        throw new Error(
+          `Invalid JSON configuration in ${shown}: ${errors.map((error) => `${printParseErrorCode(error.error)} at offset ${error.offset}`).join(", ")}`,
+        );
+    }
+    const problem = configProblem(value);
+    if (problem) throw new Error(`Invalid configuration in ${shown}: ${problem}`);
   }
   validateConfig(value);
   const root = file ? path.dirname(file) : fallbackRoot;
