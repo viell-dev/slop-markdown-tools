@@ -6,9 +6,9 @@ what is measured, records reference results, and says how good they are.
 ## In short
 
 - **Checking a whole workspace takes seconds.** From the command line, 500 pages
-  of documentation (1.4 MB) are linted in about 3.0 s and checked for formatting
-  in about 3.3 s. That is fast enough for a CI job or a check before every push.
-- **A single file is mostly start-up.** Every command needs about 0.27 s before
+  of documentation (1.4 MB) are linted in about 2.9 s and checked for formatting
+  in about 3.2 s. That is fast enough for a CI job or a check before every push.
+- **A single file is mostly start-up.** Every command needs about 0.25 s before
   it reads a document, nearly all of it Node.js loading the tool's code. Linting
   one file of a 500-file workspace costs little more than that. Pass many files
   to one command rather than running one command per file.
@@ -19,15 +19,15 @@ what is measured, records reference results, and says how good they are.
   document it changed to confirm that it still means the same.
 - **Cost grows in step with size.** Sixteen times as many files take about
   sixteen times as long. One very large document costs somewhat more per
-  kilobyte than a small one, about a third more at a megabyte, but nothing
+  kilobyte than a small one, about a quarter more at a megabyte, but nothing
   becomes disproportionately slow.
 - **Where it is weak.** The tool uses one CPU core and remembers nothing between
   runs, so every run repeats all the work, and formatting several thousand files
-  takes tens of seconds. Its start-up is slow beside the 28 ms that Node.js
+  takes tens of seconds. Its start-up is slow beside the 26 ms that Node.js
   itself needs. Memory grows with the workspace, though more slowly than the
-  number of files: linting peaks near 170 MB for 126 pages and near 410 MB for
+  number of files: linting peaks near 165 MB for 126 pages and near 400 MB for
   2,000. One very large document needs a multiple of its own size while it is
-  parsed, up to about a hundred times for a long list of links.
+  parsed: about 70 times for prose and about 130 times for a long list of links.
 
 ## What is measured
 
@@ -69,11 +69,11 @@ magnitude and as ratios between rows, not as a promise for another machine.
 
 | Step                                       | Time   | Fastest to slowest run | Per file | Per second | Compared with parsing |
 | ------------------------------------------ | ------ | ---------------------- | -------- | ---------- | --------------------- |
-| Parse only                                 | 1.07 s | 1.05 s to 1.11 s       | 2.14 ms  | 1.27 MB    | 1.0×                  |
-| Lint                                       | 2.23 s | 2.20 s to 2.27 s       | 4.44 ms  | 0.61 MB    | 2.1×                  |
-| Format, every file needs changes           | 5.11 s | 5.08 s to 5.15 s       | 10.20 ms | 0.27 MB    | 4.8×                  |
-| Format, every file already formatted       | 2.70 s | 2.68 s to 2.74 s       | 5.39 ms  | 0.57 MB    | 2.5×                  |
-| Prettier on the same files, for comparison | 3.11 s | 3.06 s to 3.16 s       | 6.20 ms  | 0.44 MB    | 2.9×                  |
+| Parse only                                 | 1.01 s | 1.00 s to 1.04 s       | 2.02 ms  | 1.34 MB    | 1.0×                  |
+| Lint                                       | 2.10 s | 2.09 s to 2.14 s       | 4.19 ms  | 0.65 MB    | 2.1×                  |
+| Format, every file needs changes           | 4.83 s | 4.81 s to 4.88 s       | 9.63 ms  | 0.28 MB    | 4.8×                  |
+| Format, every file already formatted       | 2.56 s | 2.52 s to 2.58 s       | 5.11 ms  | 0.60 MB    | 2.5×                  |
+| Prettier on the same files, for comparison | 3.04 s | 3.01 s to 3.07 s       | 6.06 ms  | 0.45 MB    | 3.0×                  |
 
 - **Parse only** turns each file into a syntax tree and does nothing else. No
   rule can run without it, so it is the floor that the other rows are compared
@@ -96,10 +96,10 @@ magnitude and as ratios between rows, not as a promise for another machine.
 
 | Step                                 | Time   | Fastest to slowest run | Per file | Per second | Compared with parsing |
 | ------------------------------------ | ------ | ---------------------- | -------- | ---------- | --------------------- |
-| Parse only                           | 518 ms | 495 ms to 526 ms       | 1.04 ms  | 1.19 MB    | 1.0×                  |
-| Lint                                 | 1.06 s | 1.06 s to 1.07 s       | 2.12 ms  | 0.58 MB    | 2.0×                  |
-| Format, every file needs changes     | 2.79 s | 2.74 s to 2.82 s       | 5.58 ms  | 0.22 MB    | 5.4×                  |
-| Format, every file already formatted | 1.24 s | 1.23 s to 1.28 s       | 2.49 ms  | 0.50 MB    | 2.4×                  |
+| Parse only                           | 479 ms | 475 ms to 503 ms       | 0.96 ms  | 1.29 MB    | 1.0×                  |
+| Lint                                 | 1.04 s | 1.02 s to 1.05 s       | 2.07 ms  | 0.59 MB    | 2.2×                  |
+| Format, every file needs changes     | 2.63 s | 2.61 s to 2.66 s       | 5.26 ms  | 0.23 MB    | 5.5×                  |
+| Format, every file already formatted | 1.16 s | 1.15 s to 1.17 s       | 2.31 ms  | 0.54 MB    | 2.4×                  |
 
 The vault's notes are less than half the size of the documentation pages, so
 each file is cheaper while the cost per megabyte is similar. The same pattern
@@ -112,12 +112,12 @@ The repository documentation above, as 501 files on disk.
 
 | Command                                        | Time   | Fastest to slowest run | Peak memory |
 | ---------------------------------------------- | ------ | ---------------------- | ----------- |
-| Start Node.js and exit, for comparison         | 28 ms  | 27 ms to 30 ms         | 51.9 MB     |
-| Start the CLI and print its version            | 272 ms | 264 ms to 274 ms       | 90.6 MB     |
-| Lint the workspace                             | 2.96 s | 2.88 s to 3.10 s       | 278.5 MB    |
-| Lint one file of the workspace                 | 351 ms | 349 ms to 354 ms       | 98.2 MB     |
-| Format and write, every file needs changes     | 6.25 s | 6.22 s to 6.54 s       | 350.8 MB    |
-| Check formatting, every file already formatted | 3.26 s | 3.25 s to 3.39 s       | 340.9 MB    |
+| Start Node.js and exit, for comparison         | 26 ms  | 24 ms to 27 ms         | 51.6 MB     |
+| Start the CLI and print its version            | 249 ms | 248 ms to 259 ms       | 84.4 MB     |
+| Lint the workspace                             | 2.91 s | 2.76 s to 2.93 s       | 259.4 MB    |
+| Lint one file of the workspace                 | 342 ms | 335 ms to 347 ms       | 94.3 MB     |
+| Format and write, every file needs changes     | 6.30 s | 6.20 s to 6.33 s       | 345.8 MB    |
+| Check formatting, every file already formatted | 3.23 s | 3.20 s to 3.32 s       | 342.5 MB    |
 
 - **Start Node.js and exit** is the cost of the runtime alone,
   and **start the CLI and print its version** adds loading the tool. The
@@ -136,18 +136,18 @@ the median of 3 runs without a warm-up run.
 
 | Files | Size    | Lint   | Lint per file | Format with changes | Format per file | Peak memory of a command-line lint |
 | ----- | ------- | ------ | ------------- | ------------------- | --------------- | ---------------------------------- |
-| 126   | 0.34 MB | 576 ms | 4.57 ms       | 1.27 s              | 10.05 ms        | 172.5 MB                           |
-| 501   | 1.36 MB | 2.23 s | 4.44 ms       | 5.11 s              | 10.20 ms        | 278.5 MB                           |
-| 2,001 | 5.44 MB | 8.87 s | 4.43 ms       | 19.97 s             | 9.98 ms         | 408.0 MB                           |
+| 126   | 0.34 MB | 533 ms | 4.23 ms       | 1.23 s              | 9.73 ms         | 163.8 MB                           |
+| 501   | 1.36 MB | 2.10 s | 4.19 ms       | 4.83 s              | 9.63 ms         | 259.4 MB                           |
+| 2,001 | 5.44 MB | 8.51 s | 4.25 ms       | 19.66 s             | 9.82 ms         | 402.0 MB                           |
 
 If the tool slowed down as a workspace grows, the per-file columns would rise
 from row to row. They stay level, so the time for a larger workspace can be
 estimated by multiplying.
 
 Memory is different. The last column is the most memory a `mdtools lint` process
-held for a workspace of that size, including the roughly 90 MB that the tool
+held for a workspace of that size, including the roughly 85 MB that the tool
 needs before it reads a document. It grows with the workspace, though far more
-slowly than the number of files: sixteen times as many files take about 2.4
+slowly than the number of files: sixteen times as many files take about 2.5
 times the memory. Until a run finishes, the tool keeps every file's text and
 diagnostics, and the anchors of every document that a link to a heading or block
 points to. Versions up to `0.2.0-rc.1` also kept the parsed form of each of
@@ -165,46 +165,49 @@ for a vault with 100,000 attachments, once a link had been searched for by name.
 
 | Document size | Format with changes | Per kilobyte |
 | ------------- | ------------------- | ------------ |
-| 17 kB         | 43 ms               | 2.57 ms      |
-| 129 kB        | 378 ms              | 2.94 ms      |
-| 1,024 kB      | 3.54 s              | 3.46 ms      |
+| 17 kB         | 41 ms               | 2.42 ms      |
+| 129 kB        | 377 ms              | 2.93 ms      |
+| 1,024 kB      | 3.09 s              | 3.02 ms      |
 
 The same check for one document instead of many files. The cost per kilobyte
-rises by about a third from a short document to one of a megabyte, which is far
-larger than documents usually are. The growth is mild, but it is growth: a very
-large document is slower than its size alone suggests.
+rises by about a quarter from a short document to one of a megabyte, which is
+far larger than documents usually are. The growth is mild, but it is growth: a
+very large document is slower than its size alone suggests.
 
 Memory for one document is a different matter. While a document is parsed, the
 parser holds a list of every token it found, and that list is many times larger
-than the text. These figures are the largest amount of memory still in use
-during a `lint` of one generated document, measured once on one machine; they
-depend on the document, not on the processor:
+than the text. These figures are the smallest heap limit
+(`--max-old-space-size`) under which one generated document could be parsed,
+found by trying limits 8 MB apart on one machine. They depend on the document,
+not on the processor:
 
-| Document                                        | Size   | Memory in use while parsing |
-| ----------------------------------------------- | ------ | --------------------------- |
-| Documentation prose                             | 0.3 MB | 37 MB                       |
-| The same                                        | 2.0 MB | 83 MB                       |
-| An index note: 13,400 list items, each one link | 2.3 MB | 250 MB                      |
+| Document                                        | Size   | Heap needed to parse |
+| ----------------------------------------------- | ------ | -------------------- |
+| Documentation prose                             | 0.4 MB | 39 MB                |
+| The same                                        | 1.0 MB | 79 MB                |
+| The same                                        | 2.0 MB | 142 MB               |
+| An index note: 13,400 list items, each one link | 2.2 MB | 291 MB               |
 
-For the index note, the parser's token list alone holds 240 MB, about 18 kB for
-each list item; the syntax tree that the tool keeps afterwards is 40 MB. The
-list belongs to the parser the tool builds on, and no rule or setting changes
-it. Each document is parsed by itself and its token list is released before the
-next one, so a run needs the memory of its largest document, not the sum.
-Node.js allows a few gigabytes by default, which is enough for documents of
-several megabytes; under a tighter limit, such as `--max-old-space-size=256`, a
-document like the index note is what fails.
+That is about 70 times the size of prose and about 130 times the size of the
+index note. For the index note, the parser's token list alone holds 240 MB once
+it is complete, about 18 kB for each list item; the syntax tree that the tool
+keeps afterwards is 40 MB. The list belongs to the parser the tool builds on,
+and no rule or setting changes it. Each document is parsed by itself and its
+token list is released before the next one, so a run needs the memory of its
+largest document, not the sum. Node.js allows a few gigabytes by default, which
+is enough for documents of several megabytes; under a tighter limit, such as
+`--max-old-space-size=256`, a document like the index note is what fails.
 
 ## Is it any good?
 
 | Situation                               | Reference result                                                                | Verdict                                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| A hook or an agent lints one file       | 0.35 s, most of it start-up                                                     | Fine, but not instant. Batch files into one command.                                               |
-| CI lints and checks 500 pages           | 3.0 s and 3.3 s                                                                 | Good. Shorter than installing the dependencies.                                                    |
+| A hook or an agent lints one file       | 0.34 s, most of it start-up                                                     | Fine, but not instant. Batch files into one command.                                               |
+| CI lints and checks 500 pages           | 2.9 s and 3.2 s                                                                 | Good. Shorter than installing the dependencies.                                                    |
 | Formatting 500 pages for the first time | 6.3 s                                                                           | Good for a one-time job.                                                                           |
-| A workspace of 2,000 pages              | About 9 s to lint, 20 s to format everything                                    | Acceptable. Tens of seconds, on one core, every time.                                              |
+| A workspace of 2,000 pages              | About 8.5 s to lint, 20 s to format everything                                  | Acceptable. Tens of seconds, on one core, every time.                                              |
 | Compared with Prettier                  | 1.6 times its time when rewriting, slightly less than its time when checking    | Comparable, while also validating links and meaning.                                               |
-| Memory                                  | About 280 MB to lint and 350 MB to format 500 pages; about 410 MB to lint 2,000 | Fine at these sizes. At this rate, tens of thousands of files could still need a gigabyte or more. |
+| Memory                                  | About 260 MB to lint and 350 MB to format 500 pages; about 400 MB to lint 2,000 | Fine at these sizes. At this rate, tens of thousands of files could still need a gigabyte or more. |
 
 The design accepts some slowness on purpose. Parsing every changed document
 again is what lets the tool refuse an edit that would alter a document's
@@ -212,8 +215,11 @@ meaning, and that guarantee matters more to this project than speed. The real
 limits are start-up time, memory, and the lack of any reuse between runs. None
 is a problem at the sizes measured here; they would be the place to start if the
 tool had to serve an editor, or workspaces of tens of thousands of files.
-Start-up time is tracked as
-[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116). The
+Start-up time was examined in
+[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116), which
+declined packing the tool into one file for a gain of about 75 ms. Dropping a
+dependency that the tool never used has since taken 15 to 20 ms off it
+([issue 140](https://github.com/viell-dev/slop-markdown-tools/issues/140)). The
 largest part of the memory that versions up to `0.2.0-rc.1` held was removed for
 [issue 114](https://github.com/viell-dev/slop-markdown-tools/issues/114); what a
 run still holds is every file's text and diagnostics.
@@ -231,8 +237,8 @@ run still holds is every file's text and diagnostics.
   spent finding files before the first document was read, because that workspace
   also held well over 100,000 files that are not Markdown. How much heap such a
   run needs at the least is set by its largest document, not by the number of
-  files: a generated index note of 2.3 MB, a list of 13,400 links, takes about
-  250 MB to parse. In a simple tree, finding files costs about a third of a
+  files: a generated index note of 2.2 MB, a list of 13,400 links, needs about
+  290 MB to parse. In a simple tree, finding files costs about a third of a
   second per 100,000 files.
 - One paragraph is not one document. The times above grow in step with size
   because long documents are made of many paragraphs, and each is parsed by
