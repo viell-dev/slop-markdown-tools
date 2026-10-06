@@ -370,6 +370,48 @@ describe("Obsidian case-insensitive resolution", () => {
   });
 });
 
+describe("file names that many files share", () => {
+  // An index note in each of fifty folders, one of them a second time in another case,
+  // among attachments that share a file name too.
+  const files: Record<string, string | null> = {
+    "Area 07/INDEX.md": "",
+    "Unique.md": "",
+    "deep/Zone/index.md": "",
+    "other/Zone/index.md": "",
+    "other/Single/index.md": "",
+  };
+  for (let area = 0; area < 50; area++) {
+    const folder = `Area ${String(area).padStart(2, "0")}`;
+    files[`${folder}/index.md`] = `# Area ${area}\n`;
+    files[`${folder}/cover.png`] = null;
+  }
+  const workspace = createWorkspace(files, { dialect: "obsidian" });
+  const resolve = (url: string, source = "Unique.md") => workspace.resolve(source, url, "obsidian");
+  it("finds one of them by its path, in any case, and reports case twins as ambiguous", () => {
+    for (const url of ["Area 12/index.md", "area 12/INDEX", "/Area 12/Index.md", "./Area 12/index"])
+      expect(resolve(url), url).toMatchObject({ status: "resolved", target: "Area 12/index.md" });
+    expect(resolve("Area 12/index.md#Area 12")).toMatchObject({ fragmentExists: true });
+    expect(resolve("Area 12/cover.png")).toMatchObject({ target: "Area 12/cover.png" });
+    // `index.md` and `INDEX.md` in one folder are the same path to Obsidian.
+    expect(resolve("Area 07/index.md")).toEqual({ status: "ambiguous" });
+    expect(resolve("Area 50/index.md")).toEqual({ status: "missing" });
+    expect(resolve("index", "Area 12/Other.md")).toMatchObject({ target: "Area 12/index.md" });
+  });
+  it("searches by name and by the end of a path among them", () => {
+    expect(resolve("index")).toEqual({ status: "ambiguous" });
+    expect(resolve("cover.png")).toEqual({ status: "ambiguous" });
+    // A path that exists from the vault's folder is taken before any search.
+    expect(resolve("Area 03/index")).toMatchObject({ target: "Area 03/index.md" });
+    // The end of a path narrows the search to the files in a folder of that name.
+    expect(resolve("Zone/index")).toEqual({ status: "ambiguous" });
+    expect(resolve("zone/INDEX.md")).toEqual({ status: "ambiguous" });
+    expect(resolve("Single/index")).toMatchObject({ target: "other/Single/index.md" });
+    expect(resolve("er/Zone/index")).toEqual({ status: "missing" });
+    expect(resolve("ingle/index")).toEqual({ status: "missing" });
+    expect(resolve("Unique")).toMatchObject({ target: "Unique.md" });
+    expect(resolve("unique.MD")).toMatchObject({ target: "Unique.md" });
+  });
+});
 describe("directories that could not be read", () => {
   const files = {
     "Doc.md": "",
