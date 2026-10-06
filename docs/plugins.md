@@ -77,8 +77,9 @@ without overriding a dialect that the configuration does name. Pass
 `defaultDialect` in the options of `lint` and `format`, or as the fourth
 argument of `resolveConfig(config, path, plugins, defaultDialect)`; it accepts a
 dialect or an alias. The library reads no files and so recognizes nothing by
-itself: the CLI passes `obsidian` when the workspace root contains a `.obsidian`
-folder, and a host for vaults should do the same.
+itself: the CLI passes `obsidian` for a document that has a `.obsidian` folder
+in its own folder or in one above it, and gives the workspace that vault's
+`strictLineBreaks` setting. A host for vaults should do the same.
 
 ```ts
 // The host found `.obsidian/` at the root of the folder it read `files` from.

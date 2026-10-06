@@ -486,6 +486,8 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(dialect(root, "vault/Folder/Deep.md")).toBe("obsidian");
     // Also for a file that does not exist yet, and from the vault itself.
     expect(dialect(root, "vault/New/Later.md")).toBe("obsidian");
+    expect(dialect(root, "vault")).toBe("obsidian");
+    expect(dialect(root, ".")).toBe("github");
     expect(dialect(root, "vault/Note.md", "--root", "vault")).toBe("obsidian");
     expect(dialect(path.join(root, "vault"), "Note.md")).toBe("obsidian");
     expect(run(root, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(note);
@@ -1068,6 +1070,32 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(configured.status).toBe(2);
     expect(configured.stderr).toBe(
       `mdtools: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
+    );
+  });
+  it("stops when it cannot tell whether a named document is in a vault", async () => {
+    const root = await fixture({ "note.md": "A note.\n", "closed/note.md": "A note.\n" });
+    await restrict(path.join(root, "closed"));
+    const message = `mdtools: Cannot tell whether ${path.join(root, "closed/note.md")} is inside an Obsidian vault (EACCES: permission denied)\n`;
+    // The run itself skips the directory, with a warning; these two name a document in it.
+    expect(run(root, ["lint"]).status).toBe(0);
+    const explained = run(root, ["config", "explain", "closed/note.md"]);
+    expect(explained.status).toBe(2);
+    expect(explained.stderr).toBe(message);
+    const piped = run(root, ["format", "-", "--stdin-filepath", "closed/note.md"], "A note.\n");
+    expect(piped.status).toBe(2);
+    expect(piped.stdout).toBe("");
+    expect(piped.stderr).toBe(message);
+    // A settings folder that is a link into the closed directory cannot be examined.
+    const linked = await fixture({
+      "notes/note.md": "A note.\n",
+      "closed/settings/app.json": "{}",
+    });
+    await symlink(path.join(linked, "closed/settings"), path.join(linked, "notes/.obsidian"));
+    await restrict(path.join(linked, "closed"));
+    const stopped = run(linked, ["format", "--write"]);
+    expect(stopped.status).toBe(2);
+    expect(stopped.stderr).toBe(
+      `mdtools: Cannot tell whether ${path.join(linked, "notes")} is an Obsidian vault (EACCES: permission denied)\n`,
     );
   });
   it("treats Obsidian settings that may not be read as unverified", async () => {

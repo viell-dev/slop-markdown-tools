@@ -43,16 +43,22 @@ CommonMark. For a document that really is plain CommonMark this only makes
 formatting more careful: constructs that would have been reflowed or restyled,
 such as a table or text between two `$` signs, are left alone. A vault is the
 exception, because no other dialect knows that Obsidian shows a single line
-break unless the vault's settings say otherwise: when the workspace root
-contains a `.obsidian` folder, the CLI assumes `obsidian`. It already looks for
-that folder to find the workspace root and the line-break setting, so no new
-guess about a document's content is involved. Only the root is examined: a vault
-in a folder of a larger workspace, or a folder of a vault passed as `--root`, is
-not recognized. Version 0.2.0-rc.1 and earlier assumed CommonMark in both cases.
-The assumption is made in one place, where configuration is resolved: the
-library takes the dialect to assume as an argument, since it does not read
-files, and anything that names a dialect replaces it. The workspace index uses
-`github` for link targets when a library caller gives it no dialect.
+break unless the vault's settings say otherwise: for a document inside a vault,
+the CLI assumes `obsidian`. A vault is a folder that contains a `.obsidian`
+folder. The CLI already looks for that folder to find the workspace root and the
+line-break setting, so no new guess about a document's content is involved. A
+document belongs to the nearest vault at or above its own folder, which can lie
+below the workspace root or above it, and the line-break setting is read from
+that vault. The search upward ends at a repository boundary, a folder that
+contains `.git`. Discovery leaves a repository inside a workspace alone, so a
+repository checked out inside a vault is not read as notes from the inside
+either; without a boundary, every project below a vault would be.
+Version 0.2.0-rc.1 and earlier assumed CommonMark everywhere. Link resolution
+does not follow the vault: links are resolved within the workspace root. The
+assumption is made in one place, where configuration is resolved: the library
+takes the dialect to assume as an argument, since it does not read files, and
+anything that names a dialect replaces it. The workspace index uses `github` for
+link targets when a library caller gives it no dialect.
 
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects

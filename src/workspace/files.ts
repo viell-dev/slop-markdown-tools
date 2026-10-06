@@ -70,7 +70,7 @@ async function describeVault(
  * folder and is added to the set when it is new.
  */
 export async function vaultFor(set: FileSet, name: string): Promise<Vault | undefined> {
-  const directory = await enclosingVault(path.dirname(path.join(set.root, name)));
+  const directory = await enclosingVault(path.join(set.root, name));
   if (!directory) return undefined;
   const relative = path.relative(set.root, directory).split(path.sep).join("/");
   const part =

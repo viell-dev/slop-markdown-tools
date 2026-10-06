@@ -22,41 +22,57 @@ export interface SettingsProblem {
   reason: string;
 }
 
-/**
- * Whether `directory` is the root of an Obsidian vault: Obsidian keeps a vault's
- * settings in a `.obsidian` folder there. A file of that name is not one.
- */
-export async function isVault(directory: string): Promise<boolean> {
+/** Whether `directory` has a `.obsidian` folder; a refusal is thrown as it is. */
+async function hasSettingsFolder(directory: string): Promise<boolean> {
   try {
     return (await stat(path.join(directory, ".obsidian"))).isDirectory();
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     // Nothing has that name, or `directory` is not a folder itself.
     if (code === "ENOENT" || code === "ENOTDIR") return false;
-    // It stays an error: taking the folder for no vault could format its notes
-    // as another dialect.
-    const refused = refusal(error);
-    if (refused)
-      throw new Error(
-        `Cannot tell whether ${directory} is an Obsidian vault (${refusalText(refused)})`,
-        { cause: error },
-      );
     throw error;
   }
 }
 /**
- * The folder of the vault that holds `directory`: the nearest folder at or
- * above it that contains `.obsidian`. The search ends at a repository boundary,
- * a folder that contains `.git`, which is the last one examined. Discovery
- * leaves the documents of a repository inside a workspace alone, so a
- * repository checked out inside a vault is not read as that vault's notes.
+ * A refusal stays an error, in words: taking a folder for no vault could format
+ * its notes as another dialect. Any other error is passed on.
  */
-export async function enclosingVault(directory: string): Promise<string | undefined> {
-  for (let current = path.resolve(directory); ;) {
-    if (await isVault(current)) return current;
-    const parent = path.dirname(current);
-    if (parent === current || (await exists(path.join(current, ".git")))) return undefined;
-    current = parent;
+function unknownVault(question: string, error: unknown): unknown {
+  const code = refusal(error);
+  return code
+    ? new Error(`Cannot tell whether ${question} (${refusalText(code)})`, { cause: error })
+    : error;
+}
+/**
+ * Whether `directory` is the root of an Obsidian vault: Obsidian keeps a vault's
+ * settings in a `.obsidian` folder there. A file of that name is not one.
+ */
+export async function isVault(directory: string): Promise<boolean> {
+  try {
+    return await hasSettingsFolder(directory);
+  } catch (error) {
+    throw unknownVault(`${directory} is an Obsidian vault`, error);
+  }
+}
+/**
+ * The folder of the vault that holds `location`, a file or a folder that need
+ * not exist: the nearest folder at or above it that contains `.obsidian`. The
+ * search ends at a repository boundary, a folder that contains `.git`, which is
+ * the last one examined. Discovery leaves the documents of a repository inside
+ * a workspace alone, so a repository checked out inside a vault is not read as
+ * that vault's notes.
+ */
+export async function enclosingVault(location: string): Promise<string | undefined> {
+  let current = path.resolve(location);
+  try {
+    for (;;) {
+      if (await hasSettingsFolder(current)) return current;
+      const parent = path.dirname(current);
+      if (parent === current || (await exists(path.join(current, ".git")))) return undefined;
+      current = parent;
+    }
+  } catch (error) {
+    throw unknownVault(`${location} is inside an Obsidian vault`, error);
   }
 }
 /**

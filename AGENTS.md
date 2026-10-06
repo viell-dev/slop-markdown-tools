@@ -254,11 +254,13 @@ passing checks, and resolved review threads remain mandatory.
   conditions there copies Node.js's defaults for an import; recheck it when the
   supported Node.js range changes.
 - The dialect assumed when nothing names one is chosen in `resolveConfig`: the
-  caller's `defaultDialect`, which the CLI sets to `obsidian` when the workspace
-  root is a vault, and otherwise `fallbackDialect` (`github`), which
-  `createWorkspace` also uses for link targets. Do not add another fallback; a
-  dialect that reads a construct as an ordinary paragraph lets reflow destroy it
-  without tripping the semantic check.
+  caller's `defaultDialect`, which the CLI sets to `obsidian` for a document
+  inside a vault, and otherwise `fallbackDialect` (`github`), which
+  `createWorkspace` also uses for link targets. `src/workspace/vault.ts` holds
+  the one rule for which vault a document belongs to. Discovery applies it to
+  the folders it visits and `enclosingVault` to any other path; change both
+  together. Do not add another fallback; a dialect that reads a construct as an
+  ordinary paragraph lets reflow destroy it without tripping the semantic check.
 - Formatting applies inline, block, then document phases. Semantic fingerprints,
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including

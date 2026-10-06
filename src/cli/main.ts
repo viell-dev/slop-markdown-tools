@@ -40,7 +40,7 @@ function common(command: Command): Command {
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",
-      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian (when none is named: github, or obsidian at a vault root)",
+      "commonmark, github, forgejo (alias: codeberg), gitea, or obsidian (when none is named: github, or obsidian inside a vault)",
     )
     .option(
       "--exclude <path>",
@@ -73,7 +73,7 @@ interface Report {
  * line break and holds wikilinks, both of which any other dialect lets reflow
  * change, so a document that a vault holds is read as a note.
  */
-function assumedDialect(vault: unknown): Dialect | undefined {
+function assumedDialect(vault: Vault | string | undefined): Dialect | undefined {
   return vault ? "obsidian" : undefined;
 }
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
@@ -259,9 +259,9 @@ common(program.command("config").description("Inspect effective configuration"))
     if (flags.dialect) loaded.config.dialect = flags.dialect;
     const root = path.resolve(flags.root ?? loaded.root);
     const name = path.relative(root, path.resolve(file)).split(path.sep).join("/");
-    // The file need not exist. Its folder is found through the root's real
-    // location, as discovery finds it, so that a root reached through a link is
-    // searched upward from where it really is.
+    // The file need not exist. It is located through the root's real path, as
+    // discovery locates it, so that a root reached through a link is searched
+    // upward from where it really is.
     const actual = await realpath(root).catch(() => root);
     process.stdout.write(
       JSON.stringify(
@@ -272,7 +272,7 @@ common(program.command("config").description("Inspect effective configuration"))
             loaded.config,
             name,
             loaded.plugins,
-            assumedDialect(await enclosingVault(path.dirname(path.join(actual, name)))),
+            assumedDialect(await enclosingVault(path.join(actual, name))),
           ),
         },
         null,

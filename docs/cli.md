@@ -58,9 +58,9 @@ trusted code only.
 
 `--dialect <name>` selects the dialect for one invocation of `lint`, `format`,
 or `config`, replacing the configuration's top-level dialect. When neither the
-configuration nor `--dialect` names a dialect, the commands assume `obsidian` if
-the workspace root is an Obsidian vault and `github` otherwise, also for stdin;
-version 0.2.0-rc.1 and earlier assumed `commonmark`. See
+configuration nor `--dialect` names a dialect, the commands assume `obsidian`
+for a document inside an Obsidian vault and `github` for any other, also for
+stdin; version 0.2.0-rc.1 and earlier assumed `commonmark`. See
 [dialects](configuration.md#dialects).
 
 ## Check documents in CI
@@ -87,18 +87,19 @@ node dist/cli/main.js format --root /path/to/documents --check --json
 ```
 
 JSON output contains file results and diagnostics with rule IDs, severity,
-messages, and source positions. When the run skipped a directory or a settings
-file that it was not permitted to read, the report also has a `skipped` list.
-Each entry has the `path` relative to the workspace root, a `type` of
-`directory` or `file`, the system's error `code`, and a `message` saying what
-follows from it. The field is absent when nothing was skipped, and versions up
-to `0.2.0-rc.1` never print it. Exit code `0` means success, `1` means a lint or
-formatting check failed, and `2` means a configuration, execution, or safety
-failure. Warnings fail only when they exceed `--max-warnings`. A selected
-document that the tool is not permitted to read is reported with an
-`engine/unreadable-file` error for that file; the other files are processed,
-nothing is written, and the exit code is `2`. Versions up to `0.2.0-rc.1`
-stopped without a report.
+messages, and source positions. When the run skipped a directory that it was not
+permitted to read, or a vault's settings file that it could not read or use, the
+report also has a `skipped` list. Each entry has the `path` relative to the
+workspace root, a `type` of `directory` or `file`, a `code`, and a `message`
+saying what follows from it. The code is the system's error code, or `INVALID`
+for a settings file whose content could not be used. The field is absent when
+nothing was skipped, and versions up to `0.2.0-rc.1` never print it. Exit code
+`0` means success, `1` means a lint or formatting check failed, and `2` means a
+configuration, execution, or safety failure. Warnings fail only when they exceed
+`--max-warnings`. A selected document that the tool is not permitted to read is
+reported with an `engine/unreadable-file` error for that file; the other files
+are processed, nothing is written, and the exit code is `2`. Versions up to
+`0.2.0-rc.1` stopped without a report.
 
 For a formatting pass, inspect a diff, apply it with `--write`, then run the
 checks again. Report reproducible document defects using a synthetic example;
