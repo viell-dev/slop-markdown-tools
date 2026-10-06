@@ -41,7 +41,7 @@ any more. When nothing names a dialect, the tool therefore assumes `github`,
 whose syntax the Forgejo, Gitea, and Obsidian dialects build on, and not
 CommonMark. For a document that really is plain CommonMark this only makes
 formatting more careful: constructs that would have been reflowed or restyled,
-such as a table or text between two `$` signs, are left alone. A vault is the
+such as a table or a formula between `$` signs, are left alone. A vault is the
 exception, because no other dialect knows that Obsidian shows a single line
 break unless the vault's settings say otherwise: for a document inside a vault,
 the CLI assumes `obsidian`. A vault is a folder that contains a `.obsidian`
@@ -80,6 +80,17 @@ continuations it cannot safely reconstruct, and paragraphs carrying block IDs.
 Long unbreakable atoms can exceed the width. Intraword emphasis retains
 asterisks when underscores would change parsing. Formatting width is a target,
 not a license to split protected syntax.
+
+Dollar math is read by a tokenizer of the project's own, with the conditions
+that each renderer was observed to apply to `$…$` in running text. The rule for
+choosing them is one-sided on purpose. Text that the tool wrongly takes for math
+is only left alone, while a formula taken for prose could be rewrapped or have
+its `*` restyled. A condition is therefore applied to a dialect only when its
+renderer was seen to apply it, and where a renderer is stricter still, the tool
+keeps protecting the text. The observations, about 125 cases rendered by GitHub,
+Forgejo, and Gitea, are kept with the tests and are compared with the tokenizer
+on every run. Obsidian was not observed, so its dialect keeps the widest
+reading.
 
 GitHub alert support normalizes known alert type markers. Footnotes, math,
 strikethrough, and autolinks are parsed, but do not each have dedicated style

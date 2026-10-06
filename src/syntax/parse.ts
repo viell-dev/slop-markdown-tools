@@ -3,10 +3,11 @@ import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
-import { math } from "micromark-extension-math";
 import { mathFromMarkdown } from "mdast-util-math";
 import type { Nodes } from "mdast";
 import type { Dialect, Document, Plugin } from "../core/types.js";
+import { math } from "./math.js";
+import type { MathConditions } from "./math.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 
 // GFM's tree transform performs GitHub's second, transform-time autolink pass
@@ -20,6 +21,18 @@ const gfmTree = gfmFromMarkdown().map((extension) => {
   return copy;
 });
 
+/**
+ * What each renderer asks of `$…$` in running text, as probed on GitHub's file
+ * view, Forgejo 16, and Gitea 1.25 and 28. Obsidian could not be probed, so it
+ * keeps the reading that takes the most for math. CommonMark has no math.
+ */
+const mathConditions: Record<Exclude<Dialect, "commonmark">, MathConditions> = {
+  github: "tight",
+  forgejo: "bounded",
+  gitea: "bounded",
+  obsidian: "loose",
+};
+
 export function parse(
   source: string,
   dialect: Dialect,
@@ -32,7 +45,7 @@ export function parse(
   // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
   // that is protected by rules rather than parsed.
   if (dialect !== "commonmark") {
-    extensions.push(gfm(), math());
+    extensions.push(gfm(), math(mathConditions[dialect]));
     mdastExtensions.push(...gfmTree, mathFromMarkdown());
   }
   if (dialect === "obsidian") {
