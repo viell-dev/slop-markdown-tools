@@ -52,6 +52,17 @@ export interface LinkResolution {
    * so the link must not be rewritten.
    */
   unreadable?: string[];
+  /**
+   * The folder of the linking note's vault, relative to the workspace root, when
+   * an Obsidian link was resolved inside a vault that lies below the root. A
+   * path that Obsidian counts from the vault starts there, not at the root.
+   */
+  vault?: string;
+  /**
+   * With status `missing`: an existing file or folder that the link's path names
+   * outside the linking note's vault, where Obsidian does not look.
+   */
+  outside?: string;
 }
 export interface Workspace {
   resolve(source: string, destination: string, dialect: Dialect, wiki?: boolean): LinkResolution;

@@ -85,7 +85,13 @@ export const linkRules: Record<string, Rule> = {
           document.dialect,
           node.type === "wikiLink",
         );
-        if (result.status === "missing" || result.status === "ambiguous")
+        if (result.status === "missing" && result.outside !== undefined && result.vault)
+          // The file is there, so "missing" would mislead: Obsidian cannot reach it.
+          findings.push({
+            start: range(node)[0],
+            message: `Local target is outside the vault: ${url} (${result.outside} is not in ${result.vault}, where Obsidian looks).`,
+          });
+        else if (result.status === "missing" || result.status === "ambiguous")
           findings.push({
             start: range(node)[0],
             message: `${result.status === "missing" ? "Missing" : "Ambiguous"} local target: ${url}.`,
@@ -142,7 +148,11 @@ export const linkRules: Record<string, Rule> = {
         )
           return;
         if (parts.path) {
-          if (style === "root") target = result.target;
+          // Obsidian counts a path from the note's vault, which can lie below the root.
+          const rooted = result.vault
+            ? result.target.slice(result.vault.length + 1)
+            : result.target;
+          if (style === "root") target = rooted;
           else if (style === "relative")
             target = path.posix.relative(path.posix.dirname(document.path), result.target);
           else if (style === "shortest") {
@@ -153,7 +163,7 @@ export const linkRules: Record<string, Rule> = {
               resolved.target === result.target &&
               !resolved.unreadable
                 ? basename
-                : result.target;
+                : rooted;
           }
           if (document.dialect === "obsidian" && result.target.endsWith(".md")) {
             if (
