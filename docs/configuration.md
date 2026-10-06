@@ -89,18 +89,24 @@ restyled, and no line is broken inside it.
 - GitHub also wants a single `$` to touch its formula: no space after the
   opening one and none before the closing one. `$ x $` is math on Forgejo and
   Gitea and prose on GitHub.
-- The Obsidian dialect reads any text between two `$` signs as math. Obsidian's
-  own conditions have not been verified, and taking too much for math only
-  leaves text alone, so two amounts in one paragraph are still protected there
-  as if they were a formula.
+- In Obsidian, the opening `$` may not be followed by a space, and a `$` closes
+  the formula only if no space stands before it and no digit follows it. Letters
+  and digits before the opening `$` do not matter there. `Costs $5 and $6` is
+  prose, and so is `$ x $`; `a$x$b` holds a formula, which it does on none of
+  the other three.
 - Display math, between lines of `$$` or in a `math` code block, is the same in
   every dialect.
 
 Where a renderer is stricter than this, the tool stays on the careful side: it
 also protects a formula with emphasis inside, which GitHub does not render, and
-one that runs over a line break, which Forgejo and Gitea do not. GitHub accepts
-an escaped `\$` as the start of a formula; the tool does not. Versions up to
-`0.2.0-rc.1` read any text between two `$` signs as math in every dialect.
+one that runs over a line break, which Forgejo and Gitea do not. Obsidian's two
+views differ in two cases, and the tool follows the one that shows more as a
+formula, Reading view: in `A $5 and $x$` it protects everything from the first
+`$` to the last, where Live Preview shows only `$x$` as the formula, and it
+protects a formula that runs over a line break, which Live Preview does not
+render. GitHub accepts an escaped `\$` as the start of a formula; the tool does
+not. Versions up to `0.2.0-rc.1` read any text between two `$` signs as math in
+every dialect.
 
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo

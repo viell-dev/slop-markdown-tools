@@ -2,7 +2,7 @@ import type { Nodes } from "mdast";
 import { describe, expect, it } from "vitest";
 import { format, lint, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
-import { mathCases } from "./math-renderers.js";
+import { mathCases, obsidianMathCases } from "./math-renderers.js";
 import type { MathRenderer } from "./math-renderers.js";
 
 /** The source text of every formula the tool reads in a document, in order. */
@@ -35,6 +35,7 @@ describe("dollar math, compared with what the renderers render", () => {
   };
   it.each(renderers)("reads as math everything that %s renders as math", (renderer) => {
     const missed = mathCases
+      .filter((item) => (item.observed ?? renderers).includes(renderer))
       .filter((item) => item.math.includes(renderer))
       .filter((item) => formulas(item.source, renderer).length === 0)
       .map((item) => item.name);
@@ -73,12 +74,16 @@ describe("dollar math, compared with what the renderers render", () => {
     // counts keep a change that widens the gap from passing unnoticed.
     const extra = (renderer: MathRenderer) =>
       mathCases.filter(
-        (item) => !item.math.includes(renderer) && formulas(item.source, renderer).length > 0,
+        (item) =>
+          (item.observed ?? renderers).includes(renderer) &&
+          !item.math.includes(renderer) &&
+          formulas(item.source, renderer).length > 0,
       ).length;
     expect(renderers.map(extra)).toEqual([27, 28, 26]);
     // Before the conditions, with any text between two dollars read as math, the
-    // same counts were 50, 46, and 45 of these 125 cases.
-    expect(mathCases).toHaveLength(125);
+    // same counts were 50, 46, and 45 of the 125 cases that all three rendered.
+    expect(mathCases.filter((item) => !item.observed)).toHaveLength(125);
+    expect(mathCases).toHaveLength(128);
   });
 });
 
@@ -99,11 +104,15 @@ describe("where dollar math begins and ends", () => {
     }
   });
   it("applies GitHub's conditions on the space inside a single dollar only for GitHub", () => {
-    for (const source of ["A $ x$ d.", "A $x $ d.", "A $\tx$ d.", "A $x\t$ d.", "A $\nx$ d."]) {
+    for (const source of ["A $ x$ d.", "A $x $ d.", "A $\nx$ d."]) {
       expect(formulas(source, "github"), source).toEqual([]);
       expect(formulas(source, "forgejo"), source).toHaveLength(1);
       expect(formulas(source, "gitea"), source).toHaveLength(1);
     }
+    // GitHub refuses a tab after the opening dollar and accepts one before the
+    // closing dollar. The first version of these conditions refused both.
+    expect(formulas("A $\tx$ d.", "github")).toEqual([]);
+    expect(formulas("A $x\t$ d.", "github")).toEqual(["$x\t$"]);
     // A line break before the closing dollar, and space inside doubled dollars, are fine there.
     expect(formulas("A $x\n$ d.", "github")).toEqual(["$x\n$"]);
     expect(formulas("A $$ x $$ d.", "github")).toEqual(["$$ x $$"]);
@@ -124,15 +133,52 @@ describe("where dollar math begins and ends", () => {
     expect(formulas("A $$x$ d.", "github")).toEqual([]);
     expect(formulas("A $$x$$5 d.", "gitea")).toEqual(["$x$"]);
   });
-  it("leaves Obsidian's reading as it was, and CommonMark without math", () => {
-    // Obsidian's own conditions are not verified, so the widest reading is kept.
-    expect(formulas("Costs $5 *per* item and $6 *per* box.", "obsidian")).toEqual([
-      "$5 *per* item and $",
-    ]);
-    expect(formulas("A $ x $ d.", "obsidian")).toEqual(["$ x $"]);
-    expect(formulas("A a$x$5 d.", "obsidian")).toEqual(["$x$"]);
+  it("reads as math in Obsidian what Reading view or Live Preview shows as a formula", () => {
+    for (const item of obsidianMathCases) {
+      const read = formulas(item.source, "obsidian");
+      // Every formula of either view lies inside one that the tool reads, and a
+      // line without a formula in both views has none for the tool.
+      for (const shown of [...item.reading, ...item.live])
+        expect(
+          read.some((formula) => formula.includes(shown)),
+          `line ${item.line}: ${shown}`,
+        ).toBe(true);
+      if (item.reading.length + item.live.length === 0)
+        expect(read, `line ${item.line}`).toEqual([]);
+    }
+    // Where the views differ, the tool has the wider reading, which is Reading view's.
+    expect(obsidianMathCases.map((item) => formulas(item.source, "obsidian"))).toEqual(
+      obsidianMathCases.map((item) => item.reading),
+    );
+    expect(obsidianMathCases).toHaveLength(22);
+  });
+  it("applies Obsidian's conditions to a single dollar only, and leaves CommonMark without math", () => {
+    // A dollar that cannot close is part of the formula; an escaped one always is.
+    expect(formulas("A $a $5 b$ d.", "obsidian")).toEqual(["$a $5 b$"]);
+    expect(formulas("A $a \\\\$ b$ d.", "obsidian")).toEqual(["$a \\\\$"]);
+    // Not observed in Obsidian, so still read as math: a tab or a line break next
+    // to a dollar, and a digit after doubled dollars.
+    expect(formulas("A $\tx$ d.", "obsidian")).toEqual(["$\tx$"]);
+    expect(formulas("A $x\t$ d.", "obsidian")).toEqual(["$x\t$"]);
+    expect(formulas("A $x\n$ d.", "obsidian")).toEqual(["$x\n$"]);
+    expect(formulas("A $$x$$5 d.", "obsidian")).toEqual(["$$x$$"]);
+    // Letters and digits around the dollars do not matter there, unlike elsewhere.
+    expect(formulas("A a$x$b d.", "obsidian")).toEqual(["$x$"]);
+    expect(formulas("A a$x$b d.", "github")).toEqual([]);
     expect(formulas("A $x$ d.", "commonmark")).toEqual([]);
     expect(formulas("$$\nx\n$$\n", "commonmark")).toEqual([]);
+  });
+  it("reads a paragraph of many prices once, not once for each price", () => {
+    // In Obsidian a dollar that cannot close is read past, so every price opens a
+    // search to the end of the paragraph unless the first failed search is remembered.
+    const source = `${"pay $5 and $6 now ".repeat(6000)}\n`;
+    const started = performance.now();
+    expect(formulas(source, "obsidian")).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(10000);
+    // A formula after the prices is still found, by the search that the first price began.
+    expect(formulas(`${"pay $5 and $6 now ".repeat(50)}and $x$ too.\n`, "obsidian")).toHaveLength(
+      1,
+    );
   });
   it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
     "keeps display math in %s as it was",
@@ -151,16 +197,20 @@ describe("where dollar math begins and ends", () => {
 
 describe("formatting prose with dollar signs", () => {
   const config = (dialect: Dialect): Config => ({ extends: ["recommended"], dialect });
+  // Obsidian notes are only reflowed in a vault whose line-break setting allows it.
+  const workspace = { resolve: () => ({ status: "external" as const }), strictLineBreaks: true };
   const tidy = (source: string, dialect: Dialect) => {
-    const result = format(source, { path: "note.md", config: config(dialect) });
+    const options = { path: "note.md", config: config(dialect), workspace };
+    const result = format(source, options);
     expect(result.diagnostics, source).toEqual([]);
-    expect(format(result.output, { path: "note.md", config: config(dialect) }).changed).toBe(false);
+    expect(format(result.output, options).changed).toBe(false);
     expect(semanticFingerprint(parse(result.output, dialect))).toBe(
       semanticFingerprint(parse(source, dialect)),
     );
     return result.output;
   };
-  it.each(renderers)("restyles and wraps text between two sums of money in %s", (dialect) => {
+  const dialects = [...renderers, "obsidian"] as const;
+  it.each(dialects)("restyles and wraps text between two sums of money in %s", (dialect) => {
     // Up to 0.2.0-rc.1 the first emphasis was taken for part of a formula.
     expect(tidy("Costs $5 *per* item and $6 *per* box.\n", dialect)).toBe(
       "Costs $5 _per_ item and $6 _per_ box.\n",
@@ -178,7 +228,7 @@ describe("formatting prose with dollar signs", () => {
       lint("Costs $5 *per* item and $6 *per* box.\n", { path: "note.md", config: config(dialect) }),
     ).toHaveLength(4);
   });
-  it.each(renderers)("still leaves a formula alone in %s", (dialect) => {
+  it.each(dialects)("still leaves a formula alone in %s", (dialect) => {
     for (const source of [
       "The area is $a * b * c$ and the cost is $x_1 * y_1 * z$ in total.\n",
       "With $\\alpha *x* \\beta$ and $$a *b* c$$ inline.\n",
@@ -192,11 +242,5 @@ describe("formatting prose with dollar signs", () => {
     expect(tidy("The area is $a * b * c$ and *more*.\n", dialect)).toBe(
       "The area is $a * b * c$ and _more_.\n",
     );
-  });
-  it("keeps the wide reading in Obsidian", () => {
-    const source = "Costs $5 *per* item and $6 *per* box.\n";
-    const workspace = { resolve: () => ({ status: "external" as const }), strictLineBreaks: true };
-    const result = format(source, { path: "note.md", config: config("obsidian"), workspace });
-    expect(result.output).toBe("Costs $5 *per* item and $6 _per_ box.\n");
   });
 });
