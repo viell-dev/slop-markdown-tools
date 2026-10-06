@@ -105,22 +105,23 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
  */
 function splitNodeOptions(value: string): string[] {
   const options: string[] = [];
-  let current = "";
   let quoted = false;
-  let started = false;
+  let fresh = true;
   for (let index = 0; index < value.length; index++) {
-    const character = value[index]!;
-    if (quoted && character === "\\" && index + 1 < value.length) current += value[++index];
-    else if (character === '"') {
+    let character = value[index]!;
+    if (quoted && character === "\\" && index + 1 < value.length) character = value[++index]!;
+    else if (character === " " && !quoted) {
+      fresh = true;
+      continue;
+    } else if (character === '"') {
       quoted = !quoted;
-      started = true;
-    } else if (character === " " && !quoted) {
-      if (started || current) options.push(current);
-      current = "";
-      started = false;
-    } else current += character;
+      continue;
+    }
+    // Like Node.js, an option starts with its first character, so `""` alone is none.
+    if (fresh) options.push(character);
+    else options[options.length - 1] += character;
+    fresh = false;
   }
-  if (started || current) options.push(current);
   return options;
 }
 /**
