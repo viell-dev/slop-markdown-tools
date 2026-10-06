@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+
 /**
  * The error codes with which a system refuses to let the process read a path:
  * `EACCES` for permission bits and access control lists, `EPERM` for
@@ -17,4 +19,18 @@ export function refusal(error: unknown): RefusalCode | undefined {
 /** A refusal in words, such as `EACCES: permission denied`. */
 export function refusalText(code: RefusalCode): string {
   return `${code}: ${refusals[code]}`;
+}
+/**
+ * Whether something exists at `file`. A path through something that is not a
+ * directory leads nowhere; a refusal, or any other error, is not an answer.
+ */
+export async function exists(file: string): Promise<boolean> {
+  try {
+    await stat(file);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw error;
+  }
 }

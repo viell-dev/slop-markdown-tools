@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { createTwoFilesPatch } from "diff";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { discover, isVault, writeAtomic } from "../workspace/files.js";
+import { discover, vaultFor, writeAtomic } from "../workspace/files.js";
+import { enclosingVault, vaultOf } from "../workspace/vault.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
 import { refusal, refusalText } from "../workspace/access.js";
-import type { Diagnostic, Dialect, DialectName, ProcessOptions } from "../core/types.js";
+import type { Diagnostic, Dialect, DialectName, ProcessOptions, Workspace } from "../core/types.js";
+import type { Vault } from "../workspace/vault.js";
 
 interface Flags {
   config?: string;
@@ -66,13 +68,13 @@ interface Report {
   output?: string;
 }
 /**
- * The dialect to assume for the workspace at `root` when nothing names one, or
- * undefined for the library's own default. An Obsidian vault shows a single
- * line break as a line break and holds wikilinks, both of which any other
- * dialect lets reflow change.
+ * The dialect to assume for a document when nothing names one, or undefined for
+ * the library's own default. An Obsidian vault shows a single line break as a
+ * line break and holds wikilinks, both of which any other dialect lets reflow
+ * change, so a document that a vault holds is read as a note.
  */
-async function assumedDialect(root: string): Promise<Dialect | undefined> {
-  return (await isVault(root)) ? "obsidian" : undefined;
+function assumedDialect(vault: unknown): Dialect | undefined {
+  return vault ? "obsidian" : undefined;
 }
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
@@ -82,13 +84,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
   const root = path.resolve(flags.root ?? loaded.root);
   if (flags.dialect) loaded.config.dialect = flags.dialect;
-  const assumed = await assumedDialect(root);
-  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins, assumed);
+  // Which files to leave out does not depend on a document's dialect.
+  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
   const set = await discover(root, stdin ? [] : inputs, resolved.ignore, resolved.resolve);
   set.selected = await excludeSelection(set.root, set.selected, flags.exclude ?? []);
+  /** The vault of the document read from stdin, found by a search of its own. */
+  let named: Vault | undefined;
   if (stdin) {
     const name = path
       .relative(root, path.resolve(flags.stdinFilepath ?? path.join(root, "stdin.md")))
@@ -101,6 +105,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     for await (const chunk of process.stdin) source += String(chunk);
     set.files[name] = source;
     set.selected = [name];
+    // The name can lead into a folder that discovery did not visit.
+    named = await vaultFor(set, name);
   }
   // Links into a directory that could not be read are reported as unchecked, not as missing.
   const unreadable = set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : []));
@@ -109,24 +115,37 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   // Selected files that the system refused to let the tool read.
   const unread: string[] = [];
   // One index per active dialect; build lazily for mixed documentation workspaces.
-  const indexes = new Map<Dialect, ReturnType<typeof createWorkspace>>();
+  const indexes = new Map<Dialect, Workspace>();
+  // The same index with the line-break setting of each vault that has documents in it.
+  const views = new Map<Dialect, Map<Vault, Workspace>>();
   for (const name of set.selected) {
+    const vault = stdin ? named : vaultOf(set.vaults, name);
+    const assumed = assumedDialect(vault);
     const config = resolveConfig(loaded.config, name, loaded.plugins, assumed);
-    if (!indexes.has(config.dialect))
+    let workspace = indexes.get(config.dialect);
+    if (!workspace)
       indexes.set(
         config.dialect,
-        createWorkspace(set.files, {
+        (workspace = createWorkspace(set.files, {
           dialect: config.dialect,
           directories: set.directories,
           unreadable,
-          ...(set.strictLineBreaks !== undefined ? { strictLineBreaks: set.strictLineBreaks } : {}),
-        }),
+        })),
       );
+    // Whether a note may be reflowed is a setting of its own vault.
+    if (vault?.strictLineBreaks !== undefined) {
+      let ofDialect = views.get(config.dialect);
+      if (!ofDialect) views.set(config.dialect, (ofDialect = new Map()));
+      const index = workspace;
+      workspace = ofDialect.get(vault);
+      if (!workspace)
+        ofDialect.set(vault, (workspace = { ...index, strictLineBreaks: vault.strictLineBreaks }));
+    }
     const options: ProcessOptions = {
       path: name,
       config: loaded.config,
       plugins: loaded.plugins,
-      workspace: indexes.get(config.dialect)!,
+      workspace,
       ...(assumed ? { defaultDialect: assumed } : {}),
     };
     const value = set.files[name]!;
@@ -239,6 +258,11 @@ common(program.command("config").description("Inspect effective configuration"))
     const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
     if (flags.dialect) loaded.config.dialect = flags.dialect;
     const root = path.resolve(flags.root ?? loaded.root);
+    const name = path.relative(root, path.resolve(file)).split(path.sep).join("/");
+    // The file need not exist. Its folder is found through the root's real
+    // location, as discovery finds it, so that a root reached through a link is
+    // searched upward from where it really is.
+    const actual = await realpath(root).catch(() => root);
     process.stdout.write(
       JSON.stringify(
         {
@@ -246,9 +270,9 @@ common(program.command("config").description("Inspect effective configuration"))
           file: loaded.file ?? null,
           effective: resolveConfig(
             loaded.config,
-            path.relative(root, path.resolve(file)).split(path.sep).join("/"),
+            name,
             loaded.plugins,
-            await assumedDialect(root),
+            assumedDialect(await enclosingVault(path.dirname(path.join(actual, name)))),
           ),
         },
         null,

@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -6,21 +6,14 @@ import { parse, printParseErrorCode } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Config, Plugin } from "../core/types.js";
 import { validateConfig } from "./resolve.js";
+import { exists } from "../workspace/access.js";
+import { isVault } from "../workspace/vault.js";
 
 export interface LoadedConfig {
   config: Config;
   plugins: Plugin[];
   root: string;
   file?: string;
-}
-export async function exists(file: string): Promise<boolean> {
-  try {
-    await stat(file);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw error;
-  }
 }
 export async function loadConfig(start: string, explicit?: string): Promise<LoadedConfig> {
   let file = explicit ? path.resolve(explicit) : undefined;
@@ -37,10 +30,8 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
         file = found[0];
         break;
       }
-      if (
-        (await exists(path.join(directory, ".git"))) ||
-        (await exists(path.join(directory, ".obsidian")))
-      ) {
+      // A repository or an Obsidian vault is a workspace of its own.
+      if ((await exists(path.join(directory, ".git"))) || (await isVault(directory))) {
         fallbackRoot = directory;
         break;
       }

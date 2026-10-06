@@ -1,4 +1,4 @@
-import { lstat, readdir, readFile, realpath, open, rename, stat, unlink } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
@@ -7,17 +7,18 @@ import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
-import { exists } from "../config/load.js";
-import { refusal, refusalText } from "./access.js";
+import { exists, refusal, refusalText } from "./access.js";
 import type { RefusalCode } from "./access.js";
+import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
+import type { SettingsProblem, Vault } from "./vault.js";
 
-/** A path that discovery was not permitted to read and left out of the run. */
+/** A path that discovery could not use and left out of the run. */
 export interface Skipped {
   /** The directory or settings file, relative to the workspace root. */
   path: string;
   type: "directory" | "file";
-  /** The system's error code. */
-  code: RefusalCode;
+  /** The system's error code, or `INVALID` for a settings file with unusable content. */
+  code: RefusalCode | "INVALID";
   /** What was skipped, why, and what follows from it. */
   message: string;
 }
@@ -25,30 +26,61 @@ export interface FileSet {
   root: string;
   files: Record<string, WorkspaceSource>;
   directories: string[];
-  /** What the system refused to let discovery read, sorted by path. */
+  /** What discovery could not read or use, sorted by path. */
   skipped: Skipped[];
   selected: string[];
-  strictLineBreaks?: boolean;
+  /**
+   * The Obsidian vaults that hold documents of the workspace, sorted by path:
+   * the one at or above the root, and each one in a folder that discovery
+   * visited.
+   */
+  vaults: Vault[];
+}
+/** The workspace's record of the vault in `directory`, and of its settings file if unusable. */
+async function describeVault(
+  root: string,
+  part: string,
+  directory: string,
+): Promise<{ vault: Vault; skipped?: Skipped }> {
+  const setting = await lineBreakSetting(directory);
+  const vault: Vault = {
+    path: part,
+    ...(setting.value !== undefined ? { strictLineBreaks: setting.value } : {}),
+  };
+  if (!setting.problem) return { vault };
+  const problem: SettingsProblem = setting.problem;
+  const file = path
+    .relative(root, path.join(directory, ".obsidian", "app.json"))
+    .split(path.sep)
+    .join("/");
+  return {
+    vault,
+    skipped: {
+      path: file,
+      type: "file",
+      code: problem.code,
+      message: `Skipped ${problem.code === "INVALID" ? "unusable" : "unreadable"} settings file: ${file} (${problem.reason}). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.`,
+    },
+  };
 }
 /**
- * Whether `root` is the root of an Obsidian vault: Obsidian keeps a vault's
- * settings in a `.obsidian` folder there. Only `root` itself is examined, so a
- * vault in a folder of a larger workspace is not one.
+ * The vault that holds the document `name` of the workspace, which need not
+ * exist on disk: text read from stdin can be named into a folder that discovery
+ * did not visit. The vault is found by searching upward from the document's
+ * folder and is added to the set when it is new.
  */
-export async function isVault(root: string): Promise<boolean> {
-  try {
-    return (await stat(path.join(root, ".obsidian"))).isDirectory();
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    // Only a root that cannot be entered refuses this. It stays an error: assuming
-    // that the root is no vault could format a vault as another dialect.
-    const code = refusal(error);
-    if (code)
-      throw new Error(`Workspace root cannot be read: ${root} (${refusalText(code)})`, {
-        cause: error,
-      });
-    throw error;
-  }
+export async function vaultFor(set: FileSet, name: string): Promise<Vault | undefined> {
+  const directory = await enclosingVault(path.dirname(path.join(set.root, name)));
+  if (!directory) return undefined;
+  const relative = path.relative(set.root, directory).split(path.sep).join("/");
+  const part =
+    relative === ".." || relative.startsWith("../") || path.isAbsolute(relative) ? "" : relative;
+  const known = set.vaults.find((vault) => vault.path === part);
+  if (known) return known;
+  const described = await describeVault(set.root, part, directory);
+  set.vaults.push(described.vault);
+  if (described.skipped) set.skipped.push(described.skipped);
+  return described.vault;
 }
 export async function discover(
   rootPath: string,
@@ -61,6 +93,8 @@ export async function discover(
   const directories: string[] = [];
   const selected: string[] = [];
   const requests: string[] = [];
+  /** The folders that are vaults, by the part of the workspace that each holds. */
+  const vaultFolders = new Map<string, string>();
   for (const input of supplied.length ? supplied : [root]) {
     const absolute = path.resolve(input);
     if ((await lstat(absolute)).isSymbolicLink())
@@ -113,6 +147,10 @@ export async function discover(
       leaveOut(relative, reading, error);
       return;
     }
+    // Obsidian creates the settings folder itself; a link to one shares a vault's settings.
+    const settings = entries.find((entry) => entry.name === ".obsidian");
+    if (settings?.isDirectory() || (settings?.isSymbolicLink() && (await isVault(directory))))
+      vaultFolders.set(relative, directory);
     for (const entry of entries) {
       if (
         [".git", ".obsidian", "node_modules", ".npm-cache", "dist", "coverage"].includes(
@@ -173,35 +211,26 @@ export async function discover(
     code: item.code,
     message: `Skipped unreadable directory: ${item.directory} (${reason(item, item.directory)}). Its files are not processed, and links into it cannot be checked.`,
   }));
-  let strictLineBreaks: boolean | undefined;
-  const app = path.join(root, ".obsidian", "app.json");
-  try {
-    if (await exists(app)) {
-      const settings: unknown = JSON.parse(await readFile(app, "utf8"));
-      strictLineBreaks =
-        typeof settings === "object" &&
-        settings !== null &&
-        "strictLineBreaks" in settings &&
-        settings.strictLineBreaks === true;
-    }
-  } catch (error) {
-    // Unverified settings are safe: Obsidian reflow needs them verified.
-    const code = refusal(error);
-    if (!code) throw error;
-    skipped.push({
-      path: ".obsidian/app.json",
-      type: "file",
-      code,
-      message: `Skipped unreadable settings file: .obsidian/app.json (${refusalText(code)}). Obsidian's strictLineBreaks setting is not verified, so Obsidian documents are not reflowed.`,
-    });
+  // A root that is no vault itself can be a folder of one.
+  if (!vaultFolders.has("")) {
+    const outer = await enclosingVault(root);
+    if (outer) vaultFolders.set("", outer);
   }
+  const vaults: Vault[] = [];
+  for (const [part, directory] of vaultFolders) {
+    const described = await describeVault(root, part, directory);
+    vaults.push(described.vault);
+    if (described.skipped) skipped.push(described.skipped);
+  }
+  const byPath = (a: { path: string }, b: { path: string }) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
   return {
     root,
     files,
     directories,
-    skipped: skipped.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
+    skipped: skipped.sort(byPath),
     selected: selected.sort(),
-    ...(strictLineBreaks !== undefined ? { strictLineBreaks } : {}),
+    vaults: vaults.sort(byPath),
   };
 }
 export async function writeAtomic(file: string, before: string, after: string): Promise<void> {
