@@ -200,6 +200,34 @@ Problem rules report findings and never become formatting edits.
 | `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
 | `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
 
+## Plugins
+
+`plugins` lists the plugins to load, each as a string:
+
+```jsonc
+{
+  "plugins": ["./rules.mjs", "sample-plugin"],
+  "extends": ["recommended", "local/recommended"],
+  "rules": { "sample/no-placeholder": "error" },
+}
+```
+
+An entry that starts with `.` or is an absolute path names a file, relative to
+the configuration file's directory. Any other entry names an installed package,
+looked up from the configuration file as Node.js looks up an `import`. A plugin
+adds rules and presets, which are used with the name that the plugin declares as
+a prefix. Above, the plugin in the file calls itself `local` and the one in the
+package `sample`. Only a configuration file can name plugins; there is no
+command-line option for them.
+
+A plugin is code. It runs with the caller's permissions when the configuration
+is loaded, so name only plugins you trust. A plugin that cannot be found or
+loaded stops the command with exit code `2` and a message that names the entry
+and the configuration file.
+
+[Rule plugins](plugins.md#rule-plugins) describes how a package is looked up in
+detail, what a plugin can contain, and how to write one.
+
 ## Document structure
 
 Enable `structure/initial-heading` explicitly with severity `warn` or `error`;

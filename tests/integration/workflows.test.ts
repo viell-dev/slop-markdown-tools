@@ -1,9 +1,11 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { importConditions } from "../../src/config/load.js";
 import { parse, semanticFingerprint } from "../../src/index.js";
 import type { Diagnostic } from "../../src/index.js";
-import { fixture, manifest, run, tree } from "./support.js";
+import { cli, fixture, manifest, run, tree } from "./support.js";
 
 interface Report {
   version: string;
@@ -408,8 +410,103 @@ describe("plugins named in a configuration", () => {
       "Cannot find package '@scope/missing-plugin'",
     );
   });
-  it("names the plugin and the configuration file when a file does not exist", async () => {
-    expect(await refused("./missing.mjs", {})).toContain("Cannot find module");
+  it("says that no file is there when a plugin named by path does not exist", async () => {
+    const root = await fixture({ "rules/index.mjs": esm(), "note.md": "A note.\n" });
+    const file = path.join(root, "mdtools.config.json");
+    // Nothing of that name, a folder, and an absolute path below a folder that is not there.
+    // The reason must not end with the tool's own location, as Node.js's reason does.
+    for (const [specifier, target] of [
+      ["./missing.mjs", "missing.mjs"],
+      ["./rules", "rules"],
+      [path.join(root, "absent", "rules.mjs"), path.join("absent", "rules.mjs")],
+    ] as const) {
+      await writeFile(file, config(specifier));
+      const checked = run(root, ["lint", "--config", file]);
+      expect(checked.status).toBe(2);
+      expect(checked.stderr).toBe(
+        `mdtools: Cannot load plugin "${specifier}" named in ${file}: no file at ${path.join(root, target)}\n`,
+      );
+    }
+    // A file that is there and imports something missing keeps Node.js's reason.
+    await mkdir(path.join(root, "broken"));
+    await writeFile(path.join(root, "broken/rules.mjs"), 'import "./absent.mjs";');
+    await writeFile(file, config("./broken/rules.mjs"));
+    const broken = run(root, ["lint", "--config", file]);
+    expect(broken.status).toBe(2);
+    expect(broken.stderr).toContain("Cannot find module");
+    expect(broken.stderr).toContain(path.join("broken", "rules.mjs"));
+  });
+  it.each([
+    ["no option", [], undefined, "addons"],
+    ["--conditions=NAME", ["--conditions=custom"], undefined, "custom"],
+    ["--conditions NAME", ["--conditions", "custom"], undefined, "custom"],
+    ["-C NAME", ["-C", "custom"], undefined, "custom"],
+    ["--no-addons", ["--no-addons"], undefined, "index"],
+    ["both options", ["--no-addons", "-C", "custom"], undefined, "custom"],
+    ["a condition the package does not declare", ["-C", "other"], undefined, "addons"],
+    ["NODE_OPTIONS", [], "--conditions=custom", "custom"],
+    ["NODE_OPTIONS with a quoted value", [], '--conditions "custom"', "custom"],
+    ["NODE_OPTIONS and the command line", ["-C", "other"], "--no-addons", "index"],
+  ] as const)(
+    "looks a package up with the conditions Node.js was started with: %s",
+    async (_, options, environment, expected) => {
+      const root = await fixture({
+        "mdtools.config.json": config("sample-plugin"),
+        ...installed(
+          "sample-plugin",
+          {
+            type: "module",
+            exports: {
+              ".": { custom: "./custom.mjs", "node-addons": "./addons.mjs", import: "./index.mjs" },
+            },
+          },
+          { "custom.mjs": esm("custom"), "addons.mjs": esm("addons"), "index.mjs": esm("index") },
+        ),
+        // What an import of the package loads in a program started the same way.
+        "real.mjs":
+          'const loaded = await import("sample-plugin");\nconsole.log(loaded.default.rules.report.check()[0].message);\n',
+        "note.md": "A note.\n",
+      });
+      const start = (...script: string[]) =>
+        spawnSync(process.execPath, [...options, ...script], {
+          cwd: root,
+          encoding: "utf8",
+          env: { ...process.env, NODE_OPTIONS: environment ?? "" },
+        });
+      const real = start("real.mjs");
+      expect(real.stdout.trim(), real.stderr).toBe(expected);
+      expect(reported(start(cli, "lint"))).toBe(expected);
+    },
+  );
+  it("reads conditions from Node.js's options as Node.js does", () => {
+    const defaults = ["node", "import", "module-sync", "node-addons"];
+    expect([...importConditions([], undefined)]).toEqual(defaults);
+    expect([...importConditions(["--conditions", "a", "-C", "b", "--conditions=c"], "")]).toEqual([
+      ...defaults,
+      "a",
+      "b",
+      "c",
+    ]);
+    // The environment comes first, so the command line has the last word on addons.
+    expect([...importConditions(["--addons"], "--no-addons")]).toEqual([
+      "node",
+      "import",
+      "module-sync",
+      "node-addons",
+    ]);
+    expect([...importConditions(["--no-addons"], "--addons")]).toEqual([
+      "node",
+      "import",
+      "module-sync",
+    ]);
+    // Quotes group a value with spaces, and a backslash keeps a quote inside one.
+    expect([
+      ...importConditions([], '  --conditions="two words" -C "say \\"hi\\""  --title=unrelated '),
+    ]).toEqual([...defaults, "two words", 'say "hi"']);
+    // Other options, and a name that only looks like the option, add nothing.
+    expect([...importConditions(["--conditionsx=a", "-Cx", "--import", "x.mjs"], "")]).toEqual(
+      defaults,
+    );
   });
   it("gives the reason an import fails when a package has no entry to load", async () => {
     const types = installed("sample-plugin", { exports: { ".": { types: "./index.d.ts" } } }, {});

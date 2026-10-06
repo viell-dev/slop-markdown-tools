@@ -251,8 +251,9 @@ passing checks, and resolved review threads remain mandatory.
   `import-meta-resolve`, a port of Node.js's own import resolution, and then
   with CommonJS resolution. Node.js has no supported call that resolves an
   import from another file's location without a flag or a warning. The list of
-  conditions there copies Node.js's defaults for an import; recheck it when the
-  supported Node.js range changes.
+  conditions there copies Node.js's defaults for an import and adds the ones the
+  process was started with (`--conditions`, `--no-addons`, also in
+  `NODE_OPTIONS`); recheck it when the supported Node.js range changes.
 - The dialect assumed when nothing names one is chosen in `resolveConfig`: the
   caller's `defaultDialect`, which the CLI sets to `obsidian` for a document
   inside a vault, and otherwise `fallbackDialect` (`github`), which

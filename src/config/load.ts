@@ -100,22 +100,73 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
 }
 
 /**
- * The conditions Node.js applies to the `exports` of a package it imports, as of Node.js
- * 22.12. Node.js has no supported way to ask for them or to resolve from another file.
+ * The options of `NODE_OPTIONS`, split as Node.js splits them: at spaces, except inside double
+ * quotes, where a backslash takes the next character literally.
  */
-const importConditions = new Set(["node", "import", "module-sync", "node-addons"]);
+function splitNodeOptions(value: string): string[] {
+  const options: string[] = [];
+  let current = "";
+  let quoted = false;
+  let started = false;
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index]!;
+    if (quoted && character === "\\" && index + 1 < value.length) current += value[++index];
+    else if (character === '"') {
+      quoted = !quoted;
+      started = true;
+    } else if (character === " " && !quoted) {
+      if (started || current) options.push(current);
+      current = "";
+      started = false;
+    } else current += character;
+  }
+  if (started || current) options.push(current);
+  return options;
+}
+/**
+ * The conditions Node.js applies to the `exports` of a package it imports: its defaults, as of
+ * Node.js 22.12, changed by the options the process was started with. `--conditions` (`-C`)
+ * adds one and `--no-addons` takes `node-addons` away, on the command line or in
+ * `NODE_OPTIONS`. Node.js has no supported way to ask for the conditions in effect or to
+ * resolve from another file, so they are worked out here.
+ */
+export function importConditions(
+  execArgv: readonly string[] = process.execArgv,
+  nodeOptions: string | undefined = process.env.NODE_OPTIONS,
+): Set<string> {
+  const conditions = new Set(["node", "import", "module-sync", "node-addons"]);
+  const options = [...splitNodeOptions(nodeOptions ?? ""), ...execArgv];
+  for (let index = 0; index < options.length; index++) {
+    const option = options[index]!;
+    // Node.js takes the value after `=` or as the next option; `-C` only as the next.
+    const named = /^--conditions(?:=(.*))?$/s.exec(option);
+    if (named || option === "-C") {
+      const condition = named?.[1] ?? options[++index];
+      if (condition) conditions.add(condition);
+    } else if (option === "--no-addons") conditions.delete("node-addons");
+    else if (option === "--addons") conditions.add("node-addons");
+  }
+  return conditions;
+}
 
 /** The URL of the module that `specifier` names in the configuration file `file`. */
 async function locatePlugin(specifier: string, file: string): Promise<string> {
   // A path is taken as written, not as a URL, so "%", "#", and "?" in a file name stay literal.
-  if (specifier.startsWith(".") || path.isAbsolute(specifier))
-    return pathToFileURL(path.resolve(path.dirname(file), specifier)).href;
+  if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
+    const named = path.resolve(path.dirname(file), specifier);
+    // Node.js's reason for a file that is not there ends with the importing file, which
+    // here is this one and means nothing to the user.
+    // The check's own failure, such as a refusal, names the path and is reported as it is.
+    if (!(await exists(named)) || !(await stat(named)).isFile())
+      throw new Error(`no file at ${named}`);
+    return pathToFileURL(named).href;
+  }
   // Loaded only here, so that a run that names no package does not pay for the resolver.
   const { moduleResolve } = await import("import-meta-resolve");
   try {
     // The module is imported, so its name is resolved as an import written in the
     // configuration file would be: a package's `import` entry wins over its `require` entry.
-    return moduleResolve(specifier, pathToFileURL(file), importConditions).href;
+    return moduleResolve(specifier, pathToFileURL(file), importConditions()).href;
   } catch (error) {
     // CommonJS resolution finds what an import does not: an entry that is only declared for
     // `require`, a file named without its extension, a directory, and NODE_PATH.
