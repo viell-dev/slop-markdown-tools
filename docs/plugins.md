@@ -72,6 +72,19 @@ dialects, resolve as without the option. The CLI passes the vaults it found
 below the root. Versions up to `0.2.0-rc.1` have neither the option nor the
 fields.
 
+`WorkspaceOptions.rootInVault` is for a workspace whose root is a folder of an
+Obsidian vault: the root's path from the vault's folder, such as
+`Projects/Notes`. The rest of the vault is then out of sight, and an Obsidian
+link whose target could lie there resolves as `"unreadable"`, not `"missing"`. A
+target found by a search, or in a place that Obsidian tries after one outside
+the root, is `"resolved"` with `unreadable` set and so is not rewritten. In both
+cases the `unreadable` list holds an entry that starts with `..`, the way from
+the root to the vault's folder. A resolved link also carries `rooted`, the
+target's path from the folder of its vault, whenever that differs from `target`;
+this applies to a vault listed in `vaults` as well. The CLI passes the option
+when it finds the vault above the root. Versions up to `0.2.0-rc.1` do not have
+it.
+
 Without a workspace, local target checks and path rewriting are unavailable.
 Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
 callers are responsible for verifying that renderer setting.

@@ -57,10 +57,14 @@ Version 0.2.0-rc.1 and earlier assumed CommonMark everywhere. Link resolution
 follows the vault too: an Obsidian link in a vault below the workspace root
 reaches only that vault's files, by paths counted from the vault's folder. A
 workspace root inside a vault is the one layout where the tool sees only part of
-a vault. The assumption is made in one place, where configuration is resolved:
-the library takes the dialect to assume as an argument, since it does not read
-files, and anything that names a dialect replaces it. The workspace index uses
-`github` for link targets when a library caller gives it no dialect.
+a vault. It does not read the rest: the root is the user's statement of what the
+tool may touch. A link whose target the rest of the vault could hold, or outdo,
+is reported as not checkable and is never rewritten, by the same marking that an
+unreadable directory gives. The assumption is made in one place, where
+configuration is resolved: the library takes the dialect to assume as an
+argument, since it does not read files, and anything that names a dialect
+replaces it. The workspace index uses `github` for link targets when a library
+caller gives it no dialect.
 
 Obsidian callout headers remain intact; supported body prose can reflow directly
 below the header or in later paragraphs. The semantic fingerprint also protects

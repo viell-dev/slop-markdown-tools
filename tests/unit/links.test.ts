@@ -666,12 +666,14 @@ describe("an Obsidian vault below the workspace root", () => {
   const note = "docs/vault/Folder/Note.md";
   const resolve = (url: string, source = note, dialect: Dialect = "obsidian") =>
     workspace.resolve(source, url, dialect);
+  /** A target found in `vault`, with its path as Obsidian counts it from there. */
   const found = (target: string, vault: string, fragment = "") => ({
     status: "resolved",
     target,
     fragment,
     fragmentExists: true,
     vault,
+    rooted: target.slice(vault.length + 1),
   });
   it("searches for a note by name in the linking note's vault only", () => {
     // Each vault finds its own `Shared`, although the name exists four times.

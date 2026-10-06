@@ -572,6 +572,48 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(applied.status, applied.stderr).toBe(0);
     expect(await readFile(path.join(strict, "vault/Folder/Note.md"), "utf8")).toBe(reflowed);
   });
+  it("does not judge or rewrite links in a folder of a vault as if it were the whole vault", async () => {
+    // Two notes named `Note`: in Obsidian the bare name reaches the one at the top.
+    const index = "See [the deep note](Sub/Note.md) and [[Sub/Note|again]] and [[Elsewhere]].\n";
+    const tree = {
+      "vault/.obsidian/app.json": "{}",
+      "vault/mdtools.config.jsonc":
+        '{ "extends": ["recommended", "obsidian"], "rules": { "obsidian/strict-line-breaks": "off", "links/path": ["warn", { "style": "shortest" }] } }',
+      "vault/Note.md": "# Top\n",
+      "vault/Elsewhere.md": "# Elsewhere\n",
+      "vault/Folder/Index.md": index,
+      "vault/Folder/Sub/Note.md": "# Deep\n",
+    };
+    const root = await fixture(tree);
+    expect((await discover(path.join(root, "vault/Folder"), [], [])).vaults).toEqual([
+      { path: "", strictLineBreaks: false, rootInVault: "Folder" },
+    ]);
+    expect((await discover(path.join(root, "vault"), [], [])).vaults).toEqual([
+      { path: "", strictLineBreaks: false },
+    ]);
+    // Up to 0.2.0-rc.1 both links were shortened to `Note`, and `Elsewhere` was called missing.
+    const part = run(root, ["format", "--write", "--root", "vault/Folder"]);
+    expect(part.status).toBe(1);
+    expect(part.stderr).toBe(
+      "Index.md:1:61: error links/valid: Local target could not be checked: Elsewhere (no readable match; the workspace root is only a part of the vault).\n" +
+        "2 file(s) processed; 0 written.\n",
+    );
+    expect(await readFile(path.join(root, "vault/Folder/Index.md"), "utf8")).toBe(index);
+    // With the whole vault in sight every link is certain: the short name would reach
+    // the other note, so the path from the vault's folder is written.
+    const whole = run(root, ["format", "--write", "--root", "vault"]);
+    expect(whole.status, whole.stderr).toBe(0);
+    expect(whole.stderr).toBe("4 file(s) processed; 1 written.\n");
+    expect(await readFile(path.join(root, "vault/Folder/Index.md"), "utf8")).toBe(
+      "See [the deep note](Folder/Sub/Note.md) and [[Folder/Sub/Note|again]] and [[Elsewhere]].\n",
+    );
+    // The folder then accepts those paths, which lead through it from the vault's folder.
+    const again = run(root, ["format", "--check", "--root", "vault/Folder"]);
+    expect(again.stderr).toBe(
+      "Index.md:1:75: error links/valid: Local target could not be checked: Elsewhere (no readable match; the workspace root is only a part of the vault).\n" +
+        "2 file(s) processed; 0 would change.\n",
+    );
+  });
   it("does not read a repository inside a vault as that vault's notes", async () => {
     const page = "A page\nof the project.\n";
     const root = await fixture({
