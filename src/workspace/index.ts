@@ -501,17 +501,49 @@ export function createWorkspace(
     return undefined;
   }
   // Obsidian resolves note names case-insensitively; these indexes are built on first use.
-  let foldedNames: Map<string, string[]> | undefined;
+  // Every file is filed once, under its file name in lowercase. A table of every
+  // path, or of every ending of every path, costs hundreds of bytes for each
+  // file, which a vault with many attachments pays whether or not they are linked.
+  let fileNames: Map<string, string | string[]> | undefined;
   let foldedDirectories: Set<string> | undefined;
-  function namesMatching(name: string): string[] {
-    if (!foldedNames) {
-      foldedNames = new Map();
+  /** The files whose file name, the last part of the path, is `key` in lowercase. */
+  function filesNamed(key: string): readonly string[] {
+    if (!fileNames) {
+      fileNames = new Map();
       for (const actual of sources.keys()) {
-        const key = actual.toLowerCase();
-        foldedNames.set(key, [...(foldedNames.get(key) ?? []), actual]);
+        const name = actual.slice(actual.lastIndexOf("/") + 1).toLowerCase();
+        const held = fileNames.get(name);
+        if (held === undefined) fileNames.set(name, actual);
+        else if (typeof held === "string") fileNames.set(name, [held, actual]);
+        else held.push(actual);
       }
     }
-    return foldedNames.get(name.toLowerCase()) ?? [];
+    const held = fileNames.get(key);
+    return held === undefined ? [] : typeof held === "string" ? [held] : held;
+  }
+  // A file name that very many files share, such as an index note in every folder,
+  // gets a table of its paths, so that a link to one of them does not compare all.
+  const manySharing = 32;
+  const sharedNames = new Map<string, Map<string, string[]>>();
+  /** The files whose whole path is `name` without regard to case. */
+  function namesMatching(name: string): string[] {
+    const folded = name.toLowerCase();
+    const key = folded.slice(folded.lastIndexOf("/") + 1);
+    const sharing = filesNamed(key);
+    if (sharing.length <= manySharing)
+      return sharing.filter((actual) => actual.toLowerCase() === folded);
+    let paths = sharedNames.get(key);
+    if (!paths) {
+      paths = new Map();
+      for (const actual of sharing) {
+        const path = actual.toLowerCase();
+        const held = paths.get(path);
+        if (held) held.push(actual);
+        else paths.set(path, [actual]);
+      }
+      sharedNames.set(key, paths);
+    }
+    return paths.get(folded) ?? [];
   }
   function isDirectory(name: string, folded: boolean): boolean {
     if (!folded) return directories.has(name);
@@ -630,13 +662,12 @@ export function createWorkspace(
     }
     return found;
   }
-  let suffixes: Map<string, Set<string>> | undefined;
   /**
    * The files that an Obsidian search for `target` finds in `vault`: those whose
    * path from the vault's folder ends with it.
    */
   function searchCandidates(target: string, vault: string): string[] {
-    const found = [...(suffixCandidates(target) ?? [])];
+    const found = suffixCandidates(target);
     if (!vault) return found;
     const wanted = target.toLowerCase();
     const ends = (name: string) => name === wanted || name.endsWith(`/${wanted}`);
@@ -647,21 +678,28 @@ export function createWorkspace(
       return ends(inside) || (inside.endsWith(".md") && ends(inside.slice(0, -3)));
     });
   }
-  function suffixCandidates(target: string): Set<string> | undefined {
-    if (!suffixes) {
-      suffixes = new Map();
-      for (const name of sources.keys()) {
-        const parts = name.split("/");
-        for (let i = 0; i < parts.length; i++) {
-          const suffix = parts.slice(i).join("/").toLowerCase();
-          for (const key of suffix.endsWith(".md") ? [suffix, suffix.slice(0, -3)] : [suffix]) {
-            if (!suffixes.has(key)) suffixes.set(key, new Set());
-            suffixes.get(key)!.add(name);
-          }
+  /**
+   * The files whose path ends with `target` at a folder boundary, without regard
+   * to case; a Markdown file is also found without its `.md`.
+   */
+  function suffixCandidates(target: string): string[] {
+    const wanted = target.toLowerCase();
+    const slash = wanted.lastIndexOf("/");
+    const found: string[] = [];
+    for (const extension of ["", ".md"]) {
+      const sharing = filesNamed(wanted.slice(slash + 1) + extension);
+      // A bare file name is decided by the table alone.
+      if (slash < 0) found.push(...sharing);
+      else {
+        const ending = `/${wanted}${extension}`;
+        for (const actual of sharing) {
+          const path = actual.toLowerCase();
+          if (path.length + 1 === ending.length ? ending.endsWith(path) : path.endsWith(ending))
+            found.push(actual);
         }
       }
     }
-    return suffixes.get(target.toLowerCase());
+    return found;
   }
   return {
     ...(options.strictLineBreaks !== undefined
