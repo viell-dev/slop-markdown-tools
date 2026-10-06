@@ -22,7 +22,7 @@ try {
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/(?:releases\/)?[^/]+\.md$|examples\/|(?:README|CONTRIBUTING|SECURITY)\.md$|LICENSE$|package\.json$)/.test(
+      /^(dist\/|docs\/(?:releases\/)?[^/]+\.md$|examples\/|(?:README|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -32,6 +32,7 @@ try {
     "dist/index.d.ts",
     "dist/cli/main.js",
     "LICENSE",
+    "THIRD_PARTY_NOTICES",
     "README.md",
     "CONTRIBUTING.md",
     "SECURITY.md",

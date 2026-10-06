@@ -262,6 +262,17 @@ passing checks, and resolved review threads remain mandatory.
   the folders it visits and `enclosingVault` to any other path; change both
   together. Do not add another fallback; a dialect that reads a construct as an
   ordinary paragraph lets reflow destroy it without tripping the semantic check.
+- `src/syntax/math.ts` is the project's own tokenizer for dollar math, adapted
+  from `micromark-extension-math` (notice in `THIRD_PARTY_NOTICES`, which ships
+  in the package) so that the package does not install KaTeX. `parse.ts` picks
+  the conditions for `$…$` per dialect, and `tests/unit/math-renderers.ts`
+  records what GitHub, Forgejo, and Gitea rendered. Apply a condition to a
+  dialect only when its renderer was observed to apply it: taking prose for math
+  is harmless, the reverse is not. To observe again, render the cases on the
+  renderer itself: for GitHub a file on a temporary branch, fetched through the
+  contents API with `Accept: application/vnd.github.html` (the Markdown API
+  renders comments, which differ); for Forgejo and Gitea the file view of a
+  local instance.
 - Formatting applies inline, block, then document phases. Semantic fingerprints,
   overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
   rather than weakening the guard; preserve unsupported constructs, including

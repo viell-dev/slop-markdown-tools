@@ -78,6 +78,30 @@ such as table alignment, still need the preset. For documents that are plain
 CommonMark, name the dialect with `"dialect": "commonmark"` or
 `--dialect commonmark`.
 
+Text between dollar signs is read as math under the conditions of the dialect's
+renderer, so that sums of money are not taken for a formula. Math is never
+restyled, and no line is broken inside it.
+
+- On GitHub, Forgejo, and Gitea, `$…$` is math only when the opening `$` does
+  not follow a letter or digit, and the next `$` is not followed by a letter, a
+  digit, or `_`. `Costs $5 and $6` is prose; `From $5 to 10$` is math, as it is
+  to all three renderers.
+- GitHub also wants a single `$` to touch its formula: no space after the
+  opening one and none before the closing one. `$ x $` is math on Forgejo and
+  Gitea and prose on GitHub.
+- The Obsidian dialect reads any text between two `$` signs as math. Obsidian's
+  own conditions have not been verified, and taking too much for math only
+  leaves text alone, so two amounts in one paragraph are still protected there
+  as if they were a formula.
+- Display math, between lines of `$$` or in a `math` code block, is the same in
+  every dialect.
+
+Where a renderer is stricter than this, the tool stays on the careful side: it
+also protects a formula with emphasis inside, which GitHub does not render, and
+one that runs over a line break, which Forgejo and Gitea do not. GitHub accepts
+an escaped `\$` as the start of a formula; the tool does not. Versions up to
+`0.2.0-rc.1` read any text between two `$` signs as math in every dialect.
+
 GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
 autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo
 additionally renders definition lists (`Term` followed by a line starting with
