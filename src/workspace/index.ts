@@ -426,6 +426,14 @@ export interface WorkspaceOptions {
    * it. Other dialects, and notes outside these folders, resolve as without it.
    */
   vaults?: string[];
+  /**
+   * The workspace root's own path inside an Obsidian vault, such as
+   * `Projects/Notes`, when the root is a folder of that vault and not the vault
+   * itself. The rest of the vault is then out of sight: an Obsidian link whose
+   * target could lie there, or be outdone by a note there, resolves as
+   * `unreadable` or as `resolved` with `unreadable` set, never as `missing`.
+   */
+  rootInVault?: string;
 }
 export function splitDestination(destination: string): { path: string; fragment: string } {
   const hash = destination.indexOf("#");
@@ -587,6 +595,41 @@ export function createWorkspace(
   function vaultOf(name: string): string {
     return vaults.find((vault) => name.startsWith(`${vault}/`)) ?? "";
   }
+  // The folders from the vault that the root is a part of, down to the root.
+  const rootFolders = path.posix
+    .normalize((options.rootInVault ?? "").replaceAll("\\", "/"))
+    .split("/")
+    .filter((part) => part !== "" && part !== ".");
+  const rootFolded = rootFolders.map((part) => part.toLowerCase());
+  /** Where the rest of that vault is, seen from the root. */
+  const beyondRoot = rootFolders.map(() => "..").join("/");
+  /**
+   * The path from the root that a path from that vault's folder names, or
+   * undefined when it names something of the vault outside the root.
+   */
+  function belowRoot(rooted: string): string | undefined {
+    const parts = rooted.split("/").filter((part) => part !== "" && part !== ".");
+    if (parts.length < rootFolders.length) return undefined;
+    for (const [index, part] of rootFolded.entries())
+      if (parts[index]!.toLowerCase() !== part) return undefined;
+    return parts.slice(rootFolders.length).join("/") || ".";
+  }
+  /**
+   * Files that a search finds when the searched path starts in the folders above
+   * the root: with the root at `A/B`, the path `B/Note` names `Note` at the root.
+   */
+  function overlapCandidates(target: string): string[] {
+    const parts = target.split("/").filter((part) => part !== "");
+    const found: string[] = [];
+    for (let count = 1; count <= rootFolders.length && count < parts.length; count++) {
+      const tail = rootFolded.slice(-count);
+      if (!tail.every((part, index) => parts[index]!.toLowerCase() === part)) continue;
+      const rest = parts.slice(count).join("/");
+      found.push(...namesMatching(rest));
+      if (!path.posix.extname(rest)) found.push(...namesMatching(`${rest}.md`));
+    }
+    return found;
+  }
   let suffixes: Map<string, Set<string>> | undefined;
   /**
    * The files that an Obsidian search for `target` finds in `vault`: those whose
@@ -645,9 +688,19 @@ export function createWorkspace(
       const vault = folded ? vaultOf(source) : "";
       // Something that the link's path names outside that vault.
       let outside: string | undefined;
+      // Whether the workspace is only a part of the note's vault.
+      const partial = folded && !vault && rootFolders.length > 0;
+      // Whether Obsidian would look in a place of that vault outside the workspace.
+      let beyond = false;
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
-        if (normalized.startsWith("../") || path.posix.isAbsolute(normalized)) return;
+        if (normalized === ".." || normalized.startsWith("../")) {
+          // As far up as the vault's folder, the path stays inside the vault.
+          const climbed = normalized.split("/").filter((part) => part === "..").length;
+          if (partial && climbed <= rootFolders.length) beyond = true;
+          return;
+        }
+        if (path.posix.isAbsolute(normalized)) return;
         const bare = normalized.replace(/\/$/, "");
         if (vault && bare !== vault && !bare.startsWith(`${vault}/`)) {
           // Obsidian does not look there; remember it to say so instead of "missing".
@@ -674,7 +727,14 @@ export function createWorkspace(
         if (/^\.{1,2}\//.test(targetPath))
           add(path.posix.join(path.posix.dirname(source), targetPath));
         else {
-          add(path.posix.join(vault, targetPath.replace(/^\//, "")));
+          const rooted = targetPath.replace(/^\//, "");
+          if (partial) {
+            // The path is counted from the vault's folder, above the root: only
+            // one through the root's own folder names something in the workspace.
+            const below = belowRoot(rooted);
+            if (below === undefined) beyond = true;
+            else add(below);
+          } else add(path.posix.join(vault, rooted));
           if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
             // The vault root comes first: a note there, unseen, would be the target.
             obstructed = blocking.size > 0;
@@ -683,6 +743,7 @@ export function createWorkspace(
           if (candidates.size === 0 && !directory && !targetPath.startsWith("/")) {
             searched = true;
             for (const name of searchCandidates(targetPath, vault)) candidates.add(name);
+            if (partial) for (const name of overlapCandidates(targetPath)) candidates.add(name);
           }
         }
       } else add(path.posix.join(path.posix.dirname(source), targetPath));
@@ -693,13 +754,16 @@ export function createWorkspace(
       // A search by name covers the readable files only: an unreadable directory
       // may hold the note that is missing, or a second one of a name found once.
       const unsearched = searched && hidden.length > 0;
-      // A match is uncertain when a directory that could not be read may hold a
+      // The rest of a vault that the workspace is a part of may hold the target of
+      // a link that led there, and a note that a search would find as well or first.
+      const unseen = partial && (beyond || searched) ? [beyondRoot] : [];
+      // A match is uncertain when a place that could not be looked in may hold a
       // note that Obsidian would choose instead, or as well.
-      const uncertain = unsearched ? hidden : obstructed ? [...blocking] : undefined;
-      if (candidates.size === 0 && (blocking.size > 0 || unsearched))
+      const uncertain = [...(unsearched ? hidden : obstructed ? blocking : []), ...unseen];
+      if (candidates.size === 0 && (blocking.size > 0 || unsearched || unseen.length > 0))
         return {
           status: "unreadable",
-          unreadable: blocking.size ? [...blocking] : [...hidden],
+          unreadable: [...(blocking.size ? blocking : unsearched ? hidden : []), ...unseen],
           ...(vault ? { vault } : {}),
         };
       if (candidates.size !== 1)
@@ -734,8 +798,9 @@ export function createWorkspace(
         target: resolved,
         fragment,
         fragmentExists,
-        ...(uncertain ? { unreadable: [...uncertain] } : {}),
-        ...(vault ? { vault } : {}),
+        ...(uncertain.length ? { unreadable: uncertain } : {}),
+        ...(vault ? { vault, rooted: resolved.slice(vault.length + 1) } : {}),
+        ...(partial ? { rooted: `${rootFolders.join("/")}/${resolved}` } : {}),
       };
     },
   };

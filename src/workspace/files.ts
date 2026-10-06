@@ -43,9 +43,12 @@ async function describeVault(
   directory: string,
 ): Promise<{ vault: Vault; skipped?: Skipped }> {
   const setting = await lineBreakSetting(directory);
+  // Only the vault that holds the root can lie above it.
+  const below = part ? "" : path.relative(directory, root).split(path.sep).join("/");
   const vault: Vault = {
     path: part,
     ...(setting.value !== undefined ? { strictLineBreaks: setting.value } : {}),
+    ...(below ? { rootInVault: below } : {}),
   };
   if (!setting.problem) return { vault };
   const problem: SettingsProblem = setting.problem;

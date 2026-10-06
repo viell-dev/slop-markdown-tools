@@ -15,6 +15,12 @@ export interface Vault {
    * undefined when the file is absent or could not be used.
    */
   strictLineBreaks?: boolean;
+  /**
+   * For a vault whose folder lies above the workspace root: the root's path
+   * from that folder, with forward slashes. The workspace is then only a part
+   * of the vault.
+   */
+  rootInVault?: string;
 }
 /** Why a vault's settings file could not be used: the system's refusal, or its content. */
 export interface SettingsProblem {
