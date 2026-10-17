@@ -20,7 +20,12 @@ On a branch, in one pull request:
    `docs/quick-start.md`, which the tests compare with the version, the
    `version` default of `.github/workflows/release.yml`, and every example and
    document that names the version.
-4. Run the checks below, push, and wait for CI.
+4. Refresh the indirect dependencies with `npm update`, so that the tests run
+   with what a fresh installation of the package gets. The lockfile does not
+   ship, and Dependabot updates only the direct dependencies. Check first that
+   every updated package is at least seven days old and comes from its known
+   maintainers (`npm view NAME time maintainers`).
+5. Run the checks below, push, and wait for CI.
 
 Review and merge it like any other pull request. Merging publishes nothing and
 leaves the documentation site as it is.
