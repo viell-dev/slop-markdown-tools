@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact prerelease version in package.json (without a v prefix)
+        description: Exact version in package.json (without a v prefix)
         required: true
-        default: 0.2.0-rc.2
+        default: 0.2.0-rc.3
       publish:
-        description: Publish to npm and create a GitHub prerelease (requires separate authorization)
+        description: Publish to npm and create a GitHub release (requires separate authorization)
         type: boolean
         default: false
       attribution:
@@ -41,10 +41,11 @@ jobs:
           import { readFileSync } from 'node:fs';
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(pkg.version, process.env.EXPECTED_VERSION);
-          // Prerelease channel tags follow the prerelease identifier: beta or rc.
-          const channel = /^\d+\.\d+\.\d+-(beta|rc)\.\d+$/.exec(pkg.version)?.[1];
-          assert(channel, 'Version must be a beta or rc prerelease');
-          assert.equal(pkg.publishConfig.tag, channel);
+          // A stable version is published as latest; a prerelease under the channel
+          // named by its identifier, beta or rc, which leaves latest alone.
+          const match = /^\d+\.\d+\.\d+(?:-(beta|rc)\.\d+)?$/.exec(pkg.version);
+          assert(match, 'Version must be stable, or a beta or rc prerelease');
+          assert.equal(pkg.publishConfig.tag, match[1] ?? 'latest');
           // The release notes are the version's section of CHANGELOG.md; the script fails without one.
           execFileSync(process.execPath, ['scripts/release-notes.mjs', pkg.version], { stdio: ['ignore', 'ignore', 'inherit'] });
           if (process.env.PUBLISH_REQUESTED === 'true') {
@@ -58,9 +59,8 @@ jobs:
       - run: npm run release:prepare
       - name: Dry-run the tested tarball
         run: |
-          channel="${EXPECTED_VERSION#*-}"
           npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --dry-run --ignore-scripts \
-            --access public --tag "${channel%%.*}"
+            --access public --tag "$(node -p "require('./package.json').publishConfig.tag")"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npm-release
@@ -137,29 +137,16 @@ jobs:
         run: sha256sum --check SHA256SUMS
       - name: Publish the tested tarball using npm trusted publishing
         run: |
-          channel="${EXPECTED_VERSION#*-}"
+          # The dist-tag that the prepare job checked: latest, or the prerelease channel.
           npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --ignore-scripts --access \
-            public --tag "${channel%%.*}" --provenance
-      - name: Record required npm tag synchronization
+            public --tag "$(node -p "require('./package.json').publishConfig.tag")" --provenance
+      - name: Create the GitHub release at this commit
         run: |
-          channel="${EXPECTED_VERSION#*-}"
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## Complete npm tag synchronization
-
-          Until the first stable release, latest follows the newest prerelease of any kind.
-          Wait for npm processing and verify the channel tag (${channel%%.*}) points to ${EXPECTED_VERSION}, then run locally:
-
-          ~~~sh
-          npm dist-tag add mdrefine@${EXPECTED_VERSION} latest
-          npm dist-tag ls mdrefine
-          ~~~
-
-          This requires npm account authentication; OIDC publication does not authenticate dist-tag updates.
-          Verify both tags before reporting the release complete. Once stable releases exist, latest follows stable.
-          If this follow-up fails, retry only the tag update; do not rerun publication.
-          EOF
-      - name: Create the GitHub prerelease at this commit
-        run: |
+          # A stable version becomes the latest release; a prerelease is marked as one.
+          case "$EXPECTED_VERSION" in
+            *-*) kind=(--prerelease --latest=false) ;;
+            *) kind=(--latest) ;;
+          esac
           gh release create "$EXPECTED_VERSION" "artifacts/mdrefine-${EXPECTED_VERSION}.tgz" artifacts/SHA256SUMS \
             --target "$GITHUB_SHA" --title "mdrefine $EXPECTED_VERSION" \
-            --prerelease --latest=false --notes-file release-notes.md
+            "${kind[@]}" --notes-file release-notes.md
