@@ -262,10 +262,10 @@ describe("style/list-indent", () => {
     expect(formatted(source, only({ "style/list-indent": ["warn", options] }))).toBe(output);
   });
   it.each([
-    [{ bulletSpaces: 5 }, "bulletSpaces must be <= 4"],
-    [{ orderedSpacesMultiline: 0 }, "orderedSpacesMultiline must be >= 1"],
-    [{ nestedIndent: 9 }, "nestedIndent must be <= 8"],
-    [{ spaces: 2 }, "must NOT have additional properties"],
+    [{ bulletSpaces: 5 }, '"bulletSpaces" must be at most 4'],
+    [{ orderedSpacesMultiline: 0 }, '"orderedSpacesMultiline" must be at least 1'],
+    [{ nestedIndent: 9 }, '"nestedIndent" must be at most 8'],
+    [{ spaces: 2 }, 'unknown option "spaces"'],
   ])("rejects the options %j", (options, message) => {
     expect(() =>
       format("- a\n", { config: only({ "style/list-indent": ["warn", options] }) }),
