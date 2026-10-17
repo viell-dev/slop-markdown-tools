@@ -11,7 +11,7 @@ interface Report {
   version: string;
   mode: string;
   root: string;
-  written: boolean;
+  written: string[];
   files: { path: string; changed?: boolean; output?: string; diagnostics: Diagnostic[] }[];
 }
 const report = (stdout: string) => JSON.parse(stdout) as Report;
@@ -232,7 +232,7 @@ describe("reports for scripts and agents", () => {
     expect(linted.stderr).toBe("");
     const result = report(linted.stdout);
     expect(Object.keys(result)).toEqual(["version", "mode", "root", "files", "written"]);
-    expect(result).toMatchObject({ version: manifest.version, mode: "lint", written: false });
+    expect(result).toMatchObject({ version: manifest.version, mode: "lint", written: [] });
     // The root that the paths of `files` are relative to, as an absolute path of the system.
     expect(path.isAbsolute(result.root)).toBe(true);
     expect(await realpath(result.root)).toBe(await realpath(root));
@@ -260,15 +260,15 @@ describe("reports for scripts and agents", () => {
     });
     expect(missing).not.toHaveProperty("edit");
   });
-  it("marks changed files and whether a write happened in format reports", async () => {
+  it("marks changed files and lists the files written in format reports", async () => {
     const root = await fixture({ "a.md": "A *note*.\n", "b.md": "A _note_.\n" });
     const previewed = report(run(root, ["format", "--json"]).stdout);
-    expect(previewed).toMatchObject({ mode: "format", written: false });
+    expect(previewed).toMatchObject({ mode: "format", written: [] });
     expect(previewed.files).toEqual([
       { path: "a.md", changed: true, diagnostics: [] },
       { path: "b.md", changed: false, diagnostics: [] },
     ]);
-    expect(report(run(root, ["format", "--write", "--json"]).stdout).written).toBe(true);
+    expect(report(run(root, ["format", "--write", "--json"]).stdout).written).toEqual(["a.md"]);
     const stdin = report(run(root, ["format", "-", "--json"], "A *note*.\n").stdout);
     expect(stdin.files).toEqual([
       { path: "stdin.md", changed: true, diagnostics: [], output: "A _note_.\n" },

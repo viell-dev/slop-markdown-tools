@@ -41,6 +41,7 @@ release. Release candidates and betas are published under the tags `rc` and
 `beta` and leave `latest` alone. Only the newest release line receives fixes;
 see the
 [security policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
+This site describes the newest stable release.
 
 A version named in the repository is not necessarily published. The registry is
 the source of truth:

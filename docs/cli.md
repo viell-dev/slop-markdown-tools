@@ -145,7 +145,7 @@ script should read the JSON report and the exit code.
       ]
     }
   ],
-  "written": false
+  "written": []
 }
 ```
 
@@ -156,8 +156,10 @@ script should read the JSON report and the exit code.
   when `--quiet` is given. With `format`, `changed` says whether the document
   changed or would change. With stdin, `format` adds `output`, the formatted
   text, unless `--check` is given.
-- `written` is `true` when `format --write` was allowed to write; it does not
-  count the files. Each entry's `changed` says which ones changed.
+- `written` lists the paths of the files that `format --write` wrote, in the
+  order of `files`. It is empty for `lint`, for `format` without `--write`, and
+  when nothing was written. A file whose entry has `changed` but that is not
+  listed was not written, and its diagnostics say why.
 - `skipped` appears only when something was skipped: one entry per directory or
   settings file, with `path`, `type` (`directory` or `file`), the system's error
   `code` or `INVALID` for content that could not be used, and a `message`.
@@ -183,9 +185,10 @@ and `engine/unwritable-file`.
 
 Warnings alone never fail a command without `--max-warnings`. `format` can
 succeed and still report problems that only a person can fix, so read its
-findings too. One document that cannot be formatted safely or read, or that a
-rule fails on, or one file that cannot be written, stops `format --write` from
-writing any file of the batch.
+findings too. `format --write` writes every document it formatted, also when
+another document cannot be read or written; each problem is reported for its own
+file, and the exit code is then `2`. A document with a rule whose edits were
+refused, or that a rule failed on, is written with the other rules' edits.
 
 ## Files that cannot be read or written
 
@@ -200,13 +203,14 @@ on the command line is an error. To leave a directory out without a warning,
 list it in a `.gitignore`.
 
 A selected document that cannot be read gets an `engine/unreadable-file` error;
-the other documents are processed, and the exit code is `2`. The system errors
-`EACCES` and `EPERM` count as not being permitted to read, and so does `EBUSY`,
-which Windows reports for a file that another program has locked. Any other read
-error stops the run with exit code `2`. So do a root, configuration file, or
-path on the command line that does not exist, cannot be read, or is of the wrong
-kind, as in `Input does not exist: notes/absent.md`, and a configuration file
-that cannot be read or a directory that refuses the search for one.
+the other documents are processed, and written with `--write`, and the exit code
+is `2`. The system errors `EACCES` and `EPERM` count as not being permitted to
+read, and so does `EBUSY`, which Windows reports for a file that another program
+has locked. Any other read error stops the run with exit code `2`. So do a root,
+configuration file, or path on the command line that does not exist, cannot be
+read, or is of the wrong kind, as in `Input does not exist: notes/absent.md`,
+and a configuration file that cannot be read or a directory that refuses the
+search for one.
 
 Documents are read as UTF-8, with or without a byte order mark. The tool does
 not guess another encoding: a guess can be wrong, and the supported renderers
@@ -223,36 +227,41 @@ gets a warning, and the vault's notes are not wrapped. When the system does not
 let the tool find out whether a directory is a vault, the command stops with
 exit code `2`, because reading notes in another dialect is not safe.
 
-`format --write` writes each changed file as a new file beside it and then
-replaces the old one, so that no file is ever half written; the exceptions are
-[below](#what-a-replaced-file-keeps). Before it writes anything, it checks that
-each file may be written and that its directory lets it create the new file. A
-file that fails the check gets an `engine/unwritable-file` error, such as
-`The file may not be written (EACCES: permission denied); no file was written.`,
-and nothing is written: `written` is `false` and the exit code is `2`. A
-read-only file fails the check on every platform. A failure that the check
-cannot foresee, such as a file that another program holds open on Windows or a
-full disk, is reported for that file in the same way, while the other files are
-still written; `written` is then `true`, and the exit code is `2`. To format the
-other files, pass `--exclude` for the one that fails.
+`format --write` writes each changed file in place, into the existing file,
+which keeps everything about the file but its content; see
+[below](#what-writing-keeps). Before it writes a file, it checks that the file
+may be written and that its directory lets it create a trial file. A file that
+fails the check gets an `engine/unwritable-file` error, such as
+`The file may not be written (EACCES: permission denied); the file is unchanged.`,
+and is left alone; the other files are still written. A read-only file fails the
+check on every platform, and the tool never makes a file writable to write it. A
+failure that the check cannot foresee, such as a file that another program has
+locked on Windows or a full disk, is reported for that file in the same way.
+Either way the file is not listed in `written`, and the exit code is `2`.
 
-### What a replaced file keeps
+### What writing keeps
 
-A replaced file keeps its content and its permission bits. As a new file, it
-loses what Node.js can neither read nor set: the creation time, extended
-attributes, and access control list entries given to the file itself, and on
-Windows also attributes such as Hidden and alternate data streams, such as the
-mark of a downloaded file. On Windows, the replaced file therefore has only the
-permissions that its directory passes on, which can let more users read it than
-before.
+Writing into the existing file keeps everything about it except its content and
+its modification time: its permissions, including access control entries of its
+own, its owner and group, attributes such as Hidden, extended attributes,
+alternate data streams such as the mark of a downloaded file, its creation time,
+and its other names if it has hard links. A file whose two names are both
+selected documents is written once and counted for each.
 
-Two kinds of file are written in place instead, and keep all of that: a file
-with more than one name, a hard link, whose other names would otherwise keep the
-old content; and, on Linux and macOS, a file whose replacement would get another
-owner or group, as when the tool runs as another user than the file's owner.
-Writing in place is not atomic. The new content is first written beside the
-file, which shows that it fits on the disk, but a failure while the file itself
-is written can leave it incomplete, and is reported as
-`The file could not be written completely (EIO: i/o error) and may be incomplete.`
-A file whose two names are both selected documents is written once and counted
-for each.
+Writing in place is not atomic, and the tool makes up for that as far as it can.
+Before it writes a file, it writes a trial file of the same size beside it,
+holding random bytes, and removes it again, which shows that the new content
+fits on the disk. Just before writing, it checks through the open file that the
+file still holds exactly the bytes it read. If writing then fails part way, it
+writes those bytes back and says whether that worked, as in
+`The file could not be written (EIO: i/o error), and its content from before formatting was written back.`
+or, when that fails too,
+`… and writing its content from before formatting back failed too (EIO: i/o error); it may be incomplete.`
+
+Nothing protects a file from a crash of the computer or a power failure while it
+is being written. The file can then be left incomplete, with part of the new
+content and part of the old, and a later run cannot repair it; keep documents
+that matter in version control or a backup. A program that reads the file at
+that moment can see it half written too. A crash during the trial write can
+leave the trial file behind; it is named `.mdtools-` followed by a random name
+and `.tmp`, holds no document text, and can be deleted.
