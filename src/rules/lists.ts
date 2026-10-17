@@ -281,13 +281,7 @@ function analyze(document: Document): Analysis {
     return chain;
   };
   const chains = new Map<number, Container[]>();
-  /**
-   * The containers that a line passes through. A blank line belongs to every
-   * container that the line before it is in, until a later line closes them,
-   * though the tree ends a container at its last line with content: in a list
-   * item that ends with indented code, a blank line's spaces beyond the code's
-   * indentation become part of the code.
-   */
+  /** A line with nothing but whitespace and `>`, which starts no container. */
   const blank = (line: number) => {
     const { start, end } = lines[line]!;
     const node = innermost[line];
@@ -295,6 +289,13 @@ function analyze(document: Document): Analysis {
       (!node || containers.get(node)!.first !== line) && /^[ \t>]*$/.test(source.slice(start, end))
     );
   };
+  /**
+   * The containers that a line passes through. A blank line belongs to every
+   * container that the line before it is in, until a later line closes them,
+   * though the tree ends a container at its last line with content: in a list
+   * item that ends with indented code, a blank line's spaces beyond the code's
+   * indentation become part of the code.
+   */
   const open = (line: number): Container[] => {
     let from = line;
     while (from > 0 && !chains.has(from) && !chains.has(from - 1) && blank(from)) from--;

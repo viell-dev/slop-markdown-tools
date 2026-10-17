@@ -242,6 +242,22 @@ describe("the list rules together", () => {
     expect(format(source).output).toBe("- a\n\n1. b\n1. c\n");
     expect(format(source, { config: only({}) }).output).toBe(source);
   });
+  it("change a list in a range only where the range holds all of its changes", () => {
+    const source = "* first item\n\n*   second item\n    more\n";
+    const second = source.indexOf("second");
+    const result = format(source, {
+      config: only(rules),
+      ranges: [{ start: second, end: second }],
+    });
+    // The markers of both items change together, so neither changes here.
+    expect(result.output).toBe("* first item\n\n* second item\n  more\n");
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    const whole = format(source, {
+      config: only(rules),
+      ranges: [{ start: 0, end: source.length }],
+    });
+    expect(whole.output).toBe("- first item\n\n- second item\n  more\n");
+  });
   it.each(dialects)("format the same lists in the %s dialect", (dialect) => {
     expect(formatted("*   a\n    1)  b\n    3)  c\n\n> + d\n", only(rules, dialect))).toBe(
       "- a\n  1. b\n  2. c\n\n> - d\n",
