@@ -113,6 +113,10 @@ From `0.2.0-rc.2`:
 - `format` throws an error that the workspace throws, such as a loader's `EIO`,
   as `lint` does, instead of reporting it as `engine/unsafe-format`.
 - A plugin named `engine` is rejected.
+- `recommended` formats lists: `*` and `+` bullets become `-`, `1)` becomes
+  `1.`, numbers are made consistent, and each item gets one space after its
+  marker and no indentation before it. `format --check` fails on lists written
+  otherwise until they are formatted or the list rules are turned off.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -153,6 +157,11 @@ From every prerelease:
 
 ### Added
 
+- `style/list-marker`, `style/ordered-list`, and `style/list-indent`, in
+  `recommended`, write bullets as `-` and numbers as `1.` with consistent
+  numbering and one space after each marker, and move each item's lines with its
+  text. Their options cover markdownlint's MD004, MD007, MD029, and MD030
+  ([#275](https://github.com/viell-dev/slop-markdown-tools/pull/275)).
 - `--quiet` reports errors only, and `rules` lists the rules of the
   configuration's plugins too, also as JSON with `--json`
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).

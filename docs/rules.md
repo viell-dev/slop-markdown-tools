@@ -38,6 +38,9 @@ the built-in rules and those of the configuration's [plugins](plugins.md).
 | `style/final-newline`         | Style   | Yes            | `recommended`                                           | All                               | None                                                        |
 | `style/heading`               | Style   | Yes            | `recommended`                                           | All                               | `style`, `closing`                                          |
 | `style/inline-code`           | Style   | Yes            | None                                                    | All                               | None                                                        |
+| `style/list-indent`           | Style   | Yes            | `recommended`                                           | All                               | Spaces after markers, `nestedIndent`                        |
+| `style/list-marker`           | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/ordered-list`          | Style   | Yes            | `recommended`                                           | All                               | `delimiter`, `numbering`                                    |
 | `style/strong`                | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
 | `style/table`                 | Style   | Yes            | `recommended`, `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | `style`                                                     |
 | `style/thematic-break`        | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
@@ -748,6 +751,152 @@ After:
 
 ```markdown
 Run `npm run build` before the tests.
+```
+
+## `style/list-indent`
+
+Puts the configured spaces, one by default, between a list marker and the item's
+text, and starts each item where its container's text starts: at the start of
+the line, after a block quote's `>`, or under the text of the list item that
+holds it. The item's other lines move by as many columns as its text, so its
+paragraphs, code blocks, and nested lists stay inside it as they were.
+
+| Option                   | Values                 | Default               |
+| ------------------------ | ---------------------- | --------------------- |
+| `bulletSpaces`           | An integer from 1 to 4 | `1`                   |
+| `orderedSpaces`          | An integer from 1 to 4 | `1`                   |
+| `bulletSpacesMultiline`  | An integer from 1 to 4 | `bulletSpaces`        |
+| `orderedSpacesMultiline` | An integer from 1 to 4 | `orderedSpaces`       |
+| `nestedIndent`           | An integer from 1 to 8 | Under the item's text |
+
+- `bulletSpaces` and `orderedSpaces`: the spaces after the marker of a bullet
+  item and of a numbered one. As in markdownlint's MD030, the `Multiline`
+  options take their place in a list where an item has more than one line or
+  blank lines separate the items.
+- `nestedIndent`: the columns from an item's marker to the marker of a list
+  nested in it, like markdownlint's MD007 `indent`. A nested marker can stand
+  from its item's text to three columns further, and the rule keeps it there:
+  `4` puts it two columns in under `- item` and one under `1. item`. A nested
+  list that starts on its item's line, as in `- - item`, stays there, and one
+  that follows another list stays out of that list's last item.
+
+With the defaults, before:
+
+```markdown
+-   Unpack the board.
+
+    Keep the box for returns.
+1.  Connect the sensor.
+     - Use the short cable.
+```
+
+After:
+
+```markdown
+- Unpack the board.
+
+  Keep the box for returns.
+1. Connect the sensor.
+   - Use the short cable.
+```
+
+These are left as written:
+
+- An item that starts with indented code, five or more spaces after the marker;
+  the code depends on that spacing.
+- A list where moving an item would move another line into it. Here `Text`
+  follows the list, and below `- Item` it would be the item's second paragraph:
+
+  ```markdown
+  -   Item
+
+    Text
+  ```
+
+  The same goes for a line that continues the item's paragraph without the
+  item's indentation, where that line would start a list, a code span, or
+  another block once inside the item.
+- A list with a tab in an item's indentation, such as one that Obsidian indented
+  with tabs.
+
+## `style/list-marker`
+
+Writes every bullet list with one marker.
+
+| Option   | Values                                              | Default |
+| -------- | --------------------------------------------------- | ------- |
+| `marker` | `"-"`, `"*"`, `"+"`, `"consistent"`, or `"sublist"` | `"-"`   |
+
+- `consistent`: the marker of the document's first bullet list, as in
+  markdownlint's MD004.
+- `sublist`: each level of nesting keeps the marker of its first list, unless
+  the level above has that marker, in which case it gets the next one, as with
+  MD004's `sublist`. A level counts the bullet lists that a list is nested in.
+
+A bullet list that directly follows another one is a separate list only because
+its marker differs, so it gets the next marker in the order `-`, `*`, `+`, and
+the list after that the first one again. A list whose new marker would make a
+line read as a thematic break, as `+ - -` would with `-`, keeps its markers, and
+so do the lists next to it.
+
+Before:
+
+```markdown
+* Milk
+* Bread
+
++ Plates
+```
+
+After:
+
+```markdown
+- Milk
+- Bread
+
+* Plates
+```
+
+## `style/ordered-list`
+
+Writes the numbers of ordered lists with one delimiter and numbers the items
+consistently.
+
+| Option      | Values                             | Default  |
+| ----------- | ---------------------------------- | -------- |
+| `delimiter` | `"."`, `")"`, or `"consistent"`    | `"."`    |
+| `numbering` | `"auto"`, `"ordered"`, or `"same"` | `"auto"` |
+
+- `delimiter`: `consistent` is the delimiter of the document's first ordered
+  list. As with bullet markers, an ordered list that directly follows another
+  one keeps a different delimiter.
+- `numbering`: `ordered` counts up from the first number, and `same` repeats it
+  in every item. `auto` repeats it when the first two items have the same
+  number, as in `1.`, `1.`, `1.`, and counts up otherwise. These are
+  markdownlint's MD029 `one_or_ordered`, `ordered`, and, for lists that start at
+  1 or 0, `one` and `zero`.
+
+The first number never changes, because the rendered list starts at it. When a
+number gets wider or narrower, as from `9.` to `10.`, the item's other lines
+move with its text. A list keeps its numbers where that would move a line into
+or out of an item, as for [`style/list-indent`](#stylelist-indent), and where
+the numbers are written with leading zeros, as in `01.`, or would need more than
+nine digits.
+
+Before:
+
+```markdown
+1) Unpack the board.
+2) Connect the sensor.
+2) Power it on.
+```
+
+After:
+
+```markdown
+1. Unpack the board.
+2. Connect the sensor.
+3. Power it on.
 ```
 
 ## `style/strong`
