@@ -12,6 +12,7 @@ import { minimatch, Minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { decodeText } from "./encoding.js";
+import { excludesFile, globalExcludesFile, optionalText, repositoryTop } from "./git.js";
 import { isMarkdownName } from "./index.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
@@ -53,10 +54,19 @@ const patternCharacters = /[*?[{]|[!@+]\(/;
  * usually ignores it, as the `glob` package does.
  */
 const patternOptions = { dot: true, nocomment: true, nonegate: true, nocase: caseInsensitive };
-/** A `.gitignore` file's rules for the folder that holds it. */
+/**
+ * A file of Git ignore rules for the folder whose paths its patterns match: a
+ * `.gitignore` for the folder that holds it, and a repository's
+ * `info/exclude` or the global excludes file for the repository's top level.
+ */
 interface IgnoreLayer {
-  /** The folder, relative to the workspace root; empty for the root. */
+  /**
+   * The folder, relative to the top level of the repository that holds the
+   * workspace root, or to the root outside a repository; empty for that folder.
+   */
   base: string;
+  /** The file, as messages name it. */
+  file: string;
   /** The file's text. */
   text: string;
   matcher: Ignore;
@@ -66,18 +76,19 @@ function folderOnly(folder: string): string {
   return `/${folder.replace(/[\\*?[]/g, "\\$&")}/`;
 }
 /**
- * The matchers for the entries of the folder `relative`, one for each
- * `.gitignore` above them, nearest last, with the path from that file's
- * folder. Git asks each file only whether its patterns match the path itself;
- * that nothing below an excluded folder counts is settled by the walk, which
- * never enters one. The `ignore` package also answers that a path is ignored
- * when the file's patterns exclude a folder above it, which is wrong when a
- * deeper `.gitignore` included that folder again. For such a folder, the
- * file's patterns are tested with each folder on the way marked as included.
+ * The matchers for the entries of the folder `at`, relative to where the
+ * layers' folders are, one for each file of rules above them, nearest last,
+ * with the path from that file's folder. Git asks each file only whether its
+ * patterns match the path itself; that nothing below an excluded folder counts
+ * is settled by the walk, which never enters one. The `ignore` package also
+ * answers that a path is ignored when the file's patterns exclude a folder
+ * above it, which is wrong when a deeper `.gitignore` included that folder
+ * again. For such a folder, the file's patterns are tested with each folder on
+ * the way marked as included.
  */
-function ignoreScopes(relative: string, layers: IgnoreLayer[]) {
+function ignoreScopes(at: string, layers: IgnoreLayer[]) {
   return layers.map((layer) => {
-    const inner = relative.slice(layer.base ? layer.base.length + 1 : 0);
+    const inner = at.slice(layer.base ? layer.base.length + 1 : 0);
     let { matcher } = layer;
     if (inner && matcher.test(`${inner}/`).ignored) {
       const folders = inner
@@ -91,9 +102,9 @@ function ignoreScopes(relative: string, layers: IgnoreLayer[]) {
   });
 }
 /**
- * The `.gitignore` file and pattern that exclude an entry, or undefined when
- * none does: the nearest file whose patterns match the entry decides, and a
- * negated pattern includes it.
+ * The file and pattern that exclude an entry, or undefined when none does: the
+ * nearest file whose patterns match the entry decides, and a negated pattern
+ * includes it.
  */
 function gitIgnoreRule(
   scopes: ReturnType<typeof ignoreScopes>,
@@ -103,14 +114,14 @@ function gitIgnoreRule(
   for (let index = scopes.length - 1; index >= 0; index--) {
     const { layer, matcher, prefix } = scopes[index]!;
     const result = matcher.test(prefix + entry + (directory ? "/" : ""));
-    if (result.ignored)
-      return {
-        file: layer.base ? `${layer.base}/.gitignore` : ".gitignore",
-        pattern: result.rule?.pattern ?? "",
-      };
+    if (result.ignored) return { file: layer.file, pattern: result.rule?.pattern ?? "" };
     if (result.unignored) return undefined;
   }
   return undefined;
+}
+/** The layer of the rules `text`, read from `file`, for the folder `base`. */
+function ignoreLayer(base: string, file: string, text: string): IgnoreLayer {
+  return { base, file, text, matcher: ignore({ ignorecase: caseInsensitive }).add(text) };
 }
 /** A path that the user named among the inputs. */
 interface NamedInput {
@@ -334,6 +345,63 @@ export async function discover(
   base = process.cwd(),
 ): Promise<FileSet> {
   const root = await realpath(rootPath);
+  // Git's rules start at the top level of the repository that holds the root,
+  // which can lie above it.
+  let top: string | undefined;
+  try {
+    top = await repositoryTop(root);
+  } catch (error) {
+    const code = refusal(error);
+    if (!code) throw error;
+    // Only the root itself can refuse it: each folder above leads to the root.
+    throw new Error(`Workspace root cannot be read: ${rootPath} (${refusalText(code)})`, {
+      cause: error,
+    });
+  }
+  /** The root, relative to the repository's top level. */
+  const lead = top ? path.relative(top, root).split(path.sep).join("/") : "";
+  /** A path relative to the root, relative to the repository's top level instead. */
+  const fromTop = (relative: string) =>
+    lead && relative ? `${lead}/${relative}` : lead || relative;
+  /** How messages name a file of rules: from the root, or in full outside the repository. */
+  function shown(file: string): string {
+    const inside = path.relative(top ?? root, file);
+    if (inside === ".." || inside.startsWith(`..${path.sep}`) || path.isAbsolute(inside))
+      return file;
+    return path.relative(root, file).split(path.sep).join("/");
+  }
+  /** The file whose read failed, as messages name it. */
+  const failed = (error: unknown, fallback: string) =>
+    shown((error as NodeJS.ErrnoException).path ?? fallback);
+  /** The global excludes file's rules, found once, from the first repository found. */
+  let global: Promise<IgnoreLayer | undefined> | undefined;
+  /**
+   * The rules for the top level of the repository in `directory`, `base` from
+   * the outer repository's top level, with the lowest precedence first: the
+   * global excludes file, then the repository's `info/exclude`.
+   */
+  async function repositoryLayers(directory: string, base: string): Promise<IgnoreLayer[]> {
+    global ??= globalExcludesFile(directory).then(async (file) => {
+      const text = file === undefined ? undefined : await optionalText(file);
+      return text === undefined ? undefined : ignoreLayer("", shown(file!), text);
+    });
+    const shared = global;
+    let text: string | undefined;
+    let exclude: string | undefined;
+    try {
+      exclude = await excludesFile(directory);
+      text = exclude === undefined ? undefined : await optionalText(exclude);
+    } finally {
+      // Git runs in the repository's folder, which Windows does not let anyone
+      // remove until it is done, so discovery waits for it also after a failure.
+      await shared.catch(() => undefined);
+    }
+    const layer = await shared;
+    return [
+      ...(layer ? [{ ...layer, base }] : []),
+      ...(text === undefined ? [] : [ignoreLayer(base, shown(exclude!), text)]),
+    ];
+  }
   const files: Record<string, WorkspaceSource> = {};
   const directories: string[] = [];
   const unlisted: string[] = [];
@@ -408,6 +476,26 @@ export async function discover(
       );
     refused.push({ directory, reading, code });
   }
+  /** The rules that apply at the root, from the repository's top level down. */
+  let rootLayers: IgnoreLayer[] = [];
+  /** The folder at or above the root that Git ignores, from the top level, and the rule. */
+  let ignoredRoot: { folder: string; file: string; pattern: string } | undefined;
+  if (top) {
+    try {
+      rootLayers = await repositoryLayers(top, "");
+      const parts = lead ? lead.split("/") : [];
+      for (let index = 0; index < parts.length && !ignoredRoot; index++) {
+        const at = parts.slice(0, index).join("/");
+        const file = path.join(top, ...parts.slice(0, index), ".gitignore");
+        const text = await optionalText(file);
+        if (text !== undefined) rootLayers.push(ignoreLayer(at, shown(file), text));
+        const rule = gitIgnoreRule(ignoreScopes(at, rootLayers), parts[index]!, true);
+        if (rule) ignoredRoot = { folder: parts.slice(0, index + 1).join("/"), ...rule };
+      }
+    } catch (error) {
+      leaveOut("", failed(error, path.join(top, ".git")), error);
+    }
+  }
   /**
    * Visit a directory. Below a folder that Git ignores, which is visited only
    * for link targets, nothing can be included again, as in Git.
@@ -429,11 +517,7 @@ export async function discover(
       if (!gitIgnoredAbove && (await exists(rules))) {
         reading = relative ? `${relative}/.gitignore` : ".gitignore";
         const text = await readFile(rules, "utf8");
-        layers.push({
-          base: relative,
-          text,
-          matcher: ignore({ ignorecase: caseInsensitive }).add(text),
-        });
+        layers.push(ignoreLayer(fromTop(relative), reading, text));
         reading = relative;
       }
       entries = await readdir(directory, { withFileTypes: true });
@@ -445,7 +529,7 @@ export async function discover(
     const settings = entries.find((entry) => entry.name === ".obsidian");
     if (settings?.isDirectory() || (settings?.isSymbolicLink() && (await isVault(directory))))
       vaultFolders.set(relative, directory);
-    const scopes = gitIgnoredAbove ? [] : ignoreScopes(relative, layers);
+    const scopes = gitIgnoredAbove ? [] : ignoreScopes(fromTop(relative), layers);
     for (const entry of entries) {
       const name = relative ? `${relative}/${entry.name}` : entry.name;
       const rule = gitIgnoredAbove
@@ -487,8 +571,17 @@ export async function discover(
           leaveNamed(name, (input) =>
             input.path === name ? "a nested repository" : `in ${name}, a nested repository`,
           );
-        if (!nested || resolve.nestedRepositories === true)
-          await walk(name, layers, targetOnly || gitIgnored || nested, gitIgnored);
+        if (nested && resolve.nestedRepositories !== true) continue;
+        // Inside a nested repository, only its own rules apply, as in Git.
+        let inner = layers;
+        if (nested && !gitIgnored)
+          try {
+            inner = await repositoryLayers(full, fromTop(name));
+          } catch (error) {
+            leaveOut(name, failed(error, path.join(full, ".git")), error);
+            continue;
+          }
+        await walk(name, inner, targetOnly || gitIgnored || nested, gitIgnored);
       } else if (entry.isFile()) {
         const request = named.get(name)?.find((input) => input.path === name && !input.directory);
         const markdown = isMarkdownName(name);
@@ -514,7 +607,17 @@ export async function discover(
       }
     }
   }
-  await walk("", []);
+  await walk("", rootLayers, false, ignoredRoot !== undefined);
+  // Nothing is processed in a root that Git ignores.
+  if (ignoredRoot) {
+    const folder = path.posix.relative(lead, ignoredRoot.folder);
+    const why = folder
+      ? `in ${folder}, which "${ignoredRoot.pattern}" in ${ignoredRoot.file} matches`
+      : `matched by "${ignoredRoot.pattern}" in ${ignoredRoot.file}`;
+    for (const input of namedInputs.values())
+      input.reason ??= folder ? why : `in the workspace root, which is ${why}`;
+    if (!namedInputs.size) namedInputs.set(".", { path: ".", directory: true, reason: why });
+  }
   // An input in a directory that was left out is an error: the user asked for it.
   for (const { input, path: request } of located) {
     const item = refused.find(

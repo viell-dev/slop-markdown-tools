@@ -89,7 +89,7 @@ export async function checkRoot(given: string): Promise<void> {
 }
 /**
  * Find the files of a workspace and select documents the way the CLI does:
- * honoring `.gitignore` files and the configuration's `ignore` and `resolve`
+ * honoring Git's ignore rules and the configuration's `ignore` and `resolve`
  * settings, skipping links, nested repositories, and what the system does not
  * let the tool read, and recognizing each document's Obsidian vault. Nothing
  * is written.

@@ -1,10 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
 import { discover } from "../../src/workspace/files.js";
-import { fixture, linkDirectory, run } from "./support.js";
+import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "./support.js";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 /** Where letter case is ignored by default, by Git and by the file system. */
@@ -13,29 +13,39 @@ const foldsCase = process.platform === "win32" || process.platform === "darwin";
 const paths = (stdout: string) =>
   (JSON.parse(stdout) as { files: { path: string }[] }).files.map((file) => file.path);
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+/** Run Git in `cwd` and fail the test if it fails. */
+function git(cwd: string, args: string[]): void {
+  const done = spawnSync("git", args, { cwd, encoding: "utf8" });
+  expect(done.status, done.stderr).toBe(0);
+}
 /**
- * The paths among `names` that Git ignores in the repository at `root`, by its
- * own `.gitignore` files alone: without the user's and the system's settings
- * and without a global excludes file, which would differ between machines.
+ * The paths among `names`, relative to `directory`, that Git ignores there.
+ * Git reads the settings that discovery reads: the test run names no user or
+ * system settings, and so no global excludes file, unless a test names one.
  */
-async function gitIgnored(root: string, names: string[]): Promise<string[]> {
-  const init = spawnSync("git", ["init", "-q", "."], { cwd: root, encoding: "utf8" });
-  expect(init.status, init.stderr).toBe(0);
-  const none = path.join(root, ".git", "no-settings");
-  await writeFile(none, "");
-  const checked = spawnSync(
-    "git",
-    ["-c", `core.excludesFile=${none}`, "check-ignore", "--no-index", "--stdin"],
-    {
-      cwd: root,
-      input: names.join("\n") + "\n",
-      encoding: "utf8",
-      env: { ...process.env, GIT_CONFIG_GLOBAL: none, GIT_CONFIG_NOSYSTEM: "1" },
-    },
-  );
+function gitIgnored(directory: string, names: string[]): string[] {
+  const checked = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], {
+    cwd: directory,
+    input: names.join("\n") + "\n",
+    encoding: "utf8",
+  });
   // Status 1 means that nothing is ignored.
   expect([0, 1], checked.stderr).toContain(checked.status);
   return checked.stdout.split("\n").filter(Boolean);
+}
+/** Make a repository of the folder `directory`, which may hold an empty `.git` folder. */
+function gitInit(directory: string): void {
+  git(directory, ["init", "-q", "."]);
+}
+/** Name `file` as the global excludes file in Git's user settings, until the test ends. */
+async function globalExcludes(settings: string, file: string): Promise<void> {
+  const config = path.join(settings, "gitconfig");
+  // Git reads a backslash in its settings as an escape.
+  await writeFile(config, `[core]\n\texcludesFile = ${file.split(path.sep).join("/")}\n`);
+  vi.stubEnv("GIT_CONFIG_GLOBAL", config);
 }
 
 describe(".gitignore files", () => {
@@ -76,7 +86,8 @@ describe(".gitignore files", () => {
 
   it.skipIf(!hasGit)("leave out exactly the files that Git ignores", async () => {
     const root = await fixture(files);
-    const ignored = await gitIgnored(root, documents);
+    gitInit(root);
+    const ignored = gitIgnored(root, documents);
     const set = await discover(root, [], []);
     expect(set.selected).toEqual(documents.filter((name) => !ignored.includes(name)).sort());
     // What Git decides here, so that the comparison covers each case.
@@ -92,6 +103,189 @@ describe(".gitignore files", () => {
     const checked = run(root, ["lint", "--json", "index.md"]);
     expect(checked.status, checked.stdout).toBe(0);
   });
+});
+
+describe("Git's ignore rules at the workspace's boundaries", () => {
+  it.skipIf(!hasGit)(
+    "apply from the repository's top level, its info/exclude, and the global excludes file",
+    async () => {
+      const settings = await fixture({ ignore: "global.md\nglobal-kept.md\n*.tmp.md\n" });
+      const names = [
+        "generated/x.md",
+        "top.md",
+        "sub/top.md",
+        "over.md",
+        "kept.md",
+        "excluded.md",
+        "global.md",
+        "global-kept.md",
+        "a.tmp.md",
+        "plain.md",
+      ];
+      const root = await fixture({
+        // Above the workspace root.
+        ".gitignore": "docs/generated/\n/docs/top.md\nover.md\n",
+        // The root's own, which outranks the repository's and the global files.
+        "docs/.gitignore": "!kept.md\n",
+        ...Object.fromEntries(names.map((name) => [`docs/${name}`, "Text.\n"])),
+      });
+      gitInit(root);
+      // A .gitignore outranks info/exclude, which outranks the global file.
+      await writeFile(
+        path.join(root, ".git/info/exclude"),
+        "docs/excluded.md\nkept.md\n!global-kept.md\n!over.md\n",
+      );
+      await globalExcludes(settings, path.join(settings, "ignore"));
+      const docs = path.join(root, "docs");
+      const ignored = gitIgnored(docs, names);
+      const set = await discover(docs, [], []);
+      expect(set.selected).toEqual(names.filter((name) => !ignored.includes(name)).sort());
+      // What Git decides here, so that the comparison covers each case.
+      expect(set.selected).toEqual(["global-kept.md", "kept.md", "plain.md", "sub/top.md"]);
+      expect(paths(run(root, ["lint", "--json", "--root", "docs"]).stdout)).toEqual(set.selected);
+      // A named input that these rules leave out says which file's pattern does.
+      const named = ["excluded.md", "generated/x.md", "global.md", "over.md"];
+      const skipped = await discover(
+        docs,
+        named.map((name) => path.join(docs, name)),
+        [],
+      );
+      expect(skipped.skipped.map((item) => item.message)).toEqual([
+        'Skipped ignored input: excluded.md (matched by "docs/excluded.md" in ../.git/info/exclude). It is not processed.',
+        'Skipped ignored input: generated/x.md (in generated, which "docs/generated/" in ../.gitignore matches). It is not processed.',
+        `Skipped ignored input: global.md (matched by "global.md" in ${path.join(settings, "ignore")}). It is not processed.`,
+        'Skipped ignored input: over.md (matched by "over.md" in ../.gitignore). It is not processed.',
+      ]);
+    },
+  );
+  it.skipIf(!hasGit)(
+    "read info/exclude where a .git file leads, as in a linked worktree or a submodule",
+    async () => {
+      const names = ["excluded.md", "kept.md"];
+      const root = await fixture({});
+      const main = path.join(root, "main");
+      await mkdir(main);
+      gitInit(main);
+      git(main, [
+        "-c",
+        "user.name=mdtools",
+        "-c",
+        "user.email=mdtools@example.invalid",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "Start",
+      ]);
+      // A linked worktree shares the main repository's info/exclude.
+      const worktree = path.join(root, "worktree");
+      git(main, ["worktree", "add", "-q", worktree]);
+      await writeFile(path.join(main, ".git/info/exclude"), "excluded.md\n");
+      // A submodule's .git file names its Git folder relative to the submodule.
+      const submodule = path.join(root, "submodule");
+      await mkdir(path.join(root, "modules"));
+      git(root, ["init", "-q", "--separate-git-dir", path.join(root, "modules/sub"), submodule]);
+      // Git for Windows hides the file, and Windows refuses to replace a hidden file.
+      await rm(path.join(submodule, ".git"));
+      await writeFile(path.join(submodule, ".git"), "gitdir: ../modules/sub\n");
+      await writeFile(path.join(root, "modules/sub/info/exclude"), "excluded.md\n");
+      for (const directory of [worktree, submodule]) {
+        for (const name of names) await writeFile(path.join(directory, name), "Text.\n");
+        expect(gitIgnored(directory, names)).toEqual(["excluded.md"]);
+        expect((await discover(directory, [], [])).selected).toEqual(["kept.md"]);
+      }
+    },
+  );
+  it.skipIf(!hasGit)("apply only a nested repository's own rules inside it", async () => {
+    const settings = await fixture({ ignore: "global.md\n" });
+    const names = ["a.draft.md", "b.md", "c.md", "d.md", "e.md", "global.md"];
+    const root = await fixture({
+      ".gitignore": "*.draft.md\nb.md\n",
+      "inner/.gitignore": "c.md\n",
+      ...Object.fromEntries(names.map((name) => [`inner/${name}`, "Text.\n"])),
+    });
+    const inner = path.join(root, "inner");
+    gitInit(inner);
+    await writeFile(path.join(inner, ".git/info/exclude"), "d.md\n");
+    await globalExcludes(settings, path.join(settings, "ignore"));
+    const ignored = gitIgnored(inner, names);
+    // Files of a nested repository are only link targets.
+    const set = await discover(root, [], [], { nestedRepositories: true });
+    const targets = names.filter((name) => set.files[`inner/${name}`] !== undefined);
+    expect(targets).toEqual(names.filter((name) => !ignored.includes(name)));
+    expect(targets).toEqual(["a.draft.md", "b.md", "e.md"]);
+  });
+  it.skipIf(!hasGit)("leave out everything in a root that Git ignores, and say why", async () => {
+    const root = await fixture({
+      ".gitignore": "generated/\n",
+      "generated/a.md": "A.\n",
+      "generated/sub/b.md": "B.\n",
+    });
+    gitInit(root);
+    const generated = path.join(root, "generated");
+    expect(gitIgnored(generated, ["a.md", "sub/b.md"])).toEqual(["a.md", "sub/b.md"]);
+    const message =
+      'Skipped ignored input: . (matched by "generated/" in ../.gitignore). Its files are not processed.';
+    const set = await discover(generated, [], []);
+    expect(set.selected).toEqual([]);
+    expect(set.skipped).toEqual([{ path: ".", type: "directory", code: "IGNORED", message }]);
+    const checked = run(root, ["lint", "--root", "generated"]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(checked.stderr).toContain(`mdtools: warning: ${message}\n`);
+    // A named input says where the rule matched, from the root.
+    const sub = path.join(generated, "sub");
+    expect((await discover(sub, [path.join(sub, "b.md")], [])).skipped).toEqual([
+      {
+        path: "b.md",
+        type: "file",
+        code: "IGNORED",
+        message:
+          'Skipped ignored input: b.md (in .., which "generated/" in ../../.gitignore matches). It is not processed.',
+      },
+    ]);
+    expect(
+      (await discover(generated, [path.join(generated, "a.md")], [])).skipped[0]?.message,
+    ).toBe(
+      'Skipped ignored input: a.md (in the workspace root, which is matched by "generated/" in ../.gitignore). It is not processed.',
+    );
+  });
+  it("skip the global excludes file where Git is not installed", async () => {
+    const settings = await fixture({ ignore: "global.md\n" });
+    const root = await fixture({ "excluded.md": "E.\n", "global.md": "G.\n", "kept.md": "K.\n" });
+    await mkdir(path.join(root, ".git/info"));
+    await writeFile(path.join(root, ".git/info/exclude"), "excluded.md\n");
+    await globalExcludes(settings, path.join(settings, "ignore"));
+    if (hasGit) expect((await discover(root, [], [])).selected).toEqual(["kept.md"]);
+    vi.stubEnv("PATH", path.join(root, "no-programs"));
+    expect((await discover(root, [], [])).selected).toEqual(["global.md", "kept.md"]);
+  });
+  it.skipIf(!canRestrict && process.platform !== "win32")(
+    "stop the run when rules above the root cannot be read, and skip such a nested repository",
+    async () => {
+      const deny = async (file: string) => {
+        if (process.platform === "win32") denyRead(file);
+        else await restrict(file);
+      };
+      const code = process.platform === "win32" ? "EPERM" : "EACCES";
+      const refused = `${code}: ${code === "EPERM" ? "operation not permitted" : "permission denied"}`;
+      const root = await fixture({ ".gitignore": "draft.md\n", "docs/a.md": "A.\n" });
+      await deny(path.join(root, ".gitignore"));
+      const docs = path.join(root, "docs");
+      await expect(discover(docs, [], [])).rejects.toThrow(
+        `Workspace root cannot be read: ${docs} (${refused} for ../.gitignore)`,
+      );
+      const outer = await fixture({ "inner/.git/info/exclude": "b.md\n", "inner/b.md": "B.\n" });
+      await deny(path.join(outer, "inner/.git/info/exclude"));
+      expect((await discover(outer, [], [], { nestedRepositories: true })).skipped).toEqual([
+        {
+          path: "inner",
+          type: "directory",
+          code,
+          message: `Skipped unreadable directory: inner (${refused} for inner/.git/info/exclude). Its files are not processed, and links into it cannot be checked.`,
+        },
+      ]);
+    },
+  );
 });
 
 describe("named inputs", () => {

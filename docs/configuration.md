@@ -119,7 +119,7 @@ start with a dot, too.
 that are never linted or formatted. They remain link targets, so links to them
 are still checked.
 
-The CLI also leaves out what `.gitignore` files exclude, decided
+The CLI also leaves out what Git ignores, decided
 [as Git decides it](cli.md#which-files-are-processed), nested Git repositories,
 symbolic links, and the directories `.git`, `.obsidian`, `node_modules`, `dist`,
 and `coverage`. `resolve` makes two of these available as link targets, without

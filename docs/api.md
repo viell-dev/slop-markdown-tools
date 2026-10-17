@@ -165,7 +165,7 @@ for (const name of discovery.selected)
 ```
 
 It finds the files below `root` and selects documents as the CLI does: it honors
-`.gitignore` files and the configuration's `ignore` and `resolve` settings,
+Git's ignore rules and the configuration's `ignore` and `resolve` settings,
 leaves out nested repositories, symbolic links, and what the system does not let
 it read, and recognizes each document's vault. It reads no configuration file
 and writes nothing: pass the configuration as `config`, plugin objects as
