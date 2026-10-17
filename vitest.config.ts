@@ -1,4 +1,11 @@
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { defineConfig } from "vitest/config";
+
+// Discovery applies the global excludes file of Git's settings, which differ
+// between machines, so the integration tests run with none: no user or system
+// settings, and a configuration folder with nothing in it.
+const noGitSettings = path.join(tmpdir(), "mdtools-tests-no-git-settings");
 
 export default defineConfig({
   test: {
@@ -19,6 +26,11 @@ export default defineConfig({
           include: ["tests/integration/**/*.test.ts"],
           testTimeout: 30000,
           sequence: { groupOrder: 1 },
+          env: {
+            GIT_CONFIG_GLOBAL: path.join(noGitSettings, "gitconfig"),
+            GIT_CONFIG_NOSYSTEM: "1",
+            XDG_CONFIG_HOME: noGitSettings,
+          },
         },
       },
     ],

@@ -73,9 +73,21 @@ From `0.2.0-rc.2`:
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
+- `recommended` formats more, so `format --check` and `lint` report documents
+  that it used to accept until `format --write` runs once. It removes trailing
+  spaces, except hard line breaks, and repeated blank lines; writes code fences
+  with backticks and thematic breaks as `---`; turns underlined headings into
+  `#` headings and removes closing `#` sequences; and aligns tables. To keep a
+  form, turn its rule off or set its option, such as
+  `"style/heading": ["warn", { "closing": "keep" }]`.
 - `.gitignore` files decide as in Git: a deeper file can include again what a
   higher one excludes, and patterns match letter case exactly on Linux. Files
   that were left out before can be linted now, and the reverse.
+- Git's other ignore rules apply too: `.gitignore` files above the workspace
+  root, `.git/info/exclude`, and the global excludes file, while a file that Git
+  tracks is never ignored. With `--root` on a folder of a repository, or with a
+  global excludes file, files that were linted before can be left out now, and a
+  tracked file that a pattern matches is linted.
 - `.markdown` files are documents, and a file named on the command line is read
   as Markdown whatever its name. A hook that passes every changed file should
   pass only the Markdown ones.
@@ -162,6 +174,12 @@ From every prerelease:
 - `style/block-spacing` separates headings and lists from the blocks around them
   with a blank line
   ([#190](https://github.com/viell-dev/slop-markdown-tools/pull/190)).
+- Four style rules in `recommended`: `style/code-fence`, `style/thematic-break`,
+  `style/blank-lines`, and `style/trailing-space`, with markdownlint's choices
+  as options. `style/heading` also removes closing `#` sequences and can write
+  underlined headings (options `closing` and `style`), `style/table` can write
+  compact tables (option `style`), and both join `recommended`
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 - `lint` and `format` accept `ranges` to work on parts of a document, and
   `format` returns their `scope`
   ([#188](https://github.com/viell-dev/slop-markdown-tools/pull/188),
@@ -225,6 +243,10 @@ From every prerelease:
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - Plugin rule option schemas are compiled once instead of for every document
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- Many repeated headings, and many emphases on one line, no longer take time
+  that grows with the square of their number on Forgejo and Gitea, and `ignore`
+  and `overrides` patterns are compiled once instead of for every path
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - `.markdown` files are documents and link targets, and a file named on the
   command line is read as Markdown whatever its name
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
@@ -241,6 +263,9 @@ From every prerelease:
 - `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
   line with its marker, as it does for Obsidian callouts
   ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- The plugin example's style rule writes one space after a heading's `#` marks,
+  because `style/thematic-break` now does what it did
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 
 ### Fixed
 
@@ -265,6 +290,14 @@ From every prerelease:
 - Documents and JSON configuration files that start with a byte order mark are
   read correctly
   ([#174](https://github.com/viell-dev/slop-markdown-tools/pull/174)).
+- `style/heading` keeps link reference definitions directly above an underlined
+  heading, which it used to replace with the heading, so that the document was
+  refused ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
+- `style/final-newline` adds no line ending, and `style/block-spacing` no blank
+  line, where it would become part of an unclosed HTML or Obsidian comment, and
+  `style/final-newline` none where it would add a line to a code block without
+  its closing fence; such documents used to be refused
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 - `style/wrap` leaves paragraphs as written instead of refusing the document
   when their first word is a bare block marker
   ([#196](https://github.com/viell-dev/slop-markdown-tools/pull/196)), when an
@@ -292,6 +325,11 @@ From every prerelease:
 - `.gitignore` files are applied as Git applies them, with negations in deeper
   files and letter case per platform
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- Git's ignore rules apply from the repository's top level, also above the
+  workspace root, together with `.git/info/exclude` and the global excludes
+  file. Inside a nested repository only its own rules apply, and none applies to
+  a file that Git tracks
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).

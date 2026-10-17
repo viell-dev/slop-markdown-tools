@@ -728,16 +728,28 @@ describe("without a named dialect", () => {
   // was assumed up to 0.2.0-rc.1, reads the tables and the consecutive definitions as
   // paragraphs, which the default rules reflow, and a definition as a link to a file.
   const table = "| Sensor | Unit |\n|---|---|\n| Temperature | °C |\n";
-  const files = {
-    "outer-pipes.md": table,
-    "no-outer-pipes.md": "Sensor | Unit\n---|---\nTemperature | °C\n",
-    "wide.md":
+  // The default rules align tables, which they would not do to a paragraph.
+  const aligned = "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n";
+  const sources = {
+    "outer-pipes.md": [table, aligned],
+    "no-outer-pipes.md": ["Sensor | Unit\n---|---\nTemperature | °C\n", aligned],
+    "wide.md": [
       "| Sensor name in a long header cell | Unit of measurement in a long header cell | Notes |\n" +
-      "|---|---|---|\n" +
-      "| Temperature measured at the north wall | Degrees Celsius, to one decimal place | Calibrated yearly |\n",
-    "footnotes.md": "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n",
-    "footnote.md": "Text with a note.[^1]\n\n[^1]: Text.\n",
+        "|---|---|---|\n" +
+        "| Temperature measured at the north wall | Degrees Celsius, to one decimal place | Calibrated yearly |\n",
+      "| Sensor name in a long header cell      | Unit of measurement in a long header cell | Notes             |\n" +
+        "| -------------------------------------- | ----------------------------------------- | ----------------- |\n" +
+        "| Temperature measured at the north wall | Degrees Celsius, to one decimal place     | Calibrated yearly |\n",
+    ],
+    "footnotes.md": Array(2).fill(
+      "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n",
+    ) as [string, string],
   };
+  /** The documents as the default rules leave them. */
+  const files = {
+    ...Object.fromEntries(Object.entries(sources).map(([name, [, output]]) => [name, output])),
+    "footnote.md": "Text with a note.[^1]\n\n[^1]: Text.\n",
+  } as Record<string, string>;
   const dialect = (root: string, file: string, ...flags: string[]) => {
     const explained = run(root, ["config", ...flags, "explain", file]);
     expect(explained.status, explained.stderr).toBe(0);
@@ -749,7 +761,7 @@ describe("without a named dialect", () => {
     // Only the dialect is assumed: the rules are those of the recommended preset.
     const explained = JSON.parse(run(root, ["config", "explain", "outer-pipes.md"]).stdout);
     expect(explained.config).toBeNull();
-    expect(Object.keys(explained.effective.rules)).not.toContain("style/table");
+    expect(Object.keys(explained.effective.rules)).not.toContain("github/task-marker");
     // A configuration that names no dialect is read the same way.
     const configured = await fixture({
       ...files,
@@ -758,19 +770,19 @@ describe("without a named dialect", () => {
     expect(dialect(configured, "outer-pipes.md")).toBe("github");
     expect(run(configured, ["format", "--check"]).status).toBe(0);
   });
-  it.each(Object.keys(files).filter((name) => name !== "footnote.md"))(
-    "formats %s without changing it",
+  it.each(Object.keys(sources))(
+    "formats %s as a table or footnotes, not as prose",
     async (name) => {
-      const source = files[name as keyof typeof files];
+      const [source, output] = sources[name as keyof typeof sources];
       const root = await fixture({ [name]: source });
+      expect(run(root, ["format", "--write"]).status).toBe(0);
+      expect(await readFile(path.join(root, name), "utf8")).toBe(output);
       const checked = run(root, ["format", "--check"]);
       expect(checked.status, checked.stderr).toBe(0);
       expect(checked.stderr).toBe("1 file(s) processed; 0 would change.\n");
-      expect(run(root, ["format", "--write"]).status).toBe(0);
-      expect(await readFile(path.join(root, name), "utf8")).toBe(source);
       const piped = run(root, ["format", "-"], source);
       expect(piped.status, piped.stderr).toBe(0);
-      expect(piped.stdout).toBe(source);
+      expect(piped.stdout).toBe(output);
     },
   );
   it("lints a footnote definition without reporting a missing file", async () => {
@@ -794,6 +806,7 @@ describe("without a named dialect", () => {
     );
     const configured = await fixture({
       ...files,
+      "outer-pipes.md": table,
       "mdtools.config.jsonc": '{ "dialect": "commonmark" }',
     });
     expect(dialect(configured, "outer-pipes.md")).toBe("commonmark");
@@ -801,7 +814,7 @@ describe("without a named dialect", () => {
     expect(run(configured, ["format", "--write", "outer-pipes.md"]).status).toBe(0);
     expect(await readFile(path.join(configured, "outer-pipes.md"), "utf8")).toBe(joined);
     // --dialect replaces the configuration's dialect, in this direction as well.
-    expect(run(configured, ["format", "-", "--dialect", "github"], table).stdout).toBe(table);
+    expect(run(configured, ["format", "-", "--dialect", "github"], table).stdout).toBe(aligned);
   });
   it("leaves the choice to a preset or an override that names a dialect", async () => {
     const root = await fixture({

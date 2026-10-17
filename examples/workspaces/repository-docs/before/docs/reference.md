@@ -4,9 +4,11 @@
 
 Reported in degrees Celsius, rounded to one decimal place.
 
-## Humidity
+## Humidity ##
 
 Reported as relative humidity in percent.
+
+
 
 ## Pressure
 
