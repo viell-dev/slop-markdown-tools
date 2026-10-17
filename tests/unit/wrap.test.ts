@@ -9,19 +9,20 @@ import {
   resolveConfig,
   semanticFingerprint,
 } from "../../src/index.js";
-import type { Config } from "../../src/index.js";
+import type { Config, Workspace } from "../../src/index.js";
 
 function wrap(options: Record<string, unknown> = {}): Config {
   return { extends: [], rules: { "style/wrap": ["warn", { width: 40, ...options }] } };
 }
-function verify(source: string, config: Config) {
-  const result = format(source, { config });
+function verify(source: string, config: Config, workspace?: Workspace) {
+  const options = { config, ...(workspace ? { workspace } : {}) };
+  const result = format(source, options);
   expect(result.diagnostics.some((item) => item.rule.startsWith("engine/"))).toBe(false);
   const { dialect } = resolveConfig(config);
   expect(semanticFingerprint(parse(result.output, dialect))).toBe(
     semanticFingerprint(parse(source, dialect)),
   );
-  expect(format(result.output, { config }).output).toBe(result.output);
+  expect(format(result.output, options).output).toBe(result.output);
   return result;
 }
 describe("wrapping controls", () => {
@@ -372,6 +373,93 @@ describe("a block marker as a paragraph's first word", () => {
     const output = verify(source, wrap()).output;
     expect(output).not.toBe(source);
     expect(output.replace(/\n(?!$)/g, " ")).toBe(source);
+  });
+});
+describe("a lazy first line", () => {
+  // Directly below a link reference definition, a paragraph can start with a
+  // line that lacks the container markers of the lines around it.
+  const emphasis: Config = { ...wrap(), rules: { ...wrap().rules, "style/emphasis": "warn" } };
+  it("keeps the document from the issue as written and still formats the rest", () => {
+    // In CommonMark, `[^1]: Footnote.` is a link reference definition.
+    const source = "*A*\r\n\r\n> [^1]: Footnote.\r\nof text.\r\n> quoted\r\n";
+    expect(verify(source, { ...emphasis, dialect: "commonmark" }).output).toBe(
+      source.replace("*A*", "_A_"),
+    );
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps the paragraph as written in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const source = ["*A*", "", "> [a]: /u", "of text.", "> quoted", ""].join(newline);
+        expect(verify(source, { ...emphasis, dialect }, workspace).output).toBe(
+          source.replace("*A*", "_A_"),
+        );
+      }
+    },
+  );
+  it.each([
+    "> > [a]: /u\n> lazy\n> > more\n",
+    "> - [a]: /u\nlazy\n>   more\n",
+    "- [a]: /u\nlazy\n  more\n",
+    "- > [a]: /u\n  lazy\n  > more\n",
+    "[^1]: [a]: /u\nlazy\n    more\n",
+  ])("keeps %j as written", (source) => {
+    expect(verify(source, { ...wrap({ width: 20 }), dialect: "github" }).output).toBe(source);
+  });
+  it("reports such a paragraph as not reflowed on request", () => {
+    const source =
+      "> [a]: /u\nlazy words that make this paragraph longer than forty columns\n> more\n";
+    expect(lint(source, { config: wrap({ reportUnreflowed: true }) })).toMatchObject([
+      { message: "Paragraph not reflowed: lazy first line (width 40 columns)." },
+    ]);
+  });
+  it.each([
+    ["[a]: /u\nA paragraph below a definition, long enough to wrap.\n", ""],
+    ["> [a]: /u\n> A paragraph below a definition, long enough to wrap.\n", "> "],
+    ["- [a]: /u\n  A paragraph below a definition, long enough to wrap.\n", "  "],
+  ])("still reflows a paragraph below a definition with its markers (%j)", (source, prefix) => {
+    expect(verify(source, wrap()).output).toBe(source.replace(" enough", `\n${prefix}enough`));
+  });
+});
+describe("Obsidian markers that joined lines could pair", () => {
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian: Config = {
+    ...wrap(),
+    dialect: "obsidian",
+    rules: { ...wrap().rules, "style/emphasis": "warn" },
+  };
+  it.each([
+    "Some ==highlighted\ntext== *here*.\n",
+    "Some [[Note\nName]] *here*.\n",
+    "> - *item*\n=====\n=====\n",
+    "A comparison a == b\nnext *line*.\n",
+  ])("keeps %j as written and still formats the rest", (source) => {
+    expect(verify(source, obsidian, workspace).output).toBe(source.replace(/\*(\w+)\*/, "_$1_"));
+  });
+  it("reflows the same paragraphs in other dialects", () => {
+    expect(
+      verify("Some ==highlighted\ntext== here.\n", { ...wrap(), dialect: "github" }).output,
+    ).toBe("Some ==highlighted text== here.\n");
+  });
+  it("reports such a paragraph as not reflowed on request", () => {
+    const source = "Some ==highlighted\ntext and enough words to go past the width of forty.\n";
+    const config: Config = { ...wrap({ reportUnreflowed: true }), dialect: "obsidian" };
+    expect(lint(source, { config, workspace })).toMatchObject([
+      {
+        message:
+          "Paragraph not reflowed: Obsidian `==`, `[[`, or `]]` outside highlights and links (width 40 columns).",
+      },
+    ]);
+  });
+  it.each([
+    "Words with ==a highlight== and [[Note|a link]] and ![[Image.png]]\nand ==more== [[Other]] on a second line.\n",
+    "Code `a == b` and math $x==y$ and `[[` and `]]`\nare not markers, so this paragraph wraps.\n",
+    "Single = signs,\n[brackets], and [ [ ] ] are not markers either.\n",
+  ])("still reflows %j", (source) => {
+    const output = verify(source, obsidian, workspace).output;
+    expect(output).not.toBe(source);
+    expect(output.replace(/\n(?!$)/g, " ")).toBe(source.replace(/\n(?!$)/, " "));
   });
 });
 describe("Forgejo syntax", () => {

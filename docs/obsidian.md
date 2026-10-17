@@ -95,6 +95,13 @@ paragraphs as written; see
 If that setting is not appropriate for your vault, disable `style/wrap`. Other
 enabled rules can still run.
 
+The tool reads highlights (`==text==`) and wikilinks within one line. A
+paragraph that holds `==`, `[[`, or `]]` outside code, math, and the highlights
+and links of a line, such as a highlight or wikilink written across two lines,
+is left as written, because joining its lines could create a highlight or link
+that was not there. `reportUnreflowed` reports such a paragraph when it is too
+wide.
+
 ## Wrap callout bodies
 
 With strict line breaks verified, `style/wrap` reflows supported body prose even

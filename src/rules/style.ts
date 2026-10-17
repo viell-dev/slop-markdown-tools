@@ -227,6 +227,35 @@ function giteaPyParagraph(source: string, node: Paragraph, start: number, end: n
   }
   return false;
 }
+/** Inline nodes whose source joined lines cannot change. */
+const obsidianOpaque = new Set(["inlineCode", "inlineMath", "wikiLink", "obsidianHighlight"]);
+/**
+ * Whether joining an Obsidian paragraph's lines could create a highlight or a
+ * wikilink. The parser reads neither across a line break, so `==` and `[[` or
+ * `]]` that it left as text, outside code, math, and the highlights and links
+ * that it did read, could pair up once two lines become one.
+ */
+function obsidianMarkers(source: string, node: Paragraph, start: number, end: number): boolean {
+  if (!/==|\[\[|\]\]/.test(source.slice(start, end))) return false;
+  const opaque: Range[] = [];
+  walk(node, (child) => {
+    if (obsidianOpaque.has(child.type)) opaque.push(range(child));
+  });
+  let text = "";
+  let cursor = start;
+  for (const [a, b] of opaque.sort((x, y) => x[0] - y[0])) {
+    if (b <= cursor) continue;
+    // A space keeps the text on both sides from forming a marker.
+    text += source.slice(cursor, Math.max(cursor, a)) + " ";
+    cursor = Math.min(Math.max(cursor, b), end);
+  }
+  text += source.slice(cursor, end);
+  return /==|\[\[|\]\]/.test(text);
+}
+/** A line's container prefix, with list item markers and checkboxes made blank. */
+function continuationOf(prefix: string): string {
+  return prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) => " ".repeat(value.length));
+}
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
@@ -266,9 +295,21 @@ const wrap: Rule = {
       let lineStart = start;
       while (lineStart > 0 && !/[\r\n]/.test(document.source[lineStart - 1]!)) lineStart--;
       let prefix = document.source.slice(lineStart, start);
-      const continuation = prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) =>
-        " ".repeat(value.length),
-      );
+      const continuation = continuationOf(prefix);
+      // Directly below a link reference definition, a paragraph can start with
+      // a lazy continuation line, which lacks some of the container markers of
+      // the lines around it. The later lines' prefixes cannot be told from it.
+      const above = index ? parent?.children[index - 1] : undefined;
+      let lazyStart = false;
+      if (
+        above?.type === "definition" &&
+        above.position!.end.line === node.position!.start.line - 1
+      ) {
+        const [definitionStart] = range(above);
+        const definitionLine = lineBounds(document.source, definitionStart, definitionStart)[0];
+        lazyStart =
+          continuationOf(document.source.slice(definitionLine, definitionStart)) !== continuation;
+      }
       if (calloutHeader) {
         const headerBreak = lineBreak.exec(original);
         const headerEnd = headerBreak ? start + headerBreak.index : end;
@@ -368,9 +409,14 @@ const wrap: Rule = {
               ? "block identifier"
               : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
                 ? "leading block marker"
-                : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                  ? "unsupported container prefix"
-                  : undefined;
+                : lazyStart
+                  ? "lazy first line"
+                  : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                    ? "unsupported container prefix"
+                    : document.dialect === "obsidian" &&
+                        obsidianMarkers(document.source, node, start, end)
+                      ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                      : undefined;
       // Protections are computed first so that skipped paragraphs still
       // classify one-line math and shortlinks as single atoms in diagnostics.
       const protections = forge
