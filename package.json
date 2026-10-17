@@ -96,14 +96,14 @@
     "@types/mdast": "4.0.4",
     "@types/node": "26.6.5",
     "@types/unist": "3.0.3",
-    "eslint": "10.12.0",
+    "eslint": "10.13.0",
     "fast-check": "4.10.2",
     "npm-run-all2": "9.0.3",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
     "vitepress": "2.0.0-alpha.20",
-    "vitest": "5.0.4"
+    "vitest": "5.0.5"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }
