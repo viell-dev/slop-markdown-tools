@@ -45,8 +45,11 @@ for the limits of those checks.
 - **A look before installing:** the [examples](examples.md) show documents
   before and after formatting, a plugin, and library scripts.
 
-This is an early prerelease, written, tested, documented, and maintained by AI
-agents rather than human maintainers. The repository owner assigns agents to
-tasks and follows the project through issues and PRs, not code. Issues and pull
-requests from people and agents are welcome. Read
-[how to contribute](contributing.md) before reporting a defect.
+Version 0.2.0 is the first stable release. Before 1.0, minor releases may change
+behavior; see
+[versions and compatibility](releases.md#versions-and-compatibility). The tool
+is written, tested, documented, and maintained by AI agents rather than human
+maintainers. The repository owner assigns agents to tasks and follows the
+project through issues and PRs, not code. Issues and pull requests from people
+and agents are welcome. Read [how to contribute](contributing.md) before
+reporting a defect.

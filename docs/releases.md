@@ -2,11 +2,10 @@
 
 ## Versions and availability
 
-These documents cover `mdrefine@0.2.0-rc.2`. The executable is `mdtools`;
-prereleases use the npm channel named after their prerelease identifier, `rc`
-for release candidates and `beta` for betas. Read the
-[0.2.0-rc.2 release notes](releases/0.2.0-rc.2.md) for changes and limitations.
-Previous releases: [0.2.0-rc.1](releases/0.2.0-rc.1.md),
+These documents cover `mdrefine@0.2.0`, the first stable release. The executable
+is `mdtools`. Read the [0.2.0 release notes](releases/0.2.0.md) for changes
+since the last release candidate. Previous releases:
+[0.2.0-rc.2](releases/0.2.0-rc.2.md), [0.2.0-rc.1](releases/0.2.0-rc.1.md),
 [0.1.0-rc.1](releases/0.1.0-rc.1.md), [beta.4](releases/0.1.0-beta.4.md),
 [beta.3](releases/0.1.0-beta.3.md), [beta.2](releases/0.1.0-beta.2.md), and
 [beta.1](releases/0.1.0-beta.1.md).
@@ -14,7 +13,7 @@ Previous releases: [0.2.0-rc.1](releases/0.2.0-rc.1.md),
 The registry is the source of truth for package availability:
 
 ```sh
-npm view mdrefine@0.2.0-rc.2 version --registry=https://registry.npmjs.org/
+npm view mdrefine@0.2.0 version --registry=https://registry.npmjs.org/
 ```
 
 An `E404` means the requested package or version is unavailable. A version in
@@ -22,11 +21,49 @@ this repository or its documentation does not imply publication. Check
 [GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases) for
 release announcements and downloadable artifacts.
 
-The npm package is published under account `viell`. Until the first stable
-release, `latest` points to the newest prerelease of any kind, alongside its
-channel tag such as `rc` or `beta`, so default installations receive fixes. Once
-a stable release exists, `latest` follows stable releases and prerelease channel
-tags remain separate.
+The npm package is published under account `viell`. Its `latest` tag points to
+the newest stable release. A release candidate or beta is published under the
+channel tag named after its prerelease identifier, `rc` or `beta`, and leaves
+`latest` alone, so a default installation gets a stable release. Before 0.2.0
+there was no stable release, and `latest` pointed to the newest prerelease of
+any kind. The `rc` tag still names the last release candidate, `0.2.0-rc.2`,
+until another one is published.
+
+## Versions and compatibility
+
+Version numbers follow [Semantic Versioning](https://semver.org/). Before 1.0,
+the second number plays the part of the first: a minor release such as 0.3.0 may
+change what 0.2 does and says how in its release notes, while a patch release
+such as 0.2.1 fixes defects and keeps the interface below.
+
+The interface that version numbers describe is:
+
+- the `mdtools` commands, their options, and their exit codes;
+- the JSON report printed with `--json`: its fields and what they mean;
+- the configuration: file names, keys, presets, dialect names, rule IDs, rule
+  options, and what each of them means;
+- the library's exports from `mdrefine`, their TypeScript types, and the plugin
+  contract described in [plugins and library API](plugins.md);
+- the supported Node.js versions, given by `engines` in `package.json`.
+
+These are not part of it and can change in any release:
+
+- the wording of messages: diagnostics, warnings, and the summary line. A script
+  should read the exit code and the JSON report, whose diagnostics carry rule
+  IDs.
+- formatting output that changes because a defect is fixed. A patch release can
+  format a document differently where the previous version damaged it, refused
+  it, or read it in the wrong way, and can report findings that the defect hid.
+- speed and memory use, and the figures on the [benchmark page](benchmarks.md).
+- files of the package that the documentation does not describe.
+
+A deliberate change of what formatting produces, such as a new default, a rule
+added to a preset, or a changed option, comes in a minor release, and so does a
+higher minimum Node.js version. The installation commands pin the exact version,
+so that a workspace chooses when such a change reaches it.
+
+Only the newest release line receives fixes; see the
+[security policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
 
 ## Prepare without publishing
 
@@ -35,15 +72,16 @@ Use Node.js 24 and npm 10 or newer from a clean checkout:
 ```sh
 npm ci
 npm run release:prepare
-npm publish ./artifacts/mdrefine-0.2.0-rc.2.tgz --dry-run --ignore-scripts --access public --tag rc
+npm publish ./artifacts/mdrefine-0.2.0.tgz --dry-run --ignore-scripts --access public --tag latest
 ```
 
-Preparation runs all checks, packs the allowlisted files, installs that exact
-tarball into a temporary consumer, exercises the installed command and library,
-and compiles a TypeScript consumer. It retains the tested tarball, file
-manifest, and SHA-256 checksum in ignored `artifacts/`. No registry upload, Git
-tag, or GitHub release occurs. Local artifacts must be regenerated after any
-change.
+The `--tag` is the package's `publishConfig.tag`: `latest` for a stable version,
+and `rc` or `beta` for a prerelease. Preparation runs all checks, packs the
+allowlisted files, installs that exact tarball into a temporary consumer,
+exercises the installed command and library, and compiles a TypeScript consumer.
+It retains the tested tarball, file manifest, and SHA-256 checksum in ignored
+`artifacts/`. No registry upload, Git tag, or GitHub release occurs. Local
+artifacts must be regenerated after any change.
 
 The manual **Release** GitHub Actions workflow performs the same checks plus a
 dependency audit and uploads the artifact for 14 days. Leave `publish` false to
@@ -82,17 +120,24 @@ Trusted-publisher settings were verified on 2026-09-18. The first release used
 local authentication and has no OIDC provenance. For workflow releases, verify
 the publication job and the registry provenance attestations after each release.
 
-## Publish an authorized prerelease
+## Publish an authorized release
 
 Dispatch **Release** on `main` with the exact package version, `publish: true`,
 and the actual publishing agent's identity as `model via harness`. The workflow
-builds and checks the package again, verifies the artifact checksum, publishes
-that tarball to the npm channel matching its prerelease identifier (`rc` or
-`beta`) with provenance, and creates a GitHub prerelease at the workflow's
-commit. Tags use exact versions without a `v` prefix. Stable publication
-deliberately needs a separate policy change; this workflow accepts only beta and
-rc versions and derives the channel tag from the version. Complete the npm tag
-synchronization below before reporting a pre-stable release complete.
+builds and checks the package again, verifies the artifact checksum, and
+publishes that tarball with provenance under the package's `publishConfig.tag`,
+which the workflow checks against the version: `latest` for a stable version,
+and the prerelease identifier, `rc` or `beta`, for a prerelease. It then creates
+a GitHub release at the workflow's commit, marked as the latest release for a
+stable version and as a prerelease otherwise. Tags use exact versions without a
+`v` prefix.
+
+Publishing under `latest` moves that tag, so a stable release needs no further
+npm step. Before 0.2.0, each prerelease also had to be made `latest` with an
+authenticated local `npm dist-tag add mdrefine@VERSION latest`, because the
+workflow's OIDC authentication covers publication but not a later tag change.
+That step is no longer part of a release: a prerelease must not move `latest`
+now that stable releases exist.
 
 For an authenticated first publication that cannot use OIDC yet, use the exact
 reviewed tarball with `npm publish <tarball> --ignore-scripts --access public
@@ -114,31 +159,17 @@ setting, so its assets are not retroactively locked; its version tag remains
 protected by the repository ruleset. Do not replace its assets or recreate the
 release to change that history.
 
-## Synchronize npm tags before the first stable release
+## Verify a release
 
-After each authorized prerelease publication, wait for npm processing to finish
-and verify that the channel tag (`rc` today) points to the expected version.
-Until the first stable release, move `latest` to that same version using an
-authenticated local npm session. For the current release candidate:
+Wait for npm to finish processing, then check the tags and a fresh installation
+with an empty cache:
 
 ```sh
-npm_config_cache="$PWD/.npm-cache" npm dist-tag add mdrefine@0.2.0-rc.2 latest
-npm_config_cache="$PWD/.npm-cache" npm dist-tag ls mdrefine
+npm dist-tag ls mdrefine
 ```
 
-Use the exact newly published version on future releases. npm's
-[OIDC authentication](https://docs.npmjs.com/trusted-publishers/) supports
-publication, but does not authenticate `dist-tag` updates. The Release workflow
-records this required follow-up in its summary; complete browser authentication
-locally if npm requests it. Keep the waiting command alive and never put
-authentication secrets in chat or repository files.
-
-Tag synchronization is part of an authorized prerelease. It does not publish
-another version or change package contents. If promotion fails, retry only the
-tag update after resolving authentication; never rerun publication. Stop
-promoting prereleases to `latest` when the first stable release is published.
-
-Verify both tags, a fresh default installation, the GitHub release and its
-assets, registry provenance, and the documentation site before reporting the
-release complete. All subsequent changes, including prerelease maintenance,
-continue through PRs.
+`latest` names the new version after a stable release, and the channel tag does
+after a prerelease. Verify a fresh default installation, the GitHub release and
+its assets, the registry provenance, and the documentation site before reporting
+the release complete. All subsequent changes, including maintenance of a release
+line, continue through PRs.

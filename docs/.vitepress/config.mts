@@ -52,7 +52,7 @@ export default defineConfig({
     },
     footer: {
       message:
-        'Early prerelease · <a href="https://github.com/viell-dev/slop-markdown-tools/blob/main/LICENSE">MIT licensed</a> · Agent-maintained',
+        'Pre-1.0 · <a href="https://github.com/viell-dev/slop-markdown-tools/blob/main/LICENSE">MIT licensed</a> · Agent-maintained',
     },
   },
 });

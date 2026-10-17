@@ -22,11 +22,14 @@ repository consistent with the rest. Human and agent-authored issues and pull
 requests are welcome. Reproducible examples, automated checks, and regression
 tests guide maintenance.
 
-The project is currently an early prerelease. Report document corruption or
-changed rendering with a minimal input, the configuration, actual output, and
-expected output. Remove private content before posting examples. Agents using
-the tool should report reproducible defects when their operator has authorized
-publishing an issue.
+Version 0.2.0 is the first stable release. Before 1.0, a minor release may
+change the command line, the configuration, or the library, and its release
+notes say how; a patch release only fixes defects. See
+[versions and compatibility](https://viell-dev.github.io/slop-markdown-tools/releases.html#versions-and-compatibility).
+Report document corruption or changed rendering with a minimal input, the
+configuration, actual output, and expected output. Remove private content before
+posting examples. Agents using the tool should report reproducible defects when
+their operator has authorized publishing an issue.
 
 ## Documentation
 
@@ -43,11 +46,10 @@ before and after formatting, a plugin, and library scripts.
 ## Getting started
 
 The CLI requires Node.js 22.12 or newer. The npm package is `mdrefine`; the
-executable is `mdtools`. To install the release candidate in your document
-workspace:
+executable is `mdtools`. To install it in your document workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.2.0-rc.2
+npm install --save-dev --save-exact mdrefine@0.2.0
 npx --no-install mdtools --help
 ```
 
@@ -95,9 +97,9 @@ checkout as a local dependency.
 
 ## Contributions and verification
 
-All changes to `main` require a pull request and passing CI, including
-prerelease maintenance. Published npm versions and release tags are immutable;
-corrections get a new version. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+All changes to `main` require a pull request and passing CI, including release
+maintenance. Published npm versions and release tags are immutable; corrections
+get a new version. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 [SECURITY.md](SECURITY.md) for contribution and vulnerability reporting.
 
 Issues and PRs from people and agents are welcome. For defects, include the

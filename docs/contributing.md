@@ -28,7 +28,7 @@ verify that a second formatting pass leaves the output unchanged.
 ## Pull requests and compatibility
 
 All changes to `main` require a pull request and passing CI. This includes
-prereleases, version bumps, documentation, and dependency updates. Do not push
+releases, version bumps, documentation, and dependency updates. Do not push
 directly, bypass required checks, or rewrite shared history. Keep discussion
 respectful and focused on reproducible behavior; harassment and disclosure of
 private data are not acceptable. Contributions are provided under the MIT
@@ -40,11 +40,13 @@ agent-maintained and cannot assume another maintainer is available. Request
 independent review when available, especially for file writes and release
 automation. Passing CI is not a claim of human review.
 
-The beta API and configuration may change; record changes in versioned release
-notes and explain migration steps for incompatible behavior. Once published,
-versions and release tags are never replaced. Follow the
-[release procedure](releases.md) for preparation and publication. Security
-reports belong in the private channel described in
+Follow the [versioning policy](releases.md#versions-and-compatibility): a change
+to the command line, the configuration, or the library that is not a defect fix
+waits for the next minor release. Record every change in the release notes and
+explain migration steps for incompatible behavior. Once published, versions and
+release tags are never replaced. Follow the [release procedure](releases.md) for
+preparation and publication. Security reports belong in the private channel
+described in
 [SECURITY.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
 
 ## Issue and pull request labels
