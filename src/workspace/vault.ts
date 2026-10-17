@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { exists, refusal, refusalText } from "./access.js";
 import type { RefusalCode } from "./access.js";
+import { splitByteOrderMark } from "../syntax/parse.js";
 
 /** An Obsidian vault that holds documents of a workspace. */
 export interface Vault {
@@ -104,7 +105,8 @@ export async function lineBreakSetting(
   }
   let settings: unknown;
   try {
-    settings = JSON.parse(text);
+    // A byte order mark, which some Windows programs write, is no part of the JSON.
+    settings = JSON.parse(splitByteOrderMark(text)[1]);
   } catch {
     return { problem: { code: "INVALID", reason: "not valid JSON" } };
   }

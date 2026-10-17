@@ -850,6 +850,13 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(run(root, ["format", "--check"]).status).toBe(0);
     expect(run(root, ["lint", "--max-warnings", "0"]).status).toBe(0);
   });
+  it("reads a settings file that starts with a byte order mark", async () => {
+    const root = await vault(`${String.fromCharCode(0xfeff)}{"strictLineBreaks":true}`);
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(applied.stderr).not.toContain("warning");
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(reflowed);
+  });
   it("assumes the dialect only, so the rules of the obsidian preset still need the preset", async () => {
     const source = "> [!TIP] Title\n> Text.\n";
     const root = await vault(undefined, { "Callout.md": source });
