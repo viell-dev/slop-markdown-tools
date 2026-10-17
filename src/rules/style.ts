@@ -141,6 +141,16 @@ const lineOpener =
 // descriptions with `:` followed by at least one space or tab, so only a bare
 // `:` atom could open one at the start of a reflowed line.
 const forgeLineOpener = /^(?::$|\\\[)/;
+/**
+ * A list, heading, or block quote marker as the whole first word of a
+ * paragraph, with more words after it. Directly below text, the parser reads
+ * a marker that would open an empty list item there, such as the second `-` of
+ * `- -`, as text, and the paragraph can continue on the next line. Joining the
+ * next word to the marker would open the block. On Forgejo and Gitea, a bare
+ * `:` joined to the next word would turn a paragraph above it into the term of
+ * a definition list.
+ */
+const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
 
 type Range = [number, number];
 /** Split text at source whitespace, except inside protected source ranges. */
@@ -356,9 +366,11 @@ const wrap: Rule = {
             ? "callout header"
             : /(?:^|\s)\^[\w-]+\s*$/.test(original)
               ? "block identifier"
-              : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                ? "unsupported container prefix"
-                : undefined;
+              : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
+                ? "leading block marker"
+                : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                  ? "unsupported container prefix"
+                  : undefined;
       // Protections are computed first so that skipped paragraphs still
       // classify one-line math and shortlinks as single atoms in diagnostics.
       const protections = forge
