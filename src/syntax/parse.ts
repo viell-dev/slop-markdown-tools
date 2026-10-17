@@ -33,12 +33,30 @@ const mathConditions: Record<Exclude<Dialect, "commonmark">, MathConditions> = {
   obsidian: "obsidian",
 };
 
+/**
+ * The byte order marks that `source` starts with, and the text after them.
+ * Some editors write a mark at the start of a UTF-8 file, and a program that
+ * adds one without looking can leave two. The parser skips one mark at the
+ * start of what it is given.
+ */
+export function splitByteOrderMark(source: string): [string, string] {
+  let end = 0;
+  while (source.charCodeAt(end) === 0xfeff) end++;
+  return [source.slice(0, end), source.slice(end)];
+}
+
+/**
+ * Parse a document. Byte order marks at the start of `source` are not part of
+ * the document: the document's source starts after them, as the positions in
+ * the tree count.
+ */
 export function parse(
   source: string,
   dialect: Dialect,
   path = "document.md",
   plugins: Plugin[] = [],
 ): Document {
+  source = splitByteOrderMark(source)[1];
   const extensions = [frontmatter(["yaml", "toml"])];
   const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
   // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,

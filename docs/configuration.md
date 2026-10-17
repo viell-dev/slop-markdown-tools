@@ -8,10 +8,13 @@ at a Git repository, an Obsidian vault, or the filesystem root. Multiple config
 files in one directory are an error. `--config` chooses one explicitly. The
 configuration directory is the workspace root unless `--root` overrides it.
 
-JSONC permits comments and trailing commas. JavaScript configuration exports a
-default object. JavaScript configs and plugins execute code with the caller's
-permissions; load trusted code only. Unknown configuration keys, rule IDs,
-preset names, and invalid built-in rule options are errors.
+JSONC permits comments and trailing commas. A JSON or JSONC file may start with
+a byte order mark, which Windows PowerShell 5.1 and some editors write;
+version 0.2.0-rc.2 and earlier rejected it as invalid JSON. JavaScript
+configuration exports a default object. JavaScript configs and plugins execute
+code with the caller's permissions; load trusted code only. Unknown
+configuration keys, rule IDs, preset names, and invalid built-in rule options
+are errors.
 
 Presets merge in listed order, followed by the configuration's own settings,
 followed by matching `overrides` in order. Each rule setting replaces the
