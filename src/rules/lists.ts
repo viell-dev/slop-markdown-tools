@@ -712,7 +712,9 @@ function bulletMarkers(analysis: Analysis, marker: string): (list: ListGroup) =>
   if (marker !== "consistent" && marker !== "sublist") return () => marker;
   const { source } = analysis;
   const lists = analysis.units.flatMap((unit) =>
-    unit.lists.filter((list) => !list.node.ordered && list.items.length),
+    unit.lists.filter(
+      (list) => !list.node.ordered && bullets.includes(source[list.items[0]?.marker ?? -1] as "-"),
+    ),
   );
   const written = (list: ListGroup) => source[list.items[0]!.marker]!;
   if (marker === "consistent") {
@@ -827,7 +829,7 @@ const orderedList: Rule = {
       const first = analysis.units
         .flatMap((unit) => unit.lists)
         .find((list) => list.node.ordered && list.items.length);
-      preferred = first ? source[first.items[0]!.markerEnd - 1]! : ".";
+      preferred = source[(first?.items[0]?.markerEnd ?? 0) - 1] === ")" ? ")" : ".";
     }
     const other = preferred === "." ? ")" : ".";
     const numbering = String(options.numbering ?? "auto");
