@@ -1,7 +1,7 @@
 import path from "node:path";
 import { walk } from "../syntax/walk.js";
-import type { Nodes } from "mdast";
-import type { Finding, Rule } from "../core/types.js";
+import type { Definition, FootnoteDefinition, Nodes } from "mdast";
+import type { Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { splitDestination } from "../workspace/index.js";
@@ -58,6 +58,167 @@ function destinationRange(raw: string): [number, number] | undefined {
     if ((char === ")" && depth-- === 0) || /\s/.test(char)) return [opening, i];
   }
   return undefined;
+}
+
+/**
+ * A label as CommonMark matches it: case folded, with its blank space
+ * collapsed and trimmed. This is how the parser computes the `identifier` of
+ * definitions and references, so the two compare equal.
+ */
+function normalizeLabel(label: string): string {
+  return label
+    .replace(/[\t\n\r ]+/g, " ")
+    .replace(/^ | $/g, "")
+    .toLowerCase()
+    .toUpperCase()
+    .toLowerCase();
+}
+/**
+ * A label's text as the parser reads it, from its source: without the block
+ * quote markers and indentation that continue its lines inside a container.
+ */
+function labelText(source: string): string {
+  return source.replace(/(\r\n|\r|\n)[ \t>]*/g, "$1");
+}
+/**
+ * The end, after its `]`, of the link label that starts with the `[` at `at`
+ * and ends before `limit`: the first unescaped `]`, with no unescaped `[`
+ * before it, at most 999 characters, and something besides blank space.
+ */
+function labelEnd(source: string, at: number, limit: number): number | undefined {
+  let blank = true;
+  for (let i = at + 1; i < limit && i - at <= 1000; i++) {
+    const char = source[i]!;
+    if (char === "\\" && /[[\]\\]/.test(source[i + 1] ?? "")) {
+      blank = false;
+      i++;
+    } else if (char === "[") return undefined;
+    else if (char === "]") return blank ? undefined : i + 1;
+    else if (!/[ \t\r\n]/.test(char)) blank = false;
+  }
+  return undefined;
+}
+/** A GFM footnote label after `^`: no blank space, and brackets only escaped. */
+const footnoteLabel = /^\^((?:\\[[\]\\]|\\(?![[\]\\])|[^\s[\]\\]){1,999})$/;
+/** Inline nodes whose text is read for brackets; any other node is syntax or a link of its own. */
+const transparent = new Set(["emphasis", "strong", "delete"]);
+/**
+ * What before a reference's text makes it no reference to report: an ASCII
+ * letter, digit, `_`, or `)`, as in the indexes `matrix[i][j]` and `f(x)[0][1]`
+ * in prose, or a `]`, which continues a run like `[a][b][c]` that is reported
+ * once, at its start.
+ */
+const notAfter = /[\w\])]/;
+/** Characters that a backslash escapes. */
+const asciiPunctuation = /[!-/:-@[-`{-~]/;
+interface Reference {
+  start: number;
+  end: number;
+  label: string;
+  footnote: boolean;
+}
+/**
+ * The full (`[text][label]`) and collapsed (`[label][]`) references, and with
+ * `footnotes` the footnote references (`[^label]`), whose label has no
+ * definition. The parser leaves these as plain text, so they are found in the
+ * text of each paragraph, heading, and table cell, as CommonMark pairs its
+ * brackets. Brackets in code, math, HTML, links, images, and other syntax, and
+ * escaped ones, are not read.
+ */
+function undefinedReferences(
+  document: Document,
+  definitions: Set<string>,
+  footnotes: Set<string> | undefined,
+): Reference[] {
+  const { source } = document;
+  if (!source.includes("[")) return [];
+  const references: Reference[] = [];
+  const forge = document.dialect === "forgejo" || document.dialect === "gitea";
+  // 1 where a character is text that the parser reads brackets in.
+  const readable = new Uint8Array(source.length);
+  const collect = (node: Nodes) => {
+    if (!("children" in node)) return;
+    for (const child of node.children)
+      if (child.type === "text") {
+        const [from, to] = range(child);
+        for (let i = from; i < to; i++) {
+          if (source[i] === "\\" && i + 1 < to && asciiPunctuation.test(source[i + 1]!)) i++;
+          else readable[i] = 1;
+        }
+      } else if (transparent.has(child.type)) collect(child);
+  };
+  walk(document.tree, (node) => {
+    if (node.type !== "paragraph" && node.type !== "heading" && node.type !== "tableCell") return;
+    const [start, end] = range(node);
+    // Searched in the block's own text, so that blocks without brackets cost no more than that.
+    const text = source.slice(start, end);
+    if (!text.includes("[")) return;
+    collect(node);
+    // Forgejo and Gitea render `\(...\)` and `\[...\]` as math, which GFM reads as text.
+    if (forge)
+      for (const [open, close] of [
+        ["\\(", "\\)"],
+        ["\\[", "\\]"],
+      ] as const)
+        for (let from = 0; ; ) {
+          const opening = text.indexOf(open, from);
+          const closing = opening < 0 ? -1 : text.indexOf(close, opening + 2);
+          if (closing < 0) break;
+          readable.fill(0, start + opening, start + closing + 2);
+          from = closing + 2;
+        }
+    const openers: number[] = [];
+    // The opening bracket of the last full reference's label, which is not read again.
+    let label = -1;
+    for (let i = start; i < end; i++) {
+      if (!readable[i]) continue;
+      if (source[i] === "[") {
+        openers.push(i);
+        continue;
+      }
+      if (source[i] !== "]") continue;
+      const opener = openers.pop();
+      if (opener === undefined || opener === label) continue;
+      let reference: Reference | undefined;
+      if (source[i + 1] === "[" && readable[i + 1]) {
+        if (source[i + 2] === "]" && readable[i + 2]) {
+          // Collapsed: the text is the label.
+          if (labelEnd(source, opener, i + 1) === i + 1)
+            reference = {
+              start: opener,
+              end: i + 3,
+              label: source.slice(opener + 1, i),
+              footnote: false,
+            };
+        } else {
+          const after = labelEnd(source, i + 1, end);
+          if (after !== undefined && readable[after - 1]) {
+            reference = {
+              start: opener,
+              end: after,
+              label: source.slice(i + 2, after - 1),
+              footnote: false,
+            };
+            label = i + 1;
+          }
+        }
+        if (reference) {
+          if (
+            !definitions.has(normalizeLabel(labelText(reference.label))) &&
+            !(opener > 0 && readable[opener - 1] && notAfter.test(source[opener - 1]!))
+          )
+            references.push(reference);
+          continue;
+        }
+      }
+      // A footnote label has at most 999 characters after its `^`.
+      if (!footnotes || source[opener + 1] !== "^" || i - opener > 1001) continue;
+      const footnote = footnoteLabel.exec(source.slice(opener + 1, i));
+      if (footnote && !footnotes.has(normalizeLabel(footnote[1]!)))
+        references.push({ start: opener, end: i + 1, label: footnote[1]!, footnote: true });
+    }
+  });
+  return references;
 }
 
 /** Names the first few of the paths that could not be read, and counts the rest. */
@@ -324,6 +485,102 @@ export const linkRules: Record<string, Rule> = {
           end,
           message: `Use ${String(options.style)} link notation.`,
           edit: { start, end, text: replacement },
+        });
+      });
+      return findings;
+    },
+  },
+  "links/undefined-reference": {
+    description:
+      "Report full, collapsed, and footnote references whose label has no definition, which show as plain text.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const definitions = new Set<string>();
+      const footnotes = new Set<string>();
+      walk(document.tree, (node) => {
+        if (node.type === "definition") definitions.add(node.identifier);
+        if (node.type === "footnoteDefinition") footnotes.add(node.identifier);
+      });
+      // CommonMark has no footnotes: there `[^label]` is an ordinary shortcut reference.
+      return undefinedReferences(
+        document,
+        definitions,
+        document.dialect === "commonmark" ? undefined : footnotes,
+      ).map(({ start, end, label, footnote }) => {
+        const name = (footnote ? `^${label}` : labelText(label)).replace(/\s+/g, " ").trim();
+        return {
+          start,
+          end,
+          message: `${footnote ? "Footnote" : "Reference"} [${name}] has no definition and shows as plain text.`,
+        };
+      });
+    },
+  },
+  "links/unused-definition": {
+    description: "Report link and footnote definitions that no reference uses.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      // Link and footnote labels are kept apart, as `link:` and `footnote:` keys.
+      const used = new Set<string>();
+      const definitions: (Definition | FootnoteDefinition)[] = [];
+      walk(document.tree, (node) => {
+        // A shortcut reference `[label]` that has a definition is a reference node too.
+        if (node.type === "linkReference" || node.type === "imageReference")
+          used.add(`link:${node.identifier}`);
+        else if (node.type === "footnoteReference") used.add(`footnote:${node.identifier}`);
+        else if (node.type === "definition" || node.type === "footnoteDefinition")
+          definitions.push(node);
+      });
+      const findings: Finding[] = [];
+      const seen = new Set<string>();
+      for (const node of definitions) {
+        const footnote = node.type === "footnoteDefinition";
+        const key = `${footnote ? "footnote" : "link"}:${node.identifier}`;
+        const label = (node.label ?? node.identifier).replace(/\s+/g, " ").trim();
+        const name = `[${footnote ? "^" : ""}${label}]`;
+        const [start] = range(node);
+        // CommonMark uses the first definition of a label; a later one is never used.
+        if (seen.has(key))
+          findings.push({
+            start,
+            message: `${footnote ? "Footnote" : "Definition"} ${name} repeats an earlier one, which references use instead.`,
+          });
+        else if (!used.has(key))
+          findings.push({
+            start,
+            message: footnote
+              ? `Footnote ${name} is not referenced${document.dialect === "github" ? ", and GitHub does not show it" : ""}.`
+              : `Definition ${name} is not used by any reference.`,
+          });
+        seen.add(key);
+      }
+      return findings;
+    },
+  },
+  "links/empty": {
+    description: "Report links and images whose destination is empty or only #.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const findings: Finding[] = [];
+      // A reference has its definition's destination, which is reported once, at the definition.
+      walk(document.tree, (node) => {
+        if (node.type !== "link" && node.type !== "image" && node.type !== "definition") return;
+        if (node.url !== "" && node.url !== "#") return;
+        const what =
+          node.type === "image"
+            ? "Image source"
+            : node.type === "definition"
+              ? `Destination of definition [${(node.label ?? node.identifier).replace(/\s+/g, " ").trim()}]`
+              : "Link destination";
+        findings.push({
+          start: range(node)[0],
+          message:
+            node.url === ""
+              ? `${what} is empty.`
+              : `${what} is only #${node.type === "link" ? ", which only leads to the top of the page" : ""}.`,
         });
       });
       return findings;
