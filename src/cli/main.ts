@@ -35,7 +35,7 @@ const program = new Command()
   .version(manifest.version);
 function common(command: Command): Command {
   return command
-    .option("--config <file>", "Explicit JSON, JSONC, or .mjs configuration")
+    .option("--config <file>", "Explicit JSON, JSONC, or JavaScript configuration")
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",
@@ -292,12 +292,12 @@ common(program.command("config").description("Inspect effective configuration"))
         {
           root,
           file: loaded.file ?? null,
-          effective: resolveConfig(
-            loaded.config,
-            name,
-            loaded.plugins,
-            assumedDialect(await enclosingVault(path.join(actual, name))),
-          ),
+          effective: resolveConfig({
+            config: loaded.config,
+            path: name,
+            plugins: loaded.plugins,
+            defaultDialect: assumedDialect(await enclosingVault(path.join(actual, name))),
+          }),
         },
         null,
         2,

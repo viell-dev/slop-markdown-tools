@@ -44,7 +44,9 @@ and load it from the configuration:
 `name` is the plugin's prefix: a lowercase identifier that starts with a letter
 and holds letters, digits, and hyphens, unique among the loaded plugins. Its
 rules are named `name/rule` and its presets `name/preset`; a rule ID that
-already exists is an error. A plugin can also provide `syntax`, described
+already exists is an error. The name `engine` is reserved for the engine's own
+diagnostics, such as `engine/rule-error`, and a plugin with that name is
+rejected. A plugin can also provide `syntax`, described
 [below](#syntax-extensions). The library takes plugin objects through its
 `plugins` option; a list of strings in a library configuration loads nothing.
 
@@ -68,7 +70,8 @@ A plugin that cannot be loaded stops the command with exit code `2` and the
 message `Cannot load plugin "NAME" named in FILE: REASON`, where `REASON` is
 Node.js's own, such as `Cannot find package 'sample-plugin' imported from FILE`,
 or `no file at PATH` for a file entry. A module whose default export is not an
-object with a string `name` gives `Invalid plugin "NAME" named in FILE`.
+object with a string `name`, or whose plugin is named `engine`, gives
+`Invalid plugin "NAME" named in FILE`.
 
 ## Rules
 
@@ -100,10 +103,10 @@ names it and the reason, as in
 `Rule local/example failed (TypeError: …); the rule was skipped for this document.`
 The other rules and documents are still processed, and the CLI's exit code is
 `2`. An error that the workspace throws, such as a file that cannot be read, is
-not the rule's and is not reported this way. A plugin rule without a `check`
-function, a `kind` of `"style"` or `"problem"`, and a string `description`, or
-with a `phase` or `schema` of another kind, stops the command with an error that
-names it, even while the rule is off.
+not the rule's: `lint` and `format` throw it, and the CLI stops. A plugin rule
+without a `check` function, a `kind` of `"style"` or `"problem"`, and a string
+`description`, or with a `phase` or `schema` of another kind, stops the command
+with an error that names it, even while the rule is off.
 
 A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
