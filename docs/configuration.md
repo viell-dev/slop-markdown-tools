@@ -432,28 +432,31 @@ stderr. `lint` counts the files and the findings it reported, as in
 `3 file(s) linted; 1 error(s), 2 warning(s).` `format` counts the files and
 those it changed or would change, as in `3 file(s) processed; 1 would change.`
 Both add `; 1 could not be read` when a selected document
-[could not be read](#paths-that-cannot-be-read). Versions up to `0.2.0-rc.1`
-ended `lint` with `0 would change`, whatever it found. The line is meant for
-people; a script should read the JSON report or the exit code.
+[could not be read](#paths-that-cannot-be-read), and `format --write` adds
+`; 1 could not be written` for a file it could not
+[write](#files-that-cannot-be-written). Versions up to `0.2.0-rc.1` ended `lint`
+with `0 would change`, whatever it found. The line is meant for people; a script
+should read the JSON report or the exit code.
 
 `format --diff` is the default for file input. `--check`, `--diff`, and
 `--write` are mutually exclusive. `format - --stdin-filepath notes/example.md`
 reads stdin with configuration and resolution context; it cannot be used with
 `--write`.
 
-| Exit | Meaning                                                                                      |
-| ---- | -------------------------------------------------------------------------------------------- |
-| `0`  | Completed; no errors or failed formatting check                                              |
-| `1`  | Lint errors, exceeded `--max-warnings`, or changes required by `format --check`              |
-| `2`  | Configuration, execution, or formatting safety failure, or a document that could not be read |
+| Exit | Meaning                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------- |
+| `0`  | Completed; no errors or failed formatting check                                                         |
+| `1`  | Lint errors, exceeded `--max-warnings`, or changes required by `format --check`                         |
+| `2`  | Configuration, execution, or formatting safety failure, or a document that could not be read or written |
 
 Warnings do not fail a command unless `--max-warnings` is supplied. A successful
 formatting command can still report remaining lint problems. Inspect its exit
 code and diagnostics. An unsafe-format diagnostic blocks the complete batch's
 write phase, and so does a selected document that
-[cannot be read](#paths-that-cannot-be-read). An I/O error during writing can
-leave earlier files written; replacement is atomic per file, not a
-workspace-wide transaction.
+[cannot be read](#paths-that-cannot-be-read) or a changed file that
+[cannot be written](#files-that-cannot-be-written). Replacement is atomic per
+file, not a workspace-wide transaction: a file that fails while the batch is
+being written is reported, and the others are still written.
 
 ## Paths that cannot be read
 
@@ -528,6 +531,34 @@ the file without a fragment is valid, because the file is known to exist.
 Versions up to `0.2.0-rc.1` stopped at the first such file or link without
 reporting anything else.
 
-Only the system errors `EACCES` and `EPERM` count as not permitted. Any other
-read error, such as a path that disappeared during the run or a failing device,
-stops the run with exit code `2`.
+The system errors `EACCES` and `EPERM` count as not permitted. So does `EBUSY`,
+which Windows reports for a file that another program has locked against
+reading, with the reason `EBUSY: resource busy or locked`; versions up to
+`0.2.0-rc.2` stopped every command at a locked file. Any other read error, such
+as a path that disappeared during the run or a failing device, stops the run
+with exit code `2`.
+
+## Files that cannot be written
+
+`format --write` replaces each file it changes with a new file written beside
+it, so that a file is never left half written. Before it writes anything, it
+checks that each file it is about to change may be written and that the file's
+folder lets it create the new file there. A file that fails the check is
+reported as an error diagnostic for that file, with the rule ID
+`engine/unwritable-file` at line 1 and the system's reason, such as
+`The file may not be written (EACCES: permission denied); no file was written.`
+Nothing of the batch is written, `written` is `false` in the JSON report, and
+the exit code is `2`, as for a document that cannot be read; pass `--exclude`
+for the file to format the rest. A read-only file is refused on every platform.
+Versions up to `0.2.0-rc.2` replaced it on Linux and macOS, where renaming over
+a file does not need permission to write it, and stopped part-way through the
+batch on Windows.
+
+A failure that the check cannot foresee is reported for its file in the same
+way, as in
+`The file could not be written (EPERM: operation not permitted) and is unchanged.`
+That happens on Windows for a file that another program has open, and on every
+platform when a file changed on disk during the run or the disk is full. The
+other files of the batch are still written, `written` is `true`, and the exit
+code is `2`. Versions up to `0.2.0-rc.2` stopped at such a file with the
+system's message, after writing the files before it.

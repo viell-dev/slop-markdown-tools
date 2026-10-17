@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, symlink, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, symlink, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { discover, writeAtomic } from "../../src/workspace/files.js";
+import { discover, replacementFailure, writeAtomic } from "../../src/workspace/files.js";
 import { enclosingVault, isVault } from "../../src/workspace/vault.js";
 import { loadConfig } from "../../src/config/load.js";
-import { canRestrict, cli, fixture, manifest, restrict, run } from "./support.js";
+import { canRestrict, cli, fixture, manifest, restrict, run, tree } from "./support.js";
 
 describe("CLI", () => {
   it("previews, writes, then verifies formatting without changing unrelated syntax", async () => {
@@ -760,6 +760,116 @@ describe("filesystem safeguards", () => {
     await writeAtomic(path.join(root, "note.md"), "old", "new");
     expect((await stat(path.join(root, "note.md"))).mode).toBe(before.mode);
   });
+  it("words a failure to write without the paths that the system names", () => {
+    const error = (code: string, message: string, syscall?: string) =>
+      Object.assign(new Error(message), { code, ...(syscall ? { syscall } : {}) });
+    expect(
+      replacementFailure(error("EROFS", "EROFS: read-only file system, open '/x/.tmp'", "open")),
+    ).toBe("The file could not be written (EROFS: read-only file system) and is unchanged");
+    // A refusal is worded the same on every platform.
+    expect(replacementFailure(error("EBUSY", "EBUSY: busy, rename 'a' -> 'b'", "rename"))).toBe(
+      "The file could not be written (EBUSY: resource busy or locked) and is unchanged",
+    );
+    expect(replacementFailure(error("EIO", "unusual"))).toBe(
+      "The file could not be written (EIO) and is unchanged",
+    );
+    // Anything else is a fault of the tool and is not reported as a file's problem.
+    expect(replacementFailure(new TypeError("fault"))).toBeUndefined();
+  });
+  const notes = { "a.md": "A *b*.\n", "held.md": "H *b*.\n", "z.md": "Z *b*.\n" };
+  // A read-only file binds every user on Windows, and every user but root elsewhere.
+  it.skipIf(process.platform !== "win32" && process.getuid?.() === 0)(
+    "writes nothing when a file to change is read-only",
+    async () => {
+      const root = await fixture(notes);
+      await restrict(path.join(root, "held.md"), 0o444);
+      const reason =
+        process.platform === "win32"
+          ? "EPERM: operation not permitted"
+          : "EACCES: permission denied";
+      const applied = run(root, ["format", "--write"]);
+      expect(applied.status).toBe(2);
+      expect(applied.stderr).toBe(
+        `held.md:1:1: error engine/unwritable-file: The file may not be written (${reason}); no file was written.\n` +
+          "3 file(s) processed; 3 would change; 1 could not be written.\n",
+      );
+      expect(await tree(root)).toEqual(notes);
+      const report = JSON.parse(run(root, ["format", "--write", "--json"]).stdout);
+      expect(report.written).toBe(false);
+      expect(report.files[1].diagnostics[0]).toEqual({
+        start: 0,
+        message: `The file may not be written (${reason}); no file was written.`,
+        rule: "engine/unwritable-file",
+        severity: "error",
+        line: 1,
+        column: 1,
+      });
+      // Only writing needs the file to be writable.
+      expect(run(root, ["format", "--check"]).status).toBe(1);
+      expect(run(root, ["lint"]).status).toBe(0);
+      const rest = run(root, ["format", "--write", "--exclude", "held.md"]);
+      expect(rest.status, rest.stderr).toBe(0);
+      expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
+    },
+  );
+  it.skipIf(!canRestrict)(
+    "writes nothing when the folder of a file to change is not writable",
+    async () => {
+      const root = await fixture({ "a.md": "A *b*.\n", "sub/s.md": "S *b*.\n" });
+      await restrict(path.join(root, "sub"), 0o555);
+      const applied = run(root, ["format", "--write"]);
+      expect(applied.status).toBe(2);
+      expect(applied.stderr).toBe(
+        "sub/s.md:1:1: error engine/unwritable-file: The file's folder may not be written (EACCES: permission denied); no file was written.\n" +
+          "2 file(s) processed; 2 would change; 1 could not be written.\n",
+      );
+      expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("A *b*.\n");
+    },
+  );
+  // Windows does not let a file be replaced while a program has it open; elsewhere that works.
+  it.skipIf(process.platform !== "win32")(
+    "reports a file that cannot be replaced for that file and writes the others",
+    async () => {
+      const root = await fixture(notes);
+      const handle = await open(path.join(root, "held.md"), "r");
+      let applied: ReturnType<typeof run>;
+      try {
+        applied = run(root, ["format", "--write", "--json"]);
+      } finally {
+        await handle.close();
+      }
+      expect(applied.status).toBe(2);
+      const report = JSON.parse(applied.stdout);
+      expect(report.written).toBe(true);
+      expect(report.files[1]).toEqual({
+        path: "held.md",
+        changed: true,
+        diagnostics: [
+          {
+            start: 0,
+            message:
+              "The file could not be written (EPERM: operation not permitted) and is unchanged.",
+            rule: "engine/unwritable-file",
+            severity: "error",
+            line: 1,
+            column: 1,
+          },
+        ],
+      });
+      expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
+      await writeFile(path.join(root, "a.md"), notes["a.md"]);
+      const again = await open(path.join(root, "held.md"), "r");
+      try {
+        applied = run(root, ["format", "--write"]);
+      } finally {
+        await again.close();
+      }
+      expect(applied.stderr).toBe(
+        "held.md:1:1: error engine/unwritable-file: The file could not be written (EPERM: operation not permitted) and is unchanged.\n" +
+          "3 file(s) processed; 1 written; 1 could not be written.\n",
+      );
+    },
+  );
   it.skipIf(process.platform === "win32")(
     "refuses explicit symlinks and skips them during traversal",
     async () => {

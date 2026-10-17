@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { discover, vaultFor, writeAtomic } from "../workspace/files.js";
+import {
+  discover,
+  replacementFailure,
+  replacementProblem,
+  vaultFor,
+  writeAtomic,
+} from "../workspace/files.js";
 import { enclosingVault, vaultOf } from "../workspace/vault.js";
 import { excludeSelection } from "../workspace/selection.js";
 import { createWorkspace } from "../workspace/index.js";
@@ -208,19 +214,54 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       if (result.changed) changes.push({ file: name, before: source, after: result.output });
     }
   }
-  // A file that could not be formatted safely, or not be read at all, is a failure
-  // to operate: nothing of the batch is written, and the run ends with status 2.
-  const diagnostics = reports.flatMap((report) => report.diagnostics);
-  const count = (severity: Diagnostic["severity"]) =>
-    diagnostics.filter((item) => item.severity === severity).length;
-  const unsafe =
+  // A file that could not be formatted safely, not be read at all, or not be
+  // written is a failure to operate: nothing of the batch is written, and the
+  // run ends with status 2.
+  let unsafe =
     unread.length > 0 ||
     reports.some((report) =>
       report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
     );
+  // Changed files that could not be written, each reported for its file.
+  const unwritten: string[] = [];
+  const refuse = (file: string, message: string) => {
+    unwritten.push(file);
+    reports
+      .find((report) => report.path === file)!
+      .diagnostics.unshift({
+        start: 0,
+        message: `${message}.`,
+        rule: "engine/unwritable-file",
+        severity: "error",
+        line: 1,
+        column: 1,
+      });
+  };
+  if (flags.write && !unsafe) {
+    // What can be seen before writing stops the whole batch, instead of being
+    // found part-way through it.
+    for (const change of changes) {
+      const problem = await replacementProblem(path.join(set.root, change.file));
+      if (problem) refuse(change.file, `${problem}; no file was written`);
+    }
+    unsafe = unwritten.length > 0;
+  }
+  let written = 0;
   if (flags.write && !unsafe)
-    for (const change of changes)
-      await writeAtomic(path.join(set.root, change.file), change.before, change.after);
+    for (const change of changes) {
+      // Each file is replaced on its own, so a failure leaves the others to be written.
+      try {
+        await writeAtomic(path.join(set.root, change.file), change.before, change.after);
+        written++;
+      } catch (error) {
+        const failure = replacementFailure(error);
+        if (!failure) throw error;
+        refuse(change.file, failure);
+      }
+    }
+  const diagnostics = reports.flatMap((report) => report.diagnostics);
+  const count = (severity: Diagnostic["severity"]) =>
+    diagnostics.filter((item) => item.severity === severity).length;
   if (flags.json)
     process.stdout.write(
       JSON.stringify(
@@ -255,19 +296,22 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       const outcome =
         mode === "lint"
           ? `${count("error")} error(s), ${count("warn")} warning(s)`
-          : `${changes.length} ${flags.write && !unsafe ? "written" : "would change"}`;
+          : flags.write && !unsafe
+            ? `${written} written`
+            : `${changes.length} would change`;
       process.stderr.write(
-        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}.\n`,
+        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}${unwritten.length ? `; ${unwritten.length} could not be written` : ""}.\n`,
       );
     }
   }
   const errors = count("error") > 0;
   const tooManyWarnings = flags.maxWarnings !== undefined && count("warn") > flags.maxWarnings;
-  process.exitCode = unsafe
-    ? 2
-    : errors || tooManyWarnings || (flags.check && changes.length > 0)
-      ? 1
-      : 0;
+  process.exitCode =
+    unsafe || unwritten.length > 0
+      ? 2
+      : errors || tooManyWarnings || (flags.check && changes.length > 0)
+        ? 1
+        : 0;
 }
 common(
   program.command("lint").argument("[paths...]", "Markdown files/directories, or - for stdin"),

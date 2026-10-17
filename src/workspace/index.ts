@@ -13,8 +13,8 @@ import { refusal } from "./access.js";
 /**
  * A Markdown file's text, null for a file that is not Markdown, or a loader
  * that returns the text when a fragment check needs it. A loader that throws an
- * error whose `code` is `EACCES` or `EPERM` marks the file as unreadable; any
- * other error propagates.
+ * error whose `code` is `EACCES`, `EPERM`, or `EBUSY` marks the file as
+ * unreadable; any other error propagates.
  */
 export type WorkspaceSource = string | null | (() => string);
 

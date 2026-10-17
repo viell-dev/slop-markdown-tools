@@ -1111,7 +1111,8 @@ describe("files that could not be read", () => {
     dialect,
     rules: { "links/valid": severity },
   });
-  it.each(["EACCES", "EPERM"])(
+  // EBUSY: on Windows, another program can lock a file against reading.
+  it.each(["EACCES", "EPERM", "EBUSY"])(
     "resolves a fragment in a file whose loader fails with %s as unreadable",
     (code) => {
       const load = refuse(code);
