@@ -615,8 +615,12 @@ function shiftOps(
   const ops: Op[] = [];
   if (![...delta.values()].some(Boolean)) return ops;
   const { lines } = analysis;
-  const firstLine = Math.min(...unit.lists.map((list) => list.items[0]?.first ?? Infinity));
-  const lastLine = Math.max(...unit.lists.map((list) => list.items.at(-1)?.last ?? -1));
+  let firstLine = Infinity;
+  let lastLine = -1;
+  for (const { items } of unit.lists) {
+    firstLine = Math.min(firstLine, items[0]?.first ?? Infinity);
+    lastLine = Math.max(lastLine, items.at(-1)?.last ?? -1);
+  }
   for (const line of linesWithBlanks(analysis, firstLine, lastLine)) {
     const { chain, levels } = analysis.match(line);
     for (const [at, level] of levels.entries()) {
@@ -653,7 +657,7 @@ function unitFinding(source: string, ops: Op[], message: string): Finding | unde
   for (let index = 1; index < ops.length; index++)
     if (ops[index]!.start < ops[index - 1]!.end) return undefined;
   const start = ops[0]!.start;
-  const end = Math.max(...ops.map((op) => op.end));
+  const end = ops.at(-1)!.end;
   let text = "";
   let cursor = start;
   for (const op of ops) {
@@ -806,7 +810,7 @@ const orderedList: Rule = {
                 : `Number this list item ${numbers[item.index]}.`;
         }
       }
-      ops.push(...shiftOps(analysis, unit, delta, "end"));
+      for (const op of shiftOps(analysis, unit, delta, "end")) ops.push(op);
       ops.sort((a, b) => a.start - b.start);
       const finding = unitFinding(source, ops, message ?? "Renumber the list.");
       if (finding) findings.push(finding);
@@ -861,10 +865,10 @@ const listIndent: Rule = {
         const minimum = (item: Item) =>
           (!list.node.ordered ? 1 : item.index ? 2 : item.digits.length + 1) + 1;
         if (!feasible(analysis, list, changes, "start", minimum, "move")) continue;
-        ops.push(...marks);
+        for (const op of marks) ops.push(op);
         for (const [item, change] of changes) delta.set(item, change);
       }
-      ops.push(...shiftOps(analysis, unit, delta, "start"));
+      for (const op of shiftOps(analysis, unit, delta, "start")) ops.push(op);
       const finding = unitFinding(
         source,
         ops,
