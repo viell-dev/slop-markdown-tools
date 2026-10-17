@@ -1,7 +1,9 @@
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
+import { deepFreeze } from "./frozen.js";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
+import { optionErrors, shown } from "../config/problems.js";
 import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
@@ -17,6 +19,7 @@ import type {
   Edit,
   Finding,
   FormatResult,
+  JsonSchema,
   Plugin,
   ProcessOptions,
   ResolvedConfig,
@@ -25,32 +28,18 @@ import type {
   Workspace,
 } from "./types.js";
 
-export const builtInRules: Record<string, Rule> = {
+/**
+ * The built-in rules by rule ID. The table and the rules in it are frozen, so
+ * that no caller can change what another one runs.
+ */
+export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze({
   ...styleRules,
   ...dialectRules,
   ...linkRules,
   ...structureRules,
   ...contentRules,
-};
+});
 const phases = ["inline", "block", "document"] as const;
-/** A short description of a value that a plugin gave where something else belongs. */
-function shown(value: unknown): string {
-  switch (typeof value) {
-    case "string":
-      return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value);
-    case "number":
-    case "bigint":
-    case "boolean":
-    case "undefined":
-      return String(value);
-    case "function":
-      return "a function";
-    case "symbol":
-      return "a symbol";
-    default:
-      return value === null ? "null" : Array.isArray(value) ? "a list" : "an object";
-  }
-}
 /** What is wrong with a plugin's rule, or undefined when it has the shape of a `Rule`. */
 function ruleProblem(rule: unknown): string | undefined {
   if (!rule || typeof rule !== "object") return `it is ${shown(rule)}, not an object`;
@@ -71,13 +60,25 @@ function ruleProblem(rule: unknown): string | undefined {
   return undefined;
 }
 /**
- * The built-in rules and those of `plugins`, by rule ID. A plugin rule that
- * does not have the shape of a `Rule` is an error that names it.
+ * The prefix of the engine's own diagnostics, such as `engine/rule-error`. A
+ * plugin of this name could report findings that pass for the engine's, which
+ * concern the whole document and make the CLI exit with code 2.
  */
-export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
+export const reservedPluginName = "engine";
+/**
+ * The built-in rules and those of `plugins`, by rule ID, in a new table. A
+ * plugin name that is invalid, reserved, or used twice, a rule ID that exists
+ * already, and a plugin rule that does not have the shape of a `Rule` are
+ * errors that name them.
+ */
+export function ruleRegistry(plugins: readonly Plugin[] = []): Record<string, Readonly<Rule>> {
   const rules = { ...builtInRules };
   const names = new Set<string>();
   for (const plugin of plugins) {
+    if (plugin.name === reservedPluginName)
+      throw new Error(
+        `Invalid plugin name: ${reservedPluginName} is reserved for the engine's own diagnostics`,
+      );
     if (!/^[a-z][a-z\d-]*$/.test(plugin.name) || names.has(plugin.name))
       throw new Error(`Invalid or duplicate plugin name: ${plugin.name}`);
     names.add(plugin.name);
@@ -100,7 +101,7 @@ const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.sc
  * legitimately reuse an `$id` with different schemas.
  */
 const compiledSchemas = new WeakMap<object, ValidateFunction>();
-function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
+function optionsValidator(name: string, schema: JsonSchema): ValidateFunction {
   // Ajv keeps compiled boolean schemas itself.
   if (typeof schema !== "object") return ruleValidator.compile(schema);
   let validate = compiledSchemas.get(schema);
@@ -108,7 +109,7 @@ function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
     try {
       validate = (
         builtInSchemas.has(schema) ? ruleValidator : new Ajv({ allErrors: true })
-      ).compile(schema);
+      ).compile(schema as AnySchema);
     } catch (error) {
       throw new Error(
         `Invalid rule ${name}: its schema cannot be compiled: ${error instanceof Error ? error.message : String(error)}`,
@@ -120,12 +121,9 @@ function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
   return validate;
 }
 function prepare(options: ProcessOptions) {
-  const config = resolveConfig(
-    options.config,
-    options.path,
-    options.plugins,
-    options.defaultDialect,
-  );
+  // Only these options, so that resolveConfig's check for the prereleases' form sees no others.
+  const { config: given, path, plugins, defaultDialect } = options;
+  const config = resolveConfig({ config: given, path, plugins, defaultDialect });
   const rules = ruleRegistry(options.plugins);
   for (const [name, value] of Object.entries(config.rules)) {
     // Names such as `toString` are found on every object; only defined rules count.
@@ -136,7 +134,7 @@ function prepare(options: ProcessOptions) {
       const validate = optionsValidator(name, rule.schema);
       if (!validate(enabled.options))
         throw new Error(
-          `Invalid options for ${name}: ${ruleValidator.errorsText(validate.errors)}`,
+          `Invalid options for ${name}: ${optionErrors(validate.errors ?? [], enabled.options)}`,
         );
     }
   }
@@ -207,6 +205,19 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
   return undefined;
 }
 /**
+ * The workspace of a run as the engine and its rules use it, and the errors
+ * that it threw. Such an error is the host's, such as a file that could not be
+ * read, and neither a rule's nor a refusal to format: it stops the run.
+ */
+interface Host {
+  workspace?: Workspace;
+  errors: Set<unknown>;
+}
+function host(workspace: Workspace | undefined): Host {
+  const errors = new Set<unknown>();
+  return workspace ? { workspace: guarded(workspace, errors), errors } : { errors };
+}
+/**
  * `workspace` as rules see it. What its `resolve` throws is added to `errors`:
  * such an error is the host's, such as a file that could not be read, and not
  * the rule's. Rules still see it as it was thrown.
@@ -248,14 +259,12 @@ function inspect(
   document: Document,
   config: ResolvedConfig,
   rules: Record<string, Rule>,
-  host?: Workspace,
+  { workspace, errors: hostErrors }: Host,
   include: (rule: Rule) => boolean = () => true,
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
   const starts = lineStarts(document.source);
-  const hostErrors = new Set<unknown>();
-  const workspace = host && guarded(host, hostErrors);
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
     const rule = rules[name]!;
@@ -306,12 +315,18 @@ function located(diagnostics: Diagnostic[], mark: string): Diagnostic[] {
       : {}),
   }));
 }
+/**
+ * The diagnostics of the enabled rules for `source`, sorted by position. A rule
+ * that fails is skipped and reported as `engine/rule-error`. An invalid
+ * configuration, an unknown rule, invalid rule options, an invalid plugin, and
+ * an error that the workspace throws are thrown.
+ */
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
   if (options.ranges) checkRanges(options.ranges, source);
   const { config, rules } = prepare(options);
   const [mark, text] = splitByteOrderMark(source);
   const document = parse(text, config.dialect, options.path, options.plugins);
-  const diagnostics = inspect(document, config, rules, options.workspace);
+  const diagnostics = inspect(document, config, rules, host(options.workspace));
   // Ranges count the marks, and the document's positions do not.
   const scope =
     options.ranges && widen(document.tree, document.source, shifted(options.ranges, -mark.length));
@@ -322,7 +337,12 @@ export function lint(source: string, options: ProcessOptions = {}): Diagnostic[]
     mark,
   );
 }
-export function applyEdits(source: string, edits: Edit[]): string {
+/**
+ * `source` with `edits` applied, which are `{ start, end, text }` replacements
+ * at UTF-16 offsets into it. Repeats of one edit count once; an edit outside
+ * the source, or one that overlaps another, is an error.
+ */
+export function applyEdits(source: string, edits: readonly Edit[]): string {
   return splice(source, acceptedEdits(source, edits));
 }
 /** `source` with `edits`, which are sorted and do not overlap, applied. */
@@ -342,7 +362,7 @@ function splice(source: string, edits: readonly Edit[]): string {
  * of the same edit. An edit outside the source, or overlapping another one, is
  * an error.
  */
-function acceptedEdits(source: string, edits: Edit[]): Edit[] {
+function acceptedEdits(source: string, edits: readonly Edit[]): Edit[] {
   const sorted = [...edits].sort((a, b) => a.start - b.start || a.end - b.end);
   let previous: Edit | undefined;
   const accepted: Edit[] = [];
@@ -371,7 +391,12 @@ function acceptedEdits(source: string, edits: Edit[]): Edit[] {
   }
   return accepted;
 }
-/** Compare semantic trees, with link identity supplied by the selected renderer's resolver. */
+/**
+ * The meaning of a parsed document as text, which `format` compares before and
+ * after edits to refuse a change of meaning: its syntax tree without positions,
+ * with runs of whitespace in text alike, and with each link's destination as
+ * the workspace resolves it, so that two spellings of one target are the same.
+ */
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   return JSON.stringify(semanticTree(document, workspace));
 }
@@ -397,12 +422,12 @@ function semanticTree(
   function normalize(node: Nodes, calloutHeader = false): unknown {
     if (node.type === "wikiLink") {
       const link = node.embed
-        ? { label: node.label, type: "embed", url: canonicalUrl(node.target ?? "", true) }
+        ? { label: node.label, type: "embed", url: canonicalUrl(node.target, true) }
         : {
             children: [{ type: "text", value: node.label ?? node.target }],
             title: null,
             type: "link",
-            url: canonicalUrl(node.target ?? "", true),
+            url: canonicalUrl(node.target, true),
           };
       origins?.set(link, node);
       return link;
@@ -492,8 +517,10 @@ function divergence(before: Document, after: Document, workspace?: Workspace): n
   }
 }
 /**
- * Format a document. Byte order marks that it starts with stay in the output
- * and are not part of what the rules see.
+ * Format a document: apply the edits of the enabled style rules, in passes
+ * until nothing changes, leaving out the edits of a rule that would change the
+ * document's meaning. Byte order marks that it starts with stay in the output
+ * and are not part of what the rules see. Errors are thrown as by `lint`.
  */
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
   if (options.ranges) checkRanges(options.ranges, source);
@@ -549,6 +576,9 @@ function formatText(
   ranges: SourceRange[] | undefined,
 ): FormatResult {
   const { config, rules } = prepare(options);
+  // What the workspace throws stops formatting, as it stops `lint`.
+  const hosted = host(options.workspace);
+  const { workspace } = hosted;
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);
   // Where edits may apply, in the positions of the current output.
@@ -569,10 +599,10 @@ function formatText(
   const check = (candidate: string) => {
     const parsed = parse(candidate, config.dialect, options.path, options.plugins);
     // Every document accepted so far means what the original means, so the current one serves.
-    fingerprint ??= semanticFingerprint(document, options.workspace);
+    fingerprint ??= semanticFingerprint(document, workspace);
     return {
       document: parsed,
-      safe: semanticFingerprint(parsed, options.workspace) === fingerprint,
+      safe: semanticFingerprint(parsed, workspace) === fingerprint,
     };
   };
   const seen = new Set([source]);
@@ -598,7 +628,7 @@ function formatText(
           document,
           config,
           rules,
-          options.workspace,
+          hosted,
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
         findings.push(...diagnostics);
@@ -653,18 +683,12 @@ function formatText(
       if (output === before) {
         // No phase changed the document, so every style finding of this pass
         // describes the final document; only the non-style rules still need to run.
-        const remaining = inspect(
-          document,
-          config,
-          rules,
-          options.workspace,
-          (rule) => rule.kind !== "style",
-        );
+        const remaining = inspect(document, config, rules, hosted, (rule) => rule.kind !== "style");
         // A refusal of this pass was tried on the final text, unless one
         // phase undid what an earlier one did.
         const starts = refused.length ? lineStarts(output) : [];
         const refusals = refused.map(({ rule, before: tried, after }) => {
-          const start = tried.source === output ? divergence(tried, after, options.workspace) : 0;
+          const start = tried.source === output ? divergence(tried, after, workspace) : 0;
           const { line } = diagnostic(starts, rule, "error", { start, message: "" });
           return diagnostic(starts, "engine/unsafe-format", "error", {
             start,
@@ -688,6 +712,7 @@ function formatText(
       `Formatting by ${listed(applied)} did not converge in eight passes; the document was left unchanged.`,
     );
   } catch (error) {
+    if (hosted.errors.has(error)) throw error;
     return unchanged(error instanceof Error ? error.message : String(error));
   }
 }

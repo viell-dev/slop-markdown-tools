@@ -6,22 +6,28 @@ file, the `recommended` preset applies and the dialect is
 
 ## Configuration files
 
-The file is named `mdtools.config.jsonc`, `mdtools.config.json`, or
-`mdtools.config.mjs`. The CLI looks for it in the directory given with `--root`,
-or else the current directory, and then in each directory above, up to the first
-one that is a Git repository (holds `.git`) or an Obsidian vault (holds
-`.obsidian`), or the filesystem root. Two configuration files in one directory
-are an error. `--config` names a file explicitly. The directory of the
-configuration file is the workspace root unless `--root` names another; without
-a configuration file, it is the repository or vault where the search stopped, or
-else the current directory. Configuration files do not cascade: a file in a
-subdirectory is not merged with one above it.
+The file is named `mdtools.config.jsonc`, `mdtools.config.json`,
+`mdtools.config.mjs`, `mdtools.config.js`, or `mdtools.config.cjs`. The CLI
+looks for it in the directory given with `--root`, or else the current
+directory, and then in each directory above, up to the first one that is a Git
+repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or the
+filesystem root. Two configuration files in one directory are an error.
+`--config` names a file explicitly. The directory of the configuration file is
+the workspace root unless `--root` names another; without a configuration file,
+it is the repository or vault where the search stopped, or else the current
+directory. Configuration files do not cascade: a file in a subdirectory is not
+merged with one above it.
 
 JSONC allows comments and trailing commas. A JSON or JSONC file may start with a
-byte order mark. An `.mjs` file exports the configuration as its default export.
-JavaScript configuration and plugins run with your permissions, so load only
-code you trust. Unknown keys, rule IDs, and preset names are errors, and so are
-rule options that the rule does not accept.
+byte order mark, and a syntax error in one is reported with its line and column.
+A JavaScript file exports the configuration as its default export, or as
+`module.exports` in CommonJS; Node.js reads an `.mjs` file as an ES module, a
+`.cjs` file as CommonJS, and a `.js` file as the nearest `package.json` declares
+with `type`, or by its syntax when none does. JavaScript configuration and
+plugins run with your permissions, so load only code you trust. Unknown keys,
+rule IDs, and preset names are errors, and so are rule options that the rule
+does not accept; the message names the setting, as in
+`"extends[1]" must be a preset name, not 5`.
 
 ```jsonc
 {
@@ -34,18 +40,44 @@ rule options that the rule does not accept.
 }
 ```
 
-| Key         | Value                                          | Purpose                                                           |
-| ----------- | ---------------------------------------------- | ----------------------------------------------------------------- |
-| `$schema`   | A string                                       | Ignored by the tool, so that an editor can be given a JSON Schema |
-| `extends`   | Preset names                                   | [Presets](#presets) to start from                                 |
-| `dialect`   | A [dialect](dialects.md) name                  | The renderer whose syntax documents are read in                   |
-| `rules`     | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                         |
-| `overrides` | Objects with `files`, and `dialect` or `rules` | [Settings for some files](#overrides)                             |
-| `ignore`    | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)       |
-| `resolve`   | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)              |
-| `plugins`   | Files or package names                         | [Plugins](#plugins) to load                                       |
+| Key         | Value                                          | Purpose                                                              |
+| ----------- | ---------------------------------------------- | -------------------------------------------------------------------- |
+| `$schema`   | A string                                       | Ignored by the tool; gives an editor the [JSON Schema](#json-schema) |
+| `extends`   | A preset name or a list of them                | [Presets](#presets) to start from                                    |
+| `dialect`   | A [dialect](dialects.md) name                  | The renderer whose syntax documents are read in                      |
+| `rules`     | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                            |
+| `overrides` | Objects with `files`, and `dialect` or `rules` | [Settings for some files](#overrides)                                |
+| `ignore`    | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)          |
+| `resolve`   | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)                 |
+| `plugins`   | Files or package names                         | [Plugins](#plugins) to load                                          |
 
-The package does not ship a schema file; the library exports the schema as
+### JSON Schema
+
+The configuration's JSON Schema lets an editor that reads JSON Schemas, such as
+Visual Studio Code, complete and check the settings. The package ships it as
+`config.schema.json`, matching the installed version; name it with `$schema`,
+relative to the configuration file:
+
+```jsonc
+{
+  "$schema": "./node_modules/mdrefine/config.schema.json",
+  "extends": ["recommended", "github"],
+}
+```
+
+The documentation site serves the schema of the version it documents at
+`https://viell-dev.github.io/slop-markdown-tools/config.schema.json`, an address
+that stays the same. In a JavaScript configuration file, a type annotation in a
+comment gives an editor the same help:
+
+```js
+/** @type {import("mdrefine").Config} */
+export default { extends: ["recommended", "github"] };
+```
+
+The schema describes the form of each setting. Rule IDs, preset names, and rule
+options are checked when the tool runs, against the rules and presets of the
+loaded plugins. The library exports the same schema as
 [`configSchema`](api.md#other-exports).
 
 ## Presets
@@ -65,10 +97,11 @@ index](rules.md) shows which rules each preset enables.
 | `gitea`       | `gitea`          | Documents rendered by Gitea                                                                                        |
 | `obsidian`    | `obsidian`       | An Obsidian vault                                                                                                  |
 
-Without `extends`, the configuration starts from `recommended`. An `extends`
-list replaces that default, so name both, as in `["recommended", "github"]`;
-`"extends": []` enables no rules. Presets apply in the order listed, then the
-configuration's own settings, then each matching override in order. A later
+Without `extends`, the configuration starts from `recommended`. `extends` names
+one preset or lists several, and replaces that default, so name both, as in
+`["recommended", "github"]`; `"extends": "github"` starts from `github` alone,
+and `"extends": []` enables no rules. Presets apply in the order listed, then
+the configuration's own settings, then each matching override in order. A later
 setting for a rule replaces an earlier one as a whole, options included. A
 plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
@@ -76,8 +109,9 @@ plugin's presets are named with the plugin's name as a prefix, such as
 ## Rules and severity
 
 A rule's setting is its severity, `"off"`, `"warn"`, or `"error"`, or a list of
-the severity and the rule's options, as in `["warn", { "width": 100 }]`. The
-[rules reference](rules.md) lists every rule and its options.
+the severity and the rule's options, as in `["warn", { "width": 100 }]`; a list
+of the severity alone, `["warn"]`, keeps the rule's default options. The [rules
+reference](rules.md) lists every rule and its options.
 
 `format` applies the edits of every enabled style rule, whether its severity is
 `warn` or `error`. Problem rules only report. Errors make `lint` and `format`
@@ -111,7 +145,10 @@ that match one of its `files` patterns:
 
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names
-start with a dot, too.
+start with a dot, too. Patterns match letter case exactly on every system, so
+that a configuration selects the same files in CI on Linux as on Windows or
+macOS, where `.gitignore` files and patterns on the command line [ignore
+case](cli.md#which-files-are-processed).
 
 ## Ignored files and link targets
 
@@ -187,13 +224,14 @@ into it is left as written. A directive inside code is code, not a directive.
 ## Inspect the result
 
 `config explain` prints, as JSON, the configuration in effect for one document:
-the workspace `root`, the configuration `file` (or `null`), and the `effective`
+the workspace `root`, the configuration file as `config` (or `null`), the
+document's `path` from the root with forward slashes, and the `effective`
 settings, with the dialect assumed for that document and the overrides that
-match it.
+match it. The document need not exist, but like an input of `lint` it must lie
+inside the workspace.
 
 ```sh
 npx mdtools config explain notes/example.md
 ```
 
-It reads `--config`, `--root`, and `--dialect`. `mdtools config --help` lists
-the other options of `lint` as well, but `config explain` ignores them.
+It reads `--config`, `--root`, and `--dialect`, before or after `explain`.

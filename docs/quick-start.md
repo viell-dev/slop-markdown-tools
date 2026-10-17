@@ -41,11 +41,11 @@ npx mdtools format --check
 ```
 
 `--diff` prints what formatting would change, and is also what `format` does
-without an option. `--write` writes the changes. `--check` writes nothing and
-exits with code `1` when a document would change, which is the check to run in
-CI. `format` changes only what its rules target, and refuses any change that
-would alter what a document means. It can still report problems that need a
-person, such as a broken link.
+without an option. `--write` writes the changes. `--check` writes nothing, names
+each document that would change, and then exits with code `1`, which is the
+check to run in CI. `format` changes only what its rules target, and refuses any
+change that would alter what a document means. It can still report problems that
+need a person, such as a broken link.
 
 ## Choose a preset and a dialect
 
@@ -53,10 +53,14 @@ Create `mdtools.config.jsonc` at the root of your documents:
 
 ```jsonc
 {
+  "$schema": "./node_modules/mdrefine/config.schema.json",
   "extends": ["recommended", "github"],
   "ignore": ["vendor/**"],
 }
 ```
+
+The `$schema` line lets your editor complete and check the settings; see [JSON
+Schema](configuration.md#json-schema).
 
 `recommended` wraps prose at 80 columns, writes emphasis as `_text_` and strong
 text as `**text**`, ends every file with a line break, and checks local links.

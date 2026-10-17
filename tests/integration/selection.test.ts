@@ -277,13 +277,19 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     const generated = path.join(root, "generated");
     expect(gitIgnored(generated, ["a.md", "sub/b.md"])).toEqual(["a.md", "sub/b.md"]);
     const message =
-      'Skipped ignored input: . (matched by "generated/" in ../.gitignore). Its files are not processed.';
+      'Skipped ignored workspace root: . (matched by "generated/" in ../.gitignore). Its files are not processed.';
     const set = await discover(generated, [], []);
     expect(set.selected).toEqual([]);
     expect(set.skipped).toEqual([{ path: ".", type: "directory", code: "IGNORED", message }]);
+    // The command line names the paths from the current directory.
     const checked = run(root, ["lint", "--root", "generated"]);
     expect(checked.status, checked.stderr).toBe(0);
-    expect(checked.stderr).toContain(`mdtools: warning: ${message}\n`);
+    expect(checked.stderr).toContain(
+      'mdtools: warning: Skipped ignored workspace root: generated (matched by "generated/" in .gitignore). Its files are not processed.\n',
+    );
+    expect(run(generated, ["lint", "--root", "."]).stderr).toContain(
+      'mdtools: warning: Skipped ignored workspace root: . (matched by "generated/" in ../.gitignore)',
+    );
     // A named input says where the rule matched, from the root.
     const sub = path.join(generated, "sub");
     expect((await discover(sub, [path.join(sub, "b.md")], [])).skipped).toEqual([

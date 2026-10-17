@@ -1386,6 +1386,18 @@ describe("files that could not be read", () => {
       expect(() =>
         lint("[a](Secret.md#section)\n", { config: valid("github"), workspace: index }),
       ).toThrow(error);
+      // `format` stops on it as `lint` does, when a rule asks and when the semantic check does.
+      expect(() =>
+        format("[a](Secret.md#section)\n", { config: valid("github"), workspace: index }),
+      ).toThrow(error);
+      const emphasis: Config = {
+        extends: [],
+        dialect: "github",
+        rules: { "style/emphasis": "warn" },
+      };
+      expect(() =>
+        format("*a* [a](Secret.md#section)\n", { config: emphasis, workspace: index }),
+      ).toThrow(error);
     }
   });
   it("keeps the anchors it has when a later read of the same file is refused", () => {

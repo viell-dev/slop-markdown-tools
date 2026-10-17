@@ -144,7 +144,7 @@ export const dialectRules: Record<string, Rule> = {
             {
               start: 0,
               message:
-                "Obsidian strictLineBreaks is not verified true; paragraph reflow is disabled. Set it in Obsidian or supply workspace.strictLineBreaks to the library.",
+                "Obsidian's \"Strict line breaks\" setting is not known to be on, so paragraphs are not reflowed. Turn it on in the vault's settings, which keep it in .obsidian/app.json; a program that calls the library passes strictLineBreaks to createWorkspace.",
             },
           ]
         : [];
