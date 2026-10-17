@@ -20,7 +20,7 @@ export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", 
  */
 export const fallbackDialect: Dialect = "github";
 export function canonicalDialect(name: DialectName): Dialect {
-  return dialectAliases[name] ?? (name as Dialect);
+  return Object.hasOwn(dialectAliases, name) ? dialectAliases[name]! : (name as Dialect);
 }
 
 export const presets: Record<string, Config> = {
@@ -127,6 +127,20 @@ export function setting(value: RuleSetting): {
     : { severity: value, options: {} };
 }
 /**
+ * Set each of `rules` in `target`. A rule named `__proto__` becomes a setting
+ * like any other, to be reported as unknown, instead of replacing the
+ * object's prototype as an assignment would.
+ */
+function addRules(target: Record<string, RuleSetting>, rules: Config["rules"] = {}) {
+  for (const [name, value] of Object.entries(rules))
+    Object.defineProperty(target, name, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+}
+/**
  * The configuration in effect for the document at `path`. `defaultDialect` is
  * the dialect to assume when neither the configuration, a preset, nor a
  * matching override names one: `github` unless the caller knows better, as the
@@ -157,12 +171,12 @@ export function resolveConfig(
     for (const name of part.extends ?? []) {
       if (chain.includes(name))
         throw new Error(`Circular preset: ${[...chain, name].join(" -> ")}`);
-      const preset = available[name];
-      if (!preset) throw new Error(`Unknown preset: ${name}`);
-      merge(preset, [...chain, name]);
+      // Names such as `toString` are found on every object; only defined presets count.
+      if (!Object.hasOwn(available, name)) throw new Error(`Unknown preset: ${name}`);
+      merge(available[name]!, [...chain, name]);
     }
     if (part.dialect) result.dialect = canonicalDialect(part.dialect);
-    Object.assign(result.rules, part.rules);
+    addRules(result.rules, part.rules);
     Object.assign(result.resolve, part.resolve);
     result.ignore.push(...(part.ignore ?? []));
     overrides.push(...(part.overrides ?? []));
@@ -176,7 +190,7 @@ export function resolveConfig(
       )
     ) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
-      Object.assign(result.rules, override.rules);
+      addRules(result.rules, override.rules);
     }
   }
   return result;

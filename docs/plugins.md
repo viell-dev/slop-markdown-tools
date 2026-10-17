@@ -80,6 +80,7 @@ A rule is an object with a `description`, a `kind`, an optional `schema` and
   problem rules.
 - `schema` is a JSON Schema for the rule's options. The options a configuration
   gives are checked against it, and a rule without a schema accepts any options.
+  Each schema is compiled once, for all documents.
 - `check({ document, options, workspace })` receives the parsed `document`
   (`source`, `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) tree with source positions), the
@@ -87,19 +88,31 @@ A rule is an object with a `description`, a `kind`, an optional `schema` and
   gave none. It returns a list of findings.
 
 A finding has a `message`, a `start` offset, an optional `end`, and, from a
-style rule, an optional `edit` of the form `{ start, end, text }`. Offsets count
-UTF-16 code units in `document.source`; `range(node)` from the library gives a
+style rule, an optional `edit` of the form `{ start, end, text }`. Offsets are
+integers that count UTF-16 code units in `document.source`, from 0 to its
+length, with `end` not before `start`; `range(node)` from the library gives a
 node's offsets. `check` must be synchronous, must not change the document or
 perform I/O, and must not keep state between calls.
+
+A rule that throws, or returns anything other than a list of such findings, is
+skipped for that document and reported with an `engine/rule-error` error that
+names it and the reason, as in
+`Rule local/example failed (TypeError: …); the rule was skipped for this document.`
+The other rules and documents are still processed, and the CLI's exit code is
+`2`. An error that the workspace throws, such as a file that cannot be read, is
+not the rule's and is not reported this way. A plugin rule without a `check`
+function, a `kind` of `"style"` or `"problem"`, and a string `description`, or
+with a `phase` or `schema` of another kind, stops the command with an error that
+names it, even while the rule is off.
 
 A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
 for at most eight passes. After each phase that changes the document, it parses
-the result again and compares its meaning with the original's. Edits that
-overlap, rules that undo each other, or a change of meaning make `format` return
-the document unchanged with an `engine/unsafe-format` error. The comparison
-covers the syntax tree, not every application's rendering, and it constrains the
-text a rule returns, not what its code does.
+the result again and compares its meaning with the original's; the
+[safety model](design.md#safety-model) describes what happens to edits that
+overlap or would change the meaning. The comparison covers the syntax tree, not
+every application's rendering, and it constrains the text a rule returns, not
+what its code does.
 
 ## Resolve links in a rule
 

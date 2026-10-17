@@ -149,22 +149,24 @@ and its position: `start` and optional `end` as offsets into the text, and
 units, as JavaScript strings do. A style rule's diagnostic can carry the `edit`
 it proposes, with `start`, `end`, and the replacement `text`. In a `format`
 report, positions refer to the formatted text. Besides the rules, the engine
-reports `engine/unsafe-format` for a document that it could not format safely,
-`engine/unreadable-file`, and `engine/unwritable-file`.
+reports `engine/unsafe-format` for edits that it could not apply safely (see the
+[safety model](design.md#safety-model)), `engine/rule-error` for a rule that
+failed on a document (see [rules](plugins.md#rules)), `engine/unreadable-file`,
+and `engine/unwritable-file`.
 
 ## Exit codes
 
-| Code | Meaning                                                                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for `format --check`.                                       |
-| `1`  | Errors were found, there were more warnings than `--max-warnings`, or `format --check` found a document to change.                         |
-| `2`  | The command could not do its job: a configuration, path, or plugin error, a document that could not be formatted safely, read, or written. |
+| Code | Meaning                                                                                                                                                           |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for `format --check`.                                                              |
+| `1`  | Errors were found, there were more warnings than `--max-warnings`, or `format --check` found a document to change.                                                |
+| `2`  | The command could not do its job: a configuration, path, or plugin error, a rule that failed, or a document that could not be formatted safely, read, or written. |
 
 Warnings alone never fail a command without `--max-warnings`. `format` can
 succeed and still report problems that only a person can fix, so read its
-findings too. One document that cannot be formatted safely or read, or one file
-that cannot be written, stops `format --write` from writing any file of the
-batch.
+findings too. One document that cannot be formatted safely or read, or that a
+rule fails on, or one file that cannot be written, stops `format --write` from
+writing any file of the batch.
 
 ## Files that cannot be read or written
 
