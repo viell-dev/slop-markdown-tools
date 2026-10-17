@@ -84,7 +84,7 @@ dialect's renderer generates.
 | GitHub, CommonMark         | Rendered text, lowercased; punctuation other than `-` and `_` deleted; spaces become `-`; repeated anchors get `-1`, `-2`                | Ignoring case                          |
 | Forgejo, Gitea before 1.26 | Source of the heading's last line as written, Markdown included; every run of characters other than letters, digits, and `_` becomes `-` | Exactly                                |
 | Gitea 1.26 and later       | Rendered text of all lines, as on GitHub, without combining marks; repeated headings share one anchor                                    | Exactly                                |
-| Obsidian                   | The heading text itself; `#^id` reaches a block identifier                                                                               | Headings ignoring case, blocks exactly |
+| Obsidian                   | The heading text itself, or as its source writes it; `#A#B` reaches a heading below another, `#^id` a block identifier                   | Headings ignoring case, blocks exactly |
 
 The Gitea dialect accepts the anchors of both Gitea generations, so it cannot
 promise that a fragment exists on every version. Inline HTML in a heading adds

@@ -5,10 +5,17 @@ updates:
     labels: ["Type: Maintenance"]
     schedule:
       interval: weekly
-    # Revisit when typescript-eslint supports TypeScript 7; see PR #3.
+    # A version becomes a candidate a week after its publication, which leaves
+    # time for a compromised or broken release to be found and withdrawn.
+    cooldown:
+      default-days: 7
     ignore:
+      # Revisit when typescript-eslint supports TypeScript 7; see PR #3.
       - dependency-name: typescript
         versions: ["7.x"]
+      # The type definitions follow the lowest supported Node.js version, 22.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       development:
         dependency-type: development
@@ -17,3 +24,5 @@ updates:
     labels: ["Type: Maintenance"]
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7

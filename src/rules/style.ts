@@ -1,9 +1,10 @@
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
-import type { Blockquote, Nodes, Paragraph, Root, RootContent } from "mdast";
+import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
-import { range } from "../syntax/parse.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
+import { labelEnd, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { takesFinalLineEnding, takesLines } from "./blocks.js";
 
@@ -105,8 +106,11 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   };
 }
 
-// Whitespace inside an inline node is protected; only text-node whitespace can wrap.
-function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
+/**
+ * Join words into the atoms that reflow puts on lines. Whitespace-only words
+ * separate atoms; whitespace inside a word, such as in a code span, does not.
+ */
+function wrappingAtoms(words: string[], openers: RegExp[]): string[] {
   const atoms: string[] = [];
   let current = "";
   for (const word of words) {
@@ -119,8 +123,9 @@ function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
   // Keep atoms that would open a block or underline a Setext heading at the
   // start of a line attached to the preceding atom.
   for (let i = 1; i < atoms.length; i++) {
-    if (lineOpener.test(atoms[i]!) || extraOpener?.test(atoms[i]!)) {
-      atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atoms[i]}`);
+    const atom = atoms[i]!;
+    if (openers.some((opener) => opener.test(atom))) {
+      atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atom}`);
       i--;
     }
   }
@@ -134,10 +139,40 @@ function wrappingAtoms(words: string[], extraOpener?: RegExp): string[] {
   }
   return atoms;
 }
-// List markers, ATX and Setext heading markers, block quotes, thematic breaks,
-// fences, math, Obsidian comments, HTML blocks, and footnote definitions.
-const lineOpener =
-  /^(?:[-+*]|\d+[.)]|#{1,6}|>|[-*_]{3,}|-{2,}|=+|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
+/**
+ * Words that open a block or underline a heading at the start of a line, the
+ * way CommonMark does with them: as a whole word only. These are list markers,
+ * ATX heading markers, and runs of the character of a thematic break or a
+ * Setext underline, which a line of such words alone forms. A word that only
+ * starts with those characters, such as `--config`, `*delta*`, `#tag`, or
+ * `-5`, opens nothing.
+ */
+const wordOpener = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|\*+|-+|_+|=+)$/;
+/**
+ * The words of a GFM table's delimiter row, which a line of them alone forms
+ * below a line that then becomes the table's header row.
+ */
+const delimiterRowWord = /^[|:-]*[|-][|:-]*$/;
+/**
+ * Word starts that open a block whatever follows them on the line: block
+ * quotes, fences, math, Obsidian comments, HTML blocks, and footnote
+ * definitions.
+ */
+const prefixOpener = /^(?:>|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
+/**
+ * A paragraph's first word that would open a thematic break or TOML front
+ * matter alone on the first line. The paragraph's first line holds more than
+ * this word, so it opened neither there.
+ */
+const firstWordAlone = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|\+\+\+)$/;
+/**
+ * The start of a fence or of display math, which the first line of a
+ * paragraph can start with when what follows on the line, such as a backtick
+ * after a backtick fence, keeps it from opening one.
+ */
+const fenceStart = /^(?:`{3,}|~{3,}|\$\$)/;
+/** A link reference definition's label and colon, which a paragraph can start with. */
+const definitionStart = /^\[(?:[^[\]\\]|\\[^])+\]:/;
 // Forgejo and Gitea additionally open display math with `\[` and definition
 // descriptions with `:` followed by at least one space or tab, so only a bare
 // `:` atom could open one at the start of a reflowed line.
@@ -154,20 +189,159 @@ const forgeLineOpener = /^(?::$|\\\[)/;
 const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
 
 type Range = [number, number];
-/** Split text at source whitespace, except inside protected source ranges. */
-function splitWords(text: string, base: number, ranges: Range[]): string[] {
-  if (!ranges.length) return text.split(/([ \t]+)/).filter(Boolean);
-  const words: string[] = [];
-  let cursor = 0;
-  for (const match of text.matchAll(/[ \t]+/g)) {
-    const at = base + match.index;
-    if (ranges.some(([from, to]) => at > from && at < to)) continue;
-    if (match.index > cursor) words.push(text.slice(cursor, match.index));
-    words.push(match[0]);
-    cursor = match.index + match[0].length;
+/**
+ * The positions of a paragraph's source where whitespace is not a wrapping
+ * opportunity: those strictly inside a protected source range.
+ */
+class Protection {
+  private readonly mask: Uint8Array;
+  constructor(
+    private readonly start: number,
+    end: number,
+  ) {
+    this.mask = new Uint8Array(Math.max(0, end - start));
   }
-  if (cursor < text.length) words.push(text.slice(cursor));
-  return words;
+  add(from: number, to: number) {
+    this.mask.fill(1, Math.max(0, from + 1 - this.start), Math.max(0, to - this.start));
+  }
+  has(at: number): boolean {
+    return this.mask[at - this.start] === 1;
+  }
+  /** Split text that starts at offset `base` at whitespace outside protected ranges. */
+  split(text: string, base: number): string[] {
+    const words: string[] = [];
+    let cursor = 0;
+    for (const match of text.matchAll(/[ \t]+/g)) {
+      if (this.has(base + match.index)) continue;
+      if (match.index > cursor) words.push(text.slice(cursor, match.index));
+      words.push(match[0]);
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < text.length) words.push(text.slice(cursor));
+    return words;
+  }
+}
+/**
+ * What reflow does with a line ending inside an inline node that it keeps
+ * whole: in a code span it becomes the space that it renders as, and so it
+ * does in an image description; elsewhere it keeps the paragraph as written,
+ * for the reason given.
+ */
+type Joining = "code" | "description" | { reason: string };
+interface InlineAtom {
+  from: number;
+  to: number;
+  joining: Joining;
+  /** A code span's parsed content. */
+  value?: string;
+}
+/** The content of a code span written on one line, as CommonMark reads it. */
+function codeSpanValue(source: string): string {
+  const fence = /^`*/.exec(source)![0].length;
+  const value = source.slice(fence, source.length - fence);
+  return /^ [^]* $/.test(value) && /[^ ]/.test(value) ? value.slice(1, -1) : value;
+}
+/**
+ * Inline containers whose text reflow wraps like the paragraph's own: a line
+ * ending in them renders as a space, like one between words. Their delimiters,
+ * and a link's destination, title, or reference label, stay attached to the
+ * neighboring words.
+ */
+const wrappable = new Set<string>(["emphasis", "strong", "delete", "link", "linkReference"]);
+const lineBreakIn: Record<string, string> = {
+  html: "inline HTML",
+  inlineMath: "math",
+  obsidianComment: "an Obsidian comment",
+};
+function located(node: Nodes): boolean {
+  return node.position?.start.offset !== undefined && node.position.end.offset !== undefined;
+}
+function holds(node: Nodes, type: string): boolean {
+  let found = false;
+  walk(node, (child) => {
+    if (child.type === type) found = true;
+  });
+  return found;
+}
+/**
+ * The inline nodes of a paragraph, from `start` on, that reflow keeps whole,
+ * sorted by position, and the hard line breaks anywhere in it. A container
+ * that holds inline HTML is kept whole too, because HTML can make the
+ * whitespace inside it significant.
+ */
+function inlineAtoms(
+  paragraph: Paragraph,
+  start: number,
+): { atoms: InlineAtom[]; breaks: Range[]; unlocated: boolean } {
+  const atoms: InlineAtom[] = [];
+  const breaks: Range[] = [];
+  let unlocated = false;
+  const destination = { reason: "line break in a link destination or title" };
+  const visit = (parent: Parents) => {
+    for (const child of parent.children) {
+      if (child.type === "text") continue;
+      if (!located(child)) {
+        unlocated = true;
+        continue;
+      }
+      const [a, b] = range(child);
+      if (b <= start) continue;
+      if (child.type === "break") breaks.push([a, b]);
+      else if (
+        wrappable.has(child.type) &&
+        "children" in child &&
+        child.children.length &&
+        !holds(child, "html")
+      ) {
+        if (child.type === "link" || child.type === "linkReference") {
+          const close = labelEnd(child) ?? range(child.children.at(-1)!)[1];
+          atoms.push({ from: close, to: b, joining: destination });
+        }
+        visit(child);
+      } else if (child.type === "inlineCode")
+        atoms.push({ from: a, to: b, joining: "code", value: child.value });
+      else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
+        const close = labelEnd(child)!;
+        atoms.push({ from: a, to: close, joining: "description" });
+        atoms.push({ from: close, to: b, joining: destination });
+      } else {
+        const name = lineBreakIn[child.type] ?? (holds(child, "html") ? "inline HTML" : undefined);
+        const reason = `line break in ${name ?? "inline syntax"}`;
+        atoms.push({ from: a, to: b, joining: { reason } });
+      }
+    }
+  };
+  visit(paragraph);
+  atoms.sort((x, y) => x.from - y.from);
+  return { atoms, breaks, unlocated };
+}
+/** The atom whose source holds `at`, among atoms sorted by position. */
+function atomAt(atoms: InlineAtom[], at: number): InlineAtom | undefined {
+  let low = 0;
+  let high = atoms.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const atom = atoms[middle]!;
+    if (at <= atom.from) high = middle - 1;
+    else if (at >= atom.to) low = middle + 1;
+    else return atom;
+  }
+  return undefined;
+}
+/**
+ * The width of a line or line prefix, with a tab advancing to the next
+ * multiple of four columns, the tab stop that CommonMark uses for indentation.
+ */
+function lineWidth(text: string, measure: (text: string) => number): number {
+  if (!text.includes("\t")) return measure(text);
+  let width = 0;
+  for (const part of text.split(/(\t)/)) width += part === "\t" ? 4 - (width % 4) : measure(part);
+  return width;
+}
+/** Whether text parses as a single paragraph. */
+function oneParagraph(text: string, dialect: Dialect): boolean {
+  const { children } = parse(text, dialect).tree;
+  return children.length === 1 && children[0]!.type === "paragraph";
 }
 /**
  * Syntax that Forgejo and Gitea render but GFM parses as prose. A line starting
@@ -288,8 +462,10 @@ const wrap: Rule = {
         while (start < end && /[ \t]/.test(document.source[start]!)) start++;
       }
       let original = document.source.slice(start, end);
+      // An Obsidian callout or a GitHub, Forgejo, or Gitea alert keeps the line
+      // with its marker, and its title in Obsidian, as written.
       let calloutHeader =
-        document.dialect === "obsidian" &&
+        document.dialect !== "commonmark" &&
         parent?.type === "blockquote" &&
         index === 0 &&
         /^\[![\w-]+\]/.test(original);
@@ -327,7 +503,7 @@ const wrap: Rule = {
           });
         // Keep unusual continuations and inline syntax spanning the boundary untouched.
         if (supported) {
-          if (options.reportUnbreakable === true && measure(prefix + header) > width)
+          if (options.reportUnbreakable === true && lineWidth(prefix + header, measure) > width)
             findings.push({
               start,
               end: start + header.length,
@@ -342,8 +518,39 @@ const wrap: Rule = {
         }
       }
       const forge = goldmarkForges[document.dialect];
-      const extraOpener = forge ? forgeLineOpener : undefined;
-      let protectedRanges: Range[] = [];
+      const openers = [wordOpener, prefixOpener];
+      if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
+      if (forge) openers.push(forgeLineOpener);
+      const { source } = document;
+      const inline = inlineAtoms(node, start);
+      const protection = new Protection(start, end);
+      for (const atom of inline.atoms) protection.add(atom.from, atom.to);
+      // Forgejo and Gitea protections apply before paragraphs are skipped, so
+      // that diagnostics still count one-line math and shortlinks as atoms.
+      const protections = forge
+        ? forgeProtections(source, start, end, forge)
+        : { ranges: [] as Range[] };
+      for (const [from, to] of protections.ranges) protection.add(from, to);
+      // A code span is joined only when its content reads the same on one line.
+      // The parser keeps a space or tab at the start of the span's next line,
+      // which CommonMark renderers such as GitHub's drop, and it reads the
+      // indentation below a task item's checkbox as such a space.
+      const codeBreak = { reason: "line break in a code span followed by a space or tab" };
+      for (const atom of inline.atoms) {
+        if (atom.joining !== "code") continue;
+        const lines = source.slice(atom.from, atom.to).split(lineBreak);
+        if (lines.length < 2) continue;
+        const content = lines.map((line, i) =>
+          i && continuation && line.startsWith(continuation)
+            ? line.slice(continuation.length)
+            : line,
+        );
+        if (
+          content.slice(1).some((line) => /^[ \t]/.test(line)) ||
+          codeSpanValue(content.join(" ")) !== atom.value!.replace(/\r\n|\r|\n/g, " ")
+        )
+          atom.joining = codeBreak;
+      }
       const reportUnbreakable = () =>
         findings.push({
           start,
@@ -355,7 +562,6 @@ const wrap: Rule = {
         let breakable = false;
         let unbreakable = false;
         let offset = start;
-        let childIndex = 0;
         for (const line of original.split(/(?<=\n|\r(?!\n))/)) {
           const content = line.replace(/(?:\r\n|\r|\n)$/, "");
           const container =
@@ -367,25 +573,17 @@ const wrap: Rule = {
           const linePrefix = offset === start ? prefix : container;
           // An Obsidian title occupies one physical line, even when it contains spaces.
           if (calloutHeader && offset === start) {
-            if (measure(prefix + content) > width) unbreakable = true;
+            if (lineWidth(prefix + content, measure) > width) unbreakable = true;
             offset += line.length;
             continue;
           }
-          const words: string[] = [];
-          while (childIndex < children.length && range(children[childIndex]!)[1] <= offset)
-            childIndex++;
-          for (let i = childIndex; i < children.length; i++) {
-            const child = children[i]!;
-            const [a, b] = range(child);
-            if (a >= offset + content.length) break;
-            if (child.type === "break") continue;
-            const from = Math.max(a, offset + container.length);
-            const raw = document.source.slice(from, Math.min(b, offset + content.length));
-            if (!raw) continue;
-            words.push(...(child.type === "text" ? splitWords(raw, from, protectedRanges) : [raw]));
-          }
-          const atoms = wrappingAtoms(words, extraOpener);
-          const available = width - measure(linePrefix);
+          // Hard-break markers do not count toward the width.
+          let contentEnd = offset + content.length;
+          for (const [a] of inline.breaks) if (a >= offset && a < contentEnd) contentEnd = a;
+          const from = offset + container.length;
+          const words = protection.split(source.slice(from, contentEnd), from);
+          const atoms = wrappingAtoms(words, openers);
+          const available = width - lineWidth(linePrefix, measure);
           if (measure(words.join("").trimEnd()) > available) {
             if (atoms.length > 1) breakable = true;
             if (atoms.some((atom) => measure(atom) > available)) unbreakable = true;
@@ -400,13 +598,13 @@ const wrap: Rule = {
           });
         if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
       };
-      const reason = children.some((child) => child.type === "break")
+      const reason = inline.breaks.length
         ? "hard line break"
         : children.some((child) => child.type === "html")
           ? "inline HTML"
           : /^\[![^\]]+\]/.test(original)
             ? "callout header"
-            : /(?:^|\s)\^[\w-]+\s*$/.test(original)
+            : blockIdentifier(document.source, node)
               ? "block identifier"
               : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
                 ? "leading block marker"
@@ -414,74 +612,101 @@ const wrap: Rule = {
                   ? "lazy first line"
                   : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
                     ? "unsupported container prefix"
-                    : document.dialect === "obsidian" &&
-                        obsidianMarkers(document.source, node, start, end)
+                    : document.dialect === "obsidian" && obsidianMarkers(source, node, start, end)
                       ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                      : undefined;
-      // Protections are computed first so that skipped paragraphs still
-      // classify one-line math and shortlinks as single atoms in diagnostics.
-      const protections = forge
-        ? forgeProtections(document.source, start, end, forge)
-        : { ranges: [] as Range[] };
-      protectedRanges = protections.ranges;
+                      : inline.unlocated
+                        ? "inline syntax without a source position"
+                        : undefined;
       const skipped =
         reason ??
         protections.reason ??
-        (document.dialect === "gitea" && giteaPyParagraph(document.source, node, start, end)
+        (document.dialect === "gitea" && giteaPyParagraph(source, node, start, end)
           ? "Gitea `_.py` emphasis exception"
           : undefined);
       if (skipped) {
         reportSkipped(skipped);
         return;
       }
+      // Collect the words line by line, without the container prefixes. A line
+      // ending between words, or in the text of emphasis or a link, separates
+      // words like a space. One inside an atom joins its lines with the space
+      // that it renders as, or keeps the paragraph as written.
       const words: string[] = [];
-      let unsupported = false;
-      for (const child of children) {
-        const [a, b] = range(child);
-        const from = Math.max(a, start);
-        const raw = document.source.slice(from, b);
-        // Odd pieces are the line breaks, so each line's source offset is known.
-        const pieces = raw.split(/(\r\n|\r|\n)/);
-        const lines: string[] = [];
-        let at = from;
-        for (let i = 0; i < pieces.length; i += 2) {
-          let line = pieces[i]!;
-          let lineAt = at;
-          at += line.length + (pieces[i + 1]?.length ?? 0);
-          if (i > 0 && continuation && line.startsWith(continuation)) {
+      let failure: string | undefined;
+      const pieces = original.split(/(\r\n|\r|\n)/);
+      let at = start;
+      let lineEnd = start;
+      for (let i = 0; i < pieces.length && !failure; i += 2) {
+        let line = pieces[i]!;
+        let lineAt = at;
+        at += line.length + (pieces[i + 1]?.length ?? 0);
+        if (i > 0) {
+          if (continuation && line.startsWith(continuation)) {
             line = line.slice(continuation.length);
             lineAt += continuation.length;
-          } else if (i > 0 && continuation && /^[\s>]/.test(line)) unsupported = true;
-          if (child.type !== "text") {
-            lines.push(line);
-            continue;
+          } else if (continuation && /^[\s>]/.test(line)) {
+            failure = "unsupported continuation";
+            break;
           }
-          // Preserve escaping and entities. Split only ordinary source whitespace.
-          if (i > 0) words.push(" ");
-          words.push(...splitWords(line, lineAt, protectedRanges));
+          const last = words.at(-1);
+          const joining = protection.has(lineEnd)
+            ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
+            : undefined;
+          if (!joining) words.push(" ");
+          else if (last === undefined || /^[ \t]+$/.test(last))
+            failure = "line break in inline syntax";
+          else if (joining === "code") words[words.length - 1] = `${last} `;
+          else if (joining === "description") {
+            // Two spaces or a backslash before the line ending make a hard break.
+            if (/(?: {2}|\\)$/.test(last)) failure = "hard line break";
+            const trimmed = line.replace(/^[ \t]+/, "");
+            lineAt += line.length - trimmed.length;
+            line = trimmed;
+            words[words.length - 1] = `${last.trimEnd()} `;
+          } else failure = joining.reason;
         }
-        if (child.type !== "text") {
-          if (/[\r\n]/.test(raw)) unsupported = true;
-          words.push(lines.join(" "));
-        }
+        words.push(...protection.split(line, lineAt));
+        lineEnd = lineAt + line.length;
       }
-      if (unsupported) {
-        reportSkipped("multiline inline syntax or unsupported continuation");
+      if (failure) {
+        reportSkipped(failure);
         return;
       }
-      const atoms = wrappingAtoms(words, extraOpener);
-      const output: string[] = [];
-      let line = "";
-      let available = width - measure(prefix);
-      for (const atom of atoms) {
-        const candidate = line ? `${line} ${atom}` : atom;
-        if (line && measure(candidate) > available) {
-          output.push(line);
-          line = atom;
-          available = width - measure(continuation);
-        } else line = candidate;
+      const atoms = wrappingAtoms(words, openers);
+      if (!atoms.length) return;
+      // The first line keeps the words after a first word that would open a
+      // block alone on the line, until the line can no longer open one.
+      while (
+        atoms.length > 1 &&
+        (firstWordAlone.test(atoms[0]!) ||
+          (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
+      )
+        atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
+      /** Fill lines greedily, with the first `first` atoms on the first line. */
+      const fill = (first: number): string[] => {
+        const lines: string[] = [];
+        let line = atoms.slice(0, first).join(" ");
+        let linePrefix = prefix;
+        for (let i = first; i < atoms.length; i++) {
+          const candidate = `${line} ${atoms[i]}`;
+          if (lineWidth(linePrefix + candidate, measure) > width) {
+            lines.push(line);
+            line = atoms[i]!;
+            linePrefix = continuation;
+          } else line = candidate;
+        }
+        if (line) lines.push(line);
+        return lines;
+      };
+      let output = fill(1);
+      // A paragraph that starts like a link reference definition becomes one
+      // when a line ends after the definition's destination or title. Keep
+      // words on the first line until the lines read as one paragraph again.
+      if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
+        let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
+        while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
+          output = fill(++first);
       }
-      if (line) output.push(line);
       const replacement = output.join(newline + continuation);
       if (replacement !== original)
         findings.push({
@@ -492,7 +717,7 @@ const wrap: Rule = {
         });
       if (
         options.reportUnbreakable === true &&
-        (prefix + replacement).split(lineBreak).some((line) => measure(line) > width)
+        (prefix + replacement).split(lineBreak).some((line) => lineWidth(line, measure) > width)
       )
         reportUnbreakable();
     });
@@ -608,12 +833,8 @@ function together(
   )
     return true;
   // Obsidian may attach a block identifier on its own line to the block above.
-  if (
-    document.dialect === "obsidian" &&
-    after.type === "paragraph" &&
-    /^\^[A-Za-z0-9-]+[ \t]*$/.test(source.slice(afterStart, afterEnd))
-  )
-    return true;
+  const alone = document.dialect === "obsidian" ? blockIdentifier(source, after) : undefined;
+  if (alone && source.slice(afterStart, afterEnd).trimEnd() === `^${alone.id}`) return true;
   // Directly below text or a link reference definition, the parser does not
   // start a list that would be empty or not start at 1, though it does below
   // a blank line: there, `- -` is a list item holding the text `-`, and `-`

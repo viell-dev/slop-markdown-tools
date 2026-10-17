@@ -1,9 +1,9 @@
 # Plugins
 
 A plugin adds rules, presets, and syntax to the built-in ones. It is a
-JavaScript module whose default export is a plugin object. The
-[plugin example](examples.md#write-a-plugin) is a complete plugin with a problem
-rule and a style rule to start from.
+JavaScript module whose default export is a plugin object. The [plugin
+example](examples.md#write-a-plugin) is a complete plugin with a problem rule
+and a style rule to start from.
 
 ## A plugin
 
@@ -108,20 +108,20 @@ names it, even while the rule is off.
 A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
 for at most eight passes. After each phase that changes the document, it parses
-the result again and compares its meaning with the original's; the
-[safety model](design.md#safety-model) describes what happens to edits that
-overlap or would change the meaning. The comparison covers the syntax tree, not
-every application's rendering, and it constrains the text a rule returns, not
-what its code does.
+the result again and compares its meaning with the original's; the [safety
+model](design.md#safety-model) describes what happens to edits that overlap or
+would change the meaning. The comparison covers the syntax tree, not every
+application's rendering, and it constrains the text a rule returns, not what its
+code does.
 
 ## Resolve links in a rule
 
 A rule asks the workspace where a link leads with
-`workspace.resolve(source, destination, dialect)`: `source` is the linking
-document's path (`document.path`), `destination` the destination as written, and
-`dialect` the document's dialect. The built-in link rules use the same call, so
-a plugin sees links as they do. Without a workspace, a rule should report
-nothing.
+`workspace.resolve(source, destination, dialect, wiki)`: `source` is the linking
+document's path (`document.path`), `destination` the destination as written,
+`dialect` the document's dialect, and `wiki` true for a wikilink, which never
+resolves to a directory. The built-in link rules use the same call, so a plugin
+sees links as they do. Without a workspace, a rule should report nothing.
 
 ```js
 export default {
@@ -170,19 +170,21 @@ The other fields are present when they apply:
   the file exists but its content could not be read.
 - `fragment`: the part after `#`, decoded, or an empty string; `fragmentExists`:
   with status `resolved`, whether the target has that heading, block, or anchor
-  by the rules of `dialect`, and `true` without a fragment.
+  by the rules of `dialect`, and `true` without a fragment and for a target that
+  is not Markdown, whose fragments are its own.
 - `unreadable`: the directories or the file that stood in the way. An entry that
   starts with `..` stands for the part of a vault outside the workspace root. In
   the Obsidian dialect, a search by note name that finds nothing readable
   resolves as `unreadable`, and one that finds a single note resolves with
   `unreadable` set, because the unreadable directories may hold another note of
-  that
-  name. **A rule must not rewrite a `resolved` link whose `unreadable` is set**,
-  and the engine refuses an edit that changes such a link's destination.
+  that name. **A rule must not rewrite a `resolved` link whose `unreadable` is
+  set**, and the engine refuses an edit that changes such a link's destination.
 - `vault`: the vault's directory, when an Obsidian link was resolved in a vault
   below the workspace root. `rooted`: the target's vault-relative path, when it
   differs from `target`. `outside`: with status `missing`, an existing file that
-  the path names outside the vault.
+  the path names outside the vault. `leavesRoot`: with status `unreadable`, the
+  symbolic link or junction through which the path leads outside the workspace
+  root.
 
 A style rule that rewrites a destination should resolve the new destination as
 well, and propose the edit only when both lead to the same `target`. The engine

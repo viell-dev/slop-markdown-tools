@@ -6,8 +6,8 @@ directory holds working examples, and the package ships the same files under
 `node_modules/mdrefine/examples/`. The tests compare every file and output on
 this page with the tool.
 
-The commands run from the root of a
-[built checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up).
+The commands run from the root of a [built
+checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up).
 With the installed package, use `npx mdtools` in place of
 `node dist/cli/main.js`.
 
@@ -97,8 +97,8 @@ a sensor board and publishes them as a small web page that updates every minute.
 
 ## Usage
 
-Follow the [setup guide](./docs/guide.md) first, then read the
-[sensor reference](./docs/reference.md#pressure) to interpret the readings. The
+Follow the [setup guide](./docs/guide.md) first, then read the [sensor
+reference](./docs/reference.md#pressure) to interpret the readings. The
 [calibration notes](docs/calibration.md) explain how to correct a drifting
 sensor.
 
@@ -145,8 +145,8 @@ README.md:13:1: error links/valid: Missing local target: docs/calibration.md.
 
 `examples/workspaces/obsidian-vault/` is a small vault, again as `before/` and
 `after/`. The configuration sits at the vault's root, next to `.obsidian/`,
-whose `app.json` sets `"strictLineBreaks": true`, which
-[wrapping needs](obsidian.md#enable-wrapping).
+whose `app.json` sets `"strictLineBreaks": true`, which [wrapping
+needs](obsidian.md#enable-wrapping).
 
 [`examples/workspaces/obsidian-vault/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/before/mdtools.config.jsonc):
 
@@ -457,14 +457,14 @@ const folder = path.resolve(
 const config = { extends: ["recommended", "github"] };
 
 // Workspace keys are forward-slash paths relative to the folder. A Markdown
-// file maps to its text; any other file maps to null, so that links to it
-// still resolve.
+// file, named .md or .markdown as the CLI finds them, maps to its text; any
+// other file maps to null, so that links to it still resolve.
 const files = {};
 for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
   if (!entry.isFile()) continue;
   const absolute = path.join(entry.parentPath, entry.name);
   const name = path.relative(folder, absolute).split(path.sep).join("/");
-  files[name] = /\.md$/i.test(name) ? await readFile(absolute, "utf8") : null;
+  files[name] = /\.(?:md|markdown)$/i.test(name) ? await readFile(absolute, "utf8") : null;
 }
 const workspace = createWorkspace(files, { dialect: "github" });
 

@@ -9,7 +9,7 @@ import { copyOf, fixture, node, repository, run, tree } from "./support.js";
 
 interface Report {
   files: { path: string; changed?: boolean; diagnostics: Diagnostic[] }[];
-  written: boolean;
+  written: string[];
 }
 const examples = path.join(repository, "examples");
 /** `path:line:column severity rule` for each diagnostic, in report order. */
@@ -72,8 +72,9 @@ describe.each(workspaces)("workspaces/%s", (name) => {
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.stderr).toBe("");
     const report = JSON.parse(applied.stdout) as Report;
-    expect(report.written).toBe(true);
-    expect(report.files.filter((file) => file.changed)).not.toHaveLength(0);
+    const changed = report.files.filter((file) => file.changed).map((file) => file.path);
+    expect(changed).not.toHaveLength(0);
+    expect(report.written).toEqual(changed);
     expect(await tree(root)).toEqual(await tree(path.join(repository, after)));
   });
   it("keeps after/ unchanged, so formatting it again does nothing", () => {
@@ -237,10 +238,11 @@ describe("library scripts", () => {
     expect(other.stdout).toContain("docs/guide.md:4:1 warn style/wrap");
     expect(other.stdout).toContain("\n1 error(s)\n");
   });
-  it("lint-folder.mjs treats any spelling of the .md extension as Markdown", async () => {
+  it("lint-folder.mjs treats any spelling of .md and .markdown as Markdown", async () => {
     const root = await fixture({
-      "README.MD": "A *note* with a [link](other.Md#title).\n",
+      "README.MD": "A *note* with a [link](other.Md#title) and [another](third.markdown#end).\n",
       "other.Md": "# Title\n",
+      "third.markdown": "# End\n",
     });
     const result = node("examples/library/lint-folder.mjs", [root]);
     expect(result.stdout).toBe(

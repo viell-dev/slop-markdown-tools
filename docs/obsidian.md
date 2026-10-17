@@ -24,10 +24,9 @@ npx mdtools format --root "/path/to/vault" --diff
 ```
 
 Without a configuration file, the notes are still read in the Obsidian dialect,
-because the vault is recognized by its `.obsidian` directory; see
-[the assumed dialect](dialects.md#the-assumed-dialect). The rules of the
-`obsidian` preset, among them the report that wrapping is off, still need the
-configuration.
+because the vault is recognized by its `.obsidian` directory; see [the assumed
+dialect](dialects.md#the-assumed-dialect). The rules of the `obsidian` preset,
+among them the report that wrapping is off, still need the configuration.
 
 ## Enable wrapping
 
@@ -37,8 +36,9 @@ only when the vault's `.obsidian/app.json` contains `"strictLineBreaks": true`,
 and [`obsidian/strict-line-breaks`](rules.md#obsidianstrict-line-breaks) reports
 when it does not. The tool reads the file and never changes it; when you change
 the setting, keep the file's other settings. If the file cannot be read or is
-not valid JSON, the tool warns and leaves paragraphs as written. If strict line
-breaks do not suit your vault, disable `style/wrap`; the other rules still run.
+not valid JSON, the tool warns and leaves paragraphs as written; a byte order
+mark at its start is ignored. If strict line breaks do not suit your vault,
+disable `style/wrap`; the other rules still run.
 
 The tool reads highlights (`==text==`) and wikilinks within one line. A
 paragraph with `==`, `[[`, or `]]` outside them, such as a highlight written
@@ -104,18 +104,19 @@ vault-relative paths in angle brackets, such as `[Note](<Folder/Note.md>)`:
 
 Note names and headings match without regard to case, as in Obsidian, and block
 identifiers match exactly; notes whose paths differ only by case are ambiguous.
-A missing or ambiguous target is never guessed. Wikilinks without a label keep
-their target as written, because it is their visible text, and embeds stay
-embeds, with any image size in their label. [`links/path`](rules.md#linkspath)
-and [`links/notation`](rules.md#linksnotation) describe the options; run the two
-rules in separate passes.
+A heading also matches as its source writes it, and `[[Note#Setup#Mobile]]`
+reaches a heading below another; a wikilink never names a folder. A missing or
+ambiguous target is never guessed. Wikilinks without a label keep their target
+as written, because it is their visible text, and embeds stay embeds, with any
+image size in their label. [`links/path`](rules.md#linkspath) and
+[`links/notation`](rules.md#linksnotation) describe the options.
 
 ## Review the result
 
 Preview with `--diff` before `--write`, and look at complex notes in Obsidian
 afterwards, especially with community plugins whose syntax the tool does not
 know. The link resolver does not reproduce every behavior of Obsidian's, and
-syntax it does not know may need an `ignore` pattern or a
-[suppression comment](configuration.md#suppression-comments). The
-[vault example](examples.md#format-an-obsidian-vault) shows a small vault before
-and after formatting, and [limits](design.md#limits) lists what is not modeled.
+syntax it does not know may need an `ignore` pattern or a [suppression
+comment](configuration.md#suppression-comments). The [vault
+example](examples.md#format-an-obsidian-vault) shows a small vault before and
+after formatting, and [limits](design.md#limits) lists what is not modeled.
