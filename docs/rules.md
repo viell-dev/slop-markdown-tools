@@ -204,7 +204,10 @@ option is required; without it the rule does nothing.
 Only links whose target exists are converted. Titles, labels with formatting,
 wikilinks without a label, and embeds are left as written: a wikilink without a
 label shows its target as text, and a note embed is not the same thing as a
-Markdown image.
+Markdown image. A new wikilink decodes percent escapes, because Obsidian takes
+its text as the note's name: `[x](My%20Note.md)` becomes `[[My Note.md|x]]`. A
+destination that does not decode, or whose name would hold `|`, `[`, `]`, `#`,
+or `^`, stays as written.
 
 With `"style": "markdown"`, before:
 
@@ -327,18 +330,22 @@ See the [guide][setup] and the [changelog].
 Reports a local link, image, wikilink, embed, or reference definition whose
 target does not exist, and a fragment (`#heading`, `#^block`) that its target
 does not have. The anchors that a fragment can reach depend on the dialect; see
-[heading anchors](dialects.md#heading-anchors). A target that is missing or
-ambiguous is reported, never guessed.
+[heading anchors](dialects.md#heading-anchors). Only a Markdown file's fragments
+are checked: an image, a PDF, or a source file accepts any, such as
+`#gh-dark-mode-only`, `#page=2`, or `#L10-L20`. A target that is missing or
+ambiguous is reported, never guessed. A link into a directory that the CLI does
+not visit, such as `dist`, or through a symbolic link is checked on disk; see
+[ignored files](configuration.md#ignored-files-and-link-targets).
 
-| Message                                | Meaning                                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `Missing local target: …`              | No file matches.                                                                                       |
-| `Ambiguous local target: …`            | Several files match, such as two notes whose names differ only by case.                                |
-| `Missing fragment in …`                | The target exists but has no such heading, block, or anchor.                                           |
-| `Local target is a directory: …`       | Obsidian only. Other dialects accept a link to a directory, which a hosting site can serve.            |
-| `Local target is outside the vault: …` | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                      |
-| `Local target could not be checked: …` | A directory that may hold the target could not be read, or the workspace root is only part of a vault. |
-| `Fragment could not be checked: …`     | The target exists but could not be read.                                                               |
+| Message                                | Meaning                                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `Missing local target: …`              | No file matches.                                                                                             |
+| `Ambiguous local target: …`            | Several files match, such as two notes whose names differ only by case.                                      |
+| `Missing fragment in …`                | The target exists but has no such heading, block, or anchor.                                                 |
+| `Local target is a directory: …`       | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.           |
+| `Local target is outside the vault: …` | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                            |
+| `Local target could not be checked: …` | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
+| `Fragment could not be checked: …`     | The target exists but could not be read.                                                                     |
 
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on
@@ -348,8 +355,11 @@ In the Obsidian dialect, links resolve as in Obsidian: a path that starts with
 `./` or `../` counts from the note; otherwise an exact path from the vault's
 root comes first, then an exact path from the note, then a note found by its
 name or by the end of its path. Several matches at the first level that finds
-any are ambiguous. Note names and headings match without regard to case; block
-identifiers match exactly.
+any are ambiguous. A wikilink never resolves to a directory, so the search goes
+on to a note of that name. Note names and headings match without regard to case;
+block identifiers match exactly. A heading matches by the text it shows or as
+its source writes it, such as ``#`move` `` for ``### `move` ``, and
+`#Setup#Mobile` names a heading below another one.
 
 Reported when `docs/guide.md` does not exist, or has no heading named "Setup":
 
@@ -359,8 +369,10 @@ See the [guide](docs/guide.md#setup).
 
 ## `obsidian/block-reference`
 
-Reports a block identifier (`^id` at the end of a paragraph) that a note uses
-more than once. A link to `#^id` can reach only one of them.
+Reports a block identifier that a note uses more than once: `^` and Latin
+letters, digits, and hyphens at the end of a paragraph or heading, or alone on
+the line after a list or quote, as Obsidian defines it. A link to `#^id` can
+reach only one of them.
 
 Reported, on the second paragraph:
 

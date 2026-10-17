@@ -3,6 +3,7 @@ import stringWidth from "string-width";
 import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
 import { labelEnd, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 
@@ -602,7 +603,7 @@ const wrap: Rule = {
           ? "inline HTML"
           : /^\[![^\]]+\]/.test(original)
             ? "callout header"
-            : /(?:^|\s)\^[\w-]+\s*$/.test(original)
+            : blockIdentifier(document.source, node)
               ? "block identifier"
               : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
                 ? "leading block marker"
@@ -829,12 +830,8 @@ function together(
   )
     return true;
   // Obsidian may attach a block identifier on its own line to the block above.
-  if (
-    document.dialect === "obsidian" &&
-    after.type === "paragraph" &&
-    /^\^[A-Za-z0-9-]+[ \t]*$/.test(source.slice(afterStart, afterEnd))
-  )
-    return true;
+  const alone = document.dialect === "obsidian" ? blockIdentifier(source, after) : undefined;
+  if (alone && source.slice(afterStart, afterEnd).trimEnd() === `^${alone.id}`) return true;
   // Directly below text or a link reference definition, the parser does not
   // start a list that would be empty or not start at 1, though it does below
   // a blank line: there, `- -` is a list item holding the text `-`, and `-`

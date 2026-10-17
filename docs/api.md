@@ -102,6 +102,15 @@ maps each path, relative to the workspace root with forward slashes, to one of:
 | `unreadable`       | Directories whose contents the host could not read. A link that may lead into one resolves as `unreadable`.                 |
 | `vaults`           | Directories below the root that are Obsidian vaults. An Obsidian link in one of their notes reaches only the vault's files. |
 | `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                      |
+| `lookup`           | `(path, folded) => result`: what is at a path that `files` and `directories` do not hold; see below.                        |
+
+`lookup` lets a host leave files out of `files` and still have links to them
+checked. It is called once per path, with `folded` true for an Obsidian link,
+which matches without regard to case, and returns
+`{ type: "file", path, source }`, `{ type: "directory" }`,
+`{ type: "outside", through }` for a path that leads out of the workspace root
+through the link `through`, `{ type: "unreadable", at }`, or `undefined` when
+nothing is there. An Obsidian search by note name does not call it.
 
 The CLI passes the directories it skipped as `unreadable`, the vaults it found
 as `vaults`, and `rootInVault` when it finds the vault above the root; [Obsidian

@@ -71,6 +71,8 @@ From `0.2.0-rc.2`:
   pass only the Markdown ones.
 - An input that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   and is an error only when it matches no document.
+- `.npm-cache` is an ordinary directory, linted like any other unless
+  `.gitignore` or `ignore` leaves it out.
 - `style/wrap` wraps more: across line breaks in links, emphasis, and code
   spans, inside the text of links and emphasis, in the bodies of GitHub,
   Forgejo, and Gitea alerts, and before words such as `--config` or
@@ -219,6 +221,28 @@ From every prerelease:
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- A link into `dist`, `coverage`, `node_modules`, or another directory that is
+  not processed, or through a symbolic link or junction, is checked on disk
+  instead of being reported missing; one that leads outside the workspace root
+  cannot be checked
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- An Obsidian block identifier counts only at the end of a block and holds
+  letters, digits, and hyphens, in every rule that reads one
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- A vault's `.obsidian/app.json` that starts with a byte order mark is read
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- `links/notation` decodes percent escapes when it makes a wikilink
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- A link to a file that is not Markdown accepts any fragment, such as an image's
+  `#gh-dark-mode-only` or a PDF's `#page=2`
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- An Obsidian wikilink never resolves to a folder
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- Obsidian links to a heading below another, `[[Note#Setup#Mobile]]`, are
+  resolved ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- An Obsidian heading link matches the heading's source text, with its
+  backticks, as well as its visible text
+  ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell

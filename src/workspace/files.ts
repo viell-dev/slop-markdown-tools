@@ -1,10 +1,10 @@
 import { access, lstat, readdir, readFile, realpath, open, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
-import { constants, readFileSync } from "node:fs";
-import type { Dirent } from "node:fs";
+import { constants, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import type { ResolveOptions } from "../core/types.js";
-import type { WorkspaceSource } from "./index.js";
+import type { LookupResult, WorkspaceSource } from "./index.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import ignore from "ignore";
 import type { Ignore } from "ignore";
@@ -29,15 +29,11 @@ export interface Skipped {
   /** What was skipped, why, and what follows from it. */
   message: string;
 }
-/** Names of folders and files that discovery never enters or selects, wherever they are. */
-const alwaysSkipped = new Set([
-  ".git",
-  ".obsidian",
-  "node_modules",
-  ".npm-cache",
-  "dist",
-  "coverage",
-]);
+/**
+ * Names of folders and files that discovery never enters or selects, wherever
+ * they are. A link can still name what is in them; `unlistedLookup` finds it.
+ */
+const alwaysSkipped = new Set([".git", ".obsidian", "node_modules", "dist", "coverage"]);
 /**
  * Whether letter case is ignored where Git and the file system usually ignore
  * it. Git sets `core.ignorecase` when it creates a repository on a file system
@@ -186,6 +182,13 @@ export interface FileSet {
   root: string;
   files: Record<string, WorkspaceSource>;
   directories: string[];
+  /**
+   * The entries below the root that discovery did not enter and that Git does
+   * not ignore: folders and files of the names that it always leaves out, and
+   * symbolic links and junctions. Their files are not in `files`, but a link
+   * can name one.
+   */
+  unlisted: string[];
   /** What discovery could not read or use, sorted by path. */
   skipped: Skipped[];
   selected: string[];
@@ -195,6 +198,74 @@ export interface FileSet {
    * visited.
    */
   vaults: Vault[];
+}
+/**
+ * The workspace's lookup of a path at or below one of the set's `unlisted`
+ * entries, on disk: a link that names such a path is checked there instead of
+ * being called missing. The workspace root still bounds what is read, so a
+ * path whose real location lies outside it, through a symbolic link or a
+ * junction, is reported as such and not read.
+ */
+export function unlistedLookup(
+  set: FileSet,
+): (name: string, folded: boolean) => LookupResult | undefined {
+  const exact = new Set(set.unlisted);
+  // Obsidian matches paths without regard to case.
+  const folded = new Map(set.unlisted.map((name) => [name.toLowerCase(), name]));
+  return (name, fold) => {
+    if (!set.unlisted.length) return undefined;
+    const parts = name.split("/");
+    for (let count = 1; count <= parts.length; count++) {
+      const prefix = parts.slice(0, count).join("/");
+      const entry = fold
+        ? folded.get(prefix.toLowerCase())
+        : exact.has(prefix)
+          ? prefix
+          : undefined;
+      if (entry !== undefined) return onDisk(set.root, [entry, ...parts.slice(count)].join("/"));
+    }
+    return undefined;
+  };
+}
+/** What is at the path `name` below `root`, following links as far as the root allows. */
+function onDisk(root: string, name: string): LookupResult | undefined {
+  const parts = name.split("/");
+  // Each step on the way, so that what stands in the way can be named.
+  for (let count = 1; count <= parts.length; count++) {
+    const step = parts.slice(0, count).join("/");
+    let actual: string;
+    try {
+      if (!lstatSync(path.join(root, step)).isSymbolicLink()) continue;
+      actual = realpathSync.native(path.join(root, step));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      // A path through something that is not there, or a link that leads nowhere.
+      if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") return undefined;
+      if (refusal(error))
+        return { type: "unreadable", at: count > 1 ? parts.slice(0, count - 1).join("/") : step };
+      throw error;
+    }
+    const relative = path.relative(root, actual);
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+      return { type: "outside", through: step };
+  }
+  let info: Stats;
+  try {
+    info = statSync(path.join(root, name));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") return undefined;
+    if (refusal(error)) return { type: "unreadable", at: name };
+    throw error;
+  }
+  if (info.isDirectory()) return { type: "directory" };
+  const full = path.join(root, name);
+  let cached: string | undefined;
+  return {
+    type: "file",
+    path: name,
+    source: isMarkdownName(name) ? () => (cached ??= decodeText(readFileSync(full), name)) : null,
+  };
 }
 /** The workspace's record of the vault in `directory`, and of its settings file if unusable. */
 async function describeVault(
@@ -265,6 +336,7 @@ export async function discover(
   const root = await realpath(rootPath);
   const files: Record<string, WorkspaceSource> = {};
   const directories: string[] = [];
+  const unlisted: string[] = [];
   const selected: string[] = [];
   /** The folders that select their Markdown files, relative to the root. */
   const requests: string[] = [];
@@ -376,18 +448,22 @@ export async function discover(
     const scopes = gitIgnoredAbove ? [] : ignoreScopes(relative, layers);
     for (const entry of entries) {
       const name = relative ? `${relative}/${entry.name}` : entry.name;
-      if (alwaysSkipped.has(entry.name)) {
-        leaveNamed(name, (input) =>
-          input.path === name
-            ? `discovery always leaves out ${entry.name}`
-            : `in ${name}, which discovery always leaves out`,
-        );
-        continue;
-      }
-      if (entry.isSymbolicLink()) continue;
       const rule = gitIgnoredAbove
         ? undefined
         : gitIgnoreRule(scopes, entry.name, entry.isDirectory());
+      const skippedName = alwaysSkipped.has(entry.name);
+      if (skippedName || entry.isSymbolicLink()) {
+        if (skippedName)
+          leaveNamed(name, (input) =>
+            input.path === name
+              ? `discovery always leaves out ${entry.name}`
+              : `in ${name}, which discovery always leaves out`,
+          );
+        // Not entered, but a link can name what is in it or behind it, unless
+        // Git ignores it and so its files are no link targets.
+        if (!(gitIgnoredAbove || rule) || resolve.gitIgnored === true) unlisted.push(name);
+        continue;
+      }
       if (rule)
         leaveNamed(name, (input) =>
           input.path === name
@@ -487,6 +563,7 @@ export async function discover(
     root,
     files,
     directories,
+    unlisted,
     skipped: skipped.sort(byPath),
     selected: selected.sort(),
     vaults: vaults.sort(byPath),
