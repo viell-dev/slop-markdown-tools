@@ -21,12 +21,15 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       EXPECTED_VERSION: ${{ inputs.version }}
       PUBLISH_REQUESTED: ${{ inputs.publish }}
       PUBLISH_ENABLED: ${{ vars.NPM_PUBLISH_ENABLED }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -50,7 +53,8 @@ jobs:
           }
           JS
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # Only the dependencies that the package installs; CI audits the development tools too.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run release:prepare
       - name: Dry-run the tested tarball
         run: |
@@ -63,10 +67,34 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
+  # Runs after the publish job below. A separate job without write permissions, so that
+  # re-running it after a failure checks the registry again without publishing again.
+  verify-publication:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-release
+          path: artifacts
+      - name: Compare the registry's checksums and provenance with the tested tarball
+        run: |
+          node scripts/verify-publication.mjs "$EXPECTED_VERSION" \
+            "artifacts/mdrefine-${EXPECTED_VERSION}.tgz" "$GITHUB_SHA"
   publish:
     if: inputs.publish && vars.NPM_PUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main'
     needs: prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: npm-release
     permissions:
       contents: write
@@ -77,6 +105,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
