@@ -248,16 +248,17 @@ const configOnly = new Set(
  * for every document, and compiling its patterns each time cost several times
  * as much as matching them.
  */
-const overridePatterns = new Map<string, Minimatch>();
-function overridePattern(pattern: string): Minimatch {
-  let matcher = overridePatterns.get(pattern);
-  if (!matcher) {
+const overridePatterns = new Map<string, (file: string) => boolean>();
+function overridePattern(pattern: string): (file: string) => boolean {
+  let matches = overridePatterns.get(pattern);
+  if (!matches) {
     // A process that loads many configurations keeps only recent patterns.
     if (overridePatterns.size >= 1000) overridePatterns.clear();
-    matcher = new Minimatch(pattern, { dot: true });
-    overridePatterns.set(pattern, matcher);
+    const matcher = new Minimatch(pattern, { dot: true });
+    matches = (file) => matcher.match(file);
+    overridePatterns.set(pattern, matches);
   }
-  return matcher;
+  return matches;
 }
 /**
  * The configuration in effect for one document: its dialect, rule settings,
@@ -308,7 +309,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
   merge(config, []);
   const document = path.replaceAll("\\", "/");
   for (const override of overrides) {
-    if (override.files.some((pattern) => overridePattern(pattern).match(document))) {
+    if (override.files.some((pattern) => overridePattern(pattern)(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       addRules(result.rules, override.rules);
     }
