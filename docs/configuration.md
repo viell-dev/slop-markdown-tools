@@ -465,10 +465,15 @@ to the wrong line or to two lines.
 
 ## Selection, output, and exit codes
 
-Commands accept explicit files/directories, or no paths to select the workspace.
-The workspace's documents, and the files that a directory selects, are those
-whose names end in `.md` or `.markdown`, in any letter case; a file named on its
-own is read as Markdown whatever its name.
+Commands accept explicit files, directories, and glob patterns, or no paths to
+select the workspace. The workspace's documents, and the files that a directory
+or pattern selects, are those whose names end in `.md` or `.markdown`, in any
+letter case; a file named on its own is read as Markdown whatever its name. A
+pattern is an input that does not exist as a path and contains `*`, `?`, `[`, or
+`{`. It is relative to the current directory, uses `/` between folders on every
+system, matches names that start with a dot, and ignores letter case on Windows
+and macOS. It selects the documents of the workspace that it matches and is an
+error when it matches none.
 
 The CLI honors `.gitignore` files and configured ignore patterns. As in Git, the
 deepest `.gitignore` with a pattern that matches a path decides, so a negated
@@ -502,8 +507,8 @@ still skipped. The CLI warns on stderr, as in
 `mdtools: warning: Skipped ignored input: generated/report.md (in generated, which "generated/" in .gitignore matches). It is not processed.`,
 and the warning does not change the exit code; with `--json` it is an entry of
 the report's `skipped` list with the code `IGNORED`. Inputs that `--exclude`
-leaves out, and files that a directory would select, are left out without a
-warning.
+leaves out, and files that a directory or pattern would select, are left out
+without a warning.
 
 `lint --json` and `format --json` print a single object with `version`, `mode`,
 `files`, and `written`, and with `skipped` when the run left out something it

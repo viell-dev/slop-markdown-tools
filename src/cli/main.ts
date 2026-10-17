@@ -249,10 +249,14 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         : 0;
 }
 common(
-  program.command("lint").argument("[paths...]", "Markdown files/directories, or - for stdin"),
+  program
+    .command("lint")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 ).action((inputs: string[], flags: Flags) => run("lint", inputs, flags));
 common(
-  program.command("format").argument("[paths...]", "Markdown files/directories, or - for stdin"),
+  program
+    .command("format")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 )
   .option("--check", "Fail if formatting changes would be needed")
   .option("--diff", "Preview the complete diff (default for file inputs)")

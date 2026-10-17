@@ -199,3 +199,68 @@ describe("named inputs", () => {
     );
   });
 });
+
+describe("input patterns", () => {
+  const files = {
+    "mdtools.config.json": '{"ignore":["docs/drafts/**"]}',
+    ".gitignore": "generated/\n",
+    "docs/a.md": "A.\n",
+    "docs/sub/b.md": "B.\n",
+    "docs/sub/c.markdown": "C.\n",
+    "docs/sub/notes.txt": "Notes.\n",
+    "docs/drafts/d.md": "D.\n",
+    "generated/g.md": "G.\n",
+    "other/o.md": "O.\n",
+    ".github/t.md": "T.\n",
+    "[x].md": "X.\n",
+  };
+  const selects = (root: string, args: string[], expected: string[], cwd = root) => {
+    const checked = run(cwd, ["lint", "--json", ...args]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(paths(checked.stdout), args.join(" ")).toEqual(expected);
+  };
+  const fails = (root: string, args: string[], message: string) => {
+    const checked = run(root, ["lint", ...args]);
+    expect(checked.status, args.join(" ")).toBe(2);
+    expect(checked.stderr, args.join(" ")).toBe(`mdtools: ${message}\n`);
+  };
+
+  it("select the documents that discovery finds and that they match", async () => {
+    const root = await fixture(files);
+    selects(root, ["docs/**/*.md"], ["docs/a.md", "docs/sub/b.md"]);
+    selects(root, ["docs/**"], ["docs/a.md", "docs/sub/b.md", "docs/sub/c.markdown"]);
+    selects(root, ["docs/*"], ["docs/a.md"]);
+    selects(
+      root,
+      ["**/*.md"],
+      [".github/t.md", "[x].md", "docs/a.md", "docs/sub/b.md", "other/o.md"],
+    );
+    selects(root, ["{docs,other}/*.md"], ["docs/a.md", "other/o.md"]);
+    selects(root, ["docs/sub/?.*"], ["docs/sub/b.md", "docs/sub/c.markdown"]);
+    // A path that exists is a path, also when it holds pattern characters.
+    selects(root, ["[x].md"], ["[x].md"]);
+    // Relative to the current directory, as paths are.
+    selects(root, ["--root", "..", "*.md"], ["docs/a.md"], path.join(root, "docs"));
+    selects(root, [`${root.split(path.sep).join("/")}/other/*.md`], ["other/o.md"]);
+    if (foldsCase) selects(root, ["DOCS/*.MD"], ["docs/a.md"]);
+  });
+  it("that match no document are an error", async () => {
+    const root = await fixture(files);
+    fails(root, ["generated/*.md"], "Input pattern matches no document: generated/*.md");
+    fails(root, ["docs/drafts/*.md"], "Input pattern matches no document: docs/drafts/*.md");
+    fails(root, ["absent/**/*.md"], "Input pattern matches no document: absent/**/*.md");
+    fails(root, ["docs/*.txt"], "Input pattern matches no document: docs/*.txt");
+    fails(
+      root,
+      ["docs\\*.md"],
+      "Input pattern matches no document: docs\\*.md (patterns separate folders with /)",
+    );
+    fails(root, ["--root", "docs", "*.md"], "Input is outside the workspace: *.md");
+    if (!foldsCase) fails(root, ["DOCS/*.MD"], "Input pattern matches no document: DOCS/*.MD");
+  });
+  it("are matched from the root by mdrefine/node", async () => {
+    const root = await fixture(files);
+    const discovery = await discoverWorkspace({ root, inputs: ["docs/sub/*"] });
+    expect(discovery.selected).toEqual(["docs/sub/b.md", "docs/sub/c.markdown"]);
+  });
+});

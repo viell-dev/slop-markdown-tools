@@ -7,7 +7,7 @@ import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
 import type { Ignore } from "ignore";
-import { minimatch } from "minimatch";
+import { minimatch, Minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { isMarkdownName } from "./index.js";
@@ -43,6 +43,18 @@ const alwaysSkipped = new Set([
  * off elsewhere; `.gitignore` patterns then match accordingly.
  */
 const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
+/**
+ * Characters that make an input a pattern when no path of its name exists:
+ * wildcards, a character class, a brace list, or an extended group.
+ */
+const patternCharacters = /[*?[{]|[!@+]\(/;
+/**
+ * How input patterns match, on every system: `/` separates folders and `\`
+ * escapes the next character; a name starting with a dot is matched like any
+ * other, as discovery finds it; letter case is ignored where the file system
+ * usually ignores it, as the `glob` package does.
+ */
+const patternOptions = { dot: true, nocomment: true, nonegate: true, nocase: caseInsensitive };
 /** A `.gitignore` file's rules for the folder that holds it. */
 interface IgnoreLayer {
   /** The folder, relative to the workspace root; empty for the root. */
@@ -110,6 +122,61 @@ interface NamedInput {
   /** Why discovery leaves it out, when it does. */
   reason?: string;
 }
+/** An input that is a pattern, with one matcher of paths from the root for each brace alternative. */
+interface PatternInput {
+  input: string;
+  matchers: Minimatch[];
+  /** The folders, relative to the root, that the alternatives' literal parts name. */
+  folders: string[];
+  matched: boolean;
+}
+/**
+ * An input that names no existing path, read as a pattern relative to `base`.
+ * The literal folders at the start of each alternative are located as a path
+ * is, so the pattern can match paths from the workspace root. Undefined for an
+ * input without pattern characters.
+ */
+async function patternInput(
+  input: string,
+  root: string,
+  base: string,
+): Promise<PatternInput | undefined> {
+  if (!patternCharacters.test(input)) return undefined;
+  const result: PatternInput = { input, matchers: [], folders: [], matched: false };
+  for (const alternative of minimatch.braceExpand(input)) {
+    const parts = alternative.split("/");
+    let literal = 0;
+    while (
+      literal < parts.length - 1 &&
+      !patternCharacters.test(parts[literal]!) &&
+      !parts[literal]!.includes("\\")
+    )
+      literal++;
+    const prefix = parts.slice(0, literal).join("/");
+    let folder: string;
+    try {
+      folder = await realpath(path.resolve(base, literal === 1 && !prefix ? "/" : prefix || "."));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      // A folder that is not there holds nothing that could match.
+      if (code === "ENOENT" || code === "ENOTDIR") continue;
+      throw pathError("Input", input, error);
+    }
+    const relative = path.relative(root, folder).split(path.sep).join("/");
+    if (relative.startsWith("../") || relative === ".." || path.isAbsolute(relative))
+      throw new Error(`Input is outside the workspace: ${input}`);
+    const rest = parts.slice(literal).join("/");
+    result.folders.push(relative);
+    result.matchers.push(
+      new Minimatch(relative ? `${relative.replace(/[\\*?[\](){}!+@]/g, "\\$&")}/${rest}` : rest, {
+        ...patternOptions,
+        // The braces were expanded already; a folder's name may hold one.
+        nobrace: true,
+      }),
+    );
+  }
+  return result;
+}
 export interface FileSet {
   root: string;
   files: Record<string, WorkspaceSource>;
@@ -175,11 +242,11 @@ export async function vaultFor(set: FileSet, name: string): Promise<Vault | unde
 }
 /**
  * The files of the workspace at `rootPath`, and the documents that `supplied`
- * files and folders select, or all of them when `supplied` is empty. Relative
- * inputs are resolved from `base`.
+ * files, folders, and patterns select, or all of them when `supplied` is
+ * empty. Relative inputs are resolved from `base`.
  *
- * A folder selects the Markdown files in it, by name (`isMarkdownName`),
- * that nothing ignores. A file named on its own is
+ * A folder or pattern selects the Markdown files in it or matching it, by
+ * name (`isMarkdownName`), that nothing ignores. A file named on its own is
  * selected whatever its name: naming it is the request. When ignore rules
  * leave out a named file or folder, `skipped` says so and why.
  */
@@ -199,7 +266,8 @@ export async function discover(
   /** The paths named as inputs, by their own path and that of each folder above them. */
   const named = new Map<string, NamedInput[]>();
   const namedInputs = new Map<string, NamedInput>();
-  /** Each input as given, with the path from the root that it names. */
+  const patterns: PatternInput[] = [];
+  /** Each input as given, with a path from the root that it names or searches. */
   const located: { input: string; path: string }[] = [];
   /** The folders that are vaults, by the part of the workspace that each holds. */
   const vaultFolders = new Map<string, string>();
@@ -213,6 +281,14 @@ export async function discover(
       directory = info.isDirectory();
       resolved = await realpath(absolute);
     } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const pattern =
+        code === "ENOENT" || code === "ENOTDIR" ? await patternInput(input, root, base) : undefined;
+      if (pattern) {
+        patterns.push(pattern);
+        for (const folder of pattern.folders) located.push({ input, path: folder });
+        continue;
+      }
       throw pathError("Input", input, error);
     }
     const relative = path.relative(root, resolved).split(path.sep).join("/");
@@ -344,12 +420,15 @@ export async function discover(
             request.reason ??= `matched by the configuration's ignore pattern "${pattern}"`;
           continue;
         }
-        if (
-          request ||
-          (markdown &&
-            requests.some((folder) => !folder || name === folder || name.startsWith(`${folder}/`)))
-        )
-          selected.push(name);
+        let chosen = request !== undefined;
+        if (markdown) {
+          chosen ||= requests.some(
+            (folder) => !folder || name === folder || name.startsWith(`${folder}/`),
+          );
+          for (const item of patterns)
+            if (item.matchers.some((matcher) => matcher.match(name))) chosen = item.matched = true;
+        }
+        if (chosen) selected.push(name);
       }
     }
   }
@@ -361,6 +440,15 @@ export async function discover(
     );
     if (item) throw new Error(`Input cannot be read: ${input} (${reason(item, request)})`);
   }
+  // A pattern stands for the documents it matches, so one that matches none is
+  // an error, as a path that does not exist is.
+  for (const item of patterns)
+    if (!item.matched)
+      throw new Error(
+        `Input pattern matches no document: ${item.input}${
+          item.input.includes("\\") ? " (patterns separate folders with /)" : ""
+        }`,
+      );
   const skipped: Skipped[] = refused.map((item) => ({
     path: item.directory,
     type: "directory",

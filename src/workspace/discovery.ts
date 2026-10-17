@@ -15,11 +15,15 @@ export interface DiscoverOptions {
   /** The workspace root: the folder whose documents are processed and whose files are link targets. */
   root: string;
   /**
-   * Files and folders to select, absolute or relative to the root. A folder
-   * selects its Markdown files, those named `.md` or `.markdown`; a file is
-   * selected whatever its name. Ignored files are not selected, and an
-   * ignored file or folder named here is reported in `skipped`. Omitted,
-   * every document of the workspace is selected; an empty list selects none.
+   * Files, folders, and patterns to select, absolute or relative to the root.
+   * A folder selects its Markdown files, those named `.md` or `.markdown`; a
+   * file is selected whatever its name. An input that names no existing path
+   * and holds pattern characters (`*`, `?`, `[`, `{`) is a pattern, with `/`
+   * between folders on every system: it selects the Markdown files that it
+   * matches, and matching none is an error. Ignored files are not selected,
+   * and an ignored file or folder named here is reported in `skipped`.
+   * Omitted, every document of the workspace is selected; an empty list
+   * selects none.
    */
   inputs?: string[];
   /**

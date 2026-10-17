@@ -20,7 +20,21 @@ directory selects its Markdown files, those whose names end in `.md` or
 CLI honors `.gitignore` and configuration ignore patterns and skips symlinks and
 nested repositories. A named file or directory that these leave out is skipped
 with a warning that says why, and the exit code does not change. Versions up to
-`0.2.0-rc.2` found only `.md` files and skipped named files without a word. See
+`0.2.0-rc.2` found only `.md` files and skipped named files without a word.
+
+An input that does not exist and contains `*`, `?`, `[`, or `{` is a glob
+pattern, which the CLI expands itself, so quoting it works in every shell,
+including PowerShell, cmd, and npm scripts:
+
+```sh
+node dist/cli/main.js lint "docs/**/*.md"
+node dist/cli/main.js format --check "{docs,notes}/*.md"
+```
+
+A pattern matches the paths of the Markdown files that discovery finds, so
+ignored files stay out, and one that matches none is an error with exit code
+`2`. Patterns are relative to the current working directory, like paths, and
+separate folders with `/` on every system; `\` escapes the next character. See
 the [selection details](configuration.md#selection-output-and-exit-codes).
 
 A directory that the tool is not permitted to read is skipped with a warning

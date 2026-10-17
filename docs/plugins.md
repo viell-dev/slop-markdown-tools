@@ -193,11 +193,11 @@ system does not let it read, and recognizes each document's Obsidian vault. It
 reads no configuration file and writes nothing: pass the configuration as
 `config`, with `plugins` for any plugin objects, and write results yourself.
 
-- `inputs` are files and folders to select, absolute or relative to `root`, not
-  to the current directory, as the CLI
-  [selects them](configuration.md#selection-output-and-exit-codes): a folder
-  selects the `.md` and `.markdown` files that are not ignored, a file is
-  selected whatever its name, and an ignored file or folder is an entry of
+- `inputs` are files, folders, and glob patterns to select, absolute or relative
+  to `root`, not to the current directory, as the CLI
+  [selects them](configuration.md#selection-output-and-exit-codes): a folder or
+  pattern selects the `.md` and `.markdown` files that are not ignored, a file
+  is selected whatever its name, and an ignored file or folder is an entry of
   `skipped` with the code `IGNORED`. Omitted, every document is selected; an
   empty list selects none. The other files remain link targets either way.
 - `exclude` lists files and folders to leave out of the selection, as paths, not
