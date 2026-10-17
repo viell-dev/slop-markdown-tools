@@ -151,6 +151,12 @@ From every prerelease:
 - `.markdown` files are documents and link targets, and a file named on the
   command line is read as Markdown whatever its name
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- CI tests Node.js 22.12.0, the lowest supported version, where it tested the
+  newest Node.js 22, and also tests Node.js 26
+  ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
+- The documentation site describes the newest stable release instead of the
+  unreleased state of `main`
+  ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
 
 ### Fixed
 
