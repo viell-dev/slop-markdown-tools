@@ -28,10 +28,13 @@ const result = format(files["note.md"], options);
 `lint(source, options)` returns the diagnostics, with the fields of the
 [JSON report](cli.md#json-report). `format(source, options)` returns `output`,
 the formatted text; `changed`, whether it differs; `diagnostics`, the findings
-that remain in the output; and `scope` with [`ranges`](#part-of-a-document). A
-document that cannot be formatted safely comes back unchanged with an
-`engine/unsafe-format` error. An invalid configuration, an unknown rule, or
-invalid rule options throw an error.
+that remain in the output; and `scope` with [`ranges`](#part-of-a-document). The
+edits of a rule that would change the document's meaning are left out and
+reported as `engine/unsafe-format`, as the
+[safety model](design.md#safety-model) describes, and a rule that fails is
+reported as [`engine/rule-error`](plugins.md#rules). An invalid configuration,
+an unknown rule, invalid rule options, or a plugin rule of the wrong shape throw
+an error.
 
 | Option           | Meaning                                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ |

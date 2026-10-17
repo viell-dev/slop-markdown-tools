@@ -10,30 +10,109 @@ Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
 the built-in rules; [plugins](plugins.md) can add more.
 
-| Rule                          | Kind    | `format` fixes | Presets                                  | Dialects                        | Options                                                     |
-| ----------------------------- | ------- | -------------- | ---------------------------------------- | ------------------------------- | ----------------------------------------------------------- |
-| `forgejo/heading-id`          | Problem | No             | `forgejo`, `gitea` (error)               | Forgejo, Gitea                  | None                                                        |
-| `github/alert-marker`         | Style   | Yes            | `github`, `forgejo`, `gitea`             | GitHub, Forgejo, Gitea          | None                                                        |
-| `github/task-marker`          | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark              | None                                                        |
-| `links/notation`              | Style   | Yes            | None                                     | Obsidian                        | `style`, required                                           |
-| `links/path`                  | Style   | Yes            | None                                     | All; some options Obsidian only | `style`, `brackets`, `extension`, `leadingDot`              |
-| `links/valid`                 | Problem | No             | `recommended` (error)                    | All                             | None                                                        |
-| `obsidian/block-reference`    | Problem | No             | `obsidian` (error)                       | Obsidian                        | None                                                        |
-| `obsidian/callout-marker`     | Style   | Yes            | `obsidian`                               | Obsidian                        | None                                                        |
-| `obsidian/strict-line-breaks` | Problem | No             | `obsidian`                               | Obsidian                        | None                                                        |
-| `structure/initial-heading`   | Problem | No             | None                                     | All                             | None                                                        |
-| `style/block-spacing`         | Style   | Yes            | None                                     | All                             | None                                                        |
-| `style/emphasis`              | Style   | Yes            | `recommended`                            | All                             | `marker`                                                    |
-| `style/final-newline`         | Style   | Yes            | `recommended`                            | All                             | None                                                        |
-| `style/heading`               | Style   | Yes            | None                                     | All                             | None                                                        |
-| `style/inline-code`           | Style   | Yes            | None                                     | All                             | None                                                        |
-| `style/strong`                | Style   | Yes            | `recommended`                            | All                             | `marker`                                                    |
-| `style/table`                 | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark              | None                                                        |
-| `style/wrap`                  | Style   | Yes            | `recommended`                            | All                             | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
+| Rule                          | Kind    | `format` fixes | Presets                                  | Dialects                          | Options                                                     |
+| ----------------------------- | ------- | -------------- | ---------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
+| `content/code-language`       | Problem | No             | None                                     | All                               | None                                                        |
+| `content/image-alt`           | Problem | No             | `recommended`                            | All                               | None                                                        |
+| `content/table-columns`       | Problem | No             | `recommended`                            | All but CommonMark                | None                                                        |
+| `forgejo/heading-id`          | Problem | No             | `forgejo`, `gitea` (error)               | Forgejo, Gitea                    | None                                                        |
+| `github/alert-marker`         | Style   | Yes            | `github`, `forgejo`, `gitea`             | GitHub, Forgejo, Gitea            | None                                                        |
+| `github/task-marker`          | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | None                                                        |
+| `links/empty`                 | Problem | No             | `recommended`                            | All                               | None                                                        |
+| `links/notation`              | Style   | Yes            | None                                     | Obsidian                          | `style`, required                                           |
+| `links/path`                  | Style   | Yes            | None                                     | All; some options Obsidian only   | `style`, `brackets`, `extension`, `leadingDot`              |
+| `links/undefined-reference`   | Problem | No             | `recommended`                            | All; footnotes all but CommonMark | None                                                        |
+| `links/unused-definition`     | Problem | No             | `recommended`                            | All                               | None                                                        |
+| `links/valid`                 | Problem | No             | `recommended` (error)                    | All                               | None                                                        |
+| `obsidian/block-reference`    | Problem | No             | `obsidian` (error)                       | Obsidian                          | None                                                        |
+| `obsidian/callout-marker`     | Style   | Yes            | `obsidian`                               | Obsidian                          | None                                                        |
+| `obsidian/strict-line-breaks` | Problem | No             | `obsidian`                               | Obsidian                          | None                                                        |
+| `structure/duplicate-heading` | Problem | No             | None                                     | All                               | None                                                        |
+| `structure/heading-increment` | Problem | No             | `recommended`                            | All                               | None                                                        |
+| `structure/initial-heading`   | Problem | No             | None                                     | All                               | None                                                        |
+| `structure/single-title`      | Problem | No             | None                                     | All                               | None                                                        |
+| `style/block-spacing`         | Style   | Yes            | None                                     | All                               | None                                                        |
+| `style/emphasis`              | Style   | Yes            | `recommended`                            | All                               | `marker`                                                    |
+| `style/final-newline`         | Style   | Yes            | `recommended`                            | All                               | None                                                        |
+| `style/heading`               | Style   | Yes            | None                                     | All                               | None                                                        |
+| `style/inline-code`           | Style   | Yes            | None                                     | All                               | None                                                        |
+| `style/strong`                | Style   | Yes            | `recommended`                            | All                               | `marker`                                                    |
+| `style/table`                 | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | None                                                        |
+| `style/wrap`                  | Style   | Yes            | `recommended`                            | All                               | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
 
 A preset enables its rules as warnings, unless the table says error. The
 `codeberg` preset is the `forgejo` preset under another name. In a dialect that
 the Dialects column does not name, the rule finds nothing.
+
+## `content/code-language`
+
+Reports a fenced code block that does not name its language after the opening
+fence. GitHub, Forgejo, Gitea, and Obsidian highlight code by the language its
+fence names; name `text` for plain text. Indented code blocks have no place for
+a language and are not reported.
+
+Reported:
+
+````markdown
+```
+npm test
+```
+````
+
+Not reported:
+
+````markdown
+```sh
+npm test
+```
+````
+
+## `content/image-alt`
+
+Reports an image without alternative text, the text between the brackets of
+`![text](chart.png)`. Screen readers read it in place of the image, and browsers
+show it when the image does not load. Text that is only blank space counts as
+none. In the Obsidian dialect, a size after `|`, as in `![|100](chart.png)`, is
+not text, and embeds such as `![[chart.png]]` are not reported, because they
+have no place for text. HTML `<img>` elements are not checked.
+
+Reported:
+
+```markdown
+![](sales-by-month.png)
+```
+
+Not reported:
+
+```markdown
+![Sales by month, rising from March](sales-by-month.png)
+```
+
+## `content/table-columns`
+
+Reports a table row with more or fewer cells than the header row. As the GFM
+specification requires, renderers drop the extra cells of a longer row without a
+trace and fill a shorter row with empty cells, so the table does not show what
+its source says. A `|` separates cells inside code and wikilinks too, unless it
+is escaped as `\|`.
+
+Reported, because the last row has three cells:
+
+```markdown
+| Name | Size |
+| ---- | ---- |
+| a    | 1    |
+| b    | 2    | 3 |
+```
+
+Not reported:
+
+```markdown
+| Name    | Size |
+| ------- | ---- |
+| a       | 1    |
+| `b\|c`  | 2    |
+```
 
 ## `forgejo/heading-id`
 
@@ -92,6 +171,26 @@ After:
 - [x] Write the guide
 ```
 
+## `links/empty`
+
+Reports a link or image whose destination is empty, as in `[guide]()`, or only
+`#`, which leads to the top of the page. Both are usually placeholders that were
+never filled in. A reference definition with such a destination is reported
+once, at the definition, rather than at each reference to it. Obsidian wikilinks
+are not checked.
+
+Reported:
+
+```markdown
+See the [setup guide](#) and the [changelog]().
+```
+
+Not reported:
+
+```markdown
+See the [setup guide](#setup).
+```
+
 ## `links/notation`
 
 Converts Obsidian links between Markdown and wikilink notation. The `style`
@@ -119,10 +218,8 @@ After:
 See [the plan](<Garden/Plan>).
 ```
 
-Do not let this rule and `links/path` change the same link in one run: their
-edits overlap, and `format` then leaves the document unchanged and reports
-`engine/unsafe-format`. Run them one after the other with different
-configurations.
+With `links/path` also on, a link that both change gets its notation first and
+its path in the next pass, the same result as running them one after the other.
 
 ## `links/path`
 
@@ -169,6 +266,60 @@ After:
 
 ```markdown
 See the [guide](./docs/guide.md#setup).
+```
+
+## `links/undefined-reference`
+
+Reports a reference whose label has no definition in the document: a full
+reference `[text][label]`, a collapsed reference `[label][]`, and, in every
+dialect but CommonMark, a footnote reference `[^label]`. The renderer shows such
+a reference as plain text, brackets and all. Labels match as the renderer
+matches them, without regard to case or to how much blank space separates words.
+
+A shortcut reference, `[label]` alone, is not reported, because brackets in
+prose are usually just brackets. Neither are brackets directly after a letter,
+digit, `_`, or `)`, as in `matrix[i][j]`, which are indexes rather than
+references, nor brackets in code, math, HTML, or links, nor escaped ones (`\[`).
+A run of brackets such as `[a][b][c]` is reported once, at its start.
+
+Reported, when neither a definition `[setup]: …` nor a footnote `[^1]: …`
+exists:
+
+```markdown
+See the [installation guide][setup] and [setup][].[^1]
+```
+
+Not reported:
+
+```markdown
+See the [installation guide][Setup] and press [Enter].
+
+[setup]: install.md
+```
+
+## `links/unused-definition`
+
+Reports a reference definition or footnote that no reference in the document
+uses. A definition that only a shortcut reference `[label]` uses counts as used.
+A second definition of the same label is reported too, because the renderers use
+the first. GitHub leaves footnotes that nothing references off the page.
+
+Reported, at `[old-setup]`:
+
+```markdown
+See the [guide][setup].
+
+[setup]: install.md
+[old-setup]: old/install.md
+```
+
+Not reported:
+
+```markdown
+See the [guide][setup] and the [changelog].
+
+[setup]: install.md
+[changelog]: CHANGELOG.md
 ```
 
 ## `links/valid`
@@ -247,6 +398,70 @@ it and never changes it. The finding is at line 1, and its message begins
 `Obsidian strictLineBreaks is not verified true`. See
 [Obsidian vaults](obsidian.md#enable-wrapping).
 
+## `structure/duplicate-heading`
+
+Reports a heading with the same text as an earlier heading under the same parent
+heading. Two "Setup" sections side by side make a table of contents ambiguous,
+and a link to `#setup` reaches only the first. The same heading under different
+parents, as in a guide with a section per platform, is not reported. Headings
+are compared by their text as the reader sees it: formatting does not count,
+case does. As for `structure/heading-increment`, the headings of a block quote
+or a footnote are checked among themselves.
+
+Reported:
+
+```markdown
+# Install
+
+## Setup
+
+## Setup
+```
+
+Not reported:
+
+```markdown
+# Linux
+
+## Setup
+
+# Windows
+
+## Setup
+```
+
+## `structure/heading-increment`
+
+Reports a heading more than one level deeper than the heading before it, such as
+a level-3 heading directly after a level-1 heading. Readers who move through a
+document by its headings, with a screen reader or a table of contents, rely on
+the levels to show how sections nest. The first heading may have any level.
+
+The headings of a block quote, which is also how callouts and alerts are
+written, and of a footnote are checked among themselves: a callout can start
+with a level-3 heading under any heading, and its headings do not count for the
+document's.
+
+Reported:
+
+```markdown
+# Install
+
+### Requirements
+```
+
+Not reported:
+
+```markdown
+# Install
+
+## Requirements
+
+> [!NOTE]
+>
+> ### Older versions
+```
+
 ## `structure/initial-heading`
 
 Requires the first block of a document, after optional YAML or TOML front
@@ -271,6 +486,32 @@ title: Notes
 ---
 
 # Notes
+```
+
+## `structure/single-title`
+
+Reports a second level-1 heading in a document. A document has one title, and
+further level-1 headings usually belong one level down. A `title` key in YAML or
+TOML front matter counts as the title; every level-1 heading is then reported.
+As for `structure/heading-increment`, the headings of a block quote or a
+footnote are checked among themselves.
+
+Reported:
+
+```markdown
+# Install
+
+# Configure
+```
+
+Not reported:
+
+```markdown
+---
+title: Install
+---
+
+## Requirements
 ```
 
 ## `style/block-spacing`
