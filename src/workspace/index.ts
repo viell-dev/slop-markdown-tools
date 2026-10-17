@@ -13,12 +13,24 @@ import { isNotUtf8 } from "./encoding.js";
 
 /**
  * A Markdown file's text, null for a file that is not Markdown, or a loader
- * that returns the text when a fragment check needs it. A loader that throws an
- * error whose `code` is `EACCES`, `EPERM`, or `EBUSY`, or
- * `ERR_ENCODING_INVALID_ENCODED_DATA` for a file that is not UTF-8 text, marks
- * the file as unreadable; any other error propagates.
+ * that returns the text when a fragment check needs it. Only a file that
+ * `isMarkdownName` accepts for the link's dialect is read for anchors. A
+ * loader that throws an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`,
+ * or `ERR_ENCODING_INVALID_ENCODED_DATA` for a file that is not UTF-8 text,
+ * marks the file as unreadable; any other error propagates.
  */
 export type WorkspaceSource = string | null | (() => string);
+
+/**
+ * Whether a file is Markdown by its name: one ending in `.md` or `.markdown`,
+ * in any letter case, both of which GitHub, Forgejo, and Gitea render.
+ * Discovery selects such files in folders, and their headings are link
+ * targets. For the Obsidian dialect only `.md` counts: Obsidian opens no
+ * other file as a note.
+ */
+export function isMarkdownName(name: string, dialect?: Dialect): boolean {
+  return (dialect === "obsidian" ? /\.md$/i : /\.(?:md|markdown)$/i).test(name);
+}
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
 interface Rendering {
@@ -555,18 +567,21 @@ export function createWorkspace(
   const targets = new Map<string, Target>();
   /**
    * One group of a target's anchors, from the target read and parsed for it;
-   * nothing keeps the parsed document. A target that is not Markdown source has
-   * no anchors. Undefined for a target that the system refuses to let be read,
-   * or whose text is not UTF-8, which is marked and not read again.
+   * nothing keeps the parsed document. A target that the link's dialect does not
+   * render as Markdown has no anchors, also when its text is known because it
+   * was linted as Markdown. Undefined for a target that the system refuses to
+   * let be read, or whose text is not UTF-8, which is marked and not read again.
    */
   function compute<Anchors>(
     target: Target,
     name: string,
+    dialect: Dialect,
     anchors: (document: Document | null) => Anchors,
   ): Anchors | undefined {
     if (target.unreadable) return undefined;
     const value = sources.get(name);
-    if (value === null || value === undefined || !/\.md$/i.test(name)) return anchors(null);
+    if (value === null || value === undefined || !isMarkdownName(name, dialect))
+      return anchors(null);
     let source: string;
     try {
       source = typeof value === "function" ? value() : value;
@@ -596,7 +611,7 @@ export function createWorkspace(
     let target = targets.get(name);
     if (!target) targets.set(name, (target = {}));
     if (dialect === "obsidian") {
-      const anchors = target.obsidian ?? compute(target, name, obsidianAnchors);
+      const anchors = target.obsidian ?? compute(target, name, dialect, obsidianAnchors);
       if (!anchors) return undefined;
       target.obsidian = anchors;
       return fragment.startsWith("^")
@@ -604,14 +619,14 @@ export function createWorkspace(
         : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
     }
     if (dialect === "forgejo" || dialect === "gitea") {
-      const forge = target.forge ?? compute(target, name, forgeAnchors);
+      const forge = target.forge ?? compute(target, name, dialect, forgeAnchors);
       if (!forge) return undefined;
       target.forge = forge;
       const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
       return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
-    const anchors = target.github ?? compute(target, name, githubAnchors);
+    const anchors = target.github ?? compute(target, name, dialect, githubAnchors);
     if (!anchors) return undefined;
     target.github = anchors;
     const folded = anchor.toLowerCase();

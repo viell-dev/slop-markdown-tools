@@ -244,10 +244,11 @@ describe("library scripts", () => {
     expect(other.stdout).toContain("docs/guide.md:4:1 warn style/wrap");
     expect(other.stdout).toContain("\n1 error(s)\n");
   });
-  it("lint-folder.mjs treats any spelling of the .md extension as Markdown", async () => {
+  it("lint-folder.mjs treats any spelling of .md and .markdown as Markdown", async () => {
     const root = await fixture({
-      "README.MD": "A *note* with a [link](other.Md#title).\n",
+      "README.MD": "A *note* with a [link](other.Md#title) and [another](third.markdown#end).\n",
       "other.Md": "# Title\n",
+      "third.markdown": "# End\n",
     });
     const result = node("examples/library/lint-folder.mjs", [root]);
     expect(result.stdout).toBe(

@@ -36,16 +36,30 @@ absolute or relative to the current directory, narrow the selection to those
 files and directories; the rest of the workspace still counts for checking
 links.
 
-- Only files whose names end in `.md`, in any case, are documents. A file with
-  another extension is not processed even when it is named on the command line;
-  it can still be a link target.
+- Files whose names end in `.md` or `.markdown`, in any case, are documents. A
+  file named on the command line is read as Markdown whatever its name. Other
+  files can still be link targets.
 - Files that `.gitignore` excludes or that match the configuration's `ignore`
   patterns are not processed, and nested Git repositories, symbolic links, and
   the directories `.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and
   `coverage` are not visited; see
   [ignored files](configuration.md#ignored-files-and-link-targets). A symbolic
-  link named on the command line is an error.
-- The CLI does not expand patterns such as `*.md`; a shell does.
+  link named on the command line is an error. A file or directory named on the
+  command line that these leave out is skipped with a warning that says why,
+  such as
+  `Skipped ignored input: generated/x.md (in generated, which "generated/" in .gitignore matches)`,
+  and the exit code does not change.
+- `.gitignore` files apply as in Git: the deepest one with a pattern that
+  matches a path decides, so a negated pattern there includes a file again, but
+  nothing below an excluded directory can be included. Letter case is ignored on
+  Windows and macOS, as Git does there by default, and not elsewhere.
+- A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
+  such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
+  PowerShell, cmd, and npm scripts. It is relative to the current directory,
+  separates directories with `/` on every system, where `\` escapes the next
+  character, matches names that start with a dot, and ignores case on Windows
+  and macOS. It selects the documents that it matches; one that matches none is
+  an error.
 - `--exclude` takes literal paths, not patterns, relative to the current
   directory or absolute, inside the workspace. It leaves out a file, or a
   directory with everything in it, which still count as link targets. A path
@@ -141,9 +155,10 @@ JSON report and the exit code.
   order of `files`. It is empty for `lint`, for `format` without `--write`, and
   when nothing was written. A file whose entry has `changed` but that is not
   listed was not written, and its diagnostics say why.
-- `skipped` appears only when something was skipped: one entry per directory or
-  settings file, with `path`, `type` (`directory` or `file`), the system's error
-  `code` or `INVALID` for content that could not be used, and a `message`.
+- `skipped` appears only when something was skipped: one entry per directory,
+  settings file, or ignored input, with `path`, `type` (`directory` or `file`),
+  the system's error `code`, `INVALID` for content that could not be used, or
+  `IGNORED` for a named input that is ignored, and a `message`.
 
 A diagnostic has the `rule`, the `severity` (`warn` or `error`), the `message`,
 and its position: `start` and optional `end` as offsets into the text, and
