@@ -3,18 +3,21 @@
 Get the CLI running, select a profile, and preview a formatting pass before
 writing changes.
 
-## Install the release candidate
+## Install the package
 
 The CLI requires Node.js 22.12 or newer. Install the package in your document
 workspace:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.2.0-rc.2
+npm install --save-dev --save-exact mdrefine@0.2.0
 npx --no-install mdtools --help
 ```
 
-The npm package is `mdrefine`; the executable is `mdtools`. Prereleases use the
-npm channel named after their kind, `rc` or `beta`. See
+The npm package is `mdrefine`; the executable is `mdtools`. The exact version
+lets you choose when a minor release, which may change formatting, reaches your
+documents; see
+[versions and compatibility](releases.md#versions-and-compatibility). Release
+candidates use the npm channel `rc`. See
 [versions and availability](releases.md#versions-and-availability) for registry
 checks and release announcements.
 

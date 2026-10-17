@@ -2,7 +2,10 @@
 
 The public API is exported from `mdrefine`. Follow the
 [installation guide](quick-start.md) to install the npm package or build a
-checkout as a local dependency. The API is provisional until a stable release.
+checkout as a local dependency. The exports and types described here are part of
+the interface that [version numbers](releases.md#versions-and-compatibility)
+describe: before 1.0, a minor release may change them, and its release notes say
+how.
 
 ## Library calls
 

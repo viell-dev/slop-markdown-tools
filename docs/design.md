@@ -35,6 +35,16 @@ filesystem/CLI integration cases, including the list-collapse failure that
 motivated replacing heuristic reflow; [testing](testing.md) describes the
 suites.
 
+The parser, micromark, follows CommonMark closely but not everywhere. Directly
+below a paragraph, a list item that begins with another list marker, as in
+`- 2. Step` or `- -`, is read as a list item holding text, where CommonMark and
+GitHub read a nested list. The cause is upstream
+([issue #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
+Formatting such a document cannot change its meaning, because the semantic check
+compares the parser's readings before and after, but rules see text there where
+GitHub shows a list, and the rules that would change such a place leave it as
+written.
+
 The fingerprint is computed in the document's dialect, so it cannot notice that
 the dialect itself is wrong. In CommonMark a table, or a run of footnote
 definitions, is an ordinary paragraph: reflow joins its lines, and the

@@ -333,14 +333,20 @@ created after it was enabled; beta.1 predates it, though its tag is protected.
 Upload all assets before publishing a future release. If npm succeeds but GitHub
 fails, finish only the missing GitHub step at the same source commit.
 
-Until the first stable release, `latest` follows the newest prerelease of any
-kind: after each authorized prerelease publication, run an authenticated local
-`npm dist-tag add mdrefine@VERSION latest` once the published version and its
-channel tag are verified. OIDC publication does not authenticate tag updates.
-Complete this step and verify both tags before reporting the release complete.
-Once stable releases exist, `latest` follows stable and prerelease channel tags
-such as `beta` remain separate. The initial local publication did not produce
-OIDC provenance.
+`latest` follows stable releases, from 0.2.0 on. The workflow publishes a stable
+version under `latest` and a prerelease under its channel tag (`rc` or `beta`),
+taken from `publishConfig.tag`, which it checks against the version; a
+prerelease must not move `latest`. Before 0.2.0, each prerelease was also made
+`latest` with an authenticated local `npm dist-tag add`, because OIDC
+publication does not authenticate tag updates; that step is no longer part of a
+release. Verify the tags after each publication. The initial local publication
+did not produce OIDC provenance.
+
+Version numbers follow the
+[versioning policy](docs/releases.md#versions-and-compatibility): before 1.0, a
+change to the interface it lists that is not a defect fix waits for the next
+minor release, and a patch release only fixes defects. Decide which release a
+change belongs to when it is assigned, and say so in the PR.
 
 With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
 `artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may
