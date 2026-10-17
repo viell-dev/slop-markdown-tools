@@ -433,8 +433,9 @@ describe("processing selected ranges", () => {
     expect(result.output).toBe(
       "# Guide\n\nLegacy *word* stays.\n\nChange _this paragraph_, with [setup][setup].\n\n[setup]: ./setup.md\n",
     );
-    // The scope is the whole paragraph, in the output's positions.
-    expect(result.scope).toEqual([at(result.output, "Change", 45)]);
+    // The scope is the whole paragraph with the line breaks next to it, in the output's positions.
+    const paragraph = at(result.output, "Change", 45);
+    expect(result.scope).toEqual([{ start: paragraph.start - 1, end: paragraph.end + 1 }]);
     // The diagnostics describe the result; those outside the scope are left out.
     expect(result.diagnostics).toEqual([]);
     // Lint reports what starts in the selected blocks; an empty range at a position selects its block.
@@ -509,8 +510,8 @@ describe("processing selected ranges", () => {
     const parts = result.output.split("\n\n");
     expect(parts).toEqual([whole[0], long("Two"), whole[2]]);
     expect(result.scope!.map((part) => result.output.slice(part.start, part.end))).toEqual([
-      whole[0],
-      whole[2]!.trimEnd(),
+      `${whole[0]}\n`,
+      `\n${whole[2]}`,
     ]);
     // Formatting the scope again changes nothing.
     expect(format(result.output, { ...options, ranges: result.scope! }).changed).toBe(false);
@@ -555,7 +556,8 @@ describe("processing selected ranges", () => {
     const source = `${mark}🙂 *a*.\r\n\r\nÜber *b*.\r\n`;
     const result = format(source, { ...emphasis, ranges: [at(source, "Über", 1)] });
     expect(result.output).toBe(`${mark}🙂 *a*.\r\n\r\nÜber _b_.\r\n`);
-    expect(result.scope).toEqual([at(result.output, "Über", 9)]);
+    const block = at(result.output, "Über", 9);
+    expect(result.scope).toEqual([{ start: block.start - 2, end: block.end + 2 }]);
     expect(format(source, { ...emphasis, ranges: [{ start: 0, end: 1 }] }).scope).toEqual([]);
     expect(format(source, { ...emphasis, ranges: [{ start: 1, end: 2 }] }).output).toBe(
       `${mark}🙂 _a_.\r\n\r\nÜber *b*.\r\n`,
@@ -584,7 +586,40 @@ describe("processing selected ranges", () => {
     });
     expect(result.output).toBe(source);
     expect(result.diagnostics.map((item) => item.rule)).toEqual(["engine/unsafe-format"]);
-    expect(result.scope).toEqual([at(source, "C", 6)]);
+    const block = at(source, "C", 6);
+    expect(result.scope).toEqual([{ start: block.start - 1, end: block.end + 1 }]);
+  });
+  it("takes in a selected block's markers and the line breaks next to it", () => {
+    const spacing: ProcessOptions = {
+      config: { extends: [], rules: { "style/block-spacing": "warn" } },
+    };
+    const source = "# Setup\nInstall the package.\n- Run the command.\n";
+    const formattedWith = (ranges: { start: number; end: number }[]) =>
+      format(source, { ...spacing, ranges }).output;
+    const messages = (ranges: { start: number; end: number }[]) =>
+      lint(source, { ...spacing, ranges }).map((item) => item.message);
+    // The blank line next to a selected block is part of formatting that block.
+    expect(formattedWith([at(source, "Setup", 1)])).toBe(
+      "# Setup\n\nInstall the package.\n- Run the command.\n",
+    );
+    expect(formattedWith([at(source, "Install", 1)])).toBe(
+      "# Setup\n\nInstall the package.\n\n- Run the command.\n",
+    );
+    expect(formattedWith([at(source, "Run", 1)])).toBe(
+      "# Setup\nInstall the package.\n\n- Run the command.\n",
+    );
+    // The list's marker is on the selected block's line, and so is a cursor on it.
+    expect(messages([at(source, "Run", 1)])).toEqual(["Add a blank line before the list."]);
+    expect(messages([at(source, "- Run")])).toEqual(["Add a blank line before the list."]);
+    expect(messages([at(source, "Setup", 1)])).toEqual(["Add a blank line after the heading."]);
+    // A quote's markers on the block's first line belong to its scope too.
+    const quoted = "> # Title\n> Text.\n";
+    const result = format(quoted, { ...spacing, ranges: [at(quoted, "Text", 1)] });
+    expect(result.output).toBe("> # Title\n>\n> Text.\n");
+    // The scope grows by the line that was added in it.
+    expect(result.output.slice(result.scope![0]!.start, result.scope![0]!.end)).toBe(
+      "\n>\n> Text.\n",
+    );
   });
   it("gives the same result for a range over the whole document as without ranges", () => {
     fc.assert(

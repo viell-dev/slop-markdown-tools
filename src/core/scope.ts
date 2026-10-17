@@ -30,14 +30,32 @@ export function checkRanges(ranges: readonly SourceRange[], source: string): voi
       );
 }
 
-/** The leaf blocks of a tree, in the order of the source; they do not overlap. */
-function leafBlocks(tree: Root): [number, number][] {
-  const blocks: [number, number][] = [];
+/** A leaf block's whole lines, and the same with the line breaks before and after them. */
+interface Block {
+  lines: [number, number];
+  scope: [number, number];
+}
+/**
+ * The leaf blocks of a document, in the order of its source; they do not
+ * overlap. A block's lines begin with what stands before it on its first
+ * line, such as a list item's marker or a quote's `>`, and end with the rest
+ * of its last line. Its scope adds the line breaks next to those lines, where
+ * the spacing between it and its neighbors is edited.
+ */
+function leafBlocks(tree: Root, source: string): Block[] {
+  const blocks: Block[] = [];
   const visit = (node: Nodes) => {
     if (!("children" in node)) return;
     for (const child of node.children)
       if (containers.has(child.type)) visit(child);
-      else blocks.push(range(child));
+      else {
+        let [start, end] = range(child);
+        while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r") start--;
+        while (end < source.length && source[end] !== "\n" && source[end] !== "\r") end++;
+        const before = source.endsWith("\r\n", start) ? 2 : start > 0 ? 1 : 0;
+        const after = source.startsWith("\r\n", end) ? 2 : end < source.length ? 1 : 0;
+        blocks.push({ lines: [start, end], scope: [start - before, end + after] });
+      }
   };
   visit(tree);
   return blocks;
@@ -45,22 +63,23 @@ function leafBlocks(tree: Root): [number, number][] {
 
 /**
  * Where processing is limited to for `ranges`: each range together with the
- * complete leaf blocks that it touches, sorted, with overlapping and adjoining
- * parts joined. A non-empty range touches a block that it overlaps, and an
- * empty one, a position, the block that holds it or ends there. A range that
- * touches no block, such as one in a run of blank lines, selects nothing.
+ * scope of the leaf blocks that it touches, sorted, with overlapping and
+ * adjoining parts joined. A non-empty range touches a block whose lines it
+ * overlaps, and an empty one, a position, the block whose lines hold it. A
+ * range that touches no block, such as one in a run of blank lines, selects
+ * nothing.
  */
-export function widen(tree: Root, ranges: readonly SourceRange[]): SourceRange[] {
-  const blocks = leafBlocks(tree);
+export function widen(tree: Root, source: string, ranges: readonly SourceRange[]): SourceRange[] {
+  const blocks = leafBlocks(tree, source);
   const widened: SourceRange[] = [];
   for (const { start, end } of ranges) {
-    const touched = blocks.filter(([from, to]) =>
+    const touched = blocks.filter(({ lines: [from, to] }) =>
       start === end ? from <= start && start <= to : start < to && end > from,
     );
     if (!touched.length) continue;
     widened.push({
-      start: Math.min(start, touched[0]![0]),
-      end: Math.max(end, touched[touched.length - 1]![1]),
+      start: Math.min(start, touched[0]!.scope[0]),
+      end: Math.max(end, touched[touched.length - 1]!.scope[1]),
     });
   }
   widened.sort((a, b) => a.start - b.start);
