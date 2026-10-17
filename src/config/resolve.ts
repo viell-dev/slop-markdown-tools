@@ -1,5 +1,6 @@
 import { Ajv } from "ajv";
 import { minimatch } from "minimatch";
+import { configErrors } from "./problems.js";
 import type {
   Config,
   Dialect,
@@ -73,64 +74,115 @@ export const presets: Record<string, Config> = {
     },
   },
 };
-const severity = { enum: ["off", "warn", "error"] };
-const dialect = { enum: [...dialects, ...Object.keys(dialectAliases)] };
-const rules = {
-  type: "object",
-  additionalProperties: {
-    anyOf: [
-      severity,
-      { type: "array", items: [severity, { type: "object" }], minItems: 2, maxItems: 2 },
-    ],
-  },
-};
+const dialectNames = [...dialects, ...Object.keys(dialectAliases)];
+const strings = { type: "array", items: { type: "string" } };
+/**
+ * The configuration's JSON Schema, which `validateConfig` enforces. The
+ * package ships it as `config.schema.json`, which a test keeps equal to it,
+ * and the documentation site serves it for editors.
+ */
 export const configSchema = {
   $schema: "http://json-schema.org/draft-07/schema#",
+  title: "mdtools configuration",
+  description:
+    "Configuration of the mdtools command of mdrefine: https://viell-dev.github.io/slop-markdown-tools/configuration.html",
   type: "object",
   additionalProperties: false,
   properties: {
-    $schema: { type: "string" },
+    $schema: { description: "The JSON Schema for editors; the tool ignores it.", type: "string" },
     resolve: {
+      description: "Files that links may lead to, which are never linted or formatted.",
       type: "object",
       additionalProperties: false,
-      properties: { gitIgnored: { type: "boolean" }, nestedRepositories: { type: "boolean" } },
+      properties: {
+        gitIgnored: {
+          description: "Files that .gitignore files exclude are link targets. Default: false.",
+          type: "boolean",
+        },
+        nestedRepositories: {
+          description: "Files of nested Git repositories are link targets. Default: false.",
+          type: "boolean",
+        },
+      },
     },
-    extends: { type: "array", items: { type: "string" } },
-    dialect,
-    rules,
-    ignore: { type: "array", items: { type: "string" } },
-    plugins: { type: "array", items: { type: "string" } },
+    extends: {
+      description:
+        "Presets to start from, in order: a preset name or a list of them. Without it, the configuration starts from recommended.",
+      anyOf: [{ type: "string" }, strings],
+    },
+    dialect: { $ref: "#/definitions/dialect" },
+    rules: { $ref: "#/definitions/rules" },
+    ignore: {
+      description:
+        "Path patterns of documents that are never linted or formatted. They stay link targets.",
+      ...strings,
+    },
+    plugins: {
+      description: "Plugins to load: files relative to this file, or package names.",
+      ...strings,
+    },
     overrides: {
+      description: "Settings for the documents that match one of the patterns in files.",
       type: "array",
       items: {
         type: "object",
         required: ["files"],
         additionalProperties: false,
         properties: {
-          files: { type: "array", items: { type: "string" }, minItems: 1 },
-          dialect,
-          rules,
+          files: {
+            description: "Path patterns, matched against paths relative to the workspace root.",
+            ...strings,
+            minItems: 1,
+          },
+          dialect: { $ref: "#/definitions/dialect" },
+          rules: { $ref: "#/definitions/rules" },
         },
+      },
+    },
+  },
+  definitions: {
+    dialect: {
+      description:
+        "The renderer whose syntax documents are read in. When nothing names one, github is assumed, or obsidian inside a vault.",
+      enum: dialectNames,
+    },
+    severity: { enum: ["off", "warn", "error"] },
+    rules: {
+      description:
+        'Rule IDs and their settings: a severity, or a list of a severity and the rule\'s options, as in ["warn", { "width": 100 }].',
+      type: "object",
+      additionalProperties: {
+        anyOf: [
+          { $ref: "#/definitions/severity" },
+          { type: "array", items: [{ $ref: "#/definitions/severity" }], minItems: 1, maxItems: 1 },
+          {
+            type: "array",
+            items: [{ $ref: "#/definitions/severity" }, { type: "object" }],
+            minItems: 2,
+            maxItems: 2,
+          },
+        ],
       },
     },
   },
 };
 const validate = new Ajv({ allErrors: true }).compile(configSchema);
-/** What is wrong with `value` as a configuration, or undefined when it is valid. */
+/** What is wrong with `value` as a configuration, in plain words, or undefined when it is valid. */
 export function configProblem(value: unknown): string | undefined {
-  return validate(value) ? undefined : new Ajv().errorsText(validate.errors);
+  return validate(value) ? undefined : configErrors(validate.errors ?? [], value, dialectNames);
 }
 export function validateConfig(value: unknown): asserts value is Config {
   const problem = configProblem(value);
   if (problem) throw new Error(`Invalid configuration: ${problem}`);
 }
+const noOptions: Record<string, unknown> = Object.freeze({});
 export function setting(value: RuleSetting): {
   severity: "off" | "warn" | "error";
   options: Record<string, unknown>;
 } {
   return Array.isArray(value)
-    ? { severity: value[0], options: value[1] }
-    : { severity: value, options: {} };
+    ? { severity: value[0], options: value[1] ?? noOptions }
+    : { severity: value, options: noOptions };
 }
 /**
  * Set each of `rules` in `target`. A rule named `__proto__` becomes a setting
@@ -174,7 +226,7 @@ export function resolveConfig(
   const overrides: NonNullable<Config["overrides"]> = [];
   function merge(part: Config, chain: string[]) {
     validateConfig(part);
-    for (const name of part.extends ?? []) {
+    for (const name of typeof part.extends === "string" ? [part.extends] : (part.extends ?? [])) {
       if (chain.includes(name))
         throw new Error(`Circular preset: ${[...chain, name].join(" -> ")}`);
       // Names such as `toString` are found on every object; only defined presets count.

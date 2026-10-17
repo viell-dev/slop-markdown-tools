@@ -35,7 +35,7 @@ const program = new Command()
   .version(manifest.version);
 function common(command: Command): Command {
   return command
-    .option("--config <file>", "Explicit JSON, JSONC, or .mjs configuration")
+    .option("--config <file>", "Explicit JSON, JSONC, or JavaScript configuration")
     .option("--root <directory>", "Workspace root (default: configuration directory or cwd)")
     .option(
       "--dialect <dialect>",

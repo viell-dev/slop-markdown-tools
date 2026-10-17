@@ -146,10 +146,10 @@ describe("line endings and file names", () => {
     const explained = run(root, ["config", "--config", "other.jsonc", "explain", "note.md"]);
     expect(explained.status, explained.stderr).toBe(0);
     expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
-    // The mark does not hide other errors, and their offsets count after it.
+    // The mark does not hide other errors, and their columns count after it.
     await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
     expect(run(root, ["lint"]).stderr).toBe(
-      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")}: ValueExpected at offset 13\n`,
+      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")} at line 1, column 14: a value is expected\n`,
     );
   });
   it("resolves and rewrites links to files with spaces and non-ASCII names", async () => {

@@ -31,10 +31,12 @@
     "./node": {
       "types": "./dist/node.d.ts",
       "import": "./dist/node.js"
-    }
+    },
+    "./config.schema.json": "./config.schema.json"
   },
   "files": [
     "dist",
+    "config.schema.json",
     "docs/*.md",
     "examples",
     "README.md",
@@ -72,7 +74,9 @@
     "benchmark": "node benchmarks/run.mjs",
     "prebenchmark": "npm run build",
     "release:prepare": "run-s check release:pack",
-    "release:pack": "node scripts/package-smoke.mjs --retain"
+    "release:pack": "node scripts/package-smoke.mjs --retain",
+    "schema": "run-s build schema:write",
+    "schema:write": "node scripts/config-schema.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",

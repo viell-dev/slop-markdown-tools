@@ -17,6 +17,55 @@ export interface LoadedConfig {
   root: string;
   file?: string;
 }
+/** The names of the configuration files that the search finds; one directory may hold one. */
+export const configFiles = [
+  "mdtools.config.jsonc",
+  "mdtools.config.json",
+  "mdtools.config.mjs",
+  "mdtools.config.js",
+  "mdtools.config.cjs",
+];
+/**
+ * Whether Node.js loads `file` as JavaScript. A `.js` file is an ES module or
+ * CommonJS as Node.js decides from the nearest `package.json`; either way,
+ * importing it gives its default export or its `module.exports`.
+ */
+const isScript = (file: string) => /\.[cm]?js$/i.test(file);
+/** The 1-based line and column, in UTF-16 code units, of `offset` in `text`. */
+function position(text: string, offset: number): { line: number; column: number } {
+  let line = 1;
+  let start = 0;
+  for (const match of text.slice(0, offset).matchAll(/\r\n|\r|\n/g)) {
+    line++;
+    start = match.index + match[0].length;
+  }
+  return { line, column: offset - start + 1 };
+}
+const syntaxProblems: Partial<Record<ReturnType<typeof printParseErrorCode>, string>> = {
+  InvalidNumberFormat: "the number is not written as JSON writes numbers",
+  PropertyNameExpected: "a property name in double quotes is expected",
+  ValueExpected: "a value is expected",
+  ColonExpected: "a colon is expected",
+  CommaExpected: "a comma is expected",
+  CloseBraceExpected: "a closing brace is expected",
+  CloseBracketExpected: "a closing bracket is expected",
+  EndOfFileExpected: "the file should end here",
+  InvalidCommentToken: "a .json file cannot hold comments; name it .jsonc to keep them",
+  UnexpectedEndOfComment: "the comment is not closed",
+  UnexpectedEndOfString: "the string is not closed on its line",
+  UnexpectedEndOfNumber: "the number is incomplete",
+  InvalidUnicode: "the Unicode escape is invalid",
+  InvalidEscapeCharacter: "the escape sequence is invalid",
+  InvalidCharacter: "a control character in a string must be escaped",
+};
+/** A JSON syntax error in plain words. */
+function syntaxProblem(text: string, error: ParseError): string {
+  const code = printParseErrorCode(error.error);
+  // Text such as an unquoted name or a single-quoted string, which JSON does not have.
+  if (code === "InvalidSymbol")
+    return `${JSON.stringify(text.slice(error.offset, error.offset + Math.min(error.length, 40)))} is not valid JSON here`;
+  return syntaxProblems[code] ?? code;
+}
 export async function loadConfig(start: string, explicit?: string): Promise<LoadedConfig> {
   let file = explicit ? path.resolve(explicit) : undefined;
   let fallbackRoot = path.resolve(start);
@@ -26,7 +75,7 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
       const found: string[] = [];
       let boundary: boolean;
       try {
-        for (const name of ["mdtools.config.jsonc", "mdtools.config.json", "mdtools.config.mjs"])
+        for (const name of configFiles)
           if (await exists(path.join(directory, name))) found.push(path.join(directory, name));
         // A repository or an Obsidian vault is a workspace of its own.
         boundary =
@@ -60,16 +109,17 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
   let value: unknown = {};
   if (file && shown) {
     let text = "";
+    const script = isScript(file);
     try {
       if (!(await stat(file)).isFile())
         throw new Error(`Configuration file is not a file: ${shown}`);
       // A script is read by Node.js itself; its refusal would not name the file.
-      if (file.endsWith(".mjs")) await access(file, constants.R_OK);
+      if (script) await access(file, constants.R_OK);
       else text = await readFile(file, "utf8");
     } catch (error) {
       throw pathError("Configuration file", shown, error);
     }
-    if (file.endsWith(".mjs")) {
+    if (script) {
       try {
         value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
       } catch (error) {
@@ -82,14 +132,19 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
       const errors: ParseError[] = [];
       // RFC 8259 lets a parser ignore a byte order mark, which some Windows
       // programs write at the start of a UTF-8 file; error offsets count after it.
-      value = parse(splitByteOrderMark(text)[1], errors, {
+      const json = splitByteOrderMark(text)[1];
+      value = parse(json, errors, {
         allowTrailingComma: true,
         disallowComments: file.endsWith(".json"),
       });
-      if (errors.length)
+      // The errors after the first mostly follow from it, as the parser recovers.
+      const [first] = errors;
+      if (first) {
+        const { line, column } = position(json, first.offset);
         throw new Error(
-          `Invalid JSON configuration in ${shown}: ${errors.map((error) => `${printParseErrorCode(error.error)} at offset ${error.offset}`).join(", ")}`,
+          `Invalid JSON configuration in ${shown} at line ${line}, column ${column}: ${syntaxProblem(json, first)}`,
         );
+      }
     }
     const problem = configProblem(value);
     if (problem) throw new Error(`Invalid configuration in ${shown}: ${problem}`);

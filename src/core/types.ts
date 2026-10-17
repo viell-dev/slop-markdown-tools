@@ -7,7 +7,7 @@ export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian"
 /** A dialect or one of its aliases, accepted wherever configuration names a dialect. */
 export type DialectName = Dialect | "codeberg";
 export type Severity = "off" | "warn" | "error";
-export type RuleSetting = Severity | [Severity, Record<string, unknown>];
+export type RuleSetting = Severity | [Severity] | [Severity, Record<string, unknown>];
 /** Replace `start` to `end`, half-open UTF-16 offsets into `document.source`, with `text`. */
 export interface Edit {
   start: number;
@@ -121,7 +121,7 @@ export interface ResolveOptions {
 }
 export interface Config {
   resolve?: ResolveOptions;
-  extends?: string[];
+  extends?: string | string[];
   /**
    * The dialect documents are read in. When neither this setting, a preset, nor
    * a matching override names one, the caller's default dialect is assumed, and

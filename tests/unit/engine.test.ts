@@ -13,6 +13,7 @@ import {
   semanticFingerprint,
   ruleRegistry,
   canonicalDialect,
+  validateConfig,
 } from "../../src/index.js";
 import type {
   Config,
@@ -852,7 +853,7 @@ describe("rules that fail", () => {
           plugins,
           config: { extends: [], rules: { "test/options": ["warn", { level: "high" }] } },
         }),
-      ).toThrow("Invalid options for test/options: data/level must be integer");
+      ).toThrow('Invalid options for test/options: "level" must be an integer, not "high"');
       expect(compile.mock.calls.filter(([compiled]) => compiled === schema)).toHaveLength(1);
     } finally {
       compile.mockRestore();
@@ -1150,6 +1151,79 @@ describe("configuration and plugins", () => {
         { name: "local", presets: { a: { extends: ["local/a"] } } },
       ]),
     ).toThrow("Circular");
+  });
+  it("accepts one preset name for extends and a severity alone in a list", () => {
+    expect(resolveConfig({ extends: "github" })).toEqual(resolveConfig({ extends: ["github"] }));
+    expect(() =>
+      resolveConfig({ extends: "local/a" }, "a.md", [
+        { name: "local", presets: { a: { extends: "local/a" } } },
+      ]),
+    ).toThrow("Circular preset: local/a -> local/a");
+    const config: Config = { extends: [], rules: { "style/wrap": ["warn"] } };
+    const source = "word ".repeat(18).trimEnd() + "\n";
+    expect(formatted(source, { config })).toBe(
+      formatted(source, { config: { extends: [], rules: { "style/wrap": "warn" } } }),
+    );
+    expect(
+      lint("*a*\n", { config: { extends: [], rules: { "style/emphasis": ["off"] } } }),
+    ).toEqual([]);
+  });
+  it.each([
+    [5, "the configuration must be an object, not 5"],
+    [{ typo: 1, rule: {} }, 'unknown setting "typo"; unknown setting "rule"'],
+    [{ extends: 5 }, '"extends" must be a preset name or a list of preset names, not 5'],
+    [{ extends: ["github", 5] }, '"extends[1]" must be a preset name, not 5'],
+    [
+      { dialect: "markdown" },
+      '"dialect" must be "commonmark", "github", "forgejo", "gitea", "obsidian", or "codeberg", not "markdown"',
+    ],
+    [{ rules: [] }, '"rules" must be an object of rule IDs and their settings, not a list'],
+    [
+      { rules: { "style/wrap": "warning" } },
+      'the setting of "style/wrap" must be "off", "warn", or "error", or a list of a severity and, optionally, the rule\'s options, not "warning"',
+    ],
+    [
+      { rules: { "style/wrap": ["warnn"] } },
+      'the severity of "style/wrap" must be "off", "warn", or "error", not "warnn"',
+    ],
+    [
+      { rules: { "style/wrap": ["warn", 80] } },
+      'the options of "style/wrap" must be an object, not 80',
+    ],
+    [
+      { rules: { "style/wrap": ["warn", {}, {}] } },
+      'the setting of "style/wrap" must be "off", "warn", or "error", or a list of a severity and, optionally, the rule\'s options',
+    ],
+    [{ ignore: "drafts/**" }, '"ignore" must be a list of path patterns, not "drafts/**"'],
+    [{ plugins: [null] }, '"plugins[0]" must be a file or package name, not null'],
+    [
+      { resolve: { gitIgnored: "yes", other: true } },
+      'unknown setting "resolve.other"; "resolve.gitIgnored" must be true or false, not "yes"',
+    ],
+    [{ overrides: [{ rules: {} }] }, '"overrides[0]" must have "files"'],
+    [
+      { overrides: [{ files: [] }] },
+      '"overrides[0].files" must be a list of one or more path patterns',
+    ],
+    [
+      { overrides: [{ files: ["a.md"], rules: { "style/wrap": "on" } }] },
+      'the setting of "style/wrap" in "overrides[0]" must be "off", "warn", or "error", or a list of a severity and, optionally, the rule\'s options, not "on"',
+    ],
+  ])("says what is wrong with %j by setting name", (value, problem) => {
+    expect(() => validateConfig(value)).toThrow(new Error(`Invalid configuration: ${problem}`));
+  });
+  it("says what is wrong with a rule's options by option name", () => {
+    const wrap = (options: Record<string, unknown>) => () =>
+      lint("", { config: { extends: [], rules: { "style/wrap": ["warn", options] } } });
+    expect(wrap({ width: "80" })).toThrow(
+      new Error('Invalid options for style/wrap: "width" must be an integer, not "80"'),
+    );
+    expect(wrap({ width: 10 })).toThrow(
+      new Error('Invalid options for style/wrap: "width" must be at least 20'),
+    );
+    expect(wrap({ widht: 80 })).toThrow(
+      new Error('Invalid options for style/wrap: unknown option "widht"'),
+    );
   });
   it("supports custom diagnostics and rejects semantic-changing style plugins", () => {
     const plugin: Plugin = {

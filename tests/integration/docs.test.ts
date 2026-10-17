@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { Ajv } from "ajv";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Code, RootContent } from "mdast";
@@ -86,6 +87,35 @@ describe("configuration and dialect references", () => {
     const reference = read("docs/dialects.md");
     for (const dialect of [...dialects, ...Object.keys(dialectAliases)])
       expect(reference).toContain(`\`${dialect}\``);
+  });
+});
+
+describe("configuration schema", () => {
+  const published = JSON.parse(read("config.schema.json")) as Record<string, unknown>;
+  it("is the schema that the tool enforces", () => {
+    // `npm run schema` writes the file from the schema in src/config/resolve.ts.
+    expect(published).toEqual(library.configSchema);
+  });
+  it("accepts the repository's configuration files on its own, and is shipped", () => {
+    const validate = new Ajv({ allErrors: true }).compile(published);
+    const files = [
+      "mdtools.config.jsonc",
+      ...readdirSync(path.join(repository, "examples"), { recursive: true, encoding: "utf8" })
+        .filter((name) => name.endsWith(".jsonc"))
+        .map((name) => `examples/${name.split(path.sep).join("/")}`),
+    ];
+    expect(files.length).toBeGreaterThan(5);
+    for (const file of files) {
+      const value = parseJsonc(read(file)) as unknown;
+      expect(validate(value), `${file}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+    expect(validate({ extends: 5 })).toBe(false);
+    const packaged = JSON.parse(read("package.json")) as {
+      files: string[];
+      exports: Record<string, unknown>;
+    };
+    expect(packaged.files).toContain("config.schema.json");
+    expect(packaged.exports["./config.schema.json"]).toBe("./config.schema.json");
   });
 });
 
@@ -267,7 +297,7 @@ describe("library API", () => {
     );
     for (const name of Object.keys(built)) expect(imported, name).toContain(name);
     const manifest = JSON.parse(read("package.json")) as { exports: Record<string, unknown> };
-    expect(Object.keys(manifest.exports)).toEqual([".", "./node"]);
+    expect(Object.keys(manifest.exports)).toEqual([".", "./node", "./config.schema.json"]);
   });
 });
 

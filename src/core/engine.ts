@@ -2,6 +2,7 @@ import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
+import { optionErrors, shown } from "../config/problems.js";
 import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
@@ -33,24 +34,6 @@ export const builtInRules: Record<string, Rule> = {
   ...contentRules,
 };
 const phases = ["inline", "block", "document"] as const;
-/** A short description of a value that a plugin gave where something else belongs. */
-function shown(value: unknown): string {
-  switch (typeof value) {
-    case "string":
-      return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value);
-    case "number":
-    case "bigint":
-    case "boolean":
-    case "undefined":
-      return String(value);
-    case "function":
-      return "a function";
-    case "symbol":
-      return "a symbol";
-    default:
-      return value === null ? "null" : Array.isArray(value) ? "a list" : "an object";
-  }
-}
 /** What is wrong with a plugin's rule, or undefined when it has the shape of a `Rule`. */
 function ruleProblem(rule: unknown): string | undefined {
   if (!rule || typeof rule !== "object") return `it is ${shown(rule)}, not an object`;
@@ -146,7 +129,7 @@ function prepare(options: ProcessOptions) {
       const validate = optionsValidator(name, rule.schema);
       if (!validate(enabled.options))
         throw new Error(
-          `Invalid options for ${name}: ${ruleValidator.errorsText(validate.errors)}`,
+          `Invalid options for ${name}: ${optionErrors(validate.errors ?? [], enabled.options)}`,
         );
     }
   }
