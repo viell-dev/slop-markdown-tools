@@ -57,10 +57,15 @@ documentation that no longer matches the tool.
 `support.ts` holds the shared helpers: `fixture()` writes a temporary workspace
 that is removed after the test, `copyOf()` copies a folder of the repository
 somewhere a test may write, and `run()` starts the CLI. `restrict()` takes a
-path's permissions away until the test ends. Tests that need an unreadable path
-are skipped on Windows and for the root user, where permissions cannot be taken
-away; `links.test.ts` covers the library's part everywhere, by telling the
-workspace which paths are unreadable.
+path's permissions away until the test ends, with a Unix mode. Tests that use it
+are skipped on Windows and for the root user, who reads anything. On Windows,
+`denyRead()` takes away the right to read a file or list a directory through the
+path's access control list instead, and a smaller set of tests checks the same
+behavior with it. `linkDirectory()` links a directory, as a junction on Windows,
+which needs no privilege there; a test that links a file needs `canSymlink`,
+because Windows allows that only in Developer Mode or for administrators.
+`links.test.ts` covers the library's part of unreadable paths everywhere, by
+telling the workspace which paths are unreadable.
 
 A defect in how the tool behaves as a program belongs here: which files it
 selects, what it prints, what it writes, and how it exits.

@@ -5,7 +5,18 @@ import { describe, expect, it } from "vitest";
 import { discover, replacementFailure, writeAtomic } from "../../src/workspace/files.js";
 import { enclosingVault, isVault } from "../../src/workspace/vault.js";
 import { loadConfig } from "../../src/config/load.js";
-import { canRestrict, cli, fixture, manifest, restrict, run, tree } from "./support.js";
+import {
+  canRestrict,
+  canSymlink,
+  cli,
+  denyRead,
+  fixture,
+  linkDirectory,
+  manifest,
+  restrict,
+  run,
+  tree,
+} from "./support.js";
 
 describe("CLI", () => {
   it("previews, writes, then verifies formatting without changing unrelated syntax", async () => {
@@ -716,28 +727,25 @@ describe("in an Obsidian vault, without a named dialect", () => {
       `mdtools: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
   });
-  it.skipIf(process.platform === "win32")(
-    "recognizes a vault whose settings folder is a link to a shared one",
-    async () => {
-      const root = await fixture({
-        "shared/app.json": '{"strictLineBreaks":true}',
-        "vault/Note.md": note,
-        [`vault/${target}`]: "# Target\n",
-        "broken/Note.md": note,
-      });
-      await symlink(path.join(root, "shared"), path.join(root, "vault/.obsidian"));
-      await symlink(path.join(root, "nowhere"), path.join(root, "broken/.obsidian"));
-      expect(dialect(root, "vault/Note.md")).toBe("obsidian");
-      expect(run(root, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
-        reflowed,
-      );
-      const applied = run(root, ["format", "--write", "vault"]);
-      expect(applied.status, applied.stderr).toBe(0);
-      expect(await readFile(path.join(root, "vault/Note.md"), "utf8")).toBe(reflowed);
-      // A link that leads nowhere is no settings folder.
-      expect(dialect(root, "broken/Note.md")).toBe("github");
-    },
-  );
+  it("recognizes a vault whose settings folder is a link to a shared one", async () => {
+    const root = await fixture({
+      "shared/app.json": '{"strictLineBreaks":true}',
+      "vault/Note.md": note,
+      [`vault/${target}`]: "# Target\n",
+      "broken/Note.md": note,
+    });
+    await linkDirectory(path.join(root, "shared"), path.join(root, "vault/.obsidian"));
+    await linkDirectory(path.join(root, "nowhere"), path.join(root, "broken/.obsidian"));
+    expect(dialect(root, "vault/Note.md")).toBe("obsidian");
+    expect(run(root, ["format", "-", "--stdin-filepath", "vault/Note.md"], note).stdout).toBe(
+      reflowed,
+    );
+    const applied = run(root, ["format", "--write", "vault"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(await readFile(path.join(root, "vault/Note.md"), "utf8")).toBe(reflowed);
+    // A link that leads nowhere is no settings folder.
+    expect(dialect(root, "broken/Note.md")).toBe("github");
+  });
 });
 describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
@@ -870,38 +878,44 @@ describe("filesystem safeguards", () => {
       );
     },
   );
-  it.skipIf(process.platform === "win32")(
-    "refuses explicit symlinks and skips them during traversal",
-    async () => {
-      const root = await fixture({ "target.md": "*content*\n" });
-      await symlink(path.join(root, "target.md"), path.join(root, "link.md"));
-      await expect(discover(root, [path.join(root, "link.md")], [])).rejects.toThrow(
-        "symbolic-link",
-      );
-      expect((await discover(root, [], [])).selected).toEqual(["target.md"]);
-    },
-  );
-  it.skipIf(process.platform === "win32")(
-    "canonicalizes exclusion paths through a workspace alias",
-    async () => {
-      const root = await fixture({ "note.md": "*note*\n", "other.md": "Text.\n" });
-      const aliasParent = await fixture({});
-      const alias = path.join(aliasParent, "workspace");
-      await symlink(root, alias);
-      const checked = run(root, [
-        "lint",
-        "--json",
-        "--exclude",
-        path.join(alias, "note.md"),
-        "--exclude",
-        path.join(alias, "not-created/note.md"),
-      ]);
-      expect(checked.status, checked.stderr).toBe(0);
-      expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
-        "other.md",
-      ]);
-    },
-  );
+  // Windows lets a process create a symbolic link to a file only with a privilege.
+  it.skipIf(!canSymlink)("refuses explicit symlinks and skips them during traversal", async () => {
+    const root = await fixture({ "target.md": "*content*\n" });
+    await symlink(path.join(root, "target.md"), path.join(root, "link.md"));
+    await expect(discover(root, [path.join(root, "link.md")], [])).rejects.toThrow("symbolic-link");
+    expect((await discover(root, [], [])).selected).toEqual(["target.md"]);
+  });
+  it("refuses a linked directory as input and skips it during traversal", async () => {
+    const root = await fixture({ "folder/target.md": "*content*\n" });
+    await linkDirectory(path.join(root, "folder"), path.join(root, "linked"));
+    const named = run(root, ["lint", "linked"]);
+    expect(named.status).toBe(2);
+    expect(named.stderr).toBe("mdtools: Refusing symbolic-link input: linked\n");
+    expect((await discover(root, [], [])).selected).toEqual(["folder/target.md"]);
+    // A path through the link names the file that the link leads to.
+    const through = run(root, ["lint", "--json", path.join("linked", "target.md")]);
+    expect(JSON.parse(through.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "folder/target.md",
+    ]);
+  });
+  it("canonicalizes exclusion paths through a workspace alias", async () => {
+    const root = await fixture({ "note.md": "*note*\n", "other.md": "Text.\n" });
+    const aliasParent = await fixture({});
+    const alias = path.join(aliasParent, "workspace");
+    await linkDirectory(root, alias);
+    const checked = run(root, [
+      "lint",
+      "--json",
+      "--exclude",
+      path.join(alias, "note.md"),
+      "--exclude",
+      path.join(alias, "not-created/note.md"),
+    ]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+      "other.md",
+    ]);
+  });
   it("finds the vault boundary when invoked from a subdirectory", async () => {
     const root = await fixture({ ".obsidian/app.json": "{}", "sub/note.md": "text" });
     expect((await loadConfig(path.join(root, "sub"))).root).toBe(root);
@@ -1074,8 +1088,9 @@ describe("paths and configuration files that cannot be used", () => {
     expect(Object.keys(JSON.parse(report.stdout))).toEqual(["version", "mode", "files", "written"]);
   });
 });
-// Permissions cannot be taken away on Windows or from root, so these tests are skipped
-// there; tests/unit/links.test.ts covers what the library does with an unreadable path.
+// These tests take permissions away with Unix modes, which root ignores and Windows
+// does not have, so they are skipped there. The tests at the end of this file cover
+// Windows; tests/unit/links.test.ts covers what the library does with an unreadable path.
 describe.skipIf(!canRestrict)("directories that may not be read", () => {
   const skippedMessage = (directory: string, detail = "") =>
     `Skipped unreadable directory: ${directory} (EACCES: permission denied${detail}). Its files are not processed, and links into it cannot be checked.`;
@@ -1389,7 +1404,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       "notes/note.md": "A note.\n",
       "closed/settings/app.json": "{}",
     });
-    await symlink(path.join(linked, "closed/settings"), path.join(linked, "notes/.obsidian"));
+    await linkDirectory(path.join(linked, "closed/settings"), path.join(linked, "notes/.obsidian"));
     await restrict(path.join(linked, "closed"));
     const stopped = run(linked, ["format", "--write"]);
     expect(stopped.status).toBe(2);
@@ -1427,7 +1442,8 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
   });
 });
 
-// Skipped on Windows and for root for the same reason as the directory tests above.
+// Skipped on Windows and for root for the same reason as the directory tests above;
+// the tests at the end of this file cover files that may not be read on Windows.
 describe.skipIf(!canRestrict)("files that may not be read", () => {
   const files = {
     "linking.md": "See [the section](secret.md#section) of [the file](secret.md).\n",
@@ -1558,5 +1574,85 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     expect(excluded.status).toBe(1);
     expect(excluded.stderr).toBe(unchecked + "2 file(s) processed; 1 written.\n");
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+  });
+});
+
+// Windows has no permission bits: these tests take the right to read a file, or
+// to list a directory, away through access control lists, and Node.js reports
+// the refusal there as EPERM. The tests above need Unix modes that Windows
+// cannot express, such as a directory that can be listed but not entered.
+describe.skipIf(process.platform !== "win32")("paths that may not be read on Windows", () => {
+  const refused = "EPERM: operation not permitted";
+  const skipped = `mdtools: warning: Skipped unreadable directory: locked (${refused}). Its files are not processed, and links into it cannot be checked.\n`;
+  const unchecked =
+    "linking.md:1:5: error links/valid: Fragment could not be checked: secret.md#section (cannot read secret.md).\n" +
+    "linking.md:1:42: error links/valid: Local target could not be checked: locked/inner.md#part (no readable match; cannot read locked).\n";
+  const files = {
+    "linking.md": "See [the section](secret.md#section) and [in](locked/inner.md#part).\n",
+    "note.md": "A *note*.\n",
+    "secret.md": "# Section\n",
+    "locked/inner.md": "# Part\n",
+  };
+  it("skips a directory that may not be listed and reports a file that may not be read", async () => {
+    const root = await fixture(files);
+    denyRead(path.join(root, "secret.md"));
+    denyRead(path.join(root, "locked"));
+    const linted = run(root, ["lint"]);
+    expect(linted.status).toBe(2);
+    expect(linted.stderr).toBe(
+      skipped +
+        unchecked +
+        'note.md:1:3: warn style/emphasis: Use "_" for emphasis.\n' +
+        'note.md:1:8: warn style/emphasis: Use "_" for emphasis.\n' +
+        `secret.md:1:1: error engine/unreadable-file: The file could not be read (${refused}) and was not linted.\n` +
+        "2 file(s) linted; 3 error(s), 2 warning(s); 1 could not be read.\n",
+    );
+    expect(JSON.parse(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
+      { path: "locked", type: "directory", code: "EPERM", message: skipped.slice(18, -1) },
+    ]);
+    // Nothing is written while a selected document cannot be read.
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status).toBe(2);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    const excluded = run(root, ["format", "--write", "--exclude", "secret.md"]);
+    expect(excluded.status).toBe(1);
+    expect(excluded.stderr).toBe(skipped + unchecked + "2 file(s) processed; 1 written.\n");
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    // A file in the directory is found by listing it, so it cannot be named as input.
+    const inside = run(root, ["lint", "locked/inner.md"]);
+    expect(inside.status).toBe(2);
+    expect(inside.stderr).toBe(
+      `mdtools: Input cannot be read: locked/inner.md (${refused} for locked)\n`,
+    );
+  });
+  it("treats Obsidian settings that may not be read as unverified", async () => {
+    const paragraph = `${"A long line of prose in a vault. ".repeat(4).trim()}\n`;
+    const root = await fixture({
+      "mdtools.config.json": '{"extends":["recommended","obsidian"]}',
+      ".obsidian/app.json": '{"strictLineBreaks":true}',
+      "Note.md": paragraph,
+    });
+    expect(run(root, ["format", "--check"]).status).toBe(1);
+    denyRead(path.join(root, ".obsidian/app.json"));
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(applied.stderr).toContain(
+      `mdtools: warning: Skipped unreadable settings file: .obsidian/app.json (${refused}).`,
+    );
+    expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(paragraph);
+  });
+  it("stops for a configuration file that may not be read, and names it", async () => {
+    const root = await fixture({ "note.md": "A *note*.\n", "mdtools.config.json": "{}" });
+    denyRead(path.join(root, "mdtools.config.json"));
+    const found = run(root, ["format", "--write"]);
+    expect(found.status).toBe(2);
+    expect(found.stderr).toBe(
+      `mdtools: Configuration file cannot be read: ${path.join(root, "mdtools.config.json")} (${refused})\n`,
+    );
+    const named = run(root, ["lint", "--config", "mdtools.config.json"]);
+    expect(named.stderr).toBe(
+      `mdtools: Configuration file cannot be read: mdtools.config.json (${refused})\n`,
+    );
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A *note*.\n");
   });
 });
