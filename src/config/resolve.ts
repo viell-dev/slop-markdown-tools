@@ -1,5 +1,5 @@
 import { Ajv } from "ajv";
-import { minimatch } from "minimatch";
+import { Minimatch } from "minimatch";
 import { configErrors } from "./problems.js";
 import { deepFreeze } from "../core/frozen.js";
 import type {
@@ -244,6 +244,23 @@ const configOnly = new Set(
   Object.keys(configSchema.properties as object).filter((key) => key !== "plugins"),
 );
 /**
+ * The matchers of override patterns, by pattern. A configuration is resolved
+ * for every document, and compiling its patterns each time cost several times
+ * as much as matching them.
+ */
+const overridePatterns = new Map<string, (file: string) => boolean>();
+function overridePattern(pattern: string): (file: string) => boolean {
+  let matches = overridePatterns.get(pattern);
+  if (!matches) {
+    // A process that loads many configurations keeps only recent patterns.
+    if (overridePatterns.size >= 1000) overridePatterns.clear();
+    const matcher = new Minimatch(pattern, { dot: true });
+    matches = (file) => matcher.match(file);
+    overridePatterns.set(pattern, matches);
+  }
+  return matches;
+}
+/**
  * The configuration in effect for one document: its dialect, rule settings,
  * `ignore` patterns, and `resolve` settings. It takes the `path`, `config`,
  * `plugins`, and `defaultDialect` that `lint` and `format` take, so their
@@ -290,12 +307,9 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
   }
   if (config.extends === undefined) merge(presets.recommended!, []);
   merge(config, []);
+  const document = path.replaceAll("\\", "/");
   for (const override of overrides) {
-    if (
-      override.files.some((pattern) =>
-        minimatch(path.replaceAll("\\", "/"), pattern, { dot: true }),
-      )
-    ) {
+    if (override.files.some((pattern) => overridePattern(pattern)(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       addRules(result.rules, override.rules);
     }

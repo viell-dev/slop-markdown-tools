@@ -14,6 +14,8 @@ import {
   textContent,
 } from "../../src/index.js";
 import type { Config, Dialect, Plugin, RuleSetting } from "../../src/index.js";
+import { builtInRules } from "../../src/core/engine.js";
+import { giteaPyLine, inForgeMath } from "../../src/rules/style.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
   return { extends: [], dialect, rules };
@@ -365,6 +367,69 @@ describe("style/emphasis and style/strong on Gitea", () => {
       "_a_ and `code span` near b_.py\n",
     );
   });
+});
+
+describe("style/emphasis and style/strong on long lines", () => {
+  /** The lines that hold a range, searched character by character. */
+  function lineOf(source: string, start: number, end: number): [number, number] {
+    let lineStart = start;
+    while (lineStart > 0 && !/[\r\n]/.test(source[lineStart - 1]!)) lineStart--;
+    let lineEnd = end;
+    while (lineEnd < source.length && !/[\r\n]/.test(source[lineEnd]!)) lineEnd++;
+    return [lineStart, lineEnd];
+  }
+  it("find `_.py`, `\\(`, and `\\)` on a line as a search of the line does", () => {
+    const text = fc
+      .array(
+        fc.constantFrom("a", " ", "\n", "\r", "\r\n", "_.py", "_.p", "\\(", "\\)", "\\", "("),
+        {
+          maxLength: 30,
+        },
+      )
+      .map((parts) => parts.join(""));
+    fc.assert(
+      fc.property(text, fc.nat(), fc.nat(), (source, a, b) => {
+        const start = a % (source.length + 1);
+        const end = start + (b % (source.length - start + 1));
+        const document = parse(source, "forgejo");
+        const [lineStart, lineEnd] = lineOf(source, start, end);
+        const before = source.slice(lineStart, start);
+        expect(giteaPyLine(document, start, end)).toBe(
+          source.slice(lineStart, lineEnd).includes("_.py"),
+        );
+        expect(inForgeMath(document, start, end)).toBe(
+          before.lastIndexOf("\\(") > before.lastIndexOf("\\)") &&
+            source.slice(end, lineEnd).includes("\\)"),
+        );
+      }),
+      { numRuns: 500 },
+    );
+  });
+  it.each(["forgejo", "gitea"] as const)(
+    "check many emphases on one line in linear time on %s",
+    (dialect) => {
+      const rule = builtInRules["style/emphasis"]!;
+      const count = 3000;
+      const oneLine = parse(`${"word _emphasis_ ".repeat(count).trim()}\n`, dialect);
+      const manyLines = parse("word _emphasis_\n".repeat(count), dialect);
+      const check = (document: ReturnType<typeof parse>) =>
+        rule.check({ document, options: { marker: "*" } });
+      expect(check(oneLine)).toHaveLength(2 * count);
+      expect(check(manyLines)).toHaveLength(2 * count);
+      const fastest = (document: ReturnType<typeof parse>) => {
+        let best = Infinity;
+        for (let run = 0; run < 3; run++) {
+          const started = performance.now();
+          check(document);
+          best = Math.min(best, performance.now() - started);
+        }
+        return best;
+      };
+      // The same emphases on short lines are the baseline. Searching the line
+      // of each emphasis took hundreds of times as long on one line.
+      expect(fastest(oneLine) / fastest(manyLines)).toBeLessThan(5);
+    },
+  );
 });
 
 describe("Forgejo and Gitea heading attribute blocks", () => {
