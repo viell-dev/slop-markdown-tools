@@ -338,7 +338,7 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     expect(lint(source, { config: rules })).toEqual([]);
   });
   it.each([
-    // A `_` that can only close, after the emphasis, cannot pair with it.
+    // A `*` or `_` left as text that the new markers cannot reach stays text.
     ["*a* and file_.\n", "_", "_a_ and file_.\n"],
     ["*a* and 2*3 and *b*\n", "_", "_a_ and 2*3 and _b_\n"],
     // Of emphases sharing a run, those that keep their pairs change.
