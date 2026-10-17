@@ -7,6 +7,7 @@ import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
+import { contentRules } from "../rules/content.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
@@ -29,6 +30,7 @@ export const builtInRules: Record<string, Rule> = {
   ...dialectRules,
   ...linkRules,
   ...structureRules,
+  ...contentRules,
 };
 const phases = ["inline", "block", "document"] as const;
 /** A short description of a value that a plugin gave where something else belongs. */

@@ -83,28 +83,36 @@ mdrefine is meant to replace these tools for Markdown, but it does not yet cover
 everything they do. This table lists what has a rule today. Where it says "None
 yet", keep the other tool for that check.
 
-| Prettier or markdownlint                                                         | mdrefine                                                                       |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `proseWrap: "always"` and `printWidth`; MD013 (line length)                      | [`style/wrap`](rules.md#stylewrap), which wraps instead of only reporting      |
-| `proseWrap: "preserve"`                                                          | Turn `style/wrap` off                                                          |
-| `proseWrap: "never"`                                                             | None yet                                                                       |
-| `_` for emphasis; MD049 (emphasis style)                                         | [`style/emphasis`](rules.md#styleemphasis)                                     |
-| `**` for strong text; MD050 (strong style)                                       | [`style/strong`](rules.md#stylestrong)                                         |
-| `#` headings; MD003 (heading style)                                              | [`style/heading`](rules.md#styleheading), for `#` headings only                |
-| Aligned tables; MD055 (table pipe style)                                         | [`style/table`](rules.md#styletable), for tables outside lists and quotes      |
-| Blank lines between blocks; MD022, MD032 (blank lines around headings and lists) | [`style/block-spacing`](rules.md#styleblock-spacing), for headings and lists   |
-| Final newline; MD047                                                             | [`style/final-newline`](rules.md#stylefinal-newline)                           |
-| MD041 (first line is a heading)                                                  | [`structure/initial-heading`](rules.md#structureinitial-heading)               |
-| MD051 (link fragments)                                                           | [`links/valid`](rules.md#linksvalid), which also checks that local files exist |
-| List markers, numbering, and indentation; MD004, MD005, MD007, MD029, MD030      | None yet                                                                       |
-| Code block and fence style; MD040, MD046, MD048                                  | None yet                                                                       |
-| `---` for thematic breaks; MD035                                                 | None yet; the [plugin example](examples.md#write-a-plugin) adds one            |
-| Trailing spaces, tabs, repeated blank lines; MD009, MD010, MD012                 | None yet                                                                       |
-| Heading levels and duplicates; MD001, MD024, MD025                               | None yet                                                                       |
-| Inline HTML, bare URLs, image text; MD033, MD034, MD045                          | None yet                                                                       |
-| Formatting the code inside code blocks                                           | None yet                                                                       |
-| `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)            |
-| Custom rules                                                                     | [Plugins](plugins.md)                                                          |
+| Prettier or markdownlint                                                         | mdrefine                                                                                              |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `proseWrap: "always"` and `printWidth`; MD013 (line length)                      | [`style/wrap`](rules.md#stylewrap), which wraps instead of only reporting                             |
+| `proseWrap: "preserve"`                                                          | Turn `style/wrap` off                                                                                 |
+| `proseWrap: "never"`                                                             | None yet                                                                                              |
+| `_` for emphasis; MD049 (emphasis style)                                         | [`style/emphasis`](rules.md#styleemphasis)                                                            |
+| `**` for strong text; MD050 (strong style)                                       | [`style/strong`](rules.md#stylestrong)                                                                |
+| `#` headings; MD003 (heading style)                                              | [`style/heading`](rules.md#styleheading), for `#` headings only                                       |
+| Aligned tables; MD055 (table pipe style)                                         | [`style/table`](rules.md#styletable), for tables outside lists and quotes                             |
+| Blank lines between blocks; MD022, MD032 (blank lines around headings and lists) | [`style/block-spacing`](rules.md#styleblock-spacing), for headings and lists                          |
+| Final newline; MD047                                                             | [`style/final-newline`](rules.md#stylefinal-newline)                                                  |
+| MD041 (first line is a heading)                                                  | [`structure/initial-heading`](rules.md#structureinitial-heading)                                      |
+| MD051 (link fragments)                                                           | [`links/valid`](rules.md#linksvalid), which also checks that local files exist                        |
+| MD052 (reference labels are defined)                                             | [`links/undefined-reference`](rules.md#linksundefined-reference), which also checks footnotes         |
+| MD053 (definitions are used)                                                     | [`links/unused-definition`](rules.md#linksunused-definition), which also checks footnotes             |
+| MD042 (no empty links)                                                           | [`links/empty`](rules.md#linksempty)                                                                  |
+| MD001 (heading levels go up by one)                                              | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart |
+| MD025 (one top-level heading)                                                    | [`structure/single-title`](rules.md#structuresingle-title)                                            |
+| MD024 (repeated headings) with `siblings_only`                                   | [`structure/duplicate-heading`](rules.md#structureduplicate-heading)                                  |
+| MD045 (image alternative text)                                                   | [`content/image-alt`](rules.md#contentimage-alt)                                                      |
+| MD056 (table column count)                                                       | [`content/table-columns`](rules.md#contenttable-columns)                                              |
+| MD040 (code block language)                                                      | [`content/code-language`](rules.md#contentcode-language)                                              |
+| List markers, numbering, and indentation; MD004, MD005, MD007, MD029, MD030      | None yet                                                                                              |
+| Code block and fence style; MD046, MD048                                         | None yet                                                                                              |
+| `---` for thematic breaks; MD035                                                 | None yet; the [plugin example](examples.md#write-a-plugin) adds one                                   |
+| Trailing spaces, tabs, repeated blank lines; MD009, MD010, MD012                 | None yet                                                                                              |
+| Inline HTML, bare URLs; MD033, MD034                                             | None yet                                                                                              |
+| Formatting the code inside code blocks                                           | None yet                                                                                              |
+| `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)                                   |
+| Custom rules                                                                     | [Plugins](plugins.md)                                                                                 |
 
 ## Agents and scripts
 

@@ -49,6 +49,9 @@ From `0.2.0-rc.2`:
   `phase: "Inline"`, stops the command with exit code `2` where it used to be
   ignored, and a rule or preset named like a built-in property of every object,
   such as `toString`, is reported as unknown.
+- `recommended` warns about six more problems, listed under Added. A check that
+  runs `lint --max-warnings 0` fails on them until the documents are fixed or
+  the rules are turned off.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -89,6 +92,12 @@ From every prerelease:
 
 ### Added
 
+- Nine problem rules: `links/undefined-reference`, `links/unused-definition`,
+  `links/empty`, `structure/heading-increment`, `content/image-alt`, and
+  `content/table-columns` in `recommended`, and the optional
+  `content/code-language`, `structure/single-title`, and
+  `structure/duplicate-heading`
+  ([#237](https://github.com/viell-dev/slop-markdown-tools/pull/237)).
 - `style/block-spacing` separates headings and lists from the blocks around them
   with a blank line
   ([#190](https://github.com/viell-dev/slop-markdown-tools/pull/190)).
