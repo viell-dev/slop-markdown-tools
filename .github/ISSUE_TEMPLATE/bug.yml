@@ -1,39 +1,73 @@
-name: Document or tool defect
-description: Report a reproducible linting, formatting, or execution problem
+name: Bug report
+description: Report wrong linting or formatting, a crash, or another reproducible defect
 labels: ["Type: Bug"]
 body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Existing issues
+      options:
+        - label: I searched the open and closed issues and found no report of this.
+          required: true
   - type: textarea
     id: environment
     attributes:
       label: Version and command
-      description: Include tool version, Node.js version, operating system, and exact command.
+      description: The mdtools version (`mdtools --version`), Node.js version, operating system, and the exact command.
+    validations:
+      required: true
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Dialect
+      description: The dialect in effect, from the configuration, `--dialect`, or the default.
+      options:
+        - GitHub (the default)
+        - CommonMark
+        - Forgejo or Codeberg
+        - Gitea
+        - Obsidian
+        - Not sure
     validations:
       required: true
   - type: textarea
     id: input
     attributes:
       label: Minimal Markdown input
-      description: Use a synthetic or public example. Do not include private vault documents.
-      render: markdown
+      description: >-
+        The smallest document that shows the problem, between the fences below. Use a synthetic or
+        public example; never paste private documents. Four backticks keep code fences inside the
+        input intact.
+      value: |
+        ````markdown
+
+        ````
     validations:
       required: true
   - type: textarea
     id: config
     attributes:
-      label: Configuration and plugins
-      render: json
-    validations:
-      required: true
+      label: Configuration
+      description: >-
+        The contents of your configuration file, whatever its format, and any plugins it loads.
+        Leave empty if you use none.
   - type: textarea
     id: actual
     attributes:
-      label: Actual output or diagnostics
-      render: text
+      label: Actual output or messages
+      description: What mdtools printed or wrote, between the fences below.
+      value: |
+        ````text
+
+        ````
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected output and rendering difference
+      label: Expected result
+      description: >-
+        What you expected instead and why. For formatting, say how the rendered document differs,
+        if it does.
     validations:
       required: true
