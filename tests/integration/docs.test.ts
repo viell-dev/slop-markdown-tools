@@ -69,7 +69,7 @@ describe("rules reference", () => {
     for (const [index, [, kind, recommended, dialectPreset, options]] of rows.entries()) {
       const rule = listed[index]!;
       const style = builtInRules[rule]?.kind === "style";
-      expect(kind, rule).toBe(style ? "🔧" : "🔍");
+      expect(kind, rule).toBe(style ? "🎨" : "🔍");
       const enabled = enabling(rule);
       expect(recommended, rule).toBe(mark(enabled.filter(({ name }) => name === "recommended")));
       expect(dialectPreset, rule).toBe(mark(enabled.filter(({ name }) => name !== "recommended")));

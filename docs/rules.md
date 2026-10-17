@@ -10,7 +10,7 @@ Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
 the built-in rules and those of the configuration's [plugins](plugins.md).
 
-🔧 marks a style rule, whose findings `format` fixes, and 🔍 a problem rule,
+🎨 marks a style rule, whose findings `format` fixes, and 🔍 a problem rule,
 which is reported only. ✅ is yes and ❌ no. Each rule's section names its
 presets, dialects, and options.
 
@@ -20,36 +20,36 @@ presets, dialects, and options.
 | `content/image-alt`           | 🔍   | ✅            | ❌             | ❌      |
 | `content/table-columns`       | 🔍   | ✅            | ❌             | ❌      |
 | `forgejo/heading-id`          | 🔍   | ❌            | ✅ (error)     | ❌      |
-| `github/alert-marker`         | 🔧   | ❌            | ✅             | ❌      |
-| `github/task-marker`          | 🔧   | ❌            | ✅             | ❌      |
+| `github/alert-marker`         | 🎨   | ❌            | ✅             | ❌      |
+| `github/task-marker`          | 🎨   | ❌            | ✅             | ❌      |
 | `links/empty`                 | 🔍   | ✅            | ❌             | ❌      |
-| `links/notation`              | 🔧   | ❌            | ❌             | ✅      |
-| `links/path`                  | 🔧   | ❌            | ❌             | ✅      |
+| `links/notation`              | 🎨   | ❌            | ❌             | ✅      |
+| `links/path`                  | 🎨   | ❌            | ❌             | ✅      |
 | `links/undefined-reference`   | 🔍   | ✅            | ❌             | ❌      |
 | `links/unused-definition`     | 🔍   | ✅            | ❌             | ❌      |
 | `links/valid`                 | 🔍   | ✅ (error)    | ❌             | ❌      |
 | `obsidian/block-reference`    | 🔍   | ❌            | ✅ (error)     | ❌      |
-| `obsidian/callout-marker`     | 🔧   | ❌            | ✅             | ❌      |
+| `obsidian/callout-marker`     | 🎨   | ❌            | ✅             | ❌      |
 | `obsidian/strict-line-breaks` | 🔍   | ❌            | ✅             | ❌      |
 | `structure/duplicate-heading` | 🔍   | ❌            | ❌             | ❌      |
 | `structure/heading-increment` | 🔍   | ✅            | ❌             | ❌      |
 | `structure/initial-heading`   | 🔍   | ❌            | ❌             | ❌      |
 | `structure/single-title`      | 🔍   | ❌            | ❌             | ❌      |
-| `style/blank-lines`           | 🔧   | ✅            | ❌             | ✅      |
-| `style/block-spacing`         | 🔧   | ❌            | ❌             | ❌      |
-| `style/code-fence`            | 🔧   | ✅            | ❌             | ✅      |
-| `style/emphasis`              | 🔧   | ✅            | ❌             | ✅      |
-| `style/final-newline`         | 🔧   | ✅            | ❌             | ❌      |
-| `style/heading`               | 🔧   | ✅            | ❌             | ✅      |
-| `style/inline-code`           | 🔧   | ❌            | ❌             | ❌      |
-| `style/list-indent`           | 🔧   | ✅            | ❌             | ✅      |
-| `style/list-marker`           | 🔧   | ✅            | ❌             | ✅      |
-| `style/ordered-list`          | 🔧   | ✅            | ❌             | ✅      |
-| `style/strong`                | 🔧   | ✅            | ❌             | ✅      |
-| `style/table`                 | 🔧   | ✅            | ✅             | ✅      |
-| `style/thematic-break`        | 🔧   | ✅            | ❌             | ✅      |
-| `style/trailing-space`        | 🔧   | ✅            | ❌             | ✅      |
-| `style/wrap`                  | 🔧   | ✅            | ❌             | ✅      |
+| `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/block-spacing`         | 🎨   | ❌            | ❌             | ❌      |
+| `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
+| `style/emphasis`              | 🎨   | ✅            | ❌             | ✅      |
+| `style/final-newline`         | 🎨   | ✅            | ❌             | ❌      |
+| `style/heading`               | 🎨   | ✅            | ❌             | ✅      |
+| `style/inline-code`           | 🎨   | ❌            | ❌             | ❌      |
+| `style/list-indent`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/list-marker`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/ordered-list`          | 🎨   | ✅            | ❌             | ✅      |
+| `style/strong`                | 🎨   | ✅            | ❌             | ✅      |
+| `style/table`                 | 🎨   | ✅            | ✅             | ✅      |
+| `style/thematic-break`        | 🎨   | ✅            | ❌             | ✅      |
+| `style/trailing-space`        | 🎨   | ✅            | ❌             | ✅      |
+| `style/wrap`                  | 🎨   | ✅            | ❌             | ✅      |
 
 A preset enables its rules as warnings, unless the rule's section says error.
 The `codeberg` preset is the `forgejo` preset under another name. In a dialect
