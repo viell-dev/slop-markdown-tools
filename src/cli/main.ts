@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { replacementFailure, replacementProblem, writeAtomic } from "../workspace/files.js";
+import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/files.js";
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
@@ -195,9 +195,9 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   let written = 0;
   if (flags.write && !unsafe)
     for (const change of changes) {
-      // Each file is replaced on its own, so a failure leaves the others to be written.
+      // Each file is written on its own, so a failure leaves the others to be written.
       try {
-        await writeAtomic(path.join(discovery.root, change.file), change.before, change.after);
+        await writeFormatted(path.join(discovery.root, change.file), change.before, change.after);
         written++;
       } catch (error) {
         const failure = replacementFailure(error);

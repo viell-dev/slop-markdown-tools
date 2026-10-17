@@ -33,10 +33,14 @@ From `0.2.0-rc.2`:
   stdin that is not stops the command with exit code `2`. Before, such text was
   decoded with U+FFFD in place of what was not UTF-8, and `format --write` wrote
   those characters into the file. Save such files as UTF-8.
-- A file with more than one name, and on Linux and macOS a file whose
-  replacement would get another owner or group, is written in place. Before,
-  every file was replaced, which left the other names of a hard link with the
-  old content and could change a file's group.
+- `format --write` writes each file into the existing file instead of replacing
+  it with a new one, so the file keeps its permissions, owner and group,
+  attributes, creation time, and hard links. Before, a replaced file lost what
+  Node.js cannot copy: the other names of a hard link kept the old content, and
+  on Windows the file's own permissions were dropped, which could let more users
+  read it. A crash or power failure during the write can now leave a file
+  incomplete; see
+  [what writing keeps](https://viell-dev.github.io/slop-markdown-tools/cli.html#what-writing-keeps).
 - When a rule's edits would change a document's meaning, `format` keeps the
   other rules' edits, so `--diff` and the library's output show them, and
   reports that rule with `engine/unsafe-format` at the line where the meaning
@@ -113,9 +117,11 @@ From every prerelease:
   damaged, and `createWorkspace` treats a loader error with the code
   `ERR_ENCODING_INVALID_ENCODED_DATA` as an unreadable target
   ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
-- `format --write` writes hard-linked files, and on Linux and macOS files whose
-  replacement would get another owner or group, in place
-  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
+- `format --write` writes into the existing file instead of replacing it, so
+  that the file keeps its permissions, attributes, owner, creation time, and
+  hard links, and writes the original content back when a write fails part way
+  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234),
+  [#255](https://github.com/viell-dev/slop-markdown-tools/pull/255)).
 - The documentation is restructured, with new pages for the rules, dialects,
   integrations, the library API, versions, and this changelog, and the release
   notes come from this file
