@@ -100,6 +100,8 @@ describe("workspaces/repository-docs", () => {
         "style/strong",
         "style/heading",
         "style/table",
+        "style/code-fence",
+        "style/blank-lines",
         "style/final-newline",
         "links/path",
         "links/valid",
@@ -156,17 +158,17 @@ describe("plugin", () => {
     expect(checked.status, checked.stderr).toBe(1);
     expect(summary(checked.stdout)).toEqual([
       "notes/release-checklist.md:3:25 error house/no-placeholder",
-      "notes/release-checklist.md:7:1 warn house/thematic-break",
+      "notes/release-checklist.md:7:1 warn house/heading-space",
     ]);
   });
   it("applies the style rule's edit and leaves the problem for a person", () => {
     const preview = run(root, ["format", "--diff"]);
-    expect(preview.stdout).toContain("-***\n+---\n");
+    expect(preview.stdout).toContain("-##   Before publishing\n+## Before publishing\n");
     expect(preview.stdout).toContain(" Draft the announcement. TODO: add the download link.\n");
     expect(preview.stderr).toContain("house/no-placeholder");
     expect(preview.stderr).not.toContain("engine/");
   });
-  it("proposes no edit where three hyphens would change the document's meaning", () => {
+  it("edits only the blank space after the marks of a # heading", () => {
     const format = (source: string) => {
       const formatted = run(
         root,
@@ -179,21 +181,13 @@ describe("plugin", () => {
       ).files[0]!;
       return [file.output, ...file.diagnostics.map((item) => `${item.line} ${item.rule}`)];
     };
-    // At the start of a document, and directly below a paragraph, which "---" would
-    // turn into a heading: reported, not edited. After a blank line: edited.
-    expect(format("***\n\nA paragraph\n***\n\nMore prose.\n\n* * *\n")).toEqual([
-      "***\n\nA paragraph\n***\n\nMore prose.\n\n---\n",
-      "1 house/thematic-break",
-      "4 house/thematic-break",
+    expect(format("#   One\n\n##\tTwo\n\n> ####  Three\n\n### Four\n\n#\n")).toEqual([
+      "# One\n\n## Two\n\n> #### Three\n\n### Four\n\n#\n",
     ]);
-    // Below a first line of "---", another "---" would turn the lines between into front matter.
-    expect(format("---\n\nText\n\n***\n")).toEqual([
-      "---\n\nText\n\n***\n",
-      "5 house/thematic-break",
-    ]);
-    // Real front matter is already closed, so a later break is safe to rewrite.
-    expect(format("---\ntitle: Draft\n---\n\nText\n\n***\n")).toEqual([
-      "---\ntitle: Draft\n---\n\nText\n\n---\n",
+    // An underlined heading has no marks, also below a link reference definition,
+    // where its position starts at the definition.
+    expect(format("[a]: https://example.com\nText\n----\n\n[a]\n")).toEqual([
+      "[a]: https://example.com\n## Text\n\n[a]\n",
     ]);
   });
   it("validates options against the schema the rule declares", async () => {
@@ -267,7 +261,7 @@ describe("automation", () => {
     expect(summarize(run(path.join(examples, "plugin"), ["lint", "--json"]).stdout)).toBe(
       "lint: 1 file(s), 2 diagnostic(s)\n" +
         "1 error house/no-placeholder in 1 file(s)\n" +
-        "1 warn house/thematic-break in 1 file(s)\n",
+        "1 warn house/heading-space in 1 file(s)\n",
     );
     const checked = run(path.join(examples, "plugin"), ["format", "--check", "--json"]);
     expect(summarize(checked.stdout)).toBe(

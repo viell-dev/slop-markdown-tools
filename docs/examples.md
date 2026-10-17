@@ -32,7 +32,7 @@ Each wraps prose at 80 columns and chooses a link style; see
 
 `examples/workspaces/repository-docs/` holds a README and two guides twice:
 `before/` as someone might write them, and `after/` exactly as `format --write`
-leaves them. The configuration adds two rules that no preset enables:
+leaves them. The configuration adds a rule that no preset enables:
 
 [`examples/workspaces/repository-docs/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/before/mdtools.config.jsonc):
 
@@ -41,8 +41,6 @@ leaves them. The configuration adds two rules that no preset enables:
   // Documentation for a repository hosted on GitHub.
   "extends": ["recommended", "github"],
   "rules": {
-    // Not part of a preset: turn underlined headings into "#" headings.
-    "style/heading": "warn",
     // Write local links as ./relative paths, which editors can follow too.
     "links/path": ["warn", { "style": "relative", "leadingDot": true }],
   },
@@ -125,7 +123,10 @@ Each change comes from one rule of the configuration:
 - `style/table` aligned the table.
 - `links/path` put `./` in front of the links it could resolve.
 - In `docs/guide.md`, `style/heading` turned an underlined heading into a `#`
-  heading, and `docs/reference.md` gained its missing final newline.
+  heading, and `style/code-fence` wrote the `~~~` code fence with backticks.
+- In `docs/reference.md`, `style/heading` removed the closing `##` of a heading,
+  `style/blank-lines` removed two repeated blank lines, and
+  `style/final-newline` added the missing final newline.
 
 The link to `docs/calibration.md`, a file that does not exist, did not change.
 Formatting never guesses a target, so `lint` still reports it and exits with
@@ -223,8 +224,8 @@ What to notice:
 ## Write a plugin
 
 `examples/plugin/` adds two rules. A problem rule reports placeholder words. A
-style rule rewrites thematic breaks as `---`, but only where that cannot change
-what the document means. [Plugins](plugins.md) describes the contract.
+style rule writes one space between a heading's `#` marks and its text, and
+leaves underlined headings alone. [Plugins](plugins.md) describes the contract.
 
 [`examples/plugin/rules.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/rules.mjs):
 
@@ -246,7 +247,7 @@ export default {
   name: "house",
   presets: {
     recommended: {
-      rules: { "house/no-placeholder": "error", "house/thematic-break": "warn" },
+      rules: { "house/no-placeholder": "error", "house/heading-space": "warn" },
     },
   },
   rules: {
@@ -288,36 +289,30 @@ export default {
         return findings;
       },
     },
-    "thematic-break": {
-      description: "Write thematic breaks as three hyphens.",
+    "heading-space": {
+      description: "Write one space between a heading's # marks and its text.",
       kind: "style",
       phase: "block",
       check({ document }) {
         const findings = [];
-        const blocks = document.tree.children;
-        // In a document whose first line is the thematic break "---", a later
-        // "---" would close it as front matter, so no break is rewritten there.
-        const opensFrontMatter =
-          blocks[0]?.type === "thematicBreak" && document.source.startsWith("---");
-        for (const [index, node] of blocks.entries()) {
-          if (node.type !== "thematicBreak") continue;
+        visit(document.tree, (node) => {
+          if (node.type !== "heading" || !node.children.length) return;
           const start = node.position.start.offset;
-          const end = node.position.end.offset;
-          if (document.source.slice(start, end) === "---") continue;
-          // "---" directly below a paragraph would turn that paragraph into a
-          // heading. Only propose the edit after a blank line, where it cannot.
-          const previous = blocks[index - 1];
-          const safe =
-            !opensFrontMatter &&
-            previous &&
-            previous.position.end.line < node.position.start.line - 1;
+          const text = node.children[0].position.start.offset;
+          const marks = document.source.slice(start, text);
+          const wanted = `${"#".repeat(node.depth)} `;
+          // Only a "#" heading starts with its marks: an underlined heading
+          // starts with its text, and so the check below leaves it alone. The
+          // parser drops the blank space before a heading's text, so changing
+          // it cannot change what the heading says.
+          if (!/^#+[ \t]+$/.test(marks) || marks === wanted) return;
           findings.push({
             start,
-            end,
-            message: "Write this thematic break as ---.",
-            ...(safe ? { edit: { start, end, text: "---" } } : {}),
+            end: text,
+            message: "Write one space after the heading's # marks.",
+            edit: { start, end: text, text: wanted },
           });
-        }
+        });
         return findings;
       },
     },
@@ -353,9 +348,9 @@ Draft the announcement. TODO: add the download link.
 
 Searching the notes with `grep TODO` is not reported: code is not prose.
 
-***
+##   Before publishing
 
-Ask for a review before publishing.
+Ask for a review.
 ````
 
 Linting reports both, but not the `TODO` inside the code span:
@@ -366,7 +361,7 @@ node dist/cli/main.js lint --root examples/plugin
 
 ```text
 notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
-notes/release-checklist.md:7:1: warn house/thematic-break: Write this thematic break as ---.
+notes/release-checklist.md:7:1: warn house/heading-space: Write one space after the heading's # marks.
 1 file(s) linted; 1 error(s), 1 warning(s).
 ```
 
@@ -385,10 +380,10 @@ node dist/cli/main.js format --root examples/plugin --diff
  
  Searching the notes with `grep TODO` is not reported: code is not prose.
  
--***
-+---
+-##   Before publishing
++## Before publishing
  
- Ask for a review before publishing.
+ Ask for a review.
 notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
 1 file(s) processed; 1 would change.
 ```
@@ -594,5 +589,5 @@ node dist/cli/main.js lint --root examples/plugin --json | node examples/automat
 ```text
 lint: 1 file(s), 2 diagnostic(s)
 1 error house/no-placeholder in 1 file(s)
-1 warn house/thematic-break in 1 file(s)
+1 warn house/heading-space in 1 file(s)
 ```

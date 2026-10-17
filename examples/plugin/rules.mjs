@@ -15,7 +15,7 @@ export default {
   name: "house",
   presets: {
     recommended: {
-      rules: { "house/no-placeholder": "error", "house/thematic-break": "warn" },
+      rules: { "house/no-placeholder": "error", "house/heading-space": "warn" },
     },
   },
   rules: {
@@ -57,36 +57,30 @@ export default {
         return findings;
       },
     },
-    "thematic-break": {
-      description: "Write thematic breaks as three hyphens.",
+    "heading-space": {
+      description: "Write one space between a heading's # marks and its text.",
       kind: "style",
       phase: "block",
       check({ document }) {
         const findings = [];
-        const blocks = document.tree.children;
-        // In a document whose first line is the thematic break "---", a later
-        // "---" would close it as front matter, so no break is rewritten there.
-        const opensFrontMatter =
-          blocks[0]?.type === "thematicBreak" && document.source.startsWith("---");
-        for (const [index, node] of blocks.entries()) {
-          if (node.type !== "thematicBreak") continue;
+        visit(document.tree, (node) => {
+          if (node.type !== "heading" || !node.children.length) return;
           const start = node.position.start.offset;
-          const end = node.position.end.offset;
-          if (document.source.slice(start, end) === "---") continue;
-          // "---" directly below a paragraph would turn that paragraph into a
-          // heading. Only propose the edit after a blank line, where it cannot.
-          const previous = blocks[index - 1];
-          const safe =
-            !opensFrontMatter &&
-            previous &&
-            previous.position.end.line < node.position.start.line - 1;
+          const text = node.children[0].position.start.offset;
+          const marks = document.source.slice(start, text);
+          const wanted = `${"#".repeat(node.depth)} `;
+          // Only a "#" heading starts with its marks: an underlined heading
+          // starts with its text, and so the check below leaves it alone. The
+          // parser drops the blank space before a heading's text, so changing
+          // it cannot change what the heading says.
+          if (!/^#+[ \t]+$/.test(marks) || marks === wanted) return;
           findings.push({
             start,
-            end,
-            message: "Write this thematic break as ---.",
-            ...(safe ? { edit: { start, end, text: "---" } } : {}),
+            end: text,
+            message: "Write one space after the heading's # marks.",
+            edit: { start, end: text, text: wanted },
           });
-        }
+        });
         return findings;
       },
     },

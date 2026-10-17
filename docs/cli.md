@@ -117,10 +117,10 @@ JSON report and the exit code.
       "diagnostics": [
         {
           "start": 149,
-          "end": 152,
-          "message": "Write this thematic break as ---.",
-          "edit": { "start": 149, "end": 152, "text": "---" },
-          "rule": "house/thematic-break",
+          "end": 154,
+          "message": "Write one space after the heading's # marks.",
+          "edit": { "start": 149, "end": 154, "text": "## " },
+          "rule": "house/heading-space",
           "severity": "warn",
           "line": 7,
           "column": 1
