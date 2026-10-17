@@ -20,9 +20,14 @@ Lint and format use the same rule settings. A style rule checks a preferred
 representation and proposes edits. A problem rule reports defects without
 inventing repairs. Inline, block, and document phases separate operations that
 would otherwise commonly overlap. Each phase reparses its result and compares a
-semantic fingerprint, using resolved destinations for link identity. Formatting
-must converge; otherwise the original document is returned with an error
-diagnostic.
+semantic fingerprint, using resolved destinations for link identity. When the
+fingerprints differ, the phase tries its edits one rule at a time and leaves out
+those of each rule that changes the meaning, so that one rule's defect does not
+cost the document the other rules' formatting. Overlapping edits are applied in
+turn, over successive passes. Formatting must converge; otherwise the original
+document is returned with an error diagnostic. A rule that throws or returns
+unusable findings is skipped for the document and reported, like a rule whose
+edits were left out, as an error.
 
 ## Safety boundaries
 
@@ -227,11 +232,12 @@ The command line checks each target against one group. A library host that
 checks a target against a second group has it read and parsed once more, which
 is cheaper overall than keeping every parsed document or computing every group
 for every target. CLI discovery also defers reading Markdown until it is
-selected or needed for a fragment. Built-in rule-schema validators are reused
-across documents. A suffix lookup index is built on first use instead of
-scanning every path for each shortened link. There is no persistent cache,
-worker pool, watch service, editor extension, or language server yet. The
-library has a pluggable workspace interface for specialized hosts.
+selected or needed for a fragment. Each rule's option schema, built-in or from a
+plugin, is compiled once and reused across documents. A suffix lookup index is
+built on first use instead of scanning every path for each shortened link. There
+is no persistent cache, worker pool, watch service, editor extension, or
+language server yet. The library has a pluggable workspace interface for
+specialized hosts.
 
 Discovery skips a directory that the system refuses to let it read (`EACCES`,
 `EPERM`, or `EBUSY` for a lock on Windows) and carries on; every other read
@@ -262,13 +268,15 @@ Formatting retains the current parsed document within one call, reusing it
 between phases and for final diagnostics. Every changed candidate is parsed and
 checked against the original semantic fingerprint before becoming the next
 phase's input; the original fingerprint is computed only once an edit produces a
-candidate. The final pass, in which no phase changes the document, reuses its
-style findings and runs only the remaining rules for the final diagnostics.
-Suppression directives are scanned only when the source contains their prefix,
-and rules traverse the tree with a plain recursive walk rather than a
-closure-per-node visitor. No-op edits still undergo range and overlap
-validation. This retains the plugin contract that rules must not mutate
-documents.
+candidate. Edits are tried one rule at a time only after a phase's edits
+together fail that check, so a document whose edits all keep its meaning is
+still parsed once for each phase that changes it. The final pass, in which no
+phase changes the document, reuses its style findings and runs only the
+remaining rules for the final diagnostics. Suppression directives are scanned
+only when the source contains their prefix, and rules traverse the tree with a
+plain recursive walk rather than a closure-per-node visitor. An edit that
+changes nothing is checked like any other finding but is not applied. This
+retains the plugin contract that rules must not mutate documents.
 
 The benchmark's library measurements compare formatting documents that need
 edits with formatting their already-formatted output. They follow a warm-up run,

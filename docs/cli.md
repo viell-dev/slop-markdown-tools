@@ -102,7 +102,11 @@ are processed, nothing is written, and the exit code is `2`. Versions up to
 `0.2.0-rc.1` stopped without a report. A changed file that `format --write`
 cannot write is reported with an `engine/unwritable-file` error, also with exit
 code `2`; see
-[files that cannot be written](configuration.md#files-that-cannot-be-written).
+[files that cannot be written](configuration.md#files-that-cannot-be-written). A
+rule whose edits would change a document's meaning is reported with an
+`engine/unsafe-format` error, and a rule that fails on a document with an
+`engine/rule-error` error, both for that file and with exit code `2`; see
+[refused edits and failing rules](configuration.md#refused-edits-and-failing-rules).
 
 For a formatting pass, inspect a diff, apply it with `--write`, then run the
 checks again. Report reproducible document defects using a synthetic example;

@@ -288,16 +288,30 @@ rejected.
 
 `check` receives the parsed `document`, configured `options`, and optional
 `workspace`. Return a list of findings containing `start`, optional `end`,
-`message`, and optional `edit`. A rule may declare a JSON Schema in `schema` to
-validate its options. Rules are synchronous and should not mutate the document,
-perform I/O, or retain invocation-specific state.
+`message`, and optional `edit`. Offsets are integers into `document.source`,
+from 0 to its length, with `end` not before `start`. A rule may declare a JSON
+Schema in `schema` to validate its options; each schema is compiled once and
+reused for every document. Rules are synchronous and should not mutate the
+document, perform I/O, or retain invocation-specific state.
+
+A rule that throws, or returns anything other than such a list, is skipped for
+that document and reported as `engine/rule-error`, naming the rule and the
+reason; the other rules and documents are still processed. A rule without a
+`check` function, a `kind` of `style` or `problem`, and a string `description`,
+or with a `phase` or `schema` of another kind, is an error that names the rule
+as soon as the plugin is used, even while the rule is off.
 
 Style rules use `kind: "style"` and can return edits of the form
 `{ start, end, text }`. Their optional `phase` is `inline` (default), `block`,
 or `document`. Problem rules use `kind: "problem"`; their edits are not applied
 by `format`. Formatting runs phases repeatedly until stable, with a limit of
-eight passes. Conflicting edits, oscillation, or a semantic change reject the
-entire document's output.
+eight passes. When a phase's edits would change the document's meaning, the
+edits of each rule that changes it are left out, all of them, and reported as
+`engine/unsafe-format`; the other rules' edits are kept. Of two edits that
+overlap, the one that starts first is applied, and the other rule is run again
+on the changed text in the next pass. Oscillation, or no stable result after
+eight passes, leaves the whole document unchanged. See
+[refused edits and failing rules](configuration.md#refused-edits-and-failing-rules).
 
 The [plugin example](examples.md#write-a-plugin) is a complete plugin with a
 problem rule and a style rule to start from. Verify a style rule by formatting

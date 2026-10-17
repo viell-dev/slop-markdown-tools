@@ -420,9 +420,11 @@ currently preserved.
 `links/notation` converts simple explicit-label wikilinks to Markdown links and
 plain-text Markdown links to wikilinks. Titles, rich labels, unaliased
 wikilinks, and embeds are preserved. A note embed is not interchangeable with a
-Markdown image. Do not enable notation conversion and path rewriting for the
-same link in one pass: overlapping edits are reported; run those policies in
-separate passes.
+Markdown image. Notation conversion and path rewriting can be enabled together.
+Where both change one link, the notation is converted first and the path is
+rewritten in the next pass, with the result of running the two one after the
+other. Versions up to `0.2.0-rc.2` refused such a document because the edits
+overlapped.
 
 Network URLs are recognized but never fetched. Website-root paths and
 query-bearing destinations in CommonMark, GitHub, Forgejo, and Gitea are outside
@@ -519,12 +521,46 @@ reads stdin with configuration and resolution context; it cannot be used with
 
 Warnings do not fail a command unless `--max-warnings` is supplied. A successful
 formatting command can still report remaining lint problems. Inspect its exit
-code and diagnostics. An unsafe-format diagnostic blocks the complete batch's
-write phase, and so does a selected document that
+code and diagnostics. An
+[`engine/unsafe-format`](#refused-edits-and-failing-rules) or
+[`engine/rule-error`](#refused-edits-and-failing-rules) diagnostic blocks the
+complete batch's write phase, and so does a selected document that
 [cannot be read](#paths-that-cannot-be-read) or a changed file that
 [cannot be written](#files-that-cannot-be-written). Replacement is atomic per
 file, not a workspace-wide transaction: a file that fails while the batch is
 being written is reported, and the others are still written.
+
+## Refused edits and failing rules
+
+`format` accepts the edits of a phase only when the result has the parsed
+meaning of the original document. When it does not, the phase tries the edits
+one rule at a time. It leaves out the edits of each rule that would change the
+meaning and keeps those of the other rules, in that phase and the others. Each
+rule left out is reported with an `engine/unsafe-format` error at the line where
+the meaning would first differ, as in
+`style/wrap would change the parsed meaning at line 12; none of its edits were applied.`
+The rule's own findings are reported as well. A rule's edits are kept or left
+out together, because one of them can depend on another, such as the opening and
+closing markers of one emphasis. Versions up to `0.2.0-rc.2` left the whole
+document unchanged and named neither the rule nor the line.
+
+When two rules propose edits to overlapping text, the edit that starts first is
+applied, and the other rule is asked again in the next pass, on the changed
+text. Formatting repeats its passes until one changes nothing, at most eight
+times. If the rules keep changing the document, or bring it back to an earlier
+text, the whole document is left unchanged, with an `engine/unsafe-format` error
+at line 1 that names the rules still changing it. Versions up to `0.2.0-rc.2`
+refused every document with overlapping edits.
+
+A rule that throws an error, or returns findings that cannot be used, such as an
+offset outside the document, is skipped for that document. It is reported with
+an `engine/rule-error` error at line 1 that names the rule and the reason, as in
+`Rule local/example failed (TypeError: …); the rule was skipped for this document.`
+The other rules still run, and the other documents are still processed. With
+either diagnostic the exit code is `2`, in `lint` and `format` alike, and
+`format --write` writes none of the batch. Versions up to `0.2.0-rc.2`
+stopped `lint` at a failing rule with its bare message, naming neither file nor
+rule, and reported it in `format` as `engine/unsafe-format`.
 
 ## Paths that cannot be read
 
