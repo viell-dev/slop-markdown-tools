@@ -8,8 +8,17 @@ The command is `mdtools`; with the package installed in a project, run it as
 | `lint [paths…]`         | Reports the findings of the enabled rules. Never writes.                                                       |
 | `format [paths…]`       | Formats documents: prints a diff (the default), checks with `--check`, or writes with `--write`.               |
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
-| `rules`                 | Lists the built-in rules, not those of plugins, one per line: ID, kind, and description, separated by tabs.    |
+| `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
+
+Help and the version are printed on stdout, with exit code `0`. Without a
+command, `mdtools` prints the help on stderr and exits with code `2`, as it does
+for every mistake on the command line, such as an unknown option.
+
+`rules` prints one line per rule: its ID, kind, and description, separated by
+tabs. It finds the configuration as `lint` does, or reads the one that
+`--config` names. With `--json` it prints `{ "rules": [...] }`, each rule an
+object with its `id`, `kind`, and `description`.
 
 ## Options
 
@@ -23,9 +32,10 @@ and exclude one another.
 | `--dialect <name>`        | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                        |
 | `--exclude <path>`        | Leave out a file or a directory. Repeat it for more.                                                                                                               |
 | `--json`                  | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                   |
+| `--quiet`                 | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                               |
 | `--stdin-filepath <file>` | The path of the document read from [stdin](#read-from-stdin).                                                                                                      |
 | `--max-warnings <count>`  | Exit with code `1` when there are more warnings than this.                                                                                                         |
-| `--check`                 | Exit with code `1` when a document would change. Writes nothing.                                                                                                   |
+| `--check`                 | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                   |
 | `--diff`                  | Print the changes as a unified diff. The default for files.                                                                                                        |
 | `--write`                 | Write the changes.                                                                                                                                                 |
 
@@ -87,8 +97,12 @@ cmd /c "npx mdtools format - --stdin-filepath notes/example.md < input.md > outp
 ## Output
 
 Without `--json`, findings go to stderr, one per line, as
-`path:line:column: severity rule: message`. `format` prints its diff on stdout.
-A run over files ends with one summary line on stderr:
+`path:line:column: severity rule: message`. The path leads from the current
+directory to the document, with forward slashes, as Prettier names files, so
+that a terminal or an editor can open it. `format` prints its diff on stdout
+with the same paths, so that `patch -p1` or `git apply` applies it in the same
+directory. `format --check` names each document that would change, one per line
+after the findings. A run over files ends with one summary line on stderr:
 
 | Command          | Summary                                       |
 | ---------------- | --------------------------------------------- |
@@ -99,9 +113,10 @@ A run over files ends with one summary line on stderr:
 Both add `; 1 could not be read` when a selected document
 [could not be read](#files-that-cannot-be-read-or-written), and `format --write`
 adds `; 1 could not be written`. Warnings about the run itself, such as a
-skipped directory, are printed as `mdtools: warning: …`, and an error that stops
-the run as `mdtools: …`. These lines are for people; a script should read the
-JSON report and the exit code.
+skipped directory, are printed as `mdtools: warning: …`, with paths from the
+workspace root as in the JSON report, and an error that stops the run, a mistake
+on the command line included, as `mdtools: …`. These lines are for people; a
+script should read the JSON report and the exit code.
 
 ### JSON report
 
@@ -111,6 +126,7 @@ JSON report and the exit code.
 {
   "version": "0.2.0",
   "mode": "lint",
+  "root": "/home/user/project",
   "files": [
     {
       "path": "notes/release-checklist.md",
@@ -133,10 +149,12 @@ JSON report and the exit code.
 ```
 
 - `version` is the tool's version, and `mode` is `lint` or `format`.
+- `root` is the workspace root, as an absolute path in the form of the system.
 - `files` has one entry per selected document: its `path`, relative to the
-  workspace root with forward slashes, and its `diagnostics`. With `format`,
-  `changed` says whether the document changed or would change. With stdin,
-  `format` adds `output`, the formatted text, unless `--check` is given.
+  workspace root with forward slashes, and its `diagnostics`, without warnings
+  when `--quiet` is given. With `format`, `changed` says whether the document
+  changed or would change. With stdin, `format` adds `output`, the formatted
+  text, unless `--check` is given.
 - `written` is `true` when `format --write` was allowed to write; it does not
   count the files. Each entry's `changed` says which ones changed.
 - `skipped` appears only when something was skipped: one entry per directory or
@@ -156,11 +174,11 @@ and `engine/unwritable-file`.
 
 ## Exit codes
 
-| Code | Meaning                                                                                                                                                           |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for `format --check`.                                                              |
-| `1`  | Errors were found, there were more warnings than `--max-warnings`, or `format --check` found a document to change.                                                |
-| `2`  | The command could not do its job: a configuration, path, or plugin error, a rule that failed, or a document that could not be formatted safely, read, or written. |
+| Code | Meaning                                                                                                                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for `format --check`. Also after help or the version.                                                             |
+| `1`  | Errors were found, there were more warnings than `--max-warnings`, or `format --check` found a document to change.                                                                               |
+| `2`  | The command could not do its job: a mistake on the command line; a configuration, path, or plugin error; a rule that failed; or a document that could not be formatted safely, read, or written. |
 
 Warnings alone never fail a command without `--max-warnings`. `format` can
 succeed and still report problems that only a person can fix, so read its

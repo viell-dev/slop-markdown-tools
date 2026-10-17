@@ -41,11 +41,11 @@ npx mdtools format --check
 ```
 
 `--diff` prints what formatting would change, and is also what `format` does
-without an option. `--write` writes the changes. `--check` writes nothing and
-exits with code `1` when a document would change, which is the check to run in
-CI. `format` changes only what its rules target, and refuses any change that
-would alter what a document means. It can still report problems that need a
-person, such as a broken link.
+without an option. `--write` writes the changes. `--check` writes nothing, names
+each document that would change, and then exits with code `1`, which is the
+check to run in CI. `format` changes only what its rules target, and refuses any
+change that would alter what a document means. It can still report problems that
+need a person, such as a broken link.
 
 ## Choose a preset and a dialect
 
