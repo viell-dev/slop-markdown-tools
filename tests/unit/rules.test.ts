@@ -141,6 +141,11 @@ describe("style/block-spacing", () => {
     ["Text\n- > 3. Step\n"],
     ["[a]: https://example.com\n- -\n"],
     ["[a]: https://example.com\n-\n---\n"],
+    // Below a table that ends in a list or quote, the parser reads the next
+    // table as a paragraph or heading text, and a blank line would make it a table.
+    ["- | a |\n  | - |\n| b |\n| - |\n"],
+    ["> - | a |\n>   | - |\n> | b |\n> | - |\n"],
+    ["> | a |\n> | - |\n| b |\n| - |\n---\n"],
   ])("leaves %j unchanged", (source) => {
     expect(spaced(source)).toBe(source);
     expect(lint(source, { config: only(rule, "github") })).toEqual([]);
@@ -149,6 +154,10 @@ describe("style/block-spacing", () => {
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
       "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
+  });
+  it("still separates other text below a table in a list", () => {
+    expect(spaced("- | a |\n  | - |\nText\n")).toBe("- | a |\n  | - |\n\nText\n");
+    expect(spaced("- | a |\n  | - |\n| b\n")).toBe("- | a |\n  | - |\n\n| b\n");
   });
   it("keeps an Obsidian block identifier below a heading", () => {
     expect(spaced("# H\n^anchor\n", "obsidian")).toBe("# H\n^anchor\n");
@@ -313,6 +322,144 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     ["*foo*(bar)\n", "_foo_(bar)\n"],
   ])("still converts %j", (source, output) => {
     expect(formatted(source, config)).toBe(output);
+  });
+  // Each would pair differently with the new markers: a `*` or `_` left as
+  // text, a run shared with other emphasis, or a `~` between two markers.
+  it.each([
+    ["*a _b* c_\n", "_", "commonmark"],
+    ["*****a***\n", "_", "commonmark"],
+    ["_a*b_ and _c*_\n", "*", "commonmark"],
+    ["_]*__a__*i_\n", "*", "commonmark"],
+    ["_~*a*e_\n", "*", "github"],
+  ] as const)("leaves the crossed delimiters of %j alone", (source, marker, dialect) => {
+    const rules = only({ "style/emphasis": ["warn", { marker }] }, dialect);
+    expect(formatted(source, rules)).toBe(source);
+    expect(lint(source, { config: rules })).toEqual([]);
+  });
+  it.each([
+    // A `_` that can only close, after the emphasis, cannot pair with it.
+    ["*a* and file_.\n", "_", "_a_ and file_.\n"],
+    ["*a* and 2*3 and *b*\n", "_", "_a_ and 2*3 and _b_\n"],
+    // Of emphases sharing a run, those that keep their pairs change.
+    ["*a****c***\n", "_", "_a_***c***\n"],
+    ["___a_ x_\n", "*", "_*_a_ x*\n"],
+    ["___b___ and ***c***\n", "*", "*__b__* and ***c***\n"],
+  ] as const)("converts what keeps its pairs in %j", (source, marker, output) => {
+    expect(formatted(source, only({ "style/emphasis": ["warn", { marker }] }))).toBe(output);
+  });
+  it.each(["github", "forgejo", "gitea"] as const)(
+    "leaves markers next to dollar math alone on %s",
+    (dialect) => {
+      // A `_` after the closing dollar keeps `$x$` from being math.
+      const source = "$x$_a_ and *$y$* and $z$ *b*\n";
+      expect(formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, dialect)))
+        .toBe("$x$_a_ and *$y$* and $z$ *b*\n");
+      expect(formatted(source, only({ "style/emphasis": "warn" }, dialect))).toBe(
+        "$x$_a_ and *$y$* and $z$ _b_\n",
+      );
+      expect(
+        formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, "commonmark")),
+      ).toBe("$x$*a* and *$y$* and $z$ *b*\n");
+    },
+  );
+  it("leaves emphasis from an Obsidian callout's title into its body alone", () => {
+    const rules = only({ "style/emphasis": ["warn", { marker: "*" }] }, "obsidian");
+    expect(formatted("> [!note] _Title\n> body_ and _b_\n", rules)).toBe(
+      "> [!note] _Title\n> body_ and *b*\n",
+    );
+    expect(formatted("> [!note] _Title_\n> _body_\n", rules)).toBe(
+      "> [!note] *Title*\n> *body*\n",
+    );
+  });
+  it("keeps the meaning of random runs of markers", () => {
+    const words = fc.constantFrom(
+      "a", "b c", "*", "_", "**", "__", "***", "*a*", "_a_", "**b**", "__b__", "***c***",
+      "___c___", "*a _b* c_", "x_y", "2*3", "file_", "_f", "`c`", "\\*", "\\_", "~", "~~s~~",
+      "$x$", "[*T*]", "[_T_][]", "[*T*](u)", "==h==", " ", "\n", "(", ".",
+    );
+    fc.assert(
+      fc.property(
+        fc.array(words, { minLength: 1, maxLength: 12 }),
+        fc.constantFrom(...dialects),
+        fc.constantFrom("*", "_"),
+        fc.constantFrom("*", "_"),
+        (parts, dialect, emphasis, strong) => {
+          const source = `${parts.join("")}\n\n[*T*]: u\n`;
+          const rules = only(
+            {
+              "style/emphasis": ["warn", { marker: emphasis }],
+              "style/strong": ["warn", { marker: strong }],
+            },
+            dialect,
+          );
+          const output = formatted(source, rules);
+          expect(semanticFingerprint(parse(output, dialect))).toBe(
+            semanticFingerprint(parse(source, dialect)),
+          );
+        },
+      ),
+      { numRuns: 400, seed: 20261017 },
+    );
+  });
+});
+
+describe("style/emphasis and style/strong in reference labels", () => {
+  const rules = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  it("leaves the text of collapsed and shortcut references alone", () => {
+    // The text is also the label, which would no longer match the definition.
+    const source =
+      "See [*Title*][] and [*Title*], [__Bold__] and [*Full*][t], and [*inline*](u).\n\n[*Title*]: u\n[__Bold__]: u\n[t]: u\n";
+    expect(formatted(source, only(rules, "github"))).toBe(
+      "See [*Title*][] and [*Title*], [__Bold__] and [_Full_][t], and [_inline_](u).\n\n[*Title*]: u\n[__Bold__]: u\n[t]: u\n",
+    );
+    expect(lint("[*Title*]\n\n[*Title*]: u\n", { config: only(rules) })).toEqual([]);
+  });
+  it("leaves bracketed text alone that would match a definition", () => {
+    const config = only(
+      { "style/emphasis": ["warn", { marker: "*" }], "style/strong": ["warn", { marker: "_" }] },
+      "github",
+    );
+    const source = "[_T_], [**B**], [^_n_], and [_x_].\n\n[*T*]: u\n[__B__]: u\n[^*n*]: Note.\n";
+    expect(formatted(source, config)).toBe(
+      "[_T_], [**B**], [^_n_], and [*x*].\n\n[*T*]: u\n[__B__]: u\n[^*n*]: Note.\n",
+    );
+  });
+});
+
+describe("style/inline-code", () => {
+  const rule = { "style/inline-code": "warn" } as const;
+  it.each([
+    // Joined, an `==` or `[[` left as text would open a highlight or wikilink.
+    "Text with ==a highlight `code` `\nspan`== here.\n",
+    "==mark `code\n==` here.\n",
+    "See [[note `code\nspan`]] here.\n",
+    // Joining would move text into a callout's title.
+    "> [!note] Title `code\n> span` here.\n",
+  ])("leaves %j unjoined in Obsidian", (source) => {
+    expect(formatted(source, only(rule, "obsidian"))).toBe(source);
+    expect(formatted(source, only(rule, "github"))).toBe(source.replace(/\n(?:> )?(?=\S+`)/, " "));
+  });
+  it("still joins code spans beside a single `==` or below a callout's title", () => {
+    expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(
+      "An == sign and `code span` here.\n",
+    );
+    expect(formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian"))).toBe(
+      "> [!note] Title\n> Body `code span` here.\n",
+    );
+  });
+  it.each([
+    // The joined span opens with one backtick, which the earlier one would pair with.
+    "A ` tick and ``code\nspan`` here.\n",
+    "Text \\`` and ``code\nspan`` here.\n",
+    "[link](u`v) and ``code\nspan`` here.\n",
+  ])("leaves %j unjoined, where an earlier run of the new backticks would pair", (source) => {
+    for (const dialect of dialects) expect(formatted(source, only(rule, dialect))).toBe(source);
+  });
+  it.each([
+    ["Ticks ``code\nspan`` and a ` after.\n", "Ticks `code span` and a ` after.\n"],
+    ["`a` and `b\nc` here.\n", "`a` and `b c` here.\n"],
+  ])("still joins %j", (source, output) => {
+    for (const dialect of dialects) expect(formatted(source, only(rule, dialect))).toBe(output);
   });
 });
 

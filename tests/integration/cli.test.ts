@@ -221,6 +221,23 @@ describe("CLI", () => {
     );
     expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("*fine*\n");
   });
+  it("refuses a blank line where the parser misreads a task item", async () => {
+    // The parser gives the document the checked state of `[x]` below an empty
+    // list item, and a blank line between them would change what it reads.
+    // The unit tests cannot parse this: the development build of the parser
+    // asserts that the state belongs to an item.
+    const source = "-\n[x] item\n";
+    const root = await fixture({
+      "mdtools.config.json": '{"dialect":"github","rules":{"style/block-spacing":"warn"}}',
+      "a.md": source,
+    });
+    const written = run(root, ["format", "--write", "a.md"]);
+    expect(written.status).toBe(2);
+    expect(written.stderr).toContain(
+      "a.md:1:1: error engine/unsafe-format: style/block-spacing would change the parsed meaning at line 1; none of its edits were applied.\n",
+    );
+    expect(await readFile(path.join(root, "a.md"), "utf8")).toBe(source);
+  });
   it("reports a rule that fails for its file, processes the others, and writes nothing", async () => {
     const root = await fixture({
       "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/fragile":"warn"}}',
