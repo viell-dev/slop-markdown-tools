@@ -1,9 +1,20 @@
 import { isUtf8 } from "node:buffer";
 import { execFileSync } from "node:child_process";
-import { mkdir, open, readFile, symlink, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  chown,
+  link,
+  mkdir,
+  open,
+  readFile,
+  symlink,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { decodeText, invalidUtf8At } from "../../src/workspace/encoding.js";
 import { discover, replacementFailure, writeAtomic } from "../../src/workspace/files.js";
 import { enclosingVault, isVault } from "../../src/workspace/vault.js";
@@ -777,9 +788,86 @@ describe("filesystem safeguards", () => {
   });
   it("preserves file permissions", async () => {
     const root = await fixture({ "note.md": "old" });
-    const before = await stat(path.join(root, "note.md"));
-    await writeAtomic(path.join(root, "note.md"), "old", "new");
-    expect((await stat(path.join(root, "note.md"))).mode).toBe(before.mode);
+    const file = path.join(root, "note.md");
+    // Group write is a bit that a usual umask takes from a new file.
+    if (process.platform !== "win32") await chmod(file, 0o660);
+    const before = await stat(file);
+    await writeAtomic(file, "old", "new");
+    expect((await stat(file)).mode).toBe(before.mode);
+  });
+  it("replaces an ordinary file and writes one with a second name in place", async () => {
+    const root = await fixture({ "single.md": "A *b*.\n", "linked.md": "A *b*.\n" });
+    // Windows allows hard links on NTFS without a privilege.
+    await link(path.join(root, "linked.md"), path.join(root, "second-name.txt"));
+    const single = await stat(path.join(root, "single.md"));
+    const linked = await stat(path.join(root, "linked.md"));
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(applied.stderr).toBe("2 file(s) processed; 2 written.\n");
+    expect((await stat(path.join(root, "single.md"))).ino).not.toBe(single.ino);
+    // Both names still lead to the one file, which holds the new content.
+    const after = await stat(path.join(root, "second-name.txt"));
+    expect([after.ino, after.nlink]).toEqual([linked.ino, 2]);
+    expect(await tree(root)).toEqual({
+      "linked.md": "A _b_.\n",
+      "second-name.txt": "A _b_.\n",
+      "single.md": "A _b_.\n",
+    });
+  });
+  it("writes a file whose two names are both documents once", async () => {
+    const root = await fixture({ "a.md": "A *b*.\n" });
+    await link(path.join(root, "a.md"), path.join(root, "b.md"));
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    // The second name already holds the formatted text and is left as it is.
+    expect(applied.stderr).toBe("2 file(s) processed; 2 written.\n");
+    expect(await tree(root)).toEqual({ "a.md": "A _b_.\n", "b.md": "A _b_.\n" });
+    expect((await stat(path.join(root, "b.md"))).nlink).toBe(2);
+  });
+  // A group of this process other than the one its new files get.
+  const otherGroup =
+    process.platform === "win32"
+      ? undefined
+      : process.getgroups?.().find((group) => group !== process.getegid?.());
+  it.skipIf(otherGroup === undefined)(
+    "writes a file of another group in place, so that it keeps its group",
+    async () => {
+      const root = await fixture({ "note.md": "A *b*.\n" });
+      const file = path.join(root, "note.md");
+      await chown(file, process.getuid!(), otherGroup!);
+      const before = await stat(file);
+      const applied = run(root, ["format", "--write"]);
+      expect(applied.status, applied.stderr).toBe(0);
+      const after = await stat(file);
+      expect([after.ino, after.gid, after.mode]).toEqual([before.ino, otherGroup, before.mode]);
+      expect(await tree(root)).toEqual({ "note.md": "A _b_.\n" });
+    },
+  );
+  it("says that a file written in place may be incomplete when writing it fails", async () => {
+    const root = await fixture({ "note.md": "old" });
+    const file = path.join(root, "note.md");
+    await link(file, path.join(root, "second-name.txt"));
+    // The in-place write is the only caller of a file handle's `write`.
+    const probe = await open(file, "r");
+    const prototype = Object.getPrototypeOf(probe) as FileHandle;
+    await probe.close();
+    const failure = Object.assign(new Error("EIO: i/o error, write"), {
+      code: "EIO",
+      syscall: "write",
+    });
+    const write = vi.spyOn(prototype, "write").mockImplementation(() => Promise.reject(failure));
+    let error: unknown;
+    try {
+      error = await writeAtomic(file, "old", "new").catch((thrown: unknown) => thrown);
+      expect(write).toHaveBeenCalledTimes(1);
+    } finally {
+      write.mockRestore();
+    }
+    expect(replacementFailure(error)).toBe(
+      "The file could not be written completely (EIO: i/o error) and may be incomplete",
+    );
+    // Nothing is left beside the file.
+    expect(Object.keys(await tree(root))).toEqual(["note.md", "second-name.txt"]);
   });
   it("words a failure to write without the paths that the system names", () => {
     const error = (code: string, message: string, syscall?: string) =>

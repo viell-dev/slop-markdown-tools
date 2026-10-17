@@ -1,7 +1,7 @@
 import { access, lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { constants, readFileSync } from "node:fs";
-import type { Dirent } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import type { ResolveOptions } from "../core/types.js";
 import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
@@ -248,13 +248,17 @@ export async function discover(
     vaults: vaults.sort(byPath),
   };
 }
-/** A file that `writeAtomic` would not replace, with the reason in words that do not name it. */
+/**
+ * A file that `writeAtomic` would not write, or did not write completely, with
+ * the reason in words that do not name it.
+ */
 export class ReplacementRefused extends Error {
   constructor(
     readonly reason: string,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
 }
 /**
@@ -296,11 +300,52 @@ function changedOnDisk(file: string, when: string): ReplacementRefused {
   );
 }
 /**
- * Replace `file`, whose text was read as `before`, with the formatted text
- * `after`, if the file still holds exactly the bytes that were read. The new
- * content is written to a file beside it, which then replaces it, so that a
- * failure never leaves the file half written; the replacement gets the file's
- * permission bits.
+ * Write `content` over the file itself, which keeps everything about it but
+ * its content, after checking through the open file that it is still the file
+ * that was read. A failure once writing has begun can leave the file
+ * incomplete and is reported so.
+ */
+async function writeInPlace(
+  file: string,
+  identity: Stats,
+  expected: Buffer,
+  content: Buffer,
+): Promise<void> {
+  const handle = await open(file, "r+");
+  try {
+    const current = await handle.stat();
+    if (current.ino !== identity.ino || !(await handle.readFile()).equals(expected))
+      throw changedOnDisk(file, "before writing");
+    try {
+      for (let at = 0; at < content.length;)
+        at += (await handle.write(content, at, content.length - at, at)).bytesWritten;
+      await handle.truncate(content.length);
+      await handle.sync();
+    } catch (error) {
+      const text = systemErrorText(error);
+      if (!text) throw error;
+      throw new ReplacementRefused(
+        `The file could not be written completely (${text}) and may be incomplete`,
+        `File written in part: ${file}`,
+        { cause: error },
+      );
+    }
+  } finally {
+    await handle.close();
+  }
+}
+/**
+ * Write the formatted text `after` to `file`, whose text was read as `before`,
+ * if the file still holds exactly the bytes that were read. The new content is
+ * written to a file beside it, which then replaces it, so that a failure never
+ * leaves the file half written; the replacement gets the file's permission
+ * bits. Replacing makes a new file, though, and some of what belonged to the old
+ * one can be seen to be lost: a second name of the file, a hard link, would keep
+ * the old content, and on Unix a replacement with another owner or group than
+ * the file's would change who may read it. Such a file is written in place
+ * instead, once the file beside it has shown that the new content fits on the
+ * disk. A file that already holds `after`, as the second name of a hard link
+ * written earlier in the batch does, is left as it is.
  */
 export async function writeAtomic(file: string, before: string, after: string): Promise<void> {
   const info = await lstat(file);
@@ -313,13 +358,17 @@ export async function writeAtomic(file: string, before: string, after: string): 
   // that were read; comparing the text instead would miss a change to bytes that
   // decode to the same text.
   const expected = Buffer.from(before, "utf8");
-  if (!(await readFile(file)).equals(expected)) throw changedOnDisk(file, "during formatting");
+  const content = Buffer.from(after, "utf8");
+  const found = await readFile(file);
+  if (found.equals(content)) return;
+  if (!found.equals(expected)) throw changedOnDisk(file, "during formatting");
   const temporary = path.join(path.dirname(file), `.mdtools-${randomUUID()}.tmp`);
   const handle = await open(temporary, "wx", info.mode);
   try {
-    await handle.writeFile(after, "utf8");
+    await handle.writeFile(content);
     await handle.chmod(info.mode);
     await handle.sync();
+    const made = await handle.stat();
     await handle.close();
     const current = await lstat(file);
     if (
@@ -328,7 +377,11 @@ export async function writeAtomic(file: string, before: string, after: string): 
       !(await readFile(file)).equals(expected)
     )
       throw changedOnDisk(file, "before replacement");
-    await rename(temporary, file);
+    if (current.nlink > 1 || made.uid !== current.uid || made.gid !== current.gid) {
+      // Removing the new file first leaves the room it took for the write.
+      await unlink(temporary);
+      await writeInPlace(file, current, expected, content);
+    } else await rename(temporary, file);
   } finally {
     await handle.close();
     await unlink(temporary).catch((error: NodeJS.ErrnoException) => {
