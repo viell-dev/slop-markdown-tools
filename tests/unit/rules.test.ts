@@ -1,11 +1,14 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   applyEdits,
   canonicalDialect,
   createWorkspace,
+  dialects,
   format,
   lint,
   parse,
+  presets,
   resolveConfig,
   semanticFingerprint,
   textContent,
@@ -49,6 +52,244 @@ describe("style/heading", () => {
   ])("leaves %j unchanged", (source) => {
     expect(formatted(source, config)).toBe(source);
     expect(lint(source, { config })).toEqual([]);
+  });
+});
+
+describe("style/block-spacing", () => {
+  const rule = { "style/block-spacing": "warn" } as const;
+  /** Format with the rule alone, and require the parsed meaning to stay the same. */
+  function spaced(source: string, dialect: Dialect = "github") {
+    const output = formatted(source, only(rule, dialect));
+    expect(semanticFingerprint(parse(output, dialect))).toBe(
+      semanticFingerprint(parse(source, dialect)),
+    );
+    return output;
+  }
+  it.each([
+    [
+      "# Setup\nInstall the package.\n- Run the command.\n",
+      "# Setup\n\nInstall the package.\n\n- Run the command.\n",
+    ],
+    ["# A\n## B\n", "# A\n\n## B\n"],
+    ["Text\n# Heading\n", "Text\n\n# Heading\n"],
+    ["Text\n1. One\n", "Text\n\n1. One\n"],
+    // Hard breaks stay where they are.
+    ["Line one  \nLine two\\\nend\n- A\n", "Line one  \nLine two\\\nend\n\n- A\n"],
+    // Tight lists stay tight, loose lists loose, and nested lists in place.
+    ["# Steps\n- One\n- Two\n## Next\n", "# Steps\n\n- One\n- Two\n\n## Next\n"],
+    ["# Steps\n- One\n\n- Two\n## Next\n", "# Steps\n\n- One\n\n- Two\n\n## Next\n"],
+    ["- One\n  - Nested\n# Next\n", "- One\n  - Nested\n\n# Next\n"],
+    ["- One\n+ Other list\n", "- One\n\n+ Other list\n"],
+    ["Title\n=====\nText\n", "Title\n=====\n\nText\n"],
+    ["# A\nTitle\n---\n", "# A\n\nTitle\n---\n"],
+    // Code, HTML, math, and tables keep their contents.
+    ["# H\n```\n# Code\n```\n- A\n", "# H\n\n```\n# Code\n```\n\n- A\n"],
+    ["# H\n    code\n# I\n", "# H\n\n    code\n\n# I\n"],
+    ["# H\n<div>\n# Inside HTML\n</div>\n", "# H\n\n<div>\n# Inside HTML\n</div>\n"],
+    ["# H\n$$\nx\n$$\n- A\n", "# H\n\n$$\nx\n$$\n\n- A\n"],
+    ["# H\n| a |\n| - |\n# I\n", "# H\n\n| a |\n| - |\n\n# I\n"],
+    ["- A\n```\ncode\n```\n", "- A\n\n```\ncode\n```\n"],
+    ["# H\n[^1]: Note.\n", "# H\n\n[^1]: Note.\n"],
+    ["# H\n***\n", "# H\n\n***\n"],
+    // Block quotes at any depth, also in a list item, and around a quote.
+    ["> # H\n> Text\n> - A\n", "> # H\n>\n> Text\n>\n> - A\n"],
+    ["> > # H\n> > Text\n", "> > # H\n> >\n> > Text\n"],
+    ["- > # H\n  > Text\n", "- > # H\n  >\n  > Text\n"],
+    ["> Quote\n# H\n", "> Quote\n\n# H\n"],
+    // A lazy continuation line belongs to the paragraph above it.
+    ["> Quote\nlazy\n# H\n", "> Quote\nlazy\n\n# H\n"],
+    ["> Text\nlazy\n> - A\n", "> Text\nlazy\n>\n> - A\n"],
+    // The document's line ending, and nothing added at its end.
+    ["# H\r\nText\r\n- A\r\n", "# H\r\n\r\nText\r\n\r\n- A\r\n"],
+    ["> # H\r\n> Text\r\n", "> # H\r\n>\r\n> Text\r\n"],
+    ["# H\rText\r", "# H\r\rText\r"],
+    ["Text\n# H", "Text\n\n# H"],
+  ])("separates %j", (source, output) => {
+    expect(spaced(source)).toBe(output);
+  });
+  it.each([
+    ["# H\n\nText\n\n- A\n- B\n\n## I\n"],
+    ["# H\n\n\nText\n"],
+    ["> # H\n>\n> Text\n"],
+    ["> # H\n>\n# I\n"],
+    ["# H\n"],
+    // Blocks inside a list item or a footnote definition.
+    ["- A\n  # H\n  Text\n"],
+    ["- # H\n  - Nested\n"],
+    ["1. Text\n   - Nested\n"],
+    ["- Text\n  ```\n  code\n  ```\n"],
+    ["[^1]: Text\n    # H\n"],
+    // Front matter.
+    ["---\ntitle: T\n---\n# H\n"],
+    ["+++\ntitle = 'T'\n+++\n- A\n"],
+    // Continuation lines, and blocks that are neither headings nor lists.
+    ["Text\n2. Two\n"],
+    ["- A\nlazy\n"],
+    ["Text\n> Quote\n"],
+    ["```\ncode\n```\nText\n"],
+    // Comments, callouts, and lines the parser reads differently below text.
+    ["<!-- note -->\n# H\n"],
+    ["<!-- mdtools-disable-next-line style/emphasis -->\n- *A*\n"],
+    ["> [!NOTE]\n> - Item\n"],
+    ["> [!tip] Title\n> # H\n"],
+    ["Text\n- 2. Step\n"],
+    ["Text\n- -\n"],
+    ["> Text\n> - 2) Step\n"],
+    ["Text\n- > 3. Step\n"],
+    ["[a]: https://example.com\n- -\n"],
+    ["[a]: https://example.com\n-\n---\n"],
+  ])("leaves %j unchanged", (source) => {
+    expect(spaced(source)).toBe(source);
+    expect(lint(source, { config: only(rule, "github") })).toEqual([]);
+  });
+  it.each(dialects)("separates the same blocks in the %s dialect", (dialect) => {
+    expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
+      "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
+    );
+  });
+  it("keeps an Obsidian block identifier below a heading", () => {
+    expect(spaced("# H\n^anchor\n", "obsidian")).toBe("# H\n^anchor\n");
+    expect(spaced("# H\n^anchor\n")).toBe("# H\n\n^anchor\n");
+  });
+  it("reports each place at the heading or list that needs the blank line", () => {
+    const diagnostics = lint("# Setup\nInstall the package.\n- Run the command.\n", {
+      config: only(rule, "github"),
+    });
+    expect(diagnostics).toEqual([
+      {
+        rule: "style/block-spacing",
+        severity: "warn",
+        line: 1,
+        column: 8,
+        start: 7,
+        message: "Add a blank line after the heading.",
+        edit: { start: 7, end: 8, text: "\n\n" },
+      },
+      {
+        rule: "style/block-spacing",
+        severity: "warn",
+        line: 3,
+        column: 1,
+        start: 29,
+        message: "Add a blank line before the list.",
+        edit: { start: 28, end: 29, text: "\n\n" },
+      },
+    ]);
+    expect(lint("> - A\n> # H\n", { config: only({ "style/block-spacing": "error" }) })).toEqual([
+      {
+        rule: "style/block-spacing",
+        severity: "error",
+        line: 2,
+        column: 3,
+        start: 8,
+        message: "Add a blank line before the heading.",
+        edit: { start: 5, end: 6, text: "\n>\n" },
+      },
+    ]);
+  });
+  it("is enabled by no preset and formats nothing when off", () => {
+    const source = "# Setup\nInstall the package.\n- Run the command.\n";
+    expect(format(source, { config: { extends: ["recommended", "github"] } }).output).toBe(source);
+    expect(format(source, { config: only({ "style/block-spacing": "off" }) }).output).toBe(source);
+    for (const preset of Object.values(presets))
+      expect(Object.keys(preset.rules ?? {})).not.toContain("style/block-spacing");
+  });
+  it("honours suppression comments", () => {
+    const config = only({ "style/block-spacing": "warn", "style/emphasis": "warn" }, "github");
+    const region =
+      "<!-- mdtools-disable style/block-spacing -->\n\n# H\nText\n\n<!-- mdtools-enable style/block-spacing -->\n\n# I\nText\n";
+    expect(formatted(region, config)).toBe(region.replace("# I\n", "# I\n\n"));
+    const next = "<!-- mdtools-disable-next-line style/block-spacing -->\n# H\nText\n";
+    expect(formatted(next, config)).toBe(next);
+    expect(lint(next, { config })).toEqual([]);
+    // A blank line would move the target of a directive for another rule.
+    const other = "<!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\nText *change*\n";
+    expect(formatted(other, config)).toBe(
+      "<!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\n\nText _change_\n",
+    );
+    const inline = "Text <!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\n";
+    expect(formatted(inline, config)).toBe(inline);
+  });
+  it("formats together with the other block rules", () => {
+    const config = only(
+      {
+        "style/block-spacing": "warn",
+        "style/heading": "warn",
+        "style/table": "warn",
+        "style/wrap": ["warn", { width: 30 }],
+      },
+      "github",
+    );
+    expect(
+      formatted(
+        "# A\nTitle\n===\n| a |\n|-|\n# B\nA paragraph that is long enough to wrap.\n- Item\n",
+        config,
+      ),
+    ).toBe(
+      "# A\n\n# Title\n\n| a   |\n| --- |\n\n# B\n\nA paragraph that is long\nenough to wrap.\n\n- Item\n",
+    );
+  });
+  it("keeps the meaning of randomly assembled documents", () => {
+    const blocks = fc.constantFrom(
+      "# Heading",
+      "Title\n=====",
+      "Text.",
+      "Two\nlines.",
+      "- Item",
+      "- One\n- Two",
+      "* A\n\n* B",
+      "1. First",
+      "2) Second",
+      "- -",
+      "- 2. Step",
+      "-",
+      "-\n---",
+      "```\ncode\n```",
+      "    code",
+      "<div>\nhtml",
+      "<!-- comment -->",
+      "$$\nx\n$$",
+      "| a |\n| - |",
+      "***",
+      "> Quoted",
+      "> [!NOTE]\n> - Item",
+      "[a]: https://example.com",
+      "[^1]: Note.",
+      "^block-id",
+      "lazy",
+      "===",
+    );
+    const containers = fc.constantFrom(
+      ["", ""],
+      ["> ", "> "],
+      ["> > ", "> > "],
+      ["- ", "  "],
+      ["- > ", "  > "],
+      ["> - ", ">   "],
+    );
+    const group = fc.tuple(
+      containers,
+      fc.array(fc.tuple(blocks, fc.boolean()), { minLength: 1, maxLength: 6 }),
+    );
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...dialects),
+        fc.array(group, { minLength: 1, maxLength: 3 }),
+        fc.constantFrom("\n", "\r\n"),
+        (dialect, groups, newline) => {
+          const lines: string[] = [];
+          for (const [[first, rest], items] of groups)
+            items.forEach(([block, blank], index) => {
+              if (index > 0 && blank) lines.push(rest.trimEnd());
+              block.split("\n").forEach((line, at) => {
+                lines.push((index === 0 && at === 0 ? first : rest) + line);
+              });
+            });
+          spaced(lines.join(newline) + newline, dialect);
+        },
+      ),
+      { numRuns: 300, seed: 20261017 },
+    );
   });
 });
 
