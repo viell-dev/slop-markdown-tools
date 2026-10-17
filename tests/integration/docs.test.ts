@@ -9,34 +9,81 @@ import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
 import { manifest, repository } from "./support.js";
 
-const { builtInRules, dialectAliases, dialects, lint, parse, presets } = library;
+const { builtInRules, dialectAliases, dialects, lint, parse, presets, range } = library;
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
-const pages = readdirSync(path.join(repository, "docs"))
-  .filter((name) => name.endsWith(".md"))
+/** Every page of the site, in subdirectories too, as a path from the repository. */
+const pages = readdirSync(path.join(repository, "docs"), { recursive: true, encoding: "utf8" })
+  .map((name) => name.split(path.sep).join("/"))
+  .filter((name) => name.endsWith(".md") && !name.startsWith(".vitepress/"))
   .map((name) => `docs/${name}`);
 /** Top-level blocks of a Markdown file, which is where the documentation keeps its code blocks. */
 const blocks = (file: string): RootContent[] => parse(read(file), "github", file).tree.children;
 const isCode = (node: RootContent | undefined, lang: string): node is Code =>
   node?.type === "code" && node.lang === lang;
 
-describe("configuration reference", () => {
-  const reference = read("docs/configuration.md");
-  it("lists every built-in rule, and no rule that does not exist", () => {
-    for (const rule of Object.keys(builtInRules)) expect(reference).toContain(`\`${rule}\``);
-    const listed = [...reference.matchAll(/^\| `([a-z]+\/[a-z-]+)` +\| (?:Style|Problem) /gm)].map(
-      (match) => match[1]!,
-    );
-    expect(listed.length).toBeGreaterThan(10);
-    for (const rule of listed) expect(Object.keys(builtInRules)).toContain(rule);
-    for (const [rule, { kind }] of Object.entries(builtInRules))
-      if (listed.includes(rule))
-        expect(reference).toMatch(
-          new RegExp(`^\\| \`${rule}\` +\\| ${kind === "style" ? "Style" : "Problem"} `, "m"),
-        );
+describe("rules reference", () => {
+  const file = "docs/rules.md";
+  const source = read(file);
+  const page = blocks(file);
+  const index = page.find((node) => node.type === "table");
+  // The index's rows, as the source text of each cell: rule, kind, fixes, presets, dialects, options.
+  const rows =
+    index?.type === "table"
+      ? index.children
+          .slice(1)
+          .map((row) =>
+            row.children.map((cell) =>
+              cell.children.length
+                ? source.slice(range(cell.children[0]!)[0], range(cell.children.at(-1)!)[1])
+                : "",
+            ),
+          )
+      : [];
+  const listed = rows.map(([rule]) => /^`([^`]+)`$/.exec(rule ?? "")?.[1] ?? String(rule));
+  /** The presets that enable a rule, with the severity they give it. */
+  const enabling = (rule: string) =>
+    Object.entries(presets).flatMap(([name, preset]) => {
+      const value = preset.rules?.[rule];
+      const severity = Array.isArray(value) ? value[0] : value;
+      return severity && severity !== "off" ? [{ name, severity }] : [];
+    });
+  it("has one index row for every built-in rule, in alphabetical order", () => {
+    expect([...listed].sort()).toEqual(Object.keys(builtInRules).sort());
+    expect(listed).toEqual([...listed].sort());
   });
-  it("lists every preset, dialect, and alias", () => {
+  it("gives each rule's kind, fix, and presets as the code does", () => {
+    for (const [index, [, kind, fixes, enabledBy = ""]] of rows.entries()) {
+      const rule = listed[index]!;
+      const style = builtInRules[rule]?.kind === "style";
+      expect(kind, rule).toBe(style ? "Style" : "Problem");
+      expect(fixes, rule).toBe(style ? "Yes" : "No");
+      const named = [...enabledBy.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+      expect(named.sort(), rule).toEqual(
+        enabling(rule)
+          .map(({ name }) => name)
+          .sort(),
+      );
+      expect(enabledBy.includes("(error)"), rule).toBe(
+        enabling(rule).some(({ severity }) => severity === "error"),
+      );
+    }
+  });
+  it("has a section for every rule, in the order of the index", () => {
+    const sections = page.flatMap((node) =>
+      node.type === "heading" && node.depth === 2 && node.children[0]?.type === "inlineCode"
+        ? [node.children[0].value]
+        : [],
+    );
+    expect(sections).toEqual(listed);
+  });
+});
+
+describe("configuration and dialect references", () => {
+  it("list every preset, dialect, and alias", () => {
+    const configuration = read("docs/configuration.md");
     for (const preset of Object.keys(presets))
-      expect(reference).toMatch(new RegExp(`^\\| \`${preset}\` +\\|`, "m"));
+      expect(configuration).toMatch(new RegExp(`^\\| \`${preset}\` +\\|`, "m"));
+    const reference = read("docs/dialects.md");
     for (const dialect of [...dialects, ...Object.keys(dialectAliases)])
       expect(reference).toContain(`\`${dialect}\``);
   });
@@ -132,7 +179,8 @@ describe("examples page", () => {
 
 describe("documentation site", () => {
   it("links every page from the sidebar, and only pages that exist", () => {
-    const sidebar = [...read("docs/.vitepress/config.mts").matchAll(/link: "\/([a-z-]+)"/g)].map(
+    const config = read("docs/.vitepress/config.mts");
+    const sidebar = [...config.matchAll(/link: "\/([a-z0-9/-]+)"/g)].map(
       (match) => `docs/${match[1]}.md`,
     );
     for (const page of pages) if (page !== "docs/index.md") expect(sidebar).toContain(page);
@@ -198,7 +246,7 @@ describe("library API", () => {
     )) as Record<string, unknown>;
     expect(Object.keys(built).sort()).toEqual(Object.keys(library).sort());
     // A name counts as documented when the page imports it in a code block or names it in code.
-    const page = read("docs/plugins.md");
+    const page = read("docs/api.md");
     const documented = new Set([
       ...[...page.matchAll(/import \{([^}]+)\} from "mdrefine"/g)].flatMap((match) =>
         match[1]!.split(",").map((name) => name.trim()),
@@ -213,12 +261,35 @@ describe("library API", () => {
       pathToFileURL(path.join(repository, "dist/node.js")).href
     )) as Record<string, unknown>;
     expect(Object.keys(built).sort()).toEqual(Object.keys(source).sort());
-    const page = read("docs/plugins.md");
+    const page = read("docs/api.md");
     const imported = [...page.matchAll(/import \{([^}]+)\} from "mdrefine\/node"/g)].flatMap(
       (match) => match[1]!.split(",").map((name) => name.trim()),
     );
     for (const name of Object.keys(built)) expect(imported, name).toContain(name);
     const manifest = JSON.parse(read("package.json")) as { exports: Record<string, unknown> };
     expect(Object.keys(manifest.exports)).toEqual([".", "./node"]);
+  });
+});
+
+describe("changelog", () => {
+  // The Release workflow publishes a version's section of CHANGELOG.md as its release notes.
+  const notes = (version: string) =>
+    spawnSync(process.execPath, ["scripts/release-notes.mjs", version], {
+      cwd: repository,
+      encoding: "utf8",
+    });
+  it("has release notes for the version in package.json, one line per paragraph", () => {
+    const result = notes(manifest.version);
+    expect(result.status, result.stderr).toBe(0);
+    const lines = result.stdout.trimEnd().split("\n");
+    expect(lines.join("")).not.toBe("");
+    // GitHub shows each line break of a release's notes, so wrapped lines are joined.
+    for (const [index, line] of lines.entries())
+      if (index > 0 && lines[index - 1] && line) expect(line).toMatch(/^\s*(?:[-*+] |\d+[.)] |#)/);
+  });
+  it("refuses a version that has no section", () => {
+    const result = notes("0.0.0-none.0");
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("CHANGELOG.md has no section for 0.0.0-none.0");
   });
 });
