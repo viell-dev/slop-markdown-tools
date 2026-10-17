@@ -99,7 +99,10 @@ configuration, execution, or safety failure. Warnings fail only when they exceed
 `--max-warnings`. A selected document that the tool is not permitted to read is
 reported with an `engine/unreadable-file` error for that file; the other files
 are processed, nothing is written, and the exit code is `2`. Versions up to
-`0.2.0-rc.1` stopped without a report.
+`0.2.0-rc.1` stopped without a report. A changed file that `format --write`
+cannot write is reported with an `engine/unwritable-file` error, also with exit
+code `2`; see
+[files that cannot be written](configuration.md#files-that-cannot-be-written).
 
 For a formatting pass, inspect a diff, apply it with `--write`, then run the
 checks again. Report reproducible document defects using a synthetic example;

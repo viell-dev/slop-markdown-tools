@@ -54,11 +54,12 @@ edit by any rule that changes its destination, because only the same spelling is
 known to name the same note. The CLI passes the directories it
 [skipped](configuration.md#paths-that-cannot-be-read). A loader that throws an
 error whose `code` is `EACCES` or `EPERM`, as Node.js does for a file the
-process is not permitted to read, makes a link to a heading or block in that
-file resolve as `"unreadable"` too, with `target` set and `unreadable` naming
-the file; a link to the file without a fragment still resolves. Any other error
-from a loader propagates. Versions up to `0.2.0-rc.1` have neither the option
-nor the status, and let every loader error through.
+process is not permitted to read, or `EBUSY`, as it does on Windows for a file
+that another program has locked, makes a link to a heading or block in that file
+resolve as `"unreadable"` too, with `target` set and `unreadable` naming the
+file; a link to the file without a fragment still resolves. Any other error from
+a loader propagates. Versions up to `0.2.0-rc.1` have neither the option nor the
+status, and let every loader error through.
 
 `WorkspaceOptions.vaults` lists folders below the workspace root that are
 Obsidian vaults of their own. An Obsidian link in a note of such a vault is

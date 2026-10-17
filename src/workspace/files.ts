@@ -1,13 +1,13 @@
-import { lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
+import { access, lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { readFileSync } from "node:fs";
+import { constants, readFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import type { ResolveOptions } from "../core/types.js";
 import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
-import { exists, pathError, refusal, refusalText } from "./access.js";
+import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
@@ -241,12 +241,58 @@ export async function discover(
     vaults: vaults.sort(byPath),
   };
 }
+/** A file that `writeAtomic` would not replace, with the reason in words that do not name it. */
+export class ReplacementRefused extends Error {
+  constructor(
+    readonly reason: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+/**
+ * Why `file` cannot be replaced, or undefined when nothing stands in the way
+ * that can be seen before writing: the file may not be written, or its folder
+ * does not let the temporary file be created beside it. A read-only file is
+ * refused on every platform, although renaming over one works outside
+ * Windows: the flag marks a file that is not to be edited.
+ */
+export async function replacementProblem(file: string): Promise<string | undefined> {
+  for (const [target, subject] of [
+    [file, "The file"],
+    [path.dirname(file), "The file's folder"],
+  ] as const) {
+    try {
+      await access(target, constants.W_OK);
+    } catch (error) {
+      const text = systemErrorText(error);
+      if (!text) throw error;
+      return `${subject} may not be written (${text})`;
+    }
+  }
+  return undefined;
+}
+/**
+ * What went wrong when `writeAtomic` failed for a file, in words that do not
+ * name it, or undefined for an error that is a fault of the tool.
+ */
+export function replacementFailure(error: unknown): string | undefined {
+  if (error instanceof ReplacementRefused) return error.reason;
+  const text = systemErrorText(error);
+  return text ? `The file could not be written (${text}) and is unchanged` : undefined;
+}
 export async function writeAtomic(file: string, before: string, after: string): Promise<void> {
   const info = await lstat(file);
   if (!info.isFile() || info.isSymbolicLink())
-    throw new Error(`Refusing non-regular file: ${file}`);
+    throw new ReplacementRefused(
+      "The file is not a regular file and was not written",
+      `Refusing non-regular file: ${file}`,
+    );
   if ((await readFile(file, "utf8")) !== before)
-    throw new Error(`File changed during formatting: ${file}`);
+    throw new ReplacementRefused(
+      "The file changed on disk during formatting and was not written",
+      `File changed during formatting: ${file}`,
+    );
   const temporary = path.join(path.dirname(file), `.mdtools-${randomUUID()}.tmp`);
   const handle = await open(temporary, "wx", info.mode);
   try {
@@ -260,7 +306,10 @@ export async function writeAtomic(file: string, before: string, after: string): 
       current.ino !== info.ino ||
       (await readFile(file, "utf8")) !== before
     )
-      throw new Error(`File changed before replacement: ${file}`);
+      throw new ReplacementRefused(
+        "The file changed on disk during formatting and was not written",
+        `File changed before replacement: ${file}`,
+      );
     await rename(temporary, file);
   } finally {
     await handle.close();
