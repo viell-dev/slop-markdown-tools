@@ -11,6 +11,7 @@ import { replacementFailure, replacementProblem, writeAtomic } from "../workspac
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
+import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
 import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
@@ -88,10 +89,16 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       .join("/");
     if (name.startsWith("../") || path.isAbsolute(name))
       throw new Error("--stdin-filepath must be within the workspace.");
-    let source = "";
-    process.stdin.setEncoding("utf8");
-    for await (const chunk of process.stdin) source += String(chunk);
-    documents = { [name]: source };
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+    try {
+      documents = { [name]: decodeText(Buffer.concat(chunks), "stdin") };
+    } catch (error) {
+      // There is no file to report it for, and nothing else to process.
+      if (error instanceof NotUtf8Error)
+        throw new Error(`stdin is not UTF-8 text (${error.reason})`, { cause: error });
+      throw error;
+    }
   }
   // Paths on the command line are relative to the working directory, and no
   // path selects the whole workspace; stdin is the only document then.
@@ -108,7 +115,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   );
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
-  // Selected files that the system refused to let the tool read.
+  // Selected files that the system refused to let the tool read, or that are not UTF-8 text.
   const unread: string[] = [];
   for (const name of discovery.selected) {
     const options = discovery.options(name);
@@ -118,7 +125,12 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     } catch (error) {
       // Report the file and carry on with the others; any other error is a fault.
       const code = refusal(error);
-      if (!code) throw error;
+      const problem = code
+        ? `could not be read (${refusalText(code)})`
+        : error instanceof NotUtf8Error
+          ? `is not UTF-8 text (${error.reason})`
+          : undefined;
+      if (!problem) throw error;
       unread.push(name);
       reports.push({
         path: name,
@@ -126,7 +138,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         diagnostics: [
           {
             start: 0,
-            message: `The file could not be read (${refusalText(code)}) and was not ${mode === "lint" ? "linted" : "formatted"}.`,
+            message: `The file ${problem} and was not ${mode === "lint" ? "linted" : "formatted"}.`,
             rule: "engine/unreadable-file",
             severity: "error",
             line: 1,

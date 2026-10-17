@@ -116,7 +116,8 @@ used, or `IGNORED` for an ignored input. The field is absent when nothing was
 skipped, and versions up to `0.2.0-rc.1` never print it. Exit code `0` means
 success, `1` means a lint or formatting check failed, and `2` means a
 configuration, execution, or safety failure. Warnings fail only when they exceed
-`--max-warnings`. A selected document that the tool is not permitted to read is
+`--max-warnings`. A selected document that the tool is not permitted to read, or
+that is not [UTF-8 text](configuration.md#paths-that-cannot-be-read), is
 reported with an `engine/unreadable-file` error for that file; the other files
 are processed, nothing is written, and the exit code is `2`. Versions up to
 `0.2.0-rc.1` stopped without a report. A changed file that `format --write`
@@ -136,14 +137,16 @@ node dist/cli/main.js format - --stdin-filepath notes/example.md < input.md > ou
 
 `--stdin-filepath` supplies the path used for configuration and link resolution.
 Stdin formatting writes Markdown to stdout and diagnostics to stderr unless
-`--json` is selected. It cannot be combined with `--write`.
+`--json` is selected. It cannot be combined with `--write`. Stdin must be UTF-8
+text, with or without a byte order mark; anything else stops the command with
+exit code `2` and a message that says what was found.
 
 The example uses the redirection of a POSIX shell or of `cmd`, which pass the
 bytes unchanged. PowerShell has no `<` operator, and it changes text that it
 pipes into a program: it adds a line break at the end, or turns every line
 ending into CRLF when it pipes lines, and Windows PowerShell 5.1 also replaces
-characters outside ASCII with `?` and writes `>` output as UTF-16. In
-PowerShell, run the redirection through `cmd`:
+characters outside ASCII with `?` and writes `>` output as UTF-16, which the
+tool then refuses to read. In PowerShell, run the redirection through `cmd`:
 
 ```powershell
 cmd /c "node dist/cli/main.js format - --stdin-filepath notes/example.md < input.md > output.md"

@@ -9,12 +9,14 @@ import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 import { refusal } from "./access.js";
+import { isNotUtf8 } from "./encoding.js";
 
 /**
  * A Markdown file's text, null for a file that is not Markdown, or a loader
  * that returns the text when a fragment check needs it. Only a file that
  * `isMarkdownName` accepts for the link's dialect is read for anchors. A
- * loader that throws an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`
+ * loader that throws an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`,
+ * or `ERR_ENCODING_INVALID_ENCODED_DATA` for a file that is not UTF-8 text,
  * marks the file as unreadable; any other error propagates.
  */
 export type WorkspaceSource = string | null | (() => string);
@@ -277,7 +279,7 @@ interface HtmlPart {
  * a check against another one parses the target once more.
  */
 interface Target {
-  /** Whether the system refused to let the target's source be read. */
+  /** Whether the system refused to let the target's source be read, or it is not UTF-8 text. */
   unreadable?: true;
   obsidian?: ObsidianAnchors;
   github?: GithubAnchors;
@@ -568,7 +570,7 @@ export function createWorkspace(
    * nothing keeps the parsed document. A target that the link's dialect does not
    * render as Markdown has no anchors, also when its text is known because it
    * was linted as Markdown. Undefined for a target that the system refuses to
-   * let be read, which is marked and not read again.
+   * let be read, or whose text is not UTF-8, which is marked and not read again.
    */
   function compute<Anchors>(
     target: Target,
@@ -585,7 +587,7 @@ export function createWorkspace(
       source = typeof value === "function" ? value() : value;
     } catch (error) {
       // The file exists, but its anchors are unknown; any other error is a fault.
-      if (!refusal(error)) throw error;
+      if (!refusal(error) && !isNotUtf8(error)) throw error;
       target.unreadable = true;
       return undefined;
     }
