@@ -1,97 +1,76 @@
-# Quick start
+# Getting started
 
-Get the CLI running, select a profile, and preview a formatting pass before
-writing changes.
+## Install
 
-## Install the release candidate
-
-The CLI requires Node.js 22.12 or newer. Install the package in your document
-workspace:
+mdrefine needs Node.js 22.12 or newer. Install the package in the project that
+holds your documents:
 
 ```sh
 npm install --save-dev --save-exact mdrefine@0.2.0-rc.2
 npx --no-install mdtools --help
 ```
 
-The npm package is `mdrefine`; the executable is `mdtools`. Prereleases use the
-npm channel named after their kind, `rc` or `beta`. See
-[versions and availability](releases.md#versions-and-availability) for registry
-checks and release announcements.
+The package is `mdrefine`; its command is `mdtools`. `npx` runs the command from
+the project, and `--no-install` stops it from downloading a package when the
+project has none; the examples below leave it out. The exact version lets you
+choose when a release that formats differently reaches your documents; see
+[versions](versions.md).
 
-Run the examples below from the workspace where you installed the package.
-`--no-install` prevents fetching a different package if the local executable is
-missing. Replace `/path/to/documents` with your document folder; quote paths
-containing spaces.
+## Lint
 
-## Install from the repository
-
-To build a checkout instead, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or
-newer; Node.js 24 LTS is preferred.
+Run the commands from the root of your documents, or point them there with
+`--root`:
 
 ```sh
-git clone https://github.com/viell-dev/slop-markdown-tools.git
-cd slop-markdown-tools
-npm ci
-npm run build
-node dist/cli/main.js --help
+npx mdtools lint
 ```
 
-From that checkout, use `node dist/cli/main.js` in place of
-`npx --no-install mdtools` in the examples below.
+`lint` reports what the enabled rules find and never changes a file. Without
+paths it checks every document of the workspace: each file ending in `.md` below
+the configuration file's directory, or else below the Git repository or vault
+you run it in; see
+[which files are processed](cli.md#which-files-are-processed). Add `--json` for
+a report that scripts can read, or `--max-warnings 0` to fail on warnings too.
 
-## Choose a configuration
+## Preview and write
 
-Create `mdtools.config.jsonc` in your document folder:
+```sh
+npx mdtools format --diff
+npx mdtools format --write
+npx mdtools format --check
+```
+
+`--diff` prints what formatting would change, and is also what `format` does
+without an option. `--write` writes the changes. `--check` writes nothing and
+exits with code `1` when a document would change, which is the check to run in
+CI. `format` changes only what its rules target, and refuses any change that
+would alter what a document means. It can still report problems that need a
+person, such as a broken link.
+
+## Choose a preset and a dialect
+
+Create `mdtools.config.jsonc` at the root of your documents:
 
 ```jsonc
 {
   "extends": ["recommended", "github"],
-  "ignore": ["vendor/**", "**/*.external.md"],
+  "ignore": ["vendor/**"],
 }
 ```
 
-The recommended preset wraps prose at **80 columns**, uses `_` for emphasis and
-`**` for strong text, ensures a final newline, and validates local links. The
-GitHub preset adds table, task marker, and alert marker rules. The configuration
-controls both linting and formatting.
+`recommended` wraps prose at 80 columns, writes emphasis as `_text_` and strong
+text as `**text**`, ends every file with a line break, and checks local links.
+The second [preset](configuration.md#presets) names where your documents are
+rendered and so their [dialect](dialects.md): replace `github` with `forgejo`
+(or `codeberg`), `gitea`, or `obsidian`. For plain CommonMark, keep only
+`recommended` and add `"dialect": "commonmark"`.
 
-For Codeberg or another Forgejo instance, replace `"github"` with `"forgejo"`
-(or its alias `"codeberg"`); for a Gitea instance, use `"gitea"`. For a vault,
-replace it with `"obsidian"` and follow the [Obsidian setup](obsidian.md). For
-plain CommonMark, use only `"recommended"` and add `"dialect": "commonmark"`.
+Without a configuration file, the `recommended` rules apply, and documents are
+read as GitHub Markdown, or as Obsidian notes inside a vault. A configuration
+file is still worth creating: it enables the rules for your renderer and makes
+the dialect explicit.
 
-Without a configuration file, the tool applies the recommended preset and
-assumes the GitHub dialect, so that tables and footnotes are left as they are,
-or the Obsidian dialect for documents inside a vault, so that line breaks and
-wikilinks are. A configuration that names no dialect is read the same way.
-Version 0.2.0-rc.1 and earlier assumed CommonMark, in which formatting reflows a
-table and the lines of a note as an ordinary paragraph, so with those versions
-create the configuration first. See [dialects](configuration.md#dialects).
-
-## Lint without writing
-
-```sh
-npx --no-install mdtools lint --root /path/to/documents
-```
-
-Lint reports diagnostics and never changes files. Add `--json` for structured
-output, or `--max-warnings 0` to make warnings fail an automated check.
-
-## Preview and apply formatting
-
-```sh
-npx --no-install mdtools format --root /path/to/documents --diff
-npx --no-install mdtools format --root /path/to/documents --write
-npx --no-install mdtools format --root /path/to/documents --check
-```
-
-Review the diff before running `--write`. The final check exits with code `1` if
-formatting changes remain. Formatting may still report lint problems that
-require a manual correction; inspect diagnostics as well as the exit code.
-
-## Adjust the rules
-
-Override a preset rule by adding a `rules` object:
+Change a rule under `rules`:
 
 ```jsonc
 {
@@ -103,10 +82,16 @@ Override a preset rule by adding a `rules` object:
 }
 ```
 
-This wraps at 100 columns and preserves existing emphasis delimiters. Use
-`"extends": []` to start with no enabled rules.
+This wraps at 100 columns and leaves emphasis markers as they are.
 
-Continue with [CLI workflows](cli.md) for automation and file selection, or
-[configuration and rules](configuration.md) for presets, links, overrides, and
-suppression comments. The [examples](examples.md) show complete workspaces
-before and after formatting.
+## Next steps
+
+- [Rules](rules.md): what each rule does, with examples.
+- [Configuration](configuration.md): overrides, ignore patterns, plugins, and
+  suppression comments.
+- [Command line](cli.md): file selection, stdin, the JSON report, and exit
+  codes.
+- [Integrations](integrations.md): CI, Git hooks, editors, and moving from
+  Prettier or markdownlint.
+- [Obsidian vaults](obsidian.md) and [examples](examples.md) of documents before
+  and after formatting.

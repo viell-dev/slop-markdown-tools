@@ -1,12 +1,12 @@
 # Obsidian vaults
 
-The Obsidian profile understands wikilinks, embeds, callouts, highlights,
-comments, heading references, and block references. Its rules share the same
-lint and format engine used for ordinary Markdown.
+The `obsidian` dialect reads wikilinks, embeds, callouts, highlights, comments,
+and heading and block references, and checks links the way Obsidian resolves
+them.
 
 ## Configure the vault
 
-Create `mdtools.config.jsonc` at the vault root:
+Create `mdtools.config.jsonc` at the vault's root, next to `.obsidian/`:
 
 ```jsonc
 {
@@ -15,109 +15,83 @@ Create `mdtools.config.jsonc` at the vault root:
 }
 ```
 
-Use the vault root as `--root` so the CLI can resolve links across all notes and
-from the vault's folder, as Obsidian does. Run these commands from a
-[built checkout](quick-start.md):
+Run the commands from the vault's root, or pass it with `--root`, so that links
+are resolved across the whole vault:
 
 ```sh
-node dist/cli/main.js lint --root "/path/to/vault" --json
-node dist/cli/main.js format --root "/path/to/vault" --diff
+npx mdtools lint --root "/path/to/vault"
+npx mdtools format --root "/path/to/vault" --diff
 ```
 
-Before that file exists, or when it names no dialect, the CLI still reads the
-notes in the Obsidian dialect: a folder that contains a `.obsidian` folder is
-recognized as a vault. Line breaks and wikilinks are then safe on a first run,
-but only the dialect is assumed. The rules of the `obsidian` preset, including
-the report that reflow is disabled, need the configuration above.
-Version 0.2.0-rc.1 and earlier read such a vault as CommonMark, joined the lines
-of its paragraphs, and could split a wikilink; with those versions, create the
-configuration first.
+Without a configuration file, the notes are still read in the Obsidian dialect,
+because the vault is recognized by its `.obsidian` directory; see
+[the assumed dialect](dialects.md#the-assumed-dialect). The rules of the
+`obsidian` preset, among them the report that wrapping is off, still need the
+configuration.
 
-## Vaults that are not the workspace root
+## Enable wrapping
 
-A note belongs to the nearest vault at or above its folder, wherever the
-workspace root is. Its assumed dialect and its line-break setting come from that
-vault:
-
-- **A vault in a folder of a larger workspace**, such as `docs/vault/` in a
-  repository: its notes are read in the Obsidian dialect and the documents
-  around it as GitHub Markdown. Each vault in a workspace follows its own
-  `.obsidian/app.json`.
-- **A folder of a vault used as the root**, with `--root` or through a
-  configuration file in that folder: the vault is found above the root.
-- **A repository inside a vault** is not part of the vault. The tool leaves a
-  repository inside a workspace alone, and when it runs in that repository it
-  reads the documents as GitHub Markdown.
-
-A dialect named by the configuration or by `--dialect` still takes precedence
-over all of this.
-
-Links follow the vault as well. In a vault below the workspace root, a link in a
-note reaches only the vault's files, as it does in Obsidian: a path is counted
-from the vault's folder, a search by note name looks inside the vault, and
-`links/path` writes `"style": "root"` paths from the vault's folder. The
-findings and edits are the ones a run with the vault as the root produces. A
-path that leads out of the vault to a file that exists, such as
-`[the project](../../README.md)`, is reported as
-`Local target is outside the vault`, because Obsidian cannot follow it.
-Documents outside the vault link into it as into any other folder. Versions up
-to `0.2.0-rc.1` resolved such a vault's links from the workspace root.
-
-In the opposite layout, a root that is a folder of a vault, the tool sees only a
-part of the vault and reads nothing outside the root. It therefore treats a link
-as uncertain whenever the rest of the vault could matter:
-
-- A link with no match below the root is reported as
-  `Local target could not be checked`, with the reason that the workspace root
-  is only a part of the vault. It is not called missing.
-- A link found by note name, or by a path that Obsidian would first look for at
-  the top of the vault, is accepted but never rewritten by `links/path` or
-  `links/notation`: another note outside the root could be the one Obsidian
-  chooses.
-- A link written as an explicit relative path (`./Sub/Note.md`), or as a path
-  from the vault's folder that leads through the root, is certain and is
-  rewritten as usual. `"style": "root"` writes it from the vault's folder.
-
-For complete link checks and shortest-path rewriting, run with the vault as the
-root. Versions up to `0.2.0-rc.1` took the folder for the whole vault, which
-could shorten a link until it named a different note.
-
-## Enable source wrapping
-
-Obsidian reflow requires `"strictLineBreaks": true` in the vault's
-`.obsidian/app.json` so soft line breaks in source do not become visible line
-breaks in Reading view. Preserve the file's other settings when changing this
-value. The CLI checks it and never edits the settings file itself. If it is not
-permitted to read the file, or the file is not valid JSON, it warns and leaves
-paragraphs as written; see
-[paths that cannot be read](configuration.md#paths-that-cannot-be-read).
-
-If that setting is not appropriate for your vault, disable `style/wrap`. Other
-enabled rules can still run.
+Obsidian shows a single line break inside a paragraph as a line break unless the
+vault's "Strict line breaks" setting is on. `style/wrap` therefore wraps notes
+only when the vault's `.obsidian/app.json` contains `"strictLineBreaks": true`,
+and [`obsidian/strict-line-breaks`](rules.md#obsidianstrict-line-breaks) reports
+when it does not. The tool reads the file and never changes it; when you change
+the setting, keep the file's other settings. If the file cannot be read or is
+not valid JSON, the tool warns and leaves paragraphs as written. If strict line
+breaks do not suit your vault, disable `style/wrap`; the other rules still run.
 
 The tool reads highlights (`==text==`) and wikilinks within one line. A
-paragraph that holds `==`, `[[`, or `]]` outside code, math, and the highlights
-and links of a line, such as a highlight or wikilink written across two lines,
-is left as written, because joining its lines could create a highlight or link
-that was not there. `reportUnreflowed` reports such a paragraph when it is too
-wide.
+paragraph with `==`, `[[`, or `]]` outside them, such as a highlight written
+across two lines, is left as written, because joining its lines could create a
+highlight or a link.
 
-## Wrap callout bodies
+In a callout, the title line stays as written, with its folding marker, and the
+body is wrapped inside the quote, also directly below the title. A body
+paragraph is left as written in the cases that
+[`style/wrap`](rules.md#stylewrap) lists, and so is a body whose quote markers
+are not consistent, or inline syntax that runs from the title into the body. A
+title that is too long is reported by `reportUnbreakable`.
 
-With strict line breaks verified, `style/wrap` reflows supported body prose even
-when it directly follows the callout header without a blank quote line. The
-header stays on its original physical line, including its title and folding
-marker. Existing quote and list-container prefixes are retained.
+## Vaults inside a larger workspace
 
-Hard breaks, block IDs, inline HTML, and unsupported multiline syntax still
-protect body paragraphs. Lazy or inconsistent quote continuations and inline
-syntax spanning the title/body boundary remain untouched. Long headers follow
-`reportUnbreakable`; skipped breakable body prose follows `reportUnreflowed`.
+A note belongs to the nearest vault at or above its directory, wherever the
+workspace root is, and its dialect and its line-break setting come from that
+vault. A vault in a directory of a repository, such as `docs/vault/`, is read in
+the Obsidian dialect while the documents around it are read as GitHub Markdown.
+Each vault in a workspace follows its own `.obsidian/app.json`. A repository
+inside a vault is not part of the vault.
 
-## Choose link policies deliberately
+Links follow the vault too. In a vault below the workspace root, a link reaches
+only the vault's files, as in Obsidian: a path counts from the vault's root, a
+search by note name looks only inside the vault, and `links/path` writes
+`"style": "root"` paths from the vault's root. A path that leaves the vault for
+a file that exists, such as `[the project](../../README.md)`, is reported as
+`Local target is outside the vault`, because Obsidian cannot follow it.
+Documents outside the vault link into it as into any other directory.
 
-The recommended preset validates local links. To normalize verified destinations
-to vault-relative paths wrapped in angle brackets:
+## A workspace root inside a vault
+
+When the workspace root is a directory inside a vault, through `--root` or a
+configuration file there, the tool finds the vault above it but reads nothing
+outside the root. Where the rest of the vault could matter, a link is uncertain:
+
+- A link with no match below the root is reported as
+  `Local target could not be checked`, because the workspace root is only part
+  of the vault. It is not called missing.
+- A link found by note name, or by a path that Obsidian would look for at the
+  vault's root first, is accepted but never rewritten by `links/path` or
+  `links/notation`: a note outside the root could be the one Obsidian chooses.
+- A link written as an explicit relative path (`./Sub/Note.md`), or as a
+  vault-relative path that leads into the root, is certain and is rewritten as
+  usual; `"style": "root"` writes it from the vault's root.
+
+For complete link checks and rewriting, use the vault's root as the workspace
+root.
+
+## Choose link policies
+
+The `recommended` preset checks links. To also write verified Markdown links as
+vault-relative paths in angle brackets, such as `[Note](<Folder/Note.md>)`:
 
 ```jsonc
 {
@@ -128,26 +102,20 @@ to vault-relative paths wrapped in angle brackets:
 }
 ```
 
-For example, a resolved Markdown link can become `[Note](<Folder/Note.md>)`.
-Note names and heading subpaths match case-insensitively, as in Obsidian, while
-block identifiers match exactly; notes whose paths differ only by case are
-reported as ambiguous. Missing or ambiguous destinations are never guessed.
-Unaliased wikilinks retain their target spelling because changing it may change
-their visible label. Note embeds remain embeds.
+Note names and headings match without regard to case, as in Obsidian, and block
+identifiers match exactly; notes whose paths differ only by case are ambiguous.
+A missing or ambiguous target is never guessed. Wikilinks without a label keep
+their target as written, because it is their visible text, and embeds stay
+embeds, with any image size in their label. [`links/path`](rules.md#linkspath)
+and [`links/notation`](rules.md#linksnotation) describe the options; run the two
+rules in separate passes.
 
-See [link policies](configuration.md#link-policies) for relative paths,
-extension handling, and eligible Markdown/wikilink conversion. Path rewriting
-and notation conversion should be run in separate passes.
+## Review the result
 
-## Review visible results
-
-Preview changes with `--diff`, then use `--write` to apply them. Inspect complex
-notes in Obsidian, especially when using additional plugins. The resolver does
-not reproduce every Obsidian link-resolution behavior, and unsupported syntax
-may need an ignore pattern or a
-[suppression comment](configuration.md#suppressions).
-
-The [vault example](examples.md#format-an-obsidian-vault) shows a small vault
-before and after formatting. Read the
-[current limitations](design.md#safety-boundaries) before a broad vault-wide
-formatting pass.
+Preview with `--diff` before `--write`, and look at complex notes in Obsidian
+afterwards, especially with community plugins whose syntax the tool does not
+know. The link resolver does not reproduce every behavior of Obsidian's, and
+syntax it does not know may need an `ignore` pattern or a
+[suppression comment](configuration.md#suppression-comments). The
+[vault example](examples.md#format-an-obsidian-vault) shows a small vault before
+and after formatting, and [limits](design.md#limits) lists what is not modeled.
