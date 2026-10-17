@@ -2187,8 +2187,9 @@ describe("anchors from HTML in the document", () => {
     // The bound tells linear from quadratic growth, which would take minutes here. It leaves
     // room for a slow CI runner and for GFM parsing, which the workspace now uses when no
     // dialect is named and which takes about half as long again as CommonMark on this input.
-    expect(performance.now() - start).toBeLessThan(10000);
-  });
+    // The scan takes 2 to 4 seconds, but a Windows runner once needed 14 (issue #185).
+    expect(performance.now() - start).toBeLessThan(30000);
+  }, 40_000);
 });
 
 describe("fragment case on GitHub", () => {
