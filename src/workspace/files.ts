@@ -1,10 +1,11 @@
-import { access, lstat, readdir, readFile, realpath, open, rename, unlink } from "node:fs/promises";
+import { access, lstat, readdir, readFile, realpath, open, unlink } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { constants, readFileSync } from "node:fs";
-import type { Dirent, Stats } from "node:fs";
+import type { Dirent } from "node:fs";
 import type { ResolveOptions } from "../core/types.js";
 import type { WorkspaceSource } from "./index.js";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
@@ -249,8 +250,8 @@ export async function discover(
   };
 }
 /**
- * A file that `writeAtomic` would not write, or did not write completely, with
- * the reason in words that do not name it.
+ * A file that `writeFormatted` would not write, or did not write completely,
+ * with the reason in words that do not name it.
  */
 export class ReplacementRefused extends Error {
   constructor(
@@ -262,11 +263,10 @@ export class ReplacementRefused extends Error {
   }
 }
 /**
- * Why `file` cannot be replaced, or undefined when nothing stands in the way
+ * Why `file` cannot be written, or undefined when nothing stands in the way
  * that can be seen before writing: the file may not be written, or its folder
- * does not let the temporary file be created beside it. A read-only file is
- * refused on every platform, although renaming over one works outside
- * Windows: the flag marks a file that is not to be edited.
+ * does not let the trial file be created beside it. A read-only file is refused
+ * on every platform: the flag marks a file that is not to be edited.
  */
 export async function replacementProblem(file: string): Promise<string | undefined> {
   for (const [target, subject] of [
@@ -284,8 +284,8 @@ export async function replacementProblem(file: string): Promise<string | undefin
   return undefined;
 }
 /**
- * What went wrong when `writeAtomic` failed for a file, in words that do not
- * name it, or undefined for an error that is a fault of the tool.
+ * What went wrong when `writeFormatted` failed for a file, in words that do
+ * not name it, or undefined for an error that is a fault of the tool.
  */
 export function replacementFailure(error: unknown): string | undefined {
   if (error instanceof ReplacementRefused) return error.reason;
@@ -300,54 +300,46 @@ function changedOnDisk(file: string, when: string): ReplacementRefused {
   );
 }
 /**
- * Write `content` over the file itself, which keeps everything about it but
- * its content, after checking through the open file that it is still the file
- * that was read. A failure once writing has begun can leave the file
- * incomplete and is reported so.
+ * Show that `size` more bytes fit on the disk of `folder`, by writing a file
+ * of that size there and removing it. It holds random bytes, not the
+ * document's text: a file left behind by a crash then reveals nothing, and a
+ * disk that compresses what it stores cannot make the trial smaller than the
+ * write. Common file systems set aside the room when the bytes are written, so
+ * the trial is not flushed to the disk; a file system that runs out of room only
+ * then makes the write itself fail, and the file's content is written back.
  */
-async function writeInPlace(
-  file: string,
-  identity: Stats,
-  expected: Buffer,
-  content: Buffer,
-): Promise<void> {
-  const handle = await open(file, "r+");
+async function trialWrite(folder: string, size: number): Promise<void> {
+  const trial = path.join(folder, `.mdtools-${randomUUID()}.tmp`);
+  const handle = await open(trial, "wx", 0o600);
   try {
-    const current = await handle.stat();
-    if (current.ino !== identity.ino || !(await handle.readFile()).equals(expected))
-      throw changedOnDisk(file, "before writing");
-    try {
-      for (let at = 0; at < content.length;)
-        at += (await handle.write(content, at, content.length - at, at)).bytesWritten;
-      await handle.truncate(content.length);
-      await handle.sync();
-    } catch (error) {
-      const text = systemErrorText(error);
-      if (!text) throw error;
-      throw new ReplacementRefused(
-        `The file could not be written completely (${text}) and may be incomplete`,
-        `File written in part: ${file}`,
-        { cause: error },
-      );
-    }
+    await handle.writeFile(randomBytes(size));
   } finally {
     await handle.close();
+    await unlink(trial).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
   }
 }
+/** Make the open file hold exactly `content`. */
+async function overwrite(handle: FileHandle, content: Buffer): Promise<void> {
+  for (let at = 0; at < content.length;)
+    at += (await handle.write(content, at, content.length - at, at)).bytesWritten;
+  await handle.truncate(content.length);
+  await handle.sync();
+}
 /**
- * Write the formatted text `after` to `file`, whose text was read as `before`,
- * if the file still holds exactly the bytes that were read. The new content is
- * written to a file beside it, which then replaces it, so that a failure never
- * leaves the file half written; the replacement gets the file's permission
- * bits. Replacing makes a new file, though, and some of what belonged to the old
- * one can be seen to be lost: a second name of the file, a hard link, would keep
- * the old content, and on Unix a replacement with another owner or group than
- * the file's would change who may read it. Such a file is written in place
- * instead, once the file beside it has shown that the new content fits on the
- * disk. A file that already holds `after`, as the second name of a hard link
- * written earlier in the batch does, is left as it is.
+ * Write the formatted text `after` into `file`, whose text was read as
+ * `before`, if the file still holds exactly the bytes that were read. The file
+ * itself is written, not replaced by a new one, so that it keeps its
+ * permissions, attributes, owner, creation time, and hard links, which Node.js
+ * cannot all carry over to a new file. A trial write beside the file first shows that
+ * the new content fits on the disk. The file is then checked through the open
+ * file, just before writing. If writing fails part way, the bytes that were read
+ * are written back, and the reason says whether that worked. A file that already
+ * holds `after`, as the second name of a hard link written earlier in the batch
+ * does, is left as it is.
  */
-export async function writeAtomic(file: string, before: string, after: string): Promise<void> {
+export async function writeFormatted(file: string, before: string, after: string): Promise<void> {
   const info = await lstat(file);
   if (!info.isFile() || info.isSymbolicLink())
     throw new ReplacementRefused(
@@ -362,30 +354,34 @@ export async function writeAtomic(file: string, before: string, after: string): 
   const found = await readFile(file);
   if (found.equals(content)) return;
   if (!found.equals(expected)) throw changedOnDisk(file, "during formatting");
-  const temporary = path.join(path.dirname(file), `.mdtools-${randomUUID()}.tmp`);
-  const handle = await open(temporary, "wx", info.mode);
+  await trialWrite(path.dirname(file), content.length);
+  const handle = await open(file, "r+");
   try {
-    await handle.writeFile(content);
-    await handle.chmod(info.mode);
-    await handle.sync();
-    const made = await handle.stat();
-    await handle.close();
-    const current = await lstat(file);
-    if (
-      current.isSymbolicLink() ||
-      current.ino !== info.ino ||
-      !(await readFile(file)).equals(expected)
-    )
-      throw changedOnDisk(file, "before replacement");
-    if (current.nlink > 1 || made.uid !== current.uid || made.gid !== current.gid) {
-      // Removing the new file first leaves the room it took for the write.
-      await unlink(temporary);
-      await writeInPlace(file, current, expected, content);
-    } else await rename(temporary, file);
+    // The path may lead to another file by now, such as through a link put in its place.
+    const current = await handle.stat();
+    if (current.ino !== info.ino || !(await handle.readFile()).equals(expected))
+      throw changedOnDisk(file, "before writing");
+    try {
+      await overwrite(handle, content);
+    } catch (error) {
+      const text = systemErrorText(error);
+      if (!text) throw error;
+      let undone: string | undefined;
+      try {
+        await overwrite(handle, expected);
+      } catch (again) {
+        undone = systemErrorText(again);
+        if (!undone) throw again;
+      }
+      throw new ReplacementRefused(
+        undone === undefined
+          ? `The file could not be written (${text}), and its content from before formatting was written back`
+          : `The file could not be written (${text}), and writing its content from before formatting back failed too (${undone}); it may be incomplete`,
+        `File written in part: ${file}`,
+        { cause: error },
+      );
+    }
   } finally {
     await handle.close();
-    await unlink(temporary).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") throw error;
-    });
   }
 }

@@ -55,9 +55,28 @@ example, and a TypeScript consumer of the published types; it can need access to
 the npm registry.
 
 GitHub Actions runs `check` and a dependency audit on Linux with Node.js 24, the
-build and tests on Linux with Node.js 22 and on Windows with Node.js 24, and
-`test:package` on all three. Windows covers file paths, access control lists,
-junctions, and the installed command; macOS is not a routine target.
+build and tests on Linux with Node.js 22.12.0, the lowest version the package
+supports, on Windows with Node.js 24, and on Linux with Node.js 26, and
+`test:package` on all four. `main` requires the first three. The Node.js 26 job
+is not required, so that a defect only the newest Node.js shows does not block
+unrelated merges; its failures get an issue. Windows covers file paths, access
+control lists, junctions, and the installed command; macOS is not a routine
+target.
+
+## Dependencies
+
+Every dependency is pinned to an exact version, and the lockfile is committed.
+For the runtime dependencies this is deliberate: a formatter's output should
+depend only on its own version, and an update of the parser can change it, so a
+dependency update reaches users only in a release of mdrefine whose tests passed
+with it. `@types/node` stays on the major version of the lowest supported
+Node.js version, 22, so that the type check rejects interfaces that Node.js 22
+does not have; the CI job on 22.12.0 catches those that later 22.x releases
+added.
+
+Dependabot proposes updates weekly, the development dependencies as one group,
+and only versions published at least seven days earlier, which leaves time for a
+broken or compromised release to be found. Security updates are not delayed.
 
 ## Tests
 
@@ -88,10 +107,11 @@ for commands and options, `workflows.test.ts` for whole tasks, `node.test.ts`
 for `mdrefine/node`, and `examples.test.ts` and `docs.test.ts` for the examples
 and documentation. `support.ts` holds the helpers: `fixture()` writes a
 temporary workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take
-away read permission on Unix and on Windows, and `linkDirectory()` links a
-directory, as a junction on Windows. Tests that need Unix permission modes are
-skipped on Windows and for the root user, and one that links a file needs
-`canSymlink`.
+away read permission on Unix and on Windows, `denyWrite()` takes away write
+permission on Windows, `windowsTool()` runs a program of Windows such as
+`icacls.exe`, and `linkDirectory()` links a directory, as a junction on Windows.
+Tests that need Unix permission modes are skipped on Windows and for the root
+user, and one that links a file needs `canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. A few unit tests guard against
@@ -130,13 +150,16 @@ The preview's address includes the `/slop-markdown-tools/` base path. The site
 build fails on a link to a page that does not exist, and the tool's lint fails
 on a heading fragment that does not. The integration tests compare the examples
 page, the rule index, and the benchmark page with the code, so update them with
-the behavior they describe. The Pages workflow builds the site from `main` and
-deploys it; GitHub Pages must use GitHub Actions as its source.
+the behavior they describe. CI builds the site for every pull request. The site
+describes the newest stable release: the Pages workflow deploys it from that
+release's tag after the Release workflow publishes it, as
+[RELEASING.md](RELEASING.md) describes. GitHub Pages must use GitHub Actions as
+its source.
 
 ## Pull requests
 
 Every change to `main` goes through a pull request with passing CI, and is
-merged with a merge commit; `main` requires the three CI checks and resolved
+merged with a merge commit; `main` requires three of the CI checks and resolved
 review threads, but no approval from a second account. Contributions are made
 under the MIT license. Keep discussion respectful and about reproducible
 behavior; harassment and disclosure of private data are not acceptable.
