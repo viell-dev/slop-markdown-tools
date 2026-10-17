@@ -88,6 +88,12 @@ GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
 break. Each preset except `recommended` also sets a dialect. The [rule
 index](rules.md) shows which rules each preset enables.
 
+Presets are starting points with opinionated defaults, not a fixed style. Every
+rule can be turned off or given another severity, and a rule whose choice
+documents reasonably differ on, such as the emphasis marker or the wrapping
+width, takes options for it; the [rules](rules.md) list them with their
+defaults.
+
 | Preset        | Sets the dialect | For                                                                                                                |
 | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `recommended` | No               | Any document: wrapping at 80 columns, emphasis markers, final newline, valid links, problems that show on the page |
@@ -224,13 +230,14 @@ into it is left as written. A directive inside code is code, not a directive.
 ## Inspect the result
 
 `config explain` prints, as JSON, the configuration in effect for one document:
-the workspace `root`, the configuration `file` (or `null`), and the `effective`
+the workspace `root`, the configuration file as `config` (or `null`), the
+document's `path` from the root with forward slashes, and the `effective`
 settings, with the dialect assumed for that document and the overrides that
-match it.
+match it. The document need not exist, but like an input of `lint` it must lie
+inside the workspace.
 
 ```sh
 npx mdtools config explain notes/example.md
 ```
 
-It reads `--config`, `--root`, and `--dialect`. `mdtools config --help` lists
-the other options of `lint` as well, but `config explain` ignores them.
+It reads `--config`, `--root`, and `--dialect`, before or after `explain`.

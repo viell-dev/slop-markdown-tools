@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { importConditions } from "../../src/config/load.js";
@@ -10,6 +10,7 @@ import { cli, fixture, manifest, run, tree } from "./support.js";
 interface Report {
   version: string;
   mode: string;
+  root: string;
   written: string[];
   files: { path: string; changed?: boolean; output?: string; diagnostics: Diagnostic[] }[];
 }
@@ -230,8 +231,11 @@ describe("reports for scripts and agents", () => {
     expect(linted.status).toBe(1);
     expect(linted.stderr).toBe("");
     const result = report(linted.stdout);
-    expect(Object.keys(result)).toEqual(["version", "mode", "files", "written"]);
+    expect(Object.keys(result)).toEqual(["version", "mode", "root", "files", "written"]);
     expect(result).toMatchObject({ version: manifest.version, mode: "lint", written: [] });
+    // The root that the paths of `files` are relative to, as an absolute path of the system.
+    expect(path.isAbsolute(result.root)).toBe(true);
+    expect(await realpath(result.root)).toBe(await realpath(root));
     expect(Object.keys(result.files[0]!)).toEqual(["path", "diagnostics"]);
     const [opening, closing, missing, ...rest] = result.files[0]!.diagnostics;
     expect(rest).toEqual([]);

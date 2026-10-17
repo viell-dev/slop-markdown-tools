@@ -157,6 +157,15 @@ choose its home:
   policy. Do not add speculative hooks or relax semantic guards for one
   consumer.
 
+The tool is a general Markdown linter and formatter that adapts to the documents
+it serves, not a formatter with one fixed style. Presets are opinionated
+defaults. Where documents reasonably differ, a rule takes options, at least
+those that markdownlint offers for the same check, with the preset's choice as
+the default. An option never lets formatting change what a document means: where
+a choice would, the rule keeps the existing form. The owner set this direction;
+a request for another style option is weighed on its use case, not declined for
+adding an option.
+
 Configurability, opt-in defaults, report-only behavior, many findings in one
 corpus, and ease of implementation do not by themselves put a feature in core,
 and plugin implementability alone is no reason to reject a broadly useful
@@ -219,6 +228,19 @@ version label rather than its exact `node-version`, and to GitHub Actions, app
 is not required. Zero required approvals is deliberate for a single-account,
 agent-maintained repository; PRs, passing checks, and resolved review threads
 remain mandatory.
+
+Other repository settings, set with the owner's authorization on 2026-10-17:
+
+- GitHub Actions may run only actions that GitHub owns, pinned by full commit
+  SHA. A workflow that needs another action, or a tag instead of a SHA, fails to
+  start until the owner changes the setting; ask before adding one.
+- CodeQL's default setup scans JavaScript, TypeScript, and the workflows.
+- Wiki, Projects, and Discussions are off; issues and pull requests are the only
+  channels.
+
+Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
+comment, lock a conversation, or close an item that breaks it, and say why where
+it helps. Blocking an account is for the owner.
 
 ## Technical map
 
