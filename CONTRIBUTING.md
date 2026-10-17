@@ -8,11 +8,13 @@ repository also follow [AGENTS.md](AGENTS.md).
 
 ## Report a defect
 
-Open an [issue](https://github.com/viell-dev/slop-markdown-tools/issues) with:
+Search the open and closed
+[issues](https://github.com/viell-dev/slop-markdown-tools/issues) first, then
+open one with the bug form's details:
 
 - the mdrefine version, the Node.js version, the operating system, and the exact
   command;
-- the configuration, with any plugins;
+- the dialect in effect, and the configuration, with any plugins;
 - a minimal Markdown input, synthetic or public;
 - the actual output or diagnostics, with the `--json` report when you have one;
 - the expected output, and how the rendering differs.
