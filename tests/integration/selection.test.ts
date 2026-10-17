@@ -256,6 +256,16 @@ describe("input patterns", () => {
       "Input pattern matches no document: docs\\*.md (patterns separate folders with /)",
     );
     fails(root, ["--root", "docs", "*.md"], "Input is outside the workspace: *.md");
+    if (process.platform === "win32") {
+      // `C:` alone names the drive's current folder, but `C:/` is the drive's root.
+      const drive = root.slice(0, 2);
+      fails(root, [`${drive}/*.md`], `Input is outside the workspace: ${drive}/*.md`);
+      fails(
+        root,
+        [`${drive.toLowerCase()}/*.md`],
+        `Input is outside the workspace: ${drive.toLowerCase()}/*.md`,
+      );
+    }
     if (!foldsCase) fails(root, ["DOCS/*.MD"], "Input pattern matches no document: DOCS/*.MD");
   });
   it("are matched from the root by mdrefine/node", async () => {
