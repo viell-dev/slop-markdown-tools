@@ -1599,6 +1599,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(Object.keys(JSON.parse(linted.stdout))).toEqual([
       "version",
       "mode",
+      "root",
       "files",
       "written",
       "skipped",
@@ -2123,7 +2124,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     expect(linted.status).toBe(2);
     expect(linted.stderr).toBe("");
     const report = JSON.parse(linted.stdout);
-    expect(Object.keys(report)).toEqual(["version", "mode", "files", "written"]);
+    expect(Object.keys(report)).toEqual(["version", "mode", "root", "files", "written"]);
     expect(report.files.map((file: { path: string }) => file.path)).toEqual([
       "linking.md",
       "note.md",
