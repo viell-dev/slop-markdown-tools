@@ -115,6 +115,42 @@ const workspace = createWorkspace(files, { dialect, strictLineBreaks });
 const result = format(files["Note.md"], { path: "Note.md", config, workspace, defaultDialect });
 ```
 
+### Part of a document
+
+An editor's "format selection", or an agent that changed one paragraph, can
+limit `lint` and `format` to parts of a document with `ranges`: a list of
+`{ start, end }` UTF-16 offsets into the source as given, half-open like edits.
+Each range is widened to the complete blocks that it touches: paragraphs,
+headings, tables, code blocks, HTML blocks, math blocks, front matter, and link
+definitions, also inside lists and block quotes, where a range inside one item
+selects that item's paragraph only. A non-empty range touches the blocks that it
+overlaps; an empty range, a cursor position, touches the block that holds it or
+ends there. A range that touches no block, such as one in a run of blank lines,
+selects nothing.
+
+```ts
+const source = "Legacy *word* stays.\n\nChange *this paragraph*.\n";
+const start = source.indexOf("Change");
+const result = format(source, { config, ranges: [{ start, end: start }] });
+// result.output: "Legacy *word* stays.\n\nChange _this paragraph_.\n"
+// result.scope: [{ start: 22, end: 46 }]
+```
+
+The whole document is still parsed and checked, so link definitions, suppression
+comments, and the workspace work as without the option. `lint` returns the
+diagnostics that start in the selected parts; a finding belongs to the block
+where the rule reports it, such as a reference link's target at its definition.
+`format` applies only edits that lie wholly in the selected parts, across all
+its phases and passes, and leaves the rest of the text byte for byte as it was.
+An edit that reaches outside them is not applied, and its diagnostic is still
+reported. The semantic check still compares the whole document, and an `engine/`
+diagnostic is always reported. `FormatResult.scope` gives the selected parts in
+the output's positions, moved and resized by the edits applied in them, so it
+can be passed as `ranges` again. Without `ranges` the whole document is
+processed; an empty list processes nothing. A range outside the source, with
+`start` after `end`, or with offsets that are not integers is an error. The CLI
+has no option for this.
+
 `parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
 `configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
 `builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
