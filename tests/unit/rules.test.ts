@@ -14,6 +14,8 @@ import {
   textContent,
 } from "../../src/index.js";
 import type { Config, Dialect, Plugin, RuleSetting } from "../../src/index.js";
+import { builtInRules } from "../../src/core/engine.js";
+import { giteaPyLine, inForgeMath } from "../../src/rules/style.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
   return { extends: [], dialect, rules };
@@ -141,6 +143,18 @@ describe("style/block-spacing", () => {
     ["Text\n- > 3. Step\n"],
     ["[a]: https://example.com\n- -\n"],
     ["[a]: https://example.com\n-\n---\n"],
+    // Below a table that ends in a list or quote, the parser reads the next
+    // table as a paragraph or heading text, and a blank line would make it a table.
+    ["- | a |\n  | - |\n| b |\n| - |\n"],
+    ["> - | a |\n>   | - |\n> | b |\n> | - |\n"],
+    ["> | a |\n> | - |\n| b |\n| - |\n---\n"],
+    ["- > | a |\n  > | - |\n| a |\n| - |\n"],
+    ["> - $$\n>   $$\n>   | a |\n>   | - |\n> a | b\n> --|--\n"],
+    // In a quote, a line of `>` below an empty footnote definition at the end
+    // of a list item would make the item loose.
+    ["> - [^2]:\n> Text\n"],
+    ["> - - [^2]:\n> # H\n"],
+    ["> > - [^2]:\n> > # H\n"],
   ])("leaves %j unchanged", (source) => {
     expect(spaced(source)).toBe(source);
     expect(lint(source, { config: only(rule, "github") })).toEqual([]);
@@ -149,6 +163,26 @@ describe("style/block-spacing", () => {
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
       "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
+  });
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps a table that the parser reads as text below a list item or quote in the %s dialect",
+    (dialect) => {
+      for (const source of [
+        "- | a |\n  | - |\n| b |\n| - |\n",
+        "- > | a |\n  > | - |\n| b |\n| - |\n",
+        "> - | a |\n>   | - |\n> | b |\n> | - |\n",
+      ])
+        expect(spaced(source, dialect)).toBe(source);
+    },
+  );
+  it("still separates a footnote definition with text, or one outside a quote", () => {
+    expect(spaced("> - [^2]: note\n> # H\n")).toBe("> - [^2]: note\n>\n> # H\n");
+    expect(spaced("- [^2]:\n# H\n")).toBe("- [^2]:\n\n# H\n");
+    expect(spaced("> [^2]:\n> # H\n")).toBe("> [^2]:\n>\n> # H\n");
+  });
+  it("still separates other text below a table in a list", () => {
+    expect(spaced("- | a |\n  | - |\nText\n")).toBe("- | a |\n  | - |\n\nText\n");
+    expect(spaced("- | a |\n  | - |\n| b\n")).toBe("- | a |\n  | - |\n\n| b\n");
   });
   it("keeps an Obsidian block identifier below a heading", () => {
     expect(spaced("# H\n^anchor\n", "obsidian")).toBe("# H\n^anchor\n");
@@ -314,6 +348,232 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
   ])("still converts %j", (source, output) => {
     expect(formatted(source, config)).toBe(output);
   });
+  // Each would pair differently with the new markers: a `*` or `_` left as
+  // text, a run of the new marker nearby, or a `~` between two markers.
+  it.each([
+    ["*a _b* c_\n", "_", "commonmark"],
+    ["_a*b_ and _c*_\n", "*", "commonmark"],
+    ["_]*__a__*i_\n", "*", "commonmark"],
+    ["_~*a*e_\n", "*", "github"],
+    ["_f~*a*e_\n", "*", "obsidian"],
+  ] as const)("leaves the crossed delimiters of %j alone", (source, marker, dialect) => {
+    const rules = only({ "style/emphasis": ["warn", { marker }] }, dialect);
+    expect(formatted(source, rules)).toBe(source);
+    expect(lint(source, { config: rules })).toEqual([]);
+  });
+  it.each([
+    // A `*` or `_` left as text that the new markers cannot reach stays text.
+    ["*a* and file_.\n", "_", "_a_ and file_.\n"],
+    ["*a* and 2*3 and *b*\n", "_", "_a_ and 2*3 and _b_\n"],
+    // Of emphases sharing a run, those that keep their pairs change.
+    ["*a****c***\n", "_", "_a_***c***\n"],
+    ["___b___ and ***c***\n", "*", "*__b__* and ***c***\n"],
+  ] as const)("converts what keeps its pairs in %j", (source, marker, output) => {
+    expect(formatted(source, only({ "style/emphasis": ["warn", { marker }] }))).toBe(output);
+  });
+  it.each(["*****a***\n", "___a_ x_\n", "***c***a\n", "**_c_**a\n"])(
+    "formats the shared runs of %j safely with every marker",
+    (source) => {
+      // Which of these markers can change depends on micromark's version:
+      // micromark-core-commonmark 2.0.4 no longer lets a run next to the other
+      // marker close whatever follows it, as in `***c***a`.
+      for (const emphasis of ["*", "_"] as const)
+        for (const strong of ["*", "_"] as const) {
+          const rules = only({
+            "style/emphasis": ["warn", { marker: emphasis }],
+            "style/strong": ["warn", { marker: strong }],
+          });
+          const output = formatted(source, rules);
+          expect(semanticFingerprint(parse(output, "commonmark"))).toBe(
+            semanticFingerprint(parse(source, "commonmark")),
+          );
+        }
+    },
+  );
+  it.each(["github", "forgejo", "gitea"] as const)(
+    "leaves markers next to dollar math alone on %s",
+    (dialect) => {
+      // A `_` after the closing dollar keeps `$x$` from being math.
+      const source = "$x$_a_ and *$y$* and $z$ *b*\n";
+      expect(
+        formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, dialect)),
+      ).toBe("$x$_a_ and *$y$* and $z$ *b*\n");
+      expect(formatted(source, only({ "style/emphasis": "warn" }, dialect))).toBe(
+        "$x$_a_ and *$y$* and $z$ _b_\n",
+      );
+      // CommonMark has no math, and Obsidian does not look for a `_` after it.
+      for (const other of ["commonmark", "obsidian"] as const)
+        expect(
+          formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, other)),
+        ).toBe("$x$*a* and *$y$* and $z$ *b*\n");
+    },
+  );
+  it("keeps `*` next to an emoji, where `_` could neither open nor close", () => {
+    // micromark reads each half of the emoji's surrogate pair as a letter.
+    expect(formatted("🙂*a*🙂 and *b*\n", only({ "style/emphasis": "warn" }, "github"))).toBe(
+      "🙂*a*🙂 and _b_\n",
+    );
+  });
+  it("leaves emphasis from the line of a callout's or alert's marker into its body alone", () => {
+    const rules = only({ "style/emphasis": ["warn", { marker: "*" }] }, "obsidian");
+    expect(formatted("> [!note] _Title\n> body_ and _b_\n", rules)).toBe(
+      "> [!note] _Title\n> body_ and *b*\n",
+    );
+    expect(formatted("> [!note] _Title_\n> _body_\n", rules)).toBe("> [!note] *Title*\n> *body*\n");
+    // An alert's marker stays alone on its line in GitHub's reading too.
+    const alert = "> [!NOTE] _Text\n> more_\n";
+    expect(formatted(alert, { ...rules, dialect: "github" })).toBe(alert);
+  });
+  it("keeps the meaning of random runs of markers", () => {
+    const words = fc.constantFrom(
+      "a",
+      "b c",
+      "*",
+      "_",
+      "**",
+      "__",
+      "***",
+      "*a*",
+      "_a_",
+      "**b**",
+      "__b__",
+      "***c***",
+      "___c___",
+      "*a _b* c_",
+      "x_y",
+      "2*3",
+      "file_",
+      "_f",
+      "`c`",
+      "\\*",
+      "\\_",
+      "~",
+      "~~s~~",
+      "$x$",
+      "[*T*]",
+      "[_T_][]",
+      "[*T*](u)",
+      "==h==",
+      " ",
+      "\n",
+      "(",
+      ".",
+    );
+    fc.assert(
+      fc.property(
+        fc.array(words, { minLength: 1, maxLength: 12 }),
+        fc.constantFrom(...dialects),
+        fc.constantFrom("*", "_"),
+        fc.constantFrom("*", "_"),
+        (parts, dialect, emphasis, strong) => {
+          const source = `${parts.join("")}\n\n[*T*]: u\n`;
+          const rules = only(
+            {
+              "style/emphasis": ["warn", { marker: emphasis }],
+              "style/strong": ["warn", { marker: strong }],
+            },
+            dialect,
+          );
+          const output = formatted(source, rules);
+          expect(semanticFingerprint(parse(output, dialect))).toBe(
+            semanticFingerprint(parse(source, dialect)),
+          );
+        },
+      ),
+      { numRuns: 400, seed: 20261017 },
+    );
+  });
+});
+
+describe("style/emphasis and style/strong in reference labels", () => {
+  const rules = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+  it("leaves the text of collapsed and shortcut references alone", () => {
+    // The text is also the label, which would no longer match the definition.
+    const source =
+      "See [*Title*][] and [*Title*], [__Bold__] and [*Full*][t], and [*inline*](u).\n\n[*Title*]: u\n[__Bold__]: u\n[t]: u\n";
+    expect(formatted(source, only(rules, "github"))).toBe(
+      "See [*Title*][] and [*Title*], [__Bold__] and [_Full_][t], and [_inline_](u).\n\n[*Title*]: u\n[__Bold__]: u\n[t]: u\n",
+    );
+    expect(lint("[*Title*]\n\n[*Title*]: u\n", { config: only(rules) })).toEqual([]);
+  });
+  it("leaves bracketed text alone that would match a definition", () => {
+    const config = only(
+      { "style/emphasis": ["warn", { marker: "*" }], "style/strong": ["warn", { marker: "_" }] },
+      "github",
+    );
+    const source = "[_T_], [**B**], [^_n_], and [_x_].\n\n[*T*]: u\n[__B__]: u\n[^*n*]: Note.\n";
+    expect(formatted(source, config)).toBe(
+      "[_T_], [**B**], [^_n_], and [*x*].\n\n[*T*]: u\n[__B__]: u\n[^*n*]: Note.\n",
+    );
+  });
+});
+
+describe("style/inline-code", () => {
+  const rule = { "style/inline-code": "warn" } as const;
+  it.each([
+    // Joined, an `==` or `[[` left as text would open a highlight or wikilink.
+    "Text with ==a highlight `code` `\nspan`== here.\n",
+    "==mark `code\n==` here.\n",
+    "See [[note `code\nspan`]] here.\n",
+  ])("leaves %j unjoined in Obsidian", (source) => {
+    expect(formatted(source, only(rule, "obsidian"))).toBe(source);
+    expect(formatted(source, only(rule, "github"))).toBe(source.replace(/\n(?=\S+`)/, " "));
+  });
+  it("leaves a code span from the line of a callout's or alert's marker unjoined", () => {
+    // That line holds an Obsidian callout's title, and an alert's marker alone.
+    for (const source of [
+      "> [!note] Title `code\n> span` here.\n",
+      "> [!NOTE] `code\n> span` here.\n",
+    ]) {
+      for (const dialect of ["github", "forgejo", "gitea", "obsidian"] as const)
+        expect(formatted(source, only(rule, dialect))).toBe(source);
+      expect(formatted(source, only(rule))).toBe(source.replace("\n> ", " "));
+    }
+  });
+  it.each(dialects)(
+    "drops the indentation of the next line when it joins a code span in the %s dialect",
+    (dialect) => {
+      // CommonMark strips it from a paragraph's lines before it reads the span,
+      // and GitHub shows `npm run build`; the parser keeps it in the span.
+      for (const [source, output] of [
+        ["Run `npm run\n   build` now.\n", "Run `npm run build` now.\n"],
+        ["Run `npm run\n\tbuild` now.\n", "Run `npm run build` now.\n"],
+        ["> Run `npm run\n>    build` now.\n", "> Run `npm run build` now.\n"],
+        ["- Run `npm run\n     build` now.\n", "- Run `npm run build` now.\n"],
+        ["- [ ] Run `npm run\n      build` now.\n", "- [ ] Run `npm run build` now.\n"],
+      ] as const)
+        expect(formatted(source, only(rule, dialect))).toBe(output);
+    },
+  );
+  it("compares code spans without the indentation after their line endings", () => {
+    const print = (source: string) => semanticFingerprint(parse(source, "github"));
+    expect(print("Run `npm run\n   build` now.\n")).toBe(print("Run `npm run build` now.\n"));
+    expect(print("Run `npm run\n   build` now.\n")).not.toBe(
+      print("Run `npm run    build` now.\n"),
+    );
+  });
+  it("still joins code spans beside a single `==` or below a callout's title", () => {
+    expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(
+      "An == sign and `code span` here.\n",
+    );
+    expect(
+      formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian")),
+    ).toBe("> [!note] Title\n> Body `code span` here.\n");
+  });
+  it.each([
+    // The joined span opens with one backtick, which the earlier one would pair with.
+    "A ` tick and ``code\nspan`` here.\n",
+    "Text \\`` and ``code\nspan`` here.\n",
+    "[link](u`v) and ``code\nspan`` here.\n",
+  ])("leaves %j unjoined, where an earlier run of the new backticks would pair", (source) => {
+    for (const dialect of dialects) expect(formatted(source, only(rule, dialect))).toBe(source);
+  });
+  it.each([
+    ["Ticks ``code\nspan`` and a ` after.\n", "Ticks `code span` and a ` after.\n"],
+    ["`a` and `b\nc` here.\n", "`a` and `b c` here.\n"],
+  ])("still joins %j", (source, output) => {
+    for (const dialect of dialects) expect(formatted(source, only(rule, dialect))).toBe(output);
+  });
 });
 
 describe("Forgejo and Gitea backslash math", () => {
@@ -365,6 +625,69 @@ describe("style/emphasis and style/strong on Gitea", () => {
       "_a_ and `code span` near b_.py\n",
     );
   });
+});
+
+describe("style/emphasis and style/strong on long lines", () => {
+  /** The lines that hold a range, searched character by character. */
+  function lineOf(source: string, start: number, end: number): [number, number] {
+    let lineStart = start;
+    while (lineStart > 0 && !/[\r\n]/.test(source[lineStart - 1]!)) lineStart--;
+    let lineEnd = end;
+    while (lineEnd < source.length && !/[\r\n]/.test(source[lineEnd]!)) lineEnd++;
+    return [lineStart, lineEnd];
+  }
+  it("find `_.py`, `\\(`, and `\\)` on a line as a search of the line does", () => {
+    const text = fc
+      .array(
+        fc.constantFrom("a", " ", "\n", "\r", "\r\n", "_.py", "_.p", "\\(", "\\)", "\\", "("),
+        {
+          maxLength: 30,
+        },
+      )
+      .map((parts) => parts.join(""));
+    fc.assert(
+      fc.property(text, fc.nat(), fc.nat(), (source, a, b) => {
+        const start = a % (source.length + 1);
+        const end = start + (b % (source.length - start + 1));
+        const document = parse(source, "forgejo");
+        const [lineStart, lineEnd] = lineOf(source, start, end);
+        const before = source.slice(lineStart, start);
+        expect(giteaPyLine(document, start, end)).toBe(
+          source.slice(lineStart, lineEnd).includes("_.py"),
+        );
+        expect(inForgeMath(document, start, end)).toBe(
+          before.lastIndexOf("\\(") > before.lastIndexOf("\\)") &&
+            source.slice(end, lineEnd).includes("\\)"),
+        );
+      }),
+      { numRuns: 500 },
+    );
+  });
+  it.each(["forgejo", "gitea"] as const)(
+    "check many emphases on one line in linear time on %s",
+    (dialect) => {
+      const rule = builtInRules["style/emphasis"]!;
+      const count = 3000;
+      const oneLine = parse(`${"word _emphasis_ ".repeat(count).trim()}\n`, dialect);
+      const manyLines = parse("word _emphasis_\n".repeat(count), dialect);
+      const check = (document: ReturnType<typeof parse>) =>
+        rule.check({ document, options: { marker: "*" } });
+      expect(check(oneLine)).toHaveLength(2 * count);
+      expect(check(manyLines)).toHaveLength(2 * count);
+      const fastest = (document: ReturnType<typeof parse>) => {
+        let best = Infinity;
+        for (let run = 0; run < 3; run++) {
+          const started = performance.now();
+          check(document);
+          best = Math.min(best, performance.now() - started);
+        }
+        return best;
+      };
+      // The same emphases on short lines are the baseline. Searching the line
+      // of each emphasis took hundreds of times as long on one line.
+      expect(fastest(oneLine) / fastest(manyLines)).toBeLessThan(5);
+    },
+  );
 });
 
 describe("Forgejo and Gitea heading attribute blocks", () => {

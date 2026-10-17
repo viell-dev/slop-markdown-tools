@@ -10,35 +10,42 @@ Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
 the built-in rules and those of the configuration's [plugins](plugins.md).
 
-| Rule                          | Kind    | `format` fixes | Presets                                  | Dialects                          | Options                                                     |
-| ----------------------------- | ------- | -------------- | ---------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
-| `content/code-language`       | Problem | No             | None                                     | All                               | None                                                        |
-| `content/image-alt`           | Problem | No             | `recommended`                            | All                               | None                                                        |
-| `content/table-columns`       | Problem | No             | `recommended`                            | All but CommonMark                | None                                                        |
-| `forgejo/heading-id`          | Problem | No             | `forgejo`, `gitea` (error)               | Forgejo, Gitea                    | None                                                        |
-| `github/alert-marker`         | Style   | Yes            | `github`, `forgejo`, `gitea`             | GitHub, Forgejo, Gitea            | None                                                        |
-| `github/task-marker`          | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | None                                                        |
-| `links/empty`                 | Problem | No             | `recommended`                            | All                               | None                                                        |
-| `links/notation`              | Style   | Yes            | None                                     | Obsidian                          | `style`, required                                           |
-| `links/path`                  | Style   | Yes            | None                                     | All; some options Obsidian only   | `style`, `brackets`, `extension`, `leadingDot`              |
-| `links/undefined-reference`   | Problem | No             | `recommended`                            | All; footnotes all but CommonMark | None                                                        |
-| `links/unused-definition`     | Problem | No             | `recommended`                            | All                               | None                                                        |
-| `links/valid`                 | Problem | No             | `recommended` (error)                    | All                               | None                                                        |
-| `obsidian/block-reference`    | Problem | No             | `obsidian` (error)                       | Obsidian                          | None                                                        |
-| `obsidian/callout-marker`     | Style   | Yes            | `obsidian`                               | Obsidian                          | None                                                        |
-| `obsidian/strict-line-breaks` | Problem | No             | `obsidian`                               | Obsidian                          | None                                                        |
-| `structure/duplicate-heading` | Problem | No             | None                                     | All                               | None                                                        |
-| `structure/heading-increment` | Problem | No             | `recommended`                            | All                               | None                                                        |
-| `structure/initial-heading`   | Problem | No             | None                                     | All                               | None                                                        |
-| `structure/single-title`      | Problem | No             | None                                     | All                               | None                                                        |
-| `style/block-spacing`         | Style   | Yes            | None                                     | All                               | None                                                        |
-| `style/emphasis`              | Style   | Yes            | `recommended`                            | All                               | `marker`                                                    |
-| `style/final-newline`         | Style   | Yes            | `recommended`                            | All                               | None                                                        |
-| `style/heading`               | Style   | Yes            | None                                     | All                               | None                                                        |
-| `style/inline-code`           | Style   | Yes            | None                                     | All                               | None                                                        |
-| `style/strong`                | Style   | Yes            | `recommended`                            | All                               | `marker`                                                    |
-| `style/table`                 | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | None                                                        |
-| `style/wrap`                  | Style   | Yes            | `recommended`                            | All                               | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
+| Rule                          | Kind    | `format` fixes | Presets                                                 | Dialects                          | Options                                                     |
+| ----------------------------- | ------- | -------------- | ------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
+| `content/code-language`       | Problem | No             | None                                                    | All                               | None                                                        |
+| `content/image-alt`           | Problem | No             | `recommended`                                           | All                               | None                                                        |
+| `content/table-columns`       | Problem | No             | `recommended`                                           | All but CommonMark                | None                                                        |
+| `forgejo/heading-id`          | Problem | No             | `forgejo`, `gitea` (error)                              | Forgejo, Gitea                    | None                                                        |
+| `github/alert-marker`         | Style   | Yes            | `github`, `forgejo`, `gitea`                            | GitHub, Forgejo, Gitea            | None                                                        |
+| `github/task-marker`          | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian`                | All but CommonMark                | None                                                        |
+| `links/empty`                 | Problem | No             | `recommended`                                           | All                               | None                                                        |
+| `links/notation`              | Style   | Yes            | None                                                    | Obsidian                          | `style`, required                                           |
+| `links/path`                  | Style   | Yes            | None                                                    | All; some options Obsidian only   | `style`, `brackets`, `extension`, `leadingDot`              |
+| `links/undefined-reference`   | Problem | No             | `recommended`                                           | All; footnotes all but CommonMark | None                                                        |
+| `links/unused-definition`     | Problem | No             | `recommended`                                           | All                               | None                                                        |
+| `links/valid`                 | Problem | No             | `recommended` (error)                                   | All                               | None                                                        |
+| `obsidian/block-reference`    | Problem | No             | `obsidian` (error)                                      | Obsidian                          | None                                                        |
+| `obsidian/callout-marker`     | Style   | Yes            | `obsidian`                                              | Obsidian                          | None                                                        |
+| `obsidian/strict-line-breaks` | Problem | No             | `obsidian`                                              | Obsidian                          | None                                                        |
+| `structure/duplicate-heading` | Problem | No             | None                                                    | All                               | None                                                        |
+| `structure/heading-increment` | Problem | No             | `recommended`                                           | All                               | None                                                        |
+| `structure/initial-heading`   | Problem | No             | None                                                    | All                               | None                                                        |
+| `structure/single-title`      | Problem | No             | None                                                    | All                               | None                                                        |
+| `style/blank-lines`           | Style   | Yes            | `recommended`                                           | All                               | `maximum`                                                   |
+| `style/block-spacing`         | Style   | Yes            | None                                                    | All                               | None                                                        |
+| `style/code-fence`            | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/emphasis`              | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/final-newline`         | Style   | Yes            | `recommended`                                           | All                               | None                                                        |
+| `style/heading`               | Style   | Yes            | `recommended`                                           | All                               | `style`, `closing`                                          |
+| `style/inline-code`           | Style   | Yes            | None                                                    | All                               | None                                                        |
+| `style/list-indent`           | Style   | Yes            | `recommended`                                           | All                               | Spaces after markers, `nestedIndent`                        |
+| `style/list-marker`           | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/ordered-list`          | Style   | Yes            | `recommended`                                           | All                               | `delimiter`, `numbering`                                    |
+| `style/strong`                | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/table`                 | Style   | Yes            | `recommended`, `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | `style`                                                     |
+| `style/thematic-break`        | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
+| `style/trailing-space`        | Style   | Yes            | `recommended`                                           | All                               | `hardBreak`                                                 |
+| `style/wrap`                  | Style   | Yes            | `recommended`                                           | All                               | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
 
 A preset enables its rules as warnings, unless the table says error. The
 `codeberg` preset is the `forgejo` preset under another name. In a dialect that
@@ -478,9 +485,10 @@ Not reported:
 
 Requires the first block of a document, after optional YAML or TOML front
 matter, to be a level-1 heading. Underlined (`===`) headings count as well as
-`#` headings; enable `style/heading` to require `#`. An empty document is
-reported. Comments and other content before the title are not skipped. Use
-[overrides](configuration.md#overrides) to exempt generated documents.
+`#` headings; [`style/heading`](#styleheading) turns them into `#` headings. An
+empty document is reported. Comments and other content before the title are not
+skipped. Use [overrides](configuration.md#overrides) to exempt generated
+documents.
 
 Reported:
 
@@ -526,6 +534,49 @@ title: Install
 ## Requirements
 ```
 
+## `style/blank-lines`
+
+Collapses blank lines in a row to at most `maximum` of them, and removes blank
+lines at the start and at the end of a document. The option `maximum` is an
+integer of at least 1; the default is 1. The line break that ends the last line
+stays; [`style/final-newline`](#stylefinal-newline) adds it where it is missing.
+Inside a block quote, a line of only `>` markers is a blank line, and repeated
+ones are removed the same way.
+
+Before, with three blank lines between the blocks and two at the end:
+
+```markdown
+# Setup
+
+
+
+Install the package.
+
+
+```
+
+After:
+
+```markdown
+# Setup
+
+Install the package.
+```
+
+These blank lines are left as written, because they are content there or their
+number changes what the document means:
+
+- Inside code blocks, HTML blocks, math blocks, front matter, and Obsidian
+  comments, also in one that runs to the end of the document without its closing
+  fence or marker.
+- At the start of a document, when the line below them is `---` or `+++`, which
+  would then open front matter.
+- Next to a blank line with other block quote markers or indentation, such as
+  `>` next to an empty line, which belong to different block quotes.
+- In a block quote, below the last block of a list, list item, or footnote that
+  the parser counts them toward: there it reads a list as loose when two or more
+  follow and as tight when one does.
+
 ## `style/block-spacing`
 
 Separates every heading and every list from the blocks before and after it with
@@ -558,6 +609,8 @@ or what a comment applies to:
 - Blocks inside a list item or a footnote definition. A blank line between the
   blocks of a list item makes the list loose, which changes how it renders.
 - Front matter and the block below it.
+- A list that ends inside an HTML comment or another HTML block without its end
+  marker, which would take the blank line in.
 - A heading or list directly below an HTML comment or below a
   `mdtools-disable-next-line` directive, which apply to the line below them.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
@@ -569,14 +622,47 @@ or what a comment applies to:
   first line continues with another list marker, as in `- 2. Step` or `- -`, and
   a heading underlined with `===` or `---`. The parser can read such a line
   differently there than below a blank line.
+- Directly below a table that ends in a list item or block quote: text whose
+  second line is a table delimiter row. The parser reads a table there as text,
+  where GitHub reads a table, and a blank line would make it a table for the
+  parser too.
+- In a block quote, below a list whose last item ends in an empty footnote
+  definition, such as `> - [^1]:`. The parser would count the new line of `>` as
+  part of the item and read the list as loose.
+
+## `style/code-fence`
+
+Writes the fences of a fenced code block with one marker, and as long as its
+content allows: three characters, or one more than the longest line inside that
+holds only the marker, which would otherwise close the block. The option
+`marker` is ``"```"`` (the default), `"~~~"`, or `"consistent"`, which takes the
+marker of the document's first fence. The info string and the content are left
+as written.
+
+Before:
+
+```markdown
+~~~sh
+npm test
+~~~
+```
+
+After:
+
+````markdown
+```sh
+npm test
+```
+````
+
+Indented code blocks have no fence and are left as written. So is a `~~~` fence
+whose info string contains a backtick, because a backtick fence cannot have one.
 
 ## `style/emphasis`
 
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
-emphasis there. A marker that would touch another `*` or `_` and change how the
-text parses is left as written, and so are the exceptions of [Forgejo and
-Gitea](dialects.md#forgejo-and-gitea).
+emphasis there.
 
 Before:
 
@@ -590,41 +676,99 @@ After:
 Use _emphasis_ sparingly, as in un*believ*able.
 ```
 
+Markers are left as written where new ones could change how the text parses, and
+so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
+
+- A new marker that would touch another `*` or `_`, or be separated from one
+  only by `~`.
+- Text with a `*` or `_` that did not pair, as in `*a _b* c_`, or with a run of
+  markers that two emphases share, as in `*****a***`. There markers change only
+  where the rule can tell that every pair stays the same.
+- The text of a collapsed or shortcut reference, such as `[*Title*][]` or
+  `[*Title*]`, which is also its label, and text in brackets that would match a
+  definition's label with the new markers.
+- A marker right after a `$` on GitHub, Forgejo, and Gitea, where a `_` after
+  the dollar decides whether dollar math ends there.
+- Emphasis that begins on the line of an alert's or a callout's marker and ends
+  below it.
+
 ## `style/final-newline`
 
 Ends a document that is not empty with a line break, using the document's own
 line ending. A file whose last line has no line break is changed; an empty file
-is not.
+is not. Nothing is added where the line break would become part of the last
+block: an HTML comment or another HTML block without its end marker, an Obsidian
+comment without its closing `%%`, or a code or math block without its closing
+fence whose last line is blank space.
 
 ## `style/heading`
 
-Turns a heading underlined with `===` or `---` into a `#` heading of the same
-level. A trailing run of `#` in the text is escaped, so that it is not taken for
-a closing sequence. Headings of more than one line, and headings inside lists or
-block quotes, are left as written.
+Writes headings in one style and without closing `#` sequences. By default it
+turns a heading underlined with `===` or `---` into a `#` heading of the same
+level, and removes the closing sequence of a `#` heading with the blank space
+around it.
+
+| Option    | Values                              | Default    |
+| --------- | ----------------------------------- | ---------- |
+| `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
+| `closing` | `"remove"`, `"keep"`                | `"remove"` |
+
+- `style`: `atx` writes `#` headings. `setext` underlines headings of levels 1
+  and 2 and keeps `#` for deeper levels, which cannot be underlined.
+  `consistent` follows the document's first heading: `setext` when it is
+  underlined, otherwise `atx`.
+- `closing`: `keep` leaves the closing sequences of `#` headings as written.
 
 Before:
 
 ```markdown
 Installation
 ------------
+
+## Usage ##
 ```
 
 After:
 
 ```markdown
 ## Installation
+
+## Usage
 ```
+
+A trailing run of `#` in the text of an underlined heading is escaped, so that
+it is not taken for a closing sequence. Underlined headings of more than one
+line, and those inside lists or block quotes, are left as written. On Forgejo
+and Gitea, a closing sequence after an attribute block such as `{#id}` stays,
+because Gitea before 1.26 reads the block only when the sequence follows it.
+
+With `setext`, a `#` heading is underlined only where its text can stand on a
+line of its own as the same heading: at the start of a line of the document, not
+in a list or block quote, below a blank line or at the start of the document,
+because directly below text its line would continue the paragraph. It keeps its
+`#` when its text starts like another block, such as a list item, block quote,
+thematic break, fence, HTML, or link reference definition, when it contains `|`,
+which `---` below it could make a table, or when it ends with a backslash, and
+on Forgejo and Gitea when it contains `{`.
 
 ## `style/inline-code`
 
 Joins a code span that is written across lines onto one line. A line break
-inside a code span renders as a space, so the content stays the same. Some
-editors, such as Obsidian's Live Preview, show a split code span differently
-from the rendered page. `style/wrap` joins such a code span only in a paragraph
-that it wraps, and this rule also elsewhere, such as in a paragraph with a hard
-line break. The exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea)
-apply.
+inside a code span renders as a space, so the content stays the same, and the
+spaces and tabs that start the next line are left out, as CommonMark and GitHub
+leave them out. Some editors, such as Obsidian's Live Preview, show a split code
+span differently from the rendered page. `style/wrap` joins such a code span
+only in a paragraph that it wraps, and this rule also elsewhere, such as in a
+paragraph with a hard line break. The exceptions of [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea) apply, and a span stays split where the
+joined line would read differently:
+
+- In Obsidian, where an `==` or `[[` left as text on the joined lines could open
+  a highlight or wikilink.
+- Where joining would move text onto the line of an alert's or a callout's
+  marker, which holds an Obsidian callout's title.
+- Where the joined span needs a different number of backticks than it has, and
+  an earlier run of that many in the same paragraph would pair with them.
 
 Before:
 
@@ -637,6 +781,152 @@ After:
 
 ```markdown
 Run `npm run build` before the tests.
+```
+
+## `style/list-indent`
+
+Puts the configured spaces, one by default, between a list marker and the item's
+text, and starts each item where its container's text starts: at the start of
+the line, after a block quote's `>`, or under the text of the list item that
+holds it. The item's other lines move by as many columns as its text, so its
+paragraphs, code blocks, and nested lists stay inside it as they were.
+
+| Option                   | Values                 | Default               |
+| ------------------------ | ---------------------- | --------------------- |
+| `bulletSpaces`           | An integer from 1 to 4 | `1`                   |
+| `orderedSpaces`          | An integer from 1 to 4 | `1`                   |
+| `bulletSpacesMultiline`  | An integer from 1 to 4 | `bulletSpaces`        |
+| `orderedSpacesMultiline` | An integer from 1 to 4 | `orderedSpaces`       |
+| `nestedIndent`           | An integer from 1 to 8 | Under the item's text |
+
+- `bulletSpaces` and `orderedSpaces`: the spaces after the marker of a bullet
+  item and of a numbered one. As in markdownlint's MD030, the `Multiline`
+  options take their place in a list where an item has more than one line or
+  blank lines separate the items.
+- `nestedIndent`: the columns from an item's marker to the marker of a list
+  nested in it, like markdownlint's MD007 `indent`. A nested marker can stand
+  from its item's text to three columns further, and the rule keeps it there:
+  `4` puts it two columns in under `- item` and one under `1. item`. A nested
+  list that starts on its item's line, as in `- - item`, stays there, and one
+  that follows another list stays out of that list's last item.
+
+With the defaults, before:
+
+```markdown
+-   Unpack the board.
+
+    Keep the box for returns.
+1.  Connect the sensor.
+     - Use the short cable.
+```
+
+After:
+
+```markdown
+- Unpack the board.
+
+  Keep the box for returns.
+1. Connect the sensor.
+   - Use the short cable.
+```
+
+These are left as written:
+
+- An item that starts with indented code, five or more spaces after the marker;
+  the code depends on that spacing.
+- A list where moving an item would move another line into it. Here `Text`
+  follows the list, and below `- Item` it would be the item's second paragraph:
+
+  ```markdown
+  -   Item
+
+    Text
+  ```
+
+  The same goes for a line that continues the item's paragraph without the
+  item's indentation, where that line would start a list, a code span, or
+  another block once inside the item.
+- A list with a tab in an item's indentation, such as one that Obsidian indented
+  with tabs.
+
+## `style/list-marker`
+
+Writes every bullet list with one marker.
+
+| Option   | Values                                              | Default |
+| -------- | --------------------------------------------------- | ------- |
+| `marker` | `"-"`, `"*"`, `"+"`, `"consistent"`, or `"sublist"` | `"-"`   |
+
+- `consistent`: the marker of the document's first bullet list, as in
+  markdownlint's MD004.
+- `sublist`: each level of nesting keeps the marker of its first list, unless
+  the level above has that marker, in which case it gets the next one, as with
+  MD004's `sublist`. A level counts the bullet lists that a list is nested in.
+
+A bullet list that directly follows another one is a separate list only because
+its marker differs, so it gets the next marker in the order `-`, `*`, `+`, and
+the list after that the first one again. A list whose new marker would make a
+line read as a thematic break, as `+ - -` would with `-`, keeps its markers, and
+so do the lists next to it.
+
+Before:
+
+```markdown
+* Milk
+* Bread
+
++ Plates
+```
+
+After:
+
+```markdown
+- Milk
+- Bread
+
+* Plates
+```
+
+## `style/ordered-list`
+
+Writes the numbers of ordered lists with one delimiter and numbers the items
+consistently.
+
+| Option      | Values                             | Default  |
+| ----------- | ---------------------------------- | -------- |
+| `delimiter` | `"."`, `")"`, or `"consistent"`    | `"."`    |
+| `numbering` | `"auto"`, `"ordered"`, or `"same"` | `"auto"` |
+
+- `delimiter`: `consistent` is the delimiter of the document's first ordered
+  list. As with bullet markers, an ordered list that directly follows another
+  one keeps a different delimiter.
+- `numbering`: `ordered` counts up from the first number, and `same` repeats it
+  in every item. `auto` repeats it when the first two items have the same
+  number, as in `1.`, `1.`, `1.`, and counts up otherwise. These are
+  markdownlint's MD029 `one_or_ordered`, `ordered`, and, for lists that start at
+  1 or 0, `one` and `zero`.
+
+The first number never changes, because the rendered list starts at it. When a
+number gets wider or narrower, as from `9.` to `10.`, the item's other lines
+move with its text. A list keeps its numbers where that would move a line into
+or out of an item, as for [`style/list-indent`](#stylelist-indent), and where
+the numbers are written with leading zeros, as in `01.`, or would need more than
+nine digits.
+
+Before:
+
+```markdown
+1) Unpack the board.
+2) Connect the sensor.
+2) Power it on.
+```
+
+After:
+
+```markdown
+1. Unpack the board.
+2. Connect the sensor.
+3. Power it on.
 ```
 
 ## `style/strong`
@@ -660,9 +950,11 @@ A **bold** claim.
 
 Aligns a table: every cell of a column is padded to the column's width, measured
 in display columns, and the delimiter row keeps each column's alignment. The
-text of each cell is left as written, and so is the number of cells in each row.
-A table inside a list or block quote, and one with a row that has more cells
-than its header, are left as written.
+option `style` is `"aligned"` (the default) or `"compact"`, which writes one
+space on each side of a cell's text and delimiters of three characters, such as
+`| :-- | --: |`. The text of each cell is left as written, and so is the number
+of cells in each row. A table inside a list or block quote, and one with a row
+that has more cells than its header, are left as written.
 
 Before:
 
@@ -680,6 +972,68 @@ After:
 | Temperature | °C   |
 ```
 
+## `style/thematic-break`
+
+Writes thematic breaks with one marker. The option `marker` is `"---"` (the
+default), `"***"`, `"___"`, or `"consistent"`, which takes the character of the
+document's first break. Blank space before and after the break stays.
+
+Before:
+
+```markdown
+Text.
+
+* * *
+```
+
+After:
+
+```markdown
+Text.
+
+---
+```
+
+A break is left as written where the new marker would change what the document
+means:
+
+- With `---`, directly below a paragraph or a link reference definition, which
+  `---` would underline as a heading.
+- On the line of a list item whose marker is the new marker's character, as in
+  `- ***` with `---`: `- ---` is one thematic break, not a list item.
+- At the start of a document, where a break that is or would become `---` is
+  read as the start of front matter.
+
+## `style/trailing-space`
+
+Removes spaces and tabs at the end of lines. A hard line break written as two or
+more spaces keeps them. The option `hardBreak` is `"keep"` (the default) or
+`"backslash"`, which writes such a break as a backslash, so that it is visible
+in the source.
+
+With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
+
+```markdown
+Line one  
+line two
+```
+
+After:
+
+```markdown
+Line one\
+line two
+```
+
+Blank space is left as written where it is content: in code blocks, except on
+their fence lines, and in HTML, math, front matter, Obsidian comments, code
+spans, and link titles and labels that span lines. With `"backslash"`, a break
+stays as spaces where a backslash would change what the line says: after another
+backslash, after a literal autolink such as `www.example.com`, which would take
+the backslash into its address, on the title line of an alert or callout, in a
+paragraph that starts like a link reference definition (`[label]:`), and on
+Forgejo and Gitea inside `\(...\)` math.
+
 ## `style/wrap`
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
@@ -695,9 +1049,15 @@ A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
 on the line before it. A word that only starts like one, such as `--config`,
 `#tag`, or `-5`, can start a line. The first line keeps more than one word when
-its first word alone would open a block, such as `***` or `$$`, and keeps a
-paragraph that starts like a link reference definition (`[Note]: see …`) from
-becoming one.
+its first word alone would open a block, such as `***` or `$$`, or, in the body
+below the line of an alert's or callout's marker, would underline that line as a
+heading, such as `==` or `--`. It also keeps a paragraph that starts like a link
+reference definition (`[Note]: see …`) from becoming one. On GitHub and in
+Obsidian, a word that starts with `$` stays on the line before it when a `$`
+comes earlier in the paragraph, and in Obsidian a word that ends in `$`, such as
+a lone `$`, stays on the line after it when a `$` comes later: at the edge of a
+line, a dollar can begin or end math that it cannot begin or end next to a
+space.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -735,6 +1095,9 @@ what it means, that is, when it:
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's
   container markers;
+- has a table delimiter row such as `| - |` as its second line, in the dialects
+  with tables: such a paragraph is usually a table that the parser reads as text
+  (see [the safety model](design.md#safety-model));
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 

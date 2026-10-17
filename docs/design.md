@@ -43,6 +43,20 @@ The comparison is only as good as the parser's reading:
   Formatting cannot change such a document's meaning, because the comparison
   uses the same reading before and after, but rules see text where GitHub shows
   a list, and the rules that would change such a place leave it as written.
+  Below an empty list item (`-`), the parser takes the `[x]` that begins the
+  next line for a checkbox that belongs to no item, where GitHub shows the text
+  `[x]`, so a blank line between them, as `style/block-spacing` would add, is
+  refused as a change of meaning. The parser also keeps the spaces and tabs that
+  start a code span's next line, where CommonMark and GitHub leave them out, so
+  that a span `npm run` continued by an indented `build` reads
+  `npm run    build`; the comparison ignores them, and `style/inline-code`
+  leaves them out when it joins the span ([issue
+  #265](https://github.com/viell-dev/slop-markdown-tools/issues/265)). Directly
+  below a table that ends in a list item or block quote, the parser reads the
+  lines of another table as text, where GitHub shows a table, so `style/wrap`
+  and `style/block-spacing` leave text whose second line is a table delimiter
+  row as written ([issue
+  #283](https://github.com/viell-dev/slop-markdown-tools/issues/283)).
 
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on

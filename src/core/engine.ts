@@ -6,10 +6,12 @@ import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
 import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
+import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
+import { listRules } from "../rules/lists.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
@@ -34,10 +36,12 @@ import type {
  */
 export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze({
   ...styleRules,
+  ...blockRules,
   ...dialectRules,
   ...linkRules,
   ...structureRules,
   ...contentRules,
+  ...listRules,
 });
 const phases = ["inline", "block", "document"] as const;
 /** What is wrong with a plugin's rule, or undefined when it has the shape of a `Rule`. */
@@ -473,7 +477,10 @@ function semanticTree(
           );
         result[key] = text;
       } else if (key === "value" && node.type === "inlineCode")
-        result[key] = node.value.replace(/\r\n|\r|\n/g, " ");
+        // A code span renders a line ending as a space. The parser keeps the
+        // spaces and tabs that start the next line, which CommonMark strips
+        // from a paragraph's lines, and renderers such as GitHub's with it.
+        result[key] = node.value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
       // An image's description renders as plain text, and a reference's label
       // matches its definition with whitespace collapsed.
       else if ((key === "alt" || key === "label") && typeof value === "string")

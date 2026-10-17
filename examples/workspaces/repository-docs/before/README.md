@@ -17,5 +17,5 @@ Follow the [setup guide](docs/guide.md) first, then read the [sensor reference](
 | Humidity | % | Yes |
 | Pressure | hPa | Since 1.2 |
 
-- [X] Publish readings every minute
-- [ ] Keep a week of history
+* [X] Publish readings every minute
+* [ ] Keep a week of history

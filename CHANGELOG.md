@@ -73,9 +73,21 @@ From `0.2.0-rc.2`:
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
+- `recommended` formats more, so `format --check` and `lint` report documents
+  that it used to accept until `format --write` runs once. It removes trailing
+  spaces, except hard line breaks, and repeated blank lines; writes code fences
+  with backticks and thematic breaks as `---`; turns underlined headings into
+  `#` headings and removes closing `#` sequences; and aligns tables. To keep a
+  form, turn its rule off or set its option, such as
+  `"style/heading": ["warn", { "closing": "keep" }]`.
 - `.gitignore` files decide as in Git: a deeper file can include again what a
   higher one excludes, and patterns match letter case exactly on Linux. Files
   that were left out before can be linted now, and the reverse.
+- Git's other ignore rules apply too: `.gitignore` files above the workspace
+  root, `.git/info/exclude`, and the global excludes file, while a file that Git
+  tracks is never ignored. With `--root` on a folder of a repository, or with a
+  global excludes file, files that were linted before can be left out now, and a
+  tracked file that a pattern matches is linted.
 - `.markdown` files are documents, and a file named on the command line is read
   as Markdown whatever its name. A hook that passes every changed file should
   pass only the Markdown ones.
@@ -101,6 +113,10 @@ From `0.2.0-rc.2`:
 - `format` throws an error that the workspace throws, such as a loader's `EIO`,
   as `lint` does, instead of reporting it as `engine/unsafe-format`.
 - A plugin named `engine` is rejected.
+- `recommended` formats lists: `*` and `+` bullets become `-`, `1)` becomes
+  `1.`, numbers are made consistent, and each item gets one space after its
+  marker and no indentation before it. `format --check` fails on lists written
+  otherwise until they are formatted or the list rules are turned off.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -141,6 +157,11 @@ From every prerelease:
 
 ### Added
 
+- `style/list-marker`, `style/ordered-list`, and `style/list-indent`, in
+  `recommended`, write bullets as `-` and numbers as `1.` with consistent
+  numbering and one space after each marker, and move each item's lines with its
+  text. Their options cover markdownlint's MD004, MD007, MD029, and MD030
+  ([#275](https://github.com/viell-dev/slop-markdown-tools/pull/275)).
 - `--quiet` reports errors only, and `rules` lists the rules of the
   configuration's plugins too, also as JSON with `--json`
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
@@ -162,6 +183,12 @@ From every prerelease:
 - `style/block-spacing` separates headings and lists from the blocks around them
   with a blank line
   ([#190](https://github.com/viell-dev/slop-markdown-tools/pull/190)).
+- Four style rules in `recommended`: `style/code-fence`, `style/thematic-break`,
+  `style/blank-lines`, and `style/trailing-space`, with markdownlint's choices
+  as options. `style/heading` also removes closing `#` sequences and can write
+  underlined headings (options `closing` and `style`), `style/table` can write
+  compact tables (option `style`), and both join `recommended`
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 - `lint` and `format` accept `ranges` to work on parts of a document, and
   `format` returns their `scope`
   ([#188](https://github.com/viell-dev/slop-markdown-tools/pull/188),
@@ -225,6 +252,10 @@ From every prerelease:
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - Plugin rule option schemas are compiled once instead of for every document
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- Many repeated headings, and many emphases on one line, no longer take time
+  that grows with the square of their number on Forgejo and Gitea, and `ignore`
+  and `overrides` patterns are compiled once instead of for every path
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - `.markdown` files are documents and link targets, and a file named on the
   command line is read as Markdown whatever its name
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
@@ -241,6 +272,9 @@ From every prerelease:
 - `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
   line with its marker, as it does for Obsidian callouts
   ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- The plugin example's style rule writes one space after a heading's `#` marks,
+  because `style/thematic-break` now does what it did
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 
 ### Fixed
 
@@ -265,6 +299,14 @@ From every prerelease:
 - Documents and JSON configuration files that start with a byte order mark are
   read correctly
   ([#174](https://github.com/viell-dev/slop-markdown-tools/pull/174)).
+- `style/heading` keeps link reference definitions directly above an underlined
+  heading, which it used to replace with the heading, so that the document was
+  refused ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
+- `style/final-newline` adds no line ending, and `style/block-spacing` no blank
+  line, where it would become part of an unclosed HTML or Obsidian comment, and
+  `style/final-newline` none where it would add a line to a code block without
+  its closing fence; such documents used to be refused
+  ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 - `style/wrap` leaves paragraphs as written instead of refusing the document
   when their first word is a bare block marker
   ([#196](https://github.com/viell-dev/slop-markdown-tools/pull/196)), when an
@@ -292,6 +334,11 @@ From every prerelease:
 - `.gitignore` files are applied as Git applies them, with negations in deeper
   files and letter case per platform
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- Git's ignore rules apply from the repository's top level, also above the
+  workspace root, together with `.git/info/exclude` and the global excludes
+  file. Inside a nested repository only its own rules apply, and none applies to
+  a file that Git tracks
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
@@ -317,6 +364,40 @@ From every prerelease:
 - An Obsidian heading link matches the heading's source text, with its
   backticks, as well as its visible text
   ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- `style/emphasis` and `style/strong` leave the text of a collapsed or shortcut
+  reference, such as `[*Title*][]`, as written, because that text is also the
+  label that matches the definition, and likewise text in brackets that the new
+  markers would make match one. Before, all of the rule's edits in the document
+  were refused
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/emphasis`, `style/strong`, `style/inline-code`, and
+  `style/block-spacing` no longer propose edits that change the parse in rare
+  places, where their edits were refused: crossed or shared markers, as in
+  `*a _b* c_` or `*****a***`, markers next to dollar math or across the line of
+  a callout's or alert's marker, code spans whose joined line would form an
+  Obsidian highlight or wikilink, change that line, or pair with earlier
+  backticks, a table below one that ends in a list item or block quote, and a
+  list in a quote that ends in an empty footnote definition
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/inline-code` leaves out the spaces and tabs that start a code span's
+  next line when it joins the span, as CommonMark and GitHub do; before,
+  `npm run` continued by an indented `build` became `npm run    build`, which
+  changed what GitHub shows. The safety check compares code spans the same way
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` keeps a dollar from the edge of a line where it could begin or
+  end math there: in Obsidian a word that ends in `$` stays with the word after
+  it, and on GitHub and in Obsidian a word that starts with `$` stays with the
+  word before it. Before, such a paragraph was refused in Obsidian
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` leaves a paragraph as written when its second line is a table
+  delimiter row, in every dialect with tables. Directly below a table that ends
+  in a list item or block quote, the parser reads another table as such a
+  paragraph, and joining its lines removed a table that GitHub shows
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` keeps a run of `=` or `-` that starts the body of an alert or
+  callout together with the next word. Alone on a line, it would underline the
+  marker's line as a heading, and the paragraph was refused
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell
