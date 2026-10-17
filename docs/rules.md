@@ -1042,7 +1042,8 @@ same, and short lines keep diffs small. Lines are broken at spaces in the text,
 also in the text of a link, emphasis, strong text, or strikethrough. A code
 span, an image, math, a link's destination, and a word longer than the line stay
 whole and can overflow; a code span or an image description written across lines
-is joined onto one. List markers, block quote markers, and indentation count
+is joined onto one, without the spaces and tabs that start its next line, as
+renderers read it. List markers, block quote markers, and indentation count
 toward the width, a tab up to the next multiple of four columns.
 
 A word that would start a block at the start of a line, such as a list marker,
@@ -1085,8 +1086,11 @@ what it means, that is, when it:
 
 - has a hard line break, inline HTML, or a block identifier (`^id`) at its end;
 - has a line break that is content, inside math, inline HTML, an Obsidian
-  comment, or a link's destination or title, or one inside a code span whose
-  next line starts with a space or tab, which renderers read differently;
+  comment, or a link's destination or title;
+- has a code span with a space or line break at both ends, one of them a line
+  break with spaces or tabs after it, such as one that opens at the end of a
+  line, goes on in an indented line, and ends with a space: the parser and
+  renderers remove different spaces from its ends;
 - has lines whose container markers the tool cannot reproduce;
 - starts with an alert or callout marker such as `[!NOTE]` in the CommonMark
   dialect; in the other dialects only the line with the marker, and an Obsidian

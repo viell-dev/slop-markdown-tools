@@ -4,7 +4,7 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { labelEnd, parse, range } from "../syntax/parse.js";
+import { codeSpanText, labelEnd, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
 
@@ -957,24 +957,27 @@ const wrap: Rule = {
         ? forgeProtections(source, start, end, forge)
         : { ranges: [] as Range[] };
       for (const [from, to] of protections.ranges) protection.add(from, to);
-      // A code span is joined only when its content reads the same on one line.
-      // The parser keeps a space or tab at the start of the span's next line,
-      // which CommonMark renderers such as GitHub's drop, and it reads the
-      // indentation below a task item's checkbox as such a space.
-      const codeBreak = { reason: "line break in a code span followed by a space or tab" };
+      // A code span is joined as `style/inline-code` joins it: each line ending
+      // becomes a space, and the spaces and tabs that start the next line go,
+      // as CommonMark and GitHub read the span. The parser keeps them, also the
+      // indentation below a task item's checkbox. A span with a space or line
+      // ending at both edges loses one at each, and where an edge is a line
+      // ending with spaces, the parser and renderers strip different ones; such
+      // a span is joined only when it reads the same on one line.
+      const codeBreak = { reason: "line break with spaces at the edge of a code span" };
       for (const atom of inline.atoms) {
         if (atom.joining !== "code") continue;
         const lines = source.slice(atom.from, atom.to).split(lineBreak);
         if (lines.length < 2) continue;
         const content = lines.map((line, i) =>
-          i && continuation && line.startsWith(continuation)
-            ? line.slice(continuation.length)
+          i
+            ? (continuation && line.startsWith(continuation)
+                ? line.slice(continuation.length)
+                : line
+              ).replace(/^[ \t]+/, "")
             : line,
         );
-        if (
-          content.slice(1).some((line) => /^[ \t]/.test(line)) ||
-          codeSpanValue(content.join(" ")) !== atom.value!.replace(/\r\n|\r|\n/g, " ")
-        )
+        if (codeSpanValue(content.join(" ")) !== codeSpanText(atom.value!))
           atom.joining = codeBreak;
       }
       const reportUnbreakable = () =>
@@ -1083,14 +1086,15 @@ const wrap: Rule = {
           if (!joining) words.push(" ");
           else if (last === undefined || /^[ \t]+$/.test(last))
             failure = "line break in inline syntax";
-          else if (joining === "code") words[words.length - 1] = `${last} `;
-          else if (joining === "description") {
-            // Two spaces or a backslash before the line ending make a hard break.
-            if (/(?: {2}|\\)$/.test(last)) failure = "hard line break";
+          else if (joining === "code" || joining === "description") {
+            // In an image description, two spaces or a backslash before the
+            // line ending make a hard break, and other spaces collapse; in a
+            // code span, the spaces before it are code.
+            if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
             const trimmed = line.replace(/^[ \t]+/, "");
             lineAt += line.length - trimmed.length;
             line = trimmed;
-            words[words.length - 1] = `${last.trimEnd()} `;
+            words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
           } else failure = joining.reason;
         }
         words.push(...protection.split(line, lineAt));
@@ -1420,7 +1424,7 @@ export const styleRules: Record<string, Rule> = {
         // A line ending becomes a space, and the spaces and tabs that start the
         // next line go: CommonMark strips them from a paragraph's lines before
         // it reads a code span, though the parser keeps them in the span.
-        const value = node.value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
+        const value = codeSpanText(node.value);
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);
         // An earlier run of the new backticks that the parser left as text, or
