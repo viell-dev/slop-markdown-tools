@@ -102,7 +102,7 @@ describe("named inputs", () => {
     }),
     ".gitignore": "generated/\nskip.md\n",
     "guide.md": "# Guide\n\nSee [the readme](README.markdown#read-me).\n",
-    "README.markdown": "# Read me\n\nSee [the notes](notes.txt#notes).\n",
+    "README.markdown": "# Read me\n\nSee [the notes](notes.txt#anything) and [me](#nope).\n",
     "notes.txt": "# Notes\n\nA *note*.\n",
     "generated/out.md": "Out.\n",
     "skip.md": "Skipped.\n",
@@ -120,10 +120,11 @@ describe("named inputs", () => {
       path: string;
       diagnostics: { message: string }[];
     }[];
-    // A text file's headings are no anchors, also when it is linted as Markdown.
+    // A text file's headings are no anchors, also when it is linted as Markdown,
+    // so any fragment is accepted there.
     expect(reports.find((file) => file.path === "guide.md")!.diagnostics).toEqual([]);
     expect(reports.find((file) => file.path === "README.markdown")!.diagnostics).toEqual([
-      expect.objectContaining({ message: "Missing fragment in notes.txt#notes." }),
+      expect.objectContaining({ message: "Missing fragment in #nope." }),
     ]);
   });
   it("read a named file as Markdown whatever its name", async () => {

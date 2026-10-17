@@ -137,6 +137,18 @@ reported as ambiguous. Missing or ambiguous destinations are never guessed.
 Unaliased wikilinks retain their target spelling because changing it may change
 their visible label. Note embeds remain embeds.
 
+A heading link names the heading by the text it shows or as the source writes
+it, so ``[[Guide#`move`]]`` and `[[Guide#move]]` both reach the heading
+``### `move` ``. A path of headings, such as `[[Guide#Setup#Mobile]]`, names a
+heading below the one before it. A wikilink never names a folder:
+`[[Attachments]]` finds a note `Attachments.md` elsewhere in the vault even when
+the vault's root holds a folder of that name. A block identifier, as in
+`[[Guide#^summary]]`, counts only at the end of a block and holds Latin letters,
+digits, and hyphens, as Obsidian's help defines it. Versions up to `0.2.0-rc.2`
+matched neither the source text nor a path of headings, took a folder as a
+wikilink's target, and also counted a `^id` before other text or with
+underscores in some places.
+
 See [link policies](configuration.md#link-policies) for relative paths,
 extension handling, and eligible Markdown/wikilink conversion. Path rewriting
 and notation conversion should be run in separate passes.

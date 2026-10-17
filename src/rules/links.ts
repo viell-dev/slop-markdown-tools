@@ -60,6 +60,35 @@ function destinationRange(raw: string): [number, number] | undefined {
   return undefined;
 }
 
+/**
+ * A Markdown link's destination as a wikilink's target, or undefined when a
+ * wikilink cannot hold it. Obsidian takes a wikilink's text as the note's
+ * name, so percent escapes are decoded: `My%20Note.md` is the note `My
+ * Note.md`, which is right whether or not Obsidian decodes escapes in
+ * wikilinks. A destination that does not decode, or whose decoded name holds
+ * a character that a wikilink cannot contain, or that would change its meaning
+ * there, stays a Markdown link.
+ */
+function wikiTarget(url: string): string | undefined {
+  const hash = url.indexOf("#");
+  const [name, fragment] = hash < 0 ? [url, undefined] : [url.slice(0, hash), url.slice(hash + 1)];
+  let decodedName: string;
+  let decodedFragment: string | undefined;
+  try {
+    decodedName = decodeURIComponent(name);
+    decodedFragment = fragment === undefined ? undefined : decodeURIComponent(fragment);
+  } catch {
+    return undefined;
+  }
+  if (/[[\]|#^\r\n]/.test(decodedName) || decodedName.trim() !== decodedName) return undefined;
+  if (decodedFragment !== undefined) {
+    if (/[[\]|\r\n]/.test(decodedFragment)) return undefined;
+    // An escaped `#` or `^` would become a separator or a block reference.
+    const marks = (text: string) => text.replace(/[^#^]/g, "");
+    if (marks(decodedFragment) !== marks(fragment!)) return undefined;
+  }
+  return decodedFragment === undefined ? decodedName : `${decodedName}#${decodedFragment}`;
+}
 /** Names the first few of the paths that could not be read, and counts the rest. */
 function named(paths: string[]): string {
   return paths.length > 3
@@ -308,8 +337,9 @@ export const linkRules: Record<string, Rule> = {
           node.children[0]?.type === "text"
         ) {
           const label = node.children[0].value;
-          if (/[[\]|\r\n]/.test(node.url + label)) return;
-          replacement = `[[${node.url}|${label}]]`;
+          const target = wikiTarget(node.url);
+          if (target === undefined || /[[\]|\r\n]/.test(label)) return;
+          replacement = `[[${target}|${label}]]`;
         }
         const url = destination(node);
         if (!replacement || url === undefined) return;

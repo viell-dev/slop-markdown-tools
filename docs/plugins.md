@@ -40,7 +40,10 @@ per-invocation file loaders. `WorkspaceOptions.directories` can list existing
 empty directories; parent directories of file entries are inferred. Resolution
 returns `status: "directory"` for a directory instead of `"missing"`. Only a
 target named `.md` or `.markdown`, or `.md` for an Obsidian link, is read for
-headings; versions up to `0.2.0-rc.2` read only `.md` targets.
+headings, and a link to any other target accepts any fragment; versions up to
+`0.2.0-rc.2` read only `.md` targets and found no fragment in any other. The
+`resolve` method's fourth argument, `wiki`, is true for a wikilink, which never
+resolves to a folder.
 
 `WorkspaceOptions.unreadable` lists existing directories whose contents the host
 could not read. A link that leads into one resolves with `status: "unreadable"`

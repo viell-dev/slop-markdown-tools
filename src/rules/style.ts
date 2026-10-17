@@ -3,6 +3,7 @@ import stringWidth from "string-width";
 import type { Blockquote, Nodes, Paragraph, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 
@@ -405,7 +406,7 @@ const wrap: Rule = {
           ? "inline HTML"
           : /^\[![^\]]+\]/.test(original)
             ? "callout header"
-            : /(?:^|\s)\^[\w-]+\s*$/.test(original)
+            : blockIdentifier(document.source, node)
               ? "block identifier"
               : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
                 ? "leading block marker"
@@ -608,7 +609,7 @@ function together(
   if (
     document.dialect === "obsidian" &&
     after.type === "paragraph" &&
-    /^\^[A-Za-z0-9-]+[ \t]*$/.test(source.slice(afterStart, afterEnd))
+    source.slice(afterStart, afterEnd).trimEnd() === `^${blockIdentifier(source, after)?.id}`
   )
     return true;
   // Directly below text or a link reference definition, the parser does not

@@ -410,7 +410,11 @@ Gitea versions give it no anchor. HTML inside comments, code, and `<script>`,
 `<textarea>`, and the other elements whose content is text is not an anchor.
 Already compliant destinations retain their percent-encoding spelling, including
 literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
-literal percent signs and hashes to preserve target identity.
+literal percent signs and hashes to preserve target identity. Only the fragments
+of Markdown files are checked: a link to any other file accepts any fragment,
+such as an image's `#gh-dark-mode-only`, a PDF's `#page=2`, or the line range
+`#L10-L20` of a source file. Versions up to `0.2.0-rc.2` reported these as
+missing fragments.
 
 Path edits require a resolved target and valid fragment. Unaliased ordinary
 wikilinks retain their target spelling because changing it may change the
@@ -422,7 +426,11 @@ plain-text Markdown links to wikilinks. Titles, rich labels, unaliased
 wikilinks, and embeds are preserved. A note embed is not interchangeable with a
 Markdown image. Do not enable notation conversion and path rewriting for the
 same link in one pass: overlapping edits are reported; run those policies in
-separate passes.
+separate passes. Percent escapes are decoded in a new wikilink, because Obsidian
+takes a wikilink's text as the note's name: `[x](My%20Note.md)` becomes
+`[[My Note.md|x]]`. A destination that does not decode, or whose name would hold
+`|`, `[`, `]`, `#`, or `^`, stays a Markdown link. Versions up to `0.2.0-rc.2`
+kept the escapes.
 
 Network URLs are recognized but never fetched. Website-root paths and
 query-bearing destinations in CommonMark, GitHub, Forgejo, and Gitea are outside

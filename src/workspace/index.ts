@@ -5,6 +5,7 @@ import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
 import { fallbackDialect } from "../config/resolve.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
@@ -252,10 +253,18 @@ function htmlView(node: Nodes): string {
   return textContent(node).replaceAll("&", "&amp;").replaceAll("<", "&lt;");
 }
 
-/** What Obsidian links to: exact heading text, matched case-insensitively, and block identifiers. */
+/**
+ * What Obsidian links to: headings, by the text they show or by their source
+ * text, as written or without regard to case, and block identifiers.
+ */
 interface ObsidianAnchors {
   headings: Set<string>;
   foldedHeadings: Set<string>;
+  /**
+   * The headings in document order, with their levels and names, for a link to
+   * a heading below another one, such as `[[Note#Setup#Mobile]]`.
+   */
+  outline: { depth: number; names: string[] }[];
   blocks: Set<string>;
 }
 /** What GitHub links to, and CommonMark in its stead. */
@@ -334,30 +343,58 @@ function htmlParts(document: Document): Map<Nodes, HtmlPart> {
   });
   return parts;
 }
-/** A target's anchors for Obsidian; none for a target that is not Markdown source. */
-function obsidianAnchors(document: Document | null): ObsidianAnchors {
+/**
+ * Whether the outline holds a chain of headings that `parts` name, each one
+ * below the one before, within its section: `Setup#Mobile` is a heading
+ * `Mobile` of any lower level after a heading `Setup` and before the next
+ * heading of `Setup`'s level or higher. Every heading that a part names is
+ * tried, so the link is missing only when no such chain exists.
+ */
+function hasHeadingPath(outline: ObsidianAnchors["outline"], parts: string[]): boolean {
+  const named = (names: string[], part: string) =>
+    names.some((name) => name === part || name.toLowerCase() === part.toLowerCase());
+  const below = (part: number, from: number, depth: number): boolean => {
+    for (let at = from; at < outline.length && outline[at]!.depth > depth; at++)
+      if (
+        named(outline[at]!.names, parts[part]!) &&
+        (part === parts.length - 1 || below(part + 1, at + 1, outline[at]!.depth))
+      )
+        return true;
+    return false;
+  };
+  return below(0, 0, 0);
+}
+/** A target's anchors for Obsidian. */
+function obsidianAnchors(document: Document): ObsidianAnchors {
   const anchors: ObsidianAnchors = {
     headings: new Set(),
     foldedHeadings: new Set(),
+    outline: [],
     blocks: new Set(),
   };
-  if (!document) return anchors;
-  walk(document.tree, "heading", (node) => {
-    const text = textContent(node);
-    anchors.headings.add(text);
-    anchors.foldedHeadings.add(text.toLowerCase());
+  const { source } = document;
+  walk(document.tree, (node) => {
+    const block = blockIdentifier(source, node);
+    if (block) anchors.blocks.add(block.id);
+    if (node.type !== "heading") return;
+    // A link may name a heading by the text it shows or as its source writes
+    // it: the heading `` `move` `` is both `move` and `` `move` ``.
+    const first = node.children[0];
+    const written = first ? source.slice(range(first)[0], range(node.children.at(-1)!)[1]) : "";
+    const names = [...new Set([textContent(node), written])].map(detach);
+    for (const name of names) {
+      anchors.headings.add(name);
+      anchors.foldedHeadings.add(name.toLowerCase());
+    }
+    anchors.outline.push({ depth: node.depth, names });
   });
-  walk(document.tree, "text", (node) => {
-    const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
-    if (match) anchors.blocks.add(match[1]!);
-  });
-  detachAll(anchors.headings, anchors.foldedHeadings, anchors.blocks);
+  // The names are detached already, and so is their lowercase form.
+  detachAll(anchors.blocks);
   return anchors;
 }
-/** A target's anchors for GitHub and CommonMark; none for a target that is not Markdown source. */
-function githubAnchors(document: Document | null): GithubAnchors {
+/** A target's anchors for GitHub and CommonMark. */
+function githubAnchors(document: Document): GithubAnchors {
   const anchors: GithubAnchors = { slugs: new Set(), explicit: new Set() };
-  if (!document) return anchors;
   const slugger = new GithubSlugger();
   const parts = htmlParts(document);
   // GitHub numbers the anchors of Markdown and HTML headings together, in
@@ -375,14 +412,13 @@ function githubAnchors(document: Document | null): GithubAnchors {
   detachAll(anchors.slugs, anchors.explicit);
   return anchors;
 }
-/** A target's anchors for Forgejo and Gitea; none for a target that is not Markdown source. */
-function forgeAnchors(document: Document | null): ForgeAnchors {
+/** A target's anchors for Forgejo and Gitea. */
+function forgeAnchors(document: Document): ForgeAnchors {
   const anchors: ForgeAnchors = {
     forgejoSlugs: new Set(),
     giteaSlugs: new Set(),
     explicit: new Set(),
   };
-  if (!document) return anchors;
   const { source } = document;
   const forgejoSlugger = createForgejoSlugger();
   const giteaSlugger = createGiteaSlugger();
@@ -602,22 +638,18 @@ export function createWorkspace(
     return result;
   }
   /**
-   * One group of a target's anchors, from the target read and parsed for it;
-   * nothing keeps the parsed document. A target that the link's dialect does not
-   * render as Markdown has no anchors, also when its text is known because it
-   * was linted as Markdown. Undefined for a target that the system refuses to
-   * let be read, or whose text is not UTF-8, which is marked and not read again.
+   * One group of a Markdown target's anchors, from the target read and parsed
+   * for it; nothing keeps the parsed document. Undefined for a target that the
+   * system refuses to let be read, or whose text is not UTF-8, which is marked
+   * and not read again.
    */
   function compute<Anchors>(
     target: Target,
+    value: string | (() => string),
     name: string,
-    dialect: Dialect,
-    anchors: (document: Document | null) => Anchors,
+    anchors: (document: Document) => Anchors,
   ): Anchors | undefined {
     if (target.unreadable) return undefined;
-    const value = sources.has(name) ? sources.get(name) : foundSources.get(name);
-    if (value === null || value === undefined || !isMarkdownName(name, dialect))
-      return anchors(null);
     let source: string;
     try {
       source = typeof value === "function" ? value() : value;
@@ -644,25 +676,33 @@ export function createWorkspace(
     fragment: string,
     anchor: string,
   ): boolean | undefined {
+    const value = sources.has(name) ? sources.get(name) : foundSources.get(name);
+    // Only a Markdown file's anchors are known. Other files take fragments of
+    // their own, such as an image's `#gh-dark-mode-only`, a PDF's `#page=2`, or
+    // a forge's line range `#L10-L20` in source code, which are not checked; so
+    // is a file that is linted as Markdown only because it was named.
+    if (value === null || value === undefined || !isMarkdownName(name, dialect)) return true;
     let target = targets.get(name);
     if (!target) targets.set(name, (target = {}));
     if (dialect === "obsidian") {
-      const anchors = target.obsidian ?? compute(target, name, dialect, obsidianAnchors);
+      const anchors = target.obsidian ?? compute(target, value, name, obsidianAnchors);
       if (!anchors) return undefined;
       target.obsidian = anchors;
-      return fragment.startsWith("^")
-        ? anchors.blocks.has(fragment.slice(1))
-        : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
+      if (fragment.startsWith("^")) return anchors.blocks.has(fragment.slice(1));
+      if (anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase()))
+        return true;
+      // A path of headings, each below the one before, such as `Setup#Mobile`.
+      return fragment.includes("#") && hasHeadingPath(anchors.outline, fragment.split("#"));
     }
     if (dialect === "forgejo" || dialect === "gitea") {
-      const forge = target.forge ?? compute(target, name, dialect, forgeAnchors);
+      const forge = target.forge ?? compute(target, value, name, forgeAnchors);
       if (!forge) return undefined;
       target.forge = forge;
       const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
       return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
-    const anchors = target.github ?? compute(target, name, dialect, githubAnchors);
+    const anchors = target.github ?? compute(target, value, name, githubAnchors);
     if (!anchors) return undefined;
     target.github = anchors;
     const folded = anchor.toLowerCase();
@@ -758,7 +798,7 @@ export function createWorkspace(
     ...(options.strictLineBreaks !== undefined
       ? { strictLineBreaks: options.strictLineBreaks }
       : {}),
-    resolve(source, destination, dialect): LinkResolution {
+    resolve(source, destination, dialect, wiki = false): LinkResolution {
       if (/^[a-z][a-z\d+.-]*:/i.test(destination) || destination.startsWith("//"))
         return { status: "external" };
       source = source.replaceAll("\\", "/");
@@ -790,7 +830,7 @@ export function createWorkspace(
         const found = lookup(name, folded);
         if (found?.type === "file") {
           if (file) candidates.add(found.path);
-        } else if (found?.type === "directory") directory = true;
+        } else if (found?.type === "directory") directory ||= !wiki;
         else if (found?.type === "outside") leaves ??= found.through;
         else if (found?.type === "unreadable") blocking.add(found.at);
       };
@@ -809,10 +849,11 @@ export function createWorkspace(
           outside ??=
             namesMatching(bare)[0] ??
             (path.posix.extname(bare) ? undefined : namesMatching(`${bare}.md`)[0]) ??
-            (isDirectory(bare, true) ? bare : undefined);
+            (!wiki && isDirectory(bare, true) ? bare : undefined);
           return;
         }
-        if (isDirectory(bare, folded)) directory = true;
+        // Obsidian links a wikilink to a note or a file, never to a folder.
+        if (!wiki && isDirectory(bare, folded)) directory = true;
         const above = unreadableAbove(bare, folded);
         if (above !== undefined) blocking.add(above);
         if (!folded) {

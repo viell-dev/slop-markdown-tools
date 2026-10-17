@@ -1,5 +1,6 @@
 import { walk } from "../syntax/walk.js";
 import type { Dialect, Finding, Rule } from "../core/types.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
 import { range } from "../syntax/parse.js";
 import { headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { optionsSchema } from "./style.js";
@@ -76,12 +77,15 @@ export const dialectRules: Record<string, Rule> = {
       if (document.dialect !== "obsidian") return [];
       const seen = new Set<string>();
       const findings: Finding[] = [];
-      walk(document.tree, "text", (node) => {
-        const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
-        if (!match) return;
-        const id = match[1]!;
+      walk(document.tree, (node) => {
+        const found = blockIdentifier(document.source, node);
+        if (!found) return;
+        const { id } = found;
         if (seen.has(id))
-          findings.push({ start: range(node)[0], message: `Duplicate block identifier ^${id}.` });
+          findings.push({
+            start: range(found.node)[0],
+            message: `Duplicate block identifier ^${id}.`,
+          });
         seen.add(id);
       });
       return findings;
