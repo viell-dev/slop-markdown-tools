@@ -63,6 +63,11 @@ From `0.2.0-rc.2`:
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
+- `style/wrap` wraps more: across line breaks in links, emphasis, and code
+  spans, inside the text of links and emphasis, in the bodies of GitHub,
+  Forgejo, and Gitea alerts, and before words such as `--config` or
+  `**strong**`. A check that runs `format --check` fails on documents formatted
+  by an earlier version until `format --write` runs once.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -157,6 +162,13 @@ From every prerelease:
 - The documentation site describes the newest stable release instead of the
   unreleased state of `main`
   ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
+- `style/wrap` reflows a paragraph with a line break inside a link's text, an
+  image description, emphasis, strong text, strikethrough, or a code span, and
+  can break lines inside the text of links and emphasis
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
+  line with its marker, as it does for Obsidian callouts
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
 
 ### Fixed
 
@@ -169,6 +181,16 @@ From every prerelease:
   Obsidian paragraph holds `==`, `[[`, or `]]` outside its highlights and links,
   or when the first line is lazy
   ([#200](https://github.com/viell-dev/slop-markdown-tools/pull/200)).
+- `style/wrap` lets words that only start like a block marker, such as
+  `--config`, `#tag`, or `-5`, begin a line, and keeps a table delimiter row
+  from beginning one
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` keeps a paragraph's first line from becoming a link reference
+  definition, a thematic break, or display math instead of refusing the document
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` counts a tab in a list item's prefix up to the next tab stop
+  instead of as no width
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
 - A carriage return alone ends a line for suppression directives, diagnostic
   positions, callout titles, and `style/wrap`
   ([#196](https://github.com/viell-dev/slop-markdown-tools/pull/196),
