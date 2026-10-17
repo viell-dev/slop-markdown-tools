@@ -1,7 +1,7 @@
 import { Ajv } from "ajv";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
-import { parse, range } from "../syntax/parse.js";
+import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
@@ -119,10 +119,28 @@ function inspect(
   }
   return result.sort(sortDiagnostics);
 }
+/**
+ * Locate diagnostics of a document that `parse` read without the byte order
+ * marks it starts with in the text as given, so that their edits apply to that
+ * text. Lines and columns stay as they are: the marks are invisible.
+ */
+function located(diagnostics: Diagnostic[], mark: string): Diagnostic[] {
+  if (!mark) return diagnostics;
+  const by = mark.length;
+  return diagnostics.map((item) => ({
+    ...item,
+    start: item.start + by,
+    ...(item.end !== undefined ? { end: item.end + by } : {}),
+    ...(item.edit
+      ? { edit: { ...item.edit, start: item.edit.start + by, end: item.edit.end + by } }
+      : {}),
+  }));
+}
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
   const { config, rules } = prepare(options);
-  const document = parse(source, config.dialect, options.path, options.plugins);
-  return inspect(document, config, rules, options.workspace);
+  const [mark, text] = splitByteOrderMark(source);
+  const document = parse(text, config.dialect, options.path, options.plugins);
+  return located(inspect(document, config, rules, options.workspace), mark);
 }
 export function applyEdits(source: string, edits: Edit[]): string {
   const sorted = [...edits].sort((a, b) => a.start - b.start || a.end - b.end);
@@ -229,7 +247,20 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
   }
   return JSON.stringify(normalize(document.tree));
 }
+/**
+ * Format a document. Byte order marks that it starts with stay in the output
+ * and are not part of what the rules see.
+ */
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
+  const [mark, text] = splitByteOrderMark(source);
+  const result = formatText(text, options);
+  return {
+    output: mark + result.output,
+    changed: result.changed,
+    diagnostics: located(result.diagnostics, mark),
+  };
+}
+function formatText(source: string, options: ProcessOptions): FormatResult {
   const { config, rules } = prepare(options);
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);

@@ -308,6 +308,50 @@ describe("formatting contracts", () => {
   it("preserves CRLF when editing", () => {
     expect(formatted("A *small* paragraph.\r\n")).toBe("A _small_ paragraph.\r\n");
   });
+  it("keeps a byte order mark and edits the text after it", () => {
+    const mark = String.fromCharCode(0xfeff);
+    const source = `${mark}First paragraph.\n\nA *b* c.\n`;
+    expect(formatted(source)).toBe(`${mark}First paragraph.\n\nA _b_ c.\n`);
+    // Positions count the mark, so that edits apply to the text as given; the
+    // first visible character of a line is still in column 1.
+    const diagnostics = lint(source);
+    expect(diagnostics.map(({ rule, start, line, column }) => [rule, start, line, column])).toEqual(
+      [
+        ["style/emphasis", 21, 3, 3],
+        ["style/emphasis", 23, 3, 5],
+      ],
+    );
+    expect(
+      applyEdits(
+        source,
+        diagnostics.flatMap((item) => item.edit ?? []),
+      ),
+    ).toBe(`${mark}First paragraph.\n\nA _b_ c.\n`);
+    expect(lint(`${mark}A *b* c.\n`).map(({ start, column }) => [start, column])).toEqual([
+      [3, 3],
+      [5, 5],
+    ]);
+    // A heading's blank line stays, and a paragraph wrapped on the first line
+    // does not repeat the mark at the start of its other lines.
+    expect(formatted(`${mark}# Heading\n\nSome *emphasis* here.\n`)).toBe(
+      `${mark}# Heading\n\nSome _emphasis_ here.\n`,
+    );
+    expect(
+      formatted(`${mark}A paragraph on the first line that is long enough to wrap.\n`, {
+        config: narrow,
+      }),
+    ).toBe(`${mark}A paragraph on the first line that\nis long enough to wrap.\n`);
+    // Front matter after the mark is still front matter.
+    expect(formatted(`${mark}---\ntitle: *x*\n---\n\nA *b* c.\n`)).toBe(
+      `${mark}---\ntitle: *x*\n---\n\nA _b_ c.\n`,
+    );
+    // Two marks, as a program that adds one without looking can leave them.
+    expect(formatted(`${mark}${mark}A *b* c.\n`)).toBe(`${mark}${mark}A _b_ c.\n`);
+    // The document that rules see starts after the marks, where the tree's positions count from.
+    const document = parse(`${mark}${mark}# Title\n`, "github");
+    expect(document.source).toBe("# Title\n");
+    expect(document.tree.children[0]!.position!.start.offset).toBe(0);
+  });
   it("leaves intraword emphasis valid", () => {
     expect(formatted("foo*bar*baz\n")).toBe("foo*bar*baz\n");
   });
