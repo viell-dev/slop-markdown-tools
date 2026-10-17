@@ -157,6 +157,15 @@ choose its home:
   policy. Do not add speculative hooks or relax semantic guards for one
   consumer.
 
+The tool is a general Markdown linter and formatter that adapts to the documents
+it serves, not a formatter with one fixed style. Presets are opinionated
+defaults. Where documents reasonably differ, a rule takes options, at least
+those that markdownlint offers for the same check, with the preset's choice as
+the default. An option never lets formatting change what a document means: where
+a choice would, the rule keeps the existing form. The owner set this direction;
+a request for another style option is weighed on its use case, not declined for
+adding an option.
+
 Configurability, opt-in defaults, report-only behavior, many findings in one
 corpus, and ease of implementation do not by themselves put a feature in core,
 and plugin implementability alone is no reason to reject a broadly useful
