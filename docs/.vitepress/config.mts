@@ -1,7 +1,14 @@
+import { copyFile } from "node:fs/promises";
+import path from "node:path";
 import { slug } from "github-slugger";
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
+  // The configuration's JSON Schema, at the address that the configuration page gives.
+  async buildEnd({ root, outDir }) {
+    const name = "config.schema.json";
+    await copyFile(path.join(root, "..", name), path.join(outDir, name));
+  },
   title: "mdrefine",
   description:
     "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian.",

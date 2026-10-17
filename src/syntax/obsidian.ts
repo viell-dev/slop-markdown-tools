@@ -2,25 +2,43 @@ import type { Literal } from "mdast";
 import type { Extension, State, Tokenizer } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 
-export interface ObsidianLiteral extends Literal {
-  type: "wikiLink" | "obsidianComment" | "obsidianHighlight";
-  embed?: boolean;
-  target?: string;
+/** An Obsidian wikilink, `[[target|label]]`, or embed, `![[target]]`, in the Obsidian dialect. */
+export interface WikiLink extends Literal {
+  type: "wikiLink";
+  /** The text between the brackets, with `\|` read as `|`. */
+  value: string;
+  /** Whether it is an embed, written with `!` before the brackets. */
+  embed: boolean;
+  /** The part before the first `|`: a note name or path, and an optional `#heading` or `#^block`. */
+  target: string;
+  /** The part after the first `|`, when there is one. */
   label?: string;
+}
+/**
+ * An Obsidian comment in the Obsidian dialect. `value` is the text between the
+ * `%%` markers of a comment in running text, and the whole source of a comment
+ * that stands as a block of its own, markers included.
+ */
+export interface ObsidianComment extends Literal {
+  type: "obsidianComment";
+}
+/** An Obsidian highlight, `==text==`, in the Obsidian dialect. `value` is the text between the markers. */
+export interface ObsidianHighlight extends Literal {
+  type: "obsidianHighlight";
 }
 declare module "mdast" {
   interface RootContentMap {
-    wikiLink: ObsidianLiteral;
-    obsidianComment: ObsidianLiteral;
-    obsidianHighlight: ObsidianLiteral;
+    wikiLink: WikiLink;
+    obsidianComment: ObsidianComment;
+    obsidianHighlight: ObsidianHighlight;
   }
   interface PhrasingContentMap {
-    wikiLink: ObsidianLiteral;
-    obsidianComment: ObsidianLiteral;
-    obsidianHighlight: ObsidianLiteral;
+    wikiLink: WikiLink;
+    obsidianComment: ObsidianComment;
+    obsidianHighlight: ObsidianHighlight;
   }
   interface BlockContentMap {
-    obsidianComment: ObsidianLiteral;
+    obsidianComment: ObsidianComment;
   }
 }
 declare module "micromark-util-types" {
@@ -151,15 +169,15 @@ export const obsidianTree: TreeExtension = {
       const embed = raw.startsWith("!");
       const value = raw.slice(wiki && embed ? 3 : 2, -2).replaceAll("\\|", "|");
       const divider = value.indexOf("|");
-      const node: ObsidianLiteral = {
-        type: wiki ? "wikiLink" : raw.startsWith("%%") ? "obsidianComment" : "obsidianHighlight",
-        value,
-      };
-      if (wiki) {
-        node.embed = embed;
-        node.target = divider < 0 ? value : value.slice(0, divider);
-        if (divider >= 0) node.label = value.slice(divider + 1);
-      }
+      const node: WikiLink | ObsidianComment | ObsidianHighlight = wiki
+        ? {
+            type: "wikiLink",
+            value,
+            embed,
+            target: divider < 0 ? value : value.slice(0, divider),
+            ...(divider >= 0 ? { label: value.slice(divider + 1) } : {}),
+          }
+        : { type: raw.startsWith("%%") ? "obsidianComment" : "obsidianHighlight", value };
       this.enter(node, token);
     },
   },

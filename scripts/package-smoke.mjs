@@ -8,11 +8,130 @@ import assert from "node:assert/strict";
 
 const npm = process.env.npm_execpath;
 assert(npm, "Run this check through npm run test:package.");
+/**
+ * The pnpm that installs the package in a strict layout, where each package
+ * sees only the dependencies that it declares. npm fetches it into the
+ * repository's cache, so nothing is installed globally.
+ */
+const pnpm = "pnpm@12.14.0";
 const directory = await mkdtemp(path.join(tmpdir(), "mdtools-package-"));
 const repository = process.cwd();
+const cache = path.join(repository, ".npm-cache");
 const manifest = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
+const named = (entry = "") => JSON.stringify(`${manifest.name}${entry}`);
 function runNpm(args, cwd = repository, input) {
   return execFileSync(process.execPath, [npm, ...args], { cwd, input, encoding: "utf8" });
+}
+function runNode(args, cwd, input) {
+  return execFileSync(process.execPath, args, { cwd, input, encoding: "utf8" });
+}
+/** A TypeScript consumer of the published types, as an ES module. */
+const consumerModule = `import {
+  builtInRules, configSchema, format, lint, parse, presets, resolveConfig,
+  type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink,
+} from ${named()};
+import { discoverWorkspace, type DiscoverOptions, type Skipped, type WorkspaceDiscovery } from ${named("/node")};
+const schema: JsonSchema = { type: "object", properties: { level: { type: "integer" } } };
+const plugin: Plugin = { name: "consumer", rules: { sample: {
+  description: "Exercise the public types", kind: "problem", schema,
+  check: ({ document }) => document.tree.children.length ? [] : [{ start: 0, message: "Empty" }],
+} } };
+// Settings written as constants are read-only, which a configuration may be.
+const config = {
+  $schema: "./node_modules/mdrefine/config.schema.json",
+  extends: "recommended",
+  rules: { "style/wrap": ["warn"], "consumer/sample": ["error", { level: 1 }] },
+} as const satisfies Config;
+const options: ProcessOptions = { config, plugins: [plugin], defaultDialect: "obsidian" };
+const output: string = format("Text", options).output;
+const assumed: Dialect = resolveConfig({ ...options, defaultDialect: "codeberg" }).dialect; void assumed;
+void lint(output, { config: presets.github });
+// @ts-expect-error The tables that every caller shares are read-only.
+builtInRules["style/wrap"] = builtInRules["style/emphasis"]!;
+void configSchema.properties;
+const discoverOptions: DiscoverOptions = { root: ".", inputs: [], documents: { "a.md": "Text" } };
+const discovery: WorkspaceDiscovery = await discoverWorkspace(discoverOptions);
+const skipped: readonly Skipped[] = discovery.skipped; void skipped;
+const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
+for (const node of parse(output, "obsidian").tree.children) {
+  if (node.type === "paragraph") for (const child of node.children) {
+    if (child.type === "wikiLink") { const link: WikiLink = child; const target: string = link.target; void target; }
+  }
+}
+`;
+/** The same package from a CommonJS module, whose imports become require() calls. */
+const consumerCommonJs = `import { format, type Config } from ${named()};
+import { discoverWorkspace } from ${named("/node")};
+const config: Config = { extends: ["recommended"] };
+const output: string = format("Text", { config }).output;
+void output; void discoverWorkspace;
+`;
+/** What every installation of the package must do, whatever its layout. */
+async function checkInstalled(project) {
+  assert.equal(
+    runNode(
+      [
+        "--input-type=module",
+        "-e",
+        `import {format} from ${named()}; process.stdout.write(format("A *small* note.\\n").output);`,
+      ],
+      project,
+    ),
+    "A _small_ note.\n",
+  );
+  // CommonJS loads the ES modules with require(), and the JSON files that the package exports.
+  assert.equal(
+    runNode(
+      [
+        "--input-type=commonjs",
+        "-e",
+        `const {format} = require(${named()}); const {discoverWorkspace} = require(${named("/node")});
+const schema = require(${named("/config.schema.json")}); const {version} = require(${named("/package.json")});
+process.stdout.write([format("A *small* note.\\n").output.trim(), typeof discoverWorkspace, schema.title, version].join("|"));`,
+      ],
+      project,
+    ),
+    `A _small_ note.|function|mdtools configuration|${manifest.version}`,
+  );
+  // The filesystem entry discovers the consumer's own documents.
+  await writeFile(path.join(project, "note.md"), "A *small* note.\n");
+  assert.equal(
+    runNode(
+      [
+        "--input-type=module",
+        "-e",
+        `import {format} from ${named()}; import {discoverWorkspace} from ${named("/node")};
+const d = await discoverWorkspace({root: ".", inputs: ["note.md"]});
+process.stdout.write(d.selected.join(",") + ":" + format(d.read("note.md"), d.options("note.md")).output);`,
+      ],
+      project,
+    ),
+    "note.md:A _small_ note.\n",
+  );
+  // The command finds its own dependencies from where it is installed.
+  const command = path.join(project, "node_modules", manifest.name, manifest.bin.mdtools);
+  assert.equal(
+    runNode([command, "format", "-", "--root", project], project, "A *small* note.\n"),
+    "A _small_ note.\n",
+  );
+  await writeFile(path.join(project, "consumer.mts"), consumerModule);
+  await writeFile(path.join(project, "consumer.cts"), consumerCommonJs);
+  execFileSync(
+    process.execPath,
+    [
+      path.join(repository, "node_modules/typescript/bin/tsc"),
+      "--noEmit",
+      "--strict",
+      "--exactOptionalPropertyTypes",
+      "--module",
+      "NodeNext",
+      "--target",
+      "ES2023",
+      "consumer.mts",
+      "consumer.cts",
+    ],
+    { cwd: project, stdio: "inherit" },
+  );
 }
 try {
   const packed = JSON.parse(
@@ -22,7 +141,7 @@ try {
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|package\.json$)/.test(
+      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -33,6 +152,7 @@ try {
     "dist/node.js",
     "dist/node.d.ts",
     "dist/cli/main.js",
+    "config.schema.json",
     "LICENSE",
     "THIRD_PARTY_NOTICES",
     "README.md",
@@ -46,23 +166,20 @@ try {
       result.files.some((file) => file.path === required),
       `Missing packed file: ${required}`,
     );
+  const tarball = path.join(directory, result.filename);
+
+  // npm's layout, where dependencies of dependencies are hoisted next to them.
+  const hoisted = path.join(directory, "npm");
+  await mkdir(hoisted);
   await writeFile(
-    path.join(directory, "package.json"),
+    path.join(hoisted, "package.json"),
     JSON.stringify({ private: true, type: "module", scripts: { cli: "mdtools" } }),
   );
   runNpm(
-    [
-      "install",
-      path.join(directory, result.filename),
-      "--ignore-scripts",
-      "--no-audit",
-      "--no-fund",
-      "--cache",
-      path.join(repository, ".npm-cache"),
-    ],
-    directory,
+    ["install", tarball, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
+    hoisted,
   );
-  const installed = path.join(directory, "node_modules", manifest.name);
+  const installed = path.join(hoisted, "node_modules", manifest.name);
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.equal(metadata.version, manifest.version);
   assert.equal(metadata.bin.mdtools, "dist/cli/main.js");
@@ -73,95 +190,66 @@ try {
   );
   // npm scripts exercise the actual installed .bin shim on Windows and POSIX.
   assert.equal(
-    runNpm(["run", "--silent", "cli", "--", "--version"], directory).trim(),
+    runNpm(["run", "--silent", "cli", "--", "--version"], hoisted).trim(),
     manifest.version,
   );
   assert.equal(
     runNpm(
-      ["run", "--silent", "cli", "--", "format", "-", "--root", directory],
-      directory,
+      ["run", "--silent", "cli", "--", "format", "-", "--root", hoisted],
+      hoisted,
       "A *small* note.\n",
     ),
     "A _small_ note.\n",
   );
-  const output = execFileSync(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `import {format} from ${JSON.stringify(manifest.name)}; process.stdout.write(format("A *small* note.\\n").output);`,
-    ],
-    { encoding: "utf8", cwd: directory },
-  );
-  assert.equal(output, "A _small_ note.\n");
-  // The filesystem entry discovers the consumer's own documents.
-  await writeFile(path.join(directory, "note.md"), "A *small* note.\n");
-  const discovered = execFileSync(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `import {format} from ${JSON.stringify(manifest.name)}; import {discoverWorkspace} from ${JSON.stringify(`${manifest.name}/node`)};
-const d = await discoverWorkspace({root: ".", inputs: ["note.md"]});
-process.stdout.write(d.selected.join(",") + ":" + format(d.read("note.md"), d.options("note.md")).output);`,
-    ],
-    { encoding: "utf8", cwd: directory },
-  );
-  assert.equal(discovered, "note.md:A _small_ note.\n");
   // A shipped example imports the package by name from inside the installed package.
   assert.equal(
-    execFileSync(
-      process.execPath,
-      [path.join(installed, "examples", "library", "format-string.mjs")],
-      { encoding: "utf8", cwd: directory },
-    ),
+    runNode([path.join(installed, "examples", "library", "format-string.mjs")], hoisted),
     "A _short_ note with **strong** words and\nno final newline.\n\nchanged: true; remaining diagnostics: 0\n",
   );
-  const consumer = path.join(directory, "consumer.mts");
+  await checkInstalled(hoisted);
+
+  // pnpm's layout without hoisting: a dependency that the package uses, its
+  // type declarations included, must be one that it declares.
+  const strict = path.join(directory, "pnpm");
+  await mkdir(strict);
   await writeFile(
-    consumer,
-    `import { format, parse, resolveConfig, type Dialect, type Plugin, type ProcessOptions } from ${JSON.stringify(manifest.name)};
-import { discoverWorkspace, type DiscoverOptions, type Skipped, type WorkspaceDiscovery } from ${JSON.stringify(`${manifest.name}/node`)};
-const plugin: Plugin = { name: "consumer", rules: { sample: {
-  description: "Exercise the public types", kind: "problem",
-  check: ({ document }) => document.tree.children.length ? [] : [{ start: 0, message: "Empty" }],
-} } };
-const options: ProcessOptions = { plugins: [plugin], defaultDialect: "obsidian" };
-const output: string = format("Text", options).output;
-const assumed: Dialect = resolveConfig({}, "note.md", [plugin], "codeberg").dialect; void assumed;
-const discoverOptions: DiscoverOptions = { root: ".", inputs: [], documents: { "a.md": "Text" } };
-const discovery: WorkspaceDiscovery = await discoverWorkspace(discoverOptions);
-const skipped: readonly Skipped[] = discovery.skipped; void skipped;
-const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
-for (const node of parse(output, "obsidian").tree.children) {
-  if (node.type === "paragraph") for (const child of node.children) {
-    if (child.type === "wikiLink") { const target: string | undefined = child.target; void target; }
-  }
-}
-`,
+    path.join(strict, "package.json"),
+    JSON.stringify({
+      private: true,
+      type: "module",
+      dependencies: { [manifest.name]: `file:../${result.filename}` },
+    }),
   );
-  execFileSync(
-    process.execPath,
+  runNpm(
     [
-      path.join(repository, "node_modules/typescript/bin/tsc"),
-      "--noEmit",
-      "--strict",
-      "--module",
-      "NodeNext",
-      "--target",
-      "ES2023",
-      consumer,
+      "exec",
+      "--yes",
+      `--package=${pnpm}`,
+      "--cache",
+      cache,
+      "--",
+      "pnpm",
+      "install",
+      "--ignore-scripts",
+      "--no-frozen-lockfile",
+      "--config.hoist=false",
+      "--config.public-hoist-pattern=",
+      `--config.store-dir=${path.join(cache, "pnpm-store")}`,
+      `--config.cache-dir=${path.join(cache, "pnpm-cache")}`,
+      "--reporter=silent",
     ],
-    { cwd: directory, stdio: "inherit" },
+    strict,
   );
+  await checkInstalled(strict);
+
   if (process.argv.includes("--retain")) {
     const artifacts = path.join(repository, "artifacts");
     await mkdir(artifacts, { recursive: true });
-    const tarball = await readFile(path.join(directory, result.filename));
-    await copyFile(path.join(directory, result.filename), path.join(artifacts, result.filename));
+    const content = await readFile(tarball);
+    await copyFile(tarball, path.join(artifacts, result.filename));
     await writeFile(
       path.join(artifacts, "SHA256SUMS"),
-      `${createHash("sha256").update(tarball).digest("hex")}  ${result.filename}\n`,
+      `${createHash("sha256").update(content).digest("hex")}  ${result.filename}\n`,
     );
     await writeFile(
       path.join(artifacts, "package-manifest.json"),
@@ -169,7 +257,7 @@ for (const node of parse(output, "obsidian").tree.children) {
     );
   }
   process.stdout.write(
-    `Installed ${manifest.name}@${manifest.version}: executable, library, and consumer types passed.\n`,
+    `Installed ${manifest.name}@${manifest.version} with npm and with ${pnpm}: executable, library, require(), and consumer types passed.\n`,
   );
 } finally {
   await rm(directory, { recursive: true, force: true });

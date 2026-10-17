@@ -127,6 +127,33 @@ describe("CLI", () => {
       "note.md",
     ]);
   });
+  it("matches configuration patterns with their letter case on every system", async () => {
+    // .gitignore files and input patterns ignore case on Windows and macOS; a configuration,
+    // which every system shares, selects the same files everywhere.
+    const root = await fixture({
+      "mdtools.config.json": JSON.stringify({
+        ignore: ["drafts/**", "skip/**"],
+        overrides: [{ files: ["notes/**", "other/**"], rules: { "style/emphasis": "off" } }],
+      }),
+      "Drafts/a.md": "A note.\n",
+      "skip/b.md": "A note.\n",
+      "Notes/c.md": "A *note*.\n",
+      "other/d.md": "A *note*.\n",
+    });
+    const result = run(root, ["lint", "--json"]);
+    const report = JSON.parse(result.stdout) as {
+      files: { path: string; diagnostics: { rule: string }[] }[];
+    };
+    expect(report.files.map((file) => file.path)).toEqual([
+      "Drafts/a.md",
+      "Notes/c.md",
+      "other/d.md",
+    ]);
+    const rules = report.files.map((file) => [
+      ...new Set(file.diagnostics.map(({ rule }) => rule)),
+    ]);
+    expect(rules).toEqual([[], ["style/emphasis"], []]);
+  });
   it("indexes ignored and nested targets only when opted in, without selecting them", async () => {
     const root = await fixture({
       "mdtools.config.json": JSON.stringify({
@@ -1256,13 +1283,23 @@ describe("paths and configuration files that cannot be used", () => {
     fails(
       path.join(cut, "sub"),
       ["lint"],
-      `Invalid JSON configuration in ${path.join(cut, "mdtools.config.json")}: ValueExpected at offset 11, CloseBraceExpected at offset 11`,
+      `Invalid JSON configuration in ${path.join(cut, "mdtools.config.json")} at line 1, column 12: a value is expected`,
     );
-    const wrong = await fixture({ "odd.jsonc": '{ "rules": 5 }', "note.md": "A note.\n" });
+    const wrong = await fixture({
+      "odd.jsonc": '{ "rules": 5 }',
+      "gitlab.json": '{ "dialect": "gitlab" }',
+      "note.md": "A note.\n",
+    });
+    // An enumerated setting names the values it allows.
+    fails(
+      wrong,
+      ["lint", "--config", "gitlab.json"],
+      'Invalid configuration in gitlab.json: "dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", or "obsidian", not "gitlab"',
+    );
     fails(
       wrong,
       ["lint", "--config", "odd.jsonc"],
-      "Invalid configuration in odd.jsonc: data/rules must be object",
+      'Invalid configuration in odd.jsonc: "rules" must be an object of rule IDs and their settings, not 5',
     );
     const script = await fixture({
       "mdtools.config.mjs": "export default {\n",
@@ -1280,12 +1317,36 @@ describe("paths and configuration files that cannot be used", () => {
     fails(
       script,
       ["lint", "--config", "wrong.mjs"],
-      "Invalid configuration in wrong.mjs: data/rules must be object",
+      'Invalid configuration in wrong.mjs: "rules" must be an object of rule IDs and their settings, not 5',
     );
     fails(
       script,
       ["lint", "--config", "throws.mjs"],
       "Cannot load configuration file throws.mjs: no settings today",
+    );
+    // A syntax error is placed by line and column, whatever the line endings, and only the
+    // first is reported: the parser's later errors follow from it.
+    const lines = await fixture({
+      "crlf.json":
+        '{\r\n  "extends": ["recommended"],\r\n  "rules": { "style/wrap": "warn" "x": 1 }\r\n}\r\n',
+      "quoted.jsonc": "{\n  // Comments are allowed here.\n  'dialect': 'github'\n}\n",
+      "comment.json": '{\n  "dialect": "github" // A comment.\n}\n',
+      "note.md": "A note.\n",
+    });
+    fails(
+      lines,
+      ["lint", "--config", "crlf.json"],
+      "Invalid JSON configuration in crlf.json at line 3, column 35: a comma is expected",
+    );
+    fails(
+      lines,
+      ["lint", "--config", "quoted.jsonc"],
+      `Invalid JSON configuration in quoted.jsonc at line 3, column 3: "'dialect'" is not valid JSON here`,
+    );
+    fails(
+      lines,
+      ["lint", "--config", "comment.json"],
+      "Invalid JSON configuration in comment.json at line 2, column 23: a .json file cannot hold comments; name it .jsonc to keep them",
     );
     // A folder with the name of a configuration file is found, and is not one.
     const folder = await fixture({ "note.md": "A note.\n" });
@@ -1295,6 +1356,29 @@ describe("paths and configuration files that cannot be used", () => {
       ["lint"],
       `Configuration file is not a file: ${path.join(folder, "mdtools.config.jsonc")}`,
     );
+  });
+  it("finds JavaScript configuration files and loads them as Node.js reads them", async () => {
+    const esm = 'export default { rules: { "style/emphasis": "off" } };\n';
+    const cjs = 'module.exports = { rules: { "style/emphasis": "off" } };\n';
+    for (const files of [
+      { "mdtools.config.js": esm },
+      { "mdtools.config.js": cjs },
+      { "mdtools.config.js": esm, "package.json": '{ "type": "module" }' },
+      { "mdtools.config.js": cjs, "package.json": '{ "type": "commonjs" }' },
+      { "mdtools.config.cjs": cjs, "package.json": '{ "type": "module" }' },
+      { "sub/mdtools.config.cjs": cjs },
+    ]) {
+      const root = await fixture({ ...files, "sub/note.md": "*keep*\n" });
+      // Found from the documents' folder or above it, the file turns emphasis off.
+      const checked = run(path.join(root, "sub"), ["format", "--check"]);
+      expect(checked.stderr, JSON.stringify(files)).toBe("1 file(s) processed; 0 would change.\n");
+      expect(checked.status).toBe(0);
+    }
+    const both = await fixture({ "mdtools.config.js": esm, "mdtools.config.cjs": cjs });
+    fails(both, ["lint"], `Multiple mdtools configuration files in ${both}. Use --config.`);
+    // Named explicitly, any of the three extensions is JavaScript.
+    const named = await fixture({ "settings.cjs": cjs, "note.md": "*keep*\n" });
+    expect(run(named, ["format", "--check", "--config", "settings.cjs"]).status).toBe(0);
   });
   it("counts the findings in the lint summary and the changes in the format summary", async () => {
     const root = await fixture({
