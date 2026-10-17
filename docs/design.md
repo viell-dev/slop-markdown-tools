@@ -1,302 +1,122 @@
-# Design and current limitations
+# How it works and its limits
 
-## Architecture
+## Safety model
 
-The project uses TypeScript, Node.js, and npm. mdast/micromark provide parsing
-and syntax extensions. The formatter retains original source and applies
-source-positioned edits rather than serializing the whole AST. This allows
-disabled formatting rules and opaque constructs to retain their spelling.
+Formatting does not print a document again from its syntax tree. Each style rule
+proposes edits at positions in the original source, and everything outside those
+edits stays byte for byte as it was. A rule that is turned off therefore leaves
+its constructs as they were written, and syntax that the tool does not
+understand survives unchanged.
 
-`src/syntax/` owns parsing and Obsidian tokens. `src/config/` owns configuration
-and plugin discovery. `src/core/` owns the shared contracts, suppression
-directives, diagnostics, and edit engine. `src/rules/` implements built-in
-rules. `src/workspace/` resolves targets and handles filesystem
-selection/writes. `src/cli/` connects those services; the public `src/index.ts`
-library has no implicit filesystem access. `src/node.ts`, published as
-`mdrefine/node`, gives library hosts the CLI's discovery and per-document
-options from `src/workspace/discovery.ts`, which the CLI itself uses.
+The edits are applied in three phases, inline, block, and document, so that
+edits that commonly overlap do not meet in one pass. After each phase that
+changes the document, the tool parses the result again and compares its meaning
+with the original: the syntax tree with the whitespace of prose normalized and
+each link compared by the file it resolves to. When the meaning differs, the
+phase tries the edits one rule at a time and leaves out the edits of each rule
+that would change it, all of them, because one edit can depend on another; the
+other rules' edits are kept. Each rule left out gets an `engine/unsafe-format`
+error at the line where the meaning would first differ, as in
+`style/wrap would change the parsed meaning at line 12; none of its edits were applied.`
+Of two edits that overlap, the one that starts first is applied, and the other
+rule runs again in the next pass. The phases repeat until nothing changes, for
+at most eight passes. When rules undo each other or formatting does not settle,
+`format` returns the document as it was with an `engine/unsafe-format` error
+that names them. Either way, `format --write` writes no file of the batch.
 
-Lint and format use the same rule settings. A style rule checks a preferred
-representation and proposes edits. A problem rule reports defects without
-inventing repairs. Inline, block, and document phases separate operations that
-would otherwise commonly overlap. Each phase reparses its result and compares a
-semantic fingerprint, using resolved destinations for link identity. When the
-fingerprints differ, the phase tries its edits one rule at a time and leaves out
-those of each rule that changes the meaning, so that one rule's defect does not
-cost the document the other rules' formatting. Overlapping edits are applied in
-turn, over successive passes. Formatting must converge; otherwise the original
-document is returned with an error diagnostic. A rule that throws or returns
-unusable findings is skipped for the document and reported, like a rule whose
-edits were left out, as an error.
+The comparison is only as good as the parser's reading:
 
-## Safety boundaries
+- It compares syntax trees, and does not run GitHub's, Forgejo's, Gitea's, or
+  Obsidian's renderer.
+- It reads the document in its dialect, so it cannot notice that the dialect is
+  wrong. In CommonMark a table is an ordinary paragraph, and joining its lines
+  changes nothing that CommonMark sees. This is why the tool
+  [assumes a dialect](dialects.md#the-assumed-dialect) with more syntax, not
+  less, when none is named.
+- The parser, micromark, follows CommonMark closely but not everywhere. Directly
+  below a paragraph, a list item that begins with another list marker, as in
+  `- 2. Step` or `- -`, is read as a list item holding text, where CommonMark
+  and GitHub read a nested list
+  ([issue #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
+  Formatting cannot change such a document's meaning, because the comparison
+  uses the same reading before and after, but rules see text where GitHub shows
+  a list, and the rules that would change such a place leave it as written.
 
-The semantic fingerprint protects the supported AST model, not every
-application's rendered output. It normalizes ordinary prose whitespace and known
-callout-marker casing. It does not run Obsidian or GitHub's renderer. Syntax
-extensions require regression tests for their own meaning and source
-preservation. Tests use synthetic documents, deterministic property checks, and
-filesystem/CLI integration cases, including the list-collapse failure that
-motivated replacing heuristic reflow; [testing](testing.md) describes the
-suites.
+Which `$…$` is math was observed on the renderers themselves: about 125 cases
+rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on
+every run, and 22 cases that a person looked at in both of Obsidian's views. The
+rule is one-sided on purpose: text taken for math is only left alone, while a
+formula taken for prose could be wrapped or restyled, so a condition is applied
+to a dialect only when its renderer was seen to apply it.
 
-The fingerprint is computed in the document's dialect, so it cannot notice that
-the dialect itself is wrong. In CommonMark a table, or a run of footnote
-definitions, is an ordinary paragraph: reflow joins its lines, and the
-CommonMark meaning of the result is unchanged although no site renders the table
-any more. When nothing names a dialect, the tool therefore assumes `github`,
-whose syntax the Forgejo, Gitea, and Obsidian dialects build on, and not
-CommonMark. For a document that really is plain CommonMark this only makes
-formatting more careful: constructs that would have been reflowed or restyled,
-such as a table or a formula between `$` signs, are left alone. A vault is the
-exception, because no other dialect knows that Obsidian shows a single line
-break unless the vault's settings say otherwise: for a document inside a vault,
-the CLI assumes `obsidian`. A vault is a folder that contains a `.obsidian`
-folder. The CLI already looks for that folder to find the workspace root and the
-line-break setting, so no new guess about a document's content is involved. A
-document belongs to the nearest vault at or above its own folder, which can lie
-below the workspace root or above it, and the line-break setting is read from
-that vault. The search upward ends at a repository boundary, a folder that
-contains `.git`. Discovery leaves a repository inside a workspace alone, so a
-repository checked out inside a vault is not read as notes from the inside
-either; without a boundary, every project below a vault would be.
-Version 0.2.0-rc.1 and earlier assumed CommonMark everywhere. Link resolution
-follows the vault too: an Obsidian link in a vault below the workspace root
-reaches only that vault's files, by paths counted from the vault's folder. A
-workspace root inside a vault is the one layout where the tool sees only part of
-a vault. It does not read the rest: the root is the user's statement of what the
-tool may touch. A link whose target the rest of the vault could hold, or outdo,
-is reported as not checkable and is never rewritten, by the same marking that an
-unreadable directory gives. The assumption is made in one place, where
-configuration is resolved: the library takes the dialect to assume as an
-argument, since it does not read files, and anything that names a dialect
-replaces it. The workspace index uses `github` for link targets when a library
-caller gives it no dialect.
+## Limits
 
-Obsidian callout headers remain intact; supported body prose can reflow directly
-below the header or in later paragraphs. The semantic fingerprint also protects
-the title/body boundary. Lazy quote continuations and inline syntax spanning
-that boundary remain untouched. Highlight, comment, math, code, HTML, and
-front-matter contents are preserved. Standalone Obsidian comment blocks may span
-blank lines. Inline comments spanning multiple paragraphs are not fully modeled;
-suppress formatting around those constructs or use standalone comment blocks.
+Formatting:
 
-The source-preserving wrapper supports ordinary paragraphs, list items, and
-blockquote containers. It preserves explicit hard-break paragraphs, lazy/unusual
-continuations it cannot safely reconstruct, including a paragraph whose first
-line is lazy, paragraphs carrying block IDs, and paragraphs whose first word is
-a bare block marker that joining the next word would turn into a block. In the
-Obsidian dialect it also preserves paragraphs with `==`, `[[`, or `]]` outside
-the highlights and wikilinks that the parser read: it reads them only within a
-line, and joining lines could create one. Long unbreakable atoms can exceed the
-width. Intraword emphasis retains asterisks when underscores would change
-parsing. Formatting width is a target, not a license to split protected syntax.
+- A link, code span, or word longer than the line stays whole and exceeds the
+  width. The width is a target, not a license to split syntax.
+- Paragraphs that wrapping cannot reconstruct safely are left as written;
+  [`style/wrap`](rules.md#stylewrap) lists them, and its `reportUnreflowed`
+  option reports them.
+- Emphasis inside a word keeps `*` when the configured marker is `_`, because
+  `_` cannot mark emphasis there.
+- Tables are aligned only outside lists and block quotes.
+- Footnotes, strikethrough, and literal autolinks are read but have no rules of
+  their own. Reference definitions are checked but not rewritten.
+- There is no formatting of code inside code blocks, no change of front matter
+  or other metadata, no generation of documents, and no renaming of files.
 
-Dollar math is read by a tokenizer of the project's own, with the conditions
-that each renderer was observed to apply to `$…$` in running text. The rule for
-choosing them is one-sided on purpose. Text that the tool wrongly takes for math
-is only left alone, while a formula taken for prose could be rewrapped or have
-its `*` restyled. A condition is therefore applied to a dialect only when its
-renderer was seen to apply it, and where a renderer is stricter still, the tool
-keeps protecting the text. The observations, about 125 cases rendered by GitHub,
-Forgejo, and Gitea, are kept with the tests and are compared with the tokenizer
-on every run. Obsidian has no renderer that a test or a script can ask, so its
-conditions rest on 22 cases that a person looked at in Reading view and in Live
-Preview. Where those two views disagree, the dialect follows the one that shows
-more as a formula, and what was not looked at is still read as math.
+Files:
 
-GitHub alert support normalizes known alert type markers. Footnotes, math,
-strikethrough, and autolinks are parsed, but do not each have dedicated style
-rules. Literal autolinks come from the syntax extension only. GitHub applies a
-second, transform-time autolink pass to files, which links cases such as
-`[www.example.com]`, but the GFM tree transform implementing it produces nodes
-without source positions, and one such URL made the engine refuse the whole
-document. No built-in rule acts on literal autolinks, so formatted output is the
-same either way; plugins inspecting link nodes do not see those autolinks.
+- Only UTF-8 text is read. Another encoding is not guessed, because a guess can
+  be wrong and the renderers read Markdown as UTF-8, and it is not decoded with
+  replacement characters, which the next edit would write into the file. See
+  [files that cannot be read](cli.md#files-that-cannot-be-read-or-written).
+- A file that `format --write` replaces loses its creation time, extended
+  attributes, and its own access control entries; see
+  [what a replaced file keeps](cli.md#what-a-replaced-file-keeps).
 
-Forgejo and Gitea documents parse as GitHub Markdown. Their additional syntax is
-protected rather than modeled: paragraphs containing a definition description
-line or a `\[` display-math line are not reflowed, `\(...\)` math and `[[...]]`
-shortlinks on one line are unbreakable atoms, and a pair split across lines
-protects its paragraph because reflow could join it. Emphasis markers inside a
-one-line `\(...\)` pair are not changed, and code spans are not joined where
-that would put `\(` and `\)` on one line. Gitea parses the backslash math
-delimiters only when its instance enables them, so they are protected
-regardless. Gitea's exception for underscores before `.py` is protected the same
-way: on a line containing `_.py`, emphasis markers, multiline code spans, and
-link destinations whose rewrite would change their underscores are left
-unchanged, and such a paragraph is reflowed only when all its underscores are
-inside code spans and it contains no `$` or `\(` math. Shortlinks are not
-resolved as links. Legacy `> **Note**` callouts, table-of-contents front matter,
-emoji shortcodes, color previews, and issue or commit references are preserved
-unchanged and not modeled. Table alignment currently applies only to top-level
-tables and preserves cell contents. Embedded code formatting, metadata mutation,
-document generation, external URL fetching, and file renames are outside this
-release.
+Syntax:
 
-A Forgejo or Gitea heading's trailing attribute block (`## Title {#id .class}`)
-is protected from formatting, because both renderers read it before they parse
-inline content. Whether a heading ends in a valid block, and what the block
-says, depends on every character from the first `{` of the heading's last text
-line on, so emphasis markers and link destinations from there on are left
-unchanged. A code span spanning lines of a heading is not joined, because the
-block is read from the heading's last text line. A Setext heading converted to
-ATX gets a `#` run in front of its block escaped, which would otherwise close
-the heading. For these two dialects the semantic fingerprint includes each
-block's source text, so an edit from any other rule or plugin that changes a
-block, makes one invalid, or creates one is refused. That covers a block
-followed by a closing `#` sequence (`## Title {#id} ##`) as well, which only
-Gitea before 1.26 reads as attributes. Forgejo, and Gitea before 1.26, also
-generate the anchor from that line as written, so the marker and link
-destination rules leave the last line of a heading without a custom `id`
-unchanged on these dialects, and the fingerprint includes the Forgejo and Gitea
-anchors generated from it.
+- Obsidian inline comments that span several paragraphs are not fully read;
+  suppress formatting around them or use comment blocks. Heading nesting paths
+  in links, property aliases, PDF subpaths, and the syntax of community plugins
+  are not supported.
+- Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
+  and shortlinks, is protected rather than read, and shortlinks are not checked
+  as links.
+- Legacy `> **Note**` callouts, table-of-contents front matter, emoji
+  shortcodes, color previews, and issue or commit references are kept as text.
+- GitHub reads an escaped `\$` as the start of a formula; the tool does not.
+- GitHub also links bare addresses such as `[www.example.com]` in a second pass
+  that leaves no source positions. The tool does not read those links, so
+  plugins do not see them; no built-in rule acts on them.
 
-Obsidian links resolve against indexed paths, extensionless Markdown candidates,
-and unique suffixes for internal links. Duplicate candidates remain ambiguous.
-Heading fragments use exact text; GitHub uses slugged headings including
-duplicate suffixes, and Forgejo uses its own anchor algorithm, which collapses
-punctuation runs and keeps Unicode letters. Gitea deletes punctuation like
-GitHub but also drops combining marks; Gitea fragments also accept the duplicate
-suffixes that versions before 1.26 generated and, for headings containing
-`_.py`, the anchor of the literal text that 1.26 and later show. Inline HTML in
-a heading contributes its text, but not its tags or comments, to GitHub anchors,
-except for the tags that GitHub's tag filter shows as text, such as `<script>`.
-Forgejo, and Gitea before 1.26, build anchors from the source of the heading's
-last line, with link destinations, emphasis markers, character references, and
-tags included and `#` sequences, container prefixes, and a trailing attribute
-block left out; Gitea 1.26 and later use the rendered text of every line, in
-which `<script>`, `<style>`, `<html>`, and `<head>` tags are shown as text and a
-hard line break is a line break, so Gitea fragments accept both. Character
-references inside a filtered tag on GitHub are not modeled. Nor, on Gitea, are
-the number a footnote reference shows in a heading, or tags or Markdown syntax
-inside `<textarea>`, `<plaintext>`, and the other elements whose content HTML
-reads as plain text, including an unclosed one, which takes in the rest of the
-document. Forgejo and Gitea fragments read a heading's trailing attribute block
-(`## Title {#id .class}`) by the rules of goldmark 1.8, which Forgejo 16 and
-Gitea 1.26 and later use: an `id` is the heading's only anchor, matched as
-written and never numbered, and any other valid block is left out of the text
-that generates the anchor. That text comes from a second parse of the target
-with the blocks blanked out, because goldmark removes a block before it parses
-the heading's inline content. The block stays heading text for other dialects,
-rules, and plugins. An `id` written with the `user-content-` prefix that the
-renderers add themselves is matched without it. Not modeled are the older
-attribute rules of Gitea before 1.26, which for example also read a block
-followed by a closing `#` sequence, and attribute values nested more than 64
-levels deep, which leave the block as heading text. A heading whose `id` is not
-a string (`{id=5}`) has no anchor on Gitea 1.26 and later and makes Forgejo, and
-Gitea before 1.26, render nothing for the document; `forgejo/heading-id` reports
-it on both dialects, and the anchors are those of Gitea 1.26 and later. Block
-identifiers are indexed from trailing text markers. Heading nesting paths,
-property aliases, PDF subpaths, and every Obsidian plugin's syntax are not fully
-supported. Embeds are preserved as embeds; image dimensions in their aliases
-remain intact.
+Links:
 
-GitHub, Forgejo, and Gitea store every anchor with the prefix `user-content-`
-and add it to a link's fragment unless the fragment already starts with it. A
-fragment written with the prefix therefore reaches the same anchor as one
-without, and is matched without it; Obsidian fragments stay literal. The three
-also keep the `id` attribute of every element and the `name` of an `<a>` in a
-document's HTML, prefixed the same way, so those are fragments too, read from
-the inline and block HTML with comments dropped; GitHub lowercases them and
-matches any fragment lowercased as well, including a heading's. They do not
-number later headings. The scan follows HTML tokenization: comments, unclosed
-ones to the end of their block, declarations, and the content of `<script>`,
-`<textarea>`, and the other raw-text elements are skipped, a `<!--` inside a
-quoted attribute value is part of the value, and every value of a repeated
-attribute counts, since the renderers disagree on which one they keep. Entity
-references in such attributes are not decoded. GitHub and Gitea 1.26 and later
-also generate anchors for headings written as HTML, from their text content with
-inner tags removed and character references decoded; GitHub numbers them in
-document order together with the Markdown headings and also when the tag has an
-`id`, Gitea numbers nothing and skips a tag with an `id`, and Forgejo generates
-none. Headings inside HTML blocks and inline in a paragraph both count, a
-heading's start tag ends a heading that is still open, and one left open at the
-end of its HTML is not reported, although the renderers continue it through the
-Markdown that follows. Numeric character references are decoded with or without
-a semicolon; named ones only with it. GitHub's treatment was taken from a live
-README and from the heading filter its rendering derives from, not from a page
-with repeated or `id`-bearing HTML headings.
+- Links to the web are never fetched.
+- Obsidian's resolution by note name is not a complete copy of Obsidian's: a
+  missing or ambiguous target is reported, never guessed. A directory is never
+  rewritten to a README or index note.
+- When a directory cannot be read, a search by note name cannot be exact. A link
+  that finds no readable note is reported as not checkable, and one that finds a
+  single note is accepted but never rewritten.
+- With the workspace root inside a vault, links to notes outside the root cannot
+  be checked; see
+  [Obsidian vaults](obsidian.md#a-workspace-root-inside-a-vault).
+- Heading anchors are modeled as each renderer generates them, with these
+  exceptions: character references inside tags that GitHub shows as text; on
+  Gitea, the number of a footnote reference in a heading, and Markdown inside
+  `<textarea>`, `<plaintext>`, and other elements whose content HTML reads as
+  text; the attribute rules of Gitea before 1.26; attribute values nested more
+  than 64 levels deep; and character references in HTML `id` and `name`
+  attributes, which are not decoded.
 
-The workspace indexes eligible paths first and parses target Markdown only when
-a fragment is checked. For the rest of that invocation it keeps the target's
-anchors and nothing else: the parsed document, which takes many times the memory
-of its source, is released as soon as the anchors are known. Versions up to
-`0.2.0-rc.1` kept every parsed target until the run ended, so memory grew with
-the number of linked documents. Anchors form three groups, one for Obsidian, one
-for GitHub and CommonMark, and one for Forgejo and Gitea. A group is computed
-the first time a link is checked against one of its dialects, so a GitHub or
-Obsidian workspace never reads attribute blocks, which need a second parse, or
-the Forgejo and Gitea anchors, and the forges never number anchors GitHub's way.
-The command line checks each target against one group. A library host that
-checks a target against a second group has it read and parsed once more, which
-is cheaper overall than keeping every parsed document or computing every group
-for every target. CLI discovery also defers reading Markdown until it is
-selected or needed for a fragment. Each rule's option schema, built-in or from a
-plugin, is compiled once and reused across documents. A suffix lookup index is
-built on first use instead of scanning every path for each shortened link. There
-is no persistent cache, worker pool, watch service, editor extension, or
-language server yet. The library has a pluggable workspace interface for
-specialized hosts.
+Scale:
 
-Discovery skips a directory that the system refuses to let it read (`EACCES`,
-`EPERM`, or `EBUSY` for a lock on Windows) and carries on; every other read
-error is treated as a fault and stops the run. A directory is read as a whole or
-not at all: one that can be listed but not entered, or entered but not listed,
-is skipped like one that allows neither, although the first reveals file names
-and the second would open a file whose name is known. The index then holds the
-readable files only. Links whose path leads into a skipped directory resolve as
-unreadable rather than missing. Obsidian's search by note name cannot be made
-exact: a name with no readable match is reported as unchecked, a name with one
-readable match is accepted but not rewritten, like a note found in a place that
-Obsidian tries only after a skipped directory, and a name with several is
-ambiguous either way. A file is read only when it is processed or when a link's
-fragment needs its content, so a refusal is met late: a selected file becomes an
-`engine/unreadable-file` diagnostic that blocks the batch's write phase, and a
-link target makes the fragment unchecked for the documents that link to it. A
-file whose bytes are not UTF-8 text is treated the same way. Decoding it with
-replacement characters would make every later edit write them into the file, and
-detecting its encoding instead would be a guess that needs an encoding library,
-for renderers that all expect UTF-8.
-[Paths that cannot be read](configuration.md#paths-that-cannot-be-read)
-describes the behavior.
-
-`npm run benchmark` measures parsing, linting, and formatting of synthetic
-repository documentation and a synthetic vault, through the library and through
-the CLI, and prints an output hash for comparing implementations.
-[Benchmarks](benchmarks.md) explains each measurement and records reference
-results. They do not predict a particular workspace's throughput. Measure the
-original workload before adding caches or workers.
-
-Formatting retains the current parsed document within one call, reusing it
-between phases and for final diagnostics. Every changed candidate is parsed and
-checked against the original semantic fingerprint before becoming the next
-phase's input; the original fingerprint is computed only once an edit produces a
-candidate. Edits are tried one rule at a time only after a phase's edits
-together fail that check, so a document whose edits all keep its meaning is
-still parsed once for each phase that changes it. The final pass, in which no
-phase changes the document, reuses its style findings and runs only the
-remaining rules for the final diagnostics. Suppression directives are scanned
-only when the source contains their prefix, and rules traverse the tree with a
-plain recursive walk rather than a closure-per-node visitor. An edit that
-changes nothing is checked like any other finding but is not applied. This
-retains the plugin contract that rules must not mutate documents.
-
-The benchmark's library measurements compare formatting documents that need
-edits with formatting their already-formatted output. They follow a warm-up run,
-check outputs and diagnostics, and exclude discovery, I/O, CLI serialization,
-and custom plugins; the command-line measurements include them. Run the
-benchmark without competing workloads.
-
-## Maintenance priorities
-
-Prioritize reproducible document corruption and renderer disagreement over new
-style options. Add a minimal regression case before a fix; verify that disabling
-the affected rule preserves the source. Broaden dialect fixtures and resolver
-compatibility before promising complete application parity. Benchmark real
-synthetic vault sizes before adding caching or worker processes.
-
-Future changes can add richer link policies, reference-definition formatting,
-more container layout, versioned plugin contracts, and optional standalone
-distribution. Each should extend the shared configuration and edit contracts
-instead of creating a second formatter pipeline.
+- The tool uses one processor core and keeps nothing between runs: there is no
+  cache, worker pool, watch mode, editor extension, or language server. Start-up
+  takes about a quarter of a second.
+- While a document is parsed, it needs about 70 to 130 times its size in memory,
+  and a single paragraph of 100 kB or more full of inline syntax parses slowly.
+  [Benchmarks](benchmarks.md) has the measurements.

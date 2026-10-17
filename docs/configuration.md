@@ -1,242 +1,142 @@
-# Configuration and rules
+# Configuration
 
-## Loading and precedence
+One configuration controls both `lint` and `format`. Without a configuration
+file, the `recommended` preset applies and the dialect is
+[assumed](dialects.md#the-assumed-dialect).
 
-Discovery searches upward from `--root` or the working directory for
-`mdtools.config.jsonc`, `mdtools.config.json`, or `mdtools.config.mjs`. It stops
-at a Git repository, an Obsidian vault, or the filesystem root. Multiple config
-files in one directory are an error. `--config` chooses one explicitly. The
-configuration directory is the workspace root unless `--root` overrides it.
+## Configuration files
 
-JSONC permits comments and trailing commas. A JSON or JSONC file may start with
-a byte order mark, which Windows PowerShell 5.1 and some editors write;
-version 0.2.0-rc.2 and earlier rejected it as invalid JSON. JavaScript
-configuration exports a default object. JavaScript configs and plugins execute
-code with the caller's permissions; load trusted code only. Unknown
-configuration keys, rule IDs, preset names, and invalid built-in rule options
-are errors.
+The file is named `mdtools.config.jsonc`, `mdtools.config.json`, or
+`mdtools.config.mjs`. The CLI looks for it in the directory given with `--root`,
+or else the current directory, and then in each directory above, up to the first
+one that is a Git repository (holds `.git`) or an Obsidian vault (holds
+`.obsidian`), or the filesystem root. Two configuration files in one directory
+are an error. `--config` names a file explicitly. The directory of the
+configuration file is the workspace root unless `--root` names another; without
+a configuration file, it is the repository or vault where the search stopped, or
+else the current directory. Configuration files do not cascade: a file in a
+subdirectory is not merged with one above it.
 
-Presets merge in listed order, followed by the configuration's own settings,
-followed by matching `overrides` in order. Each rule setting replaces the
-previous setting as a whole. Paths in overrides and ignores use forward slashes
-relative to the workspace root. Presets can extend other presets; cycles are
-rejected. Config files do not implicitly cascade or merge across directories.
-
-`--dialect` replaces the top-level dialect; an explicit file override still
-takes precedence. `config explain <file>` prints the resolved configuration,
-including the dialect in use for that file, and its source file.
+JSONC allows comments and trailing commas. A JSON or JSONC file may start with a
+byte order mark. An `.mjs` file exports the configuration as its default export.
+JavaScript configuration and plugins run with your permissions, so load only
+code you trust. Unknown keys, rule IDs, and preset names are errors, and so are
+rule options that the rule does not accept.
 
 ```jsonc
 {
   "extends": ["recommended", "github"],
   "ignore": ["generated/**"],
+  "rules": { "style/wrap": ["warn", { "width": 100 }] },
+  "overrides": [
+    { "files": ["vault/**/*.md"], "rules": { "style/emphasis": "off" } },
+  ],
+}
+```
+
+| Key         | Value                                          | Purpose                                                           |
+| ----------- | ---------------------------------------------- | ----------------------------------------------------------------- |
+| `$schema`   | A string                                       | Ignored by the tool, so that an editor can be given a JSON Schema |
+| `extends`   | Preset names                                   | [Presets](#presets) to start from                                 |
+| `dialect`   | A [dialect](dialects.md) name                  | The renderer whose syntax documents are read in                   |
+| `rules`     | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                         |
+| `overrides` | Objects with `files`, and `dialect` or `rules` | [Settings for some files](#overrides)                             |
+| `ignore`    | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)       |
+| `resolve`   | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)              |
+| `plugins`   | Files or package names                         | [Plugins](#plugins) to load                                       |
+
+The package does not ship a schema file; the library exports the schema as
+[`configSchema`](api.md#other-exports).
+
+## Presets
+
+A **preset** is a named set of rule settings. The **dialect** is a separate
+setting: it names the renderer whose syntax documents are read in, such as
+GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
+break. Each preset except `recommended` also sets a dialect. The
+[rule index](rules.md) shows which rules each preset enables.
+
+| Preset        | Sets the dialect | For                                                                                |
+| ------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `recommended` | No               | Any document: wrapping at 80 columns, emphasis markers, final newline, valid links |
+| `github`      | `github`         | Documents rendered by GitHub                                                       |
+| `forgejo`     | `forgejo`        | Documents rendered by Forgejo, such as on Codeberg                                 |
+| `codeberg`    | `forgejo`        | The `forgejo` preset under another name                                            |
+| `gitea`       | `gitea`          | Documents rendered by Gitea                                                        |
+| `obsidian`    | `obsidian`       | An Obsidian vault                                                                  |
+
+Without `extends`, the configuration starts from `recommended`. An `extends`
+list replaces that default, so name both, as in `["recommended", "github"]`;
+`"extends": []` enables no rules. Presets apply in the order listed, then the
+configuration's own settings, then each matching override in order. A later
+setting for a rule replaces an earlier one as a whole, options included. A
+plugin's presets are named with the plugin's name as a prefix, such as
+`sample/recommended`, and presets may extend other presets; a cycle is an error.
+
+## Rules and severity
+
+A rule's setting is its severity, `"off"`, `"warn"`, or `"error"`, or a list of
+the severity and the rule's options, as in `["warn", { "width": 100 }]`. The
+[rules reference](rules.md) lists every rule and its options.
+
+`format` applies the edits of every enabled style rule, whether its severity is
+`warn` or `error`. Problem rules only report. Errors make `lint` and `format`
+exit with code `1`; warnings do so only beyond `--max-warnings`.
+
+## Dialect
+
+`dialect` sets the dialect of every document, and an override can set another
+for some of them. `codeberg` is accepted as another name for `forgejo`.
+`--dialect` on the command line replaces the dialect of the configuration and
+its presets, though not one set by a matching override. When neither the
+configuration, its presets and overrides, nor `--dialect` names one, the dialect
+is [assumed](dialects.md#the-assumed-dialect).
+
+## Overrides
+
+Each entry of `overrides` applies its `dialect` and `rules` to the documents
+that match one of its `files` patterns:
+
+```jsonc
+{
+  "extends": ["recommended", "github"],
   "overrides": [
     {
-      "files": ["vault/**/*.md"],
-      "dialect": "obsidian",
-      "rules": { "style/emphasis": "off" },
+      "files": ["CHANGELOG.md", "generated/**"],
+      "rules": { "style/wrap": "off" },
     },
   ],
 }
 ```
 
-Obsidian reflow depends on a setting in the vault's `.obsidian/app.json`, which
-is read for the vault that holds each note. A workspace can hold several vaults
-with different settings. An override like the one above is not needed to have a
-vault's notes read in the Obsidian dialect, which is assumed for them when
-nothing names a dialect; it is the place for rules that only the vault should
-follow. Links in such a vault's notes are resolved within the vault; see
-[Obsidian vaults](obsidian.md#vaults-that-are-not-the-workspace-root).
+Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
+the workspace root, with forward slashes. A pattern matches files whose names
+start with a dot, too.
 
-## Dialects
+## Ignored files and link targets
 
-`dialect` selects the renderer whose rules apply: `commonmark`, `github`,
-`forgejo`, `gitea`, or `obsidian`. `codeberg` is an alias for `forgejo`, because
-Codeberg runs Forgejo's renderer; aliases are accepted wherever a dialect is
-named and resolve to the canonical name in `config explain` and plugin
-documents.
+`ignore` lists path patterns, written like those of overrides, for documents
+that are never linted or formatted. They remain link targets, so links to them
+are still checked.
 
-When nothing names a dialect, the tool assumes one. That is the case without a
-configuration file, and with a configuration in which no `dialect` setting,
-preset, or matching override names one, unless `--dialect` is passed. A named
-dialect always takes precedence. Version 0.2.0-rc.1 and earlier assumed
-`commonmark` everywhere.
+The CLI also leaves out what `.gitignore` files exclude, nested Git
+repositories, symbolic links, and the directories `.git`, `.obsidian`,
+`node_modules`, `.npm-cache`, `dist`, and `coverage`. `resolve` makes two of
+these available as link targets, without ever selecting them for linting or
+formatting:
 
-- For a document inside an Obsidian vault, the assumed dialect is `obsidian`.
-  Obsidian shows a single line break as a line break unless the vault's "Strict
-  line breaks" setting is on, so no other dialect can reflow a note safely. A
-  vault is a folder that contains a `.obsidian` folder, and a document belongs
-  to the nearest vault at or above its own folder. That can be the workspace
-  root, a folder below it, or a folder above it when a folder of a vault is used
-  as the root. The search upward ends at a repository, a folder that contains
-  `.git`: documents of a repository checked out inside a vault are not read as
-  the vault's notes, just as the tool leaves a repository inside a workspace
-  alone.
-- For every other document, it is `github`. GitHub's syntax is the common base
-  of the Forgejo, Gitea, and Obsidian dialects, so tables and footnotes are
-  recognized instead of being reflowed as ordinary paragraphs.
+```jsonc
+{
+  "resolve": { "gitIgnored": true, "nestedRepositories": true },
+}
+```
 
-Only the dialect is assumed: the rules of the `github` and `obsidian` presets,
-such as table alignment, still need the preset. For documents that are plain
-CommonMark, name the dialect with `"dialect": "commonmark"` or
-`--dialect commonmark`.
-
-Text between dollar signs is read as math under the conditions of the dialect's
-renderer, so that sums of money are not taken for a formula. Math is never
-restyled, and no line is broken inside it.
-
-- On GitHub, Forgejo, and Gitea, `$…$` is math only when the opening `$` does
-  not follow a letter or digit, and the next `$` is not followed by a letter, a
-  digit, or `_`. `Costs $5 and $6` is prose; `From $5 to 10$` is math, as it is
-  to all three renderers.
-- GitHub also wants a single `$` to touch its formula: no space after the
-  opening one and none before the closing one. `$ x $` is math on Forgejo and
-  Gitea and prose on GitHub.
-- In Obsidian, the opening `$` may not be followed by a space, and a `$` closes
-  the formula only if no space stands before it and no digit follows it. Letters
-  and digits before the opening `$` do not matter there. `Costs $5 and $6` is
-  prose, and so is `$ x $`; `a$x$b` holds a formula, which it does on none of
-  the other three.
-- Display math, between lines of `$$` or in a `math` code block, is the same in
-  every dialect.
-
-Where a renderer is stricter than this, the tool stays on the careful side: it
-also protects a formula with emphasis inside, which GitHub does not render, and
-one that runs over a line break, which Forgejo and Gitea do not. Obsidian's two
-views differ in two cases, and the tool follows the one that shows more as a
-formula, Reading view: in `A $5 and $x$` it protects everything from the first
-`$` to the last, where Live Preview shows only `$x$` as the formula, and it
-protects a formula that runs over a line break, which Live Preview does not
-render. GitHub accepts an escaped `\$` as the start of a formula; the tool does
-not. Versions up to `0.2.0-rc.1` read any text between two `$` signs as math in
-every dialect.
-
-GitHub and Forgejo share tables, task lists, strikethrough, footnotes, literal
-autolinks, `$` math, and the five `[!NOTE]`-style alert types. Forgejo
-additionally renders definition lists (`Term` followed by a line starting with
-`: `), `\(...\)` and `\[...\]` math, and `[[target|text]]` shortlinks, and
-generates heading anchors differently: every run of characters other than
-letters, numbers, and `_` becomes one hyphen, so `## test.0.1` is `#test-0-1` on
-Forgejo and `#test01` on GitHub. The Forgejo dialect keeps those constructs on
-their original lines, leaves emphasis markers and code spans inside `\(...\)`
-unchanged, and validates fragments against Forgejo anchors. The GitHub rules
-apply to both dialects.
-
-Gitea, from which Forgejo was forked, renders the same definition lists and
-shortlinks. It parses `\(...\)` and `\[...\]` math only when an administrator
-enables them with `MATH_CODE_BLOCK_DETECTION`, as was the default before
-Gitea 1.24; a document cannot reveal that setting, so the Gitea dialect keeps
-those constructs on their lines too. Gitea's heading anchors follow GitHub's:
-punctuation is deleted, so `## test.0.1` is `#test01`. Gitea 1.26 and later give
-repeated headings the same anchor; the `-1`, `-2` suffixes of earlier versions
-are still accepted. Gitea 1.26 and later also render `__init__.py` literally
-instead of as emphasis, including in headings, whose anchor is then
-`#__init__py`. Whether underscores delimit emphasis depends on the rest of the
-line, so on a line containing `_.py` the Gitea dialect leaves emphasis markers
-unchanged and keeps link destinations whose rewrite would change their
-underscores. It does not reflow such a paragraph unless all its underscores are
-inside code spans and it contains no `$` or `\(` math. The GitHub rules apply to
-Gitea as well. Gitea renders repository files with soft line breaks by default;
-if an instance adds `new-line-hard-break` to `RENDER_OPTIONS_REPO_FILE`, disable
-`style/wrap`.
-
-Forgejo, and Gitea before 1.26, build a heading's anchor from the source of its
-last line as written, before any Markdown in it is read. Link destinations,
-image syntax, emphasis markers, character references, and inline HTML tags are
-part of the anchor, and a heading underlined with `===` or `---` gets the anchor
-of its last text line only. `## Link [text](https://example.com/page) end` is
-`#link-text-https-example-com-page-end` on Forgejo and
-`#link-texthttpsexamplecompage-end` on Gitea 1.25, `## Strong __init__ end` is
-`#strong-__init__-end` on both, and `## A <span>B</span>` is `#a-span-b-span`
-and `#a-spanbspan`. The opening and closing `#` sequences, the blank space
-around the text, block quote and list prefixes, and a trailing attribute block
-are not part of the line. GitHub, and Gitea 1.26 and later, build the anchor
-from the rendered text instead: `#link-text-end`, `#strong-init-end`, and
-`#a-b`, with the text of every line of an underlined heading. GitHub keeps the
-tags that it shows as text, such as `<script>`, in the anchor; Gitea 1.26 and
-later show `<script>`, `<style>`, `<html>`, and `<head>` as text and keep them
-too, drop other tags they do not allow while keeping the text inside, and read a
-hard line break as a line break. The Gitea dialect accepts the anchors of both
-Gitea generations.
-
-Forgejo and Gitea read a `{...}` block that ends a heading as attributes instead
-of text. `## Install {#setup}` renders as "Install" with the anchor `#setup` and
-no `#install`; `## Usage {.note}` keeps the generated anchor `#usage`. The
-Forgejo and Gitea dialects validate fragments against those anchors. A block
-holds `#id`, `.class`, and `name=value` items, such as
-`{#setup .note data-level=2}`, and ends the heading's line or, in a heading
-underlined with `===` or `---`, its last text line; after a closing `#` sequence
-it still counts (`## Install ## {#setup}`). A block that is not valid, that is
-followed by more text, or whose `{` is escaped with a backslash stays heading
-text. A custom anchor must be linked exactly as written, including its case, and
-it is never numbered: a later `## Setup` heading is also `#setup`, not
-`#setup-1`. GitHub and Obsidian show the block as text, so the other dialects
-keep it in heading anchors and heading names. An `id` that is not text, such as
-`{id=5}`, `{id=true}`, or a list, has no anchor on Gitea 1.26 and later, and
-Forgejo, and Gitea before 1.26, render nothing for the whole document; the
-Forgejo and Gitea presets report it with `forgejo/heading-id`. Quote the value
-(`{id="5"}`) or use `{#5}` instead.
-
-Formatting with the Forgejo or Gitea dialect leaves a block as written:
-`{#bare data-x=__init__}` is a valid block, and `{#bare data-x=**init**}` is
-heading text without the anchor `#bare`. A change can also create a block:
-`## *Mode {.a*}` is emphasis, while `## _Mode {.a_}` is a heading with a class.
-`style/emphasis`, `style/strong`, and `links/path` therefore change nothing from
-the first `{` of a heading's last text line on. `style/inline-code` does not
-join a code span that spans lines of a heading, and `style/heading` escapes a
-`#` run in front of the block (`# Run \## {#id}`), which would otherwise end the
-heading there.
-
-Because Forgejo, and Gitea before 1.26, build a heading's anchor from its last
-line as written, `style/emphasis`, `style/strong`, and `links/path` also leave
-that line unchanged on these dialects when the heading has no custom `id`.
-Rewriting `## Emph *star* end` to `_star_` would move its anchor from
-`#emph-star-end` to `#emph-_star_-end` and break every link to it, although the
-heading reads the same. Earlier lines of an underlined heading, headings with an
-`id`, and the rest of the document are formatted as usual.
-
-## Presets
-
-| Preset        | Dialect   | Enabled rules                                                                                  |
-| ------------- | --------- | ---------------------------------------------------------------------------------------------- |
-| `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
-| `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
-| `forgejo`     | Forgejo   | The `github` rules and `forgejo/heading-id`                                                    |
-| `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
-| `gitea`       | Gitea     | The `github` rules and `forgejo/heading-id`                                                    |
-| `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
-
-An omitted `extends` selects `recommended`. Explicit `extends` replaces that
-default, so use `["recommended", "obsidian"]` for both. `extends: []` enables
-nothing. Severity is `off`, `warn`, or `error`; supply options as
-`["warn", { ... }]`. Both `warn` and `error` style rules format when enabled.
-Problem rules report findings and never become formatting edits.
-
-## Built-in rules
-
-| Rule                          | Kind    | Options                                                                |
-| ----------------------------- | ------- | ---------------------------------------------------------------------- |
-| `style/wrap`                  | Style   | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`; see below |
-| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                               |
-| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                         |
-| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                         |
-| `style/final-newline`         | Style   | None; adds a missing final newline                                     |
-| `style/table`                 | Style   | None; aligns top-level GFM tables                                      |
-| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                         |
-| `style/block-spacing`         | Style   | None; blank lines around headings and lists, opt-in                    |
-| `links/valid`                 | Problem | None; local files and heading/block fragments                          |
-| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below              |
-| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
-| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
-| `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
-| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo  |
-| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
-| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
-| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
+Both default to `false`. The Markdown files of such a target are read only when
+a link's fragment needs checking.
 
 ## Plugins
 
-`plugins` lists the plugins to load, each as a string:
+`plugins` lists plugins to load, as strings:
 
 ```jsonc
 {
@@ -247,201 +147,17 @@ Problem rules report findings and never become formatting edits.
 ```
 
 An entry that starts with `.` or is an absolute path names a file, relative to
-the configuration file's directory. Any other entry names an installed package,
-looked up from the configuration file as Node.js looks up an `import`. A plugin
-adds rules and presets, which are used with the name that the plugin declares as
-a prefix. Above, the plugin in the file calls itself `local` and the one in the
-package `sample`. Only a configuration file can name plugins; there is no
-command-line option for them.
+the configuration file's directory. Any other entry names a package, found from
+the configuration file as Node.js finds an `import`. A plugin adds rules and
+presets, named with the plugin's name as a prefix: above, the file's plugin
+calls itself `local` and the package's plugin `sample`. Only a configuration
+file can name plugins; the CLI has no option for them.
 
-A plugin is code. It runs with the caller's permissions when the configuration
-is loaded, so name only plugins you trust. A plugin that cannot be found or
-loaded stops the command with exit code `2` and a message that names the entry
-and the configuration file.
+A plugin runs with your permissions when the configuration is loaded. A plugin
+that cannot be loaded stops the command with exit code `2`.
+[Plugins](plugins.md) describes how to write one and how a package is found.
 
-[Rule plugins](plugins.md#rule-plugins) describes how a package is looked up in
-detail, what a plugin can contain, and how to write one.
-
-## Document structure
-
-Enable `structure/initial-heading` explicitly with severity `warn` or `error`;
-no preset enables it. It accepts no options and reports problems without
-changing content. Use path `overrides` to exempt generated documents or trees
-with different conventions.
-
-`structure/initial-heading` skips YAML/TOML front matter and requires a level-1
-heading as the first content block. Both ATX and Setext headings count; use
-`style/heading` separately to require ATX spelling. Empty documents are
-reported. Comments and other content before the title are not skipped.
-
-Filename/title matching, metadata placement, and guesses about accidental
-Markdown markers are consumer policies. Implement those checks through
-[rule plugins](plugins.md#rule-plugins), which receive the document source,
-parsed tree, and path. Modified-date updates belong in a consumer wrapper or
-library workflow; formatting rules must preserve document meaning.
-
-## Wrapping and inline code
-
-`style/wrap` accepts widths from 20 through 500 and defaults to `width: 80` and
-`measure: "columns"` (display columns). Set `measure: "codepoints"` to count
-Unicode scalar values instead; astral characters count once and combining marks
-count separately. Container prefixes count toward the width in either mode.
-
-`reportUnreflowed: true` reports breakable over-width lines in paragraphs
-protected by hard breaks, block IDs, inline HTML, callout headers, Forgejo or
-Gitea definition lists, display math, line-spanning inline syntax, the Gitea
-`_.py` emphasis exception, a leading block marker, a lazy first line, Obsidian
-markers outside highlights and links, or unsupported multiline syntax or
-containers. A paragraph has a leading block marker when its first word is a bare
-list, heading, or quote marker (`-`, `+`, `*`, `1.`, `1)`, `#`, `>`), or on
-Forgejo and Gitea a bare `:`, and more words follow. The parser reads such a
-marker as text only where it cannot open its block, such as the second `-` of a
-list item `- -` directly below a paragraph, whose text then continues on the
-next line. Joining the next word to the marker would open the block. A paragraph
-has a lazy first line when it starts directly below a link reference definition
-on a line without the quote markers or indentation of that definition, which
-leaves the prefixes of its later lines unknown. In the Obsidian dialect, a
-paragraph is left as written when its text outside code, math, and the
-highlights and wikilinks on one line contains `==`, `[[`, or `]]`: the tool
-reads that markup only within a line, so joining lines, as in a highlight or
-wikilink written across two of them, could create a highlight or link.
-`reportUnbreakable: true` reports overflow from an atom that cannot be split,
-including in protected paragraphs. Whitespace inside a link, code span, or other
-protected inline node is not a wrapping opportunity, nor is whitespace inside a
-Forgejo or Gitea `\(...\)` expression or `[[...]]` shortlink written on one
-line. A protected paragraph with both breakable prose and an over-width atom can
-report both causes; an atom-only overflow does not trigger `reportUnreflowed`.
-Hard-break markers are excluded from protected-line width. An Obsidian callout
-title is one indivisible physical line: an over-width title follows
-`reportUnbreakable`, even when it contains spaces. Body prose is classified
-separately. A block ID does not make its whole paragraph indivisible. Both
-options default to false, propose no edits, and use the rule's severity. Use
-severity `error` or `--max-warnings 0` to make these diagnostics fail a check;
-`--check` does not change rule settings.
-
-Enable `style/inline-code` to join multiline code spans before paragraph reflow.
-This opt-in rule handles single and multiple backticks, including list and quote
-containers. It preserves the parsed code value, converting each line ending to
-one space under CommonMark's code-span rules. Other code whitespace remains
-significant. It is useful for Obsidian editors that display split spans
-differently from Reading view.
-
-## Blank lines around headings and lists
-
-Enable `style/block-spacing` to separate every heading and every list from the
-blocks before and after it with a blank line. No preset enables it, and it
-accepts no options. It adds one blank line where there is none and keeps the
-blank lines that are already there, including additional ones. Inside a block
-quote, the new line holds the quote's `>` markers. Its line ending is the
-document's own. With the rule enabled, `format` turns this document:
-
-```markdown
-# Setup
-Install the package.
-- Run the command.
-```
-
-into this one:
-
-```markdown
-# Setup
-
-Install the package.
-
-- Run the command.
-```
-
-The rule compares the blocks of the document and of block quotes, at any depth,
-including a quote inside a list item. A line holding only `>` markers counts as
-a blank line. Nothing is added at the start or the end of a document, and these
-places are left as written:
-
-- Blocks inside a list item or a footnote definition, such as a heading and the
-  text below it in a list item. A blank line between the blocks of a list item
-  makes the list loose, which changes how it renders.
-- Front matter and the block below it.
-- A heading or list directly below a block that is an HTML comment, or directly
-  below a line holding a `mdtools-disable-next-line` directive. Such a comment
-  applies to the line below it, in this tool and in others, and a blank line
-  would take that line's place.
-- The line that opens a callout or alert, such as `> [!NOTE]`, and the block
-  directly below it.
-- In the Obsidian dialect, a block identifier on a line of its own (`^id`)
-  directly below a heading or list, which Obsidian may attach to the block
-  above.
-- Directly below text or a link reference definition: a list or quote whose
-  first line continues with another list marker, as in `- 2. Step` or `- -`, and
-  a heading underlined with `===` or `---`. The parser that the tool uses can
-  read such a line differently there than below a blank line, so the semantic
-  check would refuse the change.
-
-## Link policies
-
-```jsonc
-{
-  "extends": ["recommended", "obsidian"],
-  "rules": {
-    "links/path": ["warn", { "style": "root", "brackets": "angle", "extension": "preserve" }],
-  },
-}
-```
-
-`style` accepts `preserve` (default), `relative`, `root`, or `shortest`. `root`
-means vault-relative, without a leading slash, and is available only for
-Obsidian. `shortest` uses the basename if it resolves uniquely, otherwise the
-vault-relative path. `leadingDot: true` prefixes ordinary relative paths with
-`./`. Filesystem absolute paths are not generated.
-
-`brackets` accepts `preserve` (default), `angle`, or `bare`. Spaces in bare
-Markdown destinations are percent-encoded. `extension` accepts `preserve`
-(default), `include`, or `omit`; omission is Obsidian specific. Fragments are
-resolved according to the dialect, separately from percent-decoded filenames. On
-GitHub, Forgejo, and Gitea, a fragment written with the `user-content-` prefix
-that the renderers add to every anchor reaches the same anchor as one without,
-and is validated the same way. Anchors written as HTML, the `id` of any element
-and the `name` of an `<a>`, such as `<a name="install"></a>` before a heading,
-are valid fragments on those three dialects. GitHub matches every fragment
-without regard to case, so `#Sponsors` reaches `## Sponsors` there; Forgejo and
-Gitea match exactly as written. A heading written as HTML
-(`<h2 align="center">Title</h2>`) gets a generated anchor on GitHub, numbered
-together with the Markdown headings, and on Gitea 1.26 and later, where it is
-not numbered and a heading with its own `id` gets none; Forgejo and earlier
-Gitea versions give it no anchor. HTML inside comments, code, and `<script>`,
-`<textarea>`, and the other elements whose content is text is not an anchor.
-Already compliant destinations retain their percent-encoding spelling, including
-literal `?` and `%` in resolving Obsidian paths. Newly generated paths encode
-literal percent signs and hashes to preserve target identity.
-
-Path edits require a resolved target and valid fragment. Unaliased ordinary
-wikilinks retain their target spelling because changing it may change the
-visible label. Reference definitions are validated but their source spelling is
-currently preserved.
-
-`links/notation` converts simple explicit-label wikilinks to Markdown links and
-plain-text Markdown links to wikilinks. Titles, rich labels, unaliased
-wikilinks, and embeds are preserved. A note embed is not interchangeable with a
-Markdown image. Notation conversion and path rewriting can be enabled together.
-Where both change one link, the notation is converted first and the path is
-rewritten in the next pass, with the result of running the two one after the
-other. Versions up to `0.2.0-rc.2` refused such a document because the edits
-overlapped.
-
-Network URLs are recognized but never fetched. Website-root paths and
-query-bearing destinations in CommonMark, GitHub, Forgejo, and Gitea are outside
-local resolution. Missing or ambiguous targets are reported, never guessed. A
-target that could not be checked, because it lies in a directory the tool was
-not permitted to read, is reported as such and not as missing; see
-[paths that cannot be read](#paths-that-cannot-be-read). Obsidian resolution
-uses explicit `./` or `../` paths as source-relative; otherwise an exact
-vault-root match precedes an exact source-relative match, followed by unique
-suffix matching. Multiple candidates within the chosen tier remain ambiguous.
-Relative rewrites use `./` when needed to avoid a vault-root collision. Existing
-directories get a distinct diagnostic in Obsidian; they are not rewritten to
-README or index notes. CommonMark, GitHub, Forgejo, and Gitea directory links
-are accepted because a hosting site can serve them. Shortest-name/alias
-resolution is not a complete clone of Obsidian.
-
-## Suppressions
+## Suppression comments
 
 ```markdown
 <!-- mdtools-disable style/wrap -->
@@ -454,258 +170,23 @@ Keep the wrapping in this region.
 Keep *this* delimiter.
 ```
 
-Omit rule names to disable all rules. A disabled region suppresses edits
-intersecting it; a paragraph spanning a disabled line is therefore preserved as
-a whole. An enable directive closes matching disabled regions; `enable` without
-names closes all. Directives inside code are ordinary code. `disable-next-line`
-targets the immediately following physical line, including a blank line; place
-it directly above the content to suppress. Lines end at a line feed, a carriage
-return, or both, as in CommonMark. Versions up to `0.2.0-rc.2` looked only for
-line feeds, so the directive did nothing in a document whose lines end with a
-carriage return alone, and in a document that mixes line endings it could apply
-to the wrong line or to two lines.
+`mdtools-disable` turns rules off from the comment on, and `mdtools-enable`
+turns them on again; without rule names, they apply to every rule.
+`mdtools-disable-next-line` applies to the next line only, even when it is
+blank, so place it directly above the line. A suppressed rule reports nothing
+there and changes nothing that touches the region, so a paragraph that crosses
+into it is left as written. A directive inside code is code, not a directive.
 
-## Selection, output, and exit codes
+## Inspect the result
 
-Commands accept explicit files/directories, or no paths to select the workspace.
-The CLI honors `.gitignore` files and configured ignore patterns. Config-ignored
-documents remain available for link resolution. Git-ignored content and nested
-repositories are not indexed by default. To make their files available only as
-link targets, set:
+`config explain` prints, as JSON, the configuration in effect for one document:
+the workspace `root`, the configuration `file` (or `null`), and the `effective`
+settings, with the dialect assumed for that document and the overrides that
+match it.
 
-```jsonc
-{
-  "resolve": { "gitIgnored": true, "nestedRepositories": true },
-}
+```sh
+npx mdtools config explain notes/example.md
 ```
 
-These options are independent and default to false. They never select those
-files for linting or formatting, including when a path is supplied explicitly.
-Markdown targets are read and parsed only for fragment checks; attachments need
-only a discovered file entry. Built-in traversal exclusions still apply. `.git`,
-`.obsidian`, `node_modules`, `.npm-cache`, `dist`, and `coverage` are excluded
-from traversal, as are symlinks. Nested Git repositories are traversed for
-targets only when opted in. Explicit symlink inputs are rejected. Shell-expanded
-globs work; the CLI does not expand path globs.
-
-`lint --json` and `format --json` print a single object with `version`, `mode`,
-`files`, and `written`, and with `skipped` when the run left out something it
-was not permitted to read. Each file carries diagnostics with rule ID, severity,
-message, offsets, and one-based line/column locations. Source offsets and
-columns use JavaScript UTF-16 units; wrapping widths use display columns.
-Formatting diagnostics refer to the resulting source. `written` records whether
-the requested write phase was allowed, not how many files changed; inspect each
-file's `changed` field.
-
-Without `--json`, a command that processed files ends with one summary line on
-stderr. `lint` counts the files and the findings it reported, as in
-`3 file(s) linted; 1 error(s), 2 warning(s).` `format` counts the files and
-those it changed or would change, as in `3 file(s) processed; 1 would change.`
-Both add `; 1 could not be read` when a selected document
-[could not be read](#paths-that-cannot-be-read), and `format --write` adds
-`; 1 could not be written` for a file it could not
-[write](#files-that-cannot-be-written). Versions up to `0.2.0-rc.1` ended `lint`
-with `0 would change`, whatever it found. The line is meant for people; a script
-should read the JSON report or the exit code.
-
-`format --diff` is the default for file input. `--check`, `--diff`, and
-`--write` are mutually exclusive. `format - --stdin-filepath notes/example.md`
-reads stdin with configuration and resolution context; it cannot be used with
-`--write`.
-
-| Exit | Meaning                                                                                                 |
-| ---- | ------------------------------------------------------------------------------------------------------- |
-| `0`  | Completed; no errors or failed formatting check                                                         |
-| `1`  | Lint errors, exceeded `--max-warnings`, or changes required by `format --check`                         |
-| `2`  | Configuration, execution, or formatting safety failure, or a document that could not be read or written |
-
-Warnings do not fail a command unless `--max-warnings` is supplied. A successful
-formatting command can still report remaining lint problems. Inspect its exit
-code and diagnostics. An
-[`engine/unsafe-format`](#refused-edits-and-failing-rules) or
-[`engine/rule-error`](#refused-edits-and-failing-rules) diagnostic blocks the
-complete batch's write phase, and so does a selected document that
-[cannot be read](#paths-that-cannot-be-read) or a changed file that
-[cannot be written](#files-that-cannot-be-written). Replacement is atomic per
-file, not a workspace-wide transaction: a file that fails while the batch is
-being written is reported, and the others are still written.
-
-## Refused edits and failing rules
-
-`format` accepts the edits of a phase only when the result has the parsed
-meaning of the original document. When it does not, the phase tries the edits
-one rule at a time. It leaves out the edits of each rule that would change the
-meaning and keeps those of the other rules, in that phase and the others. Each
-rule left out is reported with an `engine/unsafe-format` error at the line where
-the meaning would first differ, as in
-`style/wrap would change the parsed meaning at line 12; none of its edits were applied.`
-The rule's own findings are reported as well. A rule's edits are kept or left
-out together, because one of them can depend on another, such as the opening and
-closing markers of one emphasis. Versions up to `0.2.0-rc.2` left the whole
-document unchanged and named neither the rule nor the line.
-
-When two rules propose edits to overlapping text, the edit that starts first is
-applied, and the other rule is asked again in the next pass, on the changed
-text. Formatting repeats its passes until one changes nothing, at most eight
-times. If the rules keep changing the document, or bring it back to an earlier
-text, the whole document is left unchanged, with an `engine/unsafe-format` error
-at line 1 that names the rules still changing it. Versions up to `0.2.0-rc.2`
-refused every document with overlapping edits.
-
-A rule that throws an error, or returns findings that cannot be used, such as an
-offset outside the document, is skipped for that document. It is reported with
-an `engine/rule-error` error at line 1 that names the rule and the reason, as in
-`Rule local/example failed (TypeError: …); the rule was skipped for this document.`
-The other rules still run, and the other documents are still processed. With
-either diagnostic the exit code is `2`, in `lint` and `format` alike, and
-`format --write` writes none of the batch. Versions up to `0.2.0-rc.2` stopped
-`lint` at a failing rule with its bare message, naming neither file nor rule,
-and reported it in `format` as `engine/unsafe-format`.
-
-## Paths that cannot be read
-
-A directory that the system does not permit the tool to read is skipped. The
-tool reports it once as a warning that names it, indexes nothing below it, and
-processes the rest of the workspace. The warning alone does not change the exit
-code and is not counted by `--max-warnings`. It is printed on stderr as
-`mdtools: warning: ...`; with `--json` it is an entry of the report's `skipped`
-list instead, with the directory's `path`, `type`, the system's error `code`,
-and a `message`. This applies to a directory that can be neither listed nor
-entered, to one that can only be listed, and to one that can only be entered. It
-also applies to a directory whose `.gitignore` cannot be read, because without
-the ignore rules nothing tells which of its files may be processed. Versions up
-to `0.2.0-rc.1` stopped every command, with exit code `2`, when the workspace
-contained such a directory.
-
-A link that leads into a skipped directory cannot be checked. `links/valid`
-reports it as `Local target could not be checked`, naming the directory, with
-the rule's configured severity. The target is not called missing, and the link
-is never rewritten. An Obsidian link that names a note without a path is
-searched for in every directory, so when no readable file matches, it is
-reported the same way, naming the skipped directories. A note that such a search
-does find is accepted, and so is a note found beside the linking note when the
-vault-root path of the same spelling leads into a skipped directory.
-`links/path` and `links/notation` leave such a link as written, and an edit by a
-plugin that changes its destination is refused, because a skipped directory may
-hold a second note of that name, or the one that Obsidian would choose.
-
-A path named on the command line that cannot be used stops the command with exit
-code `2`. The message says what the path was named as and what is wrong with it:
-a workspace root, a configuration file, or an input that `does not exist` or
-`cannot be read`, a workspace root that `is not a directory`, a configuration
-file that `is not a file`, as in `Input does not exist: notes/absent.md`. An
-input and a file given with `--config` are named as they were given, the
-workspace root with its full path. Versions up to `0.2.0-rc.1` printed the
-system's own message, which named an internal step. An `--exclude` path that
-does not exist excludes nothing; one that the tool is not permitted to examine
-is an error, because it cannot tell which file the path stands for.
-
-Naming a skipped directory, or a path inside it, as an input is an error with
-exit code `2`, and so is a workspace root that cannot be read. Configuration
-`ignore` patterns and `--exclude` choose which documents are processed; they do
-not keep the tool out of a directory, because an ignored document remains a link
-target. To leave a directory out without a warning, list it in a `.gitignore`:
-Git-ignored content is not indexed unless `resolve.gitIgnored` asks for it.
-
-If a vault's `.obsidian/app.json` cannot be read, the tool warns in the same way
-and treats `strictLineBreaks` as unverified for that vault, so its documents are
-not reflowed. The same holds when the file's content cannot be used, because it
-is not valid JSON or is not a file; the entry's `code` is then `INVALID`.
-Versions up to `0.2.0-rc.1` stopped every command in that case. A file named
-`.obsidian` is not a vault's settings folder and is ignored. When the system
-does not let the tool find out whether a folder is a vault, which takes a
-`.obsidian` that is a link into a place it may not read, or a document named for
-`config explain` or `--stdin-filepath` in a directory it may not enter, the
-command stops with exit code `2`: reading a vault's notes as another dialect is
-not a safe fallback. A configuration file that cannot be read still stops the
-run, as does a directory that refuses the search for one: default rules must not
-take the place of a configuration that exists. An error about a configuration
-file names the file, also when its content is not valid JSON, does not fit the
-configuration format, or is a script that fails to load.
-
-A selected document that cannot be read is reported for that file, as an error
-diagnostic with the rule ID `engine/unreadable-file` at line 1, in the text
-output and in the file's entry of the JSON report. The other files are processed
-and reported, and the run ends with exit code `2`. As with an unsafe-format
-diagnostic, `format --write` then writes none of the batch; pass `--exclude` for
-the file to format the rest. A link to a heading or block in a file that cannot
-be read is reported by `links/valid` as `Fragment could not be checked`, naming
-the file, with the rule's configured severity, and is never rewritten. A link to
-the file without a fragment is valid, because the file is known to exist.
-Versions up to `0.2.0-rc.1` stopped at the first such file or link without
-reporting anything else.
-
-The system errors `EACCES` and `EPERM` count as not permitted. So does `EBUSY`,
-which Windows reports for a file that another program has locked against
-reading, with the reason `EBUSY: resource busy or locked`; versions up to
-`0.2.0-rc.2` stopped every command at a locked file. Any other read error, such
-as a path that disappeared during the run or a failing device, stops the run
-with exit code `2`.
-
-Documents are read as UTF-8, with or without a byte order mark, and the tool
-does not guess another encoding: a guess can be wrong, and the supported
-renderers read Markdown as UTF-8. A selected document that is not valid UTF-8 is
-reported in the same way as one that cannot be read, with
-`engine/unreadable-file` and a message that says what was found, as in
-`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
-So is a file that starts with a UTF-16 or UTF-32 byte order mark, which Windows
-PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as UTF-16
-text without a mark does for every ASCII character. Save such a file as UTF-8 to
-process it. A link to a heading or block in it is reported as
-`Fragment could not be checked`, as for a file that cannot be read. Text on
-stdin that is not UTF-8 stops the command with exit code `2` and a message such
-as
-`mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
-Versions up to `0.2.0-rc.2` decoded every file and stdin as UTF-8 without
-checking, replaced what was not UTF-8 with the character U+FFFD, and wrote those
-characters into the file when `format --write` changed anything in it.
-
-## Files that cannot be written
-
-`format --write` replaces each file it changes with a new file written beside
-it, so that a file is never left half written; the files that it writes in place
-instead are [described below](#what-a-replaced-file-keeps). Before it writes
-anything, it checks that each file it is about to change may be written and that
-the file's folder lets it create the new file there. A file that fails the check
-is reported as an error diagnostic for that file, with the rule ID
-`engine/unwritable-file` at line 1 and the system's reason, such as
-`The file may not be written (EACCES: permission denied); no file was written.`
-Nothing of the batch is written, `written` is `false` in the JSON report, and
-the exit code is `2`, as for a document that cannot be read; pass `--exclude`
-for the file to format the rest. A read-only file is refused on every platform.
-Versions up to `0.2.0-rc.2` replaced it on Linux and macOS, where renaming over
-a file does not need permission to write it, and stopped part-way through the
-batch on Windows.
-
-A failure that the check cannot foresee is reported for its file in the same
-way, as in
-`The file could not be written (EPERM: operation not permitted) and is unchanged.`
-That happens on Windows for a file that another program has open, and on every
-platform when a file changed on disk during the run or the disk is full. The
-other files of the batch are still written, `written` is `true`, and the exit
-code is `2`. Versions up to `0.2.0-rc.2` stopped at such a file with the
-system's message, after writing the files before it.
-
-### What a replaced file keeps
-
-The new file gets the content and the permission bits of the file it replaces.
-It is a new file, though, and it loses what Node.js can neither read nor set:
-the creation time, extended attributes, and access control list entries given to
-the file itself, and on Windows also attributes such as Hidden and alternate
-data streams, such as the mark of a downloaded file. A Windows file's
-permissions are such entries, so the replaced file has only the permissions that
-its folder passes on, which can let more users read it than before.
-
-Two kinds of file are written in place instead, into the existing file, which
-keeps all of that. One is a file with more than one name, a hard link: a
-replacement would give one name the new content and leave the old content under
-the others. The other, on Linux and macOS, is a file whose replacement would get
-another owner or group, which happens when the tool runs as another user than
-the file's owner, or when the file's group is not the one that new files in its
-folder get. Writing in place is not atomic. The new content is first written
-beside the file, which shows that it fits on the disk, but a failure while the
-file itself is being written can leave it incomplete, and is reported as
-`The file could not be written completely (EIO: i/o error) and may be incomplete.`
-A file whose two names are both selected documents is written once and counted
-for each. Versions up to `0.2.0-rc.2` replaced every file, which left the other
-names of a hard link with the old content and could change a file's group.
+It reads `--config`, `--root`, and `--dialect`. `mdtools config --help` lists
+the other options of `lint` as well, but `config explain` ignores them.
