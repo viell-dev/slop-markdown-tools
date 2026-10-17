@@ -477,7 +477,10 @@ function semanticTree(
           );
         result[key] = text;
       } else if (key === "value" && node.type === "inlineCode")
-        result[key] = node.value.replace(/\r\n|\r|\n/g, " ");
+        // A code span renders a line ending as a space. The parser keeps the
+        // spaces and tabs that start the next line, which CommonMark strips
+        // from a paragraph's lines, and renderers such as GitHub's with it.
+        result[key] = node.value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
       // An image's description renders as plain text, and a reference's label
       // matches its definition with whitespace collapsed.
       else if ((key === "alt" || key === "label") && typeof value === "string")

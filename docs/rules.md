@@ -622,6 +622,13 @@ or what a comment applies to:
   first line continues with another list marker, as in `- 2. Step` or `- -`, and
   a heading underlined with `===` or `---`. The parser can read such a line
   differently there than below a blank line.
+- Directly below a table that ends in a list item or block quote: text whose
+  second line is a table delimiter row. The parser reads a table there as text,
+  where GitHub reads a table, and a blank line would make it a table for the
+  parser too.
+- In a block quote, below a list whose last item ends in an empty footnote
+  definition, such as `> - [^1]:`. The parser would count the new line of `>` as
+  part of the item and read the list as loose.
 
 ## `style/code-fence`
 
@@ -655,9 +662,7 @@ whose info string contains a backtick, because a backtick fence cannot have one.
 
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
-emphasis there. A marker that would touch another `*` or `_` and change how the
-text parses is left as written, and so are the exceptions of [Forgejo and
-Gitea](dialects.md#forgejo-and-gitea).
+emphasis there.
 
 Before:
 
@@ -670,6 +675,22 @@ After:
 ```markdown
 Use _emphasis_ sparingly, as in un*believ*able.
 ```
+
+Markers are left as written where new ones could change how the text parses, and
+so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
+
+- A new marker that would touch another `*` or `_`, or be separated from one
+  only by `~`.
+- Text with a `*` or `_` that did not pair, as in `*a _b* c_`, or with a run of
+  markers that two emphases share, as in `*****a***`. There markers change only
+  where the rule can tell that every pair stays the same.
+- The text of a collapsed or shortcut reference, such as `[*Title*][]` or
+  `[*Title*]`, which is also its label, and text in brackets that would match a
+  definition's label with the new markers.
+- A marker right after a `$` on GitHub, Forgejo, and Gitea, where a `_` after
+  the dollar decides whether dollar math ends there.
+- Emphasis that begins on the line of an alert's or a callout's marker and ends
+  below it.
 
 ## `style/final-newline`
 
@@ -733,12 +754,21 @@ on Forgejo and Gitea when it contains `{`.
 ## `style/inline-code`
 
 Joins a code span that is written across lines onto one line. A line break
-inside a code span renders as a space, so the content stays the same. Some
-editors, such as Obsidian's Live Preview, show a split code span differently
-from the rendered page. `style/wrap` joins such a code span only in a paragraph
-that it wraps, and this rule also elsewhere, such as in a paragraph with a hard
-line break. The exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea)
-apply.
+inside a code span renders as a space, so the content stays the same, and the
+spaces and tabs that start the next line are left out, as CommonMark and GitHub
+leave them out. Some editors, such as Obsidian's Live Preview, show a split code
+span differently from the rendered page. `style/wrap` joins such a code span
+only in a paragraph that it wraps, and this rule also elsewhere, such as in a
+paragraph with a hard line break. The exceptions of [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea) apply, and a span stays split where the
+joined line would read differently:
+
+- In Obsidian, where an `==` or `[[` left as text on the joined lines could open
+  a highlight or wikilink.
+- Where joining would move text onto the line of an alert's or a callout's
+  marker, which holds an Obsidian callout's title.
+- Where the joined span needs a different number of backticks than it has, and
+  an earlier run of that many in the same paragraph would pair with them.
 
 Before:
 
@@ -1019,9 +1049,15 @@ A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
 on the line before it. A word that only starts like one, such as `--config`,
 `#tag`, or `-5`, can start a line. The first line keeps more than one word when
-its first word alone would open a block, such as `***` or `$$`, and keeps a
-paragraph that starts like a link reference definition (`[Note]: see …`) from
-becoming one.
+its first word alone would open a block, such as `***` or `$$`, or, in the body
+below the line of an alert's or callout's marker, would underline that line as a
+heading, such as `==` or `--`. It also keeps a paragraph that starts like a link
+reference definition (`[Note]: see …`) from becoming one. On GitHub and in
+Obsidian, a word that starts with `$` stays on the line before it when a `$`
+comes earlier in the paragraph, and in Obsidian a word that ends in `$`, such as
+a lone `$`, stays on the line after it when a `$` comes later: at the edge of a
+line, a dollar can begin or end math that it cannot begin or end next to a
+space.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -1059,6 +1095,9 @@ what it means, that is, when it:
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's
   container markers;
+- has a table delimiter row such as `| - |` as its second line, in the dialects
+  with tables: such a paragraph is usually a table that the parser reads as text
+  (see [the safety model](design.md#safety-model));
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 

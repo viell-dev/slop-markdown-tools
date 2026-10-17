@@ -365,6 +365,40 @@ From every prerelease:
 - An Obsidian heading link matches the heading's source text, with its
   backticks, as well as its visible text
   ([#259](https://github.com/viell-dev/slop-markdown-tools/pull/259)).
+- `style/emphasis` and `style/strong` leave the text of a collapsed or shortcut
+  reference, such as `[*Title*][]`, as written, because that text is also the
+  label that matches the definition, and likewise text in brackets that the new
+  markers would make match one. Before, all of the rule's edits in the document
+  were refused
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/emphasis`, `style/strong`, `style/inline-code`, and
+  `style/block-spacing` no longer propose edits that change the parse in rare
+  places, where their edits were refused: crossed or shared markers, as in
+  `*a _b* c_` or `*****a***`, markers next to dollar math or across the line of
+  a callout's or alert's marker, code spans whose joined line would form an
+  Obsidian highlight or wikilink, change that line, or pair with earlier
+  backticks, a table below one that ends in a list item or block quote, and a
+  list in a quote that ends in an empty footnote definition
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/inline-code` leaves out the spaces and tabs that start a code span's
+  next line when it joins the span, as CommonMark and GitHub do; before,
+  `npm run` continued by an indented `build` became `npm run    build`, which
+  changed what GitHub shows. The safety check compares code spans the same way
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` keeps a dollar from the edge of a line where it could begin or
+  end math there: in Obsidian a word that ends in `$` stays with the word after
+  it, and on GitHub and in Obsidian a word that starts with `$` stays with the
+  word before it. Before, such a paragraph was refused in Obsidian
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` leaves a paragraph as written when its second line is a table
+  delimiter row, in every dialect with tables. Directly below a table that ends
+  in a list item or block quote, the parser reads another table as such a
+  paragraph, and joining its lines removed a table that GitHub shows
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` keeps a run of `=` or `-` that starts the body of an alert or
+  callout together with the next word. Alone on a line, it would underline the
+  marker's line as a heading, and the paragraph was refused
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell

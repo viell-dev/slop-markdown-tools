@@ -54,6 +54,40 @@ describe("wrapping controls", () => {
       "aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb %% more words follow here.\n",
     );
   });
+  it.each([
+    // Obsidian begins math at a lone `$` before a line ending, though not before a space.
+    ["commonmark", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["github", "aaaa the price $\ncccccccccccccccc\nand $x$ more\n"],
+    ["forgejo", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["gitea", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["obsidian", "aaaa the price\n$ cccccccccccccccc\nand $x$ more\n"],
+  ] as const)(
+    "ends no line with a dollar that could begin math in the %s dialect",
+    (dialect, output) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const source = "aaaa the price $ cccccccccccccccc and $x$ more\n";
+      expect(verify(source, { ...wrap({ width: 20 }), dialect }, workspace).output).toBe(output);
+      const priced = "It costs about five US$ cccccccccc and $x$.\n";
+      const result = verify(priced, { ...wrap({ width: 20 }), dialect }, workspace).output;
+      if (dialect === "obsidian")
+        expect(result).toBe("It costs about five\nUS$ cccccccccc\nand $x$.\n");
+    },
+  );
+  it.each([
+    // GitHub and Obsidian end math at a `$` after a line ending, though not after a space.
+    ["commonmark", "$a\nbbbbbbbbbbbbbbbbbbb\n$ c\n"],
+    ["github", "$a\nbbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["forgejo", "$a bbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["gitea", "$a bbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["obsidian", "$a\nbbbbbbbbbbbbbbbbbbb $\nc\n"],
+  ] as const)(
+    "starts no line with a dollar that could end math in the %s dialect",
+    (dialect, output) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const source = "$a bbbbbbbbbbbbbbbbbbb $ c\n";
+      expect(verify(source, { ...wrap({ width: 20 }), dialect }, workspace).output).toBe(output);
+    },
+  );
   it("keeps a trailing backslash away from the end of a line", () => {
     const source = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa C:\\ more words follow here.\n";
     expect(verify(source, wrap()).output).toBe(
@@ -985,7 +1019,8 @@ describe("multiline code spans", () => {
     ["- A `one\n  two` here.\n", "- A `one two` here.\n"],
     ["A `` `one\ntwo` `` here.\n", "A `` `one two` `` here.\n"],
     ["A `  one\ntwo  ` here.\n", "A `  one two  ` here.\n"],
-    ["A ` \n ` here.\n", "A `   ` here.\n"],
+    // The space that starts the second line goes, as GitHub renders it.
+    ["A ` \n ` here.\n", "A `  ` here.\n"],
     ["A `one\r\ntwo` here.\r\n", "A `one two` here.\r\n"],
   ])("joins parsed code without deleting content or container syntax", (source, expected) => {
     expect(verify(source!, config).output).toBe(expected);
@@ -1082,5 +1117,53 @@ describe("Obsidian callout overflow", () => {
     };
     expect(lint("> [!info] Short title\n", { config, workspace })).toEqual([]);
     expect(lint(`> ${title}\n`, { config })).toEqual([]);
+  });
+});
+
+describe("a table that the parser reads as text", () => {
+  // Directly below a table that ends in a list item or block quote, the parser
+  // reads the next table as a paragraph, and GitHub reads a table (#283).
+  const layouts = [
+    "- | a |\n  | - |\n| b | and more words in the cell |\n| - | - |\n",
+    "> | a |\n> | - |\n| b | and more words in the cell |\n| - | - |\n",
+  ];
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps its lines in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect };
+      for (const source of layouts) {
+        const result = verify(source, config, workspace);
+        expect(result.output).toBe(source);
+        expect(result.diagnostics.map((item) => item.message)).toEqual([
+          "Paragraph not reflowed: table delimiter row as its second line (width 20 columns).",
+        ]);
+      }
+    },
+  );
+  it("wraps the same lines in CommonMark, which has no tables", () => {
+    const output = verify(layouts[0]!, { ...wrap({ width: 20 }), dialect: "commonmark" }).output;
+    expect(output).not.toBe(layouts[0]);
+  });
+});
+
+describe("a run of `=` or `-` below the line of an alert's or callout's marker", () => {
+  // Alone on the body's first line, it would underline that line as a heading.
+  it.each([
+    ["github", "> [!NOTE]\n", "=="],
+    ["github", "> [!NOTE]\n", "--"],
+    ["forgejo", "> [!NOTE]\n", "=="],
+    ["gitea", "> [!WARNING]\n", "--"],
+    ["obsidian", "> [!note] Title\n", "--"],
+    ["obsidian", "> [!note]\n", "---"],
+  ] as const)("stays with the next word in the %s dialect (%j, %j)", (dialect, marker, run) => {
+    const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+    const config: Config = { ...wrap({ width: 20 }), dialect };
+    const long = `${marker}> ${run} aaaaaaaaaaaaaaaaaaaa\n`;
+    expect(verify(long, config, workspace).output).toBe(long);
+    const words = `${marker}> ${run} aaaa bbbb cccc dddd eeee ffff\n`;
+    expect(verify(words, config, workspace).output).toBe(
+      `${marker}> ${run} aaaa bbbb cccc\n> dddd eeee ffff\n`,
+    );
   });
 });
