@@ -24,10 +24,9 @@ npx mdtools format --root "/path/to/vault" --diff
 ```
 
 Without a configuration file, the notes are still read in the Obsidian dialect,
-because the vault is recognized by its `.obsidian` directory; see
-[the assumed dialect](dialects.md#the-assumed-dialect). The rules of the
-`obsidian` preset, among them the report that wrapping is off, still need the
-configuration.
+because the vault is recognized by its `.obsidian` directory; see [the assumed
+dialect](dialects.md#the-assumed-dialect). The rules of the `obsidian` preset,
+among them the report that wrapping is off, still need the configuration.
 
 ## Enable wrapping
 
@@ -117,7 +116,7 @@ image size in their label. [`links/path`](rules.md#linkspath) and
 Preview with `--diff` before `--write`, and look at complex notes in Obsidian
 afterwards, especially with community plugins whose syntax the tool does not
 know. The link resolver does not reproduce every behavior of Obsidian's, and
-syntax it does not know may need an `ignore` pattern or a
-[suppression comment](configuration.md#suppression-comments). The
-[vault example](examples.md#format-an-obsidian-vault) shows a small vault before
-and after formatting, and [limits](design.md#limits) lists what is not modeled.
+syntax it does not know may need an `ignore` pattern or a [suppression
+comment](configuration.md#suppression-comments). The [vault
+example](examples.md#format-an-obsidian-vault) shows a small vault before and
+after formatting, and [limits](design.md#limits) lists what is not modeled.

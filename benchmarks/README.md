@@ -9,10 +9,9 @@ npm run benchmark -- --json    # the same measurements as JSON
 npm run benchmark -- --quick   # tiny inputs and one sample, to check that it runs
 ```
 
-Read
-[the benchmarks page](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html)
-for what each measurement means, the reference results, and how to judge a
-change.
+Read [the benchmarks
+page](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html) for what
+each measurement means, the reference results, and how to judge a change.
 
 | File              | Purpose                                                      |
 | ----------------- | ------------------------------------------------------------ |
