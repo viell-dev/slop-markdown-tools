@@ -7,7 +7,12 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
-import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/files.js";
+import {
+  replacementFailure,
+  replacementProblem,
+  skippedMessage,
+  writeFormatted,
+} from "../workspace/files.js";
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
@@ -130,6 +135,20 @@ async function located(file: string): Promise<string> {
     }
   }
 }
+/**
+ * The path of `file`, which need not exist, from the workspace root, with
+ * forward slashes, or undefined when it lies outside. Both are located through
+ * their real paths, as discovery locates files, so that a root reached through
+ * a link still holds the files below it.
+ */
+async function workspacePath(root: string, file: string): Promise<string | undefined> {
+  const actual = await realpath(root).catch(() => root);
+  const name = path
+    .relative(actual, await located(file))
+    .split(path.sep)
+    .join("/");
+  return name === ".." || name.startsWith("../") || path.isAbsolute(name) ? undefined : name;
+}
 /** The library's diagnostics for a document that it could not process as configured. */
 const failures = new Set(["engine/unsafe-format", "engine/rule-error"]);
 interface Report {
@@ -157,12 +176,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   /** The text read from stdin, by the name it is given in the workspace. */
   let documents: Record<string, string> | undefined;
   if (stdin) {
-    const name = path
-      .relative(root, path.resolve(flags.stdinFilepath ?? path.join(root, "stdin.md")))
-      .split(path.sep)
-      .join("/");
-    if (name.startsWith("../") || path.isAbsolute(name))
-      throw new Error("--stdin-filepath must be within the workspace.");
+    const name = await workspacePath(root, flags.stdinFilepath ?? path.join(root, "stdin.md"));
+    if (name === undefined) throw new Error("--stdin-filepath must be within the workspace.");
     const chunks: Buffer[] = [];
     for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
     try {
@@ -308,7 +323,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       path.relative(here, path.join(discovery.root, name)).split(path.sep).join("/");
     // Warnings about the run, not about a document: they do not change the exit status.
     for (const item of discovery.skipped)
-      process.stderr.write(`mdtools: warning: ${item.message}\n`);
+      process.stderr.write(`mdtools: warning: ${skippedMessage(item, shown)}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)
@@ -378,15 +393,10 @@ workspaceOptions(
 ).action(async (file: string, _flags: unknown, command: Command) => {
   const flags = command.optsWithGlobals<Flags>();
   const { root, config, plugins, file: source } = await workspace(flags);
-  // The document is located as discovery locates files: from the real path of
-  // the root, which is also where the search for its vault starts.
+  const name = await workspacePath(root, file);
+  if (name === undefined) throw new Error(`Input is outside the workspace: ${file}`);
+  // The search for the document's vault starts from the root's real path too.
   const actual = await realpath(root).catch(() => root);
-  const name = path
-    .relative(actual, await located(file))
-    .split(path.sep)
-    .join("/");
-  if (name === ".." || name.startsWith("../") || path.isAbsolute(name))
-    throw new Error(`Input is outside the workspace: ${file}`);
   process.stdout.write(
     JSON.stringify(
       {

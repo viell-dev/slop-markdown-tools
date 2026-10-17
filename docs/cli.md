@@ -129,9 +129,9 @@ Both add `; 1 could not be read` when a selected document
 [could not be read](#files-that-cannot-be-read-or-written), and `format --write`
 adds `; 1 could not be written`. Warnings about the run itself, such as a
 skipped directory, are printed as `mdtools: warning: …`, with paths from the
-workspace root as in the JSON report, and an error that stops the run, a mistake
-on the command line included, as `mdtools: …`. These lines are for people; a
-script should read the JSON report and the exit code.
+current directory as well, and an error that stops the run, a mistake on the
+command line included, as `mdtools: …`. These lines are for people; a script
+should read the JSON report and the exit code.
 
 ### JSON report
 
@@ -177,7 +177,8 @@ script should read the JSON report and the exit code.
 - `skipped` appears only when something was skipped: one entry per directory,
   settings file, or ignored input, with `path`, `type` (`directory` or `file`),
   the system's error `code`, `INVALID` for content that could not be used, or
-  `IGNORED` for a named input that is ignored, and a `message`.
+  `IGNORED` for a named input that is ignored, and a `message`. Paths in both
+  are relative to the workspace root.
 
 A diagnostic has the `rule`, the `severity` (`warn` or `error`), the `message`,
 and its position: `start` and optional `end` as offsets into the text, and

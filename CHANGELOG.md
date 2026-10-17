@@ -202,6 +202,9 @@ From every prerelease:
 
 - `--dialect` works with an `.mjs` configuration that exports a frozen object
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- `--stdin-filepath` accepts a document inside a root that is reached through a
+  link or a Windows junction
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - Documents and JSON configuration files that start with a byte order mark are
   read correctly
   ([#174](https://github.com/viell-dev/slop-markdown-tools/pull/174)).

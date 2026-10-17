@@ -455,6 +455,109 @@ describe("the command line", () => {
     expect(report.files.map((file: { path: string }) => file.path)).toEqual(["docs/deep/page.md"]);
     expect(await realpath(report.root)).toBe(await realpath(root));
   });
+  it("names the paths in warnings about the run from the current directory too", async () => {
+    const root = await fixture({
+      ".gitignore": "docs/drafts/\n",
+      "docs/drafts/a.md": "A draft.\n",
+      "docs/guide.md": "A guide.\n",
+      "docs/vault/.obsidian/app.json": "",
+      "docs/vault/Note.md": "A note.\n",
+      "docs/vendor/.git/HEAD": "",
+      "docs/vendor/inner.md": "Inner.\n",
+    });
+    const inputs = ["guide.md", "drafts/a.md", "vendor/inner.md"];
+    const settings = (file: string) =>
+      `Skipped unusable settings file: ${file} (not valid JSON). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.`;
+    const ignored = (file: string, reason: string) =>
+      `Skipped ignored input: ${file} (${reason}). It is not processed.`;
+    const linted = run(path.join(root, "docs"), ["lint", ...inputs]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe(
+      `mdtools: warning: ${ignored("drafts/a.md", 'in drafts, which "docs/drafts/" in ../.gitignore matches')}\n` +
+        `mdtools: warning: ${settings("vault/.obsidian/app.json")}\n` +
+        `mdtools: warning: ${ignored("vendor/inner.md", "in vendor, a nested repository")}\n` +
+        "1 file(s) linted; 0 error(s), 0 warning(s).\n",
+    );
+    // The JSON report, like the library, names them from the root.
+    const report = JSON.parse(run(path.join(root, "docs"), ["lint", "--json", ...inputs]).stdout);
+    expect(report.skipped).toEqual([
+      {
+        path: "docs/drafts/a.md",
+        type: "file",
+        code: "IGNORED",
+        message: ignored(
+          "docs/drafts/a.md",
+          'in docs/drafts, which "docs/drafts/" in .gitignore matches',
+        ),
+      },
+      {
+        path: "docs/vault/.obsidian/app.json",
+        type: "file",
+        code: "INVALID",
+        message: settings("docs/vault/.obsidian/app.json"),
+      },
+      {
+        path: "docs/vendor/inner.md",
+        type: "file",
+        code: "IGNORED",
+        message: ignored("docs/vendor/inner.md", "in docs/vendor, a nested repository"),
+      },
+    ]);
+  });
+  it.skipIf(process.platform !== "win32" && !canRestrict)(
+    "names an unreadable directory, and the file that could not be read, from here",
+    async () => {
+      const root = await fixture({
+        "docs/guide.md": "A guide.\n",
+        "docs/closed/a.md": "A.\n",
+        "docs/open/.gitignore": "b.md\n",
+        "docs/open/c.md": "C.\n",
+      });
+      for (const file of ["docs/closed", "docs/open/.gitignore"])
+        if (process.platform === "win32") denyRead(path.join(root, file));
+        else await restrict(path.join(root, file));
+      const refused =
+        process.platform === "win32"
+          ? "EPERM: operation not permitted"
+          : "EACCES: permission denied";
+      const unreadable = (directory: string, detail = "") =>
+        `mdtools: warning: Skipped unreadable directory: ${directory} (${refused}${detail}). Its files are not processed, and links into it cannot be checked.\n`;
+      const linted = run(path.join(root, "docs"), ["lint"]);
+      expect(linted.status, linted.stderr).toBe(0);
+      expect(linted.stderr).toBe(
+        unreadable("closed") +
+          unreadable("open", " for open/.gitignore") +
+          "1 file(s) linted; 0 error(s), 0 warning(s).\n",
+      );
+      const report = JSON.parse(run(path.join(root, "docs"), ["lint", "--json"]).stdout);
+      expect(report.skipped.map((item: { message: string }) => item.message)).toEqual([
+        unreadable("docs/closed").slice(18, -1),
+        unreadable("docs/open", " for docs/open/.gitignore").slice(18, -1),
+      ]);
+    },
+  );
+  it("places --stdin-filepath in a root reached through a link", async () => {
+    const root = await fixture({ "notes/a.md": "# A\n" });
+    const alias = path.join(await fixture({}), "alias");
+    await linkDirectory(root, alias);
+    // From the real folder with the root named through the link, and the reverse.
+    for (const [cwd, named] of [
+      [root, alias],
+      [alias, root],
+    ] as const) {
+      const args = ["lint", "-", "--root", named, "--stdin-filepath", "notes/new.md"];
+      const piped = run(cwd, args, "See [a](a.md).\n");
+      expect(piped.status, piped.stderr).toBe(0);
+      expect(piped.stderr).toBe("");
+    }
+    const outside = run(
+      root,
+      ["lint", "-", "--root", alias, "--stdin-filepath", "../x.md"],
+      "A.\n",
+    );
+    expect(outside.status).toBe(2);
+    expect(outside.stderr).toBe("mdtools: --stdin-filepath must be within the workspace.\n");
+  });
   it("names the files that format --check would change, before the summary", async () => {
     const root = await fixture({
       "b.md": "B *note*.\n",
@@ -1028,9 +1131,18 @@ describe("in an Obsidian vault, without a named dialect", () => {
         message: text("docs/vault/.obsidian/app.json"),
       },
     ]);
+    // The report names it from the root, which lies in the vault; the text from here.
     const above = run(root, ["lint", "--root", "docs/vault/Folder"]);
     expect(above.status, above.stderr).toBe(0);
     expect(above.stderr).toBe(
+      `mdtools: warning: ${text("docs/vault/.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
+    );
+    const report = run(root, ["lint", "--root", "docs/vault/Folder", "--json"]);
+    expect(JSON.parse(report.stdout).skipped).toMatchObject([
+      { path: "../.obsidian/app.json", message: text("../.obsidian/app.json") },
+    ]);
+    const inside = run(path.join(root, "docs/vault/Folder"), ["lint"]);
+    expect(inside.stderr).toBe(
       `mdtools: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
   });
