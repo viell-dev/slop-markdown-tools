@@ -21,6 +21,20 @@ import { isNotUtf8 } from "./encoding.js";
  */
 export type WorkspaceSource = string | null | (() => string);
 
+/** What `WorkspaceOptions.lookup` found at a path. */
+export type LookupResult =
+  /** A file, with its path as found from the root and its source as in `files`. */
+  | { type: "file"; path: string; source: WorkspaceSource }
+  | { type: "directory" }
+  /**
+   * Something whose real location lies outside the workspace root, reached
+   * through the symbolic link or junction `through`, which the host does not
+   * follow: the root bounds what is read.
+   */
+  | { type: "outside"; through: string }
+  /** Something that the system does not let the host examine; `at` names it. */
+  | { type: "unreadable"; at: string };
+
 /**
  * Whether a file is Markdown by its name: one ending in `.md` or `.markdown`,
  * in any letter case, both of which GitHub, Forgejo, and Gitea render.
@@ -434,6 +448,14 @@ export interface WorkspaceOptions {
    */
   unreadable?: string[];
   /**
+   * Looks for a path that `files` and `directories` do not hold, when a link
+   * names it: a host that leaves some folders or links out of the index, such
+   * as the CLI, finds there what a link names. It returns what is at the path,
+   * or undefined when nothing is. `folded` asks for Obsidian's matching,
+   * without regard to letter case. A search by note name does not use it.
+   */
+  lookup?: (path: string, folded: boolean) => LookupResult | undefined;
+  /**
    * Folders below the workspace root that are Obsidian vaults of their own. An
    * Obsidian link in a note of such a vault reaches only the vault's files: a
    * path is counted from the vault's folder, and a search by name looks inside
@@ -565,6 +587,20 @@ export function createWorkspace(
     return foldedDirectories.has(name.toLowerCase());
   }
   const targets = new Map<string, Target>();
+  /** What the host's lookup found, by the matching asked for and the path. */
+  const lookedUp = new Map<string, LookupResult | undefined>();
+  /** The sources of the files that the lookup found, by path. */
+  const foundSources = new Map<string, WorkspaceSource>();
+  /** What the host finds at a path that the index does not hold, asked once per path. */
+  function lookup(name: string, folded: boolean): LookupResult | undefined {
+    if (!options.lookup) return undefined;
+    const key = `${folded ? "i" : "s"}:${name}`;
+    if (lookedUp.has(key)) return lookedUp.get(key);
+    const result = options.lookup(name, folded);
+    lookedUp.set(key, result);
+    if (result?.type === "file") foundSources.set(result.path, result.source);
+    return result;
+  }
   /**
    * One group of a target's anchors, from the target read and parsed for it;
    * nothing keeps the parsed document. A target that the link's dialect does not
@@ -579,7 +615,7 @@ export function createWorkspace(
     anchors: (document: Document | null) => Anchors,
   ): Anchors | undefined {
     if (target.unreadable) return undefined;
-    const value = sources.get(name);
+    const value = sources.has(name) ? sources.get(name) : foundSources.get(name);
     if (value === null || value === undefined || !isMarkdownName(name, dialect))
       return anchors(null);
     let source: string;
@@ -747,6 +783,17 @@ export function createWorkspace(
       const partial = folded && !vault && rootFolders.length > 0;
       // Whether Obsidian would look in a place of that vault outside the workspace.
       let beyond = false;
+      // A link on the disk that the path leads through to outside the workspace root.
+      let leaves: string | undefined;
+      /** What the host finds at a path that the index does not hold. */
+      const look = (name: string, file = true) => {
+        const found = lookup(name, folded);
+        if (found?.type === "file") {
+          if (file) candidates.add(found.path);
+        } else if (found?.type === "directory") directory = true;
+        else if (found?.type === "outside") leaves ??= found.through;
+        else if (found?.type === "unreadable") blocking.add(found.at);
+      };
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized === ".." || normalized.startsWith("../")) {
@@ -770,12 +817,19 @@ export function createWorkspace(
         if (above !== undefined) blocking.add(above);
         if (!folded) {
           if (sources.has(normalized)) candidates.add(normalized);
+          // A path that ends with a slash names a folder only.
+          else if (!directory) look(bare, bare === normalized);
           return;
         }
         // Names differing only by case all count, so such vaults report ambiguity.
+        const before = candidates.size;
         for (const name of namesMatching(normalized)) candidates.add(name);
         if (!path.posix.extname(normalized))
           for (const name of namesMatching(`${normalized}.md`)) candidates.add(name);
+        if (candidates.size === before && !directory) {
+          look(bare);
+          if (!path.posix.extname(bare)) look(`${bare}.md`);
+        }
       };
       if (!targetPath) add(source);
       else if (dialect === "obsidian") {
@@ -815,6 +869,14 @@ export function createWorkspace(
       // A match is uncertain when a place that could not be looked in may hold a
       // note that Obsidian would choose instead, or as well.
       const uncertain = [...(unsearched ? hidden : obstructed ? blocking : []), ...unseen];
+      // The tool reads nothing outside the workspace root, where the link leads.
+      if (candidates.size === 0 && leaves !== undefined)
+        return {
+          status: "unreadable",
+          unreadable: [leaves],
+          leavesRoot: leaves,
+          ...(vault ? { vault } : {}),
+        };
       if (candidates.size === 0 && (blocking.size > 0 || unsearched || unseen.length > 0))
         return {
           status: "unreadable",

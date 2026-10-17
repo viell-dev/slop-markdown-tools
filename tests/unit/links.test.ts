@@ -10,7 +10,7 @@ import {
   semanticFingerprint,
   textContent,
 } from "../../src/index.js";
-import type { Config, Dialect, Document, Plugin } from "../../src/index.js";
+import type { Config, Dialect, Document, LookupResult, Plugin } from "../../src/index.js";
 import {
   headingAttributeBlock,
   headingAttributes,
@@ -442,6 +442,61 @@ describe("file names that many files share", () => {
     expect(resolve("ingle/index")).toEqual({ status: "missing" });
     expect(resolve("Unique")).toMatchObject({ target: "Unique.md" });
     expect(resolve("unique.MD")).toMatchObject({ target: "Unique.md" });
+  });
+});
+describe("paths that the host looks up", () => {
+  const found: Record<string, LookupResult> = {
+    "dist/guide.md": { type: "file", path: "dist/guide.md", source: () => "# Guide\n" },
+    "dist/image.png": { type: "file", path: "dist/image.png", source: null },
+    dist: { type: "directory" },
+    "out/note.md": { type: "outside", through: "out" },
+    "locked/note.md": { type: "unreadable", at: "locked" },
+  };
+  function workspace() {
+    const lookup = vi.fn((name: string, folded: boolean) =>
+      folded
+        ? Object.entries(found).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1]
+        : found[name],
+    );
+    return { lookup, index: createWorkspace({ "Doc.md": "", "Listed.md": "" }, { lookup }) };
+  }
+  it("are asked for what the index does not hold, once per path", () => {
+    const { lookup, index } = workspace();
+    expect(index.resolve("Doc.md", "Listed.md", "github").status).toBe("resolved");
+    expect(lookup).not.toHaveBeenCalled();
+    expect(index.resolve("Doc.md", "dist/guide.md#guide", "github")).toMatchObject({
+      status: "resolved",
+      target: "dist/guide.md",
+      fragmentExists: true,
+    });
+    expect(index.resolve("Doc.md", "dist/guide.md#other", "github").fragmentExists).toBe(false);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(index.resolve("Doc.md", "dist/image.png#any", "github").status).toBe("resolved");
+    expect(index.resolve("Doc.md", "dist", "github").status).toBe("directory");
+    expect(index.resolve("Doc.md", "dist/guide.md/", "github").status).toBe("missing");
+    expect(index.resolve("Doc.md", "dist/absent.md", "github").status).toBe("missing");
+  });
+  it("cannot be checked where they lead outside the root or cannot be read", () => {
+    const { index } = workspace();
+    expect(index.resolve("Doc.md", "out/note.md", "github")).toEqual({
+      status: "unreadable",
+      unreadable: ["out"],
+      leavesRoot: "out",
+    });
+    expect(index.resolve("Doc.md", "locked/note.md", "gitea")).toEqual({
+      status: "unreadable",
+      unreadable: ["locked"],
+    });
+  });
+  it("are found by Obsidian paths without regard to case, also without .md", () => {
+    const { lookup, index } = workspace();
+    expect(index.resolve("Doc.md", "DIST/guide#Guide", "obsidian")).toMatchObject({
+      status: "resolved",
+      target: "dist/guide.md",
+      fragmentExists: true,
+    });
+    expect(lookup).toHaveBeenCalledWith("DIST/guide.md", true);
+    expect(index.resolve("Doc.md", "out/note", "obsidian").leavesRoot).toBe("out");
   });
 });
 describe("directories that could not be read", () => {

@@ -66,6 +66,20 @@ not valid in its encoding. Versions up to `0.2.0-rc.2` let that error through.
 Any other error from a loader propagates. Versions up to `0.2.0-rc.1` have
 neither the option nor the status, and let every loader error through.
 
+`WorkspaceOptions.lookup(path, folded)` lets a host that leaves files out of the
+index find what a link names. The workspace calls it once per path, for a path
+that neither the files nor the directories hold, with `folded` true for an
+Obsidian link, which matches without regard to letter case. It returns
+`{ type: "file", path, source }`, with the file's path and a source as in the
+files, `{ type: "directory" }`, `{ type: "outside", through }` for a path that
+leads out of the workspace root through the link `through`, which resolves as
+`"unreadable"` with `leavesRoot` naming it, `{ type: "unreadable", at }`, or
+`undefined` when nothing is there. An Obsidian search by note name does not call
+it. The CLI looks in the folders that it does not enter and behind symbolic
+links and junctions; see
+[selection](configuration.md#selection-output-and-exit-codes). Versions up to
+`0.2.0-rc.2` do not have the option.
+
 `WorkspaceOptions.vaults` lists folders below the workspace root that are
 Obsidian vaults of their own. An Obsidian link in a note of such a vault is
 resolved within it: a path is counted from the vault's folder, and a search by

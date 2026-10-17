@@ -497,9 +497,20 @@ Markdown targets are read and parsed only for fragment checks; attachments need
 only a discovered file entry. A target's headings count only when its name ends
 in `.md` or `.markdown`, and for Obsidian links only in `.md`, the one kind of
 file that Obsidian opens as a note. Built-in traversal exclusions still apply.
-`.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and `coverage` are
-excluded from traversal, as are symlinks. Nested Git repositories are traversed
-for targets only when opted in. Explicit symlink inputs are rejected.
+`.git`, `.obsidian`, `node_modules`, `dist`, and `coverage` are excluded from
+traversal, as are symbolic links and junctions. Nested Git repositories are
+traversed for targets only when opted in. Explicit symlink inputs are rejected.
+
+Those exclusions decide which files are processed, not which files exist. A link
+that names a path in such a folder, or through a symbolic link or junction, is
+checked on disk: the target is not missing when it is there, and its headings
+are read when a fragment needs them. Where such a link leads outside the
+workspace root, the tool reads nothing there and reports the target as
+`Local target could not be checked`, naming the link. A Git-ignored folder stays
+out of the index whatever its name, unless `resolve.gitIgnored` asks for it. An
+Obsidian search by note name does not look in these folders. Versions up to
+`0.2.0-rc.2` reported every such target as missing and also left out
+`.npm-cache`, which is now an ordinary folder.
 
 A file or directory named as an input that `.gitignore`, the configuration's
 `ignore` patterns, a built-in exclusion, or a nested repository leaves out is

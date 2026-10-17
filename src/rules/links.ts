@@ -111,9 +111,11 @@ export const linkRules: Record<string, Rule> = {
           findings.push({
             start: range(node)[0],
             message:
-              result.target === undefined
-                ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
-                : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
+              result.leavesRoot !== undefined
+                ? `Local target could not be checked: ${url} (${result.leavesRoot} leads outside the workspace root, which the tool does not read).`
+                : result.target === undefined
+                  ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
+                  : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
           });
         } else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });

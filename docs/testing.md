@@ -49,7 +49,7 @@ documentation that no longer matches the tool.
 | File                 | Covers                                                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `cli.test.ts`        | Commands, flags, exit codes, discovery, ignore rules, the assumed dialect, and write safeguards                     |
-| `selection.test.ts`  | Which files a run selects: `.gitignore` files compared with Git, named inputs, and input patterns                   |
+| `selection.test.ts`  | Which files a run selects and finds: `.gitignore` compared with Git, named inputs, patterns, unentered folders      |
 | `workflows.test.ts`  | Whole tasks: mixed-dialect workspaces, CRLF files, byte order marks, non-ASCII paths, JSON reports, plugin loading  |
 | `node.test.ts`       | `mdrefine/node`: discovery and per-document options, compared with the CLI's JSON report                            |
 | `examples.test.ts`   | Every example: configurations load, `before/` formats into `after/`, scripts print what is shown                    |
