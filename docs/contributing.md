@@ -159,8 +159,9 @@ runs are canceled.
 Runtime dependencies have no OS-specific installation constraints. Development
 tooling does include native platform packages, but that alone does not justify
 repeating the full toolchain matrix. Windows coverage protects filesystem path
-handling and installed command behavior; it has already caught a path-alias
-regression. macOS is not a routine CI target.
+handling, file access through access control lists and junctions, and installed
+command behavior; it has already caught a path-alias regression. macOS is not a
+routine CI target.
 
 A change is complete when everything that describes or depends on what it
 changed agrees with it: tests, examples, documentation pages, the README,
