@@ -1,18 +1,31 @@
 import { Ajv } from "ajv";
 import { minimatch } from "minimatch";
 import { configErrors } from "./problems.js";
+import { deepFreeze } from "../core/frozen.js";
 import type {
   Config,
   Dialect,
   DialectName,
-  Plugin,
+  JsonSchemaObject,
+  ResolveConfigOptions,
   ResolvedConfig,
   RuleSetting,
 } from "../core/types.js";
 
-/** Alias names that select an existing dialect; Codeberg runs Forgejo's renderer. */
-export const dialectAliases: Record<string, Dialect> = { codeberg: "forgejo" };
-export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian"];
+/**
+ * Alias names that select an existing dialect, mapped to that dialect:
+ * Codeberg runs Forgejo's renderer. The table is frozen.
+ */
+export const dialectAliases: Readonly<Record<Exclude<DialectName, Dialect>, Dialect>> =
+  Object.freeze({ codeberg: "forgejo" });
+/** The dialects, in the order the documentation lists them. The list is frozen. */
+export const dialects: readonly Dialect[] = Object.freeze([
+  "commonmark",
+  "github",
+  "forgejo",
+  "gitea",
+  "obsidian",
+]);
 /**
  * The dialect assumed when nothing names one and the caller knows no better.
  * GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian
@@ -20,11 +33,27 @@ export const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", 
  * ordinary paragraph and reflowed.
  */
 export const fallbackDialect: Dialect = "github";
+/**
+ * The dialect that `name` stands for: an alias's dialect, or `name` itself.
+ * A name that is neither is returned as it is.
+ */
 export function canonicalDialect(name: DialectName): Dialect {
-  return Object.hasOwn(dialectAliases, name) ? dialectAliases[name]! : (name as Dialect);
+  return Object.hasOwn(dialectAliases, name)
+    ? dialectAliases[name as keyof typeof dialectAliases]
+    : (name as Dialect);
+}
+/** The dialect that `name` stands for, or an error that says what was named. */
+export function knownDialect(name: DialectName, what = "dialect"): Dialect {
+  const dialect = canonicalDialect(name);
+  if (!dialects.includes(dialect)) throw new Error(`Unknown ${what}: ${String(name)}`);
+  return dialect;
 }
 
-export const presets: Record<string, Config> = {
+/**
+ * The built-in presets by name. The table and everything in it are frozen, so
+ * that no caller can change what another one gets.
+ */
+export const presets: Readonly<Record<string, Readonly<Config>>> = {
   recommended: {
     rules: {
       "style/wrap": ["warn", { width: 80 }],
@@ -74,14 +103,19 @@ export const presets: Record<string, Config> = {
     },
   },
 };
-const dialectNames = [...dialects, ...Object.keys(dialectAliases)];
+deepFreeze(presets);
+// Each dialect is followed by its aliases, as the command line lists them.
+const dialectNames = dialects.flatMap((dialect) => [
+  dialect,
+  ...Object.entries(dialectAliases).flatMap(([alias, of]) => (of === dialect ? [alias] : [])),
+]);
 const strings = { type: "array", items: { type: "string" } };
 /**
  * The configuration's JSON Schema, which `validateConfig` enforces. The
  * package ships it as `config.schema.json`, which a test keeps equal to it,
  * and the documentation site serves it for editors.
  */
-export const configSchema = {
+export const configSchema: JsonSchemaObject = deepFreeze({
   $schema: "http://json-schema.org/draft-07/schema#",
   title: "mdtools configuration",
   description:
@@ -165,24 +199,30 @@ export const configSchema = {
       },
     },
   },
-};
+});
 const validate = new Ajv({ allErrors: true }).compile(configSchema);
 /** What is wrong with `value` as a configuration, in plain words, or undefined when it is valid. */
 export function configProblem(value: unknown): string | undefined {
   return validate(value) ? undefined : configErrors(validate.errors ?? [], value, dialectNames);
 }
+/**
+ * Throws an error that says what is wrong when `value` is not a configuration
+ * that `configSchema` describes, naming each setting as it is written, as in
+ * `Invalid configuration: "extends[1]" must be a preset name, not 5`. Rule IDs,
+ * preset names, and rule options are checked when a document is processed.
+ */
 export function validateConfig(value: unknown): asserts value is Config {
   const problem = configProblem(value);
   if (problem) throw new Error(`Invalid configuration: ${problem}`);
 }
-const noOptions: Record<string, unknown> = Object.freeze({});
+const noOptions: Readonly<Record<string, unknown>> = Object.freeze({});
 export function setting(value: RuleSetting): {
   severity: "off" | "warn" | "error";
-  options: Record<string, unknown>;
+  options: Readonly<Record<string, unknown>>;
 } {
   return Array.isArray(value)
     ? { severity: value[0], options: value[1] ?? noOptions }
-    : { severity: value, options: noOptions };
+    : { severity: value as Exclude<RuleSetting, readonly unknown[]>, options: noOptions };
 }
 /**
  * Set each of `rules` in `target`. A rule named `__proto__` becomes a setting
@@ -198,33 +238,41 @@ function addRules(target: Record<string, RuleSetting>, rules: Config["rules"] = 
       configurable: true,
     });
 }
+/** Settings that only a configuration has, which show a call in the prereleases' form. */
+const configOnly = new Set(
+  Object.keys(configSchema.properties as object).filter((key) => key !== "plugins"),
+);
 /**
- * The configuration in effect for the document at `path`. `defaultDialect` is
- * the dialect to assume when neither the configuration, a preset, nor a
- * matching override names one: `github` unless the caller knows better, as the
- * CLI does at the root of an Obsidian vault.
+ * The configuration in effect for one document: its dialect, rule settings,
+ * `ignore` patterns, and `resolve` settings. It takes the `path`, `config`,
+ * `plugins`, and `defaultDialect` that `lint` and `format` take, so their
+ * options serve as they are. `defaultDialect` is the dialect to assume when
+ * neither the configuration, a preset, nor a matching override names one:
+ * `github` unless the caller knows better, as the CLI does inside an Obsidian
+ * vault. An invalid configuration or default dialect, an unknown preset, and a
+ * cycle of presets throw an error.
  */
-export function resolveConfig(
-  config: Config = {},
-  path = "document.md",
-  plugins: Plugin[] = [],
-  defaultDialect: DialectName = fallbackDialect,
-): ResolvedConfig {
+export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfig {
+  // The prereleases took the configuration, path, plugins, and default dialect one by one.
+  if (
+    arguments.length > 1 ||
+    typeof options !== "object" ||
+    options === null ||
+    Object.keys(options).some((key) => configOnly.has(key))
+  )
+    throw new TypeError(
+      "resolveConfig takes one options object, { path, config, plugins, defaultDialect }, since mdrefine 0.2.0.",
+    );
+  const { config = {}, path = "document.md", plugins = [] } = options;
   validateConfig(config);
-  if (!dialects.includes(canonicalDialect(defaultDialect)))
-    throw new Error(`Unknown default dialect: ${String(defaultDialect)}`);
-  const available = { ...presets };
+  const assumed = knownDialect(options.defaultDialect ?? fallbackDialect, "default dialect");
+  const available: Record<string, Readonly<Config>> = { ...presets };
   for (const plugin of plugins)
     for (const [name, preset] of Object.entries(plugin.presets ?? {}))
       available[`${plugin.name}/${name}`] = preset;
-  const result: ResolvedConfig = {
-    dialect: canonicalDialect(defaultDialect),
-    rules: {},
-    ignore: [],
-    resolve: {},
-  };
-  const overrides: NonNullable<Config["overrides"]> = [];
-  function merge(part: Config, chain: string[]) {
+  const result: ResolvedConfig = { dialect: assumed, rules: {}, ignore: [], resolve: {} };
+  const overrides: NonNullable<Config["overrides"]>[number][] = [];
+  function merge(part: Readonly<Config>, chain: readonly string[]) {
     validateConfig(part);
     for (const name of typeof part.extends === "string" ? [part.extends] : (part.extends ?? [])) {
       if (chain.includes(name))

@@ -18,7 +18,7 @@ function verify(source: string, config: Config, workspace?: Workspace) {
   const options = { config, ...(workspace ? { workspace } : {}) };
   const result = format(source, options);
   expect(result.diagnostics.some((item) => item.rule.startsWith("engine/"))).toBe(false);
-  const { dialect } = resolveConfig(config);
+  const { dialect } = resolveConfig({ config });
   expect(semanticFingerprint(parse(result.output, dialect))).toBe(
     semanticFingerprint(parse(source, dialect)),
   );

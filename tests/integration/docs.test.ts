@@ -6,6 +6,7 @@ import { Ajv } from "ajv";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Code, RootContent } from "mdast";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
 import { manifest, repository } from "./support.js";
@@ -270,6 +271,42 @@ describe("documentation site", () => {
 });
 
 describe("library API", () => {
+  it("has a doc comment for every export and every member that it declares", () => {
+    const entries = ["dist/index.d.ts", "dist/node.d.ts"].map((file) =>
+      path.join(repository, file),
+    );
+    const program = ts.createProgram(entries, {
+      module: ts.ModuleKind.NodeNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+      noEmit: true,
+      types: [],
+    });
+    const checker = program.getTypeChecker();
+    const dist = path.join(repository, "dist");
+    // Members that a dependency declares, such as an mdast node's `position`, are its own.
+    const declaredHere = (symbol: ts.Symbol) =>
+      (symbol.getDeclarations() ?? []).some((declaration) =>
+        path.resolve(declaration.getSourceFile().fileName).startsWith(dist),
+      );
+    const documented = (symbol: ts.Symbol) => symbol.getDocumentationComment(checker).length > 0;
+    const missing: string[] = [];
+    let count = 0;
+    for (const entry of entries) {
+      const module = checker.getSymbolAtLocation(program.getSourceFile(entry)!)!;
+      for (const exported of checker.getExportsOfModule(module)) {
+        count++;
+        const symbol =
+          exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
+        if (!documented(symbol)) missing.push(exported.name);
+        if (symbol.flags & ts.SymbolFlags.Interface)
+          for (const member of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol)))
+            if (declaredHere(member) && !documented(member))
+              missing.push(`${exported.name}.${member.name}`);
+      }
+    }
+    expect(count).toBeGreaterThan(40);
+    expect(missing).toEqual([]);
+  });
   it("is the same in the built package as in the source, and is documented", async () => {
     const built = (await import(
       pathToFileURL(path.join(repository, "dist/index.js")).href

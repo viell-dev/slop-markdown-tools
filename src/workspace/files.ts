@@ -17,6 +17,7 @@ import type { SettingsProblem, Vault } from "./vault.js";
 export interface Skipped {
   /** The directory or settings file, relative to the workspace root. */
   path: string;
+  /** Whether a directory or a file was left out. */
   type: "directory" | "file";
   /** The system's error code, or `INVALID` for a settings file with unusable content. */
   code: RefusalCode | "INVALID";

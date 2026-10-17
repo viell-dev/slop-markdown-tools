@@ -50,9 +50,15 @@ npm run test:package
 `check` runs the TypeScript checks, ESLint, Prettier on everything but Markdown,
 the tool's own lint and format check of the Markdown, the documentation site's
 build, and both test suites. `test:package` packs the package, installs it into
-a temporary project, and runs the installed command, the library, a shipped
-example, and a TypeScript consumer of the published types; it can need access to
-the npm registry.
+a temporary project with npm and again with pnpm, whose strict layout lets a
+package use only the dependencies it declares, and runs the installed command,
+the library through `import` and `require()`, a shipped example, and TypeScript
+consumers of the published types. npm fetches the pinned pnpm into the
+repository's cache, and both installations can need access to the npm registry.
+
+The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
+`npm run schema` writes it to `config.schema.json`, which the package ships and
+the site serves; a test fails when the two differ.
 
 GitHub Actions runs `check` and a dependency audit on Linux with Node.js 24, the
 build and tests on Linux with Node.js 22 and on Windows with Node.js 24, and

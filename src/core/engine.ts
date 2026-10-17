@@ -1,5 +1,6 @@
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
+import { deepFreeze } from "./frozen.js";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
@@ -18,6 +19,7 @@ import type {
   Edit,
   Finding,
   FormatResult,
+  JsonSchema,
   Plugin,
   ProcessOptions,
   ResolvedConfig,
@@ -26,13 +28,17 @@ import type {
   Workspace,
 } from "./types.js";
 
-export const builtInRules: Record<string, Rule> = {
+/**
+ * The built-in rules by rule ID. The table and the rules in it are frozen, so
+ * that no caller can change what another one runs.
+ */
+export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze({
   ...styleRules,
   ...dialectRules,
   ...linkRules,
   ...structureRules,
   ...contentRules,
-};
+});
 const phases = ["inline", "block", "document"] as const;
 /** What is wrong with a plugin's rule, or undefined when it has the shape of a `Rule`. */
 function ruleProblem(rule: unknown): string | undefined {
@@ -60,10 +66,12 @@ function ruleProblem(rule: unknown): string | undefined {
  */
 export const reservedPluginName = "engine";
 /**
- * The built-in rules and those of `plugins`, by rule ID. A plugin rule that
- * does not have the shape of a `Rule` is an error that names it.
+ * The built-in rules and those of `plugins`, by rule ID, in a new table. A
+ * plugin name that is invalid, reserved, or used twice, a rule ID that exists
+ * already, and a plugin rule that does not have the shape of a `Rule` are
+ * errors that name them.
  */
-export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
+export function ruleRegistry(plugins: readonly Plugin[] = []): Record<string, Readonly<Rule>> {
   const rules = { ...builtInRules };
   const names = new Set<string>();
   for (const plugin of plugins) {
@@ -93,7 +101,7 @@ const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.sc
  * legitimately reuse an `$id` with different schemas.
  */
 const compiledSchemas = new WeakMap<object, ValidateFunction>();
-function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
+function optionsValidator(name: string, schema: JsonSchema): ValidateFunction {
   // Ajv keeps compiled boolean schemas itself.
   if (typeof schema !== "object") return ruleValidator.compile(schema);
   let validate = compiledSchemas.get(schema);
@@ -101,7 +109,7 @@ function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
     try {
       validate = (
         builtInSchemas.has(schema) ? ruleValidator : new Ajv({ allErrors: true })
-      ).compile(schema);
+      ).compile(schema as AnySchema);
     } catch (error) {
       throw new Error(
         `Invalid rule ${name}: its schema cannot be compiled: ${error instanceof Error ? error.message : String(error)}`,
@@ -113,12 +121,9 @@ function optionsValidator(name: string, schema: AnySchema): ValidateFunction {
   return validate;
 }
 function prepare(options: ProcessOptions) {
-  const config = resolveConfig(
-    options.config,
-    options.path,
-    options.plugins,
-    options.defaultDialect,
-  );
+  // Only these options, so that resolveConfig's check for the prereleases' form sees no others.
+  const { config: given, path, plugins, defaultDialect } = options;
+  const config = resolveConfig({ config: given, path, plugins, defaultDialect });
   const rules = ruleRegistry(options.plugins);
   for (const [name, value] of Object.entries(config.rules)) {
     // Names such as `toString` are found on every object; only defined rules count.
@@ -310,6 +315,12 @@ function located(diagnostics: Diagnostic[], mark: string): Diagnostic[] {
       : {}),
   }));
 }
+/**
+ * The diagnostics of the enabled rules for `source`, sorted by position. A rule
+ * that fails is skipped and reported as `engine/rule-error`. An invalid
+ * configuration, an unknown rule, invalid rule options, an invalid plugin, and
+ * an error that the workspace throws are thrown.
+ */
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
   if (options.ranges) checkRanges(options.ranges, source);
   const { config, rules } = prepare(options);
@@ -326,7 +337,12 @@ export function lint(source: string, options: ProcessOptions = {}): Diagnostic[]
     mark,
   );
 }
-export function applyEdits(source: string, edits: Edit[]): string {
+/**
+ * `source` with `edits` applied, which are `{ start, end, text }` replacements
+ * at UTF-16 offsets into it. Repeats of one edit count once; an edit outside
+ * the source, or one that overlaps another, is an error.
+ */
+export function applyEdits(source: string, edits: readonly Edit[]): string {
   return splice(source, acceptedEdits(source, edits));
 }
 /** `source` with `edits`, which are sorted and do not overlap, applied. */
@@ -346,7 +362,7 @@ function splice(source: string, edits: readonly Edit[]): string {
  * of the same edit. An edit outside the source, or overlapping another one, is
  * an error.
  */
-function acceptedEdits(source: string, edits: Edit[]): Edit[] {
+function acceptedEdits(source: string, edits: readonly Edit[]): Edit[] {
   const sorted = [...edits].sort((a, b) => a.start - b.start || a.end - b.end);
   let previous: Edit | undefined;
   const accepted: Edit[] = [];
@@ -375,7 +391,12 @@ function acceptedEdits(source: string, edits: Edit[]): Edit[] {
   }
   return accepted;
 }
-/** Compare semantic trees, with link identity supplied by the selected renderer's resolver. */
+/**
+ * The meaning of a parsed document as text, which `format` compares before and
+ * after edits to refuse a change of meaning: its syntax tree without positions,
+ * with runs of whitespace in text alike, and with each link's destination as
+ * the workspace resolves it, so that two spellings of one target are the same.
+ */
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   return JSON.stringify(semanticTree(document, workspace));
 }
@@ -401,12 +422,12 @@ function semanticTree(
   function normalize(node: Nodes, calloutHeader = false): unknown {
     if (node.type === "wikiLink") {
       const link = node.embed
-        ? { label: node.label, type: "embed", url: canonicalUrl(node.target ?? "", true) }
+        ? { label: node.label, type: "embed", url: canonicalUrl(node.target, true) }
         : {
             children: [{ type: "text", value: node.label ?? node.target }],
             title: null,
             type: "link",
-            url: canonicalUrl(node.target ?? "", true),
+            url: canonicalUrl(node.target, true),
           };
       origins?.set(link, node);
       return link;
@@ -490,8 +511,10 @@ function divergence(before: Document, after: Document, workspace?: Workspace): n
   }
 }
 /**
- * Format a document. Byte order marks that it starts with stay in the output
- * and are not part of what the rules see.
+ * Format a document: apply the edits of the enabled style rules, in passes
+ * until nothing changes, leaving out the edits of a rule that would change the
+ * document's meaning. Byte order marks that it starts with stay in the output
+ * and are not part of what the rules see. Errors are thrown as by `lint`.
  */
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
   if (options.ranges) checkRanges(options.ranges, source);

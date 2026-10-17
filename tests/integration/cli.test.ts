@@ -1167,7 +1167,17 @@ describe("paths and configuration files that cannot be used", () => {
       ["lint"],
       `Invalid JSON configuration in ${path.join(cut, "mdtools.config.json")} at line 1, column 12: a value is expected`,
     );
-    const wrong = await fixture({ "odd.jsonc": '{ "rules": 5 }', "note.md": "A note.\n" });
+    const wrong = await fixture({
+      "odd.jsonc": '{ "rules": 5 }',
+      "gitlab.json": '{ "dialect": "gitlab" }',
+      "note.md": "A note.\n",
+    });
+    // An enumerated setting names the values it allows.
+    fails(
+      wrong,
+      ["lint", "--config", "gitlab.json"],
+      'Invalid configuration in gitlab.json: "dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", or "obsidian", not "gitlab"',
+    );
     fails(
       wrong,
       ["lint", "--config", "odd.jsonc"],

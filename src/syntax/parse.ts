@@ -5,7 +5,8 @@ import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { mathFromMarkdown } from "mdast-util-math";
 import type { Nodes } from "mdast";
-import type { Dialect, Document, Plugin } from "../core/types.js";
+import type { Dialect, DialectName, Document, Plugin } from "../core/types.js";
+import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
 import type { MathConditions } from "./math.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
@@ -46,27 +47,31 @@ export function splitByteOrderMark(source: string): [string, string] {
 }
 
 /**
- * Parse a document. Byte order marks at the start of `source` are not part of
- * the document: the document's source starts after them, as the positions in
- * the tree count.
+ * Parse a document in `dialect`, or the dialect that an alias such as
+ * `codeberg` stands for, which the result holds; an unknown dialect is an
+ * error. Byte order marks at the start of `source` are not part of the
+ * document: the document's source starts after them, as the positions in the
+ * tree count. `path` is the document's path relative to the workspace root,
+ * and `plugins` add their syntax extensions.
  */
 export function parse(
   source: string,
-  dialect: Dialect,
+  dialect: DialectName,
   path = "document.md",
-  plugins: Plugin[] = [],
+  plugins: readonly Plugin[] = [],
 ): Document {
+  const read = knownDialect(dialect);
   source = splitByteOrderMark(source)[1];
   const extensions = [frontmatter(["yaml", "toml"])];
   const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
   // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
   // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
   // that is protected by rules rather than parsed.
-  if (dialect !== "commonmark") {
-    extensions.push(gfm(), math(mathConditions[dialect]));
+  if (read !== "commonmark") {
+    extensions.push(gfm(), math(mathConditions[read]));
     mdastExtensions.push(...gfmTree, mathFromMarkdown());
   }
-  if (dialect === "obsidian") {
+  if (read === "obsidian") {
     extensions.push(obsidianSyntax);
     mdastExtensions.push(obsidianTree);
   }
@@ -76,17 +81,32 @@ export function parse(
       mdastExtensions.push(plugin.syntax.mdast);
     }
   }
-  return { source, dialect, path, tree: fromMarkdown(source, { extensions, mdastExtensions }) };
+  return {
+    source,
+    dialect: read,
+    path,
+    tree: fromMarkdown(source, { extensions, mdastExtensions }),
+  };
 }
 
+/**
+ * The `[start, end]` offsets of a node of a parsed document in its `source`:
+ * half-open, in UTF-16 code units. A node without a source position, such as
+ * one that a plugin's tree extension built without one, is an error.
+ */
 export function range(node: Nodes): [number, number] {
   if (node.position?.start.offset === undefined || node.position.end.offset === undefined) {
     throw new Error(`Missing source position for ${node.type}`);
   }
   return [node.position.start.offset, node.position.end.offset];
 }
+/**
+ * A node's text as a reader sees it: the values of its text, code, and other
+ * literal nodes, in order. A wikilink gives its label, or else its target, and
+ * an Obsidian comment nothing.
+ */
 export function textContent(node: Nodes): string {
-  if (node.type === "wikiLink") return node.label ?? node.target ?? node.value;
+  if (node.type === "wikiLink") return node.label ?? node.target;
   if (node.type === "obsidianComment") return "";
   if ("value" in node) return node.value;
   if ("children" in node) return node.children.map(textContent).join("");

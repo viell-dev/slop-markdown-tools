@@ -409,9 +409,15 @@ function forgeAnchors(document: Document | null): ForgeAnchors {
   detachAll(anchors.forgejoSlugs, anchors.giteaSlugs, anchors.explicit);
   return anchors;
 }
+/** The options of `createWorkspace`. */
 export interface WorkspaceOptions {
   /** The dialect that link targets are parsed in; `github` when omitted. */
   dialect?: Dialect;
+  /**
+   * `true` when the vault's "Strict line breaks" setting is verified on, which
+   * the workspace then reports as `Workspace.strictLineBreaks`. Obsidian notes
+   * are wrapped only then.
+   */
   strictLineBreaks?: boolean;
   /** Existing directories, including empty ones; never treated as note targets. */
   directories?: string[];
@@ -451,6 +457,13 @@ export function splitDestination(destination: string): { path: string; fragment:
     fragment: decode(hash < 0 ? "" : destination.slice(hash + 1)),
   };
 }
+/**
+ * The workspace of `files`, which maps each path, relative to the workspace
+ * root with forward slashes, to a `WorkspaceSource`. Link checks, link
+ * rewriting, and Obsidian wrapping need one. A Markdown target is parsed in
+ * `options.dialect` when a link's fragment needs its anchors, which are kept
+ * and its text is not.
+ */
 export function createWorkspace(
   files: Record<string, WorkspaceSource>,
   options: WorkspaceOptions = {},

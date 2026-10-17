@@ -743,7 +743,7 @@ describe("dialect markers", () => {
     expect(formatted("> [!tip]\n> Text.\n", only(rules, "gitea"))).toBe("> [!TIP]\n> Text.\n");
   });
   it("provides a Gitea preset with the GitHub rules", () => {
-    expect(resolveConfig({ extends: ["gitea"] })).toMatchObject({
+    expect(resolveConfig({ config: { extends: ["gitea"] } })).toMatchObject({
       dialect: "gitea",
       rules: {
         "github/task-marker": "warn",
@@ -761,12 +761,20 @@ describe("dialect markers", () => {
       "style/table": "warn",
       "forgejo/heading-id": "error",
     };
-    expect(resolveConfig({ extends: ["forgejo"] })).toMatchObject({ dialect: "forgejo", rules });
-    expect(resolveConfig({ extends: ["codeberg"] })).toMatchObject({ dialect: "forgejo", rules });
-    expect(resolveConfig({ dialect: "codeberg" }).dialect).toBe("forgejo");
+    expect(resolveConfig({ config: { extends: ["forgejo"] } })).toMatchObject({
+      dialect: "forgejo",
+      rules,
+    });
+    expect(resolveConfig({ config: { extends: ["codeberg"] } })).toMatchObject({
+      dialect: "forgejo",
+      rules,
+    });
+    expect(resolveConfig({ config: { dialect: "codeberg" } }).dialect).toBe("forgejo");
     expect(
-      resolveConfig({ overrides: [{ files: ["forge/**"], dialect: "codeberg" }] }, "forge/a.md")
-        .dialect,
+      resolveConfig({
+        config: { overrides: [{ files: ["forge/**"], dialect: "codeberg" }] },
+        path: "forge/a.md",
+      }).dialect,
     ).toBe("forgejo");
     expect(canonicalDialect("codeberg")).toBe("forgejo");
     expect(canonicalDialect("github")).toBe("github");

@@ -14,6 +14,10 @@ import {
   ruleRegistry,
   canonicalDialect,
   validateConfig,
+  builtInRules,
+  configSchema,
+  dialectAliases,
+  dialects,
 } from "../../src/index.js";
 import type {
   Config,
@@ -190,7 +194,10 @@ describe("formatting contracts", () => {
         return [{ start: end - 5, end, message: "Final word" }];
       },
     };
-    options.config!.rules!["observer/position"] = "warn";
+    options.config = {
+      ...options.config,
+      rules: { ...options.config!.rules, "observer/position": "warn" },
+    };
     const result = format(source, options);
     expect(observed.slice(0, 3)).toEqual([
       ["inline", source],
@@ -202,7 +209,7 @@ describe("formatting contracts", () => {
     expect(result.diagnostics).toMatchObject([
       { rule: "observer/position", line: 3, column: 1, start: result.output.indexOf("here.") },
     ]);
-    const { dialect } = resolveConfig(options.config);
+    const { dialect } = resolveConfig({ config: options.config });
     expect(semanticFingerprint(parse(result.output, dialect))).toBe(
       semanticFingerprint(parse(source, dialect)),
     );
@@ -432,7 +439,7 @@ describe("formatting contracts", () => {
             config: { extends: ["recommended"], rules: { "style/wrap": ["warn", { width }] } },
           } satisfies ProcessOptions;
           const output = formatted(source, options);
-          const { dialect } = resolveConfig(options.config);
+          const { dialect } = resolveConfig({ config: options.config });
           expect(semanticFingerprint(parse(output, dialect))).toBe(
             semanticFingerprint(parse(source, dialect)),
           );
@@ -1128,16 +1135,16 @@ describe("configuration and plugins", () => {
     expect(
       formatted(source, { config: { rules: { "style/wrap": ["warn", { width: 100 }] } } }),
     ).toBe(source);
-    expect(resolveConfig({ extends: [] }).rules).toEqual({});
+    expect(resolveConfig({ config: { extends: [] } }).rules).toEqual({});
     expect(
-      resolveConfig(
-        {
+      resolveConfig({
+        config: {
           overrides: [
             { files: ["vault/**/*.md"], dialect: "obsidian", rules: { "style/wrap": "off" } },
           ],
         },
-        "vault/a.md",
-      ).rules["style/wrap"],
+        path: "vault/a.md",
+      }).rules["style/wrap"],
     ).toBe("off");
   });
   it("rejects unknown configuration, rules, options, and preset cycles", () => {
@@ -1145,19 +1152,27 @@ describe("configuration and plugins", () => {
     expect(() => lint("", { config: { rules: { "style/wrap": ["warn", { width: 2 }] } } })).toThrow(
       "Invalid options",
     );
-    expect(() => resolveConfig({ typo: true } as Config)).toThrow("Invalid configuration");
+    expect(() => resolveConfig({ config: { typo: true } as Config })).toThrow(
+      "Invalid configuration",
+    );
     expect(() =>
-      resolveConfig({ extends: ["local/a"] }, "a.md", [
-        { name: "local", presets: { a: { extends: ["local/a"] } } },
-      ]),
+      resolveConfig({
+        config: { extends: ["local/a"] },
+        path: "a.md",
+        plugins: [{ name: "local", presets: { a: { extends: ["local/a"] } } }],
+      }),
     ).toThrow("Circular");
   });
   it("accepts one preset name for extends and a severity alone in a list", () => {
-    expect(resolveConfig({ extends: "github" })).toEqual(resolveConfig({ extends: ["github"] }));
+    expect(resolveConfig({ config: { extends: "github" } })).toEqual(
+      resolveConfig({ config: { extends: ["github"] } }),
+    );
     expect(() =>
-      resolveConfig({ extends: "local/a" }, "a.md", [
-        { name: "local", presets: { a: { extends: "local/a" } } },
-      ]),
+      resolveConfig({
+        config: { extends: "local/a" },
+        path: "a.md",
+        plugins: [{ name: "local", presets: { a: { extends: "local/a" } } }],
+      }),
     ).toThrow("Circular preset: local/a -> local/a");
     const config: Config = { extends: [], rules: { "style/wrap": ["warn"] } };
     const source = "word ".repeat(18).trimEnd() + "\n";
@@ -1175,7 +1190,7 @@ describe("configuration and plugins", () => {
     [{ extends: ["github", 5] }, '"extends[1]" must be a preset name, not 5'],
     [
       { dialect: "markdown" },
-      '"dialect" must be "commonmark", "github", "forgejo", "gitea", "obsidian", or "codeberg", not "markdown"',
+      '"dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", or "obsidian", not "markdown"',
     ],
     [{ rules: [] }, '"rules" must be an object of rule IDs and their settings, not a list'],
     [
@@ -1212,6 +1227,68 @@ describe("configuration and plugins", () => {
   ])("says what is wrong with %j by setting name", (value, problem) => {
     expect(() => validateConfig(value)).toThrow(new Error(`Invalid configuration: ${problem}`));
   });
+  it("takes one options object, and says so for the prereleases' form", () => {
+    const message =
+      "resolveConfig takes one options object, { path, config, plugins, defaultDialect }, since mdrefine 0.2.0.";
+    const call = resolveConfig as (...parameters: unknown[]) => unknown;
+    expect(() => call({ extends: [] })).toThrow(new TypeError(message));
+    expect(() => call({ dialect: "github" })).toThrow(new TypeError(message));
+    expect(() => call({}, "a.md")).toThrow(new TypeError(message));
+    expect(() => call(undefined, "Note.md", [], "obsidian")).toThrow(new TypeError(message));
+    expect(() => call(null)).toThrow(new TypeError(message));
+    // The options of lint and format serve as they are.
+    const options: ProcessOptions = {
+      path: "vault/a.md",
+      config: { overrides: [{ files: ["vault/**"], dialect: "obsidian" }] },
+      workspace: createWorkspace({}),
+      ranges: [],
+    };
+    expect(resolveConfig(options).dialect).toBe("obsidian");
+    expect(lint("*a*\n", { ...options, ranges: undefined })).toEqual(
+      lint("*a*\n", { path: options.path, config: options.config }),
+    );
+  });
+  it("freezes the tables that it exports, which every caller shares", () => {
+    expect(() => {
+      // @ts-expect-error The table is read-only.
+      presets.recommended!.rules!["style/wrap"] = "off";
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error The options are read-only too.
+      (presets.recommended!.rules!["style/wrap"] as readonly unknown[])[1] = { width: 20 };
+    }).toThrow(TypeError);
+    expect(resolveConfig().rules["style/wrap"]).toEqual(["warn", { width: 80 }]);
+    expect(() => {
+      // @ts-expect-error The rules and their schemas are read-only.
+      builtInRules["style/wrap"]!.check = () => [];
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error The dialects are read-only.
+      dialects.push("markdown");
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error The aliases are read-only.
+      dialectAliases.codeberg = "github";
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error The schema is read-only.
+      configSchema.title = "Other";
+    }).toThrow(TypeError);
+    expect(Object.isFrozen((configSchema.properties as { extends: object }).extends)).toBe(true);
+    // A registry is a new table, which its caller may change.
+    const registry = ruleRegistry();
+    delete registry["style/wrap"];
+    expect(builtInRules["style/wrap"]).toBeDefined();
+    // Frozen presets are configurations like any other.
+    expect(resolveConfig({ config: presets.github }).dialect).toBe("github");
+  });
+  it("reads a document in the dialect that an alias stands for", () => {
+    const source = "# Title {#custom}\n\n[Title](#custom)\n";
+    const document = parse(source, "codeberg");
+    expect(document.dialect).toBe("forgejo");
+    expect(semanticFingerprint(document)).toBe(semanticFingerprint(parse(source, "forgejo")));
+    expect(() => parse(source, "markdown" as Dialect)).toThrow("Unknown dialect: markdown");
+  });
   it("says what is wrong with a rule's options by option name", () => {
     const wrap = (options: Record<string, unknown>) => () =>
       lint("", { config: { extends: [], rules: { "style/wrap": ["warn", options] } } });
@@ -1223,6 +1300,12 @@ describe("configuration and plugins", () => {
     );
     expect(wrap({ widht: 80 })).toThrow(
       new Error('Invalid options for style/wrap: unknown option "widht"'),
+    );
+    // An enumerated option names the values it allows.
+    expect(() =>
+      lint("", { config: { extends: [], rules: { "style/emphasis": ["warn", { marker: "~" }] } } }),
+    ).toThrow(
+      new Error('Invalid options for style/emphasis: "marker" must be "*" or "_", not "~"'),
     );
   });
   it("supports custom diagnostics and rejects semantic-changing style plugins", () => {
@@ -1335,8 +1418,10 @@ describe("the dialect assumed when none is named", () => {
   const commonmark: Config = { dialect: "commonmark" };
   it("is GitHub, for a configuration, a preset, or a workspace that names none", () => {
     expect(resolveConfig().dialect).toBe("github");
-    expect(resolveConfig({ extends: ["recommended"] }).dialect).toBe("github");
-    expect(resolveConfig({ extends: [], rules: { "style/wrap": "warn" } }).dialect).toBe("github");
+    expect(resolveConfig({ config: { extends: ["recommended"] } }).dialect).toBe("github");
+    expect(
+      resolveConfig({ config: { extends: [], rules: { "style/wrap": "warn" } } }).dialect,
+    ).toBe("github");
     const spy = vi.spyOn(syntax, "parse");
     try {
       const workspace = createWorkspace({ "note.md": "", "target.md": "# Title\n" });
@@ -1368,7 +1453,7 @@ describe("the dialect assumed when none is named", () => {
     });
   });
   it("still reads CommonMark, tables and footnotes included, when CommonMark is named", () => {
-    expect(resolveConfig(commonmark).dialect).toBe("commonmark");
+    expect(resolveConfig({ config: commonmark }).dialect).toBe("commonmark");
     // A table is a paragraph in CommonMark, so its lines are prose to wrap.
     expect(formatted(table, { config: commonmark })).toBe(
       "| Sensor | Unit | |---|---| | Temperature | °C |\n",
@@ -1399,12 +1484,16 @@ describe("the dialect assumed when none is named", () => {
     );
   });
   it("gives way to a dialect named by the configuration, a preset, or an override", () => {
-    expect(resolveConfig({ dialect: "forgejo" }).dialect).toBe("forgejo");
-    expect(resolveConfig({ extends: ["recommended", "obsidian"] }).dialect).toBe("obsidian");
-    expect(resolveConfig({ extends: ["gitea"], dialect: "commonmark" }).dialect).toBe("commonmark");
+    expect(resolveConfig({ config: { dialect: "forgejo" } }).dialect).toBe("forgejo");
+    expect(resolveConfig({ config: { extends: ["recommended", "obsidian"] } }).dialect).toBe(
+      "obsidian",
+    );
+    expect(resolveConfig({ config: { extends: ["gitea"], dialect: "commonmark" } }).dialect).toBe(
+      "commonmark",
+    );
     const config: Config = { overrides: [{ files: ["plain/**"], dialect: "commonmark" }] };
-    expect(resolveConfig(config, "plain/a.md").dialect).toBe("commonmark");
-    expect(resolveConfig(config, "docs/a.md").dialect).toBe("github");
+    expect(resolveConfig({ config, path: "plain/a.md" }).dialect).toBe("commonmark");
+    expect(resolveConfig({ config, path: "docs/a.md" }).dialect).toBe("github");
     expect(formatted(table, { config, path: "plain/a.md" })).not.toBe(table);
     expect(formatted(table, { config, path: "docs/a.md" })).toBe(table);
   });
@@ -1428,13 +1517,17 @@ describe("a default dialect supplied by the caller", () => {
       ...(strictLineBreaks === undefined ? {} : { strictLineBreaks }),
     });
   it("is assumed when nothing names a dialect, and resolves aliases", () => {
-    expect(resolveConfig({}, "Note.md", [], "obsidian").dialect).toBe("obsidian");
-    expect(resolveConfig({ extends: ["recommended"] }, "Note.md", [], "obsidian").dialect).toBe(
-      "obsidian",
-    );
-    expect(resolveConfig({}, "Note.md", [], "codeberg").dialect).toBe("forgejo");
-    expect(resolveConfig({}, "Note.md", [], undefined).dialect).toBe("github");
-    expect(() => resolveConfig({}, "Note.md", [], "markdown" as Dialect)).toThrow(
+    expect(resolveConfig({ path: "Note.md", defaultDialect: "obsidian" }).dialect).toBe("obsidian");
+    expect(
+      resolveConfig({
+        config: { extends: ["recommended"] },
+        path: "Note.md",
+        defaultDialect: "obsidian",
+      }).dialect,
+    ).toBe("obsidian");
+    expect(resolveConfig({ path: "Note.md", defaultDialect: "codeberg" }).dialect).toBe("forgejo");
+    expect(resolveConfig({ path: "Note.md", defaultDialect: undefined }).dialect).toBe("github");
+    expect(() => resolveConfig({ path: "Note.md", defaultDialect: "markdown" as Dialect })).toThrow(
       "Unknown default dialect: markdown",
     );
     expect(() => lint("", { defaultDialect: "markdown" as Dialect })).toThrow(
@@ -1475,7 +1568,7 @@ describe("a default dialect supplied by the caller", () => {
   });
   it("assumes the dialect only; the rules of the obsidian preset still need the preset", () => {
     const options: ProcessOptions = { workspace: vault(), defaultDialect: "obsidian" };
-    const resolved = resolveConfig({}, "Note.md", [], "obsidian");
+    const resolved = resolveConfig({ path: "Note.md", defaultDialect: "obsidian" });
     expect(resolved.dialect).toBe("obsidian");
     expect(Object.keys(resolved.rules)).toEqual(Object.keys(presets.recommended!.rules!));
     const source = "> [!TIP] Title\n> Text.\n\n- [X] Done\n";
@@ -1489,7 +1582,7 @@ describe("a default dialect supplied by the caller", () => {
   });
   it("gives way to a dialect named by the configuration, a preset, or an override", () => {
     const resolved = (config: Config, path = "Note.md") =>
-      resolveConfig(config, path, [], "obsidian").dialect;
+      resolveConfig({ config, path, defaultDialect: "obsidian" }).dialect;
     expect(resolved({ dialect: "commonmark" })).toBe("commonmark");
     expect(resolved({ extends: ["recommended", "github"] })).toBe("github");
     expect(resolved({ extends: ["codeberg"] })).toBe("forgejo");

@@ -70,9 +70,9 @@
         "commonmark",
         "github",
         "forgejo",
+        "codeberg",
         "gitea",
-        "obsidian",
-        "codeberg"
+        "obsidian"
       ]
     },
     "severity": { "enum": ["off", "warn", "error"] },

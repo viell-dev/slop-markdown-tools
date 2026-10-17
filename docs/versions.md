@@ -11,7 +11,8 @@ release such as 0.2.1 only fixes defects.
 - the [JSON report](cli.md#json-report) printed with `--json`: its fields and
   what they mean;
 - the configuration: file names, keys, presets, dialect names, rule IDs, rule
-  options, and what each of them means;
+  options, what each of them means, and where its
+  [JSON Schema](configuration.md#json-schema) is found;
 - the library's exports from `mdrefine` and `mdrefine/node`, their TypeScript
   types, and the plugin contract described in [library API](api.md) and
   [plugins](plugins.md);

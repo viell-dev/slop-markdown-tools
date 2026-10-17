@@ -11,6 +11,7 @@ import { excludeSelection } from "./selection.js";
 import { vaultOf } from "./vault.js";
 import type { Vault } from "./vault.js";
 
+/** The options of `discoverWorkspace`. */
 export interface DiscoverOptions {
   /** The workspace root: the folder whose documents are processed and whose files are link targets. */
   root: string;
@@ -26,6 +27,7 @@ export interface DiscoverOptions {
   exclude?: string[];
   /** The configuration: its `ignore` and `resolve` settings, and the dialect of each document. */
   config?: Config;
+  /** Plugin objects, whose rules and presets the configuration can name. */
   plugins?: Plugin[];
   /**
    * Documents whose text the caller supplies, such as an editor's unsaved
@@ -34,6 +36,7 @@ export interface DiscoverOptions {
    */
   documents?: Record<string, string>;
 }
+/** The files of a workspace that `discoverWorkspace` found, and how to process them. */
 export interface WorkspaceDiscovery {
   /** The workspace root's real path. */
   readonly root: string;
@@ -97,7 +100,7 @@ export async function discoverFrom(
 ): Promise<WorkspaceDiscovery> {
   await checkRoot(options.root);
   // Which files to leave out does not depend on a document's dialect.
-  const resolved = resolveConfig(options.config, "document.md", options.plugins);
+  const resolved = resolveConfig({ config: options.config, plugins: options.plugins });
   // Discovery always visits the whole workspace, whose files are link targets;
   // the inputs only choose what is selected.
   const none = options.inputs?.length === 0;
@@ -163,7 +166,12 @@ export async function discoverFrom(
       known(name);
       const vault = supplied.has(name) ? supplied.get(name) : vaultOf(set.vaults, name);
       const assumed = assumedDialect(vault);
-      const { dialect } = resolveConfig(options.config, name, options.plugins, assumed);
+      const { dialect } = resolveConfig({
+        config: options.config,
+        path: name,
+        plugins: options.plugins,
+        defaultDialect: assumed,
+      });
       let workspace = index(dialect);
       // Whether a note may be reflowed is a setting of its own vault.
       if (vault?.strictLineBreaks !== undefined) {

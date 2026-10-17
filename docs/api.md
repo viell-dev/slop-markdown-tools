@@ -64,14 +64,17 @@ vault's `strictLineBreaks` setting; a host for vaults should do the same:
 
 ```ts
 // The host found `.obsidian/` at the root of the directory it read `files` from.
-const defaultDialect = "obsidian";
-const { dialect } = resolveConfig(config, "Note.md", [], defaultDialect);
+const options: ProcessOptions = { path: "Note.md", config, defaultDialect: "obsidian" };
+const { dialect } = resolveConfig(options);
 const workspace = createWorkspace(files, { dialect, strictLineBreaks });
-const result = format(files["Note.md"], { path: "Note.md", config, workspace, defaultDialect });
+const result = format(files["Note.md"], { ...options, workspace });
 ```
 
-`resolveConfig(config, path, plugins, defaultDialect)` returns the settings in
-effect for a path: `dialect`, `rules`, `ignore`, and `resolve`.
+`resolveConfig(options)` returns the settings in effect for a document:
+`dialect`, `rules`, `ignore`, and `resolve`. It takes the `path`, `config`,
+`plugins`, and `defaultDialect` of `lint` and `format`, so their options serve
+as they are. The prereleases took these four as separate arguments; such a call
+throws an error that says so.
 
 ## Workspaces
 
@@ -188,20 +191,33 @@ cannot be used is an error in the CLI's words, such as
   `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) syntax tree. `document.source`
   starts after any byte order mark, and `range(node)` gives a node's
-  `[start, end]` offsets into it. `textContent(node)` gives a node's text.
+  `[start, end]` offsets into it. `textContent(node)` gives a node's text. An
+  alias such as `codeberg` reads the document in its dialect, which
+  `document.dialect` holds, and an unknown dialect is an error. In the Obsidian
+  dialect, the tree holds `wikiLink`, `obsidianComment`, and `obsidianHighlight`
+  nodes, typed as `WikiLink`, `ObsidianComment`, and `ObsidianHighlight` and
+  registered with mdast's node types.
 - `resolveConfig`, described above, and `validateConfig(value)`, which throws
   when a value is not a valid configuration. `configSchema` is the
-  configuration's JSON Schema. `presets` holds the built-in presets.
+  configuration's [JSON Schema](configuration.md#json-schema), which the package
+  also ships as `mdrefine/config.schema.json`. `presets` holds the built-in
+  presets.
 - `dialects` lists the dialect names, `dialectAliases` maps aliases such as
   `codeberg` to them, and `canonicalDialect(name)` resolves an alias.
-  `document.dialect` is always canonical.
 - `builtInRules` holds the built-in rule objects, and `ruleRegistry(plugins)`
-  adds the rules of plugins under their IDs.
+  returns a new table that adds the rules of plugins under their IDs.
 - `applyEdits(source, edits)` applies `{ start, end, text }` edits, which must
   not overlap. `semanticFingerprint(document, workspace)` is the comparison that
   `format` uses to refuse a change of meaning.
 
-The TypeScript types of these values are exported too, among them `Config`,
-`ProcessOptions`, `FormatResult`, `Diagnostic`, `Plugin`, `Rule`, `Workspace`,
+`presets`, `builtInRules`, `dialects`, `dialectAliases`, and `configSchema` are
+shared by every caller in the process, so they are frozen and typed read-only;
+copy what you want to change. Each export has a doc comment, and the TypeScript
+types of these values are exported too, among them `Config`, `ProcessOptions`,
+`FormatResult`, `Diagnostic`, `Plugin`, `Rule`, `JsonSchema`, `Workspace`,
 `WorkspaceOptions`, and `LinkResolution`; `mdrefine/node` exports
-`DiscoverOptions`, `WorkspaceDiscovery`, and `Skipped`.
+`DiscoverOptions`, `WorkspaceDiscovery`, and `Skipped`. The type declarations
+depend on `@types/mdast`, which the package installs.
+
+Both entries are ES modules. A CommonJS module can load them with `require()`,
+which the supported Node.js versions allow for ES modules.

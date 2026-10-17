@@ -288,12 +288,12 @@ common(program.command("config").description("Inspect effective configuration"))
         {
           root,
           file: loaded.file ?? null,
-          effective: resolveConfig(
-            loaded.config,
-            name,
-            loaded.plugins,
-            assumedDialect(await enclosingVault(path.join(actual, name))),
-          ),
+          effective: resolveConfig({
+            config: loaded.config,
+            path: name,
+            plugins: loaded.plugins,
+            defaultDialect: assumedDialect(await enclosingVault(path.join(actual, name))),
+          }),
         },
         null,
         2,
