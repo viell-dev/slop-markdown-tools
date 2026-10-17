@@ -342,6 +342,15 @@ From every prerelease:
   it, and on GitHub and in Obsidian a word that starts with `$` stays with the
   word before it. Before, such a paragraph was refused in Obsidian
   ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` leaves a paragraph as written when its second line is a table
+  delimiter row, in every dialect with tables. Directly below a table that ends
+  in a list item or block quote, the parser reads another table as such a
+  paragraph, and joining its lines removed a table that GitHub shows
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/wrap` keeps a run of `=` or `-` that starts the body of an alert or
+  callout together with the next word. Alone on a line, it would underline the
+  marker's line as a heading, and the paragraph was refused
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell

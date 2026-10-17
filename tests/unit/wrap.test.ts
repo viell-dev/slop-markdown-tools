@@ -1119,3 +1119,51 @@ describe("Obsidian callout overflow", () => {
     expect(lint(`> ${title}\n`, { config })).toEqual([]);
   });
 });
+
+describe("a table that the parser reads as text", () => {
+  // Directly below a table that ends in a list item or block quote, the parser
+  // reads the next table as a paragraph, and GitHub reads a table (#283).
+  const layouts = [
+    "- | a |\n  | - |\n| b | and more words in the cell |\n| - | - |\n",
+    "> | a |\n> | - |\n| b | and more words in the cell |\n| - | - |\n",
+  ];
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps its lines in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect };
+      for (const source of layouts) {
+        const result = verify(source, config, workspace);
+        expect(result.output).toBe(source);
+        expect(result.diagnostics.map((item) => item.message)).toEqual([
+          "Paragraph not reflowed: table delimiter row as its second line (width 20 columns).",
+        ]);
+      }
+    },
+  );
+  it("wraps the same lines in CommonMark, which has no tables", () => {
+    const output = verify(layouts[0]!, { ...wrap({ width: 20 }), dialect: "commonmark" }).output;
+    expect(output).not.toBe(layouts[0]);
+  });
+});
+
+describe("a run of `=` or `-` below the line of an alert's or callout's marker", () => {
+  // Alone on the body's first line, it would underline that line as a heading.
+  it.each([
+    ["github", "> [!NOTE]\n", "=="],
+    ["github", "> [!NOTE]\n", "--"],
+    ["forgejo", "> [!NOTE]\n", "=="],
+    ["gitea", "> [!WARNING]\n", "--"],
+    ["obsidian", "> [!note] Title\n", "--"],
+    ["obsidian", "> [!note]\n", "---"],
+  ] as const)("stays with the next word in the %s dialect (%j, %j)", (dialect, marker, run) => {
+    const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+    const config: Config = { ...wrap({ width: 20 }), dialect };
+    const long = `${marker}> ${run} aaaaaaaaaaaaaaaaaaaa\n`;
+    expect(verify(long, config, workspace).output).toBe(long);
+    const words = `${marker}> ${run} aaaa bbbb cccc dddd eeee ffff\n`;
+    expect(verify(words, config, workspace).output).toBe(
+      `${marker}> ${run} aaaa bbbb cccc\n> dddd eeee ffff\n`,
+    );
+  });
+});

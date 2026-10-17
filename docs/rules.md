@@ -570,8 +570,9 @@ or what a comment applies to:
   a heading underlined with `===` or `---`. The parser can read such a line
   differently there than below a blank line.
 - Directly below a table that ends in a list item or block quote: text whose
-  second line holds a `|`. The parser reads a table there as text, where GitHub
-  reads a table, and a blank line would make it a table for the parser too.
+  second line is a table delimiter row. The parser reads a table there as text,
+  where GitHub reads a table, and a blank line would make it a table for the
+  parser too.
 - In a block quote, below a list whose last item ends in an empty footnote
   definition, such as `> - [^1]:`. The parser would count the new line of `>` as
   part of the item and read the list as loose.
@@ -724,13 +725,15 @@ A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
 on the line before it. A word that only starts like one, such as `--config`,
 `#tag`, or `-5`, can start a line. The first line keeps more than one word when
-its first word alone would open a block, such as `***` or `$$`, and keeps a
-paragraph that starts like a link reference definition (`[Note]: see …`) from
-becoming one. On GitHub and in Obsidian, a word that starts with `$` stays on
-the line before it when a `$` comes earlier in the paragraph, and in Obsidian a
-word that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
-comes later: at the edge of a line, a dollar can begin or end math that it
-cannot begin or end next to a space.
+its first word alone would open a block, such as `***` or `$$`, or, in the body
+below the line of an alert's or callout's marker, would underline that line as a
+heading, such as `==` or `--`. It also keeps a paragraph that starts like a link
+reference definition (`[Note]: see …`) from becoming one. On GitHub and in
+Obsidian, a word that starts with `$` stays on the line before it when a `$`
+comes earlier in the paragraph, and in Obsidian a word that ends in `$`, such as
+a lone `$`, stays on the line after it when a `$` comes later: at the edge of a
+line, a dollar can begin or end math that it cannot begin or end next to a
+space.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -768,6 +771,9 @@ what it means, that is, when it:
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's
   container markers;
+- has a table delimiter row such as `| - |` as its second line, in the dialects
+  with tables: such a paragraph is usually a table that the parser reads as text
+  (see [the safety model](design.md#safety-model));
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 

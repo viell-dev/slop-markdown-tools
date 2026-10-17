@@ -162,6 +162,17 @@ describe("style/block-spacing", () => {
       "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
   });
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps a table that the parser reads as text below a list item or quote in the %s dialect",
+    (dialect) => {
+      for (const source of [
+        "- | a |\n  | - |\n| b |\n| - |\n",
+        "- > | a |\n  > | - |\n| b |\n| - |\n",
+        "> - | a |\n>   | - |\n> | b |\n> | - |\n",
+      ])
+        expect(spaced(source, dialect)).toBe(source);
+    },
+  );
   it("still separates a footnote definition with text, or one outside a quote", () => {
     expect(spaced("> - [^2]: note\n> # H\n")).toBe("> - [^2]: note\n>\n> # H\n");
     expect(spaced("- [^2]:\n# H\n")).toBe("- [^2]:\n\n# H\n");

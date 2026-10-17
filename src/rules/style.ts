@@ -502,6 +502,20 @@ const firstWordAlone = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|\+\
 const fenceStart = /^(?:`{3,}|~{3,}|\$\$)/;
 /** A link reference definition's label and colon, which a paragraph can start with. */
 const definitionStart = /^\[(?:[^[\]\\]|\\[^])+\]:/;
+/** A GFM table's delimiter row, such as `| --- | :-: |`, after any container markers. */
+const delimiterRow = /^[ \t>]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+/**
+ * Whether text that the parser read as a paragraph or a heading's text has a
+ * table delimiter row as its second line. GitHub reads a table there, and so
+ * does the parser, except directly below a table that ends in a list item or
+ * block quote, where it reads the lines as text (issue #283). Joining the lines
+ * or adding a blank line above them would change what GitHub or the parser
+ * reads.
+ */
+function misreadTable(text: string): boolean {
+  const second = text.split(lineBreak, 2)[1];
+  return second !== undefined && second.includes("|") && delimiterRow.test(second);
+}
 // Forgejo and Gitea additionally open display math with `\[` and definition
 // descriptions with `:` followed by at least one space or tab, so only a bare
 // `:` atom could open one at the start of a reflowed line.
@@ -798,6 +812,8 @@ const wrap: Rule = {
         parent?.type === "blockquote" &&
         index === 0 &&
         /^\[![\w-]+\]/.test(original);
+      /** Whether the lines to wrap are the body below that line, in the same paragraph. */
+      let belowHeader = false;
       let lineStart = start;
       while (lineStart > 0 && !/[\r\n]/.test(document.source[lineStart - 1]!)) lineStart--;
       let prefix = document.source.slice(lineStart, start);
@@ -844,6 +860,7 @@ const wrap: Rule = {
           children = children.filter((child) => range(child)[1] > start);
           prefix = continuation;
           calloutHeader = false;
+          belowHeader = true;
         }
       }
       const forge = goldmarkForges[document.dialect];
@@ -958,15 +975,17 @@ const wrap: Rule = {
               ? "block identifier"
               : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
                 ? "leading block marker"
-                : lazyStart
-                  ? "lazy first line"
-                  : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                    ? "unsupported container prefix"
-                    : document.dialect === "obsidian" && obsidianMarkers(source, node, start, end)
-                      ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                      : inline.unlocated
-                        ? "inline syntax without a source position"
-                        : undefined;
+                : document.dialect !== "commonmark" && misreadTable(original)
+                  ? "table delimiter row as its second line"
+                  : lazyStart
+                    ? "lazy first line"
+                    : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                      ? "unsupported container prefix"
+                      : document.dialect === "obsidian" && obsidianMarkers(source, node, start, end)
+                        ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                        : inline.unlocated
+                          ? "inline syntax without a source position"
+                          : undefined;
       const skipped =
         reason ??
         protections.reason ??
@@ -1025,10 +1044,13 @@ const wrap: Rule = {
       const atoms = wrappingAtoms(words, openers, dollars);
       if (!atoms.length) return;
       // The first line keeps the words after a first word that would open a
-      // block alone on the line, until the line can no longer open one.
+      // block alone on the line, until the line can no longer open one, and
+      // below an alert's or callout's marker line, after a run of `=` or `-`
+      // that would underline that line as a heading.
       while (
         atoms.length > 1 &&
         (firstWordAlone.test(atoms[0]!) ||
+          (belowHeader && /^(?:=+|-+)$/.test(atoms[0]!)) ||
           (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
       )
         atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
@@ -1186,12 +1208,11 @@ function together(
   // Directly below a table that ends inside a list or block quote, the parser
   // reads the next table as a paragraph, or as the text of a heading
   // underlined below it, while GitHub reads a table, and a blank line would
-  // make it a table there as well. Text whose second line holds a `|` could be
-  // such a table.
+  // make it a table there as well.
   if (
-    lastBlock(before).type === "table" &&
+    document.dialect !== "commonmark" &&
     (after.type === "paragraph" || after.type === "heading") &&
-    source.slice(afterStart, afterEnd).split(lineBreak)[1]?.includes("|")
+    misreadTable(source.slice(afterStart, afterEnd))
   )
     return true;
   // In a block quote, the parser counts a line of quote markers below a list
