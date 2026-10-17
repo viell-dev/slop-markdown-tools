@@ -123,17 +123,20 @@ limit `lint` and `format` to parts of a document with `ranges`: a list of
 Each range is widened to the complete blocks that it touches: paragraphs,
 headings, tables, code blocks, HTML blocks, math blocks, front matter, and link
 definitions, also inside lists and block quotes, where a range inside one item
-selects that item's paragraph only. A non-empty range touches the blocks that it
-overlaps; an empty range, a cursor position, touches the block that holds it or
-ends there. A range that touches no block, such as one in a run of blank lines,
-selects nothing.
+selects that item's paragraph only. A selected block takes in its whole lines,
+such as a list item's marker or a quote's `>` before it, and the line breaks
+just before and after them, so that the blank lines between it and its neighbors
+can be added or removed. A non-empty range touches the blocks whose lines it
+overlaps; an empty range, a cursor position, touches the block on whose lines it
+is. A range that touches no block, such as one in a run of blank lines, selects
+nothing.
 
 ```ts
 const source = "Legacy *word* stays.\n\nChange *this paragraph*.\n";
 const start = source.indexOf("Change");
 const result = format(source, { config, ranges: [{ start, end: start }] });
 // result.output: "Legacy *word* stays.\n\nChange _this paragraph_.\n"
-// result.scope: [{ start: 22, end: 46 }]
+// result.scope: [{ start: 21, end: 47 }]: the paragraph and its line breaks
 ```
 
 The whole document is still parsed and checked, so link definitions, suppression
