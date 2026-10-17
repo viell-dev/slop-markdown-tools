@@ -16,7 +16,7 @@ import path from "node:path";
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { decodeText, invalidUtf8At } from "../../src/workspace/encoding.js";
-import { discover, replacementFailure, writeAtomic } from "../../src/workspace/files.js";
+import { discover, replacementFailure, writeFormatted } from "../../src/workspace/files.js";
 import { enclosingVault, isVault } from "../../src/workspace/vault.js";
 import { loadConfig } from "../../src/config/load.js";
 import {
@@ -24,12 +24,14 @@ import {
   canSymlink,
   cli,
   denyRead,
+  denyWrite,
   fixture,
   linkDirectory,
   manifest,
   restrict,
   run,
   tree,
+  windowsTool,
 } from "./support.js";
 
 describe("CLI", () => {
@@ -206,27 +208,29 @@ describe("CLI", () => {
     expect(findings[0].message).toContain("unbreakable atom");
     expect(run(root, ["format", "--check", "note.md"]).status).toBe(0);
   });
-  it("does not partially apply a batch when a formatter safety check fails", async () => {
+  it("writes the other documents, and the checked result of one, when a rule's edits are refused", async () => {
     const root = await fixture({
       "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/bad":"warn"}}',
       "plugin.mjs":
         'export default {name:"local",rules:{bad:{kind:"style",description:"Bad",check:({document})=>document.source.startsWith("bad")?[{start:0,message:"Bad",edit:{start:0,end:3,text:"different"}}]:[]}}};',
       "a.md": "*fine*\n",
-      "b.md": "bad\n",
+      "b.md": "bad *word*\n",
     });
     const written = run(root, ["format", "--write", "."]);
     expect(written.status).toBe(2);
     expect(written.stderr).toContain(
       "b.md:1:1: error engine/unsafe-format: local/bad would change the parsed meaning at line 1; none of its edits were applied.\n",
     );
-    expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("*fine*\n");
+    expect(written.stderr).toContain("2 file(s) processed; 2 written.\n");
+    // The refused rule's edit is left out; the other rules' edits are written.
+    expect(await tree(root)).toMatchObject({ "a.md": "_fine_\n", "b.md": "bad _word_\n" });
   });
-  it("reports a rule that fails for its file, processes the others, and writes nothing", async () => {
+  it("reports a rule that fails for its file and writes every changed document", async () => {
     const root = await fixture({
       "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/fragile":"warn"}}',
       "plugin.mjs":
         'export default {name:"local",rules:{fragile:{kind:"problem",description:"Fragile",check:({document})=>{if(document.source.includes("boom"))throw new Error("boom");return[{start:0,message:"Checked"}];}}}};',
-      "a.md": "boom\n",
+      "a.md": "boom *word*\n",
       "b.md": "*fine*\n",
     });
     const failure =
@@ -235,21 +239,21 @@ describe("CLI", () => {
     expect(linted.status).toBe(2);
     expect(linted.stderr).toContain(failure);
     expect(linted.stderr).toContain("b.md:1:1: warn local/fragile: Checked\n");
-    expect(linted.stderr).toContain("2 file(s) linted; 1 error(s), 3 warning(s).\n");
+    expect(linted.stderr).toContain("2 file(s) linted; 1 error(s), 5 warning(s).\n");
     const written = run(root, ["format", "--write", "--json", "."]);
     expect(written.status).toBe(2);
     const report = JSON.parse(written.stdout) as {
-      written: boolean;
+      written: string[];
       files: { path: string; changed: boolean; diagnostics: { rule: string }[] }[];
     };
-    expect(report.written).toBe(false);
+    expect(report.written).toEqual(["a.md", "b.md"]);
     expect(
       report.files.map((file) => [file.path, file.changed, file.diagnostics[0]?.rule]),
     ).toEqual([
-      ["a.md", false, "engine/rule-error"],
+      ["a.md", true, "engine/rule-error"],
       ["b.md", true, "local/fragile"],
     ]);
-    expect(await readFile(path.join(root, "b.md"), "utf8")).toBe("*fine*\n");
+    expect(await tree(root)).toMatchObject({ "a.md": "boom _word_\n", "b.md": "_fine_\n" });
   });
   it("stops at a plugin rule that does not have the shape of a rule", async () => {
     const root = await fixture({
@@ -819,14 +823,14 @@ describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
     const root = await fixture({ "note.md": "new content" });
     await expect(
-      writeAtomic(path.join(root, "note.md"), "old content", "formatted"),
+      writeFormatted(path.join(root, "note.md"), "old content", "formatted"),
     ).rejects.toThrow("changed during");
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("new content");
   });
-  it("refuses to replace anything but a regular file", async () => {
+  it("refuses to write anything but a regular file", async () => {
     const root = await fixture({});
     await mkdir(path.join(root, "folder.md"));
-    await expect(writeAtomic(path.join(root, "folder.md"), "", "text")).rejects.toThrow(
+    await expect(writeFormatted(path.join(root, "folder.md"), "", "text")).rejects.toThrow(
       "Refusing non-regular file",
     );
   });
@@ -835,7 +839,7 @@ describe("filesystem safeguards", () => {
     // byte 0xE9 now, decoded with replacement; the bytes differ.
     const root = await fixture({ "note.md": Buffer.from([0x41, 0x20, 0xe9]) });
     const read = `A ${String.fromCharCode(0xfffd)}`;
-    await expect(writeAtomic(path.join(root, "note.md"), read, "B")).rejects.toThrow(
+    await expect(writeFormatted(path.join(root, "note.md"), read, "B")).rejects.toThrow(
       "changed during",
     );
     expect(await readFile(path.join(root, "note.md"))).toEqual(Buffer.from([0x41, 0x20, 0xe9]));
@@ -846,10 +850,10 @@ describe("filesystem safeguards", () => {
     // Group write is a bit that a usual umask takes from a new file.
     if (process.platform !== "win32") await chmod(file, 0o660);
     const before = await stat(file);
-    await writeAtomic(file, "old", "new");
+    await writeFormatted(file, "old", "new");
     expect((await stat(file)).mode).toBe(before.mode);
   });
-  it("replaces an ordinary file and writes one with a second name in place", async () => {
+  it("writes into the file itself, so that its hard links keep sharing it", async () => {
     const root = await fixture({ "single.md": "A *b*.\n", "linked.md": "A *b*.\n" });
     // Windows allows hard links on NTFS without a privilege.
     await link(path.join(root, "linked.md"), path.join(root, "second-name.txt"));
@@ -858,8 +862,8 @@ describe("filesystem safeguards", () => {
     const applied = run(root, ["format", "--write"]);
     expect(applied.status, applied.stderr).toBe(0);
     expect(applied.stderr).toBe("2 file(s) processed; 2 written.\n");
-    expect((await stat(path.join(root, "single.md"))).ino).not.toBe(single.ino);
-    // Both names still lead to the one file, which holds the new content.
+    // Each document is still the file it was, and both names lead to the one file.
+    expect((await stat(path.join(root, "single.md"))).ino).toBe(single.ino);
     const after = await stat(path.join(root, "second-name.txt"));
     expect([after.ino, after.nlink]).toEqual([linked.ino, 2]);
     expect(await tree(root)).toEqual({
@@ -883,45 +887,68 @@ describe("filesystem safeguards", () => {
     process.platform === "win32"
       ? undefined
       : process.getgroups?.().find((group) => group !== process.getegid?.());
-  it.skipIf(otherGroup === undefined)(
-    "writes a file of another group in place, so that it keeps its group",
-    async () => {
-      const root = await fixture({ "note.md": "A *b*.\n" });
-      const file = path.join(root, "note.md");
-      await chown(file, process.getuid!(), otherGroup!);
-      const before = await stat(file);
-      const applied = run(root, ["format", "--write"]);
-      expect(applied.status, applied.stderr).toBe(0);
-      const after = await stat(file);
-      expect([after.ino, after.gid, after.mode]).toEqual([before.ino, otherGroup, before.mode]);
-      expect(await tree(root)).toEqual({ "note.md": "A _b_.\n" });
-    },
-  );
-  it("says that a file written in place may be incomplete when writing it fails", async () => {
-    const root = await fixture({ "note.md": "old" });
+  it.skipIf(otherGroup === undefined)("keeps a file's owner and group", async () => {
+    const root = await fixture({ "note.md": "A *b*.\n" });
     const file = path.join(root, "note.md");
-    await link(file, path.join(root, "second-name.txt"));
-    // The in-place write is the only caller of a file handle's `write`.
+    await chown(file, process.getuid!(), otherGroup!);
+    const before = await stat(file);
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    const after = await stat(file);
+    expect([after.ino, after.gid, after.mode]).toEqual([before.ino, otherGroup, before.mode]);
+    expect(await tree(root)).toEqual({ "note.md": "A _b_.\n" });
+  });
+  /** The prototype of Node.js's file handles, whose `write` only the write into the file calls. */
+  async function handlePrototype(file: string): Promise<FileHandle> {
     const probe = await open(file, "r");
-    const prototype = Object.getPrototypeOf(probe) as FileHandle;
     await probe.close();
-    const failure = Object.assign(new Error("EIO: i/o error, write"), {
-      code: "EIO",
-      syscall: "write",
-    });
-    const write = vi.spyOn(prototype, "write").mockImplementation(() => Promise.reject(failure));
+    return Object.getPrototypeOf(probe) as FileHandle;
+  }
+  const failure = Object.assign(new Error("EIO: i/o error, write"), {
+    code: "EIO",
+    syscall: "write",
+  });
+  it("writes the content back when writing into the file fails part way", async () => {
+    const root = await fixture({ "note.md": "old text" });
+    const file = path.join(root, "note.md");
+    // The system fails once the first bytes of the new content have reached the file.
+    const write = vi
+      .spyOn(await handlePrototype(file), "write")
+      .mockImplementationOnce(async () => {
+        await writeFile(file, "ne");
+        throw failure;
+      });
     let error: unknown;
     try {
-      error = await writeAtomic(file, "old", "new").catch((thrown: unknown) => thrown);
-      expect(write).toHaveBeenCalledTimes(1);
+      error = await writeFormatted(file, "old text", "new text").catch((thrown: unknown) => thrown);
+      expect(write).toHaveBeenCalledTimes(2);
     } finally {
       write.mockRestore();
     }
     expect(replacementFailure(error)).toBe(
-      "The file could not be written completely (EIO: i/o error) and may be incomplete",
+      "The file could not be written (EIO: i/o error), and its content from before formatting was written back",
     );
     // Nothing is left beside the file.
-    expect(Object.keys(await tree(root))).toEqual(["note.md", "second-name.txt"]);
+    expect(await tree(root)).toEqual({ "note.md": "old text" });
+  });
+  it("says that the file may be incomplete when writing its content back fails too", async () => {
+    const root = await fixture({ "note.md": "old text" });
+    const file = path.join(root, "note.md");
+    const write = vi.spyOn(await handlePrototype(file), "write").mockImplementation(async () => {
+      await writeFile(file, "ne");
+      throw failure;
+    });
+    let error: unknown;
+    try {
+      error = await writeFormatted(file, "old text", "new text").catch((thrown: unknown) => thrown);
+      expect(write).toHaveBeenCalledTimes(2);
+    } finally {
+      write.mockRestore();
+    }
+    expect(replacementFailure(error)).toBe(
+      "The file could not be written (EIO: i/o error), and writing its content from before formatting back failed too (EIO: i/o error); it may be incomplete",
+    );
+    expect(await tree(root)).toEqual({ "note.md": "ne" });
   });
   it("words a failure to write without the paths that the system names", () => {
     const error = (code: string, message: string, syscall?: string) =>
@@ -942,7 +969,7 @@ describe("filesystem safeguards", () => {
   const notes = { "a.md": "A *b*.\n", "held.md": "H *b*.\n", "z.md": "Z *b*.\n" };
   // A read-only file binds every user on Windows, and every user but root elsewhere.
   it.skipIf(process.platform !== "win32" && process.getuid?.() === 0)(
-    "writes nothing when a file to change is read-only",
+    "leaves a read-only file unchanged and writes the others",
     async () => {
       const root = await fixture(notes);
       await restrict(path.join(root, "held.md"), 0o444);
@@ -953,15 +980,15 @@ describe("filesystem safeguards", () => {
       const applied = run(root, ["format", "--write"]);
       expect(applied.status).toBe(2);
       expect(applied.stderr).toBe(
-        `held.md:1:1: error engine/unwritable-file: The file may not be written (${reason}); no file was written.\n` +
-          "3 file(s) processed; 3 would change; 1 could not be written.\n",
+        `held.md:1:1: error engine/unwritable-file: The file may not be written (${reason}); the file is unchanged.\n` +
+          "3 file(s) processed; 2 written; 1 could not be written.\n",
       );
-      expect(await tree(root)).toEqual(notes);
+      expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
       const report = JSON.parse(run(root, ["format", "--write", "--json"]).stdout);
-      expect(report.written).toBe(false);
+      expect(report.written).toEqual([]);
       expect(report.files[1].diagnostics[0]).toEqual({
         start: 0,
-        message: `The file may not be written (${reason}); no file was written.`,
+        message: `The file may not be written (${reason}); the file is unchanged.`,
         rule: "engine/unwritable-file",
         severity: "error",
         line: 1,
@@ -973,37 +1000,36 @@ describe("filesystem safeguards", () => {
       const rest = run(root, ["format", "--write", "--exclude", "held.md"]);
       expect(rest.status, rest.stderr).toBe(0);
       expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
+      // The tool never makes a file writable to write it.
+      expect((await stat(path.join(root, "held.md"))).mode & 0o222).toBe(0);
     },
   );
   it.skipIf(!canRestrict)(
-    "writes nothing when the folder of a file to change is not writable",
+    "leaves a file in a folder that is not writable unchanged and writes the others",
     async () => {
       const root = await fixture({ "a.md": "A *b*.\n", "sub/s.md": "S *b*.\n" });
       await restrict(path.join(root, "sub"), 0o555);
       const applied = run(root, ["format", "--write"]);
       expect(applied.status).toBe(2);
       expect(applied.stderr).toBe(
-        "sub/s.md:1:1: error engine/unwritable-file: The file's folder may not be written (EACCES: permission denied); no file was written.\n" +
-          "2 file(s) processed; 2 would change; 1 could not be written.\n",
+        "sub/s.md:1:1: error engine/unwritable-file: The file's folder may not be written (EACCES: permission denied); the file is unchanged.\n" +
+          "2 file(s) processed; 1 written; 1 could not be written.\n",
       );
-      expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("A *b*.\n");
+      expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("A _b_.\n");
+      expect(await readFile(path.join(root, "sub/s.md"), "utf8")).toBe("S *b*.\n");
     },
   );
-  // Windows does not let a file be replaced while a program has it open; elsewhere that works.
+  // On Windows, a permission can deny writing a file that the read-only check
+  // before writing lets through, and a program can lock a file it has open.
   it.skipIf(process.platform !== "win32")(
-    "reports a file that cannot be replaced for that file and writes the others",
+    "reports a file that cannot be written for that file and writes the others",
     async () => {
       const root = await fixture(notes);
-      const handle = await open(path.join(root, "held.md"), "r");
-      let applied: ReturnType<typeof run>;
-      try {
-        applied = run(root, ["format", "--write", "--json"]);
-      } finally {
-        await handle.close();
-      }
+      denyWrite(path.join(root, "held.md"));
+      let applied = run(root, ["format", "--write", "--json"]);
       expect(applied.status).toBe(2);
       const report = JSON.parse(applied.stdout);
-      expect(report.written).toBe(true);
+      expect(report.written).toEqual(["a.md", "z.md"]);
       expect(report.files[1]).toEqual({
         path: "held.md",
         changed: true,
@@ -1021,16 +1047,57 @@ describe("filesystem safeguards", () => {
       });
       expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
       await writeFile(path.join(root, "a.md"), notes["a.md"]);
-      const again = await open(path.join(root, "held.md"), "r");
-      try {
-        applied = run(root, ["format", "--write"]);
-      } finally {
-        await again.close();
-      }
+      applied = run(root, ["format", "--write"]);
       expect(applied.stderr).toBe(
         "held.md:1:1: error engine/unwritable-file: The file could not be written (EPERM: operation not permitted) and is unchanged.\n" +
           "3 file(s) processed; 1 written; 1 could not be written.\n",
       );
+    },
+  );
+  it.skipIf(process.platform !== "win32")(
+    "writes a file that another program has open and lets others write",
+    async () => {
+      const root = await fixture(notes);
+      // Node.js opens a file for others to read, write, and delete it too.
+      const handle = await open(path.join(root, "held.md"), "r");
+      let applied: ReturnType<typeof run>;
+      try {
+        applied = run(root, ["format", "--write"]);
+      } finally {
+        await handle.close();
+      }
+      expect(applied.status, applied.stderr).toBe(0);
+      expect(await tree(root)).toEqual({
+        "a.md": "A _b_.\n",
+        "held.md": "H _b_.\n",
+        "z.md": "Z _b_.\n",
+      });
+    },
+  );
+  it.skipIf(process.platform !== "win32")(
+    "keeps a Windows file's own permissions, attributes, streams, and creation time",
+    async () => {
+      const root = await fixture({ "note.md": "A *b*.\n" });
+      const file = path.join(root, "note.md");
+      const saved = path.join(await fixture({}), "acl.txt");
+      /** The file's access control list, in Windows's security descriptor language. */
+      const acl = async () => {
+        windowsTool("icacls.exe", [file, "/save", saved]);
+        return (await readFile(saved)).toString("utf16le");
+      };
+      // An entry of the file's own, which its folder does not pass on: everyone may read it.
+      windowsTool("icacls.exe", [file, "/grant", "*S-1-1-0:(R)"]);
+      windowsTool("attrib.exe", ["+H", file]);
+      await writeFile(`${file}:extra`, "stream");
+      const before = { acl: await acl(), born: (await stat(file)).birthtimeMs };
+      expect(before.acl).toContain("(A;;FR;;;WD)");
+      const applied = run(root, ["format", "--write"]);
+      expect(applied.status, applied.stderr).toBe(0);
+      expect(await readFile(file, "utf8")).toBe("A _b_.\n");
+      expect({ acl: await acl(), born: (await stat(file)).birthtimeMs }).toEqual(before);
+      // `attrib` prints the letters of the attributes, then the path.
+      expect(windowsTool("attrib.exe", [file]).split(/\s+[A-Za-z]:\\/)[0]).toContain("H");
+      expect(await readFile(`${file}:extra`, "utf8")).toBe("stream");
     },
   );
   // Windows lets a process create a symbolic link to a file only with a privilege.
@@ -1296,7 +1363,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     ]);
     expect(JSON.parse(linted.stdout)).toMatchObject({
       files: [{ path: "note.md" }],
-      written: false,
+      written: [],
       skipped,
     });
     const piped = run(root, ["format", "-", "--json"], "B *note*.\n");
@@ -1309,7 +1376,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(applied.status, applied.stderr).toBe(0);
     expect(JSON.parse(applied.stdout)).toMatchObject({
       files: [{ path: "note.md", changed: true }],
-      written: true,
+      written: ["note.md"],
       skipped,
     });
   });
@@ -1660,17 +1727,17 @@ describe("documents that are not UTF-8 text", () => {
     expect(named.status).toBe(1);
     expect(named.stderr).toBe(unchecked + "1 file(s) linted; 1 error(s), 0 warning(s).\n");
   });
-  it("writes nothing while one is selected, and never writes into one", async () => {
+  it("never writes into one, and writes the others", async () => {
     const root = await fixture(files);
     const applied = run(root, ["format", "--write"]);
     expect(applied.status).toBe(2);
-    expect(applied.stderr).toContain("2 file(s) processed; 1 would change; 4 could not be read.\n");
+    expect(applied.stderr).toContain("2 file(s) processed; 1 written; 4 could not be read.\n");
     await untouched(root);
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    // Without them, nothing else stands in the way.
     const rest = run(root, ["format", "--write", ...odd.flatMap((name) => ["--exclude", name])]);
     expect(rest.status).toBe(1);
-    expect(rest.stderr).toBe(unchecked + "2 file(s) processed; 1 written.\n");
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    expect(rest.stderr).toBe(unchecked + "2 file(s) processed; 0 written.\n");
     await untouched(root);
   });
   it("stops with status 2 for stdin that is not UTF-8 text, and reads it with a mark", async () => {
@@ -1836,28 +1903,26 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
       { rule: "links/valid", severity: "error", line: 1, column: 5 },
     ]);
   });
-  it("writes nothing when a file of the batch could not be read", async () => {
+  it("writes the other files when a file of the batch could not be read", async () => {
     const root = await fixture(files);
     await restrict(path.join(root, "secret.md"));
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.status).toBe(2);
     const report = JSON.parse(applied.stdout);
-    expect(report.written).toBe(false);
+    expect(report.written).toEqual(["note.md"]);
     expect(report.files).toMatchObject([
       { path: "linking.md", changed: false },
       { path: "note.md", changed: true },
       { path: "secret.md", changed: false, diagnostics: [{ rule: "engine/unreadable-file" }] },
     ]);
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    // The run still ends with status 2 while the file cannot be read.
     const text = run(root, ["format", "--write"]);
     expect(text.status).toBe(2);
-    expect(text.stderr).toContain("2 file(s) processed; 1 would change; 1 could not be read.\n");
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
-    // Leaving the file out of the selection makes the batch complete again.
+    expect(text.stderr).toContain("2 file(s) processed; 0 written; 1 could not be read.\n");
     const excluded = run(root, ["format", "--write", "--exclude", "secret.md"]);
     expect(excluded.status).toBe(1);
-    expect(excluded.stderr).toBe(unchecked + "2 file(s) processed; 1 written.\n");
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    expect(excluded.stderr).toBe(unchecked + "2 file(s) processed; 0 written.\n");
   });
 });
 
@@ -1894,10 +1959,11 @@ describe.skipIf(process.platform !== "win32")("paths that may not be read on Win
     expect(JSON.parse(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
       { path: "locked", type: "directory", code: "EPERM", message: skipped.slice(18, -1) },
     ]);
-    // Nothing is written while a selected document cannot be read.
+    // The other documents are written while a selected document cannot be read.
     const applied = run(root, ["format", "--write"]);
     expect(applied.status).toBe(2);
-    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
+    await writeFile(path.join(root, "note.md"), files["note.md"]);
     const excluded = run(root, ["format", "--write", "--exclude", "secret.md"]);
     expect(excluded.status).toBe(1);
     expect(excluded.stderr).toBe(skipped + unchecked + "2 file(s) processed; 1 written.\n");

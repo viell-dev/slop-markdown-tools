@@ -109,9 +109,11 @@ tasks, `node.test.ts` for `mdrefine/node`, and `examples.test.ts` and
 `docs.test.ts` for the examples and documentation. `support.ts` holds the
 helpers: `fixture()` writes a temporary workspace, `run()` starts the CLI,
 `restrict()` and `denyRead()` take away read permission on Unix and on Windows,
-and `linkDirectory()` links a directory, as a junction on Windows. Tests that
-need Unix permission modes are skipped on Windows and for the root user, and one
-that links a file needs `canSymlink`.
+`denyWrite()` takes away write permission on Windows, `windowsTool()` runs a
+program of Windows such as `icacls.exe`, and `linkDirectory()` links a
+directory, as a junction on Windows. Tests that need Unix permission modes are
+skipped on Windows and for the root user, and one that links a file needs
+`canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. A few unit tests guard against
