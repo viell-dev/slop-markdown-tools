@@ -77,11 +77,24 @@ interface DelimiterRun {
   close: boolean;
 }
 /**
+ * Whether the installed micromark lets a run of `*` or `_` next to the other
+ * marker open and close whatever else surrounds it, as
+ * micromark-core-commonmark did before 2.0.4. It is read from the parse of
+ * `*_c_*a`, whose last `*` then closes emphasis.
+ */
+let markersLoosen: boolean | undefined;
+function markersLoosenRuns(): boolean {
+  markersLoosen ??= parse("*_c_*a", "commonmark").tree.children.some(
+    (block) => block.type === "paragraph" && block.children[0]?.type === "emphasis",
+  );
+  return markersLoosen;
+}
+/**
  * The delimiter runs at `positions`, sorted, with the characters that `at`
  * gives. Whether a run can open or close follows micromark, which also lets a
- * run next to another `*` or `_`, or to a `~` in GFM, do both. Container
- * markers such as `>` count as punctuation here, while micromark sees the line
- * ending before them; the caller compares the result with the parse.
+ * run next to a `~` in GFM do both. Container markers such as `>` count as
+ * punctuation here, while micromark sees the line ending before them; the
+ * caller compares the result with the parse.
  */
 function delimiterRuns(
   positions: number[],
@@ -101,8 +114,9 @@ function delimiterRuns(
         close: false,
       });
   }
+  const loosen = markersLoosenRuns();
   const attention = (character: string | undefined) =>
-    character === "*" || character === "_" || (gfm && character === "~");
+    (gfm && character === "~") || (loosen && (character === "*" || character === "_"));
   for (const run of runs) {
     const previous = at(run.start - 1);
     const next = at(run.end);

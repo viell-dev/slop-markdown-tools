@@ -324,10 +324,9 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     expect(formatted(source, config)).toBe(output);
   });
   // Each would pair differently with the new markers: a `*` or `_` left as
-  // text, a run shared with other emphasis, or a `~` between two markers.
+  // text, a run of the new marker nearby, or a `~` between two markers.
   it.each([
     ["*a _b* c_\n", "_", "commonmark"],
-    ["*****a***\n", "_", "commonmark"],
     ["_a*b_ and _c*_\n", "*", "commonmark"],
     ["_]*__a__*i_\n", "*", "commonmark"],
     ["_~*a*e_\n", "*", "github"],
@@ -343,11 +342,29 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     ["*a* and 2*3 and *b*\n", "_", "_a_ and 2*3 and _b_\n"],
     // Of emphases sharing a run, those that keep their pairs change.
     ["*a****c***\n", "_", "_a_***c***\n"],
-    ["___a_ x_\n", "*", "_*_a_ x*\n"],
     ["___b___ and ***c***\n", "*", "*__b__* and ***c***\n"],
   ] as const)("converts what keeps its pairs in %j", (source, marker, output) => {
     expect(formatted(source, only({ "style/emphasis": ["warn", { marker }] }))).toBe(output);
   });
+  it.each(["*****a***\n", "___a_ x_\n", "***c***a\n", "**_c_**a\n"])(
+    "formats the shared runs of %j safely with every marker",
+    (source) => {
+      // Which of these markers can change depends on micromark's version:
+      // micromark-core-commonmark 2.0.4 no longer lets a run next to the other
+      // marker close whatever follows it, as in `***c***a`.
+      for (const emphasis of ["*", "_"] as const)
+        for (const strong of ["*", "_"] as const) {
+          const rules = only({
+            "style/emphasis": ["warn", { marker: emphasis }],
+            "style/strong": ["warn", { marker: strong }],
+          });
+          const output = formatted(source, rules);
+          expect(semanticFingerprint(parse(output, "commonmark"))).toBe(
+            semanticFingerprint(parse(source, "commonmark")),
+          );
+        }
+    },
+  );
   it.each(["github", "forgejo", "gitea"] as const)(
     "leaves markers next to dollar math alone on %s",
     (dialect) => {
