@@ -606,6 +606,24 @@ reading, with the reason `EBUSY: resource busy or locked`; versions up to
 as a path that disappeared during the run or a failing device, stops the run
 with exit code `2`.
 
+Documents are read as UTF-8, with or without a byte order mark, and the tool
+does not guess another encoding: a guess can be wrong, and the supported
+renderers read Markdown as UTF-8. A selected document that is not valid UTF-8 is
+reported in the same way as one that cannot be read, with
+`engine/unreadable-file` and a message that says what was found, as in
+`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
+So is a file that starts with a UTF-16 or UTF-32 byte order mark, which Windows
+PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as UTF-16
+text without a mark does for every ASCII character. Save such a file as UTF-8 to
+process it. A link to a heading or block in it is reported as
+`Fragment could not be checked`, as for a file that cannot be read. Text on
+stdin that is not UTF-8 stops the command with exit code `2` and a message such
+as
+`mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
+Versions up to `0.2.0-rc.2` decoded every file and stdin as UTF-8 without
+checking, replaced what was not UTF-8 with the character U+FFFD, and wrote those
+characters into the file when `format --write` changed anything in it.
+
 ## Files that cannot be written
 
 `format --write` replaces each file it changes with a new file written beside

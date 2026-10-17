@@ -9,6 +9,7 @@ import ignore from "ignore";
 import { minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
+import { decodeText } from "./encoding.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
 
@@ -196,7 +197,7 @@ export async function discover(
       } else if (entry.isFile()) {
         const markdown = /\.md$/i.test(name);
         let cached: string | undefined;
-        files[name] = markdown ? () => (cached ??= readFileSync(full, "utf8")) : null;
+        files[name] = markdown ? () => (cached ??= decodeText(readFileSync(full), name)) : null;
         if (
           markdown &&
           !targetOnly &&
@@ -287,6 +288,20 @@ export function replacementFailure(error: unknown): string | undefined {
   const text = systemErrorText(error);
   return text ? `The file could not be written (${text}) and is unchanged` : undefined;
 }
+/** The refusal for a file whose bytes are no longer those that were read. */
+function changedOnDisk(file: string, when: string): ReplacementRefused {
+  return new ReplacementRefused(
+    "The file changed on disk during formatting and was not written",
+    `File changed ${when}: ${file}`,
+  );
+}
+/**
+ * Replace `file`, whose text was read as `before`, with the formatted text
+ * `after`, if the file still holds exactly the bytes that were read. The new
+ * content is written to a file beside it, which then replaces it, so that a
+ * failure never leaves the file half written; the replacement gets the file's
+ * permission bits.
+ */
 export async function writeAtomic(file: string, before: string, after: string): Promise<void> {
   const info = await lstat(file);
   if (!info.isFile() || info.isSymbolicLink())
@@ -294,11 +309,11 @@ export async function writeAtomic(file: string, before: string, after: string): 
       "The file is not a regular file and was not written",
       `Refusing non-regular file: ${file}`,
     );
-  if ((await readFile(file, "utf8")) !== before)
-    throw new ReplacementRefused(
-      "The file changed on disk during formatting and was not written",
-      `File changed during formatting: ${file}`,
-    );
+  // The text was decoded from valid UTF-8, so encoding it again gives the bytes
+  // that were read; comparing the text instead would miss a change to bytes that
+  // decode to the same text.
+  const expected = Buffer.from(before, "utf8");
+  if (!(await readFile(file)).equals(expected)) throw changedOnDisk(file, "during formatting");
   const temporary = path.join(path.dirname(file), `.mdtools-${randomUUID()}.tmp`);
   const handle = await open(temporary, "wx", info.mode);
   try {
@@ -310,12 +325,9 @@ export async function writeAtomic(file: string, before: string, after: string): 
     if (
       current.isSymbolicLink() ||
       current.ino !== info.ino ||
-      (await readFile(file, "utf8")) !== before
+      !(await readFile(file)).equals(expected)
     )
-      throw new ReplacementRefused(
-        "The file changed on disk during formatting and was not written",
-        `File changed before replacement: ${file}`,
-      );
+      throw changedOnDisk(file, "before replacement");
     await rename(temporary, file);
   } finally {
     await handle.close();

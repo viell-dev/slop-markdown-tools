@@ -104,6 +104,26 @@ describe("filesystem discovery for library hosts (mdrefine/node)", () => {
       "# Draft\n\nSee [[#Draft]] and _this_.\n",
     );
   });
+  it("refuses a document that is not UTF-8 text with a code, and checks no link into it", async () => {
+    const root = await fixture({
+      ...files,
+      "docs/latin.md": Buffer.from("# Caf\xe9\n", "latin1"),
+      "docs/guide.md": "See [the heading](latin.md#cafe) and [the file](latin.md).\n",
+    });
+    const discovery = await discoverWorkspace({ root, config, inputs: ["docs"] });
+    expect(discovery.selected).toEqual(["docs/guide.md", "docs/latin.md", "docs/reference.md"]);
+    expect(() => discovery.read("docs/latin.md")).toThrow(
+      expect.objectContaining({
+        code: "ERR_ENCODING_INVALID_ENCODED_DATA",
+        message: "Not UTF-8 text: docs/latin.md (byte 0xE9 on line 1 is not valid UTF-8)",
+      }),
+    );
+    expect(lint(discovery.read("docs/guide.md"), discovery.options("docs/guide.md"))).toEqual([
+      expect.objectContaining({
+        message: "Fragment could not be checked: latin.md#cafe (cannot read docs/latin.md).",
+      }),
+    ]);
+  });
   it("reports paths that cannot be used in the CLI's words", async () => {
     const root = await fixture(files);
     await expect(discoverWorkspace({ root: path.join(root, "absent") })).rejects.toThrow(
