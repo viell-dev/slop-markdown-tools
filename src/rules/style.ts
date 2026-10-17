@@ -1,7 +1,8 @@
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
-import type { Nodes, Paragraph } from "mdast";
-import type { Dialect, Finding, Rule } from "../core/types.js";
+import type { Blockquote, Nodes, Paragraph, Root, RootContent } from "mdast";
+import { directive } from "../core/directives.js";
+import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 
@@ -497,6 +498,129 @@ const table: Rule = {
   },
 };
 
+/** A line holding nothing but block quote markers and blank space. */
+const blankLine = /^[ \t>]*$/;
+/**
+ * A list item or quote marker followed by another list marker on its line,
+ * including the ones that cannot open a list there, such as `* * *`.
+ */
+const nestedListStart = /^[ \t]*(?:[-+*]|\d{1,9}[.)]|>)[ \t>]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
+/** The innermost last block of a container, where its text ends. */
+function lastBlock(node: RootContent): RootContent {
+  while (
+    ["blockquote", "list", "listItem", "footnoteDefinition"].includes(node.type) &&
+    "children" in node &&
+    node.children.length
+  )
+    node = node.children.at(-1) as RootContent;
+  return node;
+}
+/**
+ * Whether two neighboring blocks have to stay as they are, although one of
+ * them is a heading or a list, because a blank line between them would change
+ * what they mean or what a comment or callout applies to.
+ */
+function together(
+  document: Document,
+  parent: Root | Blockquote,
+  index: number,
+  directiveLines: Set<number>,
+): boolean {
+  const before = parent.children[index - 1]!;
+  const after = parent.children[index]!;
+  const { source } = document;
+  const [beforeStart, beforeEnd] = range(before);
+  const [afterStart, afterEnd] = range(after);
+  // Front matter is not part of the document's text.
+  if (["yaml", "toml"].includes(before.type)) return true;
+  // Other tools, too, read a comment as applying to the line below it, and
+  // `mdtools-disable-next-line` does: a blank line would take that line's place.
+  if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
+  if (directiveLines.has(after.position!.start.line - 1)) return true;
+  // The line that opens a callout or alert stays with the body below it.
+  if (
+    index === 1 &&
+    parent.type === "blockquote" &&
+    before.type === "paragraph" &&
+    before.position!.start.line === before.position!.end.line &&
+    /^\[![\w-]+\]/.test(source.slice(beforeStart, beforeEnd))
+  )
+    return true;
+  // Obsidian may attach a block identifier on its own line to the block above.
+  if (
+    document.dialect === "obsidian" &&
+    after.type === "paragraph" &&
+    /^\^[A-Za-z0-9-]+[ \t]*$/.test(source.slice(afterStart, afterEnd))
+  )
+    return true;
+  // Directly below text or a link reference definition, the parser does not
+  // start a list that would be empty or not start at 1, though it does below
+  // a blank line: there, `- -` is a list item holding the text `-`, and `-`
+  // underlined with `---` is a heading. Such a list could start on the first
+  // line of a list or quote, and such a line could begin an underlined heading.
+  if (!["paragraph", "definition"].includes(lastBlock(before).type)) return false;
+  const firstLine = source.slice(afterStart, lineBounds(source, afterStart, afterStart)[1]);
+  if (after.type === "heading") return !/^[ \t]*#/.test(firstLine);
+  return (after.type === "list" || after.type === "blockquote") && nestedListStart.test(firstLine);
+}
+const blockSpacing: Rule = {
+  description: "Separate headings and lists from neighboring blocks with a blank line.",
+  kind: "style",
+  phase: "block",
+  schema: optionsSchema({}),
+  check({ document }) {
+    const { source } = document;
+    const findings: Finding[] = [];
+    const newline = lineEnding(source);
+    const directiveLines = new Set<number>();
+    if (source.includes("mdtools-"))
+      walk(document.tree, "html", (node) => {
+        if (directive(node.value)?.kind === "disable-next-line")
+          directiveLines.add(node.position!.end.line);
+      });
+    // Only the blocks of the document and of block quotes are compared. A
+    // blank line between the blocks of a list item makes its list loose.
+    walk(document.tree, (parent) => {
+      if (parent.type !== "root" && parent.type !== "blockquote") return;
+      for (let index = 1; index < parent.children.length; index++) {
+        const before = parent.children[index - 1]!;
+        const after = parent.children[index]!;
+        const subject = [after, before].find(
+          (node) => node.type === "heading" || node.type === "list",
+        );
+        // A plugin's syntax can add a node without a source position.
+        const located = [before, after].every(
+          ({ position }) =>
+            position?.start.offset !== undefined && position.end.offset !== undefined,
+        );
+        if (!subject || !located || together(document, parent, index, directiveLines)) continue;
+        const end = range(before)[1];
+        const start = range(after)[0];
+        const lineStart = lineBounds(source, start, start)[0];
+        const breakStart = lineStart - (source.startsWith("\r\n", lineStart - 2) ? 2 : 1);
+        if (breakStart < end) continue;
+        // A blank line, or one with only quote markers, already separates them.
+        const previous = source.slice(lineBounds(source, breakStart, breakStart)[0], breakStart);
+        if (blankLine.test(previous)) continue;
+        // The block's own line holds the quote markers that the new line needs.
+        const prefix = source.slice(lineStart, start);
+        if (!blankLine.test(prefix)) continue;
+        const kind = subject.type === "heading" ? "heading" : "list";
+        findings.push({
+          start: subject === after ? start : end,
+          message: `Add a blank line ${subject === after ? "before" : "after"} the ${kind}.`,
+          edit: {
+            start: breakStart,
+            end: lineStart,
+            text: source.slice(breakStart, lineStart) + prefix.replace(/[ \t]+$/, "") + newline,
+          },
+        });
+      }
+    });
+    return findings;
+  },
+};
+
 export const styleRules: Record<string, Rule> = {
   "style/wrap": wrap,
   "style/inline-code": {
@@ -591,6 +715,7 @@ export const styleRules: Record<string, Rule> = {
       return findings;
     },
   },
+  "style/block-spacing": blockSpacing,
 };
 
 /** Collect source-positioned nodes for rule/plugin consumers. */

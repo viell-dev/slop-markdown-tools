@@ -223,6 +223,7 @@ Problem rules report findings and never become formatting edits.
 | `style/final-newline`         | Style   | None; adds a missing final newline                                     |
 | `style/table`                 | Style   | None; aligns top-level GFM tables                                      |
 | `style/heading`               | Style   | None; converts eligible Setext headings to ATX                         |
+| `style/block-spacing`         | Style   | None; blank lines around headings and lists, opt-in                    |
 | `links/valid`                 | Problem | None; local files and heading/block fragments                          |
 | `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below              |
 | `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
@@ -310,6 +311,55 @@ containers. It preserves the parsed code value, converting each line ending to
 one space under CommonMark's code-span rules. Other code whitespace remains
 significant. It is useful for Obsidian editors that display split spans
 differently from Reading view.
+
+## Blank lines around headings and lists
+
+Enable `style/block-spacing` to separate every heading and every list from the
+blocks before and after it with a blank line. No preset enables it, and it
+accepts no options. It adds one blank line where there is none and keeps the
+blank lines that are already there, including additional ones. Inside a block
+quote, the new line holds the quote's `>` markers. Its line ending is the
+document's own. With the rule enabled, `format` turns this document:
+
+```markdown
+# Setup
+Install the package.
+- Run the command.
+```
+
+into this one:
+
+```markdown
+# Setup
+
+Install the package.
+
+- Run the command.
+```
+
+The rule compares the blocks of the document and of block quotes, at any depth,
+including a quote inside a list item. A line holding only `>` markers counts as
+a blank line. Nothing is added at the start or the end of a document, and these
+places are left as written:
+
+- Blocks inside a list item or a footnote definition, such as a heading and the
+  text below it in a list item. A blank line between the blocks of a list item
+  makes the list loose, which changes how it renders.
+- Front matter and the block below it.
+- A heading or list directly below a block that is an HTML comment, or directly
+  below a line holding a `mdtools-disable-next-line` directive. Such a comment
+  applies to the line below it, in this tool and in others, and a blank line
+  would take that line's place.
+- The line that opens a callout or alert, such as `> [!NOTE]`, and the block
+  directly below it.
+- In the Obsidian dialect, a block identifier on a line of its own (`^id`)
+  directly below a heading or list, which Obsidian may attach to the block
+  above.
+- Directly below text or a link reference definition: a list or quote whose
+  first line continues with another list marker, as in `- 2. Step` or `- -`, and
+  a heading underlined with `===` or `---`. The parser that the tool uses can
+  read such a line differently there than below a blank line, so the semantic
+  check would refuse the change.
 
 ## Link policies
 

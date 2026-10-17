@@ -145,7 +145,8 @@ export function lint(source: string, options: ProcessOptions = {}): Diagnostic[]
   const document = parse(text, config.dialect, options.path, options.plugins);
   const diagnostics = inspect(document, config, rules, options.workspace);
   // Ranges count the marks, and the document's positions do not.
-  const scope = options.ranges && widen(document.tree, shifted(options.ranges, -mark.length));
+  const scope =
+    options.ranges && widen(document.tree, document.source, shifted(options.ranges, -mark.length));
   return located(
     scope ? diagnostics.filter((item) => covers(scope, item.start)) : diagnostics,
     mark,
@@ -291,7 +292,7 @@ function formatText(
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);
   // Where edits may apply, in the positions of the current output.
-  const initial = ranges && widen(document.tree, ranges);
+  const initial = ranges && widen(document.tree, source, ranges);
   let scope = initial;
   // Engine findings concern the whole document and are always reported.
   const reported = (items: Diagnostic[]) =>

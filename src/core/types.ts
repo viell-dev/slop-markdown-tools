@@ -140,11 +140,12 @@ export interface ProcessOptions {
    * Parts of the source to lint or format, as half-open UTF-16 offsets into
    * the text as given. Each range is widened to the complete blocks that it
    * touches, such as paragraphs, headings, tables, and code blocks, also inside
-   * lists and block quotes. `lint` then returns the diagnostics that start in
-   * those parts, and `format` applies only edits that lie wholly in them, so
-   * that the rest of the text stays as it is. The whole document is still
-   * parsed and checked. Omitted, the whole document is processed; an empty
-   * list processes nothing.
+   * lists and block quotes, with their whole lines and the line breaks next to
+   * them, where blank lines between blocks are edited. `lint` then returns the
+   * diagnostics that start in those parts, and `format` applies only edits
+   * that lie wholly in them, so that the rest of the text stays as it is. The
+   * whole document is still parsed and checked. Omitted, the whole document is
+   * processed; an empty list processes nothing.
    */
   ranges?: SourceRange[];
 }
