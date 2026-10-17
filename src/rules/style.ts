@@ -158,12 +158,17 @@ const delimiterRowWord = /^[|:-]*[|-][|:-]*$/;
  */
 const prefixOpener = /^(?:>|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
 /**
- * A paragraph's first word that would open a block alone on the first line:
- * a thematic break, TOML front matter, a fence, or display math. The
- * paragraph's first line holds more than this word, so it opened none there.
+ * A paragraph's first word that would open a thematic break or TOML front
+ * matter alone on the first line. The paragraph's first line holds more than
+ * this word, so it opened neither there.
  */
-const firstWordOpener =
-  /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|\+\+\+)$|^(?:`{3,}|~{3,}|\$\$)/;
+const firstWordAlone = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|\+\+\+)$/;
+/**
+ * The start of a fence or of display math, which the first line of a
+ * paragraph can start with when what follows on the line, such as a backtick
+ * after a backtick fence, keeps it from opening one.
+ */
+const fenceStart = /^(?:`{3,}|~{3,}|\$\$)/;
 /** A link reference definition's label and colon, which a paragraph can start with. */
 const definitionStart = /^\[(?:[^[\]\\]|\\[^])+\]:/;
 // Forgejo and Gitea additionally open display math with `\[` and definition
@@ -641,9 +646,13 @@ const wrap: Rule = {
         return;
       }
       const atoms = wrappingAtoms(words, openers);
-      // A first word that would open a block alone on the first line keeps the
-      // word after it there too.
-      while (atoms.length > 1 && firstWordOpener.test(atoms[0]!))
+      // The first line keeps the words after a first word that would open a
+      // block alone on the line, until the line can no longer open one.
+      while (
+        atoms.length > 1 &&
+        (firstWordAlone.test(atoms[0]!) ||
+          (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
+      )
         atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
       /** Fill lines greedily, with the first `first` atoms on the first line. */
       const fill = (first: number): string[] => {

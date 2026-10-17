@@ -79,11 +79,16 @@ describe("direct Obsidian callout body reflow", () => {
   it("reflows multiple body source lines while preserving inline atoms", () => {
     const source =
       "> [!note] Title with `code`\n> Text with **strong words**, [a link](https://example.test),\n> `code words`, and enough ordinary words to wrap several times.\n";
-    const result = verify(source);
-    expect(result.output).not.toBe(source);
-    expect(result.output).toContain("[a link](https://example.test)");
-    expect(result.output).toContain("**strong words**");
-    expect(result.output).toContain("`code words`");
+    expect(verify(source).output).toBe(
+      "> [!note] Title with `code`\n> Text with **strong words**, [a\n> link](https://example.test),\n> `code words`, and enough ordinary\n> words to wrap several times.\n",
+    );
+  });
+
+  it("joins a code span that the body writes across lines", () => {
+    const source = `> [!info] Title\n> ${body} with \`multiline\n> code\`.\n`;
+    expect(verify(source).output).toBe(
+      "> [!info] Title\n> A body line with enough ordinary words\n> to wrap across several lines without\n> changing its meaning. with\n> `multiline code`.\n",
+    );
   });
 
   it("keeps header diagnostics separate from reflow and unbreakable body atoms", () => {
@@ -113,7 +118,7 @@ describe("direct Obsidian callout body reflow", () => {
     `> [!info] Title\n> ${body}\\\n> Next line.\n`,
     `> [!info] Title\n> ${body} ^block\n`,
     `> [!info] Title\n> ${body} <b>HTML</b>\n`,
-    `> [!info] Title\n> ${body} with \`multiline\n> code\`.\n`,
+    `> [!info] Title\n> ${body} with $multiline\n> math$.\n`,
     `> [!info] Title with \`multiline\n> code\` ${body}\n`,
     `> [!info] Title with **multiline\n> emphasis** ${body}\n`,
     `> [!info] Title\n${body}\n`,
@@ -158,11 +163,11 @@ describe("direct Obsidian callout body reflow", () => {
     expect(result.output).toContain(">\n> > [!tip]- Inner\n");
   });
 
-  it("does not enable callout body reflow in other dialects", () => {
+  it("does not enable callout body reflow in CommonMark, which has no callouts", () => {
     const source = `> [!info] Title\n> ${body}\n`;
-    for (const dialect of ["commonmark", "github"] as const) {
-      expect(format(source, { config: { ...config, dialect }, workspace }).output).toBe(source);
-    }
+    expect(
+      format(source, { config: { ...config, dialect: "commonmark" }, workspace }).output,
+    ).toBe(source);
   });
 
   it("rejects edits that move words between the title and body", () => {

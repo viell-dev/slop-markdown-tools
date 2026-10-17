@@ -281,14 +281,13 @@ describe("formatting contracts", () => {
     const source = "Some items follow\n- First item\n- Second item\n";
     expect(formatted(source)).toBe(source);
   });
-  it("reflows prose while protecting inline code and links", () => {
+  it("reflows prose while protecting inline code and link destinations", () => {
     const source =
       "A *small* paragraph with `some inline code` and [a link](https://example.test/path) followed by more words.\n";
-    const output = formatted(source, { config: narrow });
-    expect(output).toContain("_small_");
-    expect(output).toContain("`some inline code`");
-    expect(output).toContain("[a link](https://example.test/path)");
-    expect(output.split("\n").length).toBeGreaterThan(3);
+    // The link's text wraps like other text; its destination stays attached.
+    expect(formatted(source, { config: narrow })).toBe(
+      "A _small_ paragraph with\n`some inline code` and [a\nlink](https://example.test/path)\nfollowed by more words.\n",
+    );
   });
   it.each([
     "- A fairly long paragraph inside a list item that requires wrapping with the correct indentation.\n",
@@ -309,10 +308,17 @@ describe("formatting contracts", () => {
       "---\ntitle: '*unchanged*'\n---\n\n```md\n*code* and [link](missing.md)\n```\n\nAn explicit break.  \nAnother line.\n\n<div>\n*raw*\n</div>\n";
     expect(formatted(source)).toBe(source);
   });
-  it.each(["\n", "\r\n"])("preserves multiline inline code during reflow (%j)", (newline) => {
+  it.each(["\n", "\r\n"])("joins multiline inline code during reflow (%j)", (newline) => {
     const source = `Keep this paragraph and its long command \`first line${newline}second line\` intact.${newline}`;
-    expect(formatted(source, { config: narrow })).toBe(source);
-    expect(lint(source, { config: narrow })).toEqual([]);
+    expect(formatted(source, { config: narrow })).toBe(
+      ["Keep this paragraph and its long", "command `first line second line`", "intact.", ""].join(
+        newline,
+      ),
+    );
+    // A space at the start of the code span's next line is kept by the parser
+    // but dropped by GitHub, so that paragraph stays as written.
+    const indented = source.replace(`${newline}second`, `${newline} second`);
+    expect(formatted(indented, { config: narrow })).toBe(indented);
   });
   it("does not lint links in multi-backtick code spans", () => {
     const source = "``[link](missing.md)``\n";
