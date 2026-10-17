@@ -15,7 +15,10 @@ export interface DiscoverOptions {
   /** The workspace root: the folder whose documents are processed and whose files are link targets. */
   root: string;
   /**
-   * Files and folders to select, absolute or relative to the root. Omitted,
+   * Files and folders to select, absolute or relative to the root. A folder
+   * selects its Markdown files, those named `.md` or `.markdown`; a file is
+   * selected whatever its name. Ignored files are not selected, and an
+   * ignored file or folder named here is reported in `skipped`. Omitted,
    * every document of the workspace is selected; an empty list selects none.
    */
   inputs?: string[];
@@ -139,7 +142,9 @@ export async function discoverFrom(
       dialect,
       directories: set.directories,
       // Links into a directory that could not be read are unchecked, not missing.
-      unreadable: set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : [])),
+      unreadable: set.skipped.flatMap((item) =>
+        item.type === "directory" && item.code !== "IGNORED" ? [item.path] : [],
+      ),
       // The vault at or above the root holds the whole workspace and needs no entry.
       vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
       ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),

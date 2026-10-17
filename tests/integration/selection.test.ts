@@ -2,12 +2,17 @@ import { spawnSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { discoverWorkspace } from "../../src/node.js";
 import { discover } from "../../src/workspace/files.js";
 import { fixture, run } from "./support.js";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 /** Where letter case is ignored by default, by Git and by the file system. */
 const foldsCase = process.platform === "win32" || process.platform === "darwin";
+/** The paths of a report's files. */
+const paths = (stdout: string) =>
+  (JSON.parse(stdout) as { files: { path: string }[] }).files.map((file) => file.path);
+
 /**
  * The paths among `names` that Git ignores in the repository at `root`, by its
  * own `.gitignore` files alone: without the user's and the system's settings
@@ -86,5 +91,111 @@ describe(".gitignore files", () => {
     const root = await fixture(files);
     const checked = run(root, ["lint", "--json", "index.md"]);
     expect(checked.status, checked.stdout).toBe(0);
+  });
+});
+
+describe("named inputs", () => {
+  const files = {
+    "mdtools.config.json": JSON.stringify({
+      extends: ["recommended", "github"],
+      ignore: ["drafts/**"],
+    }),
+    ".gitignore": "generated/\nskip.md\n",
+    "guide.md": "# Guide\n\nSee [the readme](README.markdown#read-me).\n",
+    "README.markdown": "# Read me\n\nSee [the notes](notes.txt#notes).\n",
+    "notes.txt": "# Notes\n\nA *note*.\n",
+    "generated/out.md": "Out.\n",
+    "skip.md": "Skipped.\n",
+    "drafts/draft.md": "A draft.\n",
+    "node_modules/package/readme.md": "A package.\n",
+    "vendor/.git/HEAD": "ref: refs/heads/main\n",
+    "vendor/inner.md": "Inner.\n",
+  };
+
+  it("find .markdown files in folders, whose headings are link targets", async () => {
+    const root = await fixture(files);
+    const checked = run(root, ["lint", "--json"]);
+    expect(paths(checked.stdout)).toEqual(["README.markdown", "guide.md"]);
+    const reports = JSON.parse(checked.stdout).files as {
+      path: string;
+      diagnostics: { message: string }[];
+    }[];
+    // A text file's headings are no anchors, also when it is linted as Markdown.
+    expect(reports.find((file) => file.path === "guide.md")!.diagnostics).toEqual([]);
+    expect(reports.find((file) => file.path === "README.markdown")!.diagnostics).toEqual([
+      expect.objectContaining({ message: "Missing fragment in notes.txt#notes." }),
+    ]);
+  });
+  it("read a named file as Markdown whatever its name", async () => {
+    const root = await fixture(files);
+    const checked = run(root, ["lint", "--json", "notes.txt"]);
+    expect(checked.status, checked.stderr).toBe(0);
+    const emphasis = expect.objectContaining({ rule: "style/emphasis" });
+    expect(JSON.parse(checked.stdout).files).toEqual([
+      { path: "notes.txt", diagnostics: [emphasis, emphasis] },
+    ]);
+    expect(run(root, ["format", "--check", "notes.txt"]).status).toBe(1);
+    const written = run(root, ["format", "--write", "notes.txt"]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(written.stderr).toBe("1 file(s) processed; 1 written.\n");
+  });
+  it("say on stderr why an ignored one is skipped, without changing the exit code", async () => {
+    const root = await fixture(files);
+    const named = [
+      "generated/out.md",
+      "skip.md",
+      "drafts/draft.md",
+      "node_modules/package/readme.md",
+      "vendor/inner.md",
+      "vendor",
+      "generated",
+    ];
+    const checked = run(root, ["lint", "guide.md", ...named]);
+    expect(checked.status, checked.stderr).toBe(0);
+    const note = (name: string, reason: string, folder = false) =>
+      `mdtools: warning: Skipped ignored input: ${name} (${reason}). ${folder ? "Its files are" : "It is"} not processed.\n`;
+    expect(checked.stderr).toBe(
+      note("drafts/draft.md", `matched by the configuration's ignore pattern "drafts/**"`) +
+        note("generated", `matched by "generated/" in .gitignore`, true) +
+        note("generated/out.md", `in generated, which "generated/" in .gitignore matches`) +
+        note(
+          "node_modules/package/readme.md",
+          "in node_modules, which discovery always leaves out",
+        ) +
+        note("skip.md", `matched by "skip.md" in .gitignore`) +
+        note("vendor", "a nested repository", true) +
+        note("vendor/inner.md", "in vendor, a nested repository") +
+        "1 file(s) linted; 0 error(s), 0 warning(s).\n",
+    );
+    const reported = run(root, ["lint", "--json", "skip.md", "vendor"]);
+    expect(reported.status, reported.stderr).toBe(0);
+    expect(reported.stderr).toBe("");
+    expect(JSON.parse(reported.stdout)).toMatchObject({
+      files: [],
+      skipped: [
+        { path: "skip.md", type: "file", code: "IGNORED" },
+        { path: "vendor", type: "directory", code: "IGNORED" },
+      ],
+    });
+    // Still skipped when ignored files are link targets.
+    const targets = await discover(root, [path.join(root, "generated/out.md")], [], {
+      gitIgnored: true,
+      nestedRepositories: true,
+    });
+    expect(targets.selected).toEqual([]);
+    expect(targets.skipped).toEqual([expect.objectContaining({ code: "IGNORED" })]);
+  });
+  it("are reported the same way by mdrefine/node", async () => {
+    const root = await fixture(files);
+    const discovery = await discoverWorkspace({
+      root,
+      inputs: ["notes.txt", "skip.md"],
+      config: { ignore: ["drafts/**"] },
+    });
+    expect(discovery.selected).toEqual(["notes.txt"]);
+    expect(discovery.read("notes.txt")).toBe(files["notes.txt"]);
+    expect(discovery.skipped).toEqual(
+      JSON.parse(run(root, ["lint", "--json", "notes.txt", "skip.md"]).stdout).skipped,
+    );
   });
 });
