@@ -230,13 +230,14 @@ into it is left as written. A directive inside code is code, not a directive.
 ## Inspect the result
 
 `config explain` prints, as JSON, the configuration in effect for one document:
-the workspace `root`, the configuration `file` (or `null`), and the `effective`
+the workspace `root`, the configuration file as `config` (or `null`), the
+document's `path` from the root with forward slashes, and the `effective`
 settings, with the dialect assumed for that document and the overrides that
-match it.
+match it. The document need not exist, but like an input of `lint` it must lie
+inside the workspace.
 
 ```sh
 npx mdtools config explain notes/example.md
 ```
 
-It reads `--config`, `--root`, and `--dialect`. `mdtools config --help` lists
-the other options of `lint` as well, but `config explain` ignores them.
+It reads `--config`, `--root`, and `--dialect`, before or after `explain`.

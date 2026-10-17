@@ -53,6 +53,16 @@ From `0.2.0-rc.2`:
   reports that rule with `engine/unsafe-format` at the line where the meaning
   would first differ. Before, the whole document was left unchanged. Edits of
   two rules that overlap are applied in turn instead of refusing the document.
+- A mistake on the command line, such as an unknown option or command or a
+  missing option value, exits with code `2` instead of `1`, the code for
+  findings, and so does `mdtools` without a command, which prints the help on
+  stderr.
+- The text output and the diff name files from the current directory instead of
+  the workspace root. The JSON report keeps paths from the root and adds `root`.
+- `config explain` names the configuration file `config` instead of `file`, adds
+  the document's `path`, and refuses a document outside the workspace. `config`
+  no longer accepts `--exclude`, `--json`, `--stdin-filepath`, and
+  `--max-warnings`, which did nothing there.
 - A rule that throws or returns invalid findings is skipped for that document
   with an `engine/rule-error` error, in `lint` as well, and the exit code is
   `2`. Before, `lint` stopped at the first such rule, and `format` reported it
@@ -131,6 +141,9 @@ From every prerelease:
 
 ### Added
 
+- `--quiet` reports errors only, and `rules` lists the rules of the
+  configuration's plugins too, also as JSON with `--json`
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - The CLI finds `mdtools.config.js` and `mdtools.config.cjs`, `extends` accepts
   a single preset name, and a rule's setting can be its severity alone in a
   list, as in `["warn"]`. The package ships the configuration's JSON Schema as
@@ -162,6 +175,19 @@ From every prerelease:
 
 ### Changed
 
+- A mistake on the command line exits with code `2`, as in ESLint and Prettier
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- The text output names files from the current directory, and the JSON report
+  gives the workspace `root`
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- `format --check` names the files that would change
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- The help describes every command and lists only the options that each one
+  reads, an unknown dialect gets the list of dialects, `lint --fix` points to
+  `format --write`, `config explain` reports `config` and `path` and refuses
+  documents outside the workspace, and the `obsidian/strict-line-breaks` message
+  speaks to both command-line and library users
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - Configuration and rule option errors name the setting as it is written, in
   plain words, and list the allowed values, as in
   `"extends[1]" must be a preset name, not 5`; a JSON syntax error gives its
@@ -218,6 +244,11 @@ From every prerelease:
 
 ### Fixed
 
+- `--dialect` works with an `.mjs` configuration that exports a frozen object
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- `--stdin-filepath` accepts a document inside a root that is reached through a
+  link or a Windows junction
+  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - The configuration and command-line pages say that configuration patterns match
   letter case on every system, while `.gitignore` files and input patterns
   ignore it on Windows and macOS

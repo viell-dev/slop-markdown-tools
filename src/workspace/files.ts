@@ -30,6 +30,24 @@ export interface Skipped {
   /** What was skipped, why, and what follows from it. */
   message: string;
 }
+/** Names a path of the workspace, given relative to the root, as a message shows it. */
+type PathText = (file: string) => string;
+/** The words of each skipped entry's message, with the paths it names left to the caller. */
+const wording = new WeakMap<Skipped, (show: PathText) => string>();
+/** A skipped entry whose message names paths relative to the root. */
+function skip(entry: Omit<Skipped, "message">, words: (show: PathText) => string): Skipped {
+  const item = { ...entry, message: words((file) => file) };
+  wording.set(item, words);
+  return item;
+}
+/**
+ * The message of a skipped entry with each path of the workspace that it names
+ * given by `show`, which receives the path relative to the root. The CLI's text
+ * names them from the current directory.
+ */
+export function skippedMessage(item: Skipped, show: PathText): string {
+  return wording.get(item)?.(show) ?? item.message;
+}
 /**
  * Names of folders and files that discovery never enters or selects, wherever
  * they are. A link can still name what is in them; `unlistedLookup` finds it.
@@ -118,8 +136,8 @@ interface NamedInput {
   /** The real path, relative to the root. */
   path: string;
   directory: boolean;
-  /** Why discovery leaves it out, when it does. */
-  reason?: string;
+  /** Why discovery leaves it out, when it does, naming paths through `show`. */
+  reason?: (show: PathText) => string;
 }
 /** An input that is a pattern, with one matcher of paths from the root for each brace alternative. */
 interface PatternInput {
@@ -290,12 +308,11 @@ async function describeVault(
     .join("/");
   return {
     vault,
-    skipped: {
-      path: file,
-      type: "file",
-      code: problem.code,
-      message: `Skipped ${problem.code === "INVALID" ? "unusable" : "unreadable"} settings file: ${file} (${problem.reason}). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.`,
-    },
+    skipped: skip(
+      { path: file, type: "file", code: problem.code },
+      (show) =>
+        `Skipped ${problem.code === "INVALID" ? "unusable" : "unreadable"} settings file: ${show(file)} (${problem.reason}). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.`,
+    ),
   };
 }
 /**
@@ -387,7 +404,7 @@ export async function discover(
    * Record why the entry `name` leaves out the named inputs at or below it,
    * unless something above it did already.
    */
-  function leaveNamed(name: string, why: (input: NamedInput) => string) {
+  function leaveNamed(name: string, why: (input: NamedInput) => (show: PathText) => string) {
     for (const request of named.get(name) ?? []) request.reason ??= why(request);
   }
   /** Directories left out, with the path whose read the system refused. */
@@ -455,10 +472,12 @@ export async function discover(
       const skippedName = alwaysSkipped.has(entry.name);
       if (skippedName || entry.isSymbolicLink()) {
         if (skippedName)
-          leaveNamed(name, (input) =>
-            input.path === name
-              ? `discovery always leaves out ${entry.name}`
-              : `in ${name}, which discovery always leaves out`,
+          leaveNamed(
+            name,
+            (input) => (show) =>
+              input.path === name
+                ? `discovery always leaves out ${entry.name}`
+                : `in ${show(name)}, which discovery always leaves out`,
           );
         // Not entered, but a link can name what is in it or behind it, unless
         // Git ignores it and so its files are no link targets.
@@ -466,10 +485,12 @@ export async function discover(
         continue;
       }
       if (rule)
-        leaveNamed(name, (input) =>
-          input.path === name
-            ? `matched by "${rule.pattern}" in ${rule.file}`
-            : `in ${name}, which "${rule.pattern}" in ${rule.file} matches`,
+        leaveNamed(
+          name,
+          (input) => (show) =>
+            input.path === name
+              ? `matched by "${rule.pattern}" in ${show(rule.file)}`
+              : `in ${show(name)}, which "${rule.pattern}" in ${show(rule.file)} matches`,
         );
       const gitIgnored = gitIgnoredAbove || rule !== undefined;
       if (gitIgnored && resolve.gitIgnored !== true) continue;
@@ -485,8 +506,10 @@ export async function discover(
           continue;
         }
         if (nested)
-          leaveNamed(name, (input) =>
-            input.path === name ? "a nested repository" : `in ${name}, a nested repository`,
+          leaveNamed(
+            name,
+            (input) => (show) =>
+              input.path === name ? "a nested repository" : `in ${show(name)}, a nested repository`,
           );
         if (!nested || resolve.nestedRepositories === true)
           await walk(name, layers, targetOnly || gitIgnored || nested, gitIgnored);
@@ -500,7 +523,7 @@ export async function discover(
         const pattern = excluded.find((item) => minimatch(name, item, { dot: true }));
         if (pattern !== undefined) {
           if (request)
-            request.reason ??= `matched by the configuration's ignore pattern "${pattern}"`;
+            request.reason ??= () => `matched by the configuration's ignore pattern "${pattern}"`;
           continue;
         }
         let chosen = request !== undefined;
@@ -532,21 +555,25 @@ export async function discover(
           item.input.includes("\\") ? " (patterns separate folders with /)" : ""
         }`,
       );
-  const skipped: Skipped[] = refused.map((item) => ({
-    path: item.directory,
-    type: "directory",
-    code: item.code,
-    message: `Skipped unreadable directory: ${item.directory} (${reason(item, item.directory)}). Its files are not processed, and links into it cannot be checked.`,
-  }));
+  const skipped: Skipped[] = refused.map((item) =>
+    skip(
+      { path: item.directory, type: "directory", code: item.code },
+      (show) =>
+        `Skipped unreadable directory: ${show(item.directory)} (${refusalText(item.code)}${item.reading === item.directory ? "" : ` for ${show(item.reading)}`}). Its files are not processed, and links into it cannot be checked.`,
+    ),
+  );
   // A named input that ignore rules leave out is not an error, but the user asked for it.
-  for (const input of namedInputs.values())
-    if (input.reason)
-      skipped.push({
-        path: input.path,
-        type: input.directory ? "directory" : "file",
-        code: "IGNORED",
-        message: `Skipped ignored input: ${input.path} (${input.reason}). ${input.directory ? "Its files are" : "It is"} not processed.`,
-      });
+  for (const input of namedInputs.values()) {
+    const why = input.reason;
+    if (why)
+      skipped.push(
+        skip(
+          { path: input.path, type: input.directory ? "directory" : "file", code: "IGNORED" },
+          (show) =>
+            `Skipped ignored input: ${show(input.path)} (${why(show)}). ${input.directory ? "Its files are" : "It is"} not processed.`,
+        ),
+      );
+  }
   // A root that is no vault itself can be a folder of one.
   if (!vaultFolders.has("")) {
     const outer = await enclosingVault(root);
