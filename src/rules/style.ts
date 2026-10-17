@@ -93,7 +93,13 @@ function delimiterRuns(
     const last = runs.at(-1);
     if (last && last.end === position && at(position) === last.marker) last.end++;
     else
-      runs.push({ marker: at(position)!, start: position, end: position + 1, open: false, close: false });
+      runs.push({
+        marker: at(position)!,
+        start: position,
+        end: position + 1,
+        open: false,
+        close: false,
+      });
   }
   const attention = (character: string | undefined) =>
     character === "*" || character === "_" || (gfm && character === "~");
@@ -190,7 +196,11 @@ function scopeDelimiters(
 }
 /** A link label as CommonMark compares labels: whitespace collapsed and case folded. */
 const normalizedLabel = (label: string) =>
-  label.replace(/[\t\n\r ]+/g, " ").trim().toLowerCase().toUpperCase();
+  label
+    .replace(/[\t\n\r ]+/g, " ")
+    .trim()
+    .toLowerCase()
+    .toUpperCase();
 /** The labels of the document's definitions and footnotes that hold `*` or `_`, normalized. */
 function markerLabels(tree: Root): string[] {
   const labels: string[] = [];
@@ -284,7 +294,12 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           return;
         // GitHub, Forgejo, and Gitea end dollar math only at dollars that no
         // `_` follows, so a marker after a `$` can decide where math ends.
-        if (gfm && (source[start - 1] === "$" || source[end - size - 1] === "$")) return;
+        if (
+          gfm &&
+          document.dialect !== "obsidian" &&
+          (source[start - 1] === "$" || source[end - size - 1] === "$")
+        )
+          return;
         // Emphasis that begins in an Obsidian callout's title and ends below it
         // is text in the title, whose markers would change.
         if (
@@ -321,43 +336,43 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         list.push([start, end]);
         candidates.set(scope, list);
       });
+      /** The positions of the markers of the emphasis in `ranges`. */
+      const markers = (ranges: Range[]) => {
+        const set = new Set<number>();
+        for (const [start, end] of ranges)
+          for (let i = 0; i < size; i++) set.add(start + i).add(end - size + i);
+        return set;
+      };
       for (const [scope, list] of candidates) {
         let accepted = list;
+        // The parser's pairing of delimiter runs is modelled, and the markers
+        // change where the model, which has to reproduce the parse, pairs the
+        // same runs with the new markers: all of them, or else those that can
+        // be added one at a time. Where the model cannot be used, markers
+        // change only when no run could pair differently, which it could when
+        // a `*` or `_` in the same text did not pair, or when two emphases
+        // share a run of markers, as in `***a***` or `*a****c***`.
         const { positions, emphasis, suspicious } = scopeDelimiters(source, scope);
-        // Where pairing could change, the parser's pairing is modelled: when a
-        // `*` or `_` in the same text did not pair, when two emphases share a
-        // run of markers, as in `***a***` or `*a****c***`, and when the text
-        // already holds the new marker, as in `_]*a*i_`. The markers change
-        // where the model, which has to reproduce the parse, pairs the same
-        // runs with the new markers: all of them, or else those that can be
-        // added one at a time.
-        if (suspicious || positions.some((index) => source[index] === marker[0])) {
-          const expected = emphasis.join(" ");
-          const pairing = (at: (index: number) => string | undefined) =>
-            pairings(delimiterRuns(positions, at, gfm)).join(" ");
-          // micromark pairs `~` in a pass of its own, which can come first.
-          const modelled =
-            positions.length <= 2000 &&
-            !(gfm && source.slice(...range(scope)).includes("~")) &&
-            pairing((index) => source[index]) === expected;
-          const markers = (ranges: Range[]) => {
-            const set = new Set<number>();
-            for (const [start, end] of ranges)
-              for (let i = 0; i < size; i++) set.add(start + i).add(end - size + i);
-            return set;
-          };
-          const all = markers(list);
-          if (!modelled) accepted = suspicious ? [] : list;
-          else if (pairing((index) => (all.has(index) ? marker[0] : source[index])) !== expected) {
-            accepted = [];
-            const changed = new Set<number>();
-            for (const item of list) {
-              const trial = new Set([...changed, ...markers([item])]);
-              if (pairing((index) => (trial.has(index) ? marker[0] : source[index])) !== expected)
-                continue;
-              for (const index of trial) changed.add(index);
-              accepted.push(item);
-            }
+        const expected = emphasis.join(" ");
+        const pairing = (changed: Set<number>) =>
+          pairings(
+            delimiterRuns(positions, (at) => (changed.has(at) ? marker[0] : source[at]), gfm),
+          ).join(" ");
+        // micromark pairs `~` in a pass of its own, which can come first, and
+        // lets a run next to a `~` pair with one of the new marker, as in `_f~*a*e_`.
+        const tilde = gfm && source.slice(...range(scope)).includes("~");
+        const modelled = !tilde && positions.length <= 500 && pairing(new Set()) === expected;
+        if (!modelled)
+          accepted =
+            suspicious || (tilde && positions.some((at) => source[at] === marker[0])) ? [] : list;
+        else if (pairing(markers(list)) !== expected) {
+          accepted = [];
+          let changed = new Set<number>();
+          for (const item of list) {
+            const trial = new Set([...changed, ...markers([item])]);
+            if (pairing(trial) !== expected) continue;
+            changed = trial;
+            accepted.push(item);
           }
         }
         for (const [start, end] of accepted)
@@ -1030,7 +1045,10 @@ export const styleRules: Record<string, Rule> = {
           const before = source.slice(blockStart, start);
           for (const run of before.matchAll(/`+/g)) {
             const length = run[0].length;
-            if (length === marker.length || (escaped(before, run.index) && length - 1 === marker.length))
+            if (
+              length === marker.length ||
+              (escaped(before, run.index) && length - 1 === marker.length)
+            )
               return;
           }
         }

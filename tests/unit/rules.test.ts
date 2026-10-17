@@ -331,6 +331,7 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     ["_a*b_ and _c*_\n", "*", "commonmark"],
     ["_]*__a__*i_\n", "*", "commonmark"],
     ["_~*a*e_\n", "*", "github"],
+    ["_f~*a*e_\n", "*", "obsidian"],
   ] as const)("leaves the crossed delimiters of %j alone", (source, marker, dialect) => {
     const rules = only({ "style/emphasis": ["warn", { marker }] }, dialect);
     expect(formatted(source, rules)).toBe(source);
@@ -352,30 +353,66 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     (dialect) => {
       // A `_` after the closing dollar keeps `$x$` from being math.
       const source = "$x$_a_ and *$y$* and $z$ *b*\n";
-      expect(formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, dialect)))
-        .toBe("$x$_a_ and *$y$* and $z$ *b*\n");
+      expect(
+        formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, dialect)),
+      ).toBe("$x$_a_ and *$y$* and $z$ *b*\n");
       expect(formatted(source, only({ "style/emphasis": "warn" }, dialect))).toBe(
         "$x$_a_ and *$y$* and $z$ _b_\n",
       );
-      expect(
-        formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, "commonmark")),
-      ).toBe("$x$*a* and *$y$* and $z$ *b*\n");
+      // CommonMark has no math, and Obsidian does not look for a `_` after it.
+      for (const other of ["commonmark", "obsidian"] as const)
+        expect(
+          formatted(source, only({ "style/emphasis": ["warn", { marker: "*" }] }, other)),
+        ).toBe("$x$*a* and *$y$* and $z$ *b*\n");
     },
   );
+  it("keeps `*` next to an emoji, where `_` could neither open nor close", () => {
+    // micromark reads each half of the emoji's surrogate pair as a letter.
+    expect(formatted("🙂*a*🙂 and *b*\n", only({ "style/emphasis": "warn" }, "github"))).toBe(
+      "🙂*a*🙂 and _b_\n",
+    );
+  });
   it("leaves emphasis from an Obsidian callout's title into its body alone", () => {
     const rules = only({ "style/emphasis": ["warn", { marker: "*" }] }, "obsidian");
     expect(formatted("> [!note] _Title\n> body_ and _b_\n", rules)).toBe(
       "> [!note] _Title\n> body_ and *b*\n",
     );
-    expect(formatted("> [!note] _Title_\n> _body_\n", rules)).toBe(
-      "> [!note] *Title*\n> *body*\n",
-    );
+    expect(formatted("> [!note] _Title_\n> _body_\n", rules)).toBe("> [!note] *Title*\n> *body*\n");
   });
   it("keeps the meaning of random runs of markers", () => {
     const words = fc.constantFrom(
-      "a", "b c", "*", "_", "**", "__", "***", "*a*", "_a_", "**b**", "__b__", "***c***",
-      "___c___", "*a _b* c_", "x_y", "2*3", "file_", "_f", "`c`", "\\*", "\\_", "~", "~~s~~",
-      "$x$", "[*T*]", "[_T_][]", "[*T*](u)", "==h==", " ", "\n", "(", ".",
+      "a",
+      "b c",
+      "*",
+      "_",
+      "**",
+      "__",
+      "***",
+      "*a*",
+      "_a_",
+      "**b**",
+      "__b__",
+      "***c***",
+      "___c___",
+      "*a _b* c_",
+      "x_y",
+      "2*3",
+      "file_",
+      "_f",
+      "`c`",
+      "\\*",
+      "\\_",
+      "~",
+      "~~s~~",
+      "$x$",
+      "[*T*]",
+      "[_T_][]",
+      "[*T*](u)",
+      "==h==",
+      " ",
+      "\n",
+      "(",
+      ".",
     );
     fc.assert(
       fc.property(
@@ -443,9 +480,9 @@ describe("style/inline-code", () => {
     expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(
       "An == sign and `code span` here.\n",
     );
-    expect(formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian"))).toBe(
-      "> [!note] Title\n> Body `code span` here.\n",
-    );
+    expect(
+      formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian")),
+    ).toBe("> [!note] Title\n> Body `code span` here.\n");
   });
   it.each([
     // The joined span opens with one backtick, which the earlier one would pair with.

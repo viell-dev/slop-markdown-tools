@@ -569,14 +569,15 @@ or what a comment applies to:
   first line continues with another list marker, as in `- 2. Step` or `- -`, and
   a heading underlined with `===` or `---`. The parser can read such a line
   differently there than below a blank line.
+- Directly below a table that ends in a list item or block quote: text whose
+  second line holds a `|`. The parser reads a table there as text, where GitHub
+  reads a table, and a blank line would make it a table for the parser too.
 
 ## `style/emphasis`
 
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
-emphasis there. A marker that would touch another `*` or `_` and change how the
-text parses is left as written, and so are the exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea).
+emphasis there.
 
 Before:
 
@@ -589,6 +590,21 @@ After:
 ```markdown
 Use _emphasis_ sparingly, as in un*believ*able.
 ```
+
+Markers are left as written where new ones could change how the text parses, and
+so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
+
+- A new marker that would touch another `*` or `_`, or be separated from one
+  only by `~`.
+- Text with a `*` or `_` that did not pair, as in `*a _b* c_`, or with a run of
+  markers that two emphases share, as in `*****a***`. There markers change only
+  where the rule can tell that every pair stays the same.
+- The text of a collapsed or shortcut reference, such as `[*Title*][]` or
+  `[*Title*]`, which is also its label, and text in brackets that would match a
+  definition's label with the new markers.
+- A marker right after a `$` on GitHub, Forgejo, and Gitea, where a `_` after
+  the dollar decides whether dollar math ends there.
+- In Obsidian, emphasis that begins in a callout's title and ends in its body.
 
 ## `style/final-newline`
 
@@ -623,7 +639,14 @@ inside a code span renders as a space, so the content stays the same. Some
 editors, such as Obsidian's Live Preview, show a split code span differently
 from the rendered page, and `style/wrap` leaves a paragraph with a split code
 span as written. The exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea) apply.
+[Forgejo and Gitea](dialects.md#forgejo-and-gitea) apply, and a span stays split
+where the joined line would read differently:
+
+- In Obsidian, where an `==` or `[[` left as text on the joined lines could open
+  a highlight or wikilink, and where joining would move text into a callout's
+  title.
+- Where the joined span needs a different number of backticks than it has, and
+  an earlier run of that many in the same paragraph would pair with them.
 
 Before:
 
