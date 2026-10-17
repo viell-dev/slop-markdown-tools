@@ -54,6 +54,40 @@ describe("wrapping controls", () => {
       "aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb %% more words follow here.\n",
     );
   });
+  it.each([
+    // Obsidian begins math at a lone `$` before a line ending, though not before a space.
+    ["commonmark", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["github", "aaaa the price $\ncccccccccccccccc\nand $x$ more\n"],
+    ["forgejo", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["gitea", "aaaa the price $\ncccccccccccccccc and\n$x$ more\n"],
+    ["obsidian", "aaaa the price\n$ cccccccccccccccc\nand $x$ more\n"],
+  ] as const)(
+    "ends no line with a dollar that could begin math in the %s dialect",
+    (dialect, output) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const source = "aaaa the price $ cccccccccccccccc and $x$ more\n";
+      expect(verify(source, { ...wrap({ width: 20 }), dialect }, workspace).output).toBe(output);
+      const priced = "It costs about five US$ cccccccccc and $x$.\n";
+      const result = verify(priced, { ...wrap({ width: 20 }), dialect }, workspace).output;
+      if (dialect === "obsidian")
+        expect(result).toBe("It costs about five\nUS$ cccccccccc\nand $x$.\n");
+    },
+  );
+  it.each([
+    // GitHub and Obsidian end math at a `$` after a line ending, though not after a space.
+    ["commonmark", "$a\nbbbbbbbbbbbbbbbbbbb\n$ c\n"],
+    ["github", "$a\nbbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["forgejo", "$a bbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["gitea", "$a bbbbbbbbbbbbbbbbbbb $\nc\n"],
+    ["obsidian", "$a\nbbbbbbbbbbbbbbbbbbb $\nc\n"],
+  ] as const)(
+    "starts no line with a dollar that could end math in the %s dialect",
+    (dialect, output) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      const source = "$a bbbbbbbbbbbbbbbbbbb $ c\n";
+      expect(verify(source, { ...wrap({ width: 20 }), dialect }, workspace).output).toBe(output);
+    },
+  );
   it("keeps a trailing backslash away from the end of a line", () => {
     const source = "aaaa aaaa aaaa aaaa aaaa aaaa aaaa C:\\ more words follow here.\n";
     expect(verify(source, wrap()).output).toBe(
@@ -985,7 +1019,8 @@ describe("multiline code spans", () => {
     ["- A `one\n  two` here.\n", "- A `one two` here.\n"],
     ["A `` `one\ntwo` `` here.\n", "A `` `one two` `` here.\n"],
     ["A `  one\ntwo  ` here.\n", "A `  one two  ` here.\n"],
-    ["A ` \n ` here.\n", "A `   ` here.\n"],
+    // The space that starts the second line goes, as GitHub renders it.
+    ["A ` \n ` here.\n", "A `  ` here.\n"],
     ["A `one\r\ntwo` here.\r\n", "A `one two` here.\r\n"],
   ])("joins parsed code without deleting content or container syntax", (source, expected) => {
     expect(verify(source!, config).output).toBe(expected);

@@ -215,12 +215,13 @@ function markerLabels(tree: Root): string[] {
   return labels;
 }
 /**
- * The first lines of the document's Obsidian callouts, which Obsidian reads
- * on their own as the callouts' titles, from the `[!` on.
+ * The first lines of the document's Obsidian callouts and GitHub, Forgejo, or
+ * Gitea alerts, from the `[!` on, which hold an Obsidian callout's title and
+ * an alert's marker on its own.
  */
 function calloutTitles(document: Document): Range[] {
   const titles: Range[] = [];
-  if (document.dialect === "obsidian")
+  if (document.dialect !== "commonmark")
     walk(document.tree, "blockquote", (quote) => {
       const first = quote.children[0];
       if (first?.type !== "paragraph") return;
@@ -300,8 +301,8 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           (source[start - 1] === "$" || source[end - size - 1] === "$")
         )
           return;
-        // Emphasis that begins in an Obsidian callout's title and ends below it
-        // is text in the title, whose markers would change.
+        // Emphasis that begins on the line of a callout's or alert's marker
+        // and ends below it is text on that line, whose markers would change.
         if (
           titles.length &&
           /[\r\n]/.test(original) &&
@@ -394,35 +395,60 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
 }
 
 /**
+ * Where dollar math could begin or end at the edge of a line although it does
+ * not at a space: `start` when a dollar at the start of a line can end math
+ * that a dollar before it began, and `end` for the words whose last dollar can
+ * begin math at the end of a line, which a dollar after it could end.
+ */
+interface DollarEdges {
+  start: boolean;
+  end?: (atom: string) => boolean;
+}
+/**
  * Join words into the atoms that reflow puts on lines. Whitespace-only words
  * separate atoms; whitespace inside a word, such as in a code span, does not.
  */
-function wrappingAtoms(words: string[], openers: RegExp[]): string[] {
-  const atoms: string[] = [];
+function wrappingAtoms(words: string[], openers: RegExp[], dollars?: DollarEdges): string[] {
+  const separated: string[] = [];
   let current = "";
   for (const word of words) {
     if (/^[ \t]+$/.test(word)) {
-      if (current) atoms.push(current);
+      if (current) separated.push(current);
       current = "";
     } else current += word;
   }
-  if (current) atoms.push(current);
+  if (current) separated.push(current);
   // Keep atoms that would open a block or underline a Setext heading at the
-  // start of a line attached to the preceding atom.
-  for (let i = 1; i < atoms.length; i++) {
-    const atom = atoms[i]!;
-    if (openers.some((opener) => opener.test(atom))) {
-      atoms.splice(i - 1, 2, `${atoms[i - 1]} ${atom}`);
-      i--;
-    }
+  // start of a line attached to the preceding atom, and so a dollar that
+  // could end math there.
+  const joined: string[] = [];
+  let dollarBefore = false;
+  for (const atom of separated) {
+    if (
+      joined.length &&
+      (openers.some((opener) => opener.test(atom)) ||
+        (dollars?.start && dollarBefore && atom.startsWith("$")))
+    )
+      joined[joined.length - 1] += ` ${atom}`;
+    else joined.push(atom);
+    if (atom.includes("$")) dollarBefore = true;
   }
   // An atom ending in an unescaped backslash would become a hard break at the
-  // end of a line; keep it attached to the following atom.
-  for (let i = 0; i < atoms.length - 1; i++) {
-    if (/(?:^|[^\\])(?:\\\\)*\\$/.test(atoms[i]!)) {
-      atoms.splice(i, 2, `${atoms[i]} ${atoms[i + 1]}`);
-      i--;
-    }
+  // end of a line; keep it attached to the following atom, and so one ending
+  // in a dollar that could begin math there.
+  let lastDollar = -1;
+  joined.forEach((atom, index) => {
+    if (atom.includes("$")) lastDollar = index;
+  });
+  const atoms: string[] = [];
+  for (let i = 0; i < joined.length; i++) {
+    let atom = joined[i]!;
+    while (
+      i < joined.length - 1 &&
+      (/(?:^|[^\\])(?:\\\\)*\\$/.test(atom) || (i < lastDollar && dollars?.end?.(atom)))
+    )
+      atom += ` ${joined[++i]}`;
+    atoms.push(atom);
   }
   return atoms;
 }
@@ -446,6 +472,8 @@ const delimiterRowWord = /^[|:-]*[|-][|:-]*$/;
  * definitions.
  */
 const prefixOpener = /^(?:>|~{3,}|`{3,}|\$\$|%%|<[!?/A-Za-z]|\[\^[^\]]+\]:)/;
+/** A word that ends in an unescaped dollar, which can begin dollar math at the end of a line. */
+const dollarEnd = /(?:^|[^\\])(?:\\\\)*\$$/;
 /**
  * A paragraph's first word that would open a thematic break or TOML front
  * matter alone on the first line. The paragraph's first line holds more than
@@ -809,6 +837,27 @@ const wrap: Rule = {
       if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
       if (forge) openers.push(forgeLineOpener);
       const { source } = document;
+      // GitHub and Obsidian end dollar math at a single dollar after a line
+      // ending, but not after a space, so a word that starts with `$` stays on
+      // the line of the word before it when a dollar comes before it. Obsidian
+      // also begins math at a single dollar before a line ending, but not
+      // before a space, so a word that ends in a dollar of its text, such as a
+      // lone `$`, stays on the line of the word after it when a dollar comes
+      // after it. Forgejo and Gitea have neither condition.
+      const maths: string[] = [];
+      if (document.dialect === "obsidian")
+        walk(node, "inlineMath", (math) => {
+          maths.push(source.slice(...range(math)));
+        });
+      const dollars: DollarEdges = {
+        start: document.dialect === "github" || document.dialect === "obsidian",
+        ...(document.dialect === "obsidian"
+          ? {
+              end: (atom: string) =>
+                dollarEnd.test(atom) && !maths.some((math) => atom.endsWith(math)),
+            }
+          : {}),
+      };
       const inline = inlineAtoms(node, start);
       const protection = new Protection(start, end);
       for (const atom of inline.atoms) protection.add(atom.from, atom.to);
@@ -869,7 +918,7 @@ const wrap: Rule = {
           for (const [a] of inline.breaks) if (a >= offset && a < contentEnd) contentEnd = a;
           const from = offset + container.length;
           const words = protection.split(source.slice(from, contentEnd), from);
-          const atoms = wrappingAtoms(words, openers);
+          const atoms = wrappingAtoms(words, openers, dollars);
           const available = width - lineWidth(linePrefix, measure);
           if (measure(words.join("").trimEnd()) > available) {
             if (atoms.length > 1) breakable = true;
@@ -959,7 +1008,7 @@ const wrap: Rule = {
         reportSkipped(failure);
         return;
       }
-      const atoms = wrappingAtoms(words, openers);
+      const atoms = wrappingAtoms(words, openers, dollars);
       if (!atoms.length) return;
       // The first line keeps the words after a first word that would open a
       // block alone on the line, until the line can no longer open one.
@@ -1236,9 +1285,10 @@ export const styleRules: Record<string, Rule> = {
           const lines = document.source.slice(...lineBounds(document.source, start, end));
           if (lines.includes("\\(") && lines.includes("\\)")) return;
         }
+        // Joining would move text onto the line of a callout's or alert's
+        // marker, which holds an Obsidian callout's title.
+        if (titles.some(([a, b]) => start >= a && start < b)) return;
         if (document.dialect === "obsidian") {
-          // Joining would move text into a callout's title.
-          if (titles.some(([a, b]) => start >= a && start < b)) return;
           // Obsidian reads highlights and wikilinks only within a line. Once
           // the lines are one, an `==` or `[[` left as text could open one that
           // runs to the next `==` or `]]`, even inside this or another span.
@@ -1259,7 +1309,10 @@ export const styleRules: Record<string, Rule> = {
           )
             return;
         }
-        const value = node.value.replace(/\r\n|\r|\n/g, " ");
+        // A line ending becomes a space, and the spaces and tabs that start the
+        // next line go: CommonMark strips them from a paragraph's lines before
+        // it reads a code span, though the parser keeps them in the span.
+        const value = node.value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);
         // An earlier run of the new backticks that the parser left as text, or

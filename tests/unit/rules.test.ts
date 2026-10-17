@@ -372,12 +372,15 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
       "🙂*a*🙂 and _b_\n",
     );
   });
-  it("leaves emphasis from an Obsidian callout's title into its body alone", () => {
+  it("leaves emphasis from the line of a callout's or alert's marker into its body alone", () => {
     const rules = only({ "style/emphasis": ["warn", { marker: "*" }] }, "obsidian");
     expect(formatted("> [!note] _Title\n> body_ and _b_\n", rules)).toBe(
       "> [!note] _Title\n> body_ and *b*\n",
     );
     expect(formatted("> [!note] _Title_\n> _body_\n", rules)).toBe("> [!note] *Title*\n> *body*\n");
+    // An alert's marker stays alone on its line in GitHub's reading too.
+    const alert = "> [!NOTE] _Text\n> more_\n";
+    expect(formatted(alert, { ...rules, dialect: "github" })).toBe(alert);
   });
   it("keeps the meaning of random runs of markers", () => {
     const words = fc.constantFrom(
@@ -470,11 +473,42 @@ describe("style/inline-code", () => {
     "Text with ==a highlight `code` `\nspan`== here.\n",
     "==mark `code\n==` here.\n",
     "See [[note `code\nspan`]] here.\n",
-    // Joining would move text into a callout's title.
-    "> [!note] Title `code\n> span` here.\n",
   ])("leaves %j unjoined in Obsidian", (source) => {
     expect(formatted(source, only(rule, "obsidian"))).toBe(source);
-    expect(formatted(source, only(rule, "github"))).toBe(source.replace(/\n(?:> )?(?=\S+`)/, " "));
+    expect(formatted(source, only(rule, "github"))).toBe(source.replace(/\n(?=\S+`)/, " "));
+  });
+  it("leaves a code span from the line of a callout's or alert's marker unjoined", () => {
+    // That line holds an Obsidian callout's title, and an alert's marker alone.
+    for (const source of [
+      "> [!note] Title `code\n> span` here.\n",
+      "> [!NOTE] `code\n> span` here.\n",
+    ]) {
+      for (const dialect of ["github", "forgejo", "gitea", "obsidian"] as const)
+        expect(formatted(source, only(rule, dialect))).toBe(source);
+      expect(formatted(source, only(rule))).toBe(source.replace("\n> ", " "));
+    }
+  });
+  it.each(dialects)(
+    "drops the indentation of the next line when it joins a code span in the %s dialect",
+    (dialect) => {
+      // CommonMark strips it from a paragraph's lines before it reads the span,
+      // and GitHub shows `npm run build`; the parser keeps it in the span.
+      for (const [source, output] of [
+        ["Run `npm run\n   build` now.\n", "Run `npm run build` now.\n"],
+        ["Run `npm run\n\tbuild` now.\n", "Run `npm run build` now.\n"],
+        ["> Run `npm run\n>    build` now.\n", "> Run `npm run build` now.\n"],
+        ["- Run `npm run\n     build` now.\n", "- Run `npm run build` now.\n"],
+        ["- [ ] Run `npm run\n      build` now.\n", "- [ ] Run `npm run build` now.\n"],
+      ] as const)
+        expect(formatted(source, only(rule, dialect))).toBe(output);
+    },
+  );
+  it("compares code spans without the indentation after their line endings", () => {
+    const print = (source: string) => semanticFingerprint(parse(source, "github"));
+    expect(print("Run `npm run\n   build` now.\n")).toBe(print("Run `npm run build` now.\n"));
+    expect(print("Run `npm run\n   build` now.\n")).not.toBe(
+      print("Run `npm run    build` now.\n"),
+    );
   });
   it("still joins code spans beside a single `==` or below a callout's title", () => {
     expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(

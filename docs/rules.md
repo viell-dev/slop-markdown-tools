@@ -604,7 +604,8 @@ so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
   definition's label with the new markers.
 - A marker right after a `$` on GitHub, Forgejo, and Gitea, where a `_` after
   the dollar decides whether dollar math ends there.
-- In Obsidian, emphasis that begins in a callout's title and ends in its body.
+- Emphasis that begins on the line of an alert's or a callout's marker and ends
+  below it.
 
 ## `style/final-newline`
 
@@ -635,16 +636,19 @@ After:
 ## `style/inline-code`
 
 Joins a code span that is written across lines onto one line. A line break
-inside a code span renders as a space, so the content stays the same. Some
-editors, such as Obsidian's Live Preview, show a split code span differently
-from the rendered page. `style/wrap` joins such a code span only in a paragraph
-that it wraps, and this rule also elsewhere, such as in a paragraph with a hard
-line break. The exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea)
-apply, and a span stays split where the joined line would read differently:
+inside a code span renders as a space, so the content stays the same, and the
+spaces and tabs that start the next line are left out, as CommonMark and GitHub
+leave them out. Some editors, such as Obsidian's Live Preview, show a split code
+span differently from the rendered page. `style/wrap` joins such a code span
+only in a paragraph that it wraps, and this rule also elsewhere, such as in a
+paragraph with a hard line break. The exceptions of [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea) apply, and a span stays split where the
+joined line would read differently:
 
 - In Obsidian, where an `==` or `[[` left as text on the joined lines could open
-  a highlight or wikilink, and where joining would move text into a callout's
-  title.
+  a highlight or wikilink.
+- Where joining would move text onto the line of an alert's or a callout's
+  marker, which holds an Obsidian callout's title.
 - Where the joined span needs a different number of backticks than it has, and
   an earlier run of that many in the same paragraph would pair with them.
 
@@ -719,7 +723,11 @@ on the line before it. A word that only starts like one, such as `--config`,
 `#tag`, or `-5`, can start a line. The first line keeps more than one word when
 its first word alone would open a block, such as `***` or `$$`, and keeps a
 paragraph that starts like a link reference definition (`[Note]: see …`) from
-becoming one.
+becoming one. On GitHub and in Obsidian, a word that starts with `$` stays on
+the line before it when a `$` comes earlier in the paragraph, and in Obsidian a
+word that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
+comes later: at the edge of a line, a dollar can begin or end math that it
+cannot begin or end next to a space.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |

@@ -46,7 +46,12 @@ The comparison is only as good as the parser's reading:
   Below an empty list item (`-`), the parser takes the `[x]` that begins the
   next line for a checkbox that belongs to no item, where GitHub shows the text
   `[x]`, so a blank line between them, as `style/block-spacing` would add, is
-  refused as a change of meaning.
+  refused as a change of meaning. The parser also keeps the spaces and tabs that
+  start a code span's next line, where CommonMark and GitHub leave them out, so
+  that a span `npm run` continued by an indented `build` reads
+  `npm run    build`; the comparison ignores them, and `style/inline-code`
+  leaves them out when it joins the span ([issue
+  #265](https://github.com/viell-dev/slop-markdown-tools/issues/265)).
 
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on
