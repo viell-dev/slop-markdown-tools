@@ -12,7 +12,9 @@ and plugin discovery. `src/core/` owns the shared contracts, suppression
 directives, diagnostics, and edit engine. `src/rules/` implements built-in
 rules. `src/workspace/` resolves targets and handles filesystem
 selection/writes. `src/cli/` connects those services; the public `src/index.ts`
-library has no implicit filesystem access.
+library has no implicit filesystem access. `src/node.ts`, published as
+`mdrefine/node`, gives library hosts the CLI's discovery and per-document
+options from `src/workspace/discovery.ts`, which the CLI itself uses.
 
 Lint and format use the same rule settings. A style rule checks a preferred
 representation and proposes edits. A problem rule reports defects without

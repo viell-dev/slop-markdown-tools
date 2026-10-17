@@ -166,6 +166,52 @@ does not match it; rule-specific schemas live on rule objects.
 `canonicalDialect(name)` maps an alias such as `codeberg` to the dialect that
 rules and the workspace see (`forgejo`); `document.dialect` is always canonical.
 
+## Files on disk
+
+The main entry never touches the filesystem. A host on Node.js that wants the
+CLI's choice of files without running the CLI imports `discoverWorkspace` from
+the separate entry `mdrefine/node`:
+
+```ts
+import { lint } from "mdrefine";
+import { discoverWorkspace } from "mdrefine/node";
+
+const discovery = await discoverWorkspace({ root: "/path/to/documents", config });
+for (const name of discovery.selected)
+  console.log(name, lint(discovery.read(name), discovery.options(name)));
+```
+
+Discovery is the CLI's own; the CLI calls the same function. It finds the files
+below `root`, honors `.gitignore` files and the configuration's `ignore` and
+`resolve` settings, leaves out nested repositories, symbolic links, and what the
+system does not let it read, and recognizes each document's Obsidian vault. It
+reads no configuration file and writes nothing: pass the configuration as
+`config`, with `plugins` for any plugin objects, and write results yourself.
+
+- `inputs` are files and folders to select, absolute or relative to `root`, not
+  to the current directory. Omitted, every document is selected; an empty list
+  selects none. The other files remain link targets either way.
+- `exclude` lists files and folders to leave out of the selection, as paths, not
+  patterns; they also remain link targets.
+- `documents` gives text for paths relative to `root`, such as an editor's
+  unsaved buffer or text read from stdin. Those documents are selected, and the
+  workspace reads that text in place of a file at the path, also where no file
+  exists.
+
+The result has `root`, the root's real path; `selected`, the documents to
+process as forward-slash paths relative to it, sorted; and `skipped`, what
+discovery left out, with the entries of the CLI's JSON report (`path`, `type`,
+`code`, and `message`). `read(name)` returns a selected document's text: a file
+is read when it is first needed and then kept, so one result is a snapshot for
+one run; create a new one after files change. An error with the code `EACCES`,
+`EPERM`, or `EBUSY` means that the system did not let the file be read; the CLI
+reports such a file with `engine/unreadable-file`. `options(name)` returns what
+the CLI passes to `lint` and `format` for the document: its `path`, `config` and
+`plugins`, a `workspace` for its dialect with its vault's `strictLineBreaks`
+setting, and `defaultDialect: "obsidian"` for a note in a vault. Both throw for
+a name that is not selected. A root or input that cannot be used is an error in
+the CLI's words, such as `Input does not exist: notes/absent.md`.
+
 ## Rule plugins
 
 Create `rules.mjs` beside the configuration:

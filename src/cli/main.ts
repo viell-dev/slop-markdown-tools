@@ -1,25 +1,17 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { createTwoFilesPatch } from "diff";
-import { access, constants, readFile, realpath, stat } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import {
-  discover,
-  replacementFailure,
-  replacementProblem,
-  vaultFor,
-  writeAtomic,
-} from "../workspace/files.js";
-import { enclosingVault, vaultOf } from "../workspace/vault.js";
-import { excludeSelection } from "../workspace/selection.js";
-import { createWorkspace } from "../workspace/index.js";
-import { pathError, refusal, refusalText } from "../workspace/access.js";
-import type { Diagnostic, Dialect, DialectName, ProcessOptions, Workspace } from "../core/types.js";
-import type { Vault } from "../workspace/vault.js";
+import { replacementFailure, replacementProblem, writeAtomic } from "../workspace/files.js";
+import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
+import { enclosingVault } from "../workspace/vault.js";
+import { refusal, refusalText } from "../workspace/access.js";
+import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
   config?: string;
@@ -73,49 +65,22 @@ interface Report {
   diagnostics: Diagnostic[];
   output?: string;
 }
-/**
- * The dialect to assume for a document when nothing names one, or undefined for
- * the library's own default. An Obsidian vault shows a single line break as a
- * line break and holds wikilinks, both of which any other dialect lets reflow
- * change, so a document that a vault holds is read as a note.
- */
-function assumedDialect(vault: Vault | string | undefined): Dialect | undefined {
-  return vault ? "obsidian" : undefined;
-}
-/**
- * Stops when the folder given as `--root` cannot serve as a workspace root.
- * Without this check the first thing to fail would be the search for a
- * configuration file in it, with a message about a file the user never named.
- */
-async function checkRoot(given: string | undefined): Promise<void> {
-  if (given === undefined) return;
-  const root = path.resolve(given);
-  try {
-    if (!(await stat(root)).isDirectory())
-      throw new Error(`Workspace root is not a directory: ${root}`);
-    await access(root, constants.R_OK | constants.X_OK);
-  } catch (error) {
-    throw pathError("Workspace root", root, error);
-  }
-}
 async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
     throw new Error("Choose only one of --check, --diff, and --write.");
   if (inputs.includes("-") && flags.exclude?.length)
     throw new Error("--exclude cannot be combined with stdin.");
-  await checkRoot(flags.root);
+  // Without this check the first thing to fail would be the search for a
+  // configuration file in the root, with a message about a file the user never named.
+  if (flags.root !== undefined) await checkRoot(flags.root);
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
   const root = path.resolve(flags.root ?? loaded.root);
   if (flags.dialect) loaded.config.dialect = flags.dialect;
-  // Which files to leave out does not depend on a document's dialect.
-  const resolved = resolveConfig(loaded.config, "document.md", loaded.plugins);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
     throw new Error("stdin must be the only input and cannot be combined with --write.");
-  const set = await discover(root, stdin ? [] : inputs, resolved.ignore, resolved.resolve);
-  set.selected = await excludeSelection(set.root, set.selected, flags.exclude ?? []);
-  /** The vault of the document read from stdin, found by a search of its own. */
-  let named: Vault | undefined;
+  /** The text read from stdin, by the name it is given in the workspace. */
+  let documents: Record<string, string> | undefined;
   if (stdin) {
     const name = path
       .relative(root, path.resolve(flags.stdinFilepath ?? path.join(root, "stdin.md")))
@@ -126,60 +91,30 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     let source = "";
     process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) source += String(chunk);
-    set.files[name] = source;
-    set.selected = [name];
-    // The name can lead into a folder that discovery did not visit.
-    named = await vaultFor(set, name);
+    documents = { [name]: source };
   }
-  // Links into a directory that could not be read are reported as unchecked, not as missing.
-  const unreadable = set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : []));
+  // Paths on the command line are relative to the working directory, and no
+  // path selects the whole workspace; stdin is the only document then.
+  const discovery = await discoverFrom(
+    {
+      root,
+      ...(stdin ? { inputs: [] } : inputs.length ? { inputs } : {}),
+      exclude: flags.exclude ?? [],
+      config: loaded.config,
+      plugins: loaded.plugins,
+      ...(documents ? { documents } : {}),
+    },
+    process.cwd(),
+  );
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
   // Selected files that the system refused to let the tool read.
   const unread: string[] = [];
-  // The vault that the root is a folder of, if it is one: links may lead out of sight.
-  const enclosing = set.vaults.find((item) => item.rootInVault);
-  // One index per active dialect; build lazily for mixed documentation workspaces.
-  const indexes = new Map<Dialect, Workspace>();
-  // The same index with the line-break setting of each vault that has documents in it.
-  const views = new Map<Dialect, Map<Vault, Workspace>>();
-  for (const name of set.selected) {
-    const vault = stdin ? named : vaultOf(set.vaults, name);
-    const assumed = assumedDialect(vault);
-    const config = resolveConfig(loaded.config, name, loaded.plugins, assumed);
-    let workspace = indexes.get(config.dialect);
-    if (!workspace)
-      indexes.set(
-        config.dialect,
-        (workspace = createWorkspace(set.files, {
-          dialect: config.dialect,
-          directories: set.directories,
-          unreadable,
-          // The vault at or above the root holds the whole workspace and needs no entry.
-          vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
-          ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),
-        })),
-      );
-    // Whether a note may be reflowed is a setting of its own vault.
-    if (vault?.strictLineBreaks !== undefined) {
-      let ofDialect = views.get(config.dialect);
-      if (!ofDialect) views.set(config.dialect, (ofDialect = new Map()));
-      const index = workspace;
-      workspace = ofDialect.get(vault);
-      if (!workspace)
-        ofDialect.set(vault, (workspace = { ...index, strictLineBreaks: vault.strictLineBreaks }));
-    }
-    const options: ProcessOptions = {
-      path: name,
-      config: loaded.config,
-      plugins: loaded.plugins,
-      workspace,
-      ...(assumed ? { defaultDialect: assumed } : {}),
-    };
-    const value = set.files[name]!;
-    let source: string | null;
+  for (const name of discovery.selected) {
+    const options = discovery.options(name);
+    let source: string;
     try {
-      source = typeof value === "function" ? value() : value;
+      source = discovery.read(name);
     } catch (error) {
       // Report the file and carry on with the others; any other error is a fault.
       const code = refusal(error);
@@ -201,7 +136,6 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       });
       continue;
     }
-    if (source === null) continue;
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
       const result = format(source, options);
@@ -241,7 +175,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     // What can be seen before writing stops the whole batch, instead of being
     // found part-way through it.
     for (const change of changes) {
-      const problem = await replacementProblem(path.join(set.root, change.file));
+      const problem = await replacementProblem(path.join(discovery.root, change.file));
       if (problem) refuse(change.file, `${problem}; no file was written`);
     }
     unsafe = unwritten.length > 0;
@@ -251,7 +185,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     for (const change of changes) {
       // Each file is replaced on its own, so a failure leaves the others to be written.
       try {
-        await writeAtomic(path.join(set.root, change.file), change.before, change.after);
+        await writeAtomic(path.join(discovery.root, change.file), change.before, change.after);
         written++;
       } catch (error) {
         const failure = replacementFailure(error);
@@ -270,7 +204,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           mode,
           files: reports,
           written: flags.write === true && !unsafe,
-          ...(set.skipped.length ? { skipped: set.skipped } : {}),
+          ...(discovery.skipped.length ? { skipped: discovery.skipped } : {}),
         },
         null,
         2,
@@ -278,7 +212,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     );
   else {
     // Warnings about the run, not about a document: they do not change the exit status.
-    for (const item of set.skipped) process.stderr.write(`mdtools: warning: ${item.message}\n`);
+    for (const item of discovery.skipped)
+      process.stderr.write(`mdtools: warning: ${item.message}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)
@@ -300,7 +235,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
             ? `${written} written`
             : `${changes.length} would change`;
       process.stderr.write(
-        `${set.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}${unwritten.length ? `; ${unwritten.length} could not be written` : ""}.\n`,
+        `${discovery.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}${unwritten.length ? `; ${unwritten.length} could not be written` : ""}.\n`,
       );
     }
   }
@@ -327,7 +262,7 @@ common(program.command("config").description("Inspect effective configuration"))
   .command("explain <file>")
   .action(async (file: string, _flags: unknown, command: Command) => {
     const flags = command.parent!.opts<Flags>();
-    await checkRoot(flags.root);
+    if (flags.root !== undefined) await checkRoot(flags.root);
     const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
     if (flags.dialect) loaded.config.dialect = flags.dialect;
     const root = path.resolve(flags.root ?? loaded.root);
