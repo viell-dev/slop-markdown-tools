@@ -18,14 +18,14 @@ const folder = path.resolve(
 const config = { extends: ["recommended", "github"] };
 
 // Workspace keys are forward-slash paths relative to the folder. A Markdown
-// file maps to its text; any other file maps to null, so that links to it
-// still resolve.
+// file, named .md or .markdown as the CLI finds them, maps to its text; any
+// other file maps to null, so that links to it still resolve.
 const files = {};
 for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
   if (!entry.isFile()) continue;
   const absolute = path.join(entry.parentPath, entry.name);
   const name = path.relative(folder, absolute).split(path.sep).join("/");
-  files[name] = /\.md$/i.test(name) ? await readFile(absolute, "utf8") : null;
+  files[name] = /\.(?:md|markdown)$/i.test(name) ? await readFile(absolute, "utf8") : null;
 }
 const workspace = createWorkspace(files, { dialect: "github" });
 

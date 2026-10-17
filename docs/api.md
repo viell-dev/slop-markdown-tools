@@ -79,7 +79,8 @@ effect for a path: `dialect`, `rules`, `ignore`, and `resolve`.
 rewriting, and Obsidian wrapping need; without one, none of them happen. `files`
 maps each path, relative to the workspace root with forward slashes, to one of:
 
-- the text of a Markdown document;
+- the text of a Markdown document, whose headings are link targets when its name
+  ends in `.md` or `.markdown`, or `.md` for Obsidian links;
 - `null` for a file that is not Markdown, such as an image, so that links to it
   resolve;
 - a synchronous loader, `() => string`, which is called only when a link's
@@ -102,6 +103,15 @@ maps each path, relative to the workspace root with forward slashes, to one of:
 | `unreadable`       | Directories whose contents the host could not read. A link that may lead into one resolves as `unreadable`.                 |
 | `vaults`           | Directories below the root that are Obsidian vaults. An Obsidian link in one of their notes reaches only the vault's files. |
 | `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                      |
+| `lookup`           | `(path, folded) => result`: what is at a path that `files` and `directories` do not hold; see below.                        |
+
+`lookup` lets a host leave files out of `files` and still have links to them
+checked. It is called once per path, with `folded` true for an Obsidian link,
+which matches without regard to case, and returns
+`{ type: "file", path, source }`, `{ type: "directory" }`,
+`{ type: "outside", through }` for a path that leads out of the workspace root
+through the link `through`, `{ type: "unreadable", at }`, or `undefined` when
+nothing is there. An Obsidian search by note name does not call it.
 
 The CLI passes the directories it skipped as `unreadable`, the vaults it found
 as `vaults`, and `rootInVault` when it finds the vault above the root;
@@ -161,9 +171,12 @@ it read, and recognizes each document's vault. It reads no configuration file
 and writes nothing: pass the configuration as `config`, plugin objects as
 `plugins`, and write results yourself.
 
-- `inputs` lists files and directories to select, absolute or relative to
-  `root`, not to the current directory. Omitted, every document is selected; an
-  empty list selects none.
+- `inputs` lists files, directories, and patterns to select, absolute or
+  relative to `root`, not to the current directory, as the CLI
+  [selects them](cli.md#which-files-are-processed): a file is selected whatever
+  its name, and an ignored file or directory is an entry of `skipped` with the
+  code `IGNORED`. Omitted, every document is selected; an empty list selects
+  none.
 - `exclude` lists files and directories to leave out, as paths, not patterns.
 - `documents` gives text for paths relative to `root`, such as an editor's
   unsaved buffer. Those documents are selected, and the workspace reads that

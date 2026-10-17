@@ -4,7 +4,7 @@ import path from "node:path";
 import { resolveConfig } from "../config/resolve.js";
 import type { Config, Dialect, Plugin, ProcessOptions, Workspace } from "../core/types.js";
 import { pathError } from "./access.js";
-import { discover, vaultFor } from "./files.js";
+import { discover, unlistedLookup, vaultFor } from "./files.js";
 import type { Skipped } from "./files.js";
 import { createWorkspace } from "./index.js";
 import { excludeSelection } from "./selection.js";
@@ -15,8 +15,15 @@ export interface DiscoverOptions {
   /** The workspace root: the folder whose documents are processed and whose files are link targets. */
   root: string;
   /**
-   * Files and folders to select, absolute or relative to the root. Omitted,
-   * every document of the workspace is selected; an empty list selects none.
+   * Files, folders, and patterns to select, absolute or relative to the root.
+   * A folder selects its Markdown files, those named `.md` or `.markdown`; a
+   * file is selected whatever its name. An input that names no existing path
+   * and holds pattern characters (`*`, `?`, `[`, `{`) is a pattern, with `/`
+   * between folders on every system: it selects the Markdown files that it
+   * matches, and matching none is an error. Ignored files are not selected,
+   * and an ignored file or folder named here is reported in `skipped`.
+   * Omitted, every document of the workspace is selected; an empty list
+   * selects none.
    */
   inputs?: string[];
   /**
@@ -131,6 +138,8 @@ export async function discoverFrom(
   // processed, and a view of it with each vault's line-break setting.
   const indexes = new Map<Dialect, Workspace>();
   const views = new Map<Dialect, Map<Vault, Workspace>>();
+  // Links into folders that discovery does not enter are checked on disk.
+  const lookup = unlistedLookup(set);
   function index(dialect: Dialect): Workspace {
     let workspace = indexes.get(dialect);
     if (workspace) return workspace;
@@ -140,10 +149,13 @@ export async function discoverFrom(
       dialect,
       directories: set.directories,
       // Links into a directory that could not be read are unchecked, not missing.
-      unreadable: set.skipped.flatMap((item) => (item.type === "directory" ? [item.path] : [])),
+      unreadable: set.skipped.flatMap((item) =>
+        item.type === "directory" && item.code !== "IGNORED" ? [item.path] : [],
+      ),
       // The vault at or above the root holds the whole workspace and needs no entry.
       vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
       ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),
+      lookup,
     });
     indexes.set(dialect, workspace);
     return workspace;
