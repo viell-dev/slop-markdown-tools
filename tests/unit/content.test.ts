@@ -80,7 +80,10 @@ describe("content/table-columns", () => {
   });
   it("counts cells as GFM does", () => {
     expect(
-      check("Name | Size\n--- | ---\na | 1\n`a\\|b` \\| c | 2\n\n> | x |\n> | - |\n> | y |\n", rule),
+      check(
+        "Name | Size\n--- | ---\na | 1\n`a\\|b` \\| c | 2\n\n> | x |\n> | - |\n> | y |\n",
+        rule,
+      ),
     ).toEqual([]);
     expect(check("| a | b |\n| - | - |\n| 1 | 2 |   |\n", rule)).toHaveLength(1);
     // GFM splits cells at a pipe in a code span too, unless it is escaped.

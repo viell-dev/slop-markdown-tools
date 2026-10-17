@@ -153,10 +153,19 @@ describe("links/unused-definition", () => {
   const rule = "links/unused-definition";
   it.each([
     ["Text.\n\n[guide]: guide.md\n", "Definition [guide] is not used by any reference."],
-    ["[Guide][]\n\n[guide]: a.md\n[GUIDE]: b.md\n", "Definition [GUIDE] repeats an earlier one, which references use instead."],
+    [
+      "[Guide][]\n\n[guide]: a.md\n[GUIDE]: b.md\n",
+      "Definition [GUIDE] repeats an earlier one, which references use instead.",
+    ],
     ["Text.\n\n> [quoted]: a.md\n", "Definition [quoted] is not used by any reference."],
-    ["Text.\n\n[^note]: Unused.\n", "Footnote [^note] is not referenced, and GitHub does not show it."],
-    ["Text[^1].\n\n[^1]: One.\n\n[^1]: Again.\n", "Footnote [^1] repeats an earlier one, which references use instead."],
+    [
+      "Text.\n\n[^note]: Unused.\n",
+      "Footnote [^note] is not referenced, and GitHub does not show it.",
+    ],
+    [
+      "Text[^1].\n\n[^1]: One.\n\n[^1]: Again.\n",
+      "Footnote [^1] repeats an earlier one, which references use instead.",
+    ],
   ])("reports %j", (source, message) => {
     const findings = check(source, rule);
     expect(findings.map((item) => item.message)).toEqual([message]);
@@ -175,9 +184,7 @@ describe("links/unused-definition", () => {
   });
   it("keeps link and footnote labels apart", () => {
     // A link label that starts with `^` is no footnote's label.
-    expect(check("[^1]\n\n[ ^1]: a.md\n[^1]: Note.\n", rule).map((item) => item.line)).toEqual([
-      3,
-    ]);
+    expect(check("[^1]\n\n[ ^1]: a.md\n[^1]: Note.\n", rule).map((item) => item.line)).toEqual([3]);
   });
   it("names GitHub only in its own dialect", () => {
     expect(check("Text.\n\n[^note]: Unused.\n", rule, "obsidian")[0]?.message).toBe(
@@ -194,7 +201,10 @@ describe("links/empty", () => {
     ["[guide]()\n", "Link destination is empty."],
     ["[guide](<>)\n", "Link destination is empty."],
     ["[guide](#)\n", "Link destination is only #, which only leads to the top of the page."],
-    ['[guide](# "Title")\n', "Link destination is only #, which only leads to the top of the page."],
+    [
+      '[guide](# "Title")\n',
+      "Link destination is only #, which only leads to the top of the page.",
+    ],
     ["![chart]()\n", "Image source is empty."],
     ["![chart](#)\n", "Image source is only #."],
     // A reference has its definition's destination, reported once.

@@ -160,7 +160,7 @@ function undefinedReferences(
         ["\\(", "\\)"],
         ["\\[", "\\]"],
       ] as const)
-        for (let from = 0; ; ) {
+        for (let from = 0; ;) {
           const opening = text.indexOf(open, from);
           const closing = opening < 0 ? -1 : text.indexOf(close, opening + 2);
           if (closing < 0) break;
