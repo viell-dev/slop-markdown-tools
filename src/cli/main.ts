@@ -351,11 +351,17 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         ? 1
         : 0;
 }
-common(program.command("lint").argument("[paths...]", "Markdown files/directories, or - for stdin"))
+common(
+  program
+    .command("lint")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
+)
   .description("Report the findings of the enabled rules; never writes")
   .action((inputs: string[], flags: Flags) => run("lint", inputs, flags));
 common(
-  program.command("format").argument("[paths...]", "Markdown files/directories, or - for stdin"),
+  program
+    .command("format")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 )
   .description("Format documents: print a diff (the default), check, or write")
   .option("--check", "Fail if formatting changes would be needed, and name the files")

@@ -79,7 +79,8 @@ effect for a path: `dialect`, `rules`, `ignore`, and `resolve`.
 rewriting, and Obsidian wrapping need; without one, none of them happen. `files`
 maps each path, relative to the workspace root with forward slashes, to one of:
 
-- the text of a Markdown document;
+- the text of a Markdown document, whose headings are link targets when its name
+  ends in `.md` or `.markdown`, or `.md` for Obsidian links;
 - `null` for a file that is not Markdown, such as an image, so that links to it
   resolve;
 - a synchronous loader, `() => string`, which is called only when a link's
@@ -161,9 +162,12 @@ it read, and recognizes each document's vault. It reads no configuration file
 and writes nothing: pass the configuration as `config`, plugin objects as
 `plugins`, and write results yourself.
 
-- `inputs` lists files and directories to select, absolute or relative to
-  `root`, not to the current directory. Omitted, every document is selected; an
-  empty list selects none.
+- `inputs` lists files, directories, and patterns to select, absolute or
+  relative to `root`, not to the current directory, as the CLI
+  [selects them](cli.md#which-files-are-processed): a file is selected whatever
+  its name, and an ignored file or directory is an entry of `skipped` with the
+  code `IGNORED`. Omitted, every document is selected; an empty list selects
+  none.
 - `exclude` lists files and directories to leave out, as paths, not patterns.
 - `documents` gives text for paths relative to `root`, such as an editor's
   unsaved buffer. Those documents are selected, and the workspace reads that

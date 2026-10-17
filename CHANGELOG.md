@@ -73,6 +73,14 @@ From `0.2.0-rc.2`:
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
+- `.gitignore` files decide as in Git: a deeper file can include again what a
+  higher one excludes, and patterns match letter case exactly on Linux. Files
+  that were left out before can be linted now, and the reverse.
+- `.markdown` files are documents, and a file named on the command line is read
+  as Markdown whatever its name. A hook that passes every changed file should
+  pass only the Markdown ones.
+- An input that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
+  and is an error only when it matches no document.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -132,6 +140,9 @@ From every prerelease:
 - `mdrefine/node` exports `discoverWorkspace()`, the CLI's discovery of files,
   with the example `examples/library/lint-workspace.mjs`
   ([#189](https://github.com/viell-dev/slop-markdown-tools/pull/189)).
+- Glob patterns as inputs, such as `mdtools lint "docs/**/*.md"`, expanded by
+  the CLI itself on every system
+  ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
 
 ### Changed
 
@@ -177,6 +188,9 @@ From every prerelease:
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - Plugin rule option schemas are compiled once instead of for every document
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- `.markdown` files are documents and link targets, and a file named on the
+  command line is read as Markdown whatever its name
+  ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
 - CI tests Node.js 22.12.0, the lowest supported version, where it tested the
   newest Node.js 22, and also tests Node.js 26
   ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
@@ -205,6 +219,12 @@ From every prerelease:
   `engine/rule-error` for its document, and invalid plugin rules and names such
   as `toString` are rejected with a clear message
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- `.gitignore` files are applied as Git applies them, with negations in deeper
+  files and letter case per platform
+  ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- A file or directory named on the command line that is ignored gets a warning
+  that says why, instead of being skipped without a word
+  ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell
