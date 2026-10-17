@@ -31,10 +31,15 @@ export function suppressions(document: Document): (rule: string, finding: Findin
     const { rules } = found;
     const [start, end] = range(node);
     if (found.kind === "disable-next-line") {
-      const next = document.source.indexOf("\n", end);
-      if (next < 0) return;
-      const last = document.source.indexOf("\n", next + 1);
-      intervals.push({ start: next + 1, end: last < 0 ? document.source.length : last, rules });
+      // The line after the directive's own, whichever of CommonMark's line endings ends each.
+      const lineBreak = /\r\n|\r|\n/g;
+      lineBreak.lastIndex = end;
+      const first = lineBreak.exec(document.source);
+      if (!first) return;
+      const next = first.index + first[0].length;
+      lineBreak.lastIndex = next;
+      const last = lineBreak.exec(document.source);
+      intervals.push({ start: next, end: last ? last.index : document.source.length, rules });
     } else if (found.kind === "disable") {
       for (const rule of rules) if (!active.has(rule)) active.set(rule, end);
     } else {

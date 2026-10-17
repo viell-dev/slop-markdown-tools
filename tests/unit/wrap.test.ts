@@ -310,6 +310,70 @@ describe("wrapping controls", () => {
     expect(lint(source, { config: wrap() })).toEqual([]);
   });
 });
+describe("a block marker as a paragraph's first word", () => {
+  // Directly below text, the parser reads a marker that would open an empty
+  // list item, or one not starting at 1, as text, and the text continues on
+  // the next line. Joining the lines would open a list there.
+  const config: Config = {
+    ...wrap(),
+    dialect: "github",
+    rules: { ...wrap().rules, "style/emphasis": "warn" },
+  };
+  it.each([
+    ["Sub *a*\n- -\nmore\n", "Sub _a_\n- -\nmore\n"],
+    ["Sub *a*\n> - -\nmore\n", "Sub _a_\n> - -\nmore\n"],
+    [
+      "*A*\n\n1. [b]: /u\n   - -\n       indented code\n",
+      "_A_\n\n1. [b]: /u\n   - -\n       indented code\n",
+    ],
+  ])("keeps %j as written and still formats the rest", (source, output) => {
+    expect(verify(source, config).output).toBe(output);
+    // The default configuration refused all three documents before.
+    const engine = format(source).diagnostics.filter((item) => item.rule.startsWith("engine/"));
+    expect(engine).toEqual([]);
+  });
+  it.each(["-", "+", "*", "1.", "1)", "2."])("keeps `- %s` and the line below it", (marker) => {
+    const source = `Sub\n- ${marker}\nmore words\n`;
+    expect(verify(source, config).output).toBe(source);
+  });
+  it("keeps the body of an Obsidian callout that starts with a marker", () => {
+    const source = "> [!note] Title\n> 1.\n> more words\n";
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    const result = format(source, { config: { ...wrap(), dialect: "obsidian" }, workspace });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toEqual([]);
+  });
+  it("keeps a bare colon on Forgejo and Gitea, where it could start a definition", () => {
+    const source = "Term\n\n:\nDefinition text\n";
+    expect(verify(source, { ...wrap(), dialect: "forgejo" }).output).toBe(source);
+    expect(verify(source, { ...wrap(), dialect: "gitea" }).output).toBe(source);
+    expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(
+      "Term\n\n: Definition text\n",
+    );
+  });
+  it("reports such a paragraph as not reflowed on request", () => {
+    const source = "Sub\n- 1.\nmore words that make this paragraph longer than forty columns\n";
+    const result = verify(source, wrap({ reportUnreflowed: true }));
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: leading block marker (width 40 columns).",
+    ]);
+    expect(lint(source, { config: wrap() })).toEqual([]);
+  });
+  it.each([
+    "-5 degrees",
+    "#hashtag",
+    "*emphasis*",
+    "1.5 litres",
+    "1234567890. ten digits",
+    "2024 was",
+  ])("still reflows a paragraph that starts with %j", (start) => {
+    const source = `${start} and many more words than forty columns allow here.\n`;
+    const output = verify(source, wrap()).output;
+    expect(output).not.toBe(source);
+    expect(output.replace(/\n(?!$)/g, " ")).toBe(source);
+  });
+});
 describe("Forgejo syntax", () => {
   const forgejo: Config = { ...wrap(), dialect: "forgejo" };
   const github: Config = { ...wrap(), dialect: "github" };
