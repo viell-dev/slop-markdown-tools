@@ -289,8 +289,14 @@ count separately. Container prefixes count toward the width in either mode.
 
 `reportUnreflowed: true` reports breakable over-width lines in paragraphs
 protected by hard breaks, block IDs, inline HTML, callout headers, Forgejo or
-Gitea definition lists, display math, line-spanning inline syntax, or the Gitea
-`_.py` emphasis exception, or unsupported multiline syntax or containers.
+Gitea definition lists, display math, line-spanning inline syntax, the Gitea
+`_.py` emphasis exception, a leading block marker, or unsupported multiline
+syntax or containers. A paragraph has a leading block marker when its first word
+is a bare list, heading, or quote marker (`-`, `+`, `*`, `1.`, `1)`, `#`, `>`),
+or on Forgejo and Gitea a bare `:`, and more words follow. The parser reads such
+a marker as text only where it cannot open its block, such as the second `-` of
+a list item `- -` directly below a paragraph, whose text then continues on the
+next line. Joining the next word to the marker would open the block.
 `reportUnbreakable: true` reports overflow from an atom that cannot be split,
 including in protected paragraphs. Whitespace inside a link, code span, or other
 protected inline node is not a wrapping opportunity, nor is whitespace inside a
@@ -443,7 +449,11 @@ intersecting it; a paragraph spanning a disabled line is therefore preserved as
 a whole. An enable directive closes matching disabled regions; `enable` without
 names closes all. Directives inside code are ordinary code. `disable-next-line`
 targets the immediately following physical line, including a blank line; place
-it directly above the content to suppress.
+it directly above the content to suppress. Lines end at a line feed, a carriage
+return, or both, as in CommonMark. Versions up to `0.2.0-rc.2` looked only for
+line feeds, so the directive did nothing in a document whose lines end with a
+carriage return alone, and in a document that mixes line endings it could apply
+to the wrong line or to two lines.
 
 ## Selection, output, and exit codes
 

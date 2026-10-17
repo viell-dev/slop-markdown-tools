@@ -78,10 +78,11 @@ suppress formatting around those constructs or use standalone comment blocks.
 
 The source-preserving wrapper supports ordinary paragraphs, list items, and
 blockquote containers. It preserves explicit hard-break paragraphs, lazy/unusual
-continuations it cannot safely reconstruct, and paragraphs carrying block IDs.
-Long unbreakable atoms can exceed the width. Intraword emphasis retains
-asterisks when underscores would change parsing. Formatting width is a target,
-not a license to split protected syntax.
+continuations it cannot safely reconstruct, paragraphs carrying block IDs, and
+paragraphs whose first word is a bare block marker that joining the next word
+would turn into a block. Long unbreakable atoms can exceed the width. Intraword
+emphasis retains asterisks when underscores would change parsing. Formatting
+width is a target, not a license to split protected syntax.
 
 Dollar math is read by a tokenizer of the project's own, with the conditions
 that each renderer was observed to apply to `$…$` in running text. The rule for
