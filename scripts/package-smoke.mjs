@@ -141,7 +141,7 @@ try {
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
+      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -157,6 +157,7 @@ try {
     "THIRD_PARTY_NOTICES",
     "README.md",
     "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "examples/README.md",
