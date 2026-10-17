@@ -256,8 +256,8 @@ file. Absolute filesystem paths are never written. These are left as written: a
 wikilink without a label, whose target is also its visible text; reference
 definitions, which are checked but not rewritten; autolinks; and links whose
 target is uncertain because a directory could not be read or the workspace root
-is only part of a vault (see
-[Obsidian vaults](obsidian.md#a-workspace-root-inside-a-vault)).
+is only part of a vault (see [Obsidian
+vaults](obsidian.md#a-workspace-root-inside-a-vault)).
 
 With `{ "style": "relative", "leadingDot": true }` in `README.md`, before:
 
@@ -407,8 +407,8 @@ setting, Obsidian's Reading view shows every line break in a paragraph, so
 joining or breaking lines would change what the note looks like. The setting is
 `"strictLineBreaks": true` in the vault's `.obsidian/app.json`; the tool reads
 it and never changes it. The finding is at line 1, and its message begins
-`Obsidian's "Strict line breaks" setting is not known to be on`. See
-[Obsidian vaults](obsidian.md#enable-wrapping).
+`Obsidian's "Strict line breaks" setting is not known to be on`. See [Obsidian
+vaults](obsidian.md#enable-wrapping).
 
 ## `structure/duplicate-heading`
 
@@ -575,8 +575,8 @@ or what a comment applies to:
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
 emphasis there. A marker that would touch another `*` or `_` and change how the
-text parses is left as written, and so are the exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea).
+text parses is left as written, and so are the exceptions of [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea).
 
 Before:
 
@@ -621,9 +621,10 @@ After:
 Joins a code span that is written across lines onto one line. A line break
 inside a code span renders as a space, so the content stays the same. Some
 editors, such as Obsidian's Live Preview, show a split code span differently
-from the rendered page, and `style/wrap` leaves a paragraph with a split code
-span as written. The exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea) apply.
+from the rendered page. `style/wrap` joins such a code span only in a paragraph
+that it wraps, and this rule also elsewhere, such as in a paragraph with a hard
+line break. The exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea)
+apply.
 
 Before:
 
@@ -683,10 +684,20 @@ After:
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
 line break inside a paragraph renders as a space, so the rendered text stays the
-same, and short lines keep diffs small. Lines are broken only at spaces in the
-text: a link, a code span, math, or a word longer than the line stays whole and
-can overflow. List markers, block quote markers, and indentation count toward
-the width.
+same, and short lines keep diffs small. Lines are broken at spaces in the text,
+also in the text of a link, emphasis, strong text, or strikethrough. A code
+span, an image, math, a link's destination, and a word longer than the line stay
+whole and can overflow; a code span or an image description written across lines
+is joined onto one. List markers, block quote markers, and indentation count
+toward the width, a tab up to the next multiple of four columns.
+
+A word that would start a block at the start of a line, such as a list marker,
+`#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
+on the line before it. A word that only starts like one, such as `--config`,
+`#tag`, or `-5`, can start a line. The first line keeps more than one word when
+its first word alone would open a block, such as `***` or `$$`, and keeps a
+paragraph that starts like a link reference definition (`[Note]: see …`) from
+becoming one.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -701,8 +712,9 @@ the width.
 - `reportUnreflowed`: report a paragraph that is too wide but left as written,
   with the reason.
 - `reportUnbreakable`: report a line that stays too wide because of something
-  that cannot be split, also in paragraphs left as written. An Obsidian
-  callout's title line counts as one such piece, even when it contains spaces.
+  that cannot be split, also in paragraphs left as written. The line of an
+  alert's or a callout's marker counts as one such piece, even when it contains
+  spaces.
 
 The two report options propose no edits and use the rule's severity. To make
 them fail a check, set the rule to `error` or pass `--max-warnings 0`;
@@ -712,10 +724,13 @@ A paragraph is left as written when joining or breaking its lines could change
 what it means, that is, when it:
 
 - has a hard line break, inline HTML, or a block identifier (`^id`) at its end;
-- has inline syntax, such as a link or a code span, that spans lines, or lines
-  whose container markers the tool cannot reproduce;
-- starts with an alert or callout marker such as `[!NOTE]`; in an Obsidian
-  callout, only the title line stays as it is, and the body is wrapped;
+- has a line break that is content, inside math, inline HTML, an Obsidian
+  comment, or a link's destination or title, or one inside a code span whose
+  next line starts with a space or tab, which renderers read differently;
+- has lines whose container markers the tool cannot reproduce;
+- starts with an alert or callout marker such as `[!NOTE]` in the CommonMark
+  dialect; in the other dialects only the line with the marker, and an Obsidian
+  callout's title on it, stays as it is, and the body is wrapped;
 - starts with a bare `-`, `+`, `*`, `1.`, `1)`, `#`, or `>` followed by more
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's
@@ -723,9 +738,9 @@ what it means, that is, when it:
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 
-In the Obsidian dialect, the rule wraps only with the vault's
-[strict line breaks](obsidian.md#enable-wrapping).
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea) add their own cases.
+In the Obsidian dialect, the rule wraps only with the vault's [strict line
+breaks](obsidian.md#enable-wrapping). [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea) add their own cases.
 
 With `{ "width": 40 }`, before:
 

@@ -79,11 +79,16 @@ describe("direct Obsidian callout body reflow", () => {
   it("reflows multiple body source lines while preserving inline atoms", () => {
     const source =
       "> [!note] Title with `code`\n> Text with **strong words**, [a link](https://example.test),\n> `code words`, and enough ordinary words to wrap several times.\n";
-    const result = verify(source);
-    expect(result.output).not.toBe(source);
-    expect(result.output).toContain("[a link](https://example.test)");
-    expect(result.output).toContain("**strong words**");
-    expect(result.output).toContain("`code words`");
+    expect(verify(source).output).toBe(
+      "> [!note] Title with `code`\n> Text with **strong words**, [a\n> link](https://example.test),\n> `code words`, and enough ordinary\n> words to wrap several times.\n",
+    );
+  });
+
+  it("joins a code span that the body writes across lines", () => {
+    const source = `> [!info] Title\n> ${body} with \`multiline\n> code\`.\n`;
+    expect(verify(source).output).toBe(
+      "> [!info] Title\n> A body line with enough ordinary words\n> to wrap across several lines without\n> changing its meaning. with\n> `multiline code`.\n",
+    );
   });
 
   it("keeps header diagnostics separate from reflow and unbreakable body atoms", () => {
@@ -113,7 +118,7 @@ describe("direct Obsidian callout body reflow", () => {
     `> [!info] Title\n> ${body}\\\n> Next line.\n`,
     `> [!info] Title\n> ${body} ^block\n`,
     `> [!info] Title\n> ${body} <b>HTML</b>\n`,
-    `> [!info] Title\n> ${body} with \`multiline\n> code\`.\n`,
+    `> [!info] Title\n> ${body} with $multiline\n> math$.\n`,
     `> [!info] Title with \`multiline\n> code\` ${body}\n`,
     `> [!info] Title with **multiline\n> emphasis** ${body}\n`,
     `> [!info] Title\n${body}\n`,
@@ -158,11 +163,11 @@ describe("direct Obsidian callout body reflow", () => {
     expect(result.output).toContain(">\n> > [!tip]- Inner\n");
   });
 
-  it("does not enable callout body reflow in other dialects", () => {
+  it("does not enable callout body reflow in CommonMark, which has no callouts", () => {
     const source = `> [!info] Title\n> ${body}\n`;
-    for (const dialect of ["commonmark", "github"] as const) {
-      expect(format(source, { config: { ...config, dialect }, workspace }).output).toBe(source);
-    }
+    expect(format(source, { config: { ...config, dialect: "commonmark" }, workspace }).output).toBe(
+      source,
+    );
   });
 
   it("rejects edits that move words between the title and body", () => {
@@ -211,5 +216,92 @@ describe("direct Obsidian callout body reflow", () => {
       },
     });
     expect(result.output.startsWith("> [!info]- _Custom title_\n")).toBe(true);
+  });
+});
+
+describe("GitHub, Forgejo, and Gitea alert bodies", () => {
+  const alerts = ["github", "forgejo", "gitea"] as const;
+  function check(source: string, dialect: (typeof alerts)[number], options = {}) {
+    const settings: Config = {
+      extends: [],
+      dialect,
+      rules: { "style/wrap": ["warn", { width: 40, ...options }] },
+    };
+    const result = format(source, { config: settings });
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(semanticFingerprint(parse(result.output, dialect))).toBe(
+      semanticFingerprint(parse(source, dialect)),
+    );
+    expect(format(result.output, { config: settings }).output).toBe(result.output);
+    return result;
+  }
+  it.each(alerts)("keeps the marker line and wraps the body in the %s dialect", (dialect) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      for (const [prefix, continuation] of [
+        ["> ", "> "],
+        ["- > ", "  > "],
+        ["> > ", "> > "],
+      ] as const) {
+        for (const marker of ["[!NOTE]", "[!warning]", "[!TIP]"]) {
+          const header = `${prefix}${marker}${newline}`;
+          const source = `${header}${continuation}${body}${newline}`;
+          const { output } = check(source, dialect);
+          expect(output.startsWith(header)).toBe(true);
+          const lines = output.slice(header.length).split(newline).slice(0, -1);
+          expect(lines.length).toBeGreaterThan(1);
+          expect(lines.every((line) => line.startsWith(continuation) && line.length <= 40)).toBe(
+            true,
+          );
+          expect(lines.map((line) => line.slice(continuation.length)).join(" ")).toBe(body);
+        }
+      }
+    }
+  });
+  it.each(alerts)("keeps words after the marker on its line in the %s dialect", (dialect) => {
+    const header = "> [!NOTE] Words that follow the marker on its line and run past the width\n";
+    const source = `${header}> ${body}\n`;
+    const result = check(source, dialect, { reportUnbreakable: true });
+    expect(result.output).toBe(
+      `${header}> A body line with enough ordinary words\n> to wrap across several lines without\n> changing its meaning.\n`,
+    );
+    expect(result.diagnostics.map((item) => [item.line, item.message])).toEqual([
+      [1, "Paragraph exceeds 40 columns because of an unbreakable atom."],
+    ]);
+  });
+  it("leaves a marker without a body, and an alert's other paragraphs, to the usual rules", () => {
+    expect(check("> [!NOTE]\n", "github").output).toBe("> [!NOTE]\n");
+    const source = `> [!NOTE]\n>\n> ${body}\n`;
+    expect(check(source, "github").output).toBe(
+      "> [!NOTE]\n>\n> A body line with enough ordinary words\n> to wrap across several lines without\n> changing its meaning.\n",
+    );
+  });
+  it("refuses an edit that moves words onto the marker line", () => {
+    const source = "> [!NOTE]\n> Body words.\n";
+    const output = "> [!NOTE] Body\n> words.\n";
+    expect(semanticFingerprint(parse(output, "github"))).not.toBe(
+      semanticFingerprint(parse(source, "github")),
+    );
+    const plugin: Plugin = {
+      name: "unsafe",
+      rules: {
+        boundary: {
+          kind: "style",
+          description: "Move a body word onto the marker line",
+          check: () => [
+            {
+              start: 0,
+              message: "Unsafe edit",
+              edit: { start: 0, end: source.length, text: output },
+            },
+          ],
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "github", rules: { "unsafe/boundary": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(true);
   });
 });

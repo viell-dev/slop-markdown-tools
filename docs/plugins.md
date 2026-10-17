@@ -1,9 +1,9 @@
 # Plugins
 
 A plugin adds rules, presets, and syntax to the built-in ones. It is a
-JavaScript module whose default export is a plugin object. The
-[plugin example](examples.md#write-a-plugin) is a complete plugin with a problem
-rule and a style rule to start from.
+JavaScript module whose default export is a plugin object. The [plugin
+example](examples.md#write-a-plugin) is a complete plugin with a problem rule
+and a style rule to start from.
 
 ## A plugin
 
@@ -108,11 +108,11 @@ names it, even while the rule is off.
 A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
 for at most eight passes. After each phase that changes the document, it parses
-the result again and compares its meaning with the original's; the
-[safety model](design.md#safety-model) describes what happens to edits that
-overlap or would change the meaning. The comparison covers the syntax tree, not
-every application's rendering, and it constrains the text a rule returns, not
-what its code does.
+the result again and compares its meaning with the original's; the [safety
+model](design.md#safety-model) describes what happens to edits that overlap or
+would change the meaning. The comparison covers the syntax tree, not every
+application's rendering, and it constrains the text a rule returns, not what its
+code does.
 
 ## Resolve links in a rule
 
@@ -177,9 +177,8 @@ The other fields are present when they apply:
   the Obsidian dialect, a search by note name that finds nothing readable
   resolves as `unreadable`, and one that finds a single note resolves with
   `unreadable` set, because the unreadable directories may hold another note of
-  that
-  name. **A rule must not rewrite a `resolved` link whose `unreadable` is set**,
-  and the engine refuses an edit that changes such a link's destination.
+  that name. **A rule must not rewrite a `resolved` link whose `unreadable` is
+  set**, and the engine refuses an edit that changes such a link's destination.
 - `vault`: the vault's directory, when an Obsidian link was resolved in a vault
   below the workspace root. `rooted`: the target's vault-relative path, when it
   differs from `target`. `outside`: with status `missing`, an existing file that

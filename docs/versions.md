@@ -39,8 +39,8 @@ change reaches your documents.
 From 0.2.0, the first stable release, npm's `latest` tag names the newest stable
 release. Release candidates and betas are published under the tags `rc` and
 `beta` and leave `latest` alone. Only the newest release line receives fixes;
-see the
-[security policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
+see the [security
+policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
 This site describes the newest stable release.
 
 A version named in the repository is not necessarily published. The registry is
@@ -50,6 +50,6 @@ the source of truth:
 npm view mdrefine versions
 ```
 
-Each release has a
-[GitHub release](https://github.com/viell-dev/slop-markdown-tools/releases) with
-the tested package and its checksum.
+Each release has a [GitHub
+release](https://github.com/viell-dev/slop-markdown-tools/releases) with the
+tested package and its checksum.
