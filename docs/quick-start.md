@@ -59,8 +59,8 @@ Create `mdtools.config.jsonc` at the root of your documents:
 }
 ```
 
-The `$schema` line lets your editor complete and check the settings; see
-[JSON Schema](configuration.md#json-schema).
+The `$schema` line lets your editor complete and check the settings; see [JSON
+Schema](configuration.md#json-schema).
 
 `recommended` wraps prose at 80 columns, writes emphasis as `_text_` and strong
 text as `**text**`, ends every file with a line break, and checks local links.

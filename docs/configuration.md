@@ -110,8 +110,8 @@ plugin's presets are named with the plugin's name as a prefix, such as
 
 A rule's setting is its severity, `"off"`, `"warn"`, or `"error"`, or a list of
 the severity and the rule's options, as in `["warn", { "width": 100 }]`; a list
-of the severity alone, `["warn"]`, keeps the rule's default options. The
-[rules reference](rules.md) lists every rule and its options.
+of the severity alone, `["warn"]`, keeps the rule's default options. The [rules
+reference](rules.md) lists every rule and its options.
 
 `format` applies the edits of every enabled style rule, whether its severity is
 `warn` or `error`. Problem rules only report. Errors make `lint` and `format`
@@ -147,8 +147,8 @@ Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names
 start with a dot, too. Patterns match letter case exactly on every system, so
 that a configuration selects the same files in CI on Linux as on Windows or
-macOS, where `.gitignore` files and patterns on the command line
-[ignore case](cli.md#which-files-are-processed).
+macOS, where `.gitignore` files and patterns on the command line [ignore
+case](cli.md#which-files-are-processed).
 
 ## Ignored files and link targets
 
