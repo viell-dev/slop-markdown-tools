@@ -132,8 +132,8 @@ export interface ProcessOptions {
   /**
    * The dialect to assume when the configuration names none for the document;
    * `github` when omitted. A dialect named by the configuration, a preset, or a
-   * matching override takes precedence. The CLI passes `obsidian` when the
-   * workspace root is an Obsidian vault.
+   * matching override takes precedence. The CLI passes `obsidian` for a
+   * document inside an Obsidian vault, wherever the vault lies in the workspace.
    */
   defaultDialect?: DialectName;
 }
