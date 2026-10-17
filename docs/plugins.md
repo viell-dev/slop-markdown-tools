@@ -1,235 +1,11 @@
-# Plugins and library API
+# Plugins
 
-The public API is exported from `mdrefine`. Follow the
-[installation guide](quick-start.md) to install the npm package or build a
-checkout as a local dependency. The API is provisional until a stable release.
+A plugin adds rules, presets, and syntax to the built-in ones. It is a
+JavaScript module whose default export is a plugin object. The
+[plugin example](examples.md#write-a-plugin) is a complete plugin with a problem
+rule and a style rule to start from.
 
-## Library calls
-
-```ts
-import { createWorkspace, format, lint } from "mdrefine";
-
-const files = {
-  "note.md": "A *short* note with [a link](target.md).\n",
-  "target.md": "# Target\n",
-};
-const options = {
-  path: "note.md",
-  config: { extends: ["recommended", "github"] },
-  workspace: createWorkspace(files, { dialect: "github" }),
-};
-
-const diagnostics = lint(files["note.md"], options);
-const result = format(files["note.md"], options);
-// result: { output, changed, diagnostics }
-```
-
-Library calls do not read or write files; the
-[library examples](examples.md#call-the-library) include a script that reads a
-folder and builds the workspace from it. `path` and workspace keys use
-forward-slash paths relative to the workspace root. Use `null` values for
-non-Markdown attachments. A Markdown value can also be a synchronous loader
-`() => string`; `createWorkspace` calls it only when that target needs fragment
-validation, then keeps the target's anchors, not its text or its parsed form.
-The anchors of Obsidian, of GitHub and CommonMark, and of Forgejo and Gitea
-differ, so the loader is called once more when a later link to that target is
-checked for a dialect of another of these groups; `0.2.0-rc.1` and earlier
-called it at most once and kept the parsed target. Callers must provide a stable
-source snapshot for each workspace instance. The CLI provides its own
-per-invocation file loaders. `WorkspaceOptions.directories` can list existing
-empty directories; parent directories of file entries are inferred. Resolution
-returns `status: "directory"` for a directory instead of `"missing"`. Only a
-target named `.md` or `.markdown`, or `.md` for an Obsidian link, is read for
-headings; versions up to `0.2.0-rc.2` read only `.md` targets.
-
-`WorkspaceOptions.unreadable` lists existing directories whose contents the host
-could not read. A link that leads into one resolves with `status: "unreadable"`
-instead of `"missing"`, and the result's `unreadable` field names the
-directories that stand in the way. In the Obsidian dialect, a search by note
-name that finds nothing also resolves as `"unreadable"`. One that finds a single
-note is `"resolved"` with `unreadable` set, because those directories may hold
-another note of that name. The same marks a note found beside the linking note
-when the vault-root path of that spelling leads into an unreadable directory,
-where Obsidian would look first. A rule must not rewrite such a link:
-`links/path` and `links/notation` leave it as written, and the engine refuses an
-edit by any rule that changes its destination, because only the same spelling is
-known to name the same note. The CLI passes the directories it
-[skipped](configuration.md#paths-that-cannot-be-read). A loader that throws an
-error whose `code` is `EACCES` or `EPERM`, as Node.js does for a file the
-process is not permitted to read, or `EBUSY`, as it does on Windows for a file
-that another program has locked, makes a link to a heading or block in that file
-resolve as `"unreadable"` too, with `target` set and `unreadable` naming the
-file; a link to the file without a fragment still resolves. So does an error
-with the code `ERR_ENCODING_INVALID_ENCODED_DATA`, for a file that is not UTF-8
-text: a `TextDecoder` created with `fatal: true` throws one for bytes that are
-not valid in its encoding. Versions up to `0.2.0-rc.2` let that error through.
-Any other error from a loader propagates. Versions up to `0.2.0-rc.1` have
-neither the option nor the status, and let every loader error through.
-
-`WorkspaceOptions.vaults` lists folders below the workspace root that are
-Obsidian vaults of their own. An Obsidian link in a note of such a vault is
-resolved within it: a path is counted from the vault's folder, and a search by
-name looks only at the vault's files. The result's `vault` field then names the
-folder, also when nothing was found; `target` stays relative to the workspace
-root, so a rule that writes a path from the vault removes that prefix. A path
-that names an existing file or folder outside the vault resolves as `"missing"`
-with that file in `outside`. Notes outside the listed folders, and all other
-dialects, resolve as without the option. The CLI passes the vaults it found
-below the root. Versions up to `0.2.0-rc.1` have neither the option nor the
-fields.
-
-`WorkspaceOptions.rootInVault` is for a workspace whose root is a folder of an
-Obsidian vault: the root's path from the vault's folder, such as
-`Projects/Notes`. The rest of the vault is then out of sight, and an Obsidian
-link whose target could lie there resolves as `"unreadable"`, not `"missing"`. A
-target found by a search, or in a place that Obsidian tries after one outside
-the root, is `"resolved"` with `unreadable` set and so is not rewritten. In both
-cases the `unreadable` list holds an entry that starts with `..`, the way from
-the root to the vault's folder. A resolved link also carries `rooted`, the
-target's path from the folder of its vault, whenever that differs from `target`;
-this applies to a vault listed in `vaults` as well. The CLI passes the option
-when it finds the vault above the root. Versions up to `0.2.0-rc.1` do not have
-it.
-
-Without a workspace, local target checks and path rewriting are unavailable.
-Obsidian reflow also requires an explicit `workspace.strictLineBreaks: true`;
-callers are responsible for verifying that renderer setting.
-
-A document is read in the dialect its configuration names: through `dialect`, a
-preset, or a matching override. When none of them does, including when `config`
-is omitted, `lint`, `format`, and `resolveConfig` assume `github`, and
-`createWorkspace` parses link targets as `github` when
-`WorkspaceOptions.dialect` is omitted. Version 0.2.0-rc.1 and earlier assumed
-`commonmark` in both places; name it to keep that reading. Give the workspace
-the dialect of the documents that link into it.
-
-A host that knows more than the configuration says can change what is assumed,
-without overriding a dialect that the configuration does name. Pass
-`defaultDialect` in the options of `lint` and `format`, or as the fourth
-argument of `resolveConfig(config, path, plugins, defaultDialect)`; it accepts a
-dialect or an alias. The library reads no files and so recognizes nothing by
-itself: the CLI passes `obsidian` for a document that has a `.obsidian` folder
-in its own folder or in one above it, and gives the workspace that vault's
-`strictLineBreaks` setting. A host for vaults should do the same.
-
-```ts
-// The host found `.obsidian/` at the root of the folder it read `files` from.
-const defaultDialect = "obsidian";
-const { dialect } = resolveConfig(config, "Note.md", [], defaultDialect);
-const workspace = createWorkspace(files, { dialect, strictLineBreaks });
-const result = format(files["Note.md"], { path: "Note.md", config, workspace, defaultDialect });
-```
-
-### Part of a document
-
-An editor's "format selection", or an agent that changed one paragraph, can
-limit `lint` and `format` to parts of a document with `ranges`: a list of
-`{ start, end }` UTF-16 offsets into the source as given, half-open like edits.
-Each range is widened to the complete blocks that it touches: paragraphs,
-headings, tables, code blocks, HTML blocks, math blocks, front matter, and link
-definitions, also inside lists and block quotes, where a range inside one item
-selects that item's paragraph only. A selected block takes in its whole lines,
-such as a list item's marker or a quote's `>` before it, and the line breaks
-just before and after them, so that the blank lines between it and its neighbors
-can be added or removed. A non-empty range touches the blocks whose lines it
-overlaps; an empty range, a cursor position, touches the block on whose lines it
-is. A range that touches no block, such as one in a run of blank lines, selects
-nothing.
-
-```ts
-const source = "Legacy *word* stays.\n\nChange *this paragraph*.\n";
-const start = source.indexOf("Change");
-const result = format(source, { config, ranges: [{ start, end: start }] });
-// result.output: "Legacy *word* stays.\n\nChange _this paragraph_.\n"
-// result.scope: [{ start: 21, end: 47 }]: the paragraph and its line breaks
-```
-
-The whole document is still parsed and checked, so link definitions, suppression
-comments, and the workspace work as without the option. `lint` returns the
-diagnostics that start in the selected parts; a finding belongs to the block
-where the rule reports it, such as a reference link's target at its definition.
-`format` applies only edits that lie wholly in the selected parts, across all
-its phases and passes, and leaves the rest of the text byte for byte as it was.
-An edit that reaches outside them is not applied, and its diagnostic is still
-reported. The semantic check still compares the whole document, and an `engine/`
-diagnostic is always reported. `FormatResult.scope` gives the selected parts in
-the output's positions, moved and resized by the edits applied in them, so it
-can be passed as `ranges` again. Without `ranges` the whole document is
-processed; an empty list processes nothing. A range outside the source, with
-`start` after `end`, or with offsets that are not integers is an error. The CLI
-has no option for this.
-
-`parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
-`configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
-`builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
-exported. `range(node)` returns `[start, end]` UTF-16 offsets into
-`document.source`. That is the text given to `parse`, without a byte order mark
-(U+FEFF) at its start, which some editors write in UTF-8 files; rules never see
-the mark. `lint` and `format` report positions and edits in the text as given,
-mark included, so `applyEdits` applies them to that text, and formatted output
-keeps the mark. `0.2.0-rc.2` and earlier kept the mark in `document.source`
-while the positions in the tree skipped it. `configSchema` is the
-configuration's JSON Schema, and `validateConfig(value)` throws when a value
-does not match it; rule-specific schemas live on rule objects.
-`canonicalDialect(name)` maps an alias such as `codeberg` to the dialect that
-rules and the workspace see (`forgejo`); `document.dialect` is always canonical.
-
-## Files on disk
-
-The main entry never touches the filesystem. A host on Node.js that wants the
-CLI's choice of files without running the CLI imports `discoverWorkspace` from
-the separate entry `mdrefine/node`:
-
-```ts
-import { lint } from "mdrefine";
-import { discoverWorkspace } from "mdrefine/node";
-
-const discovery = await discoverWorkspace({ root: "/path/to/documents", config });
-for (const name of discovery.selected)
-  console.log(name, lint(discovery.read(name), discovery.options(name)));
-```
-
-Discovery is the CLI's own; the CLI calls the same function. It finds the files
-below `root`, honors `.gitignore` files and the configuration's `ignore` and
-`resolve` settings, leaves out nested repositories, symbolic links, and what the
-system does not let it read, and recognizes each document's Obsidian vault. It
-reads no configuration file and writes nothing: pass the configuration as
-`config`, with `plugins` for any plugin objects, and write results yourself.
-
-- `inputs` are files, folders, and glob patterns to select, absolute or relative
-  to `root`, not to the current directory, as the CLI
-  [selects them](configuration.md#selection-output-and-exit-codes): a folder or
-  pattern selects the `.md` and `.markdown` files that are not ignored, a file
-  is selected whatever its name, and an ignored file or folder is an entry of
-  `skipped` with the code `IGNORED`. Omitted, every document is selected; an
-  empty list selects none. The other files remain link targets either way.
-- `exclude` lists files and folders to leave out of the selection, as paths, not
-  patterns; they also remain link targets.
-- `documents` gives text for paths relative to `root`, such as an editor's
-  unsaved buffer or text read from stdin. Those documents are selected, and the
-  workspace reads that text in place of a file at the path, also where no file
-  exists.
-
-The result has `root`, the root's real path; `selected`, the documents to
-process as forward-slash paths relative to it, sorted; and `skipped`, what
-discovery left out, with the entries of the CLI's JSON report (`path`, `type`,
-`code`, and `message`). `read(name)` returns a selected document's text: a file
-is read when it is first needed and then kept, so one result is a snapshot for
-one run; create a new one after files change. An error with the code `EACCES`,
-`EPERM`, or `EBUSY` means that the system did not let the file be read, and one
-with the code `ERR_ENCODING_INVALID_ENCODED_DATA` that the file is not
-[UTF-8 text](configuration.md#paths-that-cannot-be-read), as its message says,
-such as `Not UTF-8 text: notes/old.md (byte 0xE9 on line 1 is not valid UTF-8)`;
-the CLI reports such a file with `engine/unreadable-file`. Versions up to
-`0.2.0-rc.2` returned the text of a file that is not UTF-8 with U+FFFD in place
-of what could not be decoded. `options(name)` returns what the CLI passes to
-`lint` and `format` for the document: its `path`, `config` and `plugins`, a
-`workspace` for its dialect with its vault's `strictLineBreaks` setting, and
-`defaultDialect: "obsidian"` for a note in a vault. Both throw for a name that
-is not selected. A root or input that cannot be used is an error in the CLI's
-words, such as `Input does not exist: notes/absent.md`.
-
-## Rule plugins
+## A plugin
 
 Create `rules.mjs` beside the configuration:
 
@@ -256,7 +32,7 @@ export default {
 };
 ```
 
-Load it with:
+and load it from the configuration:
 
 ```json
 {
@@ -265,68 +41,87 @@ Load it with:
 }
 ```
 
-Each `plugins` entry names a module whose default export is a plugin object. An
-entry that starts with `.` or is an absolute path names a file, relative to the
-configuration file's directory. Any other entry is resolved the way Node.js
-resolves an `import` written in the configuration file, with the conditions that
-Node.js itself applies: its defaults, those added with `--conditions` or `-C`,
-and without `node-addons` under `--no-addons`, whether the option is on
-Node.js's command line or in `NODE_OPTIONS`. Options set in any other way, such
-as a Node.js configuration file, are not seen. `0.2.0-rc.1` and earlier applied
-no added conditions. Usually such an entry names an installed package,
-optionally with a subpath: `sample-plugin`, `@scope/sample-plugin`, or
-`sample-plugin/rules`. The package's entry can be an `import` or `default`
-condition of its `exports`, or its `main` file. When an import finds no entry,
-the lookup falls back to Node.js's CommonJS rules, so a package that declares
-only a `require` condition loads too. A package with both an `import` and a
-`require` entry is loaded through its `import` entry. `0.2.0-rc.1` and earlier
-used only the CommonJS rules, so they could not load a package that declares
-only an `import` condition, and loaded a package with both entries through
-`require`.
+`name` is the plugin's prefix: a lowercase identifier that starts with a letter
+and holds letters, digits, and hyphens, unique among the loaded plugins. Its
+rules are named `name/rule` and its presets `name/preset`; a rule ID that
+already exists is an error. A plugin can also provide `syntax`, described
+[below](#syntax-extensions). The library takes plugin objects through its
+`plugins` option; a list of strings in a library configuration loads nothing.
 
-A plugin that cannot be found or loaded stops the command with exit status `2`
-and a message of the form
-`Cannot load plugin "sample-plugin" named in FILE: REASON`. `FILE` is the
-configuration file and `REASON` is Node.js's own, such as
-`Cannot find package 'sample-plugin' imported from FILE`. For an entry that
-names a file, the reason is `no file at PATH` when nothing is there or the path
-is a folder. A module whose default export is not an object with a string `name`
-is reported as `Invalid plugin "sample-plugin" named in FILE`. `0.2.0-rc.1` and
-earlier printed Node.js's reason alone.
+## Loading
 
-Library callers pass plugin objects directly through `plugins`; a string list in
-a library configuration does not perform module loading. Plugin names must be
-unique lowercase identifiers beginning with a letter, using letters, digits, and
-hyphens. Rule IDs are namespaced as `plugin-name/rule-name`; collisions are
-rejected.
+The configuration's `plugins` entries are loaded when the configuration is, and
+run with the caller's permissions; plugins are not sandboxed. An entry that
+starts with `.` or is an absolute path names a file, relative to the
+configuration file's directory. Any other entry is resolved as Node.js resolves
+an `import` written in the configuration file, such as `sample-plugin`,
+`@scope/sample-plugin`, or `sample-plugin/rules`. The package's entry can be an
+`import` or `default` condition of its `exports`, or its `main` file. When the
+import finds no entry, Node.js's CommonJS rules are tried, so a package that
+declares only a `require` condition loads as well; a package with both is loaded
+through `import`. The lookup applies the conditions that Node.js applies: its
+defaults, those added with `--conditions` or `-C`, and without `node-addons`
+under `--no-addons`, from Node.js's command line or `NODE_OPTIONS`. Options set
+in other ways, such as a Node.js configuration file, are not seen.
 
-`check` receives the parsed `document`, configured `options`, and optional
-`workspace`. Return a list of findings containing `start`, optional `end`,
-`message`, and optional `edit`. A rule may declare a JSON Schema in `schema` to
-validate its options. Rules are synchronous and should not mutate the document,
-perform I/O, or retain invocation-specific state.
+A plugin that cannot be loaded stops the command with exit code `2` and the
+message `Cannot load plugin "NAME" named in FILE: REASON`, where `REASON` is
+Node.js's own, such as `Cannot find package 'sample-plugin' imported from FILE`,
+or `no file at PATH` for a file entry. A module whose default export is not an
+object with a string `name` gives `Invalid plugin "NAME" named in FILE`.
 
-Style rules use `kind: "style"` and can return edits of the form
-`{ start, end, text }`. Their optional `phase` is `inline` (default), `block`,
-or `document`. Problem rules use `kind: "problem"`; their edits are not applied
-by `format`. Formatting runs phases repeatedly until stable, with a limit of
-eight passes. Conflicting edits, oscillation, or a semantic change reject the
-entire document's output.
+## Rules
 
-The [plugin example](examples.md#write-a-plugin) is a complete plugin with a
-problem rule and a style rule to start from. Verify a style rule by formatting
-its output again: a correct rule leaves it unchanged. Plugins execute within the
-host process and are not sandboxed. Semantic checking constrains the returned
-text, not arbitrary JavaScript behavior.
+A rule is an object with a `description`, a `kind`, an optional `schema` and
+`phase`, and a `check` function.
+
+- `kind` is `"problem"` for a rule that only reports, or `"style"` for one that
+  can propose edits, which `format` applies. `format` ignores the edits of
+  problem rules.
+- `schema` is a JSON Schema for the rule's options. The options a configuration
+  gives are checked against it, and a rule without a schema accepts any options.
+  Each schema is compiled once, for all documents.
+- `check({ document, options, workspace })` receives the parsed `document`
+  (`source`, `path`, `dialect`, and `tree`, an
+  [mdast](https://github.com/syntax-tree/mdast) tree with source positions), the
+  configured `options`, and the `workspace`, which is undefined when the host
+  gave none. It returns a list of findings.
+
+A finding has a `message`, a `start` offset, an optional `end`, and, from a
+style rule, an optional `edit` of the form `{ start, end, text }`. Offsets are
+integers that count UTF-16 code units in `document.source`, from 0 to its
+length, with `end` not before `start`; `range(node)` from the library gives a
+node's offsets. `check` must be synchronous, must not change the document or
+perform I/O, and must not keep state between calls.
+
+A rule that throws, or returns anything other than a list of such findings, is
+skipped for that document and reported with an `engine/rule-error` error that
+names it and the reason, as in
+`Rule local/example failed (TypeError: …); the rule was skipped for this document.`
+The other rules and documents are still processed, and the CLI's exit code is
+`2`. An error that the workspace throws, such as a file that cannot be read, is
+not the rule's and is not reported this way. A plugin rule without a `check`
+function, a `kind` of `"style"` or `"problem"`, and a string `description`, or
+with a `phase` or `schema` of another kind, stops the command with an error that
+names it, even while the rule is off.
+
+A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
+`format` runs the phases in that order and repeats them until nothing changes,
+for at most eight passes. After each phase that changes the document, it parses
+the result again and compares its meaning with the original's; the
+[safety model](design.md#safety-model) describes what happens to edits that
+overlap or would change the meaning. The comparison covers the syntax tree, not
+every application's rendering, and it constrains the text a rule returns, not
+what its code does.
 
 ## Resolve links in a rule
 
 A rule asks the workspace where a link leads with
-`workspace.resolve(source, destination, dialect)`: `source` is the path of the
-linking document (`document.path`), `destination` the link's destination as
-written, and `dialect` the document's dialect. The built-in link rules use this
-call and nothing else, so a plugin sees links exactly as they do. `workspace` is
-undefined when the host gave none; a rule should then report nothing.
+`workspace.resolve(source, destination, dialect)`: `source` is the linking
+document's path (`document.path`), `destination` the destination as written, and
+`dialect` the document's dialect. The built-in link rules use the same call, so
+a plugin sees links as they do. Without a workspace, a rule should report
+nothing.
 
 ```js
 export default {
@@ -364,7 +159,7 @@ The result's `status` is one of:
 | `resolved`    | One file matches. `target` is its path from the workspace root.                                               |
 | `missing`     | No file matches.                                                                                              |
 | `ambiguous`   | Several files match and nothing decides between them, such as two notes whose names differ only by case.      |
-| `directory`   | The destination names a folder.                                                                               |
+| `directory`   | The destination names a directory.                                                                            |
 | `external`    | The destination is a URL with a scheme, or starts with `//`. It is not checked.                               |
 | `unavailable` | The destination cannot be judged from files: it starts with `/` or holds a `?`, outside the Obsidian dialect. |
 | `unreadable`  | The target could not be checked, because something that may hold it could not be read.                        |
@@ -372,33 +167,61 @@ The result's `status` is one of:
 The other fields are present when they apply:
 
 - `target`: the file found, with status `resolved`, and with `unreadable` when
-  the file is there but its content could not be read.
-- `fragment`: the part after `#`, decoded, or an empty string.
-- `fragmentExists`: with status `resolved`, whether the target has the heading,
-  block, or anchor that the fragment names, by the rules of `dialect`. It is
-  true when there is no fragment.
-- `unreadable`: what stood in the way; see the paragraphs on
-  `WorkspaceOptions.unreadable` and `rootInVault` above. When it is set on a
-  `resolved` link, the match is uncertain and a rule must not rewrite the link.
-- `vault`, `rooted`, and `outside`: for Obsidian links in a vault that is not
-  the workspace root; see `WorkspaceOptions.vaults` above.
+  the file exists but its content could not be read.
+- `fragment`: the part after `#`, decoded, or an empty string; `fragmentExists`:
+  with status `resolved`, whether the target has that heading, block, or anchor
+  by the rules of `dialect`, and `true` without a fragment.
+- `unreadable`: the directories or the file that stood in the way. An entry that
+  starts with `..` stands for the part of a vault outside the workspace root. In
+  the Obsidian dialect, a search by note name that finds nothing readable
+  resolves as `unreadable`, and one that finds a single note resolves with
+  `unreadable` set, because the unreadable directories may hold another note of
+  that
+  name. **A rule must not rewrite a `resolved` link whose `unreadable` is set**,
+  and the engine refuses an edit that changes such a link's destination.
+- `vault`: the vault's directory, when an Obsidian link was resolved in a vault
+  below the workspace root. `rooted`: the target's vault-relative path, when it
+  differs from `target`. `outside`: with status `missing`, an existing file that
+  the path names outside the vault.
 
-A style rule that rewrites a destination should resolve its replacement as well
-and propose the edit only when both lead to the same `target`. The engine checks
-this again and refuses an edit that changes where a link leads.
+A style rule that rewrites a destination should resolve the new destination as
+well, and propose the edit only when both lead to the same `target`. The engine
+checks this again and refuses an edit that changes where a link leads.
 
 ## Syntax extensions
 
-An advanced plugin can provide `syntax: { micromark, mdast }`, containing
-compatible tokenizer and AST extensions from the micromark/mdast ecosystem.
-Extend the TypeScript mdast node maps for custom node types. Preserve source
-positions and expose meaningful semantic fields: the engine compares node fields
-other than `position` and `data` when checking formatting safety.
+A plugin can provide `syntax: { micromark, mdast }`, a tokenizer extension and a
+tree extension from the [micromark](https://github.com/micromark/micromark) and
+mdast ecosystem. In TypeScript, extend mdast's node maps for the new node types.
+Keep source positions on the nodes, and expose the meaning of a node in its
+fields: the semantic comparison looks at every field except `position` and
+`data`. Syntax that a parser reads as plain text is not safe to format merely
+for that; test the extension's meaning and its source preservation.
 
-This is not a general remark-transform adapter. Existing syntax extensions can
-be reused, but a remark plugin that mutates a tree must be adapted to the
-rule/edit contract. There is no custom link resolver loader in CLI plugins yet;
-library users can supply an implementation of the `Workspace` interface. Unknown
-syntax is not automatically safe merely because a parser treats it as plain
-text; use a supported dialect, an extension, an ignore pattern, or a suppression
-for application-specific constructs.
+This is not a remark plugin adapter. Existing micromark extensions can be
+reused, but a remark plugin that changes the tree must be rewritten as a rule
+that proposes edits. A plugin cannot replace link resolution; a library host can
+pass its own implementation of the `Workspace` interface.
+
+## Test a rule
+
+Call the library with the plugin object, and check what it reports and what
+formatting produces:
+
+```js
+import { format, lint } from "mdrefine";
+import plugin from "./rules.mjs";
+
+const options = {
+  plugins: [plugin],
+  config: { extends: [], rules: { "local/initial-heading": "error" } },
+};
+console.assert(lint("Text.\n", options).length === 1);
+console.assert(lint("# Title\n", options).length === 0);
+const once = format("Text.\n", options).output;
+console.assert(format(once, options).output === once);
+```
+
+A correct style rule leaves its own output unchanged when it runs again, and
+changes nothing when it is turned off. Add a case for every construct the rule
+could misread, such as code, HTML, and each dialect it supports.

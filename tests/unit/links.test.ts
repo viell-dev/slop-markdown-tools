@@ -653,7 +653,7 @@ describe("directories that could not be read", () => {
     expect(run(vault)).toMatchObject({
       output: "[[Known|label]]\n",
       changed: false,
-      diagnostics: [{ rule: "engine/unsafe-format" }],
+      diagnostics: [{ rule: "engine/unsafe-format" }, { rule: "respell/full" }],
     });
   });
   it("reports an unchecked link through links/valid at the rule's severity", () => {
