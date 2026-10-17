@@ -460,7 +460,7 @@ const wrap: Rule = {
           words.push(...splitWords(line, lineAt, protectedRanges));
         }
         if (child.type !== "text") {
-          if (raw.includes("\n")) unsupported = true;
+          if (/[\r\n]/.test(raw)) unsupported = true;
           words.push(lines.join(" "));
         }
       }

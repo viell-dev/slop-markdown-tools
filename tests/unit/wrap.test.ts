@@ -605,6 +605,16 @@ describe("Gitea syntax", () => {
     expect(verify(source, gitea).output).not.toBe(source);
   });
 });
+describe("inline syntax that spans lines", () => {
+  // Issue #201: with CR line endings the line break inside the link went unnoticed.
+  it.each(["\n", "\r\n", "\r"])("leaves the paragraph as written with %j", (newline) => {
+    const config: Config = { extends: [], rules: { "style/wrap": ["warn", { width: 30 }] } };
+    for (const inline of [`[long link${newline}label](https://example.com)`, `*a${newline}b*`]) {
+      const source = `Some text with ${inline} and more words here to wrap.${newline}`;
+      expect(format(source, { config }).output, JSON.stringify(source)).toBe(source);
+    }
+  });
+});
 describe("multiline code spans", () => {
   const config: Config = {
     extends: [],
