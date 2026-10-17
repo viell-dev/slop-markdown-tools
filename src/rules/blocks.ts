@@ -70,41 +70,58 @@ const htmlEnds: [RegExp, RegExp, number][] = [
 function unclosed(node: Nodes): boolean {
   if (node.type === "obsidianComment") return node.value.indexOf("%%", 2) < 0;
   if (node.type !== "html") return false;
+  // The value keeps the block's indentation.
+  const value = node.value.replace(/^[ \t]+/, "");
   for (const [opening, end, from] of htmlEnds)
-    if (opening.test(node.value)) return !end.test(node.value.slice(from));
+    if (opening.test(value)) return !end.test(value.slice(from));
   return false;
 }
 /**
  * Whether a line added directly below `node`, at its own level, would become
  * part of an HTML block or Obsidian comment that `node` ends with and that has
- * no end marker. The parser lets such a block run on through the blank lines
- * of a list item or footnote, and through a final line ending; a blank line
- * ends a block quote and with it the block.
+ * no end marker. The parser lets such an HTML block run on through the blank
+ * lines of a list item or footnote, and through a final line ending, but a
+ * block quote ends it. An Obsidian comment runs on to the end of the document,
+ * whatever contains it.
  */
 export function takesLines(node: Nodes): boolean {
-  while (
-    (node.type === "root" ||
-      node.type === "list" ||
-      node.type === "listItem" ||
-      node.type === "footnoteDefinition") &&
-    node.children.length
-  )
+  let quoted = false;
+  while (containers.has(node.type) && "children" in node && node.children.length) {
+    if (node.type === "blockquote") quoted = true;
     node = node.children.at(-1)!;
-  return unclosed(node);
+  }
+  return unclosed(node) && (node.type === "obsidianComment" || !quoted);
+}
+/**
+ * Whether a line ending added at the end of the document would change its
+ * last block. Besides the blocks of `takesLines`, the parser counts a last
+ * line of blank space in a code or math block that has no closing fence only
+ * when a line ending follows it.
+ */
+export function takesFinalLineEnding(document: Document): boolean {
+  if (takesLines(document.tree)) return true;
+  if (!/(?:^|[\r\n])[ \t]+$/.test(document.source)) return false;
+  const last = lastBlock(document.tree);
+  if ((last.type !== "code" && last.type !== "math") || !located(last)) return false;
+  const fence = codeFence(document.source, last);
+  return fence !== undefined && !fence.close;
 }
 
-/** The fences of a fenced code block: the marker runs, as source ranges. */
+/** The fences of a fenced code or math block: the marker runs, as source ranges. */
 interface Fence {
-  marker: "`" | "~";
+  marker: "`" | "~" | "$";
   open: [number, number];
   /** Absent when the block runs to the end of its container without a closing fence. */
   close?: [number, number];
 }
-/** The fences of a code block, or undefined for an indented code block. */
-function codeFence(source: string, node: Code): Fence | undefined {
+/** The fences of a code or math block, or undefined for an indented code block. */
+function codeFence(
+  source: string,
+  node: Code | Extract<Nodes, { type: "math" }>,
+): Fence | undefined {
   const [start, end] = range(node);
   // A fenced block starts at its fence; an indented one at its indentation.
-  const opening = /^(?:`{3,}|~{3,})/.exec(source.slice(start, lineEnd(source, start)));
+  const opening = /^(?:`{3,}|~{3,}|\${2,})/.exec(source.slice(start, lineEnd(source, start)));
   if (!opening) return undefined;
   const marker = opening[0][0] as Fence["marker"];
   const fence: Fence = { marker, open: [start, start + opening[0].length] };
@@ -114,7 +131,7 @@ function codeFence(source: string, node: Code): Fence | undefined {
   const lines = source.slice(start, end).split(lineBreak);
   const last = lines.at(-1)!;
   const closing = new RegExp(
-    `(?:${marker === "`" ? "`" : "~"}){${opening[0].length},}(?=[ \\t]*$)`,
+    `(?:${marker === "$" ? "\\$" : marker}){${opening[0].length},}(?=[ \\t]*$)`,
   ).exec(last);
   const content = node.value === "" ? undefined : node.value.split(lineBreak).length;
   if (closing && lines.length > 1 && (content === undefined || lines.length === content + 2)) {
@@ -181,16 +198,20 @@ const thematicBreak: Rule = {
     const findings: Finding[] = [];
     walk(document.tree, "thematicBreak", (node, index, parent) => {
       if (!located(node)) return;
-      const [start, end] = range(node);
+      const [start, last] = range(node);
+      // The break's range includes blank space after its markers.
+      const end = start + source.slice(start, last).replace(/[ \t]+$/, "").length;
       if (source.slice(start, end) === marker) return;
-      // On a list item's line, a marker of the item's own character would make
-      // the whole line a thematic break, as `- ---` and `* ***` are.
-      const prefix = source.slice(lineStart(source, start), start).replace(/^.*>/, "");
-      if (prefix.includes(marker[0]!) && /^[ \t]*$/.test(prefix.replaceAll(marker[0]!, ""))) return;
+      // At the start of the document, `---` is tried as front matter, and when
+      // that fails the parser reads the document after it differently.
+      if (start === 0 && (marker === "---" || source.startsWith("---"))) return;
+      // On the line of list items whose markers are the new marker's character,
+      // the items and the break would become one thematic break, as `- ---`,
+      // `1. - ---`, and `* ***` are.
+      const items = new RegExp(`[ \\t${marker[0] === "-" ? "\\-" : marker[0]}]*$`);
+      const prefix = source.slice(lineStart(source, start), start);
+      if (items.exec(prefix)![0].includes(marker[0]!)) return;
       if (marker === "---") {
-        // At the start of the document, `---` would open front matter that a
-        // later `---` line closes.
-        if (start === 0 && /^[ \t]*-{3}[ \t]*$/m.test(source.slice(end))) return;
         // Directly below a paragraph or a link reference definition, `---`
         // would underline it as a heading.
         const above = index && parent ? lastBlock(parent.children[index - 1]!) : undefined;
@@ -212,12 +233,22 @@ const thematicBreak: Rule = {
   },
 };
 
-/** The blocks in which blank lines are content, as source ranges. */
+/** Where blank lines are content, or their number counts, as source ranges. */
 function contentBlocks(document: Document): [number, number][] {
   const blocks: [number, number][] = [];
   walk(document.tree, (node, _, parent) => {
-    if (parent && containers.has(parent.type) && !containers.has(node.type) && located(node))
+    if (!located(node)) return;
+    if (parent && containers.has(parent.type) && !containers.has(node.type))
       blocks.push(range(node));
+    // In a block quote, a list, list item, or footnote can extend over the
+    // blank lines below its last block. The parser then reads a list as loose,
+    // or a list item as tight, by how many there are.
+    const last =
+      node.type === "list" || node.type === "listItem" || node.type === "footnoteDefinition"
+        ? node.children.at(-1)
+        : undefined;
+    if (last && located(last) && range(last)[1] < range(node)[1])
+      blocks.push([range(last)[1], range(node)[1]]);
   });
   return merged(blocks);
 }
@@ -319,6 +350,7 @@ const trailingSpace: Rule = {
     const kept: [number, number][] = [];
     /** Hard line breaks, with the paragraph or heading each one is in. */
     const breaks: { start: number; end: number; block: [number, number] }[] = [];
+    const links: [number, number][] = [];
     let block: [number, number] = [0, 0];
     walk(document.tree, (node, _, parent) => {
       if (!located(node)) {
@@ -328,6 +360,7 @@ const trailingSpace: Rule = {
       }
       const [start, end] = range(node);
       if (node.type === "paragraph" || node.type === "heading") block = [start, end];
+      if (node.type === "link") links.push([start, end]);
       if (node.type === "break") breaks.push({ start, end, block });
       else if (node.type === "link" || node.type === "linkReference") {
         // The link text is prose; a title or label that spans lines is not.
@@ -348,6 +381,27 @@ const trailingSpace: Rule = {
     const ranges = merged(kept);
     let next = 0;
     let following = 0;
+    let link = 0;
+    /**
+     * Whether a backslash in place of the blank space of a hard line break,
+     * which starts at `start`, would mean the same. One after another
+     * backslash would be escaped. A literal autolink such as `www.example.com`
+     * runs on to the next blank space, so it would take the backslash in. A
+     * paragraph that starts like `[label]:` could become a link reference
+     * definition with the backslash as its destination, and the title line of
+     * an alert or callout would end with it. On Forgejo and Gitea, a backslash
+     * inside `\(...\)` math would be part of the formula.
+     */
+    const backslashSafe = (start: number, paragraph: [number, number]) => {
+      if (source[start - 1] === "\\") return false;
+      let word = start;
+      while (word > paragraph[0] && !/[ \t\r\n]/.test(source[word - 1]!)) word--;
+      while (link < links.length && links[link]![1] <= word) link++;
+      if (link < links.length && links[link]![0] < start) return false;
+      const before = source.slice(paragraph[0], start);
+      if (/^\[[^]*\]:/.test(before) || /^\[![^\r\n]*$/.test(before)) return false;
+      return !(forge && source.slice(...paragraph).includes("\\("));
+    };
     const findings: Finding[] = [];
     for (const line of physicalLines(source)) {
       const space = /[ \t]+$/.exec(source.slice(line.start, line.end));
@@ -369,15 +423,7 @@ const trailingSpace: Rule = {
         continue;
       }
       const brk = breaks[following]!;
-      // A backslash after another one would be escaped, and on Forgejo and
-      // Gitea one inside `\(...\)` math would be part of the formula.
-      if (
-        !backslash ||
-        brk.start !== start ||
-        source[start - 1] === "\\" ||
-        (forge && source.slice(...brk.block).includes("\\("))
-      )
-        continue;
+      if (!backslash || brk.start !== start || !backslashSafe(start, brk.block)) continue;
       findings.push({
         start,
         end,

@@ -5,7 +5,7 @@ import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
-import { takesLines } from "./blocks.js";
+import { takesFinalLineEnding, takesLines } from "./blocks.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -732,8 +732,8 @@ export const styleRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document }) {
       const { source } = document;
-      // An unclosed HTML comment or block at the end would take in the line ending.
-      if (!source || /[\r\n]$/.test(source) || takesLines(document.tree)) return [];
+      // An unclosed block at the end, such as an HTML comment, would take in the line ending.
+      if (!source || /[\r\n]$/.test(source) || takesFinalLineEnding(document)) return [];
       return [
         {
           start: source.length,
