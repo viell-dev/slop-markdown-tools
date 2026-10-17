@@ -1111,3 +1111,82 @@ describe("Obsidian and links", () => {
     );
   });
 });
+
+describe("line endings", () => {
+  const emphasis: Config = { extends: [], rules: { "style/emphasis": "warn" } };
+  const positions = (source: string) =>
+    lint(source, { config: emphasis }).map(({ line, column }) => [line, column]);
+  it.each([
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+    ["CR", "\r"],
+  ])("counts lines and columns with %s", (_, newline) => {
+    const source = ["Line one.", "Second *x*.", ""].join(newline);
+    expect(positions(source)).toEqual([
+      [2, 8],
+      [2, 10],
+    ]);
+  });
+  it("counts lines in a document that mixes line endings", () => {
+    expect(positions("a\r\nb\rc\n\r*x*\n")).toEqual([
+      [5, 1],
+      [5, 3],
+    ]);
+  });
+  it("reports positions in the formatted text with CR line endings", () => {
+    const plugin: Plugin = {
+      name: "find",
+      rules: {
+        marker: {
+          description: "Report the word marker.",
+          kind: "problem",
+          check: ({ document }) => {
+            const at = document.source.indexOf("marker");
+            return at < 0 ? [] : [{ start: at, message: "Found." }];
+          },
+        },
+      },
+    };
+    const config: Config = {
+      extends: [],
+      rules: { "style/emphasis": "warn", "find/marker": "warn" },
+    };
+    const result = format("*a*\r\rText with the marker.\r", { config, plugins: [plugin] });
+    expect(result.output).toBe("_a_\r\rText with the marker.\r");
+    expect(result.diagnostics).toMatchObject([{ rule: "find/marker", line: 3, column: 15 }]);
+  });
+  it.each([
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+    ["CR", "\r"],
+  ])("refuses an edit that joins an Obsidian callout's title to its body with %s", (_, newline) => {
+    // A lazy body line keeps the text the same when the lines are joined.
+    const join: Plugin = {
+      name: "join",
+      rules: {
+        title: {
+          description: "Join the first two lines of a quote's first paragraph.",
+          kind: "style",
+          check: ({ document }) => {
+            const quote = document.tree.children[0];
+            const paragraph = quote?.type === "blockquote" ? quote.children[0] : undefined;
+            if (paragraph?.type !== "paragraph") return [];
+            const [start, end] = syntax.range(paragraph);
+            const found = /\r\n|\r|\n/.exec(document.source.slice(start, end));
+            if (!found) return [];
+            const at = start + found.index;
+            const edit = { start: at, end: at + found[0].length, text: " " };
+            return [{ start: at, message: "Join.", edit }];
+          },
+        },
+      },
+    };
+    const config: Config = { extends: [], dialect: "obsidian", rules: { "join/title": "warn" } };
+    const callout = ["> [!note] Title", "Body text.", ""].join(newline);
+    const result = format(callout, { config, plugins: [join] });
+    expect(result.output).toBe(callout);
+    expect(result.diagnostics.map((item) => item.rule)).toEqual(["engine/unsafe-format"]);
+    const plain = ["> Quoted", "text.", ""].join(newline);
+    expect(format(plain, { config, plugins: [join] }).output).toBe(`> Quoted text.${newline}`);
+  });
+});
