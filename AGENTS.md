@@ -42,6 +42,23 @@ or publish content from outside it. Use synthetic fixtures, never real vault
 documents, in tests, issues, and pull requests, and keep private documents and
 credentials out of diagnostic snapshots and logs.
 
+## Reports to other projects
+
+A defect in a dependency gets a blocked issue here, with everything needed to
+report and verify it without testing again: the inputs, the versions, what
+reference implementations produce, the reproduction, and what unblocks it.
+Posting a report to another project needs the owner's decision for that report.
+A report:
+
+- follows that project's contributing guide and issue form, after a search of
+  its issues and discussions and a check against its latest release;
+- opens with a `> [!NOTE]` callout that says an AI agent wrote and submitted it,
+  for whom, and that we stop if the project asks us to;
+- links the tracking issue here, which links the report back.
+
+When a project asks for no more reports, record that here, and post nothing
+further there.
+
 ## Keeping the repository consistent
 
 A change is complete only when everything that describes or depends on what it
