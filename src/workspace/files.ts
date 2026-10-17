@@ -304,14 +304,15 @@ function changedOnDisk(file: string, when: string): ReplacementRefused {
  * of that size there and removing it. It holds random bytes, not the
  * document's text: a file left behind by a crash then reveals nothing, and a
  * disk that compresses what it stores cannot make the trial smaller than the
- * write.
+ * write. Common file systems set aside the room when the bytes are written, so
+ * the trial is not flushed to the disk; a file system that runs out of room only
+ * then makes the write itself fail, and the file's content is written back.
  */
 async function trialWrite(folder: string, size: number): Promise<void> {
   const trial = path.join(folder, `.mdtools-${randomUUID()}.tmp`);
   const handle = await open(trial, "wx", 0o600);
   try {
     await handle.writeFile(randomBytes(size));
-    await handle.sync();
   } finally {
     await handle.close();
     await unlink(trial).catch((error: NodeJS.ErrnoException) => {
@@ -330,8 +331,8 @@ async function overwrite(handle: FileHandle, content: Buffer): Promise<void> {
  * Write the formatted text `after` into `file`, whose text was read as
  * `before`, if the file still holds exactly the bytes that were read. The file
  * itself is written, not replaced by a new one, so that it keeps its
- * permissions, attributes, owner, creation time, and hard links, none of which
- * Node.js can copy to a new file. A trial write beside the file first shows that
+ * permissions, attributes, owner, creation time, and hard links, which Node.js
+ * cannot all carry over to a new file. A trial write beside the file first shows that
  * the new content fits on the disk. The file is then checked through the open
  * file, just before writing. If writing fails part way, the bytes that were read
  * are written back, and the reason says whether that worked. A file that already
@@ -365,17 +366,17 @@ export async function writeFormatted(file: string, before: string, after: string
     } catch (error) {
       const text = systemErrorText(error);
       if (!text) throw error;
-      let restored: string | undefined;
+      let undone: string | undefined;
       try {
         await overwrite(handle, expected);
       } catch (again) {
-        restored = systemErrorText(again);
-        if (!restored) throw again;
+        undone = systemErrorText(again);
+        if (!undone) throw again;
       }
       throw new ReplacementRefused(
-        restored === undefined
+        undone === undefined
           ? `The file could not be written (${text}), and its content from before formatting was written back`
-          : `The file could not be written (${text}), and writing its content from before formatting back failed too (${restored}); it may be incomplete`,
+          : `The file could not be written (${text}), and writing its content from before formatting back failed too (${undone}); it may be incomplete`,
         `File written in part: ${file}`,
         { cause: error },
       );

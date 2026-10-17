@@ -195,7 +195,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   let written = 0;
   if (flags.write && !unsafe)
     for (const change of changes) {
-      // Each file is replaced on its own, so a failure leaves the others to be written.
+      // Each file is written on its own, so a failure leaves the others to be written.
       try {
         await writeFormatted(path.join(discovery.root, change.file), change.before, change.after);
         written++;
