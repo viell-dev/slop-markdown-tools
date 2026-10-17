@@ -1,55 +1,49 @@
 # Benchmarks
 
-`npm run benchmark` times the tool on synthetic documents. This page explains
-what is measured, records reference results, and says how good they are.
+`npm run benchmark`, in a checkout of the repository, times the tool on
+synthetic documents. This page explains what is measured, records reference
+results, and says how good they are.
 
 ## In short
 
 - **Checking a whole workspace takes seconds.** From the command line, 500 pages
   of documentation (1.4 MB) are linted in about 2.9 s and checked for formatting
-  in about 3.2 s. That is fast enough for a CI job or a check before every push.
+  in about 3.2 s, fast enough for CI or a check before every push.
 - **A single file is mostly start-up.** Every command needs about 0.25 s before
-  it reads a document, nearly all of it Node.js loading the tool's code. Linting
-  one file of a 500-file workspace costs little more than that. Pass many files
-  to one command rather than running one command per file.
+  it reads a document, nearly all of it Node.js loading the tool's code. Pass
+  many files to one command rather than running one command per file.
 - **Formatting is in the same range as Prettier.** Rewriting files takes
-  about 1.6 times as long as Prettier needs for the same files, and checking
-  files that are already formatted takes slightly less time than Prettier does.
-  The two do different work: this tool also validates links, and re-reads every
-  document it changed to confirm that it still means the same.
+  about 1.6 times as long as Prettier, and checking formatted files slightly
+  less, although this tool also checks links and parses every changed document
+  again to confirm its meaning.
 - **Cost grows in step with size.** Sixteen times as many files take about
-  sixteen times as long. One very large document costs somewhat more per
-  kilobyte than a small one, about a quarter more at a megabyte, but nothing
-  becomes disproportionately slow.
+  sixteen times as long, and a document of a megabyte costs about a quarter more
+  per kilobyte than a short one.
 - **Where it is weak.** The tool uses one CPU core and remembers nothing between
-  runs, so every run repeats all the work, and formatting several thousand files
-  takes tens of seconds. Its start-up is slow beside the 26 ms that Node.js
-  itself needs. Memory grows with the workspace, though more slowly than the
-  number of files: linting peaks near 165 MB for 126 pages and near 400 MB for
-  2,000. One very large document needs a multiple of its own size while it is
-  parsed: about 70 times for prose and about 130 times for a long list of links.
+  runs, so formatting several thousand files takes tens of seconds every time.
+  Memory grows with the workspace, though more slowly than the number of files:
+  linting peaks near 165 MB for 126 pages and near 400 MB for 2,000. While one
+  document is parsed, it needs about 70 times its size for prose and about 130
+  times for a long list of links.
 
 ## What is measured
 
-The documents are generated, not collected: the same command produces the same
-bytes on every machine, and nothing private is involved. There are two sets.
+The documents are generated, so the same command produces the same bytes on
+every machine, and nothing private is involved:
 
-- **Repository documentation** for the GitHub profile: pages of about 2.7 kB
+- **Repository documentation** for the GitHub dialect: pages of about 2.7 kB
   with prose, lists, a table, a code block, an alert, and links to headings on
   other pages.
 - **An Obsidian vault**: notes of about 1.2 kB with wikilinks, an embed, a
   callout, a task list, and a block reference.
 
-Every generated file needs formatting: its prose is on long lines, its emphasis
-uses the markers the default rules replace, and its tables are unaligned. That
-is the worst case for a formatter. Formatting the result a second time is the
-best case, and both are measured.
-
-Each time is the median of five runs that follow one untimed warm-up run. The
-library measurements call the package directly and touch no files. The
-command-line measurements start `mdtools` as a separate process on files on
-disk, so they include start-up, finding and reading files, and printing
-diagnostics.
+Every generated file needs formatting: long prose lines, the emphasis markers
+that the default rules replace, and unaligned tables. That is the worst case;
+formatting the result again is the best case, and both are measured. Each time
+is the median of five runs after one untimed warm-up run. The library
+measurements call the package and touch no files; the command-line measurements
+start `mdtools` as a process on files on disk, so they include start-up, finding
+and reading files, and printing.
 
 ## Reference results
 
@@ -75,20 +69,19 @@ magnitude and as ratios between rows, not as a promise for another machine.
 | Format, every file already formatted       | 2.56 s | 2.52 s to 2.58 s       | 5.11 ms  | 0.60 MB    | 2.5×                  |
 | Prettier on the same files, for comparison | 3.04 s | 3.01 s to 3.07 s       | 6.06 ms  | 0.45 MB    | 3.0×                  |
 
-- **Parse only** turns each file into a syntax tree and does nothing else. No
-  rule can run without it, so it is the floor that the other rows are compared
-  with.
+- **Parse only** turns each file into a syntax tree. No rule can run without it,
+  so it is the floor for the other rows.
 - **Lint** runs every enabled rule and checks every link, which includes reading
   the headings of each linked page.
-- **Format, every file needs changes** is the worst case. Formatting works in
-  phases, and after each phase that changes a document the tool parses the
-  result again and compares its meaning with the original. That safety check is
-  why this row costs several times the parsing floor.
+- **Format, every file needs changes** is the worst case. After each formatting
+  phase that changes a document, the tool parses the result again and compares
+  its meaning with the original, which is why this row costs several times the
+  floor.
 - **Format, every file already formatted** is the usual case, and what
-  `format --check` costs in CI. Nothing changes, so nothing needs to be verified
+  `format --check` costs in CI: nothing changes, so nothing needs to be verified
   again.
 - **Prettier on the same files** formats each file with Prettier's Markdown
-  formatter at the same width. It is here to give the numbers a familiar scale.
+  formatter at the same width, to give the numbers a familiar scale.
 
 ### Library: Obsidian vault
 
@@ -101,10 +94,8 @@ magnitude and as ratios between rows, not as a promise for another machine.
 | Format, every file needs changes     | 2.63 s | 2.61 s to 2.66 s       | 5.26 ms  | 0.23 MB    | 5.5×                  |
 | Format, every file already formatted | 1.16 s | 1.15 s to 1.17 s       | 2.31 ms  | 0.54 MB    | 2.4×                  |
 
-The vault's notes are less than half the size of the documentation pages, so
-each file is cheaper while the cost per megabyte is similar. The same pattern
-holds: linting costs about twice the parsing floor, formatting already formatted
-notes a little more, and rewriting every note about five times.
+The notes are less than half the size of the documentation pages, so each file
+is cheaper while the cost per megabyte is similar.
 
 ### Command line
 
@@ -119,15 +110,11 @@ The repository documentation above, as 501 files on disk.
 | Format and write, every file needs changes     | 6.30 s | 6.20 s to 6.33 s       | 345.8 MB    |
 | Check formatting, every file already formatted | 3.23 s | 3.20 s to 3.32 s       | 342.5 MB    |
 
-- **Start Node.js and exit** is the cost of the runtime alone,
-  and **start the CLI and print its version** adds loading the tool. The
-  difference is paid by every command, however small its input.
-- **Lint one file of the workspace** shows that the other files cost almost
-  nothing when they are not selected: they are listed so that links can be
-  checked, but only read when a link points at them.
-- The whole-workspace rows are close to the library rows above plus start-up.
-  Finding, reading, and writing files is a small part of the total.
-- **Peak memory** is the most memory the process held, including Node.js itself.
+The difference between the first two rows, loading the tool, is paid by every
+command. Linting one file shows that unselected files cost almost nothing: they
+are listed so that links can be checked, and read only when a link points at
+them. The whole-workspace rows are close to the library rows plus start-up. Peak
+memory includes Node.js itself.
 
 ### More files
 
@@ -140,26 +127,14 @@ the median of 3 runs without a warm-up run.
 | 501   | 1.36 MB | 2.10 s | 4.19 ms       | 4.83 s              | 9.63 ms         | 259.4 MB                           |
 | 2,001 | 5.44 MB | 8.51 s | 4.25 ms       | 19.66 s             | 9.82 ms         | 402.0 MB                           |
 
-If the tool slowed down as a workspace grows, the per-file columns would rise
-from row to row. They stay level, so the time for a larger workspace can be
-estimated by multiplying.
-
-Memory is different. The last column is the most memory a `mdtools lint` process
-held for a workspace of that size, including the roughly 85 MB that the tool
-needs before it reads a document. It grows with the workspace, though far more
-slowly than the number of files: sixteen times as many files take about 2.5
-times the memory. Until a run finishes, the tool keeps every file's text and
-diagnostics, and the anchors of every document that a link to a heading or block
-points to. Versions up to `0.2.0-rc.1` also kept the parsed form of each of
-those documents, and the previous reference run, made with that version, peaked
-at 496 MB for the 2,001 files. The figure also depends on when Node.js reclaims
-memory, so it is an upper bound on what the run needed, not an exact amount.
-
-These rows use the GitHub profile. For the Obsidian dialect the tool also keeps
-a table for finding a note by its name, with one entry for each file of the
-workspace, attachments included: about 70 bytes per file. Versions up to
-`0.2.0-rc.1` kept two tables that together held about 1.6 kB per file, 160 MB
-for a vault with 100,000 attachments, once a link had been searched for by name.
+The per-file columns stay level, so the time for a larger workspace can be
+estimated by multiplying. Memory grows far more slowly: sixteen times as many
+files take about 2.5 times the memory, including about 85 MB that the tool needs
+before it reads a document. Until a run finishes, the tool keeps every file's
+text and diagnostics, and the anchors of every document that a link points into;
+in the Obsidian dialect also about 70 bytes per file of the workspace,
+attachments included, for finding notes by name. The figure depends on when
+Node.js reclaims memory, so it is an upper bound.
 
 ### Larger documents
 
@@ -169,17 +144,13 @@ for a vault with 100,000 attachments, once a link had been searched for by name.
 | 129 kB        | 377 ms              | 2.93 ms      |
 | 1,024 kB      | 3.09 s              | 3.02 ms      |
 
-The same check for one document instead of many files. The cost per kilobyte
-rises by about a quarter from a short document to one of a megabyte, which is
-far larger than documents usually are. The growth is mild, but it is growth: a
-very large document is slower than its size alone suggests.
+The cost per kilobyte rises by about a quarter from a short document to one of a
+megabyte, far larger than documents usually are.
 
-Memory for one document is a different matter. While a document is parsed, the
-parser holds a list of every token it found, and that list is many times larger
-than the text. These figures are the smallest heap limit
+While a document is parsed, the parser holds a list of every token it found,
+many times larger than the text. These are the smallest heap limits
 (`--max-old-space-size`) under which one generated document could be parsed,
-found by trying limits 8 MB apart on one machine. They depend on the document,
-not on the processor:
+found in steps of 8 MB; they depend on the document, not on the processor:
 
 | Document                                        | Size   | Heap needed to parse |
 | ----------------------------------------------- | ------ | -------------------- |
@@ -188,15 +159,10 @@ not on the processor:
 | The same                                        | 2.0 MB | 142 MB               |
 | An index note: 13,400 list items, each one link | 2.2 MB | 291 MB               |
 
-That is about 70 times the size of prose and about 130 times the size of the
-index note. For the index note, the parser's token list alone holds 240 MB once
-it is complete, about 18 kB for each list item; the syntax tree that the tool
-keeps afterwards is 40 MB. The list belongs to the parser the tool builds on,
-and no rule or setting changes it. Each document is parsed by itself and its
-token list is released before the next one, so a run needs the memory of its
-largest document, not the sum. Node.js allows a few gigabytes by default, which
-is enough for documents of several megabytes; under a tighter limit, such as
-`--max-old-space-size=256`, a document like the index note is what fails.
+For the index note, the token list alone holds 240 MB, and the syntax tree that
+the tool keeps afterwards 40 MB. No rule or setting changes this. Each document
+is parsed by itself, so a run needs the memory of its largest document, not the
+sum; Node.js allows a few gigabytes by default.
 
 ## Is it any good?
 
@@ -209,57 +175,37 @@ is enough for documents of several megabytes; under a tighter limit, such as
 | Compared with Prettier                  | 1.6 times its time when rewriting, slightly less than its time when checking    | Comparable, while also validating links and meaning.                                               |
 | Memory                                  | About 260 MB to lint and 350 MB to format 500 pages; about 400 MB to lint 2,000 | Fine at these sizes. At this rate, tens of thousands of files could still need a gigabyte or more. |
 
-The design accepts some slowness on purpose. Parsing every changed document
-again is what lets the tool refuse an edit that would alter a document's
-meaning, and that guarantee matters more to this project than speed. The real
-limits are start-up time, memory, and the lack of any reuse between runs. None
-is a problem at the sizes measured here; they would be the place to start if the
-tool had to serve an editor, or workspaces of tens of thousands of files.
-Start-up time was examined in
-[issue 116](https://github.com/viell-dev/slop-markdown-tools/issues/116), which
-declined packing the tool into one file for a gain of about 75 ms. Dropping a
-dependency that the tool never used has since taken 15 to 20 ms off it
-([issue 140](https://github.com/viell-dev/slop-markdown-tools/issues/140)). The
-largest part of the memory that versions up to `0.2.0-rc.1` held was removed for
-[issue 114](https://github.com/viell-dev/slop-markdown-tools/issues/114); what a
-run still holds is every file's text and diagnostics.
+The design accepts some slowness on purpose: parsing every changed document
+again is what lets the tool refuse an edit that would change a document's
+meaning. The real limits are start-up time, memory, and the lack of reuse
+between runs, which would matter for an editor or for workspaces of tens of
+thousands of files.
 
 ## Limits of these numbers
 
-- The documents are synthetic. Real documents have a different mix of syntax,
-  and a document with many links to check or many long tables costs more per
-  kilobyte.
-- The synthetic workspaces are small. A check against a large real-world vault
-  of several thousand notes, about 40 MB of Markdown, matched the synthetic
-  throughput per megabyte within about 15% on the same machine, which supports
-  estimating time by multiplying. It also showed what small sets cannot: peak
-  memory of about 1.2 GB, half of what `0.2.0-rc.1` needed, and a few seconds
-  spent finding files before the first document was read, because that workspace
-  also held well over 100,000 files that are not Markdown. How much heap such a
-  run needs at the least is set by its largest document, not by the number of
-  files: a generated index note of 2.2 MB, a list of 13,400 links, needs about
-  290 MB to parse. In a simple tree, finding files costs about a third of a
-  second per 100,000 files.
-- One paragraph is not one document. The times above grow in step with size
-  because long documents are made of many paragraphs, and each is parsed by
-  itself. A single paragraph of 100 kB or more that is full of inline code,
-  links, or emphasis takes much longer than its size suggests: measured once,
-  doubling such a paragraph from 96 kB to 192 kB tripled the time, and it took
-  about twenty times as long as the same text read as CommonMark. The cause is
-  in the parser, which merges the pieces of text between the inline constructs
-  one by one, and it shows with GitHub's literal autolinks, which every dialect
-  but CommonMark includes. A list or a table of that size is not affected.
-- Only the built-in rules run. Plugins add their own time.
-- The runner is shared. GitHub assigns runs to machines with different
-  processors: two runs of this benchmark on the same day differed by a factor of
+- The documents are synthetic. A document with many links to check or many long
+  tables costs more per kilobyte.
+- The synthetic workspaces are small. On a large real-world vault of several
+  thousand notes, about 40 MB of Markdown, the throughput per megabyte matched
+  within about 15% on the same machine. That run peaked at about 1.2 GB of
+  memory and spent a few seconds finding files, because the vault also held well
+  over 100,000 other files; finding files costs about a third of a second per
+  100,000 files in a simple tree.
+- One paragraph is not one document. A single paragraph of 100 kB or more that
+  is full of inline code, links, or emphasis is parsed much more slowly than its
+  size suggests: doubling one from 96 kB to 192 kB tripled the time, about
+  twenty times as long as the same text read as CommonMark. The cause is in the
+  parser, and GitHub's literal autolinks, which every dialect but CommonMark
+  reads, bring it out. Lists and tables of that size are not affected.
+- Only the built-in rules run; plugins add their own time.
+- The runner is shared. Two runs on the same day differed by a factor of
   about 1.8 in every absolute time, while the "compared with parsing" ratios and
   the comparison with Prettier stayed within a tenth. Compare absolute times
   only between reports whose header names the same processor.
 - Only Linux is measured. Starting a process is slower on Windows, which adds to
   every command-line row.
 - The Prettier comparison uses its default Markdown settings with
-  `proseWrap: "always"` at 80 columns, through its API. It says nothing about
-  Prettier's command line or other configurations.
+  `proseWrap: "always"` at 80 columns, through its API.
 
 ## Run it and compare
 
@@ -269,31 +215,17 @@ npm run benchmark -- --json    # the same measurements as JSON
 npm run benchmark -- --quick   # tiny inputs, to check that it runs
 ```
 
-A full run takes a few minutes. Run it on a machine that is doing nothing else.
+A full run takes a few minutes; run it on a machine that is doing nothing else.
+To judge a change, run it before and after on the same machine:
 
-To judge a change, run the benchmark before and after it on the same machine,
-and compare like with like:
-
-- A step's time should not grow by more than run-to-run variation, which the
-  "fastest to slowest run" column shows.
+- A step's time should not grow by more than the spread in the "fastest to
+  slowest run" column.
 - The "compared with parsing" column should not grow. It depends little on the
-  machine's speed, so it can also be compared with the tables above.
-- The per-file columns of the "More files" table should stay level from row to
-  row, and the per-kilobyte column of the last table should not rise more
-  steeply than it does above. A steeper rise means the change made something
-  more than proportionally slower.
-- The output hash in the report's header identifies the formatted output. It
-  stays the same when a change does not alter what the formatter produces, and
-  it must change when the change is meant to.
-
-The Benchmark workflow runs the same command on a GitHub-hosted runner, for pull
-requests that change the benchmark and on request. Its report replaces the
-tables on this page when they are updated, so that the published results come
-from a machine anyone can use and not from one contributor's computer. Because
-runners differ in speed, a new report's absolute times can differ from the old
-one's without any change in the tool; judge by the ratios, or by
-before-and-after runs on one machine.
+  machine, so it can also be compared with the tables above.
+- The per-file columns of "More files" should stay level, and the per-kilobyte
+  column of "Larger documents" should not rise more steeply than above.
+- The output hash identifies the formatted output: it stays the same unless the
+  change is meant to alter what the formatter produces.
 
 The benchmark never fails on a slow result, because a shared machine's speed
-varies too much for a limit to be reliable. A few [unit tests](testing.md#speed)
-separately guard against algorithms whose cost grows faster than their input.
+varies too much for a limit to be reliable.

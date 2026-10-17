@@ -1,45 +1,56 @@
+import { slug } from "github-slugger";
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "Markdown Tools",
+  title: "mdrefine",
   description:
     "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian.",
   lang: "en",
   base: "/slop-markdown-tools/",
   head: [["meta", { name: "theme-color", content: "#12776c" }]],
   sitemap: { hostname: "https://viell-dev.github.io/slop-markdown-tools/" },
+  // Heading anchors as GitHub generates them, which is how the tool's own link check
+  // validates the fragments of these pages: `## \`style/wrap\`` is `#stylewrap`.
+  markdown: { anchor: { slugify: (text) => slug(text) } },
   themeConfig: {
     nav: [
-      { text: "Quick start", link: "/quick-start" },
-      { text: "Examples", link: "/examples" },
-      { text: "Reference", link: "/configuration" },
-      { text: "Contribute", link: "/contributing" },
+      { text: "Get started", link: "/quick-start" },
+      { text: "Rules", link: "/rules" },
+      { text: "Reference", link: "/cli" },
+      { text: "Changelog", link: "/changelog" },
+      {
+        text: "Contribute",
+        link: "https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md",
+      },
     ],
     sidebar: [
       {
-        text: "Start here",
+        text: "Guide",
         items: [
-          { text: "Quick start", link: "/quick-start" },
+          { text: "Getting started", link: "/quick-start" },
           { text: "Examples", link: "/examples" },
-          { text: "CLI workflows", link: "/cli" },
           { text: "Obsidian vaults", link: "/obsidian" },
+          { text: "Integrations", link: "/integrations" },
         ],
       },
       {
         text: "Reference",
         items: [
-          { text: "Configuration and rules", link: "/configuration" },
-          { text: "Plugins and library API", link: "/plugins" },
+          { text: "Command line", link: "/cli" },
+          { text: "Configuration", link: "/configuration" },
+          { text: "Rules", link: "/rules" },
+          { text: "Dialects", link: "/dialects" },
+          { text: "Library API", link: "/api" },
+          { text: "Plugins", link: "/plugins" },
         ],
       },
       {
         text: "Project",
         items: [
-          { text: "Design and limitations", link: "/design" },
+          { text: "How it works and its limits", link: "/design" },
           { text: "Benchmarks", link: "/benchmarks" },
-          { text: "Contributing and development", link: "/contributing" },
-          { text: "Testing", link: "/testing" },
-          { text: "Releases", link: "/releases" },
+          { text: "Versions", link: "/versions" },
+          { text: "Changelog", link: "/changelog" },
         ],
       },
     ],
@@ -52,7 +63,7 @@ export default defineConfig({
     },
     footer: {
       message:
-        'Early prerelease · <a href="https://github.com/viell-dev/slop-markdown-tools/blob/main/LICENSE">MIT licensed</a> · Agent-maintained',
+        'Pre-1.0 · <a href="https://github.com/viell-dev/slop-markdown-tools/blob/main/LICENSE">MIT licensed</a> · Agent-maintained',
     },
   },
 });

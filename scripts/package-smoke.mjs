@@ -22,7 +22,7 @@ try {
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/(?:releases\/)?[^/]+\.md$|examples\/|(?:README|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|package\.json$)/.test(
+      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -36,6 +36,7 @@ try {
     "LICENSE",
     "THIRD_PARTY_NOTICES",
     "README.md",
+    "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "examples/README.md",

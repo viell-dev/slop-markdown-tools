@@ -1,0 +1,11 @@
+name: Question
+description: Ask how mdtools works or how to use it, after checking the documentation
+labels: ["Type: Question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What you want to do, what you tried, and which documentation page you read.
+    validations:
+      required: true
