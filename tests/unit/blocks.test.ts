@@ -90,6 +90,21 @@ describe("style/code-fence", () => {
       { rule: "style/code-fence", line: 3, column: 1, edit: { start: 9, end: 12, text: "```" } },
     ]);
   });
+  it("takes the marker of the first fence with `consistent`", () => {
+    const consistent = only({ "style/code-fence": ["warn", { marker: "consistent" }] });
+    expect(formatted("~~~\na\n~~~\n\n```\nb\n```\n\n````\nc\n````\n", consistent)).toBe(
+      "~~~\na\n~~~\n\n~~~\nb\n~~~\n\n~~~\nc\n~~~\n",
+    );
+    expect(formatted("    indented\n\n```\na\n```\n\n~~~\nb\n~~~\n", consistent)).toBe(
+      "    indented\n\n```\na\n```\n\n```\nb\n```\n",
+    );
+    kept("No code.\n", consistent);
+  });
+  it("rejects other markers", () => {
+    expect(() =>
+      lint("", { config: only({ "style/code-fence": ["warn", { marker: "`" }] }) }),
+    ).toThrow("Invalid options for style/code-fence");
+  });
 });
 
 describe("style/thematic-break", () => {
@@ -158,6 +173,16 @@ describe("style/thematic-break", () => {
   });
   it.each(dialects)("converts thematic breaks in the %s dialect", (dialect) => {
     expect(formatted("Text\n\n***\n\n> ***\n", only(rule, dialect))).toBe("Text\n\n---\n\n> ---\n");
+  });
+  it("takes the character of the first break with `consistent`", () => {
+    const consistent = only({ "style/thematic-break": ["warn", { marker: "consistent" }] });
+    expect(formatted("Text\n\n* * *\n\n---\n\n___\n", consistent)).toBe(
+      "Text\n\n***\n\n***\n\n***\n",
+    );
+    // The exceptions still apply: `---` below text would underline it.
+    expect(formatted("Text\n\n- - -\n\nMore\n***\n", consistent)).toBe(
+      "Text\n\n---\n\nMore\n***\n",
+    );
   });
 });
 
@@ -239,6 +264,19 @@ describe("style/blank-lines", () => {
       { line: 4, message: "Remove the repeated blank line.", edit: { start: 4, end: 5, text: "" } },
       { line: 6, message: "Remove the blank lines at the end of the document." },
     ]);
+  });
+  it("keeps up to `maximum` blank lines in a row", () => {
+    const two = only({ "style/blank-lines": ["warn", { maximum: 2 }] });
+    expect(formatted("\n\nA\n\n\nB\n\n\n\nC\n\n\n", two)).toBe("A\n\n\nB\n\n\nC\n");
+    expect(formatted("> A\n>\n>\n>\n> B\n", two)).toBe("> A\n>\n>\n> B\n");
+    kept("A\n\nB\n\n\nC\n", two);
+    expect(lint("A\n\n\n\nB\n", { config: two })).toMatchObject([
+      { line: 4, message: "Remove the blank lines beyond 2 in a row." },
+    ]);
+    for (const maximum of [0, 1.5, "2"])
+      expect(() =>
+        lint("", { config: only({ "style/blank-lines": ["warn", { maximum }] }) }),
+      ).toThrow("Invalid options for style/blank-lines");
   });
 });
 
@@ -384,6 +422,83 @@ describe("style/heading closing sequences", () => {
   it.each(dialects)("removes closing sequences in the %s dialect", (dialect) => {
     expect(formatted("# Title #\n\n> ## Quoted ##\n", only(rule, dialect))).toBe(
       "# Title\n\n> ## Quoted\n",
+    );
+  });
+});
+
+describe("style/heading with underlined headings", () => {
+  const setext = only({ "style/heading": ["warn", { style: "setext" }] });
+  const consistent = only({ "style/heading": ["warn", { style: "consistent" }] });
+  it.each([
+    ["# Title\n", "Title\n=====\n"],
+    ["## Sub ##\n", "Sub\n---\n"],
+    ["Text\n\n## *Sub* and `code`\n", "Text\n\n*Sub* and `code`\n----------------\n"],
+    // Deeper levels cannot be underlined and keep their `#`.
+    ["### Deep ###\n", "### Deep\n"],
+    ["# 漢字\r\n\r\nText\r\n", "漢字\r\n====\r\n\r\nText\r\n"],
+    ["# A\r\rB\r", "A\r===\r\rB\r"],
+    ["Title\n===\n", "Title\n===\n"],
+  ])("writes %j underlined", (source, output) => {
+    expect(formatted(source, setext)).toBe(output);
+  });
+  it.each([
+    // Directly below text, the heading's line would continue the paragraph.
+    ["Text\n# Title\n"],
+    ["> Quoted\n# Title\n"],
+    ["<!-- mdtools-disable-next-line style/emphasis -->\n# *Title*\n"],
+    // On a line of its own, the text would start another block.
+    ["# - Item\n"],
+    ["# 1. Step\n"],
+    ["# > Quote\n"],
+    ["## ---\n"],
+    ["## ***\n"],
+    ["# ```\n"],
+    ["# <span>x</span>\n"],
+    ["# [a]: https://example.com\n"],
+    ["## a | b\n"],
+    ["# Ends\\\\\n"],
+    // Headings in containers, empty headings, and indented ones.
+    ["> # Quoted\n"],
+    ["- # Listed\n"],
+    ["#\n"],
+    ["  # Indented\n"],
+  ])("keeps %j a # heading", (source) => {
+    kept(source, setext);
+  });
+  it("keeps a heading with an attribute block on Forgejo and Gitea", () => {
+    for (const dialect of ["forgejo", "gitea"] as const)
+      kept("## Title {#id}\n", only({ "style/heading": ["warn", { style: "setext" }] }, dialect));
+    expect(formatted("## Title {#id}\n", setext)).toBe("Title {#id}\n-----------\n");
+  });
+  it("follows the document's first heading with `consistent`", () => {
+    expect(formatted("Title\n===\n\n# Next #\n\n### Deep\n", consistent)).toBe(
+      "Title\n===\n\nNext\n====\n\n### Deep\n",
+    );
+    expect(formatted("## Title\n\nNext\n====\n", consistent)).toBe("## Title\n\n# Next\n");
+    expect(formatted("### Deep\n\nNext\n----\n", consistent)).toBe("### Deep\n\n## Next\n");
+  });
+  it("rejects other styles", () => {
+    expect(() =>
+      lint("", { config: only({ "style/heading": ["warn", { style: "atx_closed" }] }) }),
+    ).toThrow("Invalid options for style/heading");
+  });
+});
+
+describe("style/table with compact cells", () => {
+  const compact = only({ "style/table": ["warn", { style: "compact" }] });
+  it("writes one space around each cell and the shortest delimiters", () => {
+    expect(
+      formatted(
+        "| Sensor      | Unit |\n| :---------- | ---: |\n|Temperature|°C|\n| a |  |\n",
+        compact,
+      ),
+    ).toBe("| Sensor | Unit |\n| :-- | --: |\n| Temperature | °C |\n| a |  |\n");
+    expect(formatted("| a |\n|:-------:|\n", compact)).toBe("| a |\n| :-: |\n");
+    kept("| a | b |\n| --- | :-: |\n| `c\\|d` | e |\n", compact);
+  });
+  it("aligns by default", () => {
+    expect(formatted("| a | bb |\n| - | - |\n", only({ "style/table": "warn" }))).toBe(
+      "| a   | bb  |\n| --- | --- |\n",
     );
   });
 });

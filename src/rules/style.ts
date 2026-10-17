@@ -6,7 +6,7 @@ import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { labelEnd, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
-import { takesFinalLineEnding, takesLines } from "./blocks.js";
+import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -726,12 +726,14 @@ const wrap: Rule = {
 };
 
 const table: Rule = {
-  description: "Align GFM table cells while preserving their inline source.",
+  description: "Align or compact GFM table cells while preserving their inline source.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({}),
-  check({ document }) {
+  schema: optionsSchema({ style: { enum: ["aligned", "compact"] } }),
+  check({ document, options }) {
     const findings: Finding[] = [];
+    // A compact table has one space around each cell and the shortest delimiters.
+    const compact = options.style === "compact";
     const newline = lineEnding(document.source);
     walk(document.tree, "table", (node) => {
       const [start, end] = range(node);
@@ -748,13 +750,12 @@ const table: Rule = {
       const count = node.align?.length ?? rows[0]?.length ?? 0;
       if (rows.some((row) => row.length > count)) return;
       const widths = Array.from({ length: count }, (_, i) =>
-        Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
+        compact ? 3 : Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
       );
+      const pad = (cell: string, i: number) =>
+        compact ? cell : cell + " ".repeat(widths[i]! - stringWidth(cell));
       // Keep each row's own cell count: adding cells to a short row changes the parsed table.
-      const rendered = rows.map(
-        (row) =>
-          `| ${row.map((cell, i) => cell + " ".repeat(widths[i]! - stringWidth(cell))).join(" | ")} |`,
-      );
+      const rendered = rows.map((row) => `| ${row.map(pad).join(" | ")} |`);
       rendered.splice(
         1,
         0,
@@ -774,7 +775,7 @@ const table: Rule = {
         findings.push({
           start,
           end,
-          message: "Align table cells.",
+          message: compact ? "Write the table compactly." : "Align table cells.",
           edit: { start, end, text: replacement },
         });
     });
@@ -965,19 +966,34 @@ export const styleRules: Record<string, Rule> = {
     },
   },
   "style/heading": {
-    description: "Use ATX headings without closing sequences.",
+    description: "Use ATX or Setext headings, without closing sequences.",
     kind: "style",
     phase: "block",
-    schema: optionsSchema({ closing: { enum: ["remove", "keep"] } }),
+    schema: optionsSchema({
+      style: { enum: ["atx", "setext", "consistent"] },
+      closing: { enum: ["remove", "keep"] },
+    }),
     check({ document, options }) {
       const findings: Finding[] = [];
       const { source } = document;
+      // Only levels 1 and 2 can be underlined; deeper headings keep their `#`.
+      const underlined = underlinedHeadings(document, options.style);
       walk(document.tree, "heading", (node) => {
         const [headingStart, end] = range(node);
         const first = node.children[0];
         const last = node.children.at(-1);
         // An ATX heading is one line, a Setext heading also has its underline.
         if (!/[\r\n]/.test(source.slice(headingStart, end))) {
+          const edit = underlined ? underlineEdit(document, node) : undefined;
+          if (edit) {
+            findings.push({
+              start: edit.start,
+              end: edit.end,
+              message: "Use an underlined heading.",
+              edit,
+            });
+            return;
+          }
           if (options.closing === "keep") return;
           const textEnd = last
             ? range(last)[1]
@@ -1000,7 +1016,7 @@ export const styleRules: Record<string, Rule> = {
           });
           return;
         }
-        if (!first || !last) return;
+        if (underlined || !first || !last) return;
         // Below link reference definitions, the heading's position starts at
         // the first definition; its own text starts on a later line. Headings
         // that are indented or inside lists or block quotes are left as written.

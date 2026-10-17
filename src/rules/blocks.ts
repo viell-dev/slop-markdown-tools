@@ -1,5 +1,6 @@
-import type { Code, Nodes } from "mdast";
-import type { Document, Finding, Rule } from "../core/types.js";
+import type { Code, Heading, Nodes } from "mdast";
+import stringWidth from "string-width";
+import type { Document, Edit, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
 
@@ -107,6 +108,57 @@ export function takesFinalLineEnding(document: Document): boolean {
   return fence !== undefined && !fence.close;
 }
 
+/**
+ * Whether `style/heading` writes headings of levels 1 and 2 underlined: with
+ * `setext`, or with `consistent` when the document's first heading is.
+ */
+export function underlinedHeadings(document: Document, style: unknown): boolean {
+  if (style !== "consistent") return style === "setext";
+  let first: Heading | undefined;
+  walk(document.tree, "heading", (node) => {
+    if (!first && located(node)) first = node;
+  });
+  return first !== undefined && /[\r\n]/.test(document.source.slice(...range(first)));
+}
+/**
+ * The start of a line that would not begin a paragraph after a blank line: a
+ * list item, heading, block quote, thematic break, fence, HTML, math, or
+ * Obsidian comment, a link reference definition, or a table row, which `---`
+ * below it could make a table.
+ */
+const notParagraph =
+  /^(?:[-+*](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|#{1,6}(?:[ \t]|$)|>|([-*_])[ \t]*(?:\1[ \t]*){2,}$|`{3,}|~{3,}|<|\$\$|%%|\[[^]*\]:)|\|/;
+/**
+ * The edit that writes the `#` heading `node`, of level 1 or 2, underlined
+ * with `===` or `---`, or undefined where its text could not stand on a line
+ * of its own as the same heading. Only headings at the start of a line of the
+ * document itself, below a blank line or at the start, are underlined:
+ * directly below text, the heading's line would continue a paragraph. On
+ * Forgejo and Gitea, a heading with a `{` keeps its form, because their
+ * attribute blocks depend on it.
+ */
+export function underlineEdit(document: Document, node: Heading): Edit | undefined {
+  const { source } = document;
+  const first = node.children[0];
+  const last = node.children.at(-1);
+  if (node.depth > 2 || !first || !last || !located(first) || !located(last)) return undefined;
+  const [start] = range(node);
+  if (lineStart(source, start) !== start) return undefined;
+  if (start > 0) {
+    const above = lineStart(source, start - (source.startsWith("\r\n", start - 2) ? 2 : 1));
+    if (!/^[ \t]*$/.test(source.slice(above, lineEnd(source, above)))) return undefined;
+  }
+  const text = source.slice(range(first)[0], range(last)[1]);
+  if (notParagraph.test(text) || text.endsWith("\\")) return undefined;
+  if ((document.dialect === "forgejo" || document.dialect === "gitea") && text.includes("{"))
+    return undefined;
+  // Forgejo and Gitea open a definition or display math with these.
+  if (/^(?::[ \t]|\\\[)/.test(text)) return undefined;
+  const newline = /\r\n|\r|\n/.exec(source)?.[0] ?? "\n";
+  const underline = (node.depth === 1 ? "=" : "-").repeat(Math.max(3, stringWidth(text)));
+  return { start, end: lineEnd(source, start), text: `${text}${newline}${underline}` };
+}
+
 /** The fences of a fenced code or math block: the marker runs, as source ranges. */
 interface Fence {
   marker: "`" | "~" | "$";
@@ -145,21 +197,29 @@ const codeFenceRule: Rule = {
   description: "Write code fences with one marker and the length their content needs.",
   kind: "style",
   phase: "block",
-  schema: schema({ marker: { enum: ["```", "~~~"] } }),
+  schema: schema({ marker: { enum: ["```", "~~~", "consistent"] } }),
   check({ document, options }) {
     const { source } = document;
-    const marker = options.marker === "~~~" ? "~" : "`";
-    const findings: Finding[] = [];
+    const fences: { node: Code; fence: Fence }[] = [];
     walk(document.tree, "code", (node) => {
-      if (!located(node)) return;
-      const fence = codeFence(source, node);
-      if (!fence) return;
+      const fence = located(node) ? codeFence(source, node) : undefined;
+      if (fence) fences.push({ node, fence });
+    });
+    // `consistent` takes the marker of the first fence in the document.
+    const marker =
+      options.marker === "~~~"
+        ? "~"
+        : options.marker === "consistent"
+          ? (fences[0]?.fence.marker ?? "`")
+          : "`";
+    const findings: Finding[] = [];
+    for (const { node, fence } of fences) {
       // The info string of a backtick fence cannot contain a backtick.
       if (
         marker === "`" &&
         source.slice(fence.open[1], lineEnd(source, fence.open[1])).includes("`")
       )
-        return;
+        continue;
       // A content line of the marker alone, at any indentation, could close a
       // fence that is not longer than it.
       let longest = 0;
@@ -176,7 +236,7 @@ const codeFenceRule: Rule = {
             message: `Use ${text} for the code fence.`,
             edit: { start, end, text },
           });
-    });
+    }
     return findings;
   },
 };
@@ -191,10 +251,18 @@ const thematicBreak: Rule = {
   description: "Write thematic breaks with one marker.",
   kind: "style",
   phase: "block",
-  schema: schema({ marker: { enum: ["---", "***", "___"] } }),
+  schema: schema({ marker: { enum: ["---", "***", "___", "consistent"] } }),
   check({ document, options }) {
     const { source } = document;
-    const marker = typeof options.marker === "string" ? options.marker : "---";
+    let marker = typeof options.marker === "string" ? options.marker : "---";
+    // `consistent` takes the character of the first thematic break in the document.
+    if (marker === "consistent") {
+      let first: string | undefined;
+      walk(document.tree, "thematicBreak", (node) => {
+        if (first === undefined && located(node)) first = source[range(node)[0]];
+      });
+      marker = (first ?? "-").repeat(3);
+    }
     const findings: Finding[] = [];
     walk(document.tree, "thematicBreak", (node, index, parent) => {
       if (!located(node)) return;
@@ -253,12 +321,14 @@ function contentBlocks(document: Document): [number, number][] {
   return merged(blocks);
 }
 const blankLines: Rule = {
-  description: "Collapse repeated blank lines and remove those around the document.",
+  description: "Limit blank lines in a row and remove those around the document.",
   kind: "style",
   phase: "document",
-  schema: schema({}),
-  check({ document }) {
+  // Fewer than one blank line would join the blocks that it separates.
+  schema: schema({ maximum: { type: "integer", minimum: 1 } }),
+  check({ document, options }) {
     const { source } = document;
+    const maximum = typeof options.maximum === "number" ? options.maximum : 1;
     const lines = physicalLines(source);
     const text = (line: Line) => source.slice(line.start, line.end);
     const empty = (line: Line) => /^[ \t]*$/.test(text(line));
@@ -287,30 +357,27 @@ const blankLines: Rule = {
     // Below blank lines, `---` or `+++` on the first line would open front matter.
     if (first > 0 && !/^(?:-{3}|\+{3})/.test(text(lines[first]!)))
       remove(0, lines[first]!.start, "Remove the blank lines at the start of the document.");
-    // Of blank lines in a row, those that repeat the line above them, with the
-    // same block quote markers and indentation, add nothing.
+    // Blank lines in a row with the same block quote markers and indentation
+    // are one separation, however many there are.
     const trimmed = (line: Line) => text(line).replace(/[ \t]+$/, "");
-    for (let index = first + 1; index < last; index++) {
+    const message =
+      maximum === 1
+        ? "Remove the repeated blank line."
+        : `Remove the blank lines beyond ${maximum} in a row.`;
+    for (let index = first; index < last;) {
       const line = lines[index]!;
-      const above = lines[index - 1]!;
-      if (
-        !blank(line) ||
-        !blank(above) ||
-        inBlock[index] ||
-        inBlock[index - 1] ||
-        trimmed(line) !== trimmed(above)
-      )
-        continue;
       let end = index + 1;
-      while (
-        end < last &&
-        blank(lines[end]!) &&
-        !inBlock[end] &&
-        trimmed(lines[end]!) === trimmed(line)
-      )
-        end++;
-      remove(line.start, lines[end - 1]!.next, "Remove the repeated blank line.");
-      index = end - 1;
+      if (blank(line) && !inBlock[index])
+        while (
+          end < last &&
+          blank(lines[end]!) &&
+          !inBlock[end] &&
+          trimmed(lines[end]!) === trimmed(line)
+        )
+          end++;
+      if (end - index > maximum)
+        remove(lines[index + maximum]!.start, lines[end - 1]!.next, message);
+      index = end;
     }
     if (last < lines.length)
       remove(
