@@ -340,6 +340,10 @@ From every prerelease:
   file. Inside a nested repository only its own rules apply, and none applies to
   a file that Git tracks
   ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
+- Git's ignore rules match letter case as each repository's `core.ignorecase`
+  says, and each repository, also a nested one, uses the global excludes file
+  that its own settings name
+  ([#287](https://github.com/viell-dev/slop-markdown-tools/pull/287)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
