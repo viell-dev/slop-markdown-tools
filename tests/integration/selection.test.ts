@@ -1,10 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
 import { discover } from "../../src/workspace/files.js";
-import { fixture, run } from "./support.js";
+import { fixture, linkDirectory, run } from "./support.js";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 /** Where letter case is ignored by default, by Git and by the file system. */
@@ -102,7 +102,7 @@ describe("named inputs", () => {
     }),
     ".gitignore": "generated/\nskip.md\n",
     "guide.md": "# Guide\n\nSee [the readme](README.markdown#read-me).\n",
-    "README.markdown": "# Read me\n\nSee [the notes](notes.txt#notes).\n",
+    "README.markdown": "# Read me\n\nSee [the notes](notes.txt#anything) and [me](#nope).\n",
     "notes.txt": "# Notes\n\nA *note*.\n",
     "generated/out.md": "Out.\n",
     "skip.md": "Skipped.\n",
@@ -120,10 +120,11 @@ describe("named inputs", () => {
       path: string;
       diagnostics: { message: string }[];
     }[];
-    // A text file's headings are no anchors, also when it is linted as Markdown.
+    // A text file's headings are no anchors, also when it is linted as Markdown,
+    // so any fragment is accepted there.
     expect(reports.find((file) => file.path === "guide.md")!.diagnostics).toEqual([]);
     expect(reports.find((file) => file.path === "README.markdown")!.diagnostics).toEqual([
-      expect.objectContaining({ message: "Missing fragment in notes.txt#notes." }),
+      expect.objectContaining({ message: "Missing fragment in #nope." }),
     ]);
   });
   it("read a named file as Markdown whatever its name", async () => {
@@ -272,5 +273,103 @@ describe("input patterns", () => {
     const root = await fixture(files);
     const discovery = await discoverWorkspace({ root, inputs: ["docs/sub/*"] });
     expect(discovery.selected).toEqual(["docs/sub/b.md", "docs/sub/c.markdown"]);
+  });
+});
+
+describe("link targets in folders that discovery does not enter", () => {
+  const files = {
+    "mdtools.config.json": '{"extends":["recommended","github"]}',
+    "index.md": [
+      "[Guide](dist/guide.md#guide), [report](docs/coverage/report.md),",
+      "[package](node_modules/package/readme.md), [folder](dist/),",
+      "[cache](.npm-cache/notes.md), and [linked](linked/note.md#note).",
+      "",
+    ].join("\n"),
+    "dist/guide.md": "# Guide\n\n*untouched*\n",
+    "docs/coverage/report.md": "# Report\n",
+    "node_modules/package/readme.md": "# Package\n",
+    ".npm-cache/notes.md": "# Notes\n",
+    "notes/note.md": "# Note\n",
+  };
+  const findings = (stdout: string) =>
+    (JSON.parse(stdout) as { files: { path: string; diagnostics: { message: string }[] }[] }).files
+      .flatMap((file) => file.diagnostics.map((item) => `${file.path}: ${item.message}`))
+      .filter((message) => !message.includes("Reflow"));
+
+  it("are found on disk when a link names them, and are still not processed", async () => {
+    const root = await fixture(files);
+    await linkDirectory(path.join(root, "notes"), path.join(root, "linked"));
+    const checked = run(root, ["lint", "--json"]);
+    expect(checked.status, checked.stdout).toBe(0);
+    expect(findings(checked.stdout)).toEqual([]);
+    // .npm-cache is an ordinary folder now; dist, coverage, and node_modules are not processed.
+    expect(paths(checked.stdout)).toEqual([".npm-cache/notes.md", "index.md", "notes/note.md"]);
+    const written = run(root, ["format", "--write"]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(await readFile(path.join(root, "dist/guide.md"), "utf8")).toBe(files["dist/guide.md"]);
+  });
+  it("are missing when nothing is there, and keep their fragments", async () => {
+    const root = await fixture({
+      ...files,
+      "index.md": "[a](dist/absent.md), [b](dist/guide.md#nope), [c](dist/guide.md/), [d](dist)\n",
+    });
+    const checked = run(root, ["lint", "--json"]);
+    expect(findings(checked.stdout)).toEqual([
+      "index.md: Missing local target: dist/absent.md.",
+      "index.md: Missing fragment in dist/guide.md#nope.",
+      "index.md: Missing local target: dist/guide.md/.",
+    ]);
+  });
+  it("cannot be checked where a link leads outside the workspace root", async () => {
+    const root = await fixture({ ...files, "index.md": "[a](out/thing.md) and [[out/thing]]\n" });
+    const elsewhere = await fixture({ "thing.md": "# Thing\n" });
+    await linkDirectory(elsewhere, path.join(root, "out"));
+    const checked = run(root, ["lint", "--json"]);
+    expect(findings(checked.stdout)).toEqual([
+      "index.md: Local target could not be checked: out/thing.md (out leads outside the workspace root, which the tool does not read).",
+    ]);
+    const note = run(root, ["lint", "--json", "--dialect", "obsidian"]);
+    expect(findings(note.stdout)).toEqual([
+      "index.md: Local target could not be checked: out/thing.md (out leads outside the workspace root, which the tool does not read).",
+      "index.md: Local target could not be checked: out/thing (out leads outside the workspace root, which the tool does not read).",
+    ]);
+  });
+  it("are found by Obsidian paths without regard to case", async () => {
+    const root = await fixture({
+      ...files,
+      "index.md": "[[dist/guide#Guide]], [[DIST/Guide.md]], and [[linked/note#Note]]\n",
+    });
+    await linkDirectory(path.join(root, "notes"), path.join(root, "linked"));
+    const checked = run(root, ["lint", "--json", "--dialect", "obsidian"]);
+    expect(findings(checked.stdout)).toEqual(
+      foldsCase ? [] : ["index.md: Missing local target: DIST/Guide.md."],
+    );
+  });
+  it("stay missing in a folder that Git ignores, unless ignored files are link targets", async () => {
+    const root = await fixture({ ...files, ".gitignore": "dist/\n" });
+    await linkDirectory(path.join(root, "notes"), path.join(root, "linked"));
+    // On GitHub, files that Git ignores are not there.
+    const checked = run(root, ["lint", "--json", "index.md"]);
+    expect(findings(checked.stdout)).toEqual([
+      "index.md: Missing local target: dist/guide.md#guide.",
+      "index.md: Missing local target: dist/.",
+    ]);
+    await writeFile(
+      path.join(root, "mdtools.config.json"),
+      '{"extends":["recommended","github"],"resolve":{"gitIgnored":true}}',
+    );
+    expect(findings(run(root, ["lint", "--json", "index.md"]).stdout)).toEqual([]);
+  });
+  it("are found the same way by mdrefine/node", async () => {
+    const root = await fixture(files);
+    const discovery = await discoverWorkspace({ root, inputs: ["index.md"] });
+    const resolved = discovery
+      .options("index.md")
+      .workspace!.resolve("index.md", "dist/guide.md#guide", "github");
+    expect(resolved).toMatchObject({
+      status: "resolved",
+      target: "dist/guide.md",
+      fragmentExists: true,
+    });
   });
 });

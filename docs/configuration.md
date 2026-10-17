@@ -121,9 +121,9 @@ are still checked.
 
 The CLI also leaves out what `.gitignore` files exclude, decided
 [as Git decides it](cli.md#which-files-are-processed), nested Git repositories,
-symbolic links, and the directories `.git`, `.obsidian`, `node_modules`,
-`.npm-cache`, `dist`, and `coverage`. `resolve` makes two of these available as
-link targets, without ever selecting them for linting or formatting:
+symbolic links, and the directories `.git`, `.obsidian`, `node_modules`, `dist`,
+and `coverage`. `resolve` makes two of these available as link targets, without
+ever selecting them for linting or formatting:
 
 ```jsonc
 {
@@ -133,6 +133,13 @@ link targets, without ever selecting them for linting or formatting:
 
 Both default to `false`. The Markdown files of such a target are read only when
 a link's fragment needs checking.
+
+The directories that the CLI does not visit, and the targets of symbolic links
+and junctions, are still link targets: a link that names a path in or through
+them is checked on disk. A path whose real location lies outside the workspace
+root is not read and is reported as not checkable. A Git-ignored directory stays
+out unless `resolve.gitIgnored` asks for it, whatever its name, and an Obsidian
+search by note name does not look in these directories.
 
 ## Plugins
 

@@ -209,6 +209,11 @@ describe("wrapping controls", () => {
     expect(result.diagnostics[0]?.edit).toBeUndefined();
     expect(lint(source!, { config: wrap() })).toEqual([]);
   });
+  it("reflows a paragraph that ends in what an Obsidian block identifier cannot be", () => {
+    // Obsidian allows letters, digits, and hyphens in a block identifier.
+    const source = "A long line with many words that can be reflowed. ^not_an_id\n";
+    expect(verify(source, wrap()).output).not.toBe(source);
+  });
   it.each([
     "[a label](<https://example.test/a long path with protected spaces>)",
     "![an image](https://example.test/a-very-long-unbreakable-image)",
