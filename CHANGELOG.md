@@ -105,6 +105,11 @@ From every prerelease:
   replacement would get another owner or group, in place
   ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
 
+- The documentation is restructured, with new pages for the rules, dialects,
+  integrations, the library API, versions, and this changelog, and the release
+  notes come from this file
+  ([#238](https://github.com/viell-dev/slop-markdown-tools/pull/238)).
+
 ### Fixed
 
 - Documents and JSON configuration files that start with a byte order mark are
