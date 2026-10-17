@@ -15,11 +15,18 @@ notes; the prereleases' notes there are longer than their entries here.
 From `0.2.0-rc.2`:
 
 - `format --write` refuses a read-only file on every platform, where Linux and
-  macOS used to replace it, and writes nothing when a file that would change may
-  not be written. Make the file writable, or pass `--exclude` for it.
-- A file that fails while the batch is written no longer stops the run: it gets
-  an `engine/unwritable-file` error, the other files are written, and the exit
-  code is `2`.
+  macOS used to replace it: the file gets an `engine/unwritable-file` error and
+  stays unchanged. Make the file writable to format it.
+- One document that cannot be read or written, or that a rule was refused or
+  failed on, no longer keeps `format --write` from writing the others. Every
+  document that formatted is written, that one with the edits that were kept;
+  each problem is reported for its own file, and the exit code is still `2`.
+  Before, such a document kept every file from being written, and a file that
+  failed while the batch was written stopped the run. Pass `--exclude` to leave
+  a file alone.
+- In the JSON report, `written` lists the files that were written instead of
+  being `true` or `false`. A script that tested it as a boolean must test its
+  length, because an empty list counts as true in JavaScript.
 - A document that starts with a byte order mark gets its findings and edits at
   the right positions; before, it could be refused or get findings in the wrong
   places. In the library, `parse` now returns `document.source` without the
@@ -33,10 +40,14 @@ From `0.2.0-rc.2`:
   stdin that is not stops the command with exit code `2`. Before, such text was
   decoded with U+FFFD in place of what was not UTF-8, and `format --write` wrote
   those characters into the file. Save such files as UTF-8.
-- A file with more than one name, and on Linux and macOS a file whose
-  replacement would get another owner or group, is written in place. Before,
-  every file was replaced, which left the other names of a hard link with the
-  old content and could change a file's group.
+- `format --write` writes each file into the existing file instead of replacing
+  it with a new one, so the file keeps its permissions, owner and group,
+  attributes, creation time, and hard links. Before, a replaced file lost what
+  Node.js cannot copy: the other names of a hard link kept the old content, and
+  on Windows the file's own permissions were dropped, which could let more users
+  read it. A crash or power failure during the write can now leave a file
+  incomplete; see
+  [what writing keeps](https://viell-dev.github.io/slop-markdown-tools/cli.html#what-writing-keeps).
 - When a rule's edits would change a document's meaning, `format` keeps the
   other rules' edits, so `--diff` and the library's output show them, and
   reports that rule with `engine/unsafe-format` at the line where the meaning
@@ -122,9 +133,8 @@ From every prerelease:
 
 ### Changed
 
-- `format --write` checks that every changed file may be written before it
-  writes any, refuses read-only files on every platform, and reports a file that
-  fails with `engine/unwritable-file`
+- `format --write` refuses read-only files on every platform, and reports a file
+  that fails with `engine/unwritable-file`
   ([#177](https://github.com/viell-dev/slop-markdown-tools/pull/177)).
 - A file locked by another program on Windows counts as one that may not be
   read, in the CLI and in `createWorkspace` loaders
@@ -133,9 +143,15 @@ From every prerelease:
   damaged, and `createWorkspace` treats a loader error with the code
   `ERR_ENCODING_INVALID_ENCODED_DATA` as an unreadable target
   ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
-- `format --write` writes hard-linked files, and on Linux and macOS files whose
-  replacement would get another owner or group, in place
-  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
+- `format --write` writes into the existing file instead of replacing it, so
+  that the file keeps its permissions, attributes, owner, creation time, and
+  hard links, and writes the original content back when a write fails part way
+  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234),
+  [#255](https://github.com/viell-dev/slop-markdown-tools/pull/255)).
+- `format --write` writes every document that formatted, and reports a document
+  that could not be read, formatted as configured, or written for its own file;
+  the JSON report's `written` lists the files written
+  ([#255](https://github.com/viell-dev/slop-markdown-tools/pull/255)).
 - The documentation is restructured, with new pages for the rules, dialects,
   integrations, the library API, versions, and this changelog, and the release
   notes come from this file
