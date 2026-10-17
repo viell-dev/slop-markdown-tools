@@ -55,11 +55,12 @@ links.
   `~/.config/git/ignore`), and the first with a pattern that matches decides. So
   a negated pattern includes a file again, but nothing below an excluded
   directory can be included, and nothing in a workspace root that Git ignores is
-  processed. Inside a nested repository only its own rules apply, and outside a
-  repository only the workspace's `.gitignore` files. The tool asks Git which
-  global excludes file it reads, so without Git installed that file is not read.
-  Letter case is ignored on Windows and macOS, as Git does there by default, and
-  not elsewhere.
+  processed, except files that Git tracks, which it never ignores. Inside a
+  nested repository only its own rules apply, and outside a repository only the
+  workspace's `.gitignore` files. The tool asks Git which global excludes file
+  it reads and which files it tracks; without Git installed, that file is not
+  read and tracked files are ignored like the others. Letter case is ignored on
+  Windows and macOS, as Git does there by default, and not elsewhere.
 - A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
   PowerShell, cmd, and npm scripts. It is relative to the current directory,

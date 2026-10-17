@@ -12,7 +12,13 @@ import { minimatch, Minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { decodeText } from "./encoding.js";
-import { excludesFile, globalExcludesFile, optionalText, repositoryTop } from "./git.js";
+import {
+  excludesFile,
+  globalExcludesFile,
+  optionalText,
+  repositoryTop,
+  trackedFiles,
+} from "./git.js";
 import { isMarkdownName } from "./index.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
@@ -328,36 +334,12 @@ export async function vaultFor(set: FileSet, name: string): Promise<Vault | unde
   return described.vault;
 }
 /**
- * The files of the workspace at `rootPath`, and the documents that `supplied`
- * files, folders, and patterns select, or all of them when `supplied` is
- * empty. Relative inputs are resolved from `base`.
- *
- * A folder or pattern selects the Markdown files in it or matching it, by
- * name (`isMarkdownName`), that nothing ignores. A file named on its own is
- * selected whatever its name: naming it is the request. When ignore rules
- * leave out a named file or folder, `skipped` says so and why.
+ * Where Git's ignore rules for the workspace at `root` come from. They start at
+ * `top`, the top level of the repository that holds the root, which can lie
+ * above it; in each repository nested in the workspace, only its own rules
+ * apply. What a repository tracks is never ignored.
  */
-export async function discover(
-  rootPath: string,
-  supplied: string[],
-  excluded: string[],
-  resolve: ResolveOptions = {},
-  base = process.cwd(),
-): Promise<FileSet> {
-  const root = await realpath(rootPath);
-  // Git's rules start at the top level of the repository that holds the root,
-  // which can lie above it.
-  let top: string | undefined;
-  try {
-    top = await repositoryTop(root);
-  } catch (error) {
-    const code = refusal(error);
-    if (!code) throw error;
-    // Only the root itself can refuse it: each folder above leads to the root.
-    throw new Error(`Workspace root cannot be read: ${rootPath} (${refusalText(code)})`, {
-      cause: error,
-    });
-  }
+function gitRules(root: string, top: string | undefined) {
   /** The root, relative to the repository's top level. */
   const lead = top ? path.relative(top, root).split(path.sep).join("/") : "";
   /** A path relative to the root, relative to the repository's top level instead. */
@@ -375,10 +357,15 @@ export async function discover(
     shown((error as NodeJS.ErrnoException).path ?? fallback);
   /** The global excludes file's rules, found once, from the first repository found. */
   let global: Promise<IgnoreLayer | undefined> | undefined;
+  /** The tracked files, from the top level, and the folders that hold them. */
+  const tracked = new Set<string>();
+  const holding = new Set<string>();
+  const fold = (name: string) => (caseInsensitive ? name.toLowerCase() : name);
   /**
    * The rules for the top level of the repository in `directory`, `base` from
    * the outer repository's top level, with the lowest precedence first: the
-   * global excludes file, then the repository's `info/exclude`.
+   * global excludes file, then the repository's `info/exclude`. What the
+   * repository tracks is recorded on the way.
    */
   async function repositoryLayers(directory: string, base: string): Promise<IgnoreLayer[]> {
     global ??= globalExcludesFile(directory).then(async (file) => {
@@ -386,6 +373,7 @@ export async function discover(
       return text === undefined ? undefined : ignoreLayer("", shown(file!), text);
     });
     const shared = global;
+    const listed = trackedFiles(directory);
     let text: string | undefined;
     let exclude: string | undefined;
     try {
@@ -394,7 +382,13 @@ export async function discover(
     } finally {
       // Git runs in the repository's folder, which Windows does not let anyone
       // remove until it is done, so discovery waits for it also after a failure.
-      await shared.catch(() => undefined);
+      await Promise.allSettled([shared, listed]);
+    }
+    for (const name of (await listed) ?? []) {
+      let at = fold(base ? `${base}/${name}` : name);
+      tracked.add(at);
+      for (at = path.posix.dirname(at); at !== "." && !holding.has(at); at = path.posix.dirname(at))
+        holding.add(at);
     }
     const layer = await shared;
     return [
@@ -402,6 +396,40 @@ export async function discover(
       ...(text === undefined ? [] : [ignoreLayer(base, shown(exclude!), text)]),
     ];
   }
+  /** Whether Git tracks the path `at`, from the top level, or a file in that folder. */
+  const isTracked = (at: string) => tracked.has(fold(at)) || holding.has(fold(at));
+  return { lead, fromTop, shown, failed, repositoryLayers, isTracked };
+}
+/**
+ * The files of the workspace at `rootPath`, and the documents that `supplied`
+ * files, folders, and patterns select, or all of them when `supplied` is
+ * empty. Relative inputs are resolved from `base`.
+ *
+ * A folder or pattern selects the Markdown files in it or matching it, by
+ * name (`isMarkdownName`), that nothing ignores. A file named on its own is
+ * selected whatever its name: naming it is the request. When ignore rules
+ * leave out a named file or folder, `skipped` says so and why.
+ */
+export async function discover(
+  rootPath: string,
+  supplied: string[],
+  excluded: string[],
+  resolve: ResolveOptions = {},
+  base = process.cwd(),
+): Promise<FileSet> {
+  const root = await realpath(rootPath);
+  let top: string | undefined;
+  try {
+    top = await repositoryTop(root);
+  } catch (error) {
+    const code = refusal(error);
+    if (!code) throw error;
+    // Only the root itself can refuse it: each folder above leads to the root.
+    throw new Error(`Workspace root cannot be read: ${rootPath} (${refusalText(code)})`, {
+      cause: error,
+    });
+  }
+  const { lead, fromTop, shown, failed, repositoryLayers, isTracked } = gitRules(root, top);
   const files: Record<string, WorkspaceSource> = {};
   const directories: string[] = [];
   const unlisted: string[] = [];
@@ -451,12 +479,19 @@ export async function discover(
     }
   }
   /**
-   * Record why the entry `name` leaves out the named inputs at or below it,
-   * unless something above it did already.
+   * Record why the entry `name` leaves out the named inputs at or below it for
+   * which `applies` holds, unless something above it did already.
    */
-  function leaveNamed(name: string, why: (input: NamedInput) => string) {
-    for (const request of named.get(name) ?? []) request.reason ??= why(request);
+  function leaveNamed(
+    name: string,
+    why: (input: NamedInput) => string,
+    applies: (input: NamedInput) => boolean = () => true,
+  ) {
+    for (const request of named.get(name) ?? [])
+      if (applies(request)) request.reason ??= why(request);
   }
+  /** Whether Git's rules can leave out a named input: Git ignores nothing that it tracks. */
+  const untracked = (input: NamedInput) => !isTracked(fromTop(input.path));
   /** Directories left out, with the path whose read the system refused. */
   const refused: { directory: string; reading: string; code: RefusalCode }[] = [];
   const reason = (item: { reading: string; code: RefusalCode }, subject: string) =>
@@ -497,8 +532,9 @@ export async function discover(
     }
   }
   /**
-   * Visit a directory. Below a folder that Git ignores, which is visited only
-   * for link targets, nothing can be included again, as in Git.
+   * Visit a directory. Below a folder that Git's rules exclude, nothing can be
+   * included again, as in Git, except what Git tracks. Such a folder is visited
+   * for what it tracks, and otherwise only for link targets.
    */
   async function walk(
     relative: string,
@@ -535,6 +571,10 @@ export async function discover(
       const rule = gitIgnoredAbove
         ? undefined
         : gitIgnoreRule(scopes, entry.name, entry.isDirectory());
+      const gitExcluded = gitIgnoredAbove || rule !== undefined;
+      // Git ignores no file that it tracks, and no folder that holds one,
+      // though the folder's other files stay ignored.
+      const gitIgnored = gitExcluded && !isTracked(fromTop(name));
       const skippedName = alwaysSkipped.has(entry.name);
       if (skippedName || entry.isSymbolicLink()) {
         if (skippedName)
@@ -545,16 +585,18 @@ export async function discover(
           );
         // Not entered, but a link can name what is in it or behind it, unless
         // Git ignores it and so its files are no link targets.
-        if (!(gitIgnoredAbove || rule) || resolve.gitIgnored === true) unlisted.push(name);
+        if (!gitIgnored || resolve.gitIgnored === true) unlisted.push(name);
         continue;
       }
       if (rule)
-        leaveNamed(name, (input) =>
-          input.path === name
-            ? `matched by "${rule.pattern}" in ${rule.file}`
-            : `in ${name}, which "${rule.pattern}" in ${rule.file} matches`,
+        leaveNamed(
+          name,
+          (input) =>
+            input.path === name
+              ? `matched by "${rule.pattern}" in ${rule.file}`
+              : `in ${name}, which "${rule.pattern}" in ${rule.file} matches`,
+          untracked,
         );
-      const gitIgnored = gitIgnoredAbove || rule !== undefined;
       if (gitIgnored && resolve.gitIgnored !== true) continue;
       const full = path.join(root, name);
       if (entry.isDirectory()) {
@@ -581,7 +623,12 @@ export async function discover(
             leaveOut(name, failed(error, path.join(full, ".git")), error);
             continue;
           }
-        await walk(name, inner, targetOnly || gitIgnored || nested, gitIgnored);
+        await walk(
+          name,
+          inner,
+          targetOnly || gitIgnored || nested,
+          nested && !gitIgnored ? false : gitExcluded,
+        );
       } else if (entry.isFile()) {
         const request = named.get(name)?.find((input) => input.path === name && !input.directory);
         const markdown = isMarkdownName(name);
@@ -608,15 +655,17 @@ export async function discover(
     }
   }
   await walk("", rootLayers, false, ignoredRoot !== undefined);
-  // Nothing is processed in a root that Git ignores.
+  // Nothing that Git does not track is processed in a root that Git ignores.
   if (ignoredRoot) {
     const folder = path.posix.relative(lead, ignoredRoot.folder);
     const why = folder
       ? `in ${folder}, which "${ignoredRoot.pattern}" in ${ignoredRoot.file} matches`
       : `matched by "${ignoredRoot.pattern}" in ${ignoredRoot.file}`;
     for (const input of namedInputs.values())
-      input.reason ??= folder ? why : `in the workspace root, which is ${why}`;
-    if (!namedInputs.size) namedInputs.set(".", { path: ".", directory: true, reason: why });
+      if (untracked(input))
+        input.reason ??= folder ? why : `in the workspace root, which is ${why}`;
+    if (!namedInputs.size && !isTracked(lead))
+      namedInputs.set(".", { path: ".", directory: true, reason: why });
   }
   // An input in a directory that was left out is an error: the user asked for it.
   for (const { input, path: request } of located) {

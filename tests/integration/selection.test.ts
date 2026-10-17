@@ -22,12 +22,13 @@ function git(cwd: string, args: string[]): void {
   expect(done.status, done.stderr).toBe(0);
 }
 /**
- * The paths among `names`, relative to `directory`, that Git ignores there.
- * Git reads the settings that discovery reads: the test run names no user or
- * system settings, and so no global excludes file, unless a test names one.
+ * The paths among `names`, relative to `directory`, that Git ignores there,
+ * where they are not tracked. Git reads the settings that discovery reads: the
+ * test run names no user or system settings, and so no global excludes file,
+ * unless a test names one.
  */
 function gitIgnored(directory: string, names: string[]): string[] {
-  const checked = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], {
+  const checked = spawnSync("git", ["check-ignore", "--stdin"], {
     cwd: directory,
     input: names.join("\n") + "\n",
     encoding: "utf8",
@@ -158,6 +159,57 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
       ]);
     },
   );
+  it.skipIf(!hasGit)("leave in what Git tracks, also in a folder that it ignores", async () => {
+    // A global excludes file can name a file that a repository tracks.
+    const settings = await fixture({ ignore: "AGENTS.md\n" });
+    const root = await fixture({
+      ".gitignore": "generated/\n",
+      "AGENTS.md": "# Agents\n",
+      "generated/kept.md": "# Kept\n",
+      "generated/other.md": "Other.\n",
+      "generated/deep/kept.md": "Deep.\n",
+      "generated/deep/other.md": "Other.\n",
+      "index.md": "See [the agents](AGENTS.md) and [the kept file](generated/kept.md#kept).\n",
+    });
+    gitInit(root);
+    await globalExcludes(settings, path.join(settings, "ignore"));
+    git(root, ["add", "-f", "AGENTS.md", "generated/kept.md", "generated/deep/kept.md"]);
+    const names = [
+      "AGENTS.md",
+      "generated/deep/kept.md",
+      "generated/deep/other.md",
+      "generated/kept.md",
+      "generated/other.md",
+      "index.md",
+    ];
+    const ignored = gitIgnored(root, names);
+    const set = await discover(root, [], []);
+    expect(set.selected).toEqual(names.filter((name) => !ignored.includes(name)));
+    expect(set.selected).toEqual([
+      "AGENTS.md",
+      "generated/deep/kept.md",
+      "generated/kept.md",
+      "index.md",
+    ]);
+    // The files that Git tracks are link targets.
+    const checked = run(root, ["lint", "--json", "index.md"]);
+    expect(checked.status, checked.stdout).toBe(0);
+    // Of the named inputs in the folder, only the one that Git ignores is skipped.
+    const inputs = ["generated/kept.md", "generated/other.md"];
+    const skipped = await discover(
+      root,
+      inputs.map((name) => path.join(root, name)),
+      [],
+    );
+    expect(skipped.selected).toEqual(["generated/kept.md"]);
+    expect(skipped.skipped.map((item) => item.message)).toEqual([
+      'Skipped ignored input: generated/other.md (in generated, which "generated/" in .gitignore matches). It is not processed.',
+    ]);
+    // The same in a root that Git ignores.
+    const generated = await discover(path.join(root, "generated"), [], []);
+    expect(generated.selected).toEqual(["deep/kept.md", "kept.md"]);
+    expect(generated.skipped).toEqual([]);
+  });
   it.skipIf(!hasGit)(
     "read info/exclude where a .git file leads, as in a linked worktree or a submodule",
     async () => {
