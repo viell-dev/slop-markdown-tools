@@ -9,6 +9,10 @@ body:
       options:
         - label: I searched the open and closed issues and found no report of this.
           required: true
+        - label:
+            I follow the project's [code of
+            conduct](https://github.com/viell-dev/slop-markdown-tools/blob/main/CODE_OF_CONDUCT.md).
+          required: true
   - type: textarea
     id: environment
     attributes:

@@ -112,5 +112,6 @@ parsed meaning.
 ## Contributing, security, and license
 
 [CONTRIBUTING.md](CONTRIBUTING.md) explains how to report a defect and how to
-make a change. Report vulnerabilities as [SECURITY.md](SECURITY.md) describes.
-mdrefine is released under the [MIT license](LICENSE).
+make a change, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) what is expected of
+everyone who takes part. Report vulnerabilities as [SECURITY.md](SECURITY.md)
+describes. mdrefine is released under the [MIT license](LICENSE).

@@ -229,6 +229,19 @@ is not required. Zero required approvals is deliberate for a single-account,
 agent-maintained repository; PRs, passing checks, and resolved review threads
 remain mandatory.
 
+Other repository settings, set with the owner's authorization on 2026-10-17:
+
+- GitHub Actions may run only actions that GitHub owns, pinned by full commit
+  SHA. A workflow that needs another action, or a tag instead of a SHA, fails to
+  start until the owner changes the setting; ask before adding one.
+- CodeQL's default setup scans JavaScript, TypeScript, and the workflows.
+- Wiki, Projects, and Discussions are off; issues and pull requests are the only
+  channels.
+
+Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
+comment, lock a conversation, or close an item that breaks it, and say why where
+it helps. Blocking an account is for the owner.
+
 ## Technical map
 
 - TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
