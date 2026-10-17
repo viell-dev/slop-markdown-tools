@@ -1163,6 +1163,11 @@ describe("configuration and plugins", () => {
       }),
     ).toThrow("Circular");
   });
+  it("matches override patterns with their letter case on every system", () => {
+    const config: Config = { overrides: [{ files: ["docs/**"], dialect: "obsidian" }] };
+    expect(resolveConfig({ config, path: "docs/a.md" }).dialect).toBe("obsidian");
+    expect(resolveConfig({ config, path: "Docs/a.md" }).dialect).toBe("github");
+  });
   it("accepts one preset name for extends and a severity alone in a list", () => {
     expect(resolveConfig({ config: { extends: "github" } })).toEqual(
       resolveConfig({ config: { extends: ["github"] } }),

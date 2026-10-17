@@ -52,7 +52,9 @@ links.
 - `.gitignore` files apply as in Git: the deepest one with a pattern that
   matches a path decides, so a negated pattern there includes a file again, but
   nothing below an excluded directory can be included. Letter case is ignored on
-  Windows and macOS, as Git does there by default, and not elsewhere.
+  Windows and macOS, as Git does there by default, and not elsewhere. The
+  configuration's `ignore` and `overrides` patterns match case exactly on every
+  system, so that a shared configuration applies to the same files everywhere.
 - A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
   PowerShell, cmd, and npm scripts. It is relative to the current directory,

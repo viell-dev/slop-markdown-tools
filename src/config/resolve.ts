@@ -148,7 +148,7 @@ export const configSchema: JsonSchemaObject = deepFreeze({
     rules: { $ref: "#/definitions/rules" },
     ignore: {
       description:
-        "Path patterns of documents that are never linted or formatted. They stay link targets.",
+        "Path patterns of documents that are never linted or formatted, matched with their letter case. They stay link targets.",
       ...strings,
     },
     plugins: {
@@ -164,7 +164,8 @@ export const configSchema: JsonSchemaObject = deepFreeze({
         additionalProperties: false,
         properties: {
           files: {
-            description: "Path patterns, matched against paths relative to the workspace root.",
+            description:
+              "Path patterns, matched with their letter case against paths relative to the workspace root.",
             ...strings,
             minItems: 1,
           },

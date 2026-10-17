@@ -334,7 +334,12 @@ describe("library API", () => {
     );
     for (const name of Object.keys(built)) expect(imported, name).toContain(name);
     const manifest = JSON.parse(read("package.json")) as { exports: Record<string, unknown> };
-    expect(Object.keys(manifest.exports)).toEqual([".", "./node", "./config.schema.json"]);
+    expect(Object.keys(manifest.exports)).toEqual([
+      ".",
+      "./node",
+      "./config.schema.json",
+      "./package.json",
+    ]);
   });
 });
 

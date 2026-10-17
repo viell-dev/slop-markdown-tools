@@ -127,6 +127,33 @@ describe("CLI", () => {
       "note.md",
     ]);
   });
+  it("matches configuration patterns with their letter case on every system", async () => {
+    // .gitignore files and input patterns ignore case on Windows and macOS; a configuration,
+    // which every system shares, selects the same files everywhere.
+    const root = await fixture({
+      "mdtools.config.json": JSON.stringify({
+        ignore: ["drafts/**", "skip/**"],
+        overrides: [{ files: ["notes/**", "other/**"], rules: { "style/emphasis": "off" } }],
+      }),
+      "Drafts/a.md": "A note.\n",
+      "skip/b.md": "A note.\n",
+      "Notes/c.md": "A *note*.\n",
+      "other/d.md": "A *note*.\n",
+    });
+    const result = run(root, ["lint", "--json"]);
+    const report = JSON.parse(result.stdout) as {
+      files: { path: string; diagnostics: { rule: string }[] }[];
+    };
+    expect(report.files.map((file) => file.path)).toEqual([
+      "Drafts/a.md",
+      "Notes/c.md",
+      "other/d.md",
+    ]);
+    const rules = report.files.map((file) => [
+      ...new Set(file.diagnostics.map(({ rule }) => rule)),
+    ]);
+    expect(rules).toEqual([[], ["style/emphasis"], []]);
+  });
   it("indexes ignored and nested targets only when opted in, without selecting them", async () => {
     const root = await fixture({
       "mdtools.config.json": JSON.stringify({

@@ -204,6 +204,10 @@ From every prerelease:
 
 ### Fixed
 
+- The configuration and command-line pages say that configuration patterns match
+  letter case on every system, while `.gitignore` files and input patterns
+  ignore it on Windows and macOS
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
 - `format` stops on an error of the workspace, as `lint` does, instead of
   reporting it as `engine/unsafe-format`, and a plugin named `engine`, whose
   findings would pass for the engine's own, is rejected

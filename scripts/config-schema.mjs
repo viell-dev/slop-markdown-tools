@@ -5,8 +5,9 @@
 //   npm run schema
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { format } from "prettier";
+import { format, resolveConfig } from "prettier";
 import { configSchema } from "../dist/index.js";
 
 const file = path.join(import.meta.dirname, "..", "config.schema.json");
-await writeFile(file, await format(JSON.stringify(configSchema), { filepath: file }));
+const options = { ...(await resolveConfig(file)), filepath: file };
+await writeFile(file, await format(JSON.stringify(configSchema), options));

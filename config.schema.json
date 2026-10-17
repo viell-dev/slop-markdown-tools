@@ -26,15 +26,12 @@
     },
     "extends": {
       "description": "Presets to start from, in order: a preset name or a list of them. Without it, the configuration starts from recommended.",
-      "anyOf": [
-        { "type": "string" },
-        { "type": "array", "items": { "type": "string" } }
-      ]
+      "anyOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
     },
     "dialect": { "$ref": "#/definitions/dialect" },
     "rules": { "$ref": "#/definitions/rules" },
     "ignore": {
-      "description": "Path patterns of documents that are never linted or formatted. They stay link targets.",
+      "description": "Path patterns of documents that are never linted or formatted, matched with their letter case. They stay link targets.",
       "type": "array",
       "items": { "type": "string" }
     },
@@ -52,7 +49,7 @@
         "additionalProperties": false,
         "properties": {
           "files": {
-            "description": "Path patterns, matched against paths relative to the workspace root.",
+            "description": "Path patterns, matched with their letter case against paths relative to the workspace root.",
             "type": "array",
             "items": { "type": "string" },
             "minItems": 1
@@ -66,14 +63,7 @@
   "definitions": {
     "dialect": {
       "description": "The renderer whose syntax documents are read in. When nothing names one, github is assumed, or obsidian inside a vault.",
-      "enum": [
-        "commonmark",
-        "github",
-        "forgejo",
-        "codeberg",
-        "gitea",
-        "obsidian"
-      ]
+      "enum": ["commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian"]
     },
     "severity": { "enum": ["off", "warn", "error"] },
     "rules": {
@@ -90,10 +80,7 @@
           },
           {
             "type": "array",
-            "items": [
-              { "$ref": "#/definitions/severity" },
-              { "type": "object" }
-            ],
+            "items": [{ "$ref": "#/definitions/severity" }, { "type": "object" }],
             "minItems": 2,
             "maxItems": 2
           }

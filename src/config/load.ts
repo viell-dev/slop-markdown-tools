@@ -18,7 +18,7 @@ export interface LoadedConfig {
   file?: string;
 }
 /** The names of the configuration files that the search finds; one directory may hold one. */
-export const configFiles = [
+const configFiles = [
   "mdtools.config.jsonc",
   "mdtools.config.json",
   "mdtools.config.mjs",
