@@ -81,8 +81,9 @@ From `0.2.0-rc.2`:
   form, turn its rule off or set its option, such as
   `"style/heading": ["warn", { "closing": "keep" }]`.
 - `.gitignore` files decide as in Git: a deeper file can include again what a
-  higher one excludes, and patterns match letter case exactly on Linux. Files
-  that were left out before can be linted now, and the reverse.
+  higher one excludes, and patterns match letter case exactly unless the
+  repository's `core.ignorecase` is on, as Git sets it on Windows and macOS.
+  Files that were left out before can be linted now, and the reverse.
 - Git's other ignore rules apply too: `.gitignore` files above the workspace
   root, `.git/info/exclude`, and the global excludes file, while a file that Git
   tracks is never ignored. With `--root` on a folder of a repository, or with a
