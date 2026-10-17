@@ -200,8 +200,55 @@ describe("CLI", () => {
       "a.md": "*fine*\n",
       "b.md": "bad\n",
     });
-    expect(run(root, ["format", "--write", "."]).status).toBe(2);
+    const written = run(root, ["format", "--write", "."]);
+    expect(written.status).toBe(2);
+    expect(written.stderr).toContain(
+      "b.md:1:1: error engine/unsafe-format: local/bad would change the parsed meaning at line 1; none of its edits were applied.\n",
+    );
     expect(await readFile(path.join(root, "a.md"), "utf8")).toBe("*fine*\n");
+  });
+  it("reports a rule that fails for its file, processes the others, and writes nothing", async () => {
+    const root = await fixture({
+      "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/fragile":"warn"}}',
+      "plugin.mjs":
+        'export default {name:"local",rules:{fragile:{kind:"problem",description:"Fragile",check:({document})=>{if(document.source.includes("boom"))throw new Error("boom");return[{start:0,message:"Checked"}];}}}};',
+      "a.md": "boom\n",
+      "b.md": "*fine*\n",
+    });
+    const failure =
+      "a.md:1:1: error engine/rule-error: Rule local/fragile failed (Error: boom); the rule was skipped for this document.\n";
+    const linted = run(root, ["lint", "."]);
+    expect(linted.status).toBe(2);
+    expect(linted.stderr).toContain(failure);
+    expect(linted.stderr).toContain("b.md:1:1: warn local/fragile: Checked\n");
+    expect(linted.stderr).toContain("2 file(s) linted; 1 error(s), 3 warning(s).\n");
+    const written = run(root, ["format", "--write", "--json", "."]);
+    expect(written.status).toBe(2);
+    const report = JSON.parse(written.stdout) as {
+      written: boolean;
+      files: { path: string; changed: boolean; diagnostics: { rule: string }[] }[];
+    };
+    expect(report.written).toBe(false);
+    expect(
+      report.files.map((file) => [file.path, file.changed, file.diagnostics[0]?.rule]),
+    ).toEqual([
+      ["a.md", false, "engine/rule-error"],
+      ["b.md", true, "local/fragile"],
+    ]);
+    expect(await readFile(path.join(root, "b.md"), "utf8")).toBe("*fine*\n");
+  });
+  it("stops at a plugin rule that does not have the shape of a rule", async () => {
+    const root = await fixture({
+      "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/case":"warn"}}',
+      "plugin.mjs":
+        'export default {name:"local",rules:{case:{kind:"style",phase:"Inline",description:"Case",check:()=>[{start:0,message:"Case",edit:{start:0,end:1,text:"T"}}]}}};',
+      "a.md": "text\n",
+    });
+    const checked = run(root, ["format", "--check", "."]);
+    expect(checked.status).toBe(2);
+    expect(checked.stderr).toBe(
+      'mdtools: Invalid rule local/case: its phase is "Inline", not "inline", "block", or "document".\n',
+    );
   });
   it("applies literal exclusions without removing link targets", async () => {
     const root = await fixture({
