@@ -48,6 +48,194 @@ function inForgeMath(source: string, start: number, end: number): boolean {
     source.slice(end, lineEnd).includes("\\)")
   );
 }
+/** The blocks whose inline content the parser reads, and pairs delimiters in, as a whole. */
+const inlineBlocks = new Set(["paragraph", "heading", "tableCell"]);
+/** Whether the character at `index` is escaped by an odd number of backslashes before it. */
+function escaped(source: string, index: number): boolean {
+  let count = 0;
+  while (source[index - count - 1] === "\\") count++;
+  return count % 2 === 1;
+}
+/**
+ * How micromark classifies a character next to a delimiter run: 1 for
+ * whitespace and for the start or end of the text, 2 for punctuation and
+ * symbols, and 0 for anything else. It looks at UTF-16 code units, so half of
+ * a surrogate pair counts as anything else.
+ */
+function characterGroup(character: string | undefined): 0 | 1 | 2 {
+  if (character === undefined || /\s/.test(character)) return 1;
+  return /\p{P}|\p{S}/u.test(character) ? 2 : 0;
+}
+/** A run of `*` or `_` that micromark reads as one delimiter sequence. */
+interface DelimiterRun {
+  marker: string;
+  /** The part of the run that has not paired yet. */
+  start: number;
+  end: number;
+  open: boolean;
+  close: boolean;
+}
+/**
+ * The delimiter runs at `positions`, sorted, with the characters that `at`
+ * gives. Whether a run can open or close follows micromark, which also lets a
+ * run next to another `*` or `_`, or to a `~` in GFM, do both. Container
+ * markers such as `>` count as punctuation here, while micromark sees the line
+ * ending before them; the caller compares the result with the parse.
+ */
+function delimiterRuns(
+  positions: number[],
+  at: (index: number) => string | undefined,
+  gfm: boolean,
+): DelimiterRun[] {
+  const runs: DelimiterRun[] = [];
+  for (const position of positions) {
+    const last = runs.at(-1);
+    if (last && last.end === position && at(position) === last.marker) last.end++;
+    else
+      runs.push({ marker: at(position)!, start: position, end: position + 1, open: false, close: false });
+  }
+  const attention = (character: string | undefined) =>
+    character === "*" || character === "_" || (gfm && character === "~");
+  for (const run of runs) {
+    const previous = at(run.start - 1);
+    const next = at(run.end);
+    const before = characterGroup(previous);
+    const after = characterGroup(next);
+    const open = after === 0 || (after === 2 && before !== 0) || attention(next);
+    const close = before === 0 || (before === 2 && after !== 0) || attention(previous);
+    run.open = run.marker === "*" ? open : open && (before !== 0 || !close);
+    run.close = run.marker === "*" ? close : close && (after !== 0 || !open);
+  }
+  return runs;
+}
+/**
+ * The emphasis and strong emphasis that micromark makes of `runs`, as
+ * `start:end:size` strings: each closing run, in order, pairs with the nearest
+ * opening run of its marker before it, except where the rule of three forbids
+ * it, and the runs between them become text.
+ */
+function pairings(runs: DelimiterRun[]): string[] {
+  const left = runs.map((run) => ({ ...run }));
+  const pairs: string[] = [];
+  for (let index = 0; index < left.length; index++) {
+    const closer = left[index]!;
+    while (closer.close && closer.end > closer.start) {
+      const closeSize = closer.end - closer.start;
+      let found = index - 1;
+      for (; found >= 0; found--) {
+        const opener = left[found]!;
+        const openSize = opener.end - opener.start;
+        if (!opener.open || !openSize || opener.marker !== closer.marker) continue;
+        if ((opener.close || closer.open) && closeSize % 3 && !((openSize + closeSize) % 3))
+          continue;
+        break;
+      }
+      if (found < 0) break;
+      const opener = left[found]!;
+      const use = opener.end - opener.start > 1 && closeSize > 1 ? 2 : 1;
+      opener.end -= use;
+      closer.start += use;
+      pairs.push(`${opener.end}:${closer.start}:${use}`);
+      for (let between = found + 1; between < index; between++)
+        left[between]!.end = left[between]!.start;
+    }
+  }
+  return pairs.sort();
+}
+/**
+ * The `*` and `_` characters that micromark reads as delimiters in the text of
+ * `scope`, a block or a link whose text it pairs delimiters in on its own: the
+ * markers of emphasis, and unescaped characters left as text. Also the
+ * emphasis there, as `start:end:size` strings, and whether changing markers
+ * could change how they pair: when a character left as text could open or
+ * close emphasis, as in `*a _b* c_`, or when one run holds the markers of two
+ * emphases, or a marker and text, as in `***a***` or `*****a***`.
+ */
+function scopeDelimiters(
+  source: string,
+  scope: Nodes,
+): { positions: number[]; emphasis: string[]; suspicious: boolean } {
+  const positions: number[] = [];
+  const markers = new Set<string>();
+  const emphasis: string[] = [];
+  const literal = new Set<number>();
+  const visit = (node: Nodes) => {
+    if (node !== scope && (node.type === "link" || node.type === "linkReference")) return;
+    if (node.type === "emphasis" || node.type === "strong") {
+      const [a, b] = range(node);
+      const size = node.type === "strong" ? 2 : 1;
+      emphasis.push(`${a}:${b}:${size}`);
+      markers.add(`${a}:${a + size}`).add(`${b - size}:${b}`);
+      for (let i = 0; i < size; i++) positions.push(a + i, b - size + i);
+    } else if (node.type === "text") {
+      const [a, b] = range(node);
+      for (let i = a; i < b; i++)
+        if ((source[i] === "*" || source[i] === "_") && !escaped(source, i)) {
+          positions.push(i);
+          literal.add(i);
+        }
+    }
+    if ("children" in node) for (const child of node.children) visit(child);
+  };
+  visit(scope);
+  positions.sort((a, b) => a - b);
+  const suspicious = delimiterRuns(positions, (index) => source[index], true).some((run) => {
+    if (markers.has(`${run.start}:${run.end}`)) return false;
+    for (let index = run.start; index < run.end; index++)
+      if (literal.has(index)) return run.open || run.close;
+    return true;
+  });
+  return { positions, emphasis: emphasis.sort(), suspicious };
+}
+/** A link label as CommonMark compares labels: whitespace collapsed and case folded. */
+const normalizedLabel = (label: string) =>
+  label.replace(/[\t\n\r ]+/g, " ").trim().toLowerCase().toUpperCase();
+/** The labels of the document's definitions and footnotes that hold `*` or `_`, normalized. */
+function markerLabels(tree: Root): string[] {
+  const labels: string[] = [];
+  walk(tree, (node) => {
+    if (
+      (node.type === "definition" || node.type === "footnoteDefinition") &&
+      node.label &&
+      /[*_]/.test(node.label)
+    )
+      labels.push(normalizedLabel(node.label));
+  });
+  return labels;
+}
+/**
+ * The first lines of the document's Obsidian callouts, which Obsidian reads
+ * on their own as the callouts' titles, from the `[!` on.
+ */
+function calloutTitles(document: Document): Range[] {
+  const titles: Range[] = [];
+  if (document.dialect === "obsidian")
+    walk(document.tree, "blockquote", (quote) => {
+      const first = quote.children[0];
+      if (first?.type !== "paragraph") return;
+      const [start] = range(first);
+      const end = lineBounds(document.source, start, start)[1];
+      if (/^\[![\w-]+\]/.test(document.source.slice(start, end))) titles.push([start, end]);
+    });
+  return titles;
+}
+/**
+ * Visit the nodes of `type` with their scope: the innermost link, whose text
+ * micromark pairs delimiters in on its own, or else the block that holds them.
+ */
+function eachInline<T extends "emphasis" | "strong">(
+  tree: Root,
+  type: T,
+  visitor: (node: Extract<Nodes, { type: T }>, scope: Nodes) => void,
+): void {
+  const step = (node: Nodes, scope: Nodes) => {
+    if (inlineBlocks.has(node.type) || node.type === "link" || node.type === "linkReference")
+      scope = node;
+    if (node.type === type) visitor(node as Extract<Nodes, { type: T }>, scope);
+    if ("children" in node) for (const child of node.children) step(child, scope);
+  };
+  step(tree, tree);
+}
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
     description: `Choose ${type} delimiters without reprinting their contents.`,
@@ -56,11 +244,17 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
     schema: optionsSchema({ marker: { enum: ["*", "_"] } }),
     check({ document, options }) {
       const findings: Finding[] = [];
-      walk(document.tree, type, (node) => {
+      const { source } = document;
+      const gfm = document.dialect !== "commonmark";
+      const size = type === "strong" ? 2 : 1;
+      const marker = String(options.marker ?? fallback).repeat(size);
+      const labels = markerLabels(document.tree);
+      const titles = calloutTitles(document);
+      /** The ranges of the emphasis to change, by the scope that holds them. */
+      const candidates = new Map<Nodes, Range[]>();
+      eachInline(document.tree, type, (node, scope) => {
         const [start, end] = range(node);
-        const size = type === "strong" ? 2 : 1;
-        const marker = String(options.marker ?? fallback).repeat(size);
-        const original = document.source.slice(start, end);
+        const original = source.slice(start, end);
         if (original.startsWith(marker)) return;
         // Underscores cannot delimit intraword emphasis. Preserve these valid forms.
         if (
@@ -87,19 +281,98 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
             document.source.startsWith(".py", start + size))
         )
           return;
-        for (const [a, b] of [
-          [start, start + size],
-          [end - size, end],
-        ] as const) {
-          findings.push({
-            start: a,
-            end: b,
-            message: `Use ${JSON.stringify(marker)} for ${type}.`,
-            edit: { start: a, end: b, text: marker },
-          });
+        // GitHub, Forgejo, and Gitea end dollar math only at dollars that no
+        // `_` follows, so a marker after a `$` can decide where math ends.
+        if (gfm && (source[start - 1] === "$" || source[end - size - 1] === "$")) return;
+        // Emphasis that begins in an Obsidian callout's title and ends below it
+        // is text in the title, whose markers would change.
+        if (
+          titles.length &&
+          /[\r\n]/.test(original) &&
+          titles.some(([a, b]) => start >= a && start < b && end > b)
+        )
+          return;
+        // The text of a collapsed or shortcut reference, such as `[*Title*][]`
+        // or `[*Title*]`, is also its label, which would no longer match the
+        // definition's.
+        if (scope.type === "linkReference" && scope.referenceType !== "full") return;
+        // Text in brackets that would match a definition with the new markers
+        // would become a reference.
+        if (labels.length) {
+          const rewritten = normalizedLabel(marker + original.slice(size, -size) + marker);
+          if (labels.some((label) => label.includes(rewritten))) return;
         }
+        // micromark lets a run next to a `~` open and close, so a new marker
+        // that a `~` separates from another `*` or `_` like it could pair with it.
+        const reaches = (index: number, step: number) => {
+          while (source[index] === "~") index += step;
+          return source[index] === marker[0];
+        };
+        if (
+          gfm &&
+          (reaches(start - 1, -1) ||
+            reaches(end, 1) ||
+            reaches(start + size, 1) ||
+            reaches(end - size - 1, -1))
+        )
+          return;
+        const list = candidates.get(scope) ?? [];
+        list.push([start, end]);
+        candidates.set(scope, list);
       });
-      return findings;
+      for (const [scope, list] of candidates) {
+        let accepted = list;
+        const { positions, emphasis, suspicious } = scopeDelimiters(source, scope);
+        // Where pairing could change, the parser's pairing is modelled: when a
+        // `*` or `_` in the same text did not pair, when two emphases share a
+        // run of markers, as in `***a***` or `*a****c***`, and when the text
+        // already holds the new marker, as in `_]*a*i_`. The markers change
+        // where the model, which has to reproduce the parse, pairs the same
+        // runs with the new markers: all of them, or else those that can be
+        // added one at a time.
+        if (suspicious || positions.some((index) => source[index] === marker[0])) {
+          const expected = emphasis.join(" ");
+          const pairing = (at: (index: number) => string | undefined) =>
+            pairings(delimiterRuns(positions, at, gfm)).join(" ");
+          // micromark pairs `~` in a pass of its own, which can come first.
+          const modelled =
+            positions.length <= 2000 &&
+            !(gfm && source.slice(...range(scope)).includes("~")) &&
+            pairing((index) => source[index]) === expected;
+          const markers = (ranges: Range[]) => {
+            const set = new Set<number>();
+            for (const [start, end] of ranges)
+              for (let i = 0; i < size; i++) set.add(start + i).add(end - size + i);
+            return set;
+          };
+          const all = markers(list);
+          if (!modelled) accepted = suspicious ? [] : list;
+          else if (pairing((index) => (all.has(index) ? marker[0] : source[index])) !== expected) {
+            accepted = [];
+            const changed = new Set<number>();
+            for (const item of list) {
+              const trial = new Set([...changed, ...markers([item])]);
+              if (pairing((index) => (trial.has(index) ? marker[0] : source[index])) !== expected)
+                continue;
+              for (const index of trial) changed.add(index);
+              accepted.push(item);
+            }
+          }
+        }
+        for (const [start, end] of accepted)
+          for (const [a, b] of [
+            [start, start + size],
+            [end - size, end],
+          ] as const) {
+            findings.push({
+              start: a,
+              end: b,
+              message: `Use ${JSON.stringify(marker)} for ${type}.`,
+              edit: { start: a, end: b, text: marker },
+            });
+          }
+      }
+      return findings.sort((a, b) => a.start - b.start);
     },
   };
 }
@@ -611,6 +884,17 @@ function together(
     /^\^[A-Za-z0-9-]+[ \t]*$/.test(source.slice(afterStart, afterEnd))
   )
     return true;
+  // Directly below a table that ends inside a list or block quote, the parser
+  // reads the next table as a paragraph, or as the text of a heading
+  // underlined below it, while GitHub reads a table, and a blank line would
+  // make it a table there as well. Text whose second line holds a `|` could be
+  // such a table.
+  if (
+    lastBlock(before).type === "table" &&
+    (after.type === "paragraph" || after.type === "heading") &&
+    source.slice(afterStart, afterEnd).split(lineBreak)[1]?.includes("|")
+  )
+    return true;
   // Directly below text or a link reference definition, the parser does not
   // start a list that would be empty or not start at 1, though it does below
   // a blank line: there, `- -` is a list item holding the text `-`, and `-`
@@ -688,13 +972,24 @@ export const styleRules: Record<string, Rule> = {
     schema: optionsSchema({}),
     check({ document }) {
       const findings: Finding[] = [];
+      const { source } = document;
       const forge = goldmarkForges[document.dialect] !== undefined;
+      // In Obsidian, the inline nodes whose source joined lines cannot change.
+      const opaque: Range[] = [];
+      if (document.dialect === "obsidian")
+        walk(document.tree, (node) => {
+          if (obsidianOpaque.has(node.type) || node.type === "obsidianComment")
+            opaque.push(range(node));
+        });
+      const titles = calloutTitles(document);
       let headingEnd = 0;
+      let blockStart = 0;
       walk(document.tree, (node) => {
         if (node.type === "heading" && forge) headingEnd = range(node)[1];
+        if (inlineBlocks.has(node.type)) blockStart = range(node)[0];
         if (node.type !== "inlineCode") return;
         const [start, end] = range(node);
-        if (!/[\r\n]/.test(document.source.slice(start, end))) return;
+        if (!/[\r\n]/.test(source.slice(start, end))) return;
         // Forgejo and Gitea look for a heading's attribute block on its last
         // text line, and Forgejo also builds the anchor from that line alone.
         // Joining lines would change what that line holds.
@@ -705,9 +1000,43 @@ export const styleRules: Record<string, Rule> = {
           const lines = document.source.slice(...lineBounds(document.source, start, end));
           if (lines.includes("\\(") && lines.includes("\\)")) return;
         }
+        if (document.dialect === "obsidian") {
+          // Joining would move text into a callout's title.
+          if (titles.some(([a, b]) => start >= a && start < b)) return;
+          // Obsidian reads highlights and wikilinks only within a line. Once
+          // the lines are one, an `==` or `[[` left as text could open one that
+          // runs to the next `==` or `]]`, even inside this or another span.
+          const [from, to] = lineBounds(source, start, end);
+          const lines = source.slice(from, to);
+          let text = "";
+          let cursor = from;
+          for (const [a, b] of opaque) {
+            if (b <= cursor || a >= to) continue;
+            // A space keeps the text on both sides from forming a marker.
+            text += source.slice(cursor, Math.max(cursor, a)) + " ";
+            cursor = Math.min(b, to);
+          }
+          text += source.slice(cursor, to);
+          if (
+            (text.includes("==") && (lines.match(/==/g) ?? []).length > 1) ||
+            (text.includes("[[") && lines.includes("]]"))
+          )
+            return;
+        }
         const value = node.value.replace(/\r\n|\r|\n/g, " ");
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);
+        // An earlier run of the new backticks that the parser left as text, or
+        // that lies in a link destination, would pair with the new opening one.
+        // The span's own backticks cannot have such a run before them.
+        if (marker.length !== /^`+/.exec(source.slice(start, end))![0].length) {
+          const before = source.slice(blockStart, start);
+          for (const run of before.matchAll(/`+/g)) {
+            const length = run[0].length;
+            if (length === marker.length || (escaped(before, run.index) && length - 1 === marker.length))
+              return;
+          }
+        }
         const pad = /^`|`$/.test(value) || (/^ .* $/.test(value) && /[^ ]/.test(value)) ? " " : "";
         findings.push({
           start,
