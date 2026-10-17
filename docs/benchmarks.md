@@ -199,8 +199,8 @@ thousands of files.
   reads, bring it out. Lists and tables of that size are not affected. Square
   brackets are the worst case, in every dialect: a single paragraph of 70 kB
   made only of bracketed references such as `[a][b]` took from 1 to more than 30
-  seconds to parse, while one of 35 kB took a fraction of a second
-  ([issue #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
+  seconds to parse, while one of 35 kB took a fraction of a second ([issue
+  #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
   1.8 in every absolute time, while the "compared with parsing" ratios and the
