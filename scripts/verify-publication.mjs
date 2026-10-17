@@ -71,7 +71,9 @@ try {
       ? undefined
       : "no provenance attestation",
   );
-  const bundle = attestations.find((attestation) => attestation.predicateType === provenance).bundle;
+  const bundle = attestations.find(
+    (attestation) => attestation.predicateType === provenance,
+  ).bundle;
   const statement = JSON.parse(Buffer.from(bundle.dsseEnvelope.payload, "base64").toString("utf8"));
   const subject = `pkg:npm/${manifest.name}@${version}`;
   expect(

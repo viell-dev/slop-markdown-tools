@@ -21,7 +21,8 @@ concurrency:
 jobs:
   resolve:
     # A Release run that only prepared succeeds too; the step checks whether it published.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if:
+      github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

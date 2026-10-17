@@ -102,7 +102,9 @@ Once npm has processed the version, its dist-tag should name it:
 npm dist-tag ls mdrefine
 ```
 
-Then install the package into a fresh project with an empty cache, and check the
-GitHub release and its assets, the result of the publication check, and, for a
-stable version, the documentation site. Work after the release continues through
-pull requests.
+Then install the package into a fresh project with an empty cache and run
+`npm audit signatures` there, which verifies the signatures of the registry and
+of the provenance; the workflow's check only reads what the provenance names.
+Check the GitHub release and its assets, the result of the publication check,
+and, for a stable version, the documentation site. Work after the release
+continues through pull requests.
