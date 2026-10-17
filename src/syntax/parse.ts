@@ -47,6 +47,16 @@ const labelEndTree: TreeExtension = {
 export function labelEnd(node: Nodes): number | undefined {
   return labelEnds.get(node);
 }
+/**
+ * The value of a code span as renderers read it on one line, from its value in
+ * the tree: each line ending, with the spaces and tabs that start the next
+ * line, becomes one space. CommonMark strips those from a paragraph's lines
+ * before it reads a code span, and GitHub's renderer with it, while the parser
+ * keeps them in the span (issue #276).
+ */
+export function codeSpanText(value: string): string {
+  return value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
+}
 
 /**
  * Whose conditions for `$…$` in running text each dialect follows, as observed
