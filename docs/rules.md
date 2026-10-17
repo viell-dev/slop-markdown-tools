@@ -47,9 +47,9 @@ the Dialects column does not name, the rule finds nothing.
 ## `content/code-language`
 
 Reports a fenced code block that does not name its language after the opening
-fence. Editors and hosting sites highlight code only when they know its
-language; name `text` for plain text. Indented code blocks have no place for a
-language and are not reported.
+fence. GitHub, Forgejo, Gitea, and Obsidian highlight code by the language its
+fence names; name `text` for plain text. Indented code blocks have no place for
+a language and are not reported.
 
 Reported:
 
@@ -90,10 +90,11 @@ Not reported:
 
 ## `content/table-columns`
 
-Reports a table row with more or fewer cells than the header row. The renderers
-drop the extra cells of a longer row without a trace and fill a shorter row with
-empty cells, so the table does not show what its source says. A `|` separates
-cells inside code and wikilinks too, unless it is escaped as `\|`.
+Reports a table row with more or fewer cells than the header row. As the GFM
+specification requires, renderers drop the extra cells of a longer row without a
+trace and fill a shorter row with empty cells, so the table does not show what
+its source says. A `|` separates cells inside code and wikilinks too, unless it
+is escaped as `\|`.
 
 Reported, because the last row has three cells:
 
@@ -493,8 +494,8 @@ title: Notes
 
 Reports a second level-1 heading in a document. A document has one title, and
 further level-1 headings usually belong one level down. A `title` key in YAML or
-TOML front matter counts as the title, so that every level-1 heading is reported
-then. As for `structure/heading-increment`, the headings of a block quote or a
+TOML front matter counts as the title; every level-1 heading is then reported.
+As for `structure/heading-increment`, the headings of a block quote or a
 footnote are checked among themselves.
 
 Reported:
