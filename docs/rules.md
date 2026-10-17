@@ -8,7 +8,7 @@ same afterwards; see [how it works](design.md#safety-model).
 
 Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
-the built-in rules; [plugins](plugins.md) can add more.
+the built-in rules and those of the configuration's [plugins](plugins.md).
 
 | Rule                          | Kind    | `format` fixes | Presets                                  | Dialects                          | Options                                                     |
 | ----------------------------- | ------- | -------------- | ---------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
@@ -410,7 +410,7 @@ setting, Obsidian's Reading view shows every line break in a paragraph, so
 joining or breaking lines would change what the note looks like. The setting is
 `"strictLineBreaks": true` in the vault's `.obsidian/app.json`; the tool reads
 it and never changes it. The finding is at line 1, and its message begins
-`Obsidian strictLineBreaks is not verified true`. See [Obsidian
+`Obsidian's "Strict line breaks" setting is not known to be on`. See [Obsidian
 vaults](obsidian.md#enable-wrapping).
 
 ## `structure/duplicate-heading`

@@ -2,6 +2,22 @@
   "name": "mdrefine",
   "version": "0.2.0-rc.2",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian",
+  "keywords": [
+    "markdown",
+    "lint",
+    "linter",
+    "format",
+    "formatter",
+    "commonmark",
+    "gfm",
+    "github",
+    "forgejo",
+    "codeberg",
+    "gitea",
+    "obsidian",
+    "mdast",
+    "micromark"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "viell",
@@ -26,19 +42,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./node": {
       "types": "./dist/node.d.ts",
-      "import": "./dist/node.js"
-    }
+      "default": "./dist/node.js"
+    },
+    "./config.schema.json": "./config.schema.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "config.schema.json",
     "docs/*.md",
     "examples",
     "README.md",
     "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "LICENSE",
@@ -72,9 +92,12 @@
     "benchmark": "node benchmarks/run.mjs",
     "prebenchmark": "npm run build",
     "release:prepare": "run-s check release:pack",
-    "release:pack": "node scripts/package-smoke.mjs --retain"
+    "release:pack": "node scripts/package-smoke.mjs --retain",
+    "schema": "run-s build schema:write",
+    "schema:write": "node scripts/config-schema.mjs"
   },
   "dependencies": {
+    "@types/mdast": "4.0.4",
     "ajv": "8.20.0",
     "commander": "15.0.0",
     "decode-named-character-reference": "1.3.0",
@@ -97,7 +120,6 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/mdast": "4.0.4",
     "@types/node": "22.20.5",
     "@types/unist": "3.0.3",
     "eslint": "10.13.0",

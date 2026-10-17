@@ -62,7 +62,9 @@ findings remain, and the output is still the formatted text; with `2`, keep the
 buffer as it was.
 `npx mdtools lint - --stdin-filepath path/of/the/file.md --json` returns the
 findings with their positions. An editor that formats a selection can use the
-library's [`ranges`](api.md#part-of-a-document).
+library's [`ranges`](api.md#part-of-a-document). An editor that reads JSON
+Schemas completes and checks the configuration file with the package's
+[schema](configuration.md#json-schema).
 
 ## Next to Prettier or markdownlint
 

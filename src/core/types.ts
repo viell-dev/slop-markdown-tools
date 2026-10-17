@@ -1,17 +1,40 @@
 import type { Root } from "mdast";
 import type { Extension as SyntaxExtension } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
-import type { AnySchema } from "ajv";
 
+/** A dialect: the renderer whose Markdown syntax a document is read in. */
 export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian";
-/** A dialect or one of its aliases, accepted wherever configuration names a dialect. */
+/**
+ * A dialect or one of its aliases, accepted wherever a dialect is named:
+ * `codeberg` is `forgejo`. Parsed documents and resolved configurations hold
+ * the dialect itself.
+ */
 export type DialectName = Dialect | "codeberg";
+/** How a rule's findings count: `off` disables the rule. */
 export type Severity = "off" | "warn" | "error";
-export type RuleSetting = Severity | [Severity, Record<string, unknown>];
-/** Replace `start` to `end`, half-open UTF-16 offsets into `document.source`, with `text`. */
+/**
+ * A rule's setting in a configuration: its severity, or a list of its severity
+ * and, optionally, its options, which the rule's `schema` checks.
+ */
+export type RuleSetting =
+  Severity | readonly [Severity] | readonly [Severity, Readonly<Record<string, unknown>>];
+/**
+ * A JSON Schema of draft 7, the version that Ajv validates by default: `true`
+ * accepts every value, `false` none, and an object holds keywords such as
+ * `type` and `properties`.
+ */
+export type JsonSchema = boolean | JsonSchemaObject;
+/** A JSON Schema written as an object of keywords. */
+export interface JsonSchemaObject {
+  readonly [keyword: string]: unknown;
+}
+/** A replacement of part of a text. */
 export interface Edit {
+  /** Where the replaced text starts: an offset in UTF-16 code units, from 0. */
   start: number;
+  /** Where the replaced text ends, not included: an offset, not before `start`. */
   end: number;
+  /** The text that replaces it. */
   text: string;
 }
 /**
@@ -20,33 +43,66 @@ export interface Edit {
  * else is skipped for the document and reported as `engine/rule-error`.
  */
 export interface Finding {
+  /** What is wrong, in a sentence. */
   message: string;
+  /** Where the finding starts. */
   start: number;
+  /** Where it ends, not included; omitted for a finding at one position. */
   end?: number;
+  /** A style rule's correction, which `format` applies. Problem rules give none. */
   edit?: Edit;
 }
+/**
+ * A finding as `lint` and `format` report it. Its offsets, and those of its
+ * edit, count UTF-16 code units in the text given to them, byte order marks
+ * included, so that the edit applies to that text.
+ */
 export interface Diagnostic extends Finding {
+  /** The rule's ID, such as `style/wrap`, or `engine/…` for the engine's own diagnostics. */
   rule: string;
+  /** The severity that the configuration gives the rule. */
   severity: Exclude<Severity, "off">;
+  /** The line of `start`, counting from 1. */
   line: number;
+  /** The column of `start` in UTF-16 code units, counting from 1. */
   column: number;
 }
+/**
+ * A parsed document. `Document` is also the name of the browser's DOM type;
+ * a module that uses both can import this one under another name.
+ */
 export interface Document {
+  /** The text that was parsed, without the byte order marks it started with. */
   source: string;
+  /** The document's path, relative to the workspace root with forward slashes. */
   path: string;
+  /** The mdast syntax tree, whose positions are offsets into `source`. */
   tree: Root;
+  /** The dialect it was read in, never an alias. */
   dialect: Dialect;
 }
+/** Where a link leads, as `Workspace.resolve` finds it. */
 export interface LinkResolution {
   /**
+   * `resolved`: one file matches; `missing`: none does; `ambiguous`: several
+   * match and nothing decides between them; `directory`: the destination names
+   * a directory; `external`: a URL with a scheme, or one starting with `//`;
+   * `unavailable`: the destination cannot be judged from files.
    * `unreadable` means that the target could not be checked, because the
    * workspace could not read what it would have to; it is neither found nor
    * known to be missing.
    */
   status:
     "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory" | "unreadable";
+  /** The file found, as a path from the workspace root. */
   target?: string;
+  /** The part of the destination after `#`, decoded, or an empty string. */
   fragment?: string;
+  /**
+   * With status `resolved`: whether the target has the heading, block, or
+   * anchor that `fragment` names, by the rules of the dialect; `true` without
+   * a fragment.
+   */
   fragmentExists?: boolean;
   /**
    * What could not be read and limits the result. With status `unreadable` it
@@ -83,14 +139,32 @@ export interface LinkResolution {
    */
   outside?: string;
 }
+/**
+ * The files that links can reach, which `createWorkspace` builds. A host can
+ * implement it itself.
+ */
 export interface Workspace {
+  /**
+   * Where a link leads. `source` is the linking document's path, `destination`
+   * the destination as written, and `dialect` the linking document's dialect;
+   * `wiki` is true for an Obsidian wikilink or embed. An error that it throws
+   * stops `lint` and `format`.
+   */
   resolve(source: string, destination: string, dialect: Dialect, wiki?: boolean): LinkResolution;
-  /** Obsidian's strictLineBreaks setting; false prevents semantic-changing prose reflow. */
+  /**
+   * Obsidian's "Strict line breaks" setting of the vault, which is a property
+   * of the workspace: `true` when it is verified on. Obsidian notes are wrapped
+   * only then, because otherwise a single line break shows as a line break.
+   */
   strictLineBreaks?: boolean;
 }
+/** What a rule's `check` receives. */
 export interface RuleContext {
+  /** The parsed document, which the rule must not change. */
   document: Document;
-  options: Record<string, unknown>;
+  /** The rule's options from the configuration, checked against its `schema`; `{}` without. */
+  options: Readonly<Record<string, unknown>>;
+  /** The workspace that links resolve in, or undefined when the host gave none. */
   workspace?: Workspace;
 }
 /**
@@ -98,65 +172,117 @@ export interface RuleContext {
  * that does not have this shape, naming it.
  */
 export interface Rule {
+  /** What the rule checks, in a sentence. */
   description: string;
+  /** `problem` only reports; `style` may propose edits, which `format` applies. */
   kind: "style" | "problem";
   /** Inline edits, then block layout, then document-wide whitespace. */
   phase?: "inline" | "block" | "document";
   /** Validates the rule's options; compiled once and reused for every document. */
-  schema?: AnySchema;
+  schema?: JsonSchema;
   /**
    * The rule's findings for one document. A rule that throws is skipped for
    * that document and reported as `engine/rule-error`.
    */
   check(context: RuleContext): Finding[];
 }
+/** A plugin: rules, presets, and syntax, named with its `name` as a prefix. */
 export interface Plugin {
+  /**
+   * The prefix of its rules and presets: a lowercase identifier of letters,
+   * digits, and hyphens that starts with a letter, unique among the plugins of
+   * a run. `engine` is reserved for the engine's own diagnostics.
+   */
   name: string;
+  /** Rules by name; rule `x` of plugin `p` has the ID `p/x`. */
   rules?: Record<string, Rule>;
+  /** Presets by name; preset `x` of plugin `p` is extended as `p/x`. */
   presets?: Record<string, Config>;
+  /** A micromark syntax extension and the mdast extension that builds its nodes. */
   syntax?: { micromark: SyntaxExtension; mdast: TreeExtension };
 }
+/** Settings for the documents that match one of `files`. */
 export interface Override {
-  files: string[];
-  dialect?: DialectName;
-  rules?: Record<string, RuleSetting>;
+  /** Glob patterns, matched against paths relative to the workspace root, with forward slashes. */
+  readonly files: readonly string[];
+  /** The dialect of the matching documents. */
+  readonly dialect?: DialectName;
+  /** Rule settings for the matching documents, applied after the configuration's own. */
+  readonly rules?: Readonly<Record<string, RuleSetting>>;
 }
+/** Files that links may lead to without being linted or formatted. */
 export interface ResolveOptions {
+  /** Files that `.gitignore` files exclude are link targets. Default: false. */
   gitIgnored?: boolean;
+  /** Files of nested Git repositories are link targets. Default: false. */
   nestedRepositories?: boolean;
 }
+/**
+ * A configuration, as a configuration file holds it. `configSchema` describes
+ * it, and `validateConfig` checks it.
+ */
 export interface Config {
-  resolve?: ResolveOptions;
-  extends?: string[];
+  /** The JSON Schema for editors; the tool ignores it. */
+  $schema?: string;
+  /** Files that links may lead to; see `ResolveOptions`. */
+  resolve?: Readonly<ResolveOptions>;
+  /**
+   * Presets to start from, in order: a preset name or a list of them. Without
+   * it, the configuration starts from `recommended`.
+   */
+  extends?: string | readonly string[];
   /**
    * The dialect documents are read in. When neither this setting, a preset, nor
    * a matching override names one, the caller's default dialect is assumed, and
    * `github` when the caller gives none.
    */
   dialect?: DialectName;
-  rules?: Record<string, RuleSetting>;
-  ignore?: string[];
-  overrides?: Override[];
-  plugins?: string[];
+  /** Rule settings by rule ID, applied after those of the presets. */
+  rules?: Readonly<Record<string, RuleSetting>>;
+  /** Glob patterns of documents that are never linted or formatted; they stay link targets. */
+  ignore?: readonly string[];
+  /** Settings for some documents, applied in order after the others. */
+  overrides?: readonly Override[];
+  /**
+   * Plugins to load, as files or package names. Only a configuration file
+   * loads them; the library takes plugin objects through its `plugins` option.
+   */
+  plugins?: readonly string[];
 }
+/** The settings in effect for one document, which `resolveConfig` returns. */
 export interface ResolvedConfig {
+  /** The `resolve` settings of the configuration and its presets. */
   resolve: ResolveOptions;
+  /** The dialect the document is read in, never an alias. */
   dialect: Dialect;
+  /** The setting of every rule that the configuration, its presets, or an override names. */
   rules: Record<string, RuleSetting>;
+  /** The `ignore` patterns of the configuration and its presets. */
   ignore: string[];
 }
-export interface ProcessOptions {
-  path?: string;
-  config?: Config;
-  plugins?: Plugin[];
-  workspace?: Workspace;
+/** What decides the configuration in effect for a document; see `resolveConfig`. */
+export interface ResolveConfigOptions {
+  /**
+   * The document's path, relative to the workspace root with forward slashes.
+   * It selects overrides and resolves links; `document.md` when omitted.
+   */
+  path?: string | undefined;
+  /** The configuration. Without it, the `recommended` preset applies. */
+  config?: Config | undefined;
+  /** Plugin objects, whose rules and presets the configuration can name. */
+  plugins?: readonly Plugin[] | undefined;
   /**
    * The dialect to assume when the configuration names none for the document;
    * `github` when omitted. A dialect named by the configuration, a preset, or a
    * matching override takes precedence. The CLI passes `obsidian` for a
    * document inside an Obsidian vault, wherever the vault lies in the workspace.
    */
-  defaultDialect?: DialectName;
+  defaultDialect?: DialectName | undefined;
+}
+/** The options of `lint` and `format`. */
+export interface ProcessOptions extends ResolveConfigOptions {
+  /** The files that links can reach. Without it, links are not checked or rewritten. */
+  workspace?: Workspace | undefined;
   /**
    * Parts of the source to lint or format, as half-open UTF-16 offsets into
    * the text as given. Each range is widened to the complete blocks that it
@@ -168,13 +294,16 @@ export interface ProcessOptions {
    * whole document is still parsed and checked. Omitted, the whole document is
    * processed; an empty list processes nothing.
    */
-  ranges?: SourceRange[];
+  ranges?: readonly SourceRange[] | undefined;
 }
 /** A part of a text, as half-open UTF-16 offsets. */
 export interface SourceRange {
+  /** Where the part starts. */
   start: number;
+  /** Where it ends, not included. */
   end: number;
 }
+/** What `format` returns. */
 export interface FormatResult {
   /**
    * The formatted text. It leaves out the edits of each rule that would change
@@ -183,7 +312,9 @@ export interface FormatResult {
    * not settle.
    */
   output: string;
+  /** Whether `output` differs from the text as given. */
   changed: boolean;
+  /** The findings that remain in `output`, and the engine's own diagnostics. */
   diagnostics: Diagnostic[];
   /**
    * With `ranges`: the parts of the output that formatting was limited to,
