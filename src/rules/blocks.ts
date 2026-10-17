@@ -53,15 +53,21 @@ function merged(ranges: [number, number][]): [number, number][] {
 
 /**
  * HTML blocks that end only at an end marker, by what starts them, with the
- * marker and the offset from which it is searched: CommonMark's kinds 1 to 5.
- * The other kinds end at a blank line.
+ * markers that end them, in lowercase, and the offset from which they are
+ * searched: CommonMark's kinds 1 to 5. The other kinds end at a blank line.
+ * These are CommonMark's markers, not HTML's: a comment's block ends only at
+ * `-->`, not at `--!>`.
  */
-const htmlEnds: [RegExp, RegExp, number][] = [
-  [/^<(?:pre|script|style|textarea)(?:[\t\n\r >]|$)/i, /<\/(?:pre|script|style|textarea)>/i, 1],
-  [/^<!--/, /-->/, 2],
-  [/^<\?/, /\?>/, 1],
-  [/^<!\[CDATA\[/, /\]\]>/, 9],
-  [/^<![A-Za-z]/, />/, 2],
+const htmlEnds: [RegExp, string[], number][] = [
+  [
+    /^<(?:pre|script|style|textarea)(?:[\t\n\r >]|$)/i,
+    ["</pre>", "</script>", "</style>", "</textarea>"],
+    1,
+  ],
+  [/^<!--/, ["-->"], 2],
+  [/^<\?/, ["?>"], 1],
+  [/^<!\[CDATA\[/, ["]]>"], 9],
+  [/^<![A-Za-z]/, [">"], 2],
 ];
 /**
  * Whether a block is an HTML block of a kind that ends only at its end marker,
@@ -73,8 +79,11 @@ function unclosed(node: Nodes): boolean {
   if (node.type !== "html") return false;
   // The value keeps the block's indentation.
   const value = node.value.replace(/^[ \t]+/, "");
-  for (const [opening, end, from] of htmlEnds)
-    if (opening.test(value)) return !end.test(value.slice(from));
+  for (const [opening, ends, from] of htmlEnds) {
+    if (!opening.test(value)) continue;
+    const rest = value.slice(from).toLowerCase();
+    return !ends.some((end) => rest.includes(end));
+  }
   return false;
 }
 /**

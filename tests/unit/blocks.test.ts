@@ -527,6 +527,9 @@ describe("a final line ending inside an unclosed block (#251)", () => {
   it.each([
     ["Text.\n\n<!-- todo", "github"],
     ["<!-- todo\nmore", "github"],
+    // CommonMark ends such a block at `-->` only, not at HTML's `--!>`.
+    ["<!-- todo --!>", "github"],
+    ["<SCRIPT>\nlet a", "github"],
     ["<script>\nlet a", "github"],
     ["<pre>\ncode", "github"],
     ["<?php echo", "github"],
@@ -581,6 +584,9 @@ describe("a final line ending inside an unclosed block (#251)", () => {
       fc.constantFrom(
         "<!--",
         "<!-- a -->",
+        "<!-- a --!>",
+        "<SCRIPT>",
+        "<script></Script>",
         "<!-->",
         "<!--->",
         "<?",
