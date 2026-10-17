@@ -8,11 +8,17 @@ export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian"
 export type DialectName = Dialect | "codeberg";
 export type Severity = "off" | "warn" | "error";
 export type RuleSetting = Severity | [Severity, Record<string, unknown>];
+/** Replace `start` to `end`, half-open UTF-16 offsets into `document.source`, with `text`. */
 export interface Edit {
   start: number;
   end: number;
   text: string;
 }
+/**
+ * What a rule reports. Offsets are integers into `document.source`, from 0 to
+ * its length, and `end` is not before `start`; a rule that returns anything
+ * else is skipped for the document and reported as `engine/rule-error`.
+ */
 export interface Finding {
   message: string;
   start: number;
@@ -81,12 +87,21 @@ export interface RuleContext {
   options: Record<string, unknown>;
   workspace?: Workspace;
 }
+/**
+ * A rule. `ruleRegistry`, and so `lint` and `format`, reject a plugin rule
+ * that does not have this shape, naming it.
+ */
 export interface Rule {
   description: string;
   kind: "style" | "problem";
   /** Inline edits, then block layout, then document-wide whitespace. */
   phase?: "inline" | "block" | "document";
+  /** Validates the rule's options; compiled once and reused for every document. */
   schema?: AnySchema;
+  /**
+   * The rule's findings for one document. A rule that throws is skipped for
+   * that document and reported as `engine/rule-error`.
+   */
   check(context: RuleContext): Finding[];
 }
 export interface Plugin {
@@ -155,6 +170,12 @@ export interface SourceRange {
   end: number;
 }
 export interface FormatResult {
+  /**
+   * The formatted text. It leaves out the edits of each rule that would change
+   * the document's meaning, reported as `engine/unsafe-format` where the
+   * meaning would first differ, and is the text as given when formatting did
+   * not settle.
+   */
   output: string;
   changed: boolean;
   diagnostics: Diagnostic[];

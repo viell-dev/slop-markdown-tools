@@ -34,6 +34,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
           import { readFileSync } from 'node:fs';
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(pkg.version, process.env.EXPECTED_VERSION);
@@ -41,7 +42,8 @@ jobs:
           const channel = /^\d+\.\d+\.\d+-(beta|rc)\.\d+$/.exec(pkg.version)?.[1];
           assert(channel, 'Version must be a beta or rc prerelease');
           assert.equal(pkg.publishConfig.tag, channel);
-          readFileSync(`docs/releases/${pkg.version}.md`);
+          // The release notes are the version's section of CHANGELOG.md; the script fails without one.
+          execFileSync(process.execPath, ['scripts/release-notes.mjs', pkg.version], { stdio: ['ignore', 'ignore', 'inherit'] });
           if (process.env.PUBLISH_REQUESTED === 'true') {
             assert.equal(process.env.GITHUB_REF, 'refs/heads/main', 'Publish only from main');
             assert.equal(process.env.PUBLISH_ENABLED, 'true', 'Publication is disabled');
@@ -87,7 +89,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import { execFileSync } from 'node:child_process';
-          import { readFileSync, writeFileSync } from 'node:fs';
+          import { writeFileSync } from 'node:fs';
           const identity = process.env.RELEASE_ATTRIBUTION;
           assert.match(identity, /^[^\r\n<>]+ via [^\r\n<>]+$/);
           const [major, minor, patch] = execFileSync('npm', ['--version'], {encoding: 'utf8'}).trim().split('.').map(Number);
@@ -97,7 +99,8 @@ jobs:
           assert.equal(response.status, 404, 'Version must be unused; investigate existing publication before retrying');
           const tags = execFileSync('git', ['ls-remote', '--tags', 'origin', `refs/tags/${version}`], {encoding: 'utf8'});
           assert.equal(tags.trim(), '', 'Release tag already exists');
-          writeFileSync('release-notes.md', readFileSync(`docs/releases/${version}.md`, 'utf8') + `\n🤖 Generated with ${identity}\n`);
+          const notes = execFileSync(process.execPath, ['scripts/release-notes.mjs', version], {encoding: 'utf8'});
+          writeFileSync('release-notes.md', notes + `\n🤖 Generated with ${identity}\n`);
           JS
       - name: Verify artifact checksum
         working-directory: artifacts

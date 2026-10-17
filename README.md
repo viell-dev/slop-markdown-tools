@@ -1,173 +1,115 @@
-# mdrefine — Markdown Tools
+# mdrefine
 
-Configurable linting and formatting for CommonMark, GitHub Markdown, Forgejo
-(Codeberg), Gitea, and Obsidian. Separate `lint` and `format` commands share
-syntax, style settings, and an extensible rule engine.
+Lint and format Markdown for GitHub, Forgejo, Gitea, Obsidian, or any CommonMark
+renderer, with one configuration for both.
 
-[npm package](https://www.npmjs.com/package/mdrefine) ·
-[GitHub releases](https://github.com/viell-dev/slop-markdown-tools/releases)
+[![npm](https://img.shields.io/npm/v/mdrefine)](https://www.npmjs.com/package/mdrefine) [![CI](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/npm/l/mdrefine)](LICENSE)
 
-## Maintenance
+mdrefine is meant to replace a general-purpose linter and formatter, such as
+markdownlint and Prettier, for Markdown. It does not cover all of their checks
+yet;
+[the comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
+shows which have a rule.
 
-This project is entirely agent-authored and agent-maintained. AI agents wrote
-the code, tests, documentation, CI, and release tooling, and agents implement,
-verify, and merge every change. It is **not human-maintained**; do not assume
-that a person has reviewed generated changes. The repository owner does not
-write, read, or review code, does not know the codebase or API, and does not use
-the tool directly. They guide the project lightly, from what they can see: the
-public documentation, issue and PR descriptions, and Markdown documents that
-agents have processed with the tool. They assign agents to tasks; the assigned
-agents make the architectural and design decisions and keep every part of the
-repository consistent with the rest. Human and agent-authored issues and pull
-requests are welcome. Reproducible examples, automated checks, and regression
-tests guide maintenance.
+- **One configuration for lint and format.** Style rules report in `lint` and
+  fix in `format`; problem rules report what has no single correct repair.
+- **Changes only what its rules target.** Everything else stays byte for byte as
+  written, and an edit that would change a document's parsed meaning is refused.
+- **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, and
+  Obsidian: tables, math, wikilinks, and callouts are read as each renderer
+  reads them.
+- **Checks local links** and their heading and block fragments, with each
+  renderer's anchors.
+- **Extensible.** Plugins add rules, presets, and syntax, and a library runs the
+  same engine without the command line.
 
-The project is currently an early prerelease. Report document corruption or
-changed rendering with a minimal input, the configuration, actual output, and
-expected output. Remove private content before posting examples. Agents using
-the tool should report reproducible defects when their operator has authorized
-publishing an issue.
+## Example
 
-## Documentation
+```markdown
+Weather Station collects *temperature*, *humidity*, and *pressure* readings from a sensor board.
 
-Read the
-[quick start](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
-or browse the
-[documentation site](https://viell-dev.github.io/slop-markdown-tools/). It
-covers CLI workflows, configuration and rules, Obsidian vaults, plugins, and
-current limitations. The Markdown source lives in `docs/`. Working
-[examples](https://viell-dev.github.io/slop-markdown-tools/examples.html) live
-in `examples/` and ship with the package: starting configurations, workspaces
-before and after formatting, a plugin, and library scripts.
+> [!note]
+> Use matching firmware and page versions, or the page shows __no data__.
 
-## Getting started
+| Sensor | Unit |
+|---|---|
+| Temperature | °C |
+```
 
-The CLI requires Node.js 22.12 or newer. The npm package is `mdrefine`; the
-executable is `mdtools`. To install the release candidate in your document
-workspace:
+`npx mdtools format --write` with the `recommended` and `github` presets turns
+it into:
+
+```markdown
+Weather Station collects _temperature_, _humidity_, and _pressure_ readings from
+a sensor board.
+
+> [!NOTE]
+> Use matching firmware and page versions, or the page shows **no data**.
+
+| Sensor      | Unit |
+| ----------- | ---- |
+| Temperature | °C   |
+```
+
+## Install
+
+mdrefine needs Node.js 22.12 or newer. The package is `mdrefine`, and its
+command is `mdtools`:
 
 ```sh
 npm install --save-dev --save-exact mdrefine@0.2.0-rc.2
-npx --no-install mdtools --help
+npx mdtools lint
+npx mdtools format --diff
+npx mdtools format --write
+npx mdtools format --check
 ```
 
-See the
-[release procedure](https://viell-dev.github.io/slop-markdown-tools/releases.html)
-for registry availability, preparation, and authentication requirements.
+`lint` reports and never writes. `format` shows a diff, writes with `--write`,
+and with `--check` fails when a document would change.
 
-Inspect your documents from the workspace where you installed the package:
+## Configure
 
-```sh
-npx --no-install mdtools lint --root /path/to/documents --json
-npx --no-install mdtools format --root /path/to/documents --diff
-npx --no-install mdtools format --root /path/to/documents --write
-npx --no-install mdtools format --root /path/to/documents --check
+`mdtools.config.jsonc` at the root of the documents:
+
+```jsonc
+{
+  "extends": ["recommended", "github"],
+}
 ```
 
-`lint` never writes documents. `format` previews a diff by default for file
-inputs and writes only with `--write`. For stdin, `format -` returns formatted
-Markdown on stdout. Diagnostics use stderr unless `--json` requests a structured
-report. `--no-install` prevents fetching a different package if the local
-executable is missing.
+`recommended` wraps prose at 80 columns, writes emphasis as `_text_` and strong
+text as `**text**`, ends files with a line break, and checks links. It also
+warns about references without a definition, unused definitions, empty links,
+skipped heading levels, images without alternative text, and table rows with the
+wrong number of cells. Use `forgejo`, `codeberg`, `gitea`, or `obsidian` in
+place of `github` for documents rendered there.
 
-Without a configuration file, the commands apply the `recommended` preset and
-assume GitHub Markdown, or the Obsidian dialect for documents inside an Obsidian
-vault. Version 0.2.0-rc.1 and earlier assumed CommonMark, in which formatting
-reflows tables and joins the lines of a note. The quick start shows how to
-choose a profile for GitHub, Forgejo, Gitea, Obsidian, or plain CommonMark.
+## Documentation
 
-## Build from source
+The [documentation](https://viell-dev.github.io/slop-markdown-tools/) starts
+with
+[getting started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
+and covers the
+[rules](https://viell-dev.github.io/slop-markdown-tools/rules.html),
+configuration, the command line, Obsidian vaults, CI and editors, the library
+and plugins, and
+[what is not covered yet](https://viell-dev.github.io/slop-markdown-tools/design.html#limits).
+The package ships working
+[examples](https://viell-dev.github.io/slop-markdown-tools/examples.html) and
+the [changelog](CHANGELOG.md).
 
-For development, use Node.js 22.22.2+ or 24.15.0+ and npm 10 or newer; Node.js
-24 LTS is preferred.
+## Status
 
-```sh
-git clone https://github.com/viell-dev/slop-markdown-tools.git
-cd slop-markdown-tools
-npm ci
-npm run build
-node dist/cli/main.js --help
-```
+mdrefine follows a
+[pre-1.0 versioning policy](https://viell-dev.github.io/slop-markdown-tools/versions.html):
+a minor release may change behavior and says how, and a patch release only fixes
+defects. It is written and maintained by AI agents, and no person reviews the
+code. Changes are accepted on their tests, CI on Linux and Windows, and a
+semantic check that refuses any formatting edit that would change a document's
+parsed meaning.
 
-From the checkout, use `node dist/cli/main.js` in place of
-`npx --no-install mdtools` in the examples above. You can also install the built
-checkout as a local dependency.
+## Contributing, security, and license
 
-## Contributions and verification
-
-All changes to `main` require a pull request and passing CI, including
-prerelease maintenance. Published npm versions and release tags are immutable;
-corrections get a new version. See [CONTRIBUTING.md](CONTRIBUTING.md) and
-[SECURITY.md](SECURITY.md) for contribution and vulnerability reporting.
-
-Issues and PRs from people and agents are welcome. For defects, include the
-version, command, configuration, minimal Markdown input, actual output, and
-expected rendering. A screenshot can help explain a visible defect, but the
-Markdown source is needed to reproduce it. For agents, include the JSON
-diagnostic output when available. Automatic issue reporting is not built into
-the tool.
-
-```sh
-npm run check
-npm run test:package
-```
-
-The project uses Markdown Tools to lint and format its own Markdown at the
-default 80-column width. `npm run format:docs` formats Markdown;
-`npm run format:docs:check` checks it without writing. Prettier formats
-implementation and configuration files and excludes Markdown. `npm run format`
-runs both formatters. Markdown fixtures under `tests/fixtures/` and the example
-documents under `examples/workspaces/` and `examples/plugin/notes/` are excluded
-from documentation passes, because they are deliberately unformatted.
-
-`npm-run-all2` coordinates scripts, running independent checks in parallel and
-building the CLI before documentation checks and tests.
-
-`check` runs strict TypeScript checks, ESLint, Prettier for non-Markdown files,
-Markdown Tools for documentation, the VitePress site build, and both test
-suites. Unit tests in `tests/unit/` call the library's source; integration tests
-in `tests/integration/` run the built CLI on real files and check the examples
-and documentation against the tool. `npm run test:unit` and
-`npm run test:integration` run one suite; see
-[testing](https://viell-dev.github.io/slop-markdown-tools/testing.html). GitHub
-Actions runs full checks on Linux with Node.js 24, plus build and test coverage
-on Linux with Node.js 22 and Windows with Node.js 24. All three jobs verify the
-installed package. Changes to formatting need tests for expected output,
-idempotence, and preserved semantics; defects should add a regression example.
-Keep fixes scoped and describe remaining limitations in the PR.
-
-Agent contributors should read
-[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md)
-for maintenance-specific instructions, including what an assigned agent decides
-and the limits of that authority. `test:package` packs and installs a temporary
-consumer project, then exercises the installed CLI and library; it can require
-access to the npm registry.
-
-## Benchmarks
-
-```sh
-npm run benchmark
-```
-
-The benchmark times parsing, linting, and formatting of synthetic documents
-through the library and the CLI, with Prettier on the same files for comparison.
-It takes a few minutes and is not part of `check`.
-[Benchmarks](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html)
-explains what each number means and whether it is good.
-
-## Documentation website
-
-```sh
-npm run docs:dev
-npm run docs:build
-npm run docs:preview
-```
-
-VitePress renders `docs/`; Markdown Tools formats its Markdown sources. The
-Pages workflow builds from `main` and deploys the generated artifact. No
-publishing branch or committed build output is needed. See the
-[documentation workflow](https://viell-dev.github.io/slop-markdown-tools/contributing.html#write-and-preview-documentation).
-
-## License
-
-[MIT](LICENSE).
+[CONTRIBUTING.md](CONTRIBUTING.md) explains how to report a defect and how to
+make a change. Report vulnerabilities as [SECURITY.md](SECURITY.md) describes.
+mdrefine is released under the [MIT license](LICENSE).

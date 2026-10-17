@@ -1,17 +1,15 @@
 # Security policy
 
-Report suspected vulnerabilities through
-[GitHub private vulnerability reporting](https://github.com/viell-dev/slop-markdown-tools/security/advisories/new).
-Include the affected version, configuration, and a minimal synthetic example. Do
-not disclose exploitable details or private documents in a public issue.
+Report a suspected vulnerability through
+[GitHub's private vulnerability reporting](https://github.com/viell-dev/slop-markdown-tools/security/advisories/new),
+with the affected version, the configuration, and a minimal synthetic example.
+Do not put exploitable details or private documents in a public issue.
 
-This project is authored and maintained by agents, without a guaranteed response
-time. Reports are handled by an agent assigned by the repository owner; no
-person reads the code. Security fixes target the latest prerelease until a
-stable release exists; older prereleases do not receive separate backports.
+Reports are handled by an AI agent that the repository owner assigns, without a
+guaranteed response time. Fixes go into the newest release line; older versions
+and prereleases do not receive backports.
 
-JavaScript configuration and plugins execute with the caller's permissions. Only
-load trusted code. JSON configuration is data, but its plugin entries can still
-load executable code. Link validation does not fetch external URLs. Document
-rendering defects without a security impact belong in ordinary issues; remove
-private content before posting.
+JavaScript configuration files and plugins run with the permissions of whoever
+runs the tool, so load only code you trust. A JSON configuration is data, but
+its `plugins` entries still load code. Link checks never fetch URLs. A rendering
+defect without a security impact belongs in an ordinary issue.

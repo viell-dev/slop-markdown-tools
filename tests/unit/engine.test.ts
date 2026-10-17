@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Ajv } from "ajv";
 import * as syntax from "../../src/syntax/parse.js";
 import fc from "fast-check";
 import {
@@ -10,8 +11,19 @@ import {
   createWorkspace,
   applyEdits,
   semanticFingerprint,
+  ruleRegistry,
+  canonicalDialect,
 } from "../../src/index.js";
-import type { Config, Dialect, Plugin, ProcessOptions, RuleContext } from "../../src/index.js";
+import type {
+  Config,
+  Diagnostic,
+  Dialect,
+  Finding,
+  Plugin,
+  ProcessOptions,
+  Rule,
+  RuleContext,
+} from "../../src/index.js";
 
 const narrow: Config = {
   extends: ["recommended", "github"],
@@ -216,9 +228,16 @@ describe("formatting contracts", () => {
         plugins: [plugin],
       });
       expect(result.output).toBe("word\n");
-      expect(result.diagnostics[0]?.message).toContain(
-        `in the ${phase} phase would change parsed meaning`,
-      );
+      expect(result.diagnostics).toMatchObject([
+        {
+          rule: "engine/unsafe-format",
+          severity: "error",
+          line: 1,
+          message:
+            "unsafe/replace would change the parsed meaning at line 1; none of its edits were applied.",
+        },
+        { rule: "unsafe/replace" },
+      ]);
     },
   );
   it.each([false, true])("retains convergence guards (oscillation: %s)", (oscillate) => {
@@ -251,7 +270,12 @@ describe("formatting contracts", () => {
       plugins: [plugin],
     });
     expect(result.output).toBe("*word*\n");
-    expect(result.diagnostics[0]?.message).toContain(oscillate ? "oscillate" : "eight passes");
+    expect(result.diagnostics).toMatchObject([
+      {
+        rule: "engine/unsafe-format",
+        message: `Formatting by unstable/change ${oscillate ? "oscillates" : "did not converge in eight passes"}; the document was left unchanged.`,
+      },
+    ]);
   });
   it("preserves genuine lists following prose", () => {
     const source = "Some items follow\n- First item\n- Second item\n";
@@ -415,6 +439,409 @@ describe("formatting contracts", () => {
       ),
       { numRuns: 120, seed: 20260918 },
     );
+  });
+});
+
+describe("a rule whose edits would change the meaning", () => {
+  /** A block rule that puts a list marker before the paragraphs starting with one of `targets`. */
+  const listing = (name: string, targets: string[]): Rule => ({
+    kind: "style",
+    phase: "block",
+    description: "Turn paragraphs into list items",
+    check: ({ document }) =>
+      targets.flatMap((target) => {
+        const start = document.source.indexOf(target);
+        return start < 0 ? [] : [{ start, message: name, edit: { start, end: start, text: "- " } }];
+      }),
+  });
+  const engine = (result: { diagnostics: Diagnostic[] }) =>
+    result.diagnostics.filter((item) => item.rule.startsWith("engine/"));
+  it("keeps the edits of the other rules in every phase, and names the rule and the line", () => {
+    const plugins: Plugin[] = [{ name: "test", rules: { list: listing("List", ["Keep"]) } }];
+    const options: ProcessOptions = {
+      plugins,
+      config: {
+        extends: [],
+        rules: {
+          "style/emphasis": "warn",
+          "style/heading": "warn",
+          "test/list": "warn",
+          "style/final-newline": "warn",
+        },
+      },
+    };
+    const source = "Title\n=====\n\nSome *emphasis* here.\n\nKeep this paragraph.";
+    const result = format(source, options);
+    expect(result.output).toBe("# Title\n\nSome _emphasis_ here.\n\nKeep this paragraph.\n");
+    expect(result.changed).toBe(true);
+    expect(result.diagnostics).toMatchObject([
+      {
+        rule: "engine/unsafe-format",
+        severity: "error",
+        line: 5,
+        column: 1,
+        message:
+          "test/list would change the parsed meaning at line 5; none of its edits were applied.",
+      },
+      { rule: "test/list", line: 5 },
+    ]);
+    expect(result.diagnostics).toHaveLength(2);
+    // Formatting the result again changes nothing and reports the same.
+    expect(format(result.output, options)).toEqual({ ...result, changed: false });
+    expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+      semanticFingerprint(parse(source, "github")),
+    );
+  });
+  it("reports where the meaning first differs, not where the rule's first edit is", () => {
+    const rule: Rule = {
+      kind: "style",
+      description: "Collapse a double space, then add a list marker",
+      check: ({ document }) => {
+        const space = document.source.indexOf("  ");
+        const list = document.source.indexOf("Third");
+        return [
+          ...(space < 0
+            ? []
+            : [
+                {
+                  start: space,
+                  message: "Space",
+                  edit: { start: space, end: space + 2, text: " " },
+                },
+              ]),
+          ...(list < 0
+            ? []
+            : [{ start: list, message: "List", edit: { start: list, end: list, text: "- " } }]),
+        ];
+      },
+    };
+    const source = "First  paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n";
+    const result = format(source, {
+      plugins: [{ name: "test", rules: { mixed: rule } }],
+      config: { extends: [], rules: { "test/mixed": "warn" } },
+    });
+    // The rule is left out as a whole, its harmless first edit included.
+    expect(result.output).toBe(source);
+    expect(engine(result)).toMatchObject([{ line: 5, column: 1 }]);
+  });
+  it("reports every rule that fails and keeps a rule of the same phase between them", () => {
+    const plugins: Plugin[] = [
+      {
+        name: "test",
+        rules: { first: listing("First", ["First"]), last: listing("Last", ["Last"]) },
+      },
+    ];
+    const source = "First paragraph.\n\nTitle\n=====\n\nLast paragraph.\n";
+    const result = format(source, {
+      plugins,
+      config: {
+        extends: [],
+        rules: { "test/first": "warn", "style/heading": "warn", "test/last": "warn" },
+      },
+    });
+    expect(result.output).toBe("First paragraph.\n\n# Title\n\nLast paragraph.\n");
+    expect(engine(result).map((item) => [item.line, item.message.split(" ")[0]])).toEqual([
+      [1, "test/first"],
+      [5, "test/last"],
+    ]);
+  });
+  it("applies overlapping edits in turn, the later in the next pass", () => {
+    const collapse: Rule = {
+      kind: "style",
+      description: "Rewrite a line that holds a double space",
+      check: ({ document }) => {
+        const end = document.source.indexOf("\n");
+        const line = document.source.slice(0, end);
+        return line.includes("  ")
+          ? [
+              {
+                start: 0,
+                message: "Collapse",
+                edit: { start: 0, end, text: line.replace(/ {2,}/g, " ") },
+              },
+            ]
+          : [];
+      },
+    };
+    const options: ProcessOptions = {
+      plugins: [{ name: "test", rules: { collapse } }],
+      config: { extends: [], rules: { "style/emphasis": "warn", "test/collapse": "warn" } },
+    };
+    expect(formatted("A *b*  c.\n", options)).toBe("A _b_ c.\n");
+    // `applyEdits` has no next pass and still rejects edits that overlap.
+    expect(() =>
+      applyEdits("A *b*  c.\n", [
+        { start: 0, end: 9, text: "A *b* c." },
+        { start: 2, end: 3, text: "_" },
+      ]),
+    ).toThrow("overlapping");
+  });
+  it.each([
+    ["See [[Note|label]] here.\n", "markdown", "See [label](<Folder/Note>) here.\n"],
+    ["See [label](Note.md) here.\n", "wiki", "See [[Folder/Note.md|label]] here.\n"],
+  ])("converts the notation and the path of one link in turn: %j", (source, style, output) => {
+    const workspace = createWorkspace(
+      { "Doc.md": source, "Folder/Note.md": "# Note\n" },
+      { dialect: "obsidian", strictLineBreaks: true },
+    );
+    const config = (rules: Config["rules"]): ProcessOptions => ({
+      path: "Doc.md",
+      workspace,
+      config: { extends: [], dialect: "obsidian", rules: { "links/valid": "error", ...rules } },
+    });
+    const path: Config["rules"] = { "links/path": ["warn", { style: "root" }] };
+    const notation: Config["rules"] = { "links/notation": ["warn", { style }] };
+    expect(formatted(source, config({ ...path, ...notation }))).toBe(output);
+    // The same as one rule after the other.
+    expect(formatted(formatted(source, config(path)), config(notation))).toBe(output);
+  });
+  it("gives the edits that overlapped a refused rule's edits their turn in the same pass", () => {
+    const replace: Rule = {
+      kind: "style",
+      description: "Replace the first line",
+      check: ({ document }) => {
+        const end = document.source.indexOf("\n");
+        return document.source.startsWith("A")
+          ? [{ start: 0, message: "Replace", edit: { start: 0, end, text: "Other words." } }]
+          : [];
+      },
+    };
+    const parsed = vi.spyOn(syntax, "parse");
+    try {
+      const result = format("A *b* c.\n", {
+        plugins: [{ name: "test", rules: { replace } }],
+        config: { extends: [], rules: { "style/emphasis": "warn", "test/replace": "warn" } },
+      });
+      expect(result.output).toBe("A _b_ c.\n");
+      expect(engine(result)).toMatchObject([
+        {
+          message:
+            "test/replace would change the parsed meaning at line 1; none of its edits were applied.",
+        },
+      ]);
+      // The source, the replacement, the emphasis edits, and the replacement again in the
+      // final pass, which then has nothing else to try.
+      expect(parsed).toHaveBeenCalledTimes(4);
+    } finally {
+      parsed.mockRestore();
+    }
+  });
+});
+
+describe("rules that fail", () => {
+  const source = "A *b* c.\n";
+  const failing = (check: Rule["check"], kind: Rule["kind"] = "problem"): ProcessOptions => ({
+    plugins: [{ name: "test", rules: { fragile: { kind, description: "Fail", check } } }],
+    config: { extends: [], rules: { "style/emphasis": "warn", "test/fragile": "warn" } },
+  });
+  const ruleErrors = (diagnostics: Diagnostic[]) =>
+    diagnostics.filter((item) => item.rule === "engine/rule-error");
+  it.each(["problem", "style"] as const)(
+    "reports a %s rule that throws and runs the other rules, in lint and format",
+    (kind) => {
+      const options = failing(() => {
+        throw new TypeError("Cannot read properties of undefined (reading 'x')");
+      }, kind);
+      const expected = {
+        rule: "engine/rule-error",
+        severity: "error",
+        start: 0,
+        line: 1,
+        column: 1,
+        message:
+          "Rule test/fragile failed (TypeError: Cannot read properties of undefined (reading 'x')); the rule was skipped for this document.",
+      };
+      const linted = lint(source, options);
+      expect(ruleErrors(linted)).toEqual([expected]);
+      expect(linted.filter((item) => item.rule === "style/emphasis")).toHaveLength(2);
+      const result = format(source, options);
+      expect(result.output).toBe("A _b_ c.\n");
+      expect(result.diagnostics).toEqual([expected]);
+      // Ranges leave out findings elsewhere, never the engine's.
+      const ranged = lint("Text.\n\n" + source, { ...options, ranges: [{ start: 7, end: 7 }] });
+      expect(ruleErrors(ranged)).toEqual([expected]);
+      const thrown = failing(() => {
+        throw "text";
+      }, kind);
+      expect(ruleErrors(lint(source, thrown))).toMatchObject([
+        { message: expect.stringContaining("Rule test/fragile failed (text);") },
+      ]);
+    },
+  );
+  it.each([
+    [undefined, "returned undefined instead of a list of findings"],
+    [{ start: 0, message: "m" }, "returned an object instead of a list of findings"],
+    [[5], "returned a finding that is 5, not an object"],
+    [[{ start: 0 }], "returned a finding whose message is undefined, not a string"],
+    [
+      [{ start: -4, message: "m" }],
+      "returned a finding whose start is -4, not an offset from 0 to 9",
+    ],
+    [
+      [{ start: Number.NaN, message: "m" }],
+      "returned a finding whose start is NaN, not an offset from 0 to 9",
+    ],
+    [
+      [{ start: 1.5, message: "m" }],
+      "returned a finding whose start is 1.5, not an offset from 0 to 9",
+    ],
+    [
+      [{ start: 10, message: "m" }],
+      "returned a finding whose start is 10, not an offset from 0 to 9",
+    ],
+    [
+      [{ start: 2, end: 1, message: "m" }],
+      "returned a finding whose end is 1, not an offset from 2 to 9",
+    ],
+    [
+      [{ start: 0, message: "m", edit: null }],
+      "returned a finding whose edit is null, not an object",
+    ],
+    [
+      [{ start: 0, message: "m", edit: { start: 0, end: 99, text: "x" } }],
+      "returned an edit whose end is 99, not an offset from 0 to 9",
+    ],
+    [
+      [{ start: 0, message: "m", edit: { start: "0", end: 1, text: "x" } }],
+      'returned an edit whose start is "0", not an offset from 0 to 9',
+    ],
+    [
+      [{ start: 0, message: "m", edit: { start: 0, end: 1 } }],
+      "returned an edit whose text is undefined, not a string",
+    ],
+  ])("reports invalid findings as engine/rule-error: %j", (returned, problem) => {
+    for (const kind of ["problem", "style"] as const) {
+      const options = failing(() => returned as Finding[], kind);
+      const message = `Rule test/fragile ${problem}; the rule was skipped for this document.`;
+      const linted = lint(source, options);
+      expect(linted.filter((item) => item.rule.startsWith("test/"))).toEqual([]);
+      expect(ruleErrors(linted)).toMatchObject([{ message, line: 1, column: 1 }]);
+      const result = format(source, options);
+      expect(result.output).toBe("A _b_ c.\n");
+      expect(result.diagnostics).toMatchObject([{ rule: "engine/rule-error", message }]);
+    }
+  });
+  it("lets an error of the workspace through, as the rule saw it", () => {
+    const error = Object.assign(new Error("EIO: i/o error"), { code: "EIO" });
+    const workspace = createWorkspace({
+      "Note.md": () => {
+        throw error;
+      },
+    });
+    const asking = (handle: (caught: unknown) => Finding[]) =>
+      failing(({ workspace: asked }) => {
+        try {
+          asked?.resolve("Doc.md", "Note.md#part", "github");
+          return [];
+        } catch (caught) {
+          return handle(caught);
+        }
+      });
+    const rethrown = asking((caught) => {
+      throw caught;
+    });
+    expect(() => lint(source, { ...rethrown, workspace })).toThrow(error);
+    // A rule that handles the error itself is not failing; one that throws its own is.
+    const handled = lint(source, {
+      ...asking((caught) => [{ start: 0, message: caught === error ? "Same" : "Other" }]),
+      workspace,
+    });
+    expect(handled.filter((item) => item.rule === "test/fragile")).toMatchObject([
+      { message: "Same" },
+    ]);
+    const replaced = asking(() => {
+      throw new Error("Own");
+    });
+    expect(ruleErrors(lint(source, { ...replaced, workspace }))).toMatchObject([
+      { message: expect.stringContaining("failed (Error: Own)") },
+    ]);
+  });
+  it("checks offsets in the text that rules see, without a byte order mark", () => {
+    const mark = String.fromCharCode(0xfeff);
+    const at = (start: number) => failing(() => [{ start, message: "End" }]);
+    expect(lint(`${mark}A.\n`, at(3))).toMatchObject([{ rule: "test/fragile", start: 4 }]);
+    expect(lint(`${mark}A.\n`, at(4))).toMatchObject([
+      { message: expect.stringContaining("start is 4, not an offset from 0 to 3") },
+    ]);
+  });
+  it.each([
+    [
+      { kind: "style", phase: "Inline" },
+      'its phase is "Inline", not "inline", "block", or "document"',
+    ],
+    [{ kind: "Style" }, 'its kind is "Style", not "style" or "problem"'],
+    [{ kind: "problem", check: undefined }, "its check is undefined, not a function"],
+    [{ kind: "problem", description: undefined }, "its description is undefined, not a string"],
+    [{ kind: "problem", schema: "object" }, 'its schema is "object", not a JSON Schema'],
+  ])("rejects a plugin rule that does not have the shape of a rule: %j", (fields, problem) => {
+    const rule = { description: "Invalid", check: () => [], ...fields } as unknown as Rule;
+    const plugins: Plugin[] = [{ name: "test", rules: { invalid: rule } }];
+    const message = `Invalid rule test/invalid: ${problem}.`;
+    expect(() => ruleRegistry(plugins)).toThrow(message);
+    // Also when the rule is off: a plugin with an invalid rule is unusable.
+    for (const run of [lint, format])
+      expect(() => run("Text.\n", { plugins, config: { extends: [] } })).toThrow(message);
+    expect(() =>
+      ruleRegistry([{ name: "test", rules: { invalid: null as unknown as Rule } }]),
+    ).toThrow("Invalid rule test/invalid: it is null, not an object.");
+  });
+  it("looks rule and preset names up only among those defined", () => {
+    for (const name of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+      const rules = JSON.parse(`{"${name}": "warn"}`) as NonNullable<Config["rules"]>;
+      expect(() => lint("Text.\n", { config: { rules } })).toThrow(`Unknown rule: ${name}`);
+      expect(() => format("Text.\n", { config: { extends: [name] } })).toThrow(
+        `Unknown preset: ${name}`,
+      );
+    }
+    expect(canonicalDialect("toString" as Dialect)).toBe("toString");
+  });
+  it("names the rule whose option schema cannot be compiled", () => {
+    const plugins: Plugin[] = [
+      {
+        name: "test",
+        rules: {
+          options: {
+            kind: "problem",
+            description: "Invalid schema",
+            schema: { type: "nonsense" },
+            check: () => [],
+          },
+        },
+      },
+    ];
+    expect(() =>
+      lint("Text.\n", { plugins, config: { extends: [], rules: { "test/options": "warn" } } }),
+    ).toThrow("Invalid rule test/options: its schema cannot be compiled: schema is invalid");
+  });
+  it("compiles each option schema once, however many documents use it", () => {
+    const schema = {
+      type: "object",
+      additionalProperties: false,
+      properties: { level: { type: "integer" } },
+    };
+    const plugins: Plugin[] = [
+      {
+        name: "test",
+        rules: { options: { kind: "problem", description: "Options", schema, check: () => [] } },
+      },
+    ];
+    const compile = vi.spyOn(Ajv.prototype, "compile");
+    try {
+      for (let level = 0; level < 5; level++)
+        lint("Text.\n", {
+          plugins,
+          config: { extends: [], rules: { "test/options": ["warn", { level }] } },
+        });
+      expect(() =>
+        lint("Text.\n", {
+          plugins,
+          config: { extends: [], rules: { "test/options": ["warn", { level: "high" }] } },
+        }),
+      ).toThrow("Invalid options for test/options: data/level must be integer");
+      expect(compile.mock.calls.filter(([compiled]) => compiled === schema)).toHaveLength(1);
+    } finally {
+      compile.mockRestore();
+    }
   });
 });
 
@@ -585,7 +1012,10 @@ describe("processing selected ranges", () => {
       ranges: [at(source, "C", 1)],
     });
     expect(result.output).toBe(source);
-    expect(result.diagnostics.map((item) => item.rule)).toEqual(["engine/unsafe-format"]);
+    expect(result.diagnostics.map((item) => [item.rule, item.line])).toEqual([
+      ["engine/unsafe-format", 4],
+      ["unsafe/drop", 4],
+    ]);
     const block = at(source, "C", 6);
     expect(result.scope).toEqual([{ start: block.start - 1, end: block.end + 1 }]);
   });
@@ -1185,7 +1615,10 @@ describe("line endings", () => {
     const callout = ["> [!note] Title", "Body text.", ""].join(newline);
     const result = format(callout, { config, plugins: [join] });
     expect(result.output).toBe(callout);
-    expect(result.diagnostics.map((item) => item.rule)).toEqual(["engine/unsafe-format"]);
+    expect(result.diagnostics.map((item) => [item.rule, item.line])).toEqual([
+      ["engine/unsafe-format", 1],
+      ["join/title", 1],
+    ]);
     const plain = ["> Quoted", "text.", ""].join(newline);
     expect(format(plain, { config, plugins: [join] }).output).toBe(`> Quoted text.${newline}`);
   });
