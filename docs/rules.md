@@ -119,10 +119,8 @@ After:
 See [the plan](<Garden/Plan>).
 ```
 
-Do not let this rule and `links/path` change the same link in one run: their
-edits overlap, and `format` then leaves the document unchanged and reports
-`engine/unsafe-format`. Run them one after the other with different
-configurations.
+With `links/path` also on, a link that both change gets its notation first and
+its path in the next pass, the same result as running them one after the other.
 
 ## `links/path`
 
