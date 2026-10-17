@@ -25,16 +25,15 @@ const result = format(files["note.md"], options);
 // result: { output, changed, diagnostics }
 ```
 
-`lint(source, options)` returns the diagnostics, with the fields of the
-[JSON report](cli.md#json-report). `format(source, options)` returns `output`,
-the formatted text; `changed`, whether it differs; `diagnostics`, the findings
-that remain in the output; and `scope` with [`ranges`](#part-of-a-document). The
+`lint(source, options)` returns the diagnostics, with the fields of the [JSON
+report](cli.md#json-report). `format(source, options)` returns `output`, the
+formatted text; `changed`, whether it differs; `diagnostics`, the findings that
+remain in the output; and `scope` with [`ranges`](#part-of-a-document). The
 edits of a rule that would change the document's meaning are left out and
-reported as `engine/unsafe-format`, as the
-[safety model](design.md#safety-model) describes, and a rule that fails is
-reported as [`engine/rule-error`](plugins.md#rules). An invalid configuration,
-an unknown rule, invalid rule options, or a plugin rule of the wrong shape throw
-an error.
+reported as `engine/unsafe-format`, as the [safety
+model](design.md#safety-model) describes, and a rule that fails is reported as
+[`engine/rule-error`](plugins.md#rules). An invalid configuration, an unknown
+rule, invalid rule options, or a plugin rule of the wrong shape throw an error.
 
 | Option           | Meaning                                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -104,11 +103,11 @@ maps each path, relative to the workspace root with forward slashes, to one of:
 | `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                      |
 
 The CLI passes the directories it skipped as `unreadable`, the vaults it found
-as `vaults`, and `rootInVault` when it finds the vault above the root;
-[Obsidian vaults](obsidian.md#vaults-inside-a-larger-workspace) describes the
-effects. A rule asks the workspace where a link leads;
-[resolve links in a rule](plugins.md#resolve-links-in-a-rule) describes the
-result. A host can also implement the `Workspace` interface itself.
+as `vaults`, and `rootInVault` when it finds the vault above the root; [Obsidian
+vaults](obsidian.md#vaults-inside-a-larger-workspace) describes the effects. A
+rule asks the workspace where a link leads; [resolve links in a
+rule](plugins.md#resolve-links-in-a-rule) describes the result. A host can also
+implement the `Workspace` interface itself.
 
 ## Part of a document
 

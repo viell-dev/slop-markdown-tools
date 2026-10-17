@@ -42,9 +42,9 @@ links.
 - Files that `.gitignore` excludes or that match the configuration's `ignore`
   patterns are not processed, and nested Git repositories, symbolic links, and
   the directories `.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and
-  `coverage` are not visited; see
-  [ignored files](configuration.md#ignored-files-and-link-targets). A symbolic
-  link named on the command line is an error.
+  `coverage` are not visited; see [ignored
+  files](configuration.md#ignored-files-and-link-targets). A symbolic link named
+  on the command line is an error.
 - The CLI does not expand patterns such as `*.md`; a shell does.
 - `--exclude` takes literal paths, not patterns, relative to the current
   directory or absolute, inside the workspace. It leaves out a file, or a
@@ -52,8 +52,8 @@ links.
   that does not exist excludes nothing; one that the tool may not examine is an
   error. It cannot be combined with stdin.
 
-To check only the files that changed, pass them as arguments; see
-[Git hooks](integrations.md#git-hooks).
+To check only the files that changed, pass them as arguments; see [Git
+hooks](integrations.md#git-hooks).
 
 ## Read from stdin
 
@@ -96,12 +96,12 @@ A run over files ends with one summary line on stderr:
 | `format`         | `3 file(s) processed; 1 would change.`        |
 | `format --write` | `3 file(s) processed; 1 written.`             |
 
-Both add `; 1 could not be read` when a selected document
-[could not be read](#files-that-cannot-be-read-or-written), and `format --write`
-adds `; 1 could not be written`. Warnings about the run itself, such as a
-skipped directory, are printed as `mdtools: warning: …`, and an error that stops
-the run as `mdtools: …`. These lines are for people; a script should read the
-JSON report and the exit code.
+Both add `; 1 could not be read` when a selected document [could not be
+read](#files-that-cannot-be-read-or-written), and `format --write` adds
+`; 1 could not be written`. Warnings about the run itself, such as a skipped
+directory, are printed as `mdtools: warning: …`, and an error that stops the run
+as `mdtools: …`. These lines are for people; a script should read the JSON
+report and the exit code.
 
 ### JSON report
 

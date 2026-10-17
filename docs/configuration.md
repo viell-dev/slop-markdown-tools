@@ -53,8 +53,8 @@ The package does not ship a schema file; the library exports the schema as
 A **preset** is a named set of rule settings. The **dialect** is a separate
 setting: it names the renderer whose syntax documents are read in, such as
 GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
-break. Each preset except `recommended` also sets a dialect. The
-[rule index](rules.md) shows which rules each preset enables.
+break. Each preset except `recommended` also sets a dialect. The [rule
+index](rules.md) shows which rules each preset enables.
 
 | Preset        | Sets the dialect | For                                                                                                                |
 | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
