@@ -671,6 +671,7 @@ const wrap: Rule = {
         return;
       }
       const atoms = wrappingAtoms(words, openers);
+      if (!atoms.length) return;
       // The first line keeps the words after a first word that would open a
       // block alone on the line, until the line can no longer open one.
       while (
