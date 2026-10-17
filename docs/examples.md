@@ -73,8 +73,8 @@ Follow the [setup guide](docs/guide.md) first, then read the [sensor reference](
 | Humidity | % | Yes |
 | Pressure | hPa | Since 1.2 |
 
-- [X] Publish readings every minute
-- [ ] Keep a week of history
+* [X] Publish readings every minute
+* [ ] Keep a week of history
 ````
 
 Preview the changes with `--diff`. To try `--write`, copy `before/` elsewhere
@@ -122,10 +122,13 @@ Each change comes from one rule of the configuration:
   keep their lines.
 - `style/emphasis` and `style/strong` chose `_` and `**`.
 - `github/alert-marker` and `github/task-marker` normalized `[!note]` and `[X]`.
+- `style/list-marker` wrote the task list with `-`.
 - `style/table` aligned the table.
 - `links/path` put `./` in front of the links it could resolve.
 - In `docs/guide.md`, `style/heading` turned an underlined heading into a `#`
-  heading, and `docs/reference.md` gained its missing final newline.
+  heading, `style/ordered-list` wrote `1)` as `1.`, and `style/list-indent` left
+  one space after each number and moved the code block in the second step with
+  the step's text. `docs/reference.md` gained its missing final newline.
 
 The link to `docs/calibration.md`, a file that does not exist, did not change.
 Formatting never guesses a target, so `lint` still reports it and exits with

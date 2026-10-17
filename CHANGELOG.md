@@ -52,6 +52,10 @@ From `0.2.0-rc.2`:
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
+- `recommended` formats lists: `*` and `+` bullets become `-`, `1)` becomes
+  `1.`, numbers are made consistent, and each item gets one space after its
+  marker and no indentation before it. `format --check` fails on lists written
+  otherwise until they are formatted or the list rules are turned off.
 
 From `0.2.0-rc.1` or earlier, also:
 

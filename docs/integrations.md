@@ -105,7 +105,9 @@ yet", keep the other tool for that check.
 | MD045 (image alternative text)                                                   | [`content/image-alt`](rules.md#contentimage-alt)                                                      |
 | MD056 (table column count)                                                       | [`content/table-columns`](rules.md#contenttable-columns)                                              |
 | MD040 (code block language)                                                      | [`content/code-language`](rules.md#contentcode-language)                                              |
-| List markers, numbering, and indentation; MD004, MD005, MD007, MD029, MD030      | None yet                                                                                              |
+| `-` for bullets; MD004 (list style)                                              | [`style/list-marker`](rules.md#stylelist-marker)                                                      |
+| `1.` and numbering; MD029 (ordered list prefix)                                  | [`style/ordered-list`](rules.md#styleordered-list), which repeats any first number written twice      |
+| One space after list markers, list indentation; MD005, MD007, MD030              | [`style/list-indent`](rules.md#stylelist-indent); lists indented with tabs stay as written            |
 | Code block and fence style; MD046, MD048                                         | None yet                                                                                              |
 | `---` for thematic breaks; MD035                                                 | None yet; the [plugin example](examples.md#write-a-plugin) adds one                                   |
 | Trailing spaces, tabs, repeated blank lines; MD009, MD010, MD012                 | None yet                                                                                              |
