@@ -6,6 +6,7 @@ import type { ResolveOptions } from "../core/types.js";
 import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
+import type { Ignore } from "ignore";
 import { minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
@@ -21,6 +22,72 @@ export interface Skipped {
   code: RefusalCode | "INVALID";
   /** What was skipped, why, and what follows from it. */
   message: string;
+}
+/**
+ * Whether letter case is ignored where Git and the file system usually ignore
+ * it. Git sets `core.ignorecase` when it creates a repository on a file system
+ * that ignores case, as those of Windows and macOS do by default, and leaves it
+ * off elsewhere; `.gitignore` patterns then match accordingly.
+ */
+const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
+/** A `.gitignore` file's rules for the folder that holds it. */
+interface IgnoreLayer {
+  /** The folder, relative to the workspace root; empty for the root. */
+  base: string;
+  /** The file's text. */
+  text: string;
+  matcher: Ignore;
+}
+/** A gitignore pattern that matches exactly one folder, at a path relative to the file's folder. */
+function folderOnly(folder: string): string {
+  return `/${folder.replace(/[\\*?[]/g, "\\$&")}/`;
+}
+/**
+ * The matchers for the entries of the folder `relative`, one for each
+ * `.gitignore` above them, nearest last, with the path from that file's
+ * folder. Git asks each file only whether its patterns match the path itself;
+ * that nothing below an excluded folder counts is settled by the walk, which
+ * never enters one. The `ignore` package also answers that a path is ignored
+ * when the file's patterns exclude a folder above it, which is wrong when a
+ * deeper `.gitignore` included that folder again. For such a folder, the
+ * file's patterns are tested with each folder on the way marked as included.
+ */
+function ignoreScopes(relative: string, layers: IgnoreLayer[]) {
+  return layers.map((layer) => {
+    const inner = relative.slice(layer.base ? layer.base.length + 1 : 0);
+    let { matcher } = layer;
+    if (inner && matcher.test(`${inner}/`).ignored) {
+      const folders = inner
+        .split("/")
+        .map((_, index, parts) => parts.slice(0, index + 1).join("/"));
+      matcher = ignore({ ignorecase: caseInsensitive })
+        .add(layer.text)
+        .add(folders.map((folder) => `!${folderOnly(folder)}`));
+    }
+    return { layer, matcher, prefix: inner ? `${inner}/` : "" };
+  });
+}
+/**
+ * The `.gitignore` file and pattern that exclude an entry, or undefined when
+ * none does: the nearest file whose patterns match the entry decides, and a
+ * negated pattern includes it.
+ */
+function gitIgnoreRule(
+  scopes: ReturnType<typeof ignoreScopes>,
+  entry: string,
+  directory: boolean,
+): { file: string; pattern: string } | undefined {
+  for (let index = scopes.length - 1; index >= 0; index--) {
+    const { layer, matcher, prefix } = scopes[index]!;
+    const result = matcher.test(prefix + entry + (directory ? "/" : ""));
+    if (result.ignored)
+      return {
+        file: layer.base ? `${layer.base}/.gitignore` : ".gitignore",
+        pattern: result.rule?.pattern ?? "",
+      };
+    if (result.unignored) return undefined;
+  }
+  return undefined;
 }
 export interface FileSet {
   root: string;
@@ -119,10 +186,6 @@ export async function discover(
       throw new Error(`Input is outside the workspace: ${input}`);
     requests.push(relative);
   }
-  interface IgnoreLayer {
-    base: string;
-    matcher: ReturnType<typeof ignore>;
-  }
   /** Directories left out, with the path whose read the system refused. */
   const refused: { directory: string; reading: string; code: RefusalCode }[] = [];
   const reason = (item: { reading: string; code: RefusalCode }, subject: string) =>
@@ -142,7 +205,16 @@ export async function discover(
       );
     refused.push({ directory, reading, code });
   }
-  async function walk(relative: string, inherited: IgnoreLayer[], targetOnly = false) {
+  /**
+   * Visit a directory. Below a folder that Git ignores, which is visited only
+   * for link targets, nothing can be included again, as in Git.
+   */
+  async function walk(
+    relative: string,
+    inherited: IgnoreLayer[],
+    targetOnly = false,
+    gitIgnoredAbove = false,
+  ) {
     const directory = path.join(root, relative);
     const layers = [...inherited];
     const rules = path.join(directory, ".gitignore");
@@ -151,9 +223,14 @@ export async function discover(
     // ignore rules nothing tells which of the directory's files may be touched.
     let reading = relative;
     try {
-      if (await exists(rules)) {
+      if (!gitIgnoredAbove && (await exists(rules))) {
         reading = relative ? `${relative}/.gitignore` : ".gitignore";
-        layers.push({ base: relative, matcher: ignore().add(await readFile(rules, "utf8")) });
+        const text = await readFile(rules, "utf8");
+        layers.push({
+          base: relative,
+          text,
+          matcher: ignore({ ignorecase: caseInsensitive }).add(text),
+        });
         reading = relative;
       }
       entries = await readdir(directory, { withFileTypes: true });
@@ -165,6 +242,7 @@ export async function discover(
     const settings = entries.find((entry) => entry.name === ".obsidian");
     if (settings?.isDirectory() || (settings?.isSymbolicLink() && (await isVault(directory))))
       vaultFolders.set(relative, directory);
+    const scopes = gitIgnoredAbove ? [] : ignoreScopes(relative, layers);
     for (const entry of entries) {
       if (
         [".git", ".obsidian", "node_modules", ".npm-cache", "dist", "coverage"].includes(
@@ -174,11 +252,8 @@ export async function discover(
       )
         continue;
       const name = relative ? `${relative}/${entry.name}` : entry.name;
-      const gitIgnored = layers.some((layer) =>
-        layer.matcher.ignores(
-          name.slice(layer.base ? layer.base.length + 1 : 0) + (entry.isDirectory() ? "/" : ""),
-        ),
-      );
+      const gitIgnored =
+        gitIgnoredAbove || gitIgnoreRule(scopes, entry.name, entry.isDirectory()) !== undefined;
       if (gitIgnored && resolve.gitIgnored !== true) continue;
       const full = path.join(root, name);
       if (entry.isDirectory()) {
@@ -192,7 +267,7 @@ export async function discover(
           continue;
         }
         if (!nested || resolve.nestedRepositories === true)
-          await walk(name, layers, targetOnly || gitIgnored || nested);
+          await walk(name, layers, targetOnly || gitIgnored || nested, gitIgnored);
       } else if (entry.isFile()) {
         const markdown = /\.md$/i.test(name);
         let cached: string | undefined;

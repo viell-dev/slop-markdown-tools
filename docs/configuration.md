@@ -466,10 +466,16 @@ to the wrong line or to two lines.
 ## Selection, output, and exit codes
 
 Commands accept explicit files/directories, or no paths to select the workspace.
-The CLI honors `.gitignore` files and configured ignore patterns. Config-ignored
-documents remain available for link resolution. Git-ignored content and nested
-repositories are not indexed by default. To make their files available only as
-link targets, set:
+
+The CLI honors `.gitignore` files and configured ignore patterns. As in Git, the
+deepest `.gitignore` with a pattern that matches a path decides, so a negated
+pattern there includes a file that a higher one excludes, but nothing below an
+excluded folder can be included again. Patterns ignore letter case on Windows
+and macOS, where Git does so by default, and not elsewhere. Versions up to
+`0.2.0-rc.2` left out a file that any `.gitignore` on its path matched and
+ignored letter case everywhere. Config-ignored documents remain available for
+link resolution. Git-ignored content and nested repositories are not indexed by
+default. To make their files available only as link targets, set:
 
 ```jsonc
 {
