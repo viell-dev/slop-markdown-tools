@@ -60,6 +60,10 @@ Verify these once per release rather than setting them up again:
   `mdrefine` names the user `viell-dev`, the repository `slop-markdown-tools`,
   the workflow `release.yml`, and the environment `npm-release`, with direct
   publishing allowed. No npm token is stored in GitHub.
+- The package's publishing access on npm is "Require two-factor authentication
+  and disallow tokens". Trusted publishing still works; publishing with a token
+  does not, and a change made by hand on the account, such as a dist-tag, asks
+  for the second factor.
 - The GitHub environment `npm-release` is restricted to `main`.
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
 - GitHub Pages uses GitHub Actions as its source, and the environment
