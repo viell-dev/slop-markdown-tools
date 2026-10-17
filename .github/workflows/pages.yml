@@ -1,28 +1,89 @@
 name: Pages
+# The site documents the newest stable release. After a Release run that published a stable
+# version, this workflow builds the site from that version's tag and deploys it; dispatched by
+# hand with a version tag, it deploys that tag's site. Either way the workflow runs on main,
+# which the github-pages environment requires, and only the checkout uses the tag. CI builds
+# the site for every pull request.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to build the site from (an exact version, without a v prefix)
+        required: true
 permissions:
   contents: read
 concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  build:
+  resolve:
+    # A Release run that only prepared succeeds too; the step checks whether it published.
+    if:
+      github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Choose the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          JOBS_URL: ${{ github.event.workflow_run.jobs_url }}
+          RELEASED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          skip() { echo "$1" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; }
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            # The Release workflow publishes only in its publish job, from a commit whose
+            # package.json names the version, and tags that commit with the version.
+            published=$(gh api "$JOBS_URL" --jq '.jobs[] | select(.name == "publish") | .conclusion')
+            [ "$published" = success ] || skip "The Release run published nothing; the site stays as it is."
+            TAG=$(gh api "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$RELEASED_COMMIT" \
+              --jq '.content | @base64d | fromjson | .version')
+            case "$TAG" in
+              *-*) skip "$TAG is a prerelease; the site keeps documenting the newest stable release." ;;
+            esac
+          fi
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$TAG' is not a version tag"
+            exit 1
+          fi
+          if ! commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$TAG" --jq .sha); then
+            echo "::error::The tag $TAG does not exist"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ "$commit" != "$RELEASED_COMMIT" ]; then
+            echo "::error::The tag $TAG names $commit, not the released commit $RELEASED_COMMIT"
+            exit 1
+          fi
+          echo "Building the site of $TAG, commit $commit." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: npm ci
-      - run: npm run format:docs:check
       - run: npm run docs:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -31,6 +92,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write

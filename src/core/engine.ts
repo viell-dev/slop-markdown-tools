@@ -419,11 +419,13 @@ function semanticTree(
       const anchors = headingAnchorSource(document, node);
       if (anchors !== undefined) result.anchors = anchors;
     }
-    if (calloutHeader && document.dialect === "obsidian" && node.type === "paragraph") {
+    if (calloutHeader && document.dialect !== "commonmark" && node.type === "paragraph") {
       const [start, end] = range(node);
       const header = document.source.slice(start, end).split(/\r\n|\r|\n/, 1)[0]!;
       if (/^\[![\w-]+\]/.test(header)) {
-        // CommonMark merges title and body into one paragraph. Preserve their boundary too.
+        // CommonMark merges an Obsidian callout's title, or the line of a
+        // GitHub alert's marker, and the body into one paragraph. Preserve
+        // their boundary too.
         const title = header.replace(
           /^\[!([\w-]+)\]/,
           (_, marker: string) => `[!${marker.toLowerCase()}]`,
@@ -449,6 +451,10 @@ function semanticTree(
         result[key] = text;
       } else if (key === "value" && node.type === "inlineCode")
         result[key] = node.value.replace(/\r\n|\r|\n/g, " ");
+      // An image's description renders as plain text, and a reference's label
+      // matches its definition with whitespace collapsed.
+      else if ((key === "alt" || key === "label") && typeof value === "string")
+        result[key] = value.replace(/[ \t\r\n]+/g, " ");
       else result[key] = value;
     }
     origins?.set(result, node);

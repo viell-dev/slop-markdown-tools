@@ -207,7 +207,10 @@ option is required; without it the rule does nothing.
 Only links whose target exists are converted. Titles, labels with formatting,
 wikilinks without a label, and embeds are left as written: a wikilink without a
 label shows its target as text, and a note embed is not the same thing as a
-Markdown image.
+Markdown image. A new wikilink decodes percent escapes, because Obsidian takes
+its text as the note's name: `[x](My%20Note.md)` becomes `[[My Note.md|x]]`. A
+destination that does not decode, or whose name would hold `|`, `[`, `]`, `#`,
+or `^`, stays as written.
 
 With `"style": "markdown"`, before:
 
@@ -256,8 +259,8 @@ file. Absolute filesystem paths are never written. These are left as written: a
 wikilink without a label, whose target is also its visible text; reference
 definitions, which are checked but not rewritten; autolinks; and links whose
 target is uncertain because a directory could not be read or the workspace root
-is only part of a vault (see
-[Obsidian vaults](obsidian.md#a-workspace-root-inside-a-vault)).
+is only part of a vault (see [Obsidian
+vaults](obsidian.md#a-workspace-root-inside-a-vault)).
 
 With `{ "style": "relative", "leadingDot": true }` in `README.md`, before:
 
@@ -330,18 +333,22 @@ See the [guide][setup] and the [changelog].
 Reports a local link, image, wikilink, embed, or reference definition whose
 target does not exist, and a fragment (`#heading`, `#^block`) that its target
 does not have. The anchors that a fragment can reach depend on the dialect; see
-[heading anchors](dialects.md#heading-anchors). A target that is missing or
-ambiguous is reported, never guessed.
+[heading anchors](dialects.md#heading-anchors). Only a Markdown file's fragments
+are checked: an image, a PDF, or a source file accepts any, such as
+`#gh-dark-mode-only`, `#page=2`, or `#L10-L20`. A target that is missing or
+ambiguous is reported, never guessed. A link into a directory that the CLI does
+not visit, such as `dist`, or through a symbolic link is checked on disk; see
+[ignored files](configuration.md#ignored-files-and-link-targets).
 
-| Message                                | Meaning                                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `Missing local target: …`              | No file matches.                                                                                       |
-| `Ambiguous local target: …`            | Several files match, such as two notes whose names differ only by case.                                |
-| `Missing fragment in …`                | The target exists but has no such heading, block, or anchor.                                           |
-| `Local target is a directory: …`       | Obsidian only. Other dialects accept a link to a directory, which a hosting site can serve.            |
-| `Local target is outside the vault: …` | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                      |
-| `Local target could not be checked: …` | A directory that may hold the target could not be read, or the workspace root is only part of a vault. |
-| `Fragment could not be checked: …`     | The target exists but could not be read.                                                               |
+| Message                                | Meaning                                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `Missing local target: …`              | No file matches.                                                                                             |
+| `Ambiguous local target: …`            | Several files match, such as two notes whose names differ only by case.                                      |
+| `Missing fragment in …`                | The target exists but has no such heading, block, or anchor.                                                 |
+| `Local target is a directory: …`       | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.           |
+| `Local target is outside the vault: …` | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                            |
+| `Local target could not be checked: …` | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
+| `Fragment could not be checked: …`     | The target exists but could not be read.                                                                     |
 
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on
@@ -351,8 +358,11 @@ In the Obsidian dialect, links resolve as in Obsidian: a path that starts with
 `./` or `../` counts from the note; otherwise an exact path from the vault's
 root comes first, then an exact path from the note, then a note found by its
 name or by the end of its path. Several matches at the first level that finds
-any are ambiguous. Note names and headings match without regard to case; block
-identifiers match exactly.
+any are ambiguous. A wikilink never resolves to a directory, so the search goes
+on to a note of that name. Note names and headings match without regard to case;
+block identifiers match exactly. A heading matches by the text it shows or as
+its source writes it, such as ``#`move` `` for ``### `move` ``, and
+`#Setup#Mobile` names a heading below another one.
 
 Reported when `docs/guide.md` does not exist, or has no heading named "Setup":
 
@@ -362,8 +372,10 @@ See the [guide](docs/guide.md#setup).
 
 ## `obsidian/block-reference`
 
-Reports a block identifier (`^id` at the end of a paragraph) that a note uses
-more than once. A link to `#^id` can reach only one of them.
+Reports a block identifier that a note uses more than once: `^` and Latin
+letters, digits, and hyphens at the end of a paragraph or heading, or alone on
+the line after a list or quote, as Obsidian defines it. A link to `#^id` can
+reach only one of them.
 
 Reported, on the second paragraph:
 
@@ -398,8 +410,8 @@ setting, Obsidian's Reading view shows every line break in a paragraph, so
 joining or breaking lines would change what the note looks like. The setting is
 `"strictLineBreaks": true` in the vault's `.obsidian/app.json`; the tool reads
 it and never changes it. The finding is at line 1, and its message begins
-`Obsidian strictLineBreaks is not verified true`. See
-[Obsidian vaults](obsidian.md#enable-wrapping).
+`Obsidian strictLineBreaks is not verified true`. See [Obsidian
+vaults](obsidian.md#enable-wrapping).
 
 ## `structure/duplicate-heading`
 
@@ -566,8 +578,8 @@ or what a comment applies to:
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
 emphasis there. A marker that would touch another `*` or `_` and change how the
-text parses is left as written, and so are the exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea).
+text parses is left as written, and so are the exceptions of [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea).
 
 Before:
 
@@ -612,9 +624,10 @@ After:
 Joins a code span that is written across lines onto one line. A line break
 inside a code span renders as a space, so the content stays the same. Some
 editors, such as Obsidian's Live Preview, show a split code span differently
-from the rendered page, and `style/wrap` leaves a paragraph with a split code
-span as written. The exceptions of
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea) apply.
+from the rendered page. `style/wrap` joins such a code span only in a paragraph
+that it wraps, and this rule also elsewhere, such as in a paragraph with a hard
+line break. The exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea)
+apply.
 
 Before:
 
@@ -787,10 +800,20 @@ After:
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
 line break inside a paragraph renders as a space, so the rendered text stays the
-same, and short lines keep diffs small. Lines are broken only at spaces in the
-text: a link, a code span, math, or a word longer than the line stays whole and
-can overflow. List markers, block quote markers, and indentation count toward
-the width.
+same, and short lines keep diffs small. Lines are broken at spaces in the text,
+also in the text of a link, emphasis, strong text, or strikethrough. A code
+span, an image, math, a link's destination, and a word longer than the line stay
+whole and can overflow; a code span or an image description written across lines
+is joined onto one. List markers, block quote markers, and indentation count
+toward the width, a tab up to the next multiple of four columns.
+
+A word that would start a block at the start of a line, such as a list marker,
+`#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
+on the line before it. A word that only starts like one, such as `--config`,
+`#tag`, or `-5`, can start a line. The first line keeps more than one word when
+its first word alone would open a block, such as `***` or `$$`, and keeps a
+paragraph that starts like a link reference definition (`[Note]: see …`) from
+becoming one.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -805,8 +828,9 @@ the width.
 - `reportUnreflowed`: report a paragraph that is too wide but left as written,
   with the reason.
 - `reportUnbreakable`: report a line that stays too wide because of something
-  that cannot be split, also in paragraphs left as written. An Obsidian
-  callout's title line counts as one such piece, even when it contains spaces.
+  that cannot be split, also in paragraphs left as written. The line of an
+  alert's or a callout's marker counts as one such piece, even when it contains
+  spaces.
 
 The two report options propose no edits and use the rule's severity. To make
 them fail a check, set the rule to `error` or pass `--max-warnings 0`;
@@ -816,10 +840,13 @@ A paragraph is left as written when joining or breaking its lines could change
 what it means, that is, when it:
 
 - has a hard line break, inline HTML, or a block identifier (`^id`) at its end;
-- has inline syntax, such as a link or a code span, that spans lines, or lines
-  whose container markers the tool cannot reproduce;
-- starts with an alert or callout marker such as `[!NOTE]`; in an Obsidian
-  callout, only the title line stays as it is, and the body is wrapped;
+- has a line break that is content, inside math, inline HTML, an Obsidian
+  comment, or a link's destination or title, or one inside a code span whose
+  next line starts with a space or tab, which renderers read differently;
+- has lines whose container markers the tool cannot reproduce;
+- starts with an alert or callout marker such as `[!NOTE]` in the CommonMark
+  dialect; in the other dialects only the line with the marker, and an Obsidian
+  callout's title on it, stays as it is, and the body is wrapped;
 - starts with a bare `-`, `+`, `*`, `1.`, `1)`, `#`, or `>` followed by more
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's
@@ -827,9 +854,9 @@ what it means, that is, when it:
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 
-In the Obsidian dialect, the rule wraps only with the vault's
-[strict line breaks](obsidian.md#enable-wrapping).
-[Forgejo and Gitea](dialects.md#forgejo-and-gitea) add their own cases.
+In the Obsidian dialect, the rule wraps only with the vault's [strict line
+breaks](obsidian.md#enable-wrapping). [Forgejo and
+Gitea](dialects.md#forgejo-and-gitea) add their own cases.
 
 With `{ "width": 40 }`, before:
 

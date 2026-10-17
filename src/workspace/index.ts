@@ -5,6 +5,7 @@ import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
 import { fallbackDialect } from "../config/resolve.js";
+import { blockIdentifier } from "../syntax/block-identifier.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
@@ -13,12 +14,38 @@ import { isNotUtf8 } from "./encoding.js";
 
 /**
  * A Markdown file's text, null for a file that is not Markdown, or a loader
- * that returns the text when a fragment check needs it. A loader that throws an
- * error whose `code` is `EACCES`, `EPERM`, or `EBUSY`, or
- * `ERR_ENCODING_INVALID_ENCODED_DATA` for a file that is not UTF-8 text, marks
- * the file as unreadable; any other error propagates.
+ * that returns the text when a fragment check needs it. Only a file that
+ * `isMarkdownName` accepts for the link's dialect is read for anchors. A
+ * loader that throws an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`,
+ * or `ERR_ENCODING_INVALID_ENCODED_DATA` for a file that is not UTF-8 text,
+ * marks the file as unreadable; any other error propagates.
  */
 export type WorkspaceSource = string | null | (() => string);
+
+/** What `WorkspaceOptions.lookup` found at a path. */
+export type LookupResult =
+  /** A file, with its path as found from the root and its source as in `files`. */
+  | { type: "file"; path: string; source: WorkspaceSource }
+  | { type: "directory" }
+  /**
+   * Something whose real location lies outside the workspace root, reached
+   * through the symbolic link or junction `through`, which the host does not
+   * follow: the root bounds what is read.
+   */
+  | { type: "outside"; through: string }
+  /** Something that the system does not let the host examine; `at` names it. */
+  | { type: "unreadable"; at: string };
+
+/**
+ * Whether a file is Markdown by its name: one ending in `.md` or `.markdown`,
+ * in any letter case, both of which GitHub, Forgejo, and Gitea render.
+ * Discovery selects such files in folders, and their headings are link
+ * targets. For the Obsidian dialect only `.md` counts: Obsidian opens no
+ * other file as a note.
+ */
+export function isMarkdownName(name: string, dialect?: Dialect): boolean {
+  return (dialect === "obsidian" ? /\.md$/i : /\.(?:md|markdown)$/i).test(name);
+}
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
 interface Rendering {
@@ -226,10 +253,18 @@ function htmlView(node: Nodes): string {
   return textContent(node).replaceAll("&", "&amp;").replaceAll("<", "&lt;");
 }
 
-/** What Obsidian links to: exact heading text, matched case-insensitively, and block identifiers. */
+/**
+ * What Obsidian links to: headings, by the text they show or by their source
+ * text, as written or without regard to case, and block identifiers.
+ */
 interface ObsidianAnchors {
   headings: Set<string>;
   foldedHeadings: Set<string>;
+  /**
+   * The headings in document order, with their levels and names, for a link to
+   * a heading below another one, such as `[[Note#Setup#Mobile]]`.
+   */
+  outline: { depth: number; names: string[] }[];
   blocks: Set<string>;
 }
 /** What GitHub links to, and CommonMark in its stead. */
@@ -308,30 +343,58 @@ function htmlParts(document: Document): Map<Nodes, HtmlPart> {
   });
   return parts;
 }
-/** A target's anchors for Obsidian; none for a target that is not Markdown source. */
-function obsidianAnchors(document: Document | null): ObsidianAnchors {
+/**
+ * Whether the outline holds a chain of headings that `parts` name, each one
+ * below the one before, within its section: `Setup#Mobile` is a heading
+ * `Mobile` of any lower level after a heading `Setup` and before the next
+ * heading of `Setup`'s level or higher. Every heading that a part names is
+ * tried, so the link is missing only when no such chain exists.
+ */
+function hasHeadingPath(outline: ObsidianAnchors["outline"], parts: string[]): boolean {
+  const named = (names: string[], part: string) =>
+    names.some((name) => name === part || name.toLowerCase() === part.toLowerCase());
+  const below = (part: number, from: number, depth: number): boolean => {
+    for (let at = from; at < outline.length && outline[at]!.depth > depth; at++)
+      if (
+        named(outline[at]!.names, parts[part]!) &&
+        (part === parts.length - 1 || below(part + 1, at + 1, outline[at]!.depth))
+      )
+        return true;
+    return false;
+  };
+  return below(0, 0, 0);
+}
+/** A target's anchors for Obsidian. */
+function obsidianAnchors(document: Document): ObsidianAnchors {
   const anchors: ObsidianAnchors = {
     headings: new Set(),
     foldedHeadings: new Set(),
+    outline: [],
     blocks: new Set(),
   };
-  if (!document) return anchors;
-  walk(document.tree, "heading", (node) => {
-    const text = textContent(node);
-    anchors.headings.add(text);
-    anchors.foldedHeadings.add(text.toLowerCase());
+  const { source } = document;
+  walk(document.tree, (node) => {
+    const block = blockIdentifier(source, node);
+    if (block) anchors.blocks.add(block.id);
+    if (node.type !== "heading") return;
+    // A link may name a heading by the text it shows or as its source writes
+    // it: the heading `` `move` `` is both `move` and `` `move` ``.
+    const first = node.children[0];
+    const written = first ? source.slice(range(first)[0], range(node.children.at(-1)!)[1]) : "";
+    const names = [...new Set([textContent(node), written])].map(detach);
+    for (const name of names) {
+      anchors.headings.add(name);
+      anchors.foldedHeadings.add(name.toLowerCase());
+    }
+    anchors.outline.push({ depth: node.depth, names });
   });
-  walk(document.tree, "text", (node) => {
-    const match = /(?:^|\s)\^([A-Za-z0-9-]+)\s*$/.exec(node.value);
-    if (match) anchors.blocks.add(match[1]!);
-  });
-  detachAll(anchors.headings, anchors.foldedHeadings, anchors.blocks);
+  // The names are detached already, and so is their lowercase form.
+  detachAll(anchors.blocks);
   return anchors;
 }
-/** A target's anchors for GitHub and CommonMark; none for a target that is not Markdown source. */
-function githubAnchors(document: Document | null): GithubAnchors {
+/** A target's anchors for GitHub and CommonMark. */
+function githubAnchors(document: Document): GithubAnchors {
   const anchors: GithubAnchors = { slugs: new Set(), explicit: new Set() };
-  if (!document) return anchors;
   const slugger = new GithubSlugger();
   const parts = htmlParts(document);
   // GitHub numbers the anchors of Markdown and HTML headings together, in
@@ -349,14 +412,13 @@ function githubAnchors(document: Document | null): GithubAnchors {
   detachAll(anchors.slugs, anchors.explicit);
   return anchors;
 }
-/** A target's anchors for Forgejo and Gitea; none for a target that is not Markdown source. */
-function forgeAnchors(document: Document | null): ForgeAnchors {
+/** A target's anchors for Forgejo and Gitea. */
+function forgeAnchors(document: Document): ForgeAnchors {
   const anchors: ForgeAnchors = {
     forgejoSlugs: new Set(),
     giteaSlugs: new Set(),
     explicit: new Set(),
   };
-  if (!document) return anchors;
   const { source } = document;
   const forgejoSlugger = createForgejoSlugger();
   const giteaSlugger = createGiteaSlugger();
@@ -421,6 +483,14 @@ export interface WorkspaceOptions {
    * `unreadable` instead of `missing`.
    */
   unreadable?: string[];
+  /**
+   * Looks for a path that `files` and `directories` do not hold, when a link
+   * names it: a host that leaves some folders or links out of the index, such
+   * as the CLI, finds there what a link names. It returns what is at the path,
+   * or undefined when nothing is. `folded` asks for Obsidian's matching,
+   * without regard to letter case. A search by note name does not use it.
+   */
+  lookup?: (path: string, folded: boolean) => LookupResult | undefined;
   /**
    * Folders below the workspace root that are Obsidian vaults of their own. An
    * Obsidian link in a note of such a vault reaches only the vault's files: a
@@ -553,20 +623,33 @@ export function createWorkspace(
     return foldedDirectories.has(name.toLowerCase());
   }
   const targets = new Map<string, Target>();
+  /** What the host's lookup found, by the matching asked for and the path. */
+  const lookedUp = new Map<string, LookupResult | undefined>();
+  /** The sources of the files that the lookup found, by path. */
+  const foundSources = new Map<string, WorkspaceSource>();
+  /** What the host finds at a path that the index does not hold, asked once per path. */
+  function lookup(name: string, folded: boolean): LookupResult | undefined {
+    if (!options.lookup) return undefined;
+    const key = `${folded ? "i" : "s"}:${name}`;
+    if (lookedUp.has(key)) return lookedUp.get(key);
+    const result = options.lookup(name, folded);
+    lookedUp.set(key, result);
+    if (result?.type === "file") foundSources.set(result.path, result.source);
+    return result;
+  }
   /**
-   * One group of a target's anchors, from the target read and parsed for it;
-   * nothing keeps the parsed document. A target that is not Markdown source has
-   * no anchors. Undefined for a target that the system refuses to let be read,
-   * or whose text is not UTF-8, which is marked and not read again.
+   * One group of a Markdown target's anchors, from the target read and parsed
+   * for it; nothing keeps the parsed document. Undefined for a target that the
+   * system refuses to let be read, or whose text is not UTF-8, which is marked
+   * and not read again.
    */
   function compute<Anchors>(
     target: Target,
+    value: string | (() => string),
     name: string,
-    anchors: (document: Document | null) => Anchors,
+    anchors: (document: Document) => Anchors,
   ): Anchors | undefined {
     if (target.unreadable) return undefined;
-    const value = sources.get(name);
-    if (value === null || value === undefined || !/\.md$/i.test(name)) return anchors(null);
     let source: string;
     try {
       source = typeof value === "function" ? value() : value;
@@ -593,25 +676,33 @@ export function createWorkspace(
     fragment: string,
     anchor: string,
   ): boolean | undefined {
+    const value = sources.has(name) ? sources.get(name) : foundSources.get(name);
+    // Only a Markdown file's anchors are known. Other files take fragments of
+    // their own, such as an image's `#gh-dark-mode-only`, a PDF's `#page=2`, or
+    // a forge's line range `#L10-L20` in source code, which are not checked; so
+    // is a file that is linted as Markdown only because it was named.
+    if (value === null || value === undefined || !isMarkdownName(name, dialect)) return true;
     let target = targets.get(name);
     if (!target) targets.set(name, (target = {}));
     if (dialect === "obsidian") {
-      const anchors = target.obsidian ?? compute(target, name, obsidianAnchors);
+      const anchors = target.obsidian ?? compute(target, value, name, obsidianAnchors);
       if (!anchors) return undefined;
       target.obsidian = anchors;
-      return fragment.startsWith("^")
-        ? anchors.blocks.has(fragment.slice(1))
-        : anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase());
+      if (fragment.startsWith("^")) return anchors.blocks.has(fragment.slice(1));
+      if (anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase()))
+        return true;
+      // A path of headings, each below the one before, such as `Setup#Mobile`.
+      return fragment.includes("#") && hasHeadingPath(anchors.outline, fragment.split("#"));
     }
     if (dialect === "forgejo" || dialect === "gitea") {
-      const forge = target.forge ?? compute(target, name, forgeAnchors);
+      const forge = target.forge ?? compute(target, value, name, forgeAnchors);
       if (!forge) return undefined;
       target.forge = forge;
       const slugs = dialect === "forgejo" ? forge.forgejoSlugs : forge.giteaSlugs;
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
       return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
-    const anchors = target.github ?? compute(target, name, githubAnchors);
+    const anchors = target.github ?? compute(target, value, name, githubAnchors);
     if (!anchors) return undefined;
     target.github = anchors;
     const folded = anchor.toLowerCase();
@@ -707,7 +798,7 @@ export function createWorkspace(
     ...(options.strictLineBreaks !== undefined
       ? { strictLineBreaks: options.strictLineBreaks }
       : {}),
-    resolve(source, destination, dialect): LinkResolution {
+    resolve(source, destination, dialect, wiki = false): LinkResolution {
       if (/^[a-z][a-z\d+.-]*:/i.test(destination) || destination.startsWith("//"))
         return { status: "external" };
       source = source.replaceAll("\\", "/");
@@ -732,6 +823,17 @@ export function createWorkspace(
       const partial = folded && !vault && rootFolders.length > 0;
       // Whether Obsidian would look in a place of that vault outside the workspace.
       let beyond = false;
+      // A link on the disk that the path leads through to outside the workspace root.
+      let leaves: string | undefined;
+      /** What the host finds at a path that the index does not hold. */
+      const look = (name: string, file = true) => {
+        const found = lookup(name, folded);
+        if (found?.type === "file") {
+          if (file) candidates.add(found.path);
+        } else if (found?.type === "directory") directory ||= !wiki;
+        else if (found?.type === "outside") leaves ??= found.through;
+        else if (found?.type === "unreadable") blocking.add(found.at);
+      };
       const add = (candidate: string) => {
         const normalized = path.posix.normalize(candidate);
         if (normalized === ".." || normalized.startsWith("../")) {
@@ -747,20 +849,28 @@ export function createWorkspace(
           outside ??=
             namesMatching(bare)[0] ??
             (path.posix.extname(bare) ? undefined : namesMatching(`${bare}.md`)[0]) ??
-            (isDirectory(bare, true) ? bare : undefined);
+            (!wiki && isDirectory(bare, true) ? bare : undefined);
           return;
         }
-        if (isDirectory(bare, folded)) directory = true;
+        // Obsidian links a wikilink to a note or a file, never to a folder.
+        if (!wiki && isDirectory(bare, folded)) directory = true;
         const above = unreadableAbove(bare, folded);
         if (above !== undefined) blocking.add(above);
         if (!folded) {
           if (sources.has(normalized)) candidates.add(normalized);
+          // A path that ends with a slash names a folder only.
+          else if (!directory) look(bare, bare === normalized);
           return;
         }
         // Names differing only by case all count, so such vaults report ambiguity.
+        const before = candidates.size;
         for (const name of namesMatching(normalized)) candidates.add(name);
         if (!path.posix.extname(normalized))
           for (const name of namesMatching(`${normalized}.md`)) candidates.add(name);
+        if (candidates.size === before && !directory) {
+          look(bare);
+          if (!path.posix.extname(bare)) look(`${bare}.md`);
+        }
       };
       if (!targetPath) add(source);
       else if (dialect === "obsidian") {
@@ -800,6 +910,14 @@ export function createWorkspace(
       // A match is uncertain when a place that could not be looked in may hold a
       // note that Obsidian would choose instead, or as well.
       const uncertain = [...(unsearched ? hidden : obstructed ? blocking : []), ...unseen];
+      // The tool reads nothing outside the workspace root, where the link leads.
+      if (candidates.size === 0 && leaves !== undefined)
+        return {
+          status: "unreadable",
+          unreadable: [leaves],
+          leavesRoot: leaves,
+          ...(vault ? { vault } : {}),
+        };
       if (candidates.size === 0 && (blocking.size > 0 || unsearched || unseen.length > 0))
         return {
           status: "unreadable",

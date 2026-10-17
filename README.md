@@ -7,8 +7,8 @@ renderer, with one configuration for both.
 
 mdrefine is meant to replace a general-purpose linter and formatter, such as
 markdownlint and Prettier, for Markdown. It does not cover all of their checks
-yet;
-[the comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
+yet; [the
+comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
 shows which have a rule.
 
 - **One configuration for lint and format.** Style rules report in `lint` and
@@ -88,22 +88,21 @@ rendered there.
 ## Documentation
 
 The [documentation](https://viell-dev.github.io/slop-markdown-tools/) starts
-with
-[getting started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
-and covers the
-[rules](https://viell-dev.github.io/slop-markdown-tools/rules.html),
+with [getting
+started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html) and
+covers the [rules](https://viell-dev.github.io/slop-markdown-tools/rules.html),
 configuration, the command line, Obsidian vaults, CI and editors, the library
-and plugins, and
-[what is not covered yet](https://viell-dev.github.io/slop-markdown-tools/design.html#limits).
-The package ships working
+and plugins, and [what is not covered
+yet](https://viell-dev.github.io/slop-markdown-tools/design.html#limits). The
+package ships working
 [examples](https://viell-dev.github.io/slop-markdown-tools/examples.html) and
 the [changelog](CHANGELOG.md).
 
 ## Status
 
-mdrefine follows a
-[pre-1.0 versioning policy](https://viell-dev.github.io/slop-markdown-tools/versions.html):
-a minor release may change behavior and says how, and a patch release only fixes
+mdrefine follows a [pre-1.0 versioning
+policy](https://viell-dev.github.io/slop-markdown-tools/versions.html): a minor
+release may change behavior and says how, and a patch release only fixes
 defects. It is written and maintained by AI agents, and no person reviews the
 code. Changes are accepted on their tests, CI on Linux and Windows, and a
 semantic check that refuses any formatting edit that would change a document's

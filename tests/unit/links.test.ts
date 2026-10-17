@@ -10,7 +10,7 @@ import {
   semanticFingerprint,
   textContent,
 } from "../../src/index.js";
-import type { Config, Dialect, Document, Plugin } from "../../src/index.js";
+import type { Config, Dialect, Document, LookupResult, Plugin } from "../../src/index.js";
 import {
   headingAttributeBlock,
   headingAttributes,
@@ -315,6 +315,165 @@ describe("local target resolution", () => {
     expect(exists("install-setup", "github")).toBe(true);
     expect(exists("^id", "obsidian")).toBe(true);
   });
+  it("reads anchors from .md and .markdown files, and only .md ones for Obsidian", () => {
+    const text = "# Heading\n";
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Upper.MD": text,
+      "Long.markdown": text,
+      // Text given for another file, such as one linted as Markdown, gives no anchors.
+      "Plain.txt": text,
+    });
+    const exists = (target: string, fragment: string, dialect: Dialect) =>
+      index.resolve("Doc.md", `${target}#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const) {
+      expect(exists("Upper.MD", "heading", dialect), dialect).toBe(true);
+      expect(exists("Upper.MD", "other", dialect), dialect).toBe(false);
+      expect(exists("Long.markdown", "heading", dialect), dialect).toBe(true);
+      expect(exists("Long.markdown", "other", dialect), dialect).toBe(false);
+      // Any fragment, since the tool does not know a text file's anchors.
+      expect(exists("Plain.txt", "other", dialect), dialect).toBe(true);
+    }
+    expect(exists("Upper.MD", "Heading", "obsidian")).toBe(true);
+    expect(exists("Upper.MD", "Other", "obsidian")).toBe(false);
+    expect(exists("Long.markdown", "Other", "obsidian")).toBe(true);
+    expect(exists("Plain.txt", "Other", "obsidian")).toBe(true);
+  });
+  it("accepts any fragment on a file that is not Markdown", () => {
+    const index = createWorkspace({
+      "Doc.md": "",
+      "logo.png": null,
+      "manual.pdf": null,
+      "src/main.rs": null,
+      "icon.svg": null,
+    });
+    for (const dialect of ["github", "forgejo", "gitea", "commonmark"] as const)
+      for (const link of ["logo.png#gh-dark-mode-only", "manual.pdf#page=2", "src/main.rs#L10-L20"])
+        expect(index.resolve("Doc.md", link, dialect), `${dialect} ${link}`).toMatchObject({
+          status: "resolved",
+          fragmentExists: true,
+        });
+    for (const link of ["icon.svg#icon", "manual.pdf#page=3", "logo.png#^block"])
+      expect(index.resolve("Doc.md", link, "obsidian", true).fragmentExists, link).toBe(true);
+    const checked = (source: string, dialect: Dialect) =>
+      lint(source, {
+        path: "Doc.md",
+        config: { extends: [], dialect, rules: { "links/valid": "error" } },
+        workspace: createWorkspace({ "Doc.md": source, "logo.png": null, "manual.pdf": null }),
+      });
+    expect(
+      checked("![Logo](logo.png#gh-dark-mode-only) [m](manual.pdf#page=2)\n", "github"),
+    ).toEqual([]);
+    expect(checked("![[logo.png#icon]] ![[manual.pdf#page=3]]\n", "obsidian")).toEqual([]);
+    expect(checked("[[manual.pdf#page=3]] [[absent.pdf#page=3]]\n", "obsidian")).toEqual([
+      expect.objectContaining({ message: "Missing local target: absent.pdf#page=3." }),
+    ]);
+  });
+});
+describe("Obsidian headings, blocks, and folders", () => {
+  const guide = [
+    "# Guide",
+    "## Setup",
+    "### Mobile",
+    "#### Tablet",
+    "## Other",
+    "### Desktop",
+    "### `move` and *more*",
+    "Text ^abc *more* words.",
+    "A paragraph. ^end-1",
+    "Escaped \\^esc",
+    "Under ^under_score",
+    "",
+  ].join("\n\n");
+  const files = {
+    "Doc.md": "",
+    "Guide.md": guide,
+    "Attachments/image.png": null,
+    "Notes/Attachments.md": "# Attachments\n",
+    "Empty/.keep": null,
+  };
+  const workspace = createWorkspace(files, { dialect: "obsidian" });
+  const fragment = (link: string) => workspace.resolve("Doc.md", link, "obsidian", true);
+  it("finds a heading below other headings by its path", () => {
+    for (const link of [
+      "Guide#Setup#Mobile",
+      "Guide#setup#mobile",
+      "Guide#Guide#Setup#Mobile#Tablet",
+      "Guide#Setup#Tablet",
+      "Guide#Guide#Desktop",
+    ])
+      expect(fragment(link).fragmentExists, link).toBe(true);
+    // Each heading must lie in the section of the one before it.
+    for (const link of ["Guide#Other#Mobile", "Guide#Mobile#Setup", "Guide#Setup#Desktop"])
+      expect(fragment(link).fragmentExists, link).toBe(false);
+  });
+  it("matches a heading by its source text as well as by the text it shows", () => {
+    for (const link of [
+      "Guide#`move` and *more*",
+      "Guide#move and more",
+      "Guide#Other#`move` and *more*",
+    ])
+      expect(fragment(link).fragmentExists, link).toBe(true);
+    expect(fragment("Guide#`move` and more").fragmentExists).toBe(false);
+  });
+  it("takes a block identifier only at the end of a block, of letters, digits, and hyphens", () => {
+    expect(fragment("Guide#^end-1").fragmentExists).toBe(true);
+    for (const id of ["abc", "esc", "under_score", "score"])
+      expect(fragment(`Guide#^${id}`).fragmentExists, id).toBe(false);
+    const duplicates = (source: string) =>
+      lint(source, {
+        path: "Doc.md",
+        config: { extends: [], dialect: "obsidian", rules: { "obsidian/block-reference": "warn" } },
+      }).map((item) => item.message);
+    expect(duplicates("Text ^abc *more* words.\n\nOther ^abc\n")).toEqual([]);
+    expect(duplicates("One. ^abc\n\n- item\n\n^abc\n")).toEqual([
+      "Duplicate block identifier ^abc.",
+    ]);
+    expect(duplicates("# Title ^abc\n\nText. ^abc\n")).toEqual([
+      "Duplicate block identifier ^abc.",
+    ]);
+  });
+  it("never takes a folder as the target of a wikilink", () => {
+    expect(fragment("Attachments")).toMatchObject({
+      status: "resolved",
+      target: "Notes/Attachments.md",
+    });
+    expect(fragment("Empty").status).toBe("missing");
+    // A Markdown link can name a folder, which the forges open.
+    expect(workspace.resolve("Doc.md", "Attachments", "obsidian").status).toBe("directory");
+  });
+  it("decodes percent escapes when links/notation makes a wikilink", () => {
+    const notes = createWorkspace(
+      {
+        "Doc.md": "",
+        "My Note.md": "# Some Heading\n\nText. ^id\n",
+        "100%.md": "",
+        "A#B.md": "",
+        "Caret^.md": "",
+      },
+      { dialect: "obsidian" },
+    );
+    const wiki = (source: string) => {
+      const result = format(source, {
+        path: "Doc.md",
+        workspace: notes,
+        config: {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "links/notation": ["warn", { style: "wiki" }] },
+        },
+      });
+      expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+      return result.output;
+    };
+    expect(wiki("[x](My%20Note.md)\n")).toBe("[[My Note.md|x]]\n");
+    expect(wiki("[x](My%20Note.md#Some%20Heading)\n")).toBe("[[My Note.md#Some Heading|x]]\n");
+    expect(wiki("[x](<My Note.md#^id>)\n")).toBe("[[My Note.md#^id|x]]\n");
+    // A name that does not decode, or that a wikilink cannot hold, stays as it is.
+    for (const source of ["[x](100%.md)\n", "[x](A%23B.md)\n", "[x](Caret%5E.md)\n"])
+      expect(wiki(source), source).toBe(source);
+    expect(wiki("[x](My%20Note.md#Some%23Heading)\n")).toBe("[x](My%20Note.md#Some%23Heading)\n");
+  });
 });
 describe("Obsidian case-insensitive resolution", () => {
   const files = {
@@ -422,6 +581,61 @@ describe("file names that many files share", () => {
     expect(resolve("ingle/index")).toEqual({ status: "missing" });
     expect(resolve("Unique")).toMatchObject({ target: "Unique.md" });
     expect(resolve("unique.MD")).toMatchObject({ target: "Unique.md" });
+  });
+});
+describe("paths that the host looks up", () => {
+  const found: Record<string, LookupResult> = {
+    "dist/guide.md": { type: "file", path: "dist/guide.md", source: () => "# Guide\n" },
+    "dist/image.png": { type: "file", path: "dist/image.png", source: null },
+    dist: { type: "directory" },
+    "out/note.md": { type: "outside", through: "out" },
+    "locked/note.md": { type: "unreadable", at: "locked" },
+  };
+  function workspace() {
+    const lookup = vi.fn((name: string, folded: boolean) =>
+      folded
+        ? Object.entries(found).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1]
+        : found[name],
+    );
+    return { lookup, index: createWorkspace({ "Doc.md": "", "Listed.md": "" }, { lookup }) };
+  }
+  it("are asked for what the index does not hold, once per path", () => {
+    const { lookup, index } = workspace();
+    expect(index.resolve("Doc.md", "Listed.md", "github").status).toBe("resolved");
+    expect(lookup).not.toHaveBeenCalled();
+    expect(index.resolve("Doc.md", "dist/guide.md#guide", "github")).toMatchObject({
+      status: "resolved",
+      target: "dist/guide.md",
+      fragmentExists: true,
+    });
+    expect(index.resolve("Doc.md", "dist/guide.md#other", "github").fragmentExists).toBe(false);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(index.resolve("Doc.md", "dist/image.png#any", "github").status).toBe("resolved");
+    expect(index.resolve("Doc.md", "dist", "github").status).toBe("directory");
+    expect(index.resolve("Doc.md", "dist/guide.md/", "github").status).toBe("missing");
+    expect(index.resolve("Doc.md", "dist/absent.md", "github").status).toBe("missing");
+  });
+  it("cannot be checked where they lead outside the root or cannot be read", () => {
+    const { index } = workspace();
+    expect(index.resolve("Doc.md", "out/note.md", "github")).toEqual({
+      status: "unreadable",
+      unreadable: ["out"],
+      leavesRoot: "out",
+    });
+    expect(index.resolve("Doc.md", "locked/note.md", "gitea")).toEqual({
+      status: "unreadable",
+      unreadable: ["locked"],
+    });
+  });
+  it("are found by Obsidian paths without regard to case, also without .md", () => {
+    const { lookup, index } = workspace();
+    expect(index.resolve("Doc.md", "DIST/guide#Guide", "obsidian")).toMatchObject({
+      status: "resolved",
+      target: "dist/guide.md",
+      fragmentExists: true,
+    });
+    expect(lookup).toHaveBeenCalledWith("DIST/guide.md", true);
+    expect(index.resolve("Doc.md", "out/note", "obsidian").leavesRoot).toBe("out");
   });
 });
 describe("directories that could not be read", () => {

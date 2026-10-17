@@ -22,7 +22,9 @@ Of two edits that overlap, the one that starts first is applied, and the other
 rule runs again in the next pass. The phases repeat until nothing changes, for
 at most eight passes. When rules undo each other or formatting does not settle,
 `format` returns the document as it was with an `engine/unsafe-format` error
-that names them. Either way, `format --write` writes no file of the batch.
+that names them. Either way the run ends with exit code `2`, and
+`format --write` still writes the other documents, and this one when the edits
+that were kept changed it.
 
 The comparison is only as good as the parser's reading:
 
@@ -30,14 +32,14 @@ The comparison is only as good as the parser's reading:
   Obsidian's renderer.
 - It reads the document in its dialect, so it cannot notice that the dialect is
   wrong. In CommonMark a table is an ordinary paragraph, and joining its lines
-  changes nothing that CommonMark sees. This is why the tool
-  [assumes a dialect](dialects.md#the-assumed-dialect) with more syntax, not
-  less, when none is named.
+  changes nothing that CommonMark sees. This is why the tool [assumes a
+  dialect](dialects.md#the-assumed-dialect) with more syntax, not less, when
+  none is named.
 - The parser, micromark, follows CommonMark closely but not everywhere. Directly
   below a paragraph, a list item that begins with another list marker, as in
   `- 2. Step` or `- -`, is read as a list item holding text, where CommonMark
-  and GitHub read a nested list
-  ([issue #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
+  and GitHub read a nested list ([issue
+  #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
   Formatting cannot change such a document's meaning, because the comparison
   uses the same reading before and after, but rules see text where GitHub shows
   a list, and the rules that would change such a place leave it as written.
@@ -53,8 +55,9 @@ to a dialect only when its renderer was seen to apply it.
 
 Formatting:
 
-- A link, code span, or word longer than the line stays whole and exceeds the
-  width. The width is a target, not a license to split syntax.
+- A code span, an image, a link's destination, or a word longer than the line
+  stays whole and exceeds the width. The width is a target, not a license to
+  split syntax.
 - Paragraphs that wrapping cannot reconstruct safely are left as written;
   [`style/wrap`](rules.md#stylewrap) lists them, and its `reportUnreflowed`
   option reports them.
@@ -72,9 +75,10 @@ Files:
   be wrong and the renderers read Markdown as UTF-8, and it is not decoded with
   replacement characters, which the next edit would write into the file. See
   [files that cannot be read](cli.md#files-that-cannot-be-read-or-written).
-- A file that `format --write` replaces loses its creation time, extended
-  attributes, and its own access control entries; see
-  [what a replaced file keeps](cli.md#what-a-replaced-file-keeps).
+- `format --write` writes into the existing file, which keeps its permissions
+  and attributes but is not atomic: a crash or power failure during the write
+  can leave the file incomplete; see [what writing
+  keeps](cli.md#what-writing-keeps).
 
 Syntax:
 
@@ -102,8 +106,8 @@ Links:
   that finds no readable note is reported as not checkable, and one that finds a
   single note is accepted but never rewritten.
 - With the workspace root inside a vault, links to notes outside the root cannot
-  be checked; see
-  [Obsidian vaults](obsidian.md#a-workspace-root-inside-a-vault).
+  be checked; see [Obsidian
+  vaults](obsidian.md#a-workspace-root-inside-a-vault).
 - Heading anchors are modeled as each renderer generates them, with these
   exceptions: character references inside tags that GitHub shows as text; on
   Gitea, the number of a footnote reference in a heading, and Markdown inside
@@ -118,5 +122,7 @@ Scale:
   cache, worker pool, watch mode, editor extension, or language server. Start-up
   takes about a quarter of a second.
 - While a document is parsed, it needs about 70 to 130 times its size in memory,
-  and a single paragraph of 100 kB or more full of inline syntax parses slowly.
-  [Benchmarks](benchmarks.md) has the measurements.
+  and a single paragraph of 100 kB or more full of inline syntax parses slowly;
+  one made of tens of thousands of square brackets can take seconds from about
+  50 kB. [Benchmarks](benchmarks.md#limits-of-these-numbers) has the
+  measurements.
