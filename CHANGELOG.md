@@ -291,7 +291,7 @@ From every prerelease:
   label that matches the definition, and likewise text in brackets that the new
   markers would make match one. Before, all of the rule's edits in the document
   were refused
-  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - `style/emphasis`, `style/strong`, `style/inline-code`, and
   `style/block-spacing` no longer propose edits that change the parse in rare
   places, where their edits were refused: crossed or shared markers, as in
@@ -299,17 +299,17 @@ From every prerelease:
   a callout's or alert's marker, code spans whose joined line would form an
   Obsidian highlight or wikilink, change that line, or pair with earlier
   backticks, and a table below one that ends in a list item or block quote
-  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - `style/inline-code` leaves out the spaces and tabs that start a code span's
   next line when it joins the span, as CommonMark and GitHub do; before,
   `npm run` continued by an indented `build` became `npm run    build`, which
   changed what GitHub shows. The safety check compares code spans the same way
-  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - `style/wrap` keeps a dollar from the edge of a line where it could begin or
   end math there: in Obsidian a word that ends in `$` stays with the word after
   it, and on GitHub and in Obsidian a word that starts with `$` stays with the
   word before it. Before, such a paragraph was refused in Obsidian
-  ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+  ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell
