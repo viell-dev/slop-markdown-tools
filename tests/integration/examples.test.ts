@@ -9,7 +9,7 @@ import { copyOf, fixture, node, repository, run, tree } from "./support.js";
 
 interface Report {
   files: { path: string; changed?: boolean; diagnostics: Diagnostic[] }[];
-  written: boolean;
+  written: string[];
 }
 const examples = path.join(repository, "examples");
 /** `path:line:column severity rule` for each diagnostic, in report order. */
@@ -72,8 +72,9 @@ describe.each(workspaces)("workspaces/%s", (name) => {
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.stderr).toBe("");
     const report = JSON.parse(applied.stdout) as Report;
-    expect(report.written).toBe(true);
-    expect(report.files.filter((file) => file.changed)).not.toHaveLength(0);
+    const changed = report.files.filter((file) => file.changed).map((file) => file.path);
+    expect(changed).not.toHaveLength(0);
+    expect(report.written).toEqual(changed);
     expect(await tree(root)).toEqual(await tree(path.join(repository, after)));
   });
   it("keeps after/ unchanged, so formatting it again does nothing", () => {

@@ -4,7 +4,8 @@
 //
 // The report is one object: { version, mode, files, written }, with a `skipped`
 // list when the run left out a path it was not permitted to read. Each file has
-// a `path`, its `diagnostics`, and for `format` a `changed` flag.
+// a `path`, its `diagnostics`, and for `format` a `changed` flag; `written` lists
+// the paths of the files that `format --write` wrote.
 let input = "";
 process.stdin.setEncoding("utf8");
 for await (const chunk of process.stdin) input += chunk;
@@ -27,7 +28,9 @@ console.log(`${report.mode}: ${report.files.length} file(s), ${diagnostics} diag
 if (report.mode === "format") {
   // `changed` stays true for a file that `--write` has just formatted.
   const changed = report.files.filter((file) => file.changed).length;
-  console.log(`${changed} file(s) ${report.written ? "were formatted" : "need formatting"}`);
+  const written = report.written.length;
+  if (written) console.log(`${written} file(s) were formatted`);
+  if (!written || changed > written) console.log(`${changed - written} file(s) need formatting`);
 }
 for (const [key, entry] of [...counts].sort((a, b) => b[1].count - a[1].count)) {
   console.log(`${entry.count} ${key} in ${entry.files.size} file(s)`);
