@@ -91,8 +91,11 @@ export const canSymlink = await (async () => {
     await rm(root, { recursive: true, force: true });
   }
 })();
-/** Create a temporary workspace holding `files`; it is removed after the current test. */
-export async function fixture(files: Record<string, string>): Promise<string> {
+/**
+ * Create a temporary workspace holding `files`, given as text or as bytes; it
+ * is removed after the current test.
+ */
+export async function fixture(files: Record<string, string | Uint8Array>): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
   temporary.push(root);
   // Keep discovery inside the fixture even when the host's temp directory is a repository.
@@ -120,8 +123,8 @@ export async function tree(root: string): Promise<Record<string, string>> {
   }
   return Object.fromEntries(files.sort(([a], [b]) => (a < b ? -1 : 1)));
 }
-/** Run the built CLI as a separate process, the way a consumer does. */
-export function run(root: string, args: string[], input?: string) {
+/** Run the built CLI as a separate process, the way a consumer does, with text or bytes on stdin. */
+export function run(root: string, args: string[], input?: string | Uint8Array) {
   return spawnSync(process.execPath, [cli, ...args], { cwd: root, input, encoding: "utf8" });
 }
 /** Run a script of the repository with Node, from `cwd`. */

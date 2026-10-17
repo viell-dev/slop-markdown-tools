@@ -57,9 +57,12 @@ error whose `code` is `EACCES` or `EPERM`, as Node.js does for a file the
 process is not permitted to read, or `EBUSY`, as it does on Windows for a file
 that another program has locked, makes a link to a heading or block in that file
 resolve as `"unreadable"` too, with `target` set and `unreadable` naming the
-file; a link to the file without a fragment still resolves. Any other error from
-a loader propagates. Versions up to `0.2.0-rc.1` have neither the option nor the
-status, and let every loader error through.
+file; a link to the file without a fragment still resolves. So does an error
+with the code `ERR_ENCODING_INVALID_ENCODED_DATA`, for a file that is not UTF-8
+text: a `TextDecoder` created with `fatal: true` throws one for bytes that are
+not valid in its encoding. Versions up to `0.2.0-rc.2` let that error through.
+Any other error from a loader propagates. Versions up to `0.2.0-rc.1` have
+neither the option nor the status, and let every loader error through.
 
 `WorkspaceOptions.vaults` lists folders below the workspace root that are
 Obsidian vaults of their own. An Obsidian link in a note of such a vault is
@@ -207,13 +210,18 @@ discovery left out, with the entries of the CLI's JSON report (`path`, `type`,
 `code`, and `message`). `read(name)` returns a selected document's text: a file
 is read when it is first needed and then kept, so one result is a snapshot for
 one run; create a new one after files change. An error with the code `EACCES`,
-`EPERM`, or `EBUSY` means that the system did not let the file be read; the CLI
-reports such a file with `engine/unreadable-file`. `options(name)` returns what
-the CLI passes to `lint` and `format` for the document: its `path`, `config` and
-`plugins`, a `workspace` for its dialect with its vault's `strictLineBreaks`
-setting, and `defaultDialect: "obsidian"` for a note in a vault. Both throw for
-a name that is not selected. A root or input that cannot be used is an error in
-the CLI's words, such as `Input does not exist: notes/absent.md`.
+`EPERM`, or `EBUSY` means that the system did not let the file be read, and one
+with the code `ERR_ENCODING_INVALID_ENCODED_DATA` that the file is not
+[UTF-8 text](configuration.md#paths-that-cannot-be-read), as its message says,
+such as `Not UTF-8 text: notes/old.md (byte 0xE9 on line 1 is not valid UTF-8)`;
+the CLI reports such a file with `engine/unreadable-file`. Versions up to
+`0.2.0-rc.2` returned the text of a file that is not UTF-8 with U+FFFD in place
+of what could not be decoded. `options(name)` returns what the CLI passes to
+`lint` and `format` for the document: its `path`, `config` and `plugins`, a
+`workspace` for its dialect with its vault's `strictLineBreaks` setting, and
+`defaultDialect: "obsidian"` for a note in a vault. Both throw for a name that
+is not selected. A root or input that cannot be used is an error in the CLI's
+words, such as `Input does not exist: notes/absent.md`.
 
 ## Rule plugins
 

@@ -44,7 +44,8 @@ export interface WorkspaceDiscovery {
   /**
    * The text of a selected document. A file is read when it is first needed
    * and then kept; an error with the code `EACCES`, `EPERM`, or `EBUSY` means
-   * that the system did not let it be read.
+   * that the system did not let it be read, and one with the code
+   * `ERR_ENCODING_INVALID_ENCODED_DATA` that its bytes are not UTF-8 text.
    */
   read(path: string): string;
   /**
