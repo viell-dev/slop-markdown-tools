@@ -98,8 +98,8 @@ function problem(bytes: Buffer): string | undefined {
  * A mark stays at the start of the text, where formatting keeps it. Text with a
  * NUL byte is refused too: Markdown has no use for one, and UTF-16 text without
  * a byte order mark, whose ASCII characters each have one, could otherwise pass
- * for UTF-8 and be damaged by an edit. Anything else throws a `NotUtf8Error`
- * whose message names `subject`, instead of replacing what cannot be decoded.
+ * for UTF-8 and be damaged by an edit. Bytes that are not such text throw a
+ * `NotUtf8Error` whose message names `subject`; nothing is ever replaced.
  */
 export function decodeText(bytes: Buffer, subject: string): string {
   const reason = problem(bytes);

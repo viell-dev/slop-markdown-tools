@@ -1639,13 +1639,19 @@ describe("documents that are not UTF-8 text", () => {
     expect([at(0xc0, 0x80), at(0xe0, 0x80, 0x80), at(0xed, 0xa0, 0x80)]).toEqual([0, 0, 0]);
     expect([at(0xf4, 0x90, 0x80, 0x80), at(0x41, 0xe2, 0x82), at(0x80)]).toEqual([0, 1, 0]);
     expect([at(0xe2, 0x82, 0xac), at(0xf0, 0x9f, 0x98, 0x80, 0xc3, 0xa9)]).toEqual([-1, -1]);
-    // Unicode's rules are those of Node.js's own check.
+    // Unicode's rules are those of Node.js's own check, for valid text with random
+    // bytes inside it as well as for random bytes alone.
+    const valid = fc.string({ unit: "binary", maxLength: 6 }).map((value) => Buffer.from(value));
+    const mixed = fc
+      .tuple(valid, fc.uint8Array({ maxLength: 6 }), valid)
+      .map((parts) => Buffer.concat(parts));
     fc.assert(
-      fc.property(fc.uint8Array({ maxLength: 12 }), (bytes) => {
-        const invalid = invalidUtf8At(bytes);
-        expect(invalid < 0).toBe(isUtf8(bytes));
-        if (invalid >= 0) expect(isUtf8(bytes.subarray(0, invalid))).toBe(true);
+      fc.property(mixed, (input) => {
+        const invalid = invalidUtf8At(input);
+        expect(invalid < 0).toBe(isUtf8(input));
+        if (invalid >= 0) expect(isUtf8(input.subarray(0, invalid))).toBe(true);
       }),
+      { numRuns: 2000 },
     );
     const reason = (bytes: Buffer) => {
       try {
