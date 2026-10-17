@@ -22,6 +22,9 @@ On a branch, in one pull request:
    document that names the version.
 4. Run the checks below, push, and wait for CI.
 
+Review and merge it like any other pull request. Merging publishes nothing and
+leaves the documentation site as it is.
+
 ## Prepare without publishing
 
 From a clean checkout with Node.js 24 and npm 10 or newer:
@@ -41,7 +44,8 @@ starting with `./`, because `artifacts/name.tgz` can be read as a GitHub
 package.
 
 The **Release** workflow, dispatched with `publish` left false, does the same on
-GitHub, adds a dependency audit, and keeps the artifact for 14 days.
+GitHub, adds an audit of the runtime dependencies, and keeps the artifact for 14
+days.
 
 ## Publication prerequisites
 
@@ -53,7 +57,10 @@ Verify these once per release rather than setting them up again:
   publishing allowed. No npm token is stored in GitHub.
 - The GitHub environment `npm-release` is restricted to `main`.
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
-- The ruleset for `main` requires pull requests and the three CI checks.
+- GitHub Pages uses GitHub Actions as its source, and the environment
+  `github-pages` allows deployments from `main`, where the Pages workflow runs.
+- The ruleset for `main` requires pull requests and the three CI checks that
+  `.github/rulesets/main.json` names.
 
 ## Publish
 
@@ -67,11 +74,25 @@ version, and creates the GitHub release at the workflow's commit, with the
 tarball and checksum attached and the changelog section as its notes. Tags are
 exact versions without a `v` prefix.
 
+A last job, with read-only access, then checks the publication: the registry's
+`integrity` and `shasum` must match the tested tarball, and the version's
+provenance must name that tarball, the Release workflow, and the workflow's
+commit. It waits up to a minute for the registry to know the version. If only
+this job failed, re-run it with `gh run rerun RUN --failed`; it does not publish
+again. When the Release run succeeds for a stable version, the **Pages**
+workflow builds the documentation site from the new tag and deploys it; a
+prerelease leaves the site on the newest stable release. To deploy a release's
+site by hand, dispatch **Pages** on `main` with the version as its `tag`.
+
 The workflow refuses a version or tag that already exists. Never run publication
 again for an existing version. If npm succeeded but the GitHub release failed,
-compare the published package's integrity with the retained artifact and finish
-only the GitHub step at the same commit. Attach every asset before a release is
-published, because published releases are immutable.
+download the run's artifact with
+`gh run download RUN --name npm-release --dir artifacts`, check the publication
+with
+`node scripts/verify-publication.mjs VERSION ./artifacts/mdrefine-VERSION.tgz COMMIT`,
+where `COMMIT` is the run's commit, and finish only the GitHub step at that
+commit. Then deploy the site by hand for a stable version. Attach every asset
+before a release is published, because published releases are immutable.
 
 ## Verify
 
@@ -82,5 +103,6 @@ npm dist-tag ls mdrefine
 ```
 
 Then install the package into a fresh project with an empty cache, and check the
-GitHub release and its assets, the provenance on npm, and the documentation
-site. Work after the release continues through pull requests.
+GitHub release and its assets, the result of the publication check, and, for a
+stable version, the documentation site. Work after the release continues through
+pull requests.
