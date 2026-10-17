@@ -12,11 +12,17 @@ The edits are applied in three phases, inline, block, and document, so that
 edits that commonly overlap do not meet in one pass. After each phase that
 changes the document, the tool parses the result again and compares its meaning
 with the original: the syntax tree with the whitespace of prose normalized and
-each link compared by the file it resolves to. The phases repeat until nothing
-changes, for at most eight passes. When edits overlap, when rules undo each
-other, when formatting does not settle, or when the meaning changes, `format`
-returns the document as it was with an `engine/unsafe-format` error, and
-`format --write` writes no file of the batch.
+each link compared by the file it resolves to. When the meaning differs, the
+phase tries the edits one rule at a time and leaves out the edits of each rule
+that would change it, all of them, because one edit can depend on another; the
+other rules' edits are kept. Each rule left out gets an `engine/unsafe-format`
+error at the line where the meaning would first differ, as in
+`style/wrap would change the parsed meaning at line 12; none of its edits were applied.`
+Of two edits that overlap, the one that starts first is applied, and the other
+rule runs again in the next pass. The phases repeat until nothing changes, for
+at most eight passes. When rules undo each other or formatting does not settle,
+`format` returns the document as it was with an `engine/unsafe-format` error
+that names them. Either way, `format --write` writes no file of the batch.
 
 The comparison is only as good as the parser's reading:
 

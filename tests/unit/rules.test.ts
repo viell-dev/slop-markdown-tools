@@ -25,6 +25,9 @@ function formatted(source: string, config: Config, options: Record<string, unkno
   expect(format(result.output, { config, ...options }).output).toBe(result.output);
   return result.output;
 }
+/** The engine's diagnostics of a formatting result; the refused rules' own findings stay too. */
+const refusals = (result: { diagnostics: { rule: string }[] }) =>
+  result.diagnostics.filter((item) => item.rule.startsWith("engine/"));
 
 describe("style/heading", () => {
   const config = only({ "style/heading": "warn" });
@@ -477,7 +480,7 @@ describe("Forgejo and Gitea heading attribute blocks", () => {
       for (const dialect of forges) {
         const result = format(source, { config: config(dialect), plugins });
         expect(result.output).toBe(source);
-        expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+        expect(refusals(result)).toMatchObject([{ rule: "engine/unsafe-format" }]);
       }
       expect(format(source, { config: config("github"), plugins }).output).toBe(
         source.replaceAll(from, to),
@@ -517,7 +520,7 @@ describe("Forgejo and Gitea heading attribute blocks", () => {
           plugins: [closing(text)],
         });
         expect(result.output).toBe(source);
-        expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+        expect(refusals(result)).toMatchObject([{ rule: "engine/unsafe-format" }]);
       }
       const github = only({ "closing/sequence": "warn" }, "github");
       expect(format(source, { config: github, plugins: [closing(text)] }).output).toBe(`${text}\n`);
@@ -640,7 +643,7 @@ describe("Forgejo and Gitea heading anchors under formatting", () => {
     for (const dialect of forges) {
       const result = run("## Emph *star* end\n", dialect);
       expect(result.output).toBe("## Emph *star* end\n");
-      expect(result.diagnostics).toMatchObject([{ rule: "engine/unsafe-format" }]);
+      expect(refusals(result)).toMatchObject([{ rule: "engine/unsafe-format" }]);
       expect(run("*Two*\nlines\n===\n", dialect).output).toBe("_Two_\nlines\n===\n");
     }
     expect(run("## Emph *star* end\n", "github").output).toBe("## Emph _star_ end\n");

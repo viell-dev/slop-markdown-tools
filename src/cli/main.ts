@@ -60,6 +60,8 @@ function common(command: Command): Command {
       },
     );
 }
+/** The library's diagnostics for a document that it could not process as configured. */
+const failures = new Set(["engine/unsafe-format", "engine/rule-error"]);
 interface Report {
   path: string;
   changed?: boolean;
@@ -160,14 +162,12 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       if (result.changed) changes.push({ file: name, before: source, after: result.output });
     }
   }
-  // A file that could not be formatted safely, not be read at all, or not be
-  // written is a failure to operate: nothing of the batch is written, and the
-  // run ends with status 2.
+  // A file that could not be formatted safely, could not be read at all, had
+  // a rule fail on it, or could not be written is a failure to operate:
+  // nothing of the batch is written, and the run ends with status 2.
   let unsafe =
     unread.length > 0 ||
-    reports.some((report) =>
-      report.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
-    );
+    reports.some((report) => report.diagnostics.some((item) => failures.has(item.rule)));
   // Changed files that could not be written, each reported for its file.
   const unwritten: string[] = [];
   const refuse = (file: string, message: string) => {

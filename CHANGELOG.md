@@ -37,6 +37,18 @@ From `0.2.0-rc.2`:
   replacement would get another owner or group, is written in place. Before,
   every file was replaced, which left the other names of a hard link with the
   old content and could change a file's group.
+- When a rule's edits would change a document's meaning, `format` keeps the
+  other rules' edits, so `--diff` and the library's output show them, and
+  reports that rule with `engine/unsafe-format` at the line where the meaning
+  would first differ. Before, the whole document was left unchanged. Edits of
+  two rules that overlap are applied in turn instead of refusing the document.
+- A rule that throws or returns invalid findings is skipped for that document
+  with an `engine/rule-error` error, in `lint` as well, and the exit code is
+  `2`. Before, `lint` stopped at the first such rule, and `format` reported it
+  as `engine/unsafe-format`. A plugin rule with an invalid definition, such as
+  `phase: "Inline"`, stops the command with exit code `2` where it used to be
+  ignored, and a rule or preset named like a built-in property of every object,
+  such as `toString`, is reported as unknown.
 - `recommended` warns about six more problems, listed under Added. A check that
   runs `lint --max-warnings 0` fails on them until the documents are fixed or
   the rules are turned off.
@@ -117,6 +129,12 @@ From every prerelease:
   integrations, the library API, versions, and this changelog, and the release
   notes come from this file
   ([#238](https://github.com/viell-dev/slop-markdown-tools/pull/238)).
+- When one rule's edits would change a document's meaning, `format` leaves out
+  only that rule's edits and names the rule and the line, and it applies
+  overlapping edits in turn
+  ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- Plugin rule option schemas are compiled once instead of for every document
+  ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 
 ### Fixed
 
@@ -133,6 +151,10 @@ From every prerelease:
   positions, callout titles, and `style/wrap`
   ([#196](https://github.com/viell-dev/slop-markdown-tools/pull/196),
   [#200](https://github.com/viell-dev/slop-markdown-tools/pull/200)).
+- A rule that throws or returns invalid findings is reported as
+  `engine/rule-error` for its document, and invalid plugin rules and names such
+  as `toString` are rejected with a clear message
+  ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - The type declaration of `defaultDialect` describes vaults anywhere in a
   workspace ([#184](https://github.com/viell-dev/slop-markdown-tools/pull/184)),
   and the CLI guide explains stdin in PowerShell
