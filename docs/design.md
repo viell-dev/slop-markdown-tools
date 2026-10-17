@@ -247,7 +247,11 @@ Obsidian tries only after a skipped directory, and a name with several is
 ambiguous either way. A file is read only when it is processed or when a link's
 fragment needs its content, so a refusal is met late: a selected file becomes an
 `engine/unreadable-file` diagnostic that blocks the batch's write phase, and a
-link target makes the fragment unchecked for the documents that link to it.
+link target makes the fragment unchecked for the documents that link to it. A
+file whose bytes are not UTF-8 text is treated the same way. Decoding it with
+replacement characters would make every later edit write them into the file, and
+detecting its encoding instead would be a guess that needs an encoding library,
+for renderers that all expect UTF-8.
 [Paths that cannot be read](configuration.md#paths-that-cannot-be-read)
 describes the behavior.
 
