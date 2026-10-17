@@ -14,10 +14,28 @@ node dist/cli/main.js lint --root /path/to/documents /path/to/documents/notes/ex
 node dist/cli/main.js format --root /path/to/documents /path/to/documents/notes --diff
 ```
 
-Input paths are absolute or relative to the current working directory. The CLI
-honors `.gitignore` and configuration ignore patterns, skips symlinks and nested
-repositories, and does not expand path globs itself. See the
-[selection details](configuration.md#selection-output-and-exit-codes).
+Input paths are absolute or relative to the current working directory. A
+directory selects its Markdown files, those whose names end in `.md` or
+`.markdown`; a file named on its own is read as Markdown whatever its name. The
+CLI honors `.gitignore` and configuration ignore patterns and skips symlinks and
+nested repositories. A named file or directory that these leave out is skipped
+with a warning that says why, and the exit code does not change. Versions up to
+`0.2.0-rc.2` found only `.md` files and skipped named files without a word.
+
+An input that does not exist and contains `*`, `?`, `[`, or `{` is a glob
+pattern, which the CLI expands itself, so quoting it works in every shell,
+including PowerShell, cmd, and npm scripts:
+
+```sh
+node dist/cli/main.js lint "docs/**/*.md"
+node dist/cli/main.js format --check "{docs,notes}/*.md"
+```
+
+A pattern matches the paths of the Markdown files that discovery finds, so
+ignored files stay out, and one that matches none is an error with exit code
+`2`. Patterns are relative to the current working directory, like paths, and
+separate folders with `/` on every system; `\` escapes the next character. See
+the [selection details](configuration.md#selection-output-and-exit-codes).
 
 A directory that the tool is not permitted to read is skipped with a warning
 that names it, and the rest of the workspace is processed. Naming such a
@@ -30,7 +48,8 @@ explicit file arguments. The CLI processes working-tree contents, not the Git
 index. Pass paths as separate arguments (after `--` when they could begin with
 `-`), retain `--root` for workspace-wide link resolution, and skip the
 invocation when the selection is empty: no file arguments means the whole
-workspace.
+workspace. Pass only the Markdown files among them, since a named file is read
+as Markdown whatever its name.
 
 ```sh
 node dist/cli/main.js lint --exclude generated
@@ -88,13 +107,14 @@ node dist/cli/main.js format --root /path/to/documents --check --json
 
 JSON output contains file results and diagnostics with rule IDs, severity,
 messages, and source positions. When the run skipped a directory that it was not
-permitted to read, or a vault's settings file that it could not read or use, the
-report also has a `skipped` list. Each entry has the `path` relative to the
-workspace root, a `type` of `directory` or `file`, a `code`, and a `message`
-saying what follows from it. The code is the system's error code, or `INVALID`
-for a settings file whose content could not be used. The field is absent when
-nothing was skipped, and versions up to `0.2.0-rc.1` never print it. Exit code
-`0` means success, `1` means a lint or formatting check failed, and `2` means a
+permitted to read, a vault's settings file that it could not read or use, or a
+named input that is ignored, the report also has a `skipped` list. Each entry
+has the `path` relative to the workspace root, a `type` of `directory` or
+`file`, a `code`, and a `message` saying what follows from it. The code is the
+system's error code, `INVALID` for a settings file whose content could not be
+used, or `IGNORED` for an ignored input. The field is absent when nothing was
+skipped, and versions up to `0.2.0-rc.1` never print it. Exit code `0` means
+success, `1` means a lint or formatting check failed, and `2` means a
 configuration, execution, or safety failure. Warnings fail only when they exceed
 `--max-warnings`. A selected document that the tool is not permitted to read, or
 that is not [UTF-8 text](configuration.md#paths-that-cannot-be-read), is

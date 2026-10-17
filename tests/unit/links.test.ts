@@ -315,6 +315,26 @@ describe("local target resolution", () => {
     expect(exists("install-setup", "github")).toBe(true);
     expect(exists("^id", "obsidian")).toBe(true);
   });
+  it("reads anchors from .md and .markdown files, and only .md ones for Obsidian", () => {
+    const text = "# Heading\n";
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Upper.MD": text,
+      "Long.markdown": text,
+      // Text given for another file, such as one linted as Markdown, gives no anchors.
+      "Plain.txt": text,
+    });
+    const exists = (target: string, fragment: string, dialect: Dialect) =>
+      index.resolve("Doc.md", `${target}#${fragment}`, dialect).fragmentExists;
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const) {
+      expect(exists("Upper.MD", "heading", dialect), dialect).toBe(true);
+      expect(exists("Long.markdown", "heading", dialect), dialect).toBe(true);
+      expect(exists("Plain.txt", "heading", dialect), dialect).toBe(false);
+    }
+    expect(exists("Upper.MD", "Heading", "obsidian")).toBe(true);
+    expect(exists("Long.markdown", "Heading", "obsidian")).toBe(false);
+    expect(exists("Plain.txt", "Heading", "obsidian")).toBe(false);
+  });
 });
 describe("Obsidian case-insensitive resolution", () => {
   const files = {

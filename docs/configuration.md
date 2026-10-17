@@ -465,11 +465,25 @@ to the wrong line or to two lines.
 
 ## Selection, output, and exit codes
 
-Commands accept explicit files/directories, or no paths to select the workspace.
-The CLI honors `.gitignore` files and configured ignore patterns. Config-ignored
-documents remain available for link resolution. Git-ignored content and nested
-repositories are not indexed by default. To make their files available only as
-link targets, set:
+Commands accept explicit files, directories, and glob patterns, or no paths to
+select the workspace. The workspace's documents, and the files that a directory
+or pattern selects, are those whose names end in `.md` or `.markdown`, in any
+letter case; a file named on its own is read as Markdown whatever its name. A
+pattern is an input that does not exist as a path and contains `*`, `?`, `[`, or
+`{`. It is relative to the current directory, uses `/` between folders on every
+system, matches names that start with a dot, and ignores letter case on Windows
+and macOS. It selects the documents of the workspace that it matches and is an
+error when it matches none.
+
+The CLI honors `.gitignore` files and configured ignore patterns. As in Git, the
+deepest `.gitignore` with a pattern that matches a path decides, so a negated
+pattern there includes a file that a higher one excludes, but nothing below an
+excluded folder can be included again. Patterns ignore letter case on Windows
+and macOS, where Git does so by default, and not elsewhere. Versions up to
+`0.2.0-rc.2` left out a file that any `.gitignore` on its path matched and
+ignored letter case everywhere. Config-ignored documents remain available for
+link resolution. Git-ignored content and nested repositories are not indexed by
+default. To make their files available only as link targets, set:
 
 ```jsonc
 {
@@ -480,20 +494,30 @@ link targets, set:
 These options are independent and default to false. They never select those
 files for linting or formatting, including when a path is supplied explicitly.
 Markdown targets are read and parsed only for fragment checks; attachments need
-only a discovered file entry. Built-in traversal exclusions still apply. `.git`,
-`.obsidian`, `node_modules`, `.npm-cache`, `dist`, and `coverage` are excluded
-from traversal, as are symlinks. Nested Git repositories are traversed for
-targets only when opted in. Explicit symlink inputs are rejected. Shell-expanded
-globs work; the CLI does not expand path globs.
+only a discovered file entry. A target's headings count only when its name ends
+in `.md` or `.markdown`, and for Obsidian links only in `.md`, the one kind of
+file that Obsidian opens as a note. Built-in traversal exclusions still apply.
+`.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and `coverage` are
+excluded from traversal, as are symlinks. Nested Git repositories are traversed
+for targets only when opted in. Explicit symlink inputs are rejected.
+
+A file or directory named as an input that `.gitignore`, the configuration's
+`ignore` patterns, a built-in exclusion, or a nested repository leaves out is
+still skipped. The CLI warns on stderr, as in
+`mdtools: warning: Skipped ignored input: generated/report.md (in generated, which "generated/" in .gitignore matches). It is not processed.`,
+and the warning does not change the exit code; with `--json` it is an entry of
+the report's `skipped` list with the code `IGNORED`. Inputs that `--exclude`
+leaves out, and files that a directory or pattern would select, are left out
+without a warning.
 
 `lint --json` and `format --json` print a single object with `version`, `mode`,
 `files`, and `written`, and with `skipped` when the run left out something it
-was not permitted to read. Each file carries diagnostics with rule ID, severity,
-message, offsets, and one-based line/column locations. Source offsets and
-columns use JavaScript UTF-16 units; wrapping widths use display columns.
-Formatting diagnostics refer to the resulting source. `written` records whether
-the requested write phase was allowed, not how many files changed; inspect each
-file's `changed` field.
+was not permitted to read or an ignored input. Each file carries diagnostics
+with rule ID, severity, message, offsets, and one-based line/column locations.
+Source offsets and columns use JavaScript UTF-16 units; wrapping widths use
+display columns. Formatting diagnostics refer to the resulting source. `written`
+records whether the requested write phase was allowed, not how many files
+changed; inspect each file's `changed` field.
 
 Without `--json`, a command that processed files ends with one summary line on
 stderr. `lint` counts the files and the findings it reported, as in

@@ -6,22 +6,177 @@ import type { ResolveOptions } from "../core/types.js";
 import type { WorkspaceSource } from "./index.js";
 import { randomUUID } from "node:crypto";
 import ignore from "ignore";
-import { minimatch } from "minimatch";
+import type { Ignore } from "ignore";
+import { minimatch, Minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { decodeText } from "./encoding.js";
+import { isMarkdownName } from "./index.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
 
 /** A path that discovery could not use and left out of the run. */
 export interface Skipped {
-  /** The directory or settings file, relative to the workspace root. */
+  /** The directory or file, relative to the workspace root. */
   path: string;
   type: "directory" | "file";
-  /** The system's error code, or `INVALID` for a settings file with unusable content. */
-  code: RefusalCode | "INVALID";
+  /**
+   * The system's error code, `INVALID` for a settings file with unusable
+   * content, or `IGNORED` for an input that was named but is ignored.
+   */
+  code: RefusalCode | "INVALID" | "IGNORED";
   /** What was skipped, why, and what follows from it. */
   message: string;
+}
+/** Names of folders and files that discovery never enters or selects, wherever they are. */
+const alwaysSkipped = new Set([
+  ".git",
+  ".obsidian",
+  "node_modules",
+  ".npm-cache",
+  "dist",
+  "coverage",
+]);
+/**
+ * Whether letter case is ignored where Git and the file system usually ignore
+ * it. Git sets `core.ignorecase` when it creates a repository on a file system
+ * that ignores case, as those of Windows and macOS do by default, and leaves it
+ * off elsewhere; `.gitignore` patterns then match accordingly.
+ */
+const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
+/**
+ * Characters that make an input a pattern when no path of its name exists:
+ * wildcards, a character class, a brace list, or an extended group.
+ */
+const patternCharacters = /[*?[{]|[!@+]\(/;
+/**
+ * How input patterns match, on every system: `/` separates folders and `\`
+ * escapes the next character; a name starting with a dot is matched like any
+ * other, as discovery finds it; letter case is ignored where the file system
+ * usually ignores it, as the `glob` package does.
+ */
+const patternOptions = { dot: true, nocomment: true, nonegate: true, nocase: caseInsensitive };
+/** A `.gitignore` file's rules for the folder that holds it. */
+interface IgnoreLayer {
+  /** The folder, relative to the workspace root; empty for the root. */
+  base: string;
+  /** The file's text. */
+  text: string;
+  matcher: Ignore;
+}
+/** A gitignore pattern that matches exactly one folder, at a path relative to the file's folder. */
+function folderOnly(folder: string): string {
+  return `/${folder.replace(/[\\*?[]/g, "\\$&")}/`;
+}
+/**
+ * The matchers for the entries of the folder `relative`, one for each
+ * `.gitignore` above them, nearest last, with the path from that file's
+ * folder. Git asks each file only whether its patterns match the path itself;
+ * that nothing below an excluded folder counts is settled by the walk, which
+ * never enters one. The `ignore` package also answers that a path is ignored
+ * when the file's patterns exclude a folder above it, which is wrong when a
+ * deeper `.gitignore` included that folder again. For such a folder, the
+ * file's patterns are tested with each folder on the way marked as included.
+ */
+function ignoreScopes(relative: string, layers: IgnoreLayer[]) {
+  return layers.map((layer) => {
+    const inner = relative.slice(layer.base ? layer.base.length + 1 : 0);
+    let { matcher } = layer;
+    if (inner && matcher.test(`${inner}/`).ignored) {
+      const folders = inner
+        .split("/")
+        .map((_, index, parts) => parts.slice(0, index + 1).join("/"));
+      matcher = ignore({ ignorecase: caseInsensitive })
+        .add(layer.text)
+        .add(folders.map((folder) => `!${folderOnly(folder)}`));
+    }
+    return { layer, matcher, prefix: inner ? `${inner}/` : "" };
+  });
+}
+/**
+ * The `.gitignore` file and pattern that exclude an entry, or undefined when
+ * none does: the nearest file whose patterns match the entry decides, and a
+ * negated pattern includes it.
+ */
+function gitIgnoreRule(
+  scopes: ReturnType<typeof ignoreScopes>,
+  entry: string,
+  directory: boolean,
+): { file: string; pattern: string } | undefined {
+  for (let index = scopes.length - 1; index >= 0; index--) {
+    const { layer, matcher, prefix } = scopes[index]!;
+    const result = matcher.test(prefix + entry + (directory ? "/" : ""));
+    if (result.ignored)
+      return {
+        file: layer.base ? `${layer.base}/.gitignore` : ".gitignore",
+        pattern: result.rule?.pattern ?? "",
+      };
+    if (result.unignored) return undefined;
+  }
+  return undefined;
+}
+/** A path that the user named among the inputs. */
+interface NamedInput {
+  /** The real path, relative to the root. */
+  path: string;
+  directory: boolean;
+  /** Why discovery leaves it out, when it does. */
+  reason?: string;
+}
+/** An input that is a pattern, with one matcher of paths from the root for each brace alternative. */
+interface PatternInput {
+  input: string;
+  matchers: Minimatch[];
+  /** The folders, relative to the root, that the alternatives' literal parts name. */
+  folders: string[];
+  matched: boolean;
+}
+/**
+ * An input that names no existing path, read as a pattern relative to `base`.
+ * The literal folders at the start of each alternative are located as a path
+ * is, so the pattern can match paths from the workspace root. Undefined for an
+ * input without pattern characters.
+ */
+async function patternInput(
+  input: string,
+  root: string,
+  base: string,
+): Promise<PatternInput | undefined> {
+  if (!patternCharacters.test(input)) return undefined;
+  const result: PatternInput = { input, matchers: [], folders: [], matched: false };
+  for (const alternative of minimatch.braceExpand(input)) {
+    const parts = alternative.split("/");
+    let literal = 0;
+    while (
+      literal < parts.length - 1 &&
+      !patternCharacters.test(parts[literal]!) &&
+      !parts[literal]!.includes("\\")
+    )
+      literal++;
+    const prefix = parts.slice(0, literal).join("/");
+    let folder: string;
+    try {
+      folder = await realpath(path.resolve(base, literal === 1 && !prefix ? "/" : prefix || "."));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      // A folder that is not there holds nothing that could match.
+      if (code === "ENOENT" || code === "ENOTDIR") continue;
+      throw pathError("Input", input, error);
+    }
+    const relative = path.relative(root, folder).split(path.sep).join("/");
+    if (relative.startsWith("../") || relative === ".." || path.isAbsolute(relative))
+      throw new Error(`Input is outside the workspace: ${input}`);
+    const rest = parts.slice(literal).join("/");
+    result.folders.push(relative);
+    result.matchers.push(
+      new Minimatch(relative ? `${relative.replace(/[\\*?[\](){}!+@]/g, "\\$&")}/${rest}` : rest, {
+        ...patternOptions,
+        // The braces were expanded already; a folder's name may hold one.
+        nobrace: true,
+      }),
+    );
+  }
+  return result;
 }
 export interface FileSet {
   root: string;
@@ -88,8 +243,13 @@ export async function vaultFor(set: FileSet, name: string): Promise<Vault | unde
 }
 /**
  * The files of the workspace at `rootPath`, and the documents that `supplied`
- * files and folders select, or all of them when `supplied` is empty. Relative
- * inputs are resolved from `base`.
+ * files, folders, and patterns select, or all of them when `supplied` is
+ * empty. Relative inputs are resolved from `base`.
+ *
+ * A folder or pattern selects the Markdown files in it or matching it, by
+ * name (`isMarkdownName`), that nothing ignores. A file named on its own is
+ * selected whatever its name: naming it is the request. When ignore rules
+ * leave out a named file or folder, `skipped` says so and why.
  */
 export async function discover(
   rootPath: string,
@@ -102,27 +262,56 @@ export async function discover(
   const files: Record<string, WorkspaceSource> = {};
   const directories: string[] = [];
   const selected: string[] = [];
+  /** The folders that select their Markdown files, relative to the root. */
   const requests: string[] = [];
+  /** The paths named as inputs, by their own path and that of each folder above them. */
+  const named = new Map<string, NamedInput[]>();
+  const namedInputs = new Map<string, NamedInput>();
+  const patterns: PatternInput[] = [];
+  /** Each input as given, with a path from the root that it names or searches. */
+  const located: { input: string; path: string }[] = [];
   /** The folders that are vaults, by the part of the workspace that each holds. */
   const vaultFolders = new Map<string, string>();
   for (const input of supplied.length ? supplied : [root]) {
     const absolute = path.resolve(base, input);
     let resolved: string;
+    let directory: boolean;
     try {
-      if ((await lstat(absolute)).isSymbolicLink())
-        throw new Error(`Refusing symbolic-link input: ${input}`);
+      const info = await lstat(absolute);
+      if (info.isSymbolicLink()) throw new Error(`Refusing symbolic-link input: ${input}`);
+      directory = info.isDirectory();
       resolved = await realpath(absolute);
     } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const pattern =
+        code === "ENOENT" || code === "ENOTDIR" ? await patternInput(input, root, base) : undefined;
+      if (pattern) {
+        patterns.push(pattern);
+        for (const folder of pattern.folders) located.push({ input, path: folder });
+        continue;
+      }
       throw pathError("Input", input, error);
     }
     const relative = path.relative(root, resolved).split(path.sep).join("/");
     if (relative.startsWith("../") || relative === ".." || path.isAbsolute(relative))
       throw new Error(`Input is outside the workspace: ${input}`);
-    requests.push(relative);
+    located.push({ input, path: relative });
+    if (directory) requests.push(relative);
+    if (!relative || namedInputs.has(relative)) continue;
+    const request: NamedInput = { path: relative, directory };
+    namedInputs.set(relative, request);
+    for (let at = relative; at !== "."; at = path.posix.dirname(at)) {
+      const list = named.get(at);
+      if (list) list.push(request);
+      else named.set(at, [request]);
+    }
   }
-  interface IgnoreLayer {
-    base: string;
-    matcher: ReturnType<typeof ignore>;
+  /**
+   * Record why the entry `name` leaves out the named inputs at or below it,
+   * unless something above it did already.
+   */
+  function leaveNamed(name: string, why: (input: NamedInput) => string) {
+    for (const request of named.get(name) ?? []) request.reason ??= why(request);
   }
   /** Directories left out, with the path whose read the system refused. */
   const refused: { directory: string; reading: string; code: RefusalCode }[] = [];
@@ -143,7 +332,16 @@ export async function discover(
       );
     refused.push({ directory, reading, code });
   }
-  async function walk(relative: string, inherited: IgnoreLayer[], targetOnly = false) {
+  /**
+   * Visit a directory. Below a folder that Git ignores, which is visited only
+   * for link targets, nothing can be included again, as in Git.
+   */
+  async function walk(
+    relative: string,
+    inherited: IgnoreLayer[],
+    targetOnly = false,
+    gitIgnoredAbove = false,
+  ) {
     const directory = path.join(root, relative);
     const layers = [...inherited];
     const rules = path.join(directory, ".gitignore");
@@ -152,9 +350,14 @@ export async function discover(
     // ignore rules nothing tells which of the directory's files may be touched.
     let reading = relative;
     try {
-      if (await exists(rules)) {
+      if (!gitIgnoredAbove && (await exists(rules))) {
         reading = relative ? `${relative}/.gitignore` : ".gitignore";
-        layers.push({ base: relative, matcher: ignore().add(await readFile(rules, "utf8")) });
+        const text = await readFile(rules, "utf8");
+        layers.push({
+          base: relative,
+          text,
+          matcher: ignore({ ignorecase: caseInsensitive }).add(text),
+        });
         reading = relative;
       }
       entries = await readdir(directory, { withFileTypes: true });
@@ -166,20 +369,28 @@ export async function discover(
     const settings = entries.find((entry) => entry.name === ".obsidian");
     if (settings?.isDirectory() || (settings?.isSymbolicLink() && (await isVault(directory))))
       vaultFolders.set(relative, directory);
+    const scopes = gitIgnoredAbove ? [] : ignoreScopes(relative, layers);
     for (const entry of entries) {
-      if (
-        [".git", ".obsidian", "node_modules", ".npm-cache", "dist", "coverage"].includes(
-          entry.name,
-        ) ||
-        entry.isSymbolicLink()
-      )
-        continue;
       const name = relative ? `${relative}/${entry.name}` : entry.name;
-      const gitIgnored = layers.some((layer) =>
-        layer.matcher.ignores(
-          name.slice(layer.base ? layer.base.length + 1 : 0) + (entry.isDirectory() ? "/" : ""),
-        ),
-      );
+      if (alwaysSkipped.has(entry.name)) {
+        leaveNamed(name, (input) =>
+          input.path === name
+            ? `discovery always leaves out ${entry.name}`
+            : `in ${name}, which discovery always leaves out`,
+        );
+        continue;
+      }
+      if (entry.isSymbolicLink()) continue;
+      const rule = gitIgnoredAbove
+        ? undefined
+        : gitIgnoreRule(scopes, entry.name, entry.isDirectory());
+      if (rule)
+        leaveNamed(name, (input) =>
+          input.path === name
+            ? `matched by "${rule.pattern}" in ${rule.file}`
+            : `in ${name}, which "${rule.pattern}" in ${rule.file} matches`,
+        );
+      const gitIgnored = gitIgnoredAbove || rule !== undefined;
       if (gitIgnored && resolve.gitIgnored !== true) continue;
       const full = path.join(root, name);
       if (entry.isDirectory()) {
@@ -192,40 +403,69 @@ export async function discover(
           leaveOut(name, name, error);
           continue;
         }
+        if (nested)
+          leaveNamed(name, (input) =>
+            input.path === name ? "a nested repository" : `in ${name}, a nested repository`,
+          );
         if (!nested || resolve.nestedRepositories === true)
-          await walk(name, layers, targetOnly || gitIgnored || nested);
+          await walk(name, layers, targetOnly || gitIgnored || nested, gitIgnored);
       } else if (entry.isFile()) {
-        const markdown = /\.md$/i.test(name);
+        const request = named.get(name)?.find((input) => input.path === name && !input.directory);
+        const markdown = isMarkdownName(name);
         let cached: string | undefined;
-        files[name] = markdown ? () => (cached ??= decodeText(readFileSync(full), name)) : null;
-        if (
-          markdown &&
-          !targetOnly &&
-          !gitIgnored &&
-          requests.some(
-            (request) => !request || name === request || name.startsWith(`${request}/`),
-          ) &&
-          !excluded.some((pattern) => minimatch(name, pattern, { dot: true }))
-        )
-          selected.push(name);
+        files[name] =
+          markdown || request ? () => (cached ??= decodeText(readFileSync(full), name)) : null;
+        if (!(markdown || request) || targetOnly || gitIgnored) continue;
+        const pattern = excluded.find((item) => minimatch(name, item, { dot: true }));
+        if (pattern !== undefined) {
+          if (request)
+            request.reason ??= `matched by the configuration's ignore pattern "${pattern}"`;
+          continue;
+        }
+        let chosen = request !== undefined;
+        if (markdown) {
+          chosen ||= requests.some(
+            (folder) => !folder || name === folder || name.startsWith(`${folder}/`),
+          );
+          for (const item of patterns)
+            if (item.matchers.some((matcher) => matcher.match(name))) chosen = item.matched = true;
+        }
+        if (chosen) selected.push(name);
       }
     }
   }
   await walk("", []);
   // An input in a directory that was left out is an error: the user asked for it.
-  for (const [index, request] of requests.entries()) {
+  for (const { input, path: request } of located) {
     const item = refused.find(
       ({ directory }) => request === directory || request.startsWith(`${directory}/`),
     );
-    if (item)
-      throw new Error(`Input cannot be read: ${supplied[index]!} (${reason(item, request)})`);
+    if (item) throw new Error(`Input cannot be read: ${input} (${reason(item, request)})`);
   }
+  // A pattern stands for the documents it matches, so one that matches none is
+  // an error, as a path that does not exist is.
+  for (const item of patterns)
+    if (!item.matched)
+      throw new Error(
+        `Input pattern matches no document: ${item.input}${
+          item.input.includes("\\") ? " (patterns separate folders with /)" : ""
+        }`,
+      );
   const skipped: Skipped[] = refused.map((item) => ({
     path: item.directory,
     type: "directory",
     code: item.code,
     message: `Skipped unreadable directory: ${item.directory} (${reason(item, item.directory)}). Its files are not processed, and links into it cannot be checked.`,
   }));
+  // A named input that ignore rules leave out is not an error, but the user asked for it.
+  for (const input of namedInputs.values())
+    if (input.reason)
+      skipped.push({
+        path: input.path,
+        type: input.directory ? "directory" : "file",
+        code: "IGNORED",
+        message: `Skipped ignored input: ${input.path} (${input.reason}). ${input.directory ? "Its files are" : "It is"} not processed.`,
+      });
   // A root that is no vault itself can be a folder of one.
   if (!vaultFolders.has("")) {
     const outer = await enclosingVault(root);
