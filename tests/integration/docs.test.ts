@@ -28,7 +28,7 @@ describe("rules reference", () => {
   const source = read(file);
   const page = blocks(file);
   const index = page.find((node) => node.type === "table");
-  // The index's rows, as the source text of each cell: rule, kind, fixes, presets, dialects, options.
+  // The index's rows, as the source text of each cell: rule, kind, `recommended`, dialect preset, options.
   const rows =
     index?.type === "table"
       ? index.children
@@ -53,22 +53,55 @@ describe("rules reference", () => {
     expect([...listed].sort()).toEqual(Object.keys(builtInRules).sort());
     expect(listed).toEqual([...listed].sort());
   });
-  it("gives each rule's kind, fix, and presets as the code does", () => {
-    for (const [index, [, kind, fixes, enabledBy = ""]] of rows.entries()) {
+  /** Whether a rule takes options: its schema names at least one. */
+  const hasOptions = (rule: string) =>
+    Object.keys(
+      (builtInRules[rule]?.schema as { properties?: object } | undefined)?.properties ?? {},
+    ).length > 0;
+  /** A cell for whether some presets enable a rule: ✅ or ✅ (error), else ❌. */
+  const mark = (enabled: { severity: string }[]) =>
+    !enabled.length
+      ? "❌"
+      : enabled.some(({ severity }) => severity === "error")
+        ? "✅ (error)"
+        : "✅";
+  it("gives each rule's kind, presets, and options as the code does", () => {
+    for (const [index, [, kind, recommended, dialectPreset, options]] of rows.entries()) {
       const rule = listed[index]!;
       const style = builtInRules[rule]?.kind === "style";
+      expect(kind, rule).toBe(style ? "🔧" : "🔍");
+      const enabled = enabling(rule);
+      expect(recommended, rule).toBe(mark(enabled.filter(({ name }) => name === "recommended")));
+      expect(dialectPreset, rule).toBe(mark(enabled.filter(({ name }) => name !== "recommended")));
+      expect(options, rule).toBe(hasOptions(rule) ? "✅" : "❌");
+    }
+  });
+  it("opens each rule's section with its kind, presets, dialects, and options", () => {
+    const facts =
+      /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
+    page.forEach((node, at) => {
+      if (node.type !== "heading" || node.depth !== 2 || node.children[0]?.type !== "inlineCode")
+        return;
+      const rule = node.children[0].value;
+      const next = page[at + 1];
+      const text = next ? source.slice(...range(next)).replace(/\s+/g, " ") : "";
+      const match = facts.exec(text);
+      expect(match, `${rule}: ${text}`).not.toBeNull();
+      const [, kind, fixes, presetsText = "", , optionsText] = match!;
+      const style = builtInRules[rule]?.kind === "style";
       expect(kind, rule).toBe(style ? "Style" : "Problem");
-      expect(fixes, rule).toBe(style ? "Yes" : "No");
-      const named = [...enabledBy.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+      expect(fixes, rule).toBe(style ? "fixed by `format`" : "reported only");
+      const named = [...presetsText.matchAll(/`([^`]+)`/g)].map((found) => found[1]);
       expect(named.sort(), rule).toEqual(
         enabling(rule)
           .map(({ name }) => name)
           .sort(),
       );
-      expect(enabledBy.includes("(error)"), rule).toBe(
+      expect(presetsText.includes("(error)"), rule).toBe(
         enabling(rule).some(({ severity }) => severity === "error"),
       );
-    }
+      expect(optionsText === "none", rule).toBe(!hasOptions(rule));
+    });
   });
   it("has a section for every rule, in the order of the index", () => {
     const sections = page.flatMap((node) =>
