@@ -239,9 +239,13 @@ passing checks, and resolved review threads remain mandatory.
 
 ## Technical map
 
-- TypeScript ESM compiles with `tsc`; the package exports `dist/index.js` and
-  the `mdtools` executable at `dist/cli/main.js`. npm package, CLI, and config
-  names intentionally differ: `mdrefine`, `mdtools`, and `mdtools.config.*`.
+- TypeScript ESM compiles with `tsc`; the package exports `dist/index.js`,
+  `dist/node.js` as `mdrefine/node`, and the `mdtools` executable at
+  `dist/cli/main.js`. The main entry never touches the filesystem;
+  `mdrefine/node` exposes `src/workspace/discovery.ts`, which the CLI uses for
+  discovery and per-document options, so change the two together. npm package,
+  CLI, and config names intentionally differ: `mdrefine`, `mdtools`, and
+  `mdtools.config.*`.
 - `src/syntax/` owns micromark/mdast parsing and Obsidian extensions;
   `src/config/` resolves presets, schemas, overrides, and trusted plugins.
   `src/core/` executes rules and validates edits; `src/workspace/` resolves
