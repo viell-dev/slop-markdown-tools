@@ -110,8 +110,7 @@ reaches a heading below another; a wikilink never names a folder. A missing or
 ambiguous target is never guessed. Wikilinks without a label keep their target
 as written, because it is their visible text, and embeds stay embeds, with any
 image size in their label. [`links/path`](rules.md#linkspath) and
-[`links/notation`](rules.md#linksnotation) describe the options; run the two
-rules in separate passes.
+[`links/notation`](rules.md#linksnotation) describe the options.
 
 ## Review the result
 
