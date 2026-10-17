@@ -135,6 +135,12 @@ From every prerelease:
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - Plugin rule option schemas are compiled once instead of for every document
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- CI tests Node.js 22.12.0, the lowest supported version, where it tested the
+  newest Node.js 22, and also tests Node.js 26
+  ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
+- The documentation site describes the newest stable release instead of the
+  unreleased state of `main`
+  ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
 
 ### Fixed
 
