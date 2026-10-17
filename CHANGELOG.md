@@ -272,6 +272,9 @@ From every prerelease:
 - `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
   line with its marker, as it does for Obsidian callouts
   ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` reflows a paragraph whose code span goes on in a line that starts
+  with spaces or tabs, and joins the span without them, as `style/inline-code`
+  does ([#288](https://github.com/viell-dev/slop-markdown-tools/pull/288)).
 - The plugin example's style rule writes one space after a heading's `#` marks,
   because `style/thematic-break` now does what it did
   ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
