@@ -136,7 +136,7 @@ node dist/cli/main.js lint --root examples/workspaces/repository-docs/after
 ```
 
 ```text
-README.md:13:1: error links/valid: Missing local target: docs/calibration.md.
+examples/workspaces/repository-docs/after/README.md:13:1: error links/valid: Missing local target: docs/calibration.md.
 3 file(s) linted; 1 error(s), 0 warning(s).
 ```
 
@@ -365,8 +365,8 @@ node dist/cli/main.js lint --root examples/plugin
 ```
 
 ```text
-notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
-notes/release-checklist.md:7:1: warn house/thematic-break: Write this thematic break as ---.
+examples/plugin/notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
+examples/plugin/notes/release-checklist.md:7:1: warn house/thematic-break: Write this thematic break as ---.
 1 file(s) linted; 1 error(s), 1 warning(s).
 ```
 
@@ -378,8 +378,8 @@ node dist/cli/main.js format --root examples/plugin --diff
 
 ```text
 ===================================================================
---- a/notes/release-checklist.md
-+++ b/notes/release-checklist.md
+--- a/examples/plugin/notes/release-checklist.md
++++ b/examples/plugin/notes/release-checklist.md
 @@ -3,7 +3,7 @@
  Draft the announcement. TODO: add the download link.
  
@@ -389,7 +389,7 @@ node dist/cli/main.js format --root examples/plugin --diff
 +---
  
  Ask for a review before publishing.
-notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
+examples/plugin/notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
 1 file(s) processed; 1 would change.
 ```
 
