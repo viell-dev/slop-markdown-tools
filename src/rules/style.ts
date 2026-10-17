@@ -606,12 +606,8 @@ function together(
   )
     return true;
   // Obsidian may attach a block identifier on its own line to the block above.
-  if (
-    document.dialect === "obsidian" &&
-    after.type === "paragraph" &&
-    source.slice(afterStart, afterEnd).trimEnd() === `^${blockIdentifier(source, after)?.id}`
-  )
-    return true;
+  const alone = document.dialect === "obsidian" ? blockIdentifier(source, after) : undefined;
+  if (alone && source.slice(afterStart, afterEnd).trimEnd() === `^${alone.id}`) return true;
   // Directly below text or a link reference definition, the parser does not
   // start a list that would be empty or not start at 1, though it does below
   // a blank line: there, `- -` is a list item holding the text `-`, and `-`
