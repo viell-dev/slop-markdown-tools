@@ -147,8 +147,8 @@ From every prerelease:
 
 - `style/list-marker`, `style/ordered-list`, and `style/list-indent`, in
   `recommended`, write bullets as `-` and numbers as `1.` with consistent
-  numbering and one space after each marker, and move each item's lines with
-  its text. Their options cover markdownlint's MD004, MD007, MD029, and MD030
+  numbering and one space after each marker, and move each item's lines with its
+  text. Their options cover markdownlint's MD004, MD007, MD029, and MD030
   ([#275](https://github.com/viell-dev/slop-markdown-tools/pull/275)).
 - `--quiet` reports errors only, and `rules` lists the rules of the
   configuration's plugins too, also as JSON with `--json`
