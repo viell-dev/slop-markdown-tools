@@ -12,10 +12,10 @@ results, and says how good they are.
 - **A single file is mostly start-up.** Every command needs about 0.25 s before
   it reads a document, nearly all of it Node.js loading the tool's code. Pass
   many files to one command rather than running one command per file.
-- **Formatting is in the same range as Prettier.** Rewriting files takes
-  about 1.6 times as long as Prettier, and checking formatted files slightly
-  less, although this tool also checks links and parses every changed document
-  again to confirm its meaning.
+- **Formatting is in the same range as Prettier.** Rewriting files takes about
+  1.6 times as long as Prettier, and checking formatted files slightly less,
+  although this tool also checks links and parses every changed document again
+  to confirm its meaning.
 - **Cost grows in step with size.** Sixteen times as many files take about
   sixteen times as long, and a document of a megabyte costs about a quarter more
   per kilobyte than a short one.
@@ -199,13 +199,13 @@ thousands of files.
   reads, bring it out. Lists and tables of that size are not affected. Square
   brackets are the worst case, in every dialect: a single paragraph of 70 kB
   made only of bracketed references such as `[a][b]` took from 1 to more than 30
-  seconds to parse, while one of 35 kB took a fraction of a second
-  ([issue #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
+  seconds to parse, while one of 35 kB took a fraction of a second ([issue
+  #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
 - Only the built-in rules run; plugins add their own time.
-- The runner is shared. Two runs on the same day differed by a factor of
-  about 1.8 in every absolute time, while the "compared with parsing" ratios and
-  the comparison with Prettier stayed within a tenth. Compare absolute times
-  only between reports whose header names the same processor.
+- The runner is shared. Two runs on the same day differed by a factor of about
+  1.8 in every absolute time, while the "compared with parsing" ratios and the
+  comparison with Prettier stayed within a tenth. Compare absolute times only
+  between reports whose header names the same processor.
 - Only Linux is measured. Starting a process is slower on Windows, which adds to
   every command-line row.
 - The Prettier comparison uses its default Markdown settings with

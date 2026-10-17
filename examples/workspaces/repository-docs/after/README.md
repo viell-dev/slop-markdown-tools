@@ -8,8 +8,8 @@ a sensor board and publishes them as a small web page that updates every minute.
 
 ## Usage
 
-Follow the [setup guide](./docs/guide.md) first, then read the
-[sensor reference](./docs/reference.md#pressure) to interpret the readings. The
+Follow the [setup guide](./docs/guide.md) first, then read the [sensor
+reference](./docs/reference.md#pressure) to interpret the readings. The
 [calibration notes](docs/calibration.md) explain how to correct a drifting
 sensor.
 

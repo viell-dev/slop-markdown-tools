@@ -126,8 +126,8 @@ such a defect.
 `npm run benchmark` times the tool on generated documents; it takes a few
 minutes, is not part of `check`, and never fails on a slow result. Run it before
 and after a change that could affect speed, on the same idle machine, and
-compare as the
-[benchmarks page](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html#run-it-and-compare)
+compare as the [benchmarks
+page](https://viell-dev.github.io/slop-markdown-tools/benchmarks.html#run-it-and-compare)
 explains. The reference results on that page come from the Benchmark workflow on
 a GitHub-hosted runner, which runs for pull requests that change `benchmarks/`
 and on request (`gh workflow run benchmark.yml --ref <branch>`); replace them
@@ -177,5 +177,6 @@ behavior; harassment and disclosure of private data are not acceptable.
   [CHANGELOG.md](CHANGELOG.md).
 - A change to the command line, the configuration, the JSON report, or the
   library that is not a defect fix waits for the next minor release; see the
-  [versioning policy](https://viell-dev.github.io/slop-markdown-tools/versions.html).
+  [versioning
+  policy](https://viell-dev.github.io/slop-markdown-tools/versions.html).
 - Keep changes scoped, and state remaining limits.

@@ -258,7 +258,7 @@ remain mandatory.
   fingerprints and convergence checks: a rule whose edits would change meaning
   is left out and reported, and an overlapping edit waits for the next pass
   (`src/core/engine.ts`). Fix a rule's unsafe edit rather than weakening a
-  guard; preserve unsupported constructs, including multiline inline code.
+  guard; preserve unsupported constructs, such as math that spans lines.
   Obsidian wrapping needs verified strict line breaks.
 - `docs.test.ts` compares the examples page, the rule index, the preset table,
   the library pages, the installation commands, and the changelog with the code,
