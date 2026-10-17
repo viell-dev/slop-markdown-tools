@@ -36,9 +36,9 @@
   "files": [
     "dist",
     "docs/*.md",
-    "docs/releases/*.md",
     "examples",
     "README.md",
+    "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "LICENSE",

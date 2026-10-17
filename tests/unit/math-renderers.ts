@@ -10,9 +10,17 @@
  *
  * Each case is one paragraph or block. `math` lists the renderers whose output
  * for it contained a formula. A case with `observed` was rendered by those
- * renderers only, and says nothing about the others. To observe again, render the sources separated by
- * thematic breaks and look for `math-renderer` (GitHub) or `language-math`
- * (Forgejo, Gitea) in each part.
+ * renderers only, and says nothing about the others.
+ *
+ * To observe again, render the sources on the renderer itself, separated by
+ * thematic breaks, and look for `math-renderer` (GitHub) or `language-math`
+ * (Forgejo, Gitea) in each part. For GitHub, put a file on a temporary branch
+ * and fetch it as above; the Markdown API renders as comments do. For Forgejo
+ * and Gitea, use the file view of a local instance. Obsidian can only be
+ * observed by a person: give the cases as a numbered list to paste into a note,
+ * and ask which lines show a formula in Reading view and in Live Preview, with
+ * screenshots, because the two views differ. Do not assume that a condition seen
+ * for a space also holds for a tab or a line break: for GitHub it did not.
  */
 export type MathRenderer = "github" | "forgejo" | "gitea";
 export interface MathCase {

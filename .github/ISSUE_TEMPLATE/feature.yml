@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a new rule, option, or capability
+labels: ["Type: Feature Request"]
+body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Existing issues
+      options:
+        - label: I searched the open and closed issues and found no request for this.
+          required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description:
+        The problem you want to solve, in the documents you work with. Describe the need, not only a
+        solution.
+    validations:
+      required: true
+  - type: dropdown
+    id: dialects
+    attributes:
+      label: Dialects
+      description: The dialects the request applies to.
+      multiple: true
+      options:
+        - All
+        - GitHub
+        - CommonMark
+        - Forgejo or Codeberg
+        - Gitea
+        - Obsidian
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: >-
+        What mdtools should report or change. A short example before and after helps; use four
+        backticks around Markdown that contains code fences.
+    validations:
+      required: true
+  - type: textarea
+    id: fit
+    attributes:
+      label: Why it belongs in mdtools
+      description: >-
+        Why a Markdown linter and formatter should do this, rather than a plugin or another tool.
+        Name another tool that does it, if you know one.
+    validations:
+      required: true

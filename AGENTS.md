@@ -1,370 +1,301 @@
 # Agent maintenance
 
-Read [README.md](./README.md) first for consumer-facing behavior, setup,
-maintenance policy, and contribution instructions. Keep that information there
-rather than duplicating it here. Public design and API documentation belongs in
-`docs/`.
+The [README](./README.md#status) states how the project is maintained.
+[CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test layout,
+documentation workflow, and pull request rules, and
+[RELEASING.md](./RELEASING.md) the release procedure; follow them and do not
+repeat them here. User and API documentation belongs in `docs/`.
 
-## Ownership and agent authority
+## Agent authority
 
-This project is agent-authored, agent-tested, agent-documented, and
-agent-maintained. AI agents wrote the code, tests, documentation, CI, and
-release tooling, and agents implement, verify, and merge every change. No person
-writes, reads, or reviews the code. The repository owner does not know the
-codebase, the API, or the CLI and does not run the tool directly. They guide the
-project lightly, from what they can see: the public documentation, issue and PR
-descriptions, and Markdown documents that other agents have processed with the
-tool, including the problems those agents meet. They assign agents to tasks
-based on the overall status, open issues, and open PRs.
+The owner does not read the code, the API, or the CLI and does not run the tool.
+They follow the project through the public documentation, issue and PR
+descriptions, and documents that other agents processed with the tool, and they
+assign agents to tasks.
 
 - Architectural, design, API, and implementation decisions belong to agents. The
-  owner does not know the codebase and cannot weigh them. The agent assigned to
-  a task makes every such decision the task needs, including the ones an issue
-  lists as open questions: gather the evidence, choose, and record the choice,
-  its reasoning, and the alternatives rejected in the issue or PR. Do not hand a
-  design question back to the owner, wait for a ruling, or leave accepted work
-  undecided because the choice is hard. Ask the owner only for what only the
-  owner can give: which work to assign, a change in the project's direction, and
-  authorization for actions with external effect.
-- Issue and PR descriptions are the owner's main view of the work. Write them so
-  a reader without codebase knowledge understands the observed problem, the
-  resulting behavior, the scope decision, and the design decisions made. Do not
-  rely on the diff or on code references to carry that meaning. When filing an
-  issue for something found during other work, record what a later assignee will
-  have to decide as decisions for that agent, not as questions for the owner.
-- There is no personal author voice to preserve in code, documentation, or other
-  prose. Keep terminology, structure, and formatting consistent with the
-  existing documents; do not imitate an earlier model's writing style for its
-  own sake.
-- Deciding how the project is built is not deciding what to work on. The owner
-  assigns each task, and the assigned agent owns the judgment that task
-  requires, including deciding whether a request is in scope or applicable to
-  the project. Record that decision and its reasoning in the issue or PR. Do not
+  assigned agent makes every decision its task needs, including those an issue
+  lists as open questions, and records the choice, its reasoning, and the
+  alternatives rejected in the issue or PR. Ask the owner only for which work to
+  assign, a change of direction, and authorization for actions with external
+  effect.
+- Write issue and PR descriptions so that a reader without knowledge of the code
+  understands the observed problem, the resulting behavior, the scope decision,
+  and the design decisions, without the diff. An issue filed during other work
+  states what a later assignee must decide, as decisions for that agent, not
+  questions for the owner.
+- There is no personal author voice to preserve; keep terminology, structure,
+  and formatting consistent with the existing documents.
+- Deciding how the project is built is not deciding what to work on. The
+  assigned agent judges, and records, whether a request is in scope. Do not
   extend an assignment to unrelated issues, PRs, or design changes, and do not
-  take actions with external effect, such as publishing, releasing, changing
-  repository settings, or closing work outside the assignment, unless the
-  assignment covers them. When an assignment is ambiguous, state the
-  interpretation used rather than widening the scope silently.
+  publish, release, change repository settings, or close work outside the
+  assignment unless it covers them. State the interpretation used when an
+  assignment is ambiguous.
 - No one else catches mistakes before merge. Verification, regression fixtures,
-  CI, and the complete diff review are the only review the change receives;
-  treat them as such.
+  CI, and the review of the complete diff are the only review a change receives.
 
 ## Repository boundary
 
-Everything this project needs lives in this repository. Never stage, copy,
-quote, or publish content from outside it. Use synthetic fixtures; do not copy
-real vault documents into tests, issues, or pull requests.
+Everything the project needs lives in this repository. Never stage, copy, quote,
+or publish content from outside it. Use synthetic fixtures, never real vault
+documents, in tests, issues, and pull requests, and keep private documents and
+credentials out of diagnostic snapshots and logs.
 
 ## Keeping the repository consistent
 
-Agents maintain every part of this repository: source, tests and fixtures,
-examples, benchmarks, the documentation site, the README and contributor
-documents, these instructions, issue and PR templates, the label catalog, CI and
-release workflows, rulesets, and package metadata. Many of these describe or
-depend on one another, and no one else will notice when they drift apart. A
-change is complete only when everything that describes or depends on what it
-changed agrees with it, in the same PR.
-
-Before committing, search the repository for other statements of whatever the
-change touches: behavior, option names, defaults, commands, file locations,
-version and Node.js requirements, and policy. Known couplings include:
+A change is complete only when everything that describes or depends on what it
+changed agrees with it, in the same PR. Before committing, search the repository
+for other statements of what the change touches: behavior, option names,
+defaults, commands, file locations, versions and Node.js requirements, and
+policy. Known couplings:
 
 - Behavior and its descriptions: the `docs/` pages, the README, `examples/` and
-  each workspace's `after/` tree, CLI help text, and release notes. The
-  integration tests compare some of these with the code, not all of them.
-- The ownership and maintenance statement: the README, `CONTRIBUTING.md`,
-  `docs/contributing.md`, the PR template, and this file.
-- Labels: `.github/labels.json`, the table in `docs/contributing.md`, GitHub,
-  the issue templates, and `.github/dependabot.yml`.
+  each workspace's `after/` tree, CLI help text, type declarations, and
+  `CHANGELOG.md`. The integration tests compare some of these with the code, not
+  all.
+- Rules: `docs/rules.md` has one index row and one section per rule, in
+  alphabetical order of rule ID; a new rule adds both.
+- The maintenance statement: the README's status section, which other documents
+  link to rather than repeat.
+- Labels: `.github/labels.json`, GitHub, the issue templates,
+  `.github/dependabot.yml`, and the policy below.
 - Branch and tag policy: `.github/rulesets/`, GitHub's settings, and the job
   names in `ci.yml`.
-- Versions and requirements: `package.json`, the lockfile, the install commands
-  in the README and quick start, the CI matrix, and release notes.
+- Versions and requirements: `package.json`, the lockfile, the installation
+  commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
+  and CONTRIBUTING.md, and `CHANGELOG.md`.
 
-Existing drift found along the way is a defect. Correct it in the same PR when
-it lies in what the PR already changes; otherwise file an issue for it rather
-than widening the assignment.
+Drift found along the way is a defect. Correct it in the same PR when it lies in
+what the PR already changes; otherwise file an issue rather than widening the
+assignment.
 
 ## Issue triage and project scope
 
-Review requests against the README, design boundaries, and existing extension
-contracts before implementing them. The agent assigned to review or resolve
-issues exercises the maintainer's scope judgment for that assignment; nobody
-else will. The assignment does not authorize accepting every reporter's proposed
-feature, and it does not extend to issues outside the assignment. Reports from
-agents receive the same scrutiny as reports from people. Rejecting, narrowing,
-splitting, or closing an issue as out of scope is a valid outcome. Triage also
-settles an issue's open design questions as far as the evidence allows, so that
-an accepted issue states the direction its fix will take.
+Review requests against the README, the design boundaries, and the extension
+contracts before implementing them. An assignment to review or resolve issues
+gives the maintainer's scope judgment for those issues only, and does not mean
+accepting every proposed feature. Reports from agents get the same scrutiny as
+reports from people. Rejecting, narrowing, splitting, or closing an issue as out
+of scope is a valid outcome. Document corruption and changed rendering take
+priority over new style options.
 
-Take each assigned issue through these steps, and leave the issue accurate after
-each one. The issue is the record of how it was handled; the session that
-handled it is not.
+Take each assigned issue through these steps, and leave it accurate after each;
+the issue, not the session, is the record:
 
 1. **Validate.** Reproduce a defect, or measure a performance or presentation
-   claim, on current `main`. Post the commands, inputs, and results in a
-   comment, and say where the evidence differs from the report.
-2. **Decide.** Accept, narrow, or decline, and settle the open design questions.
-   Post the decision, its reasoning, and the alternatives rejected.
-3. **Split.** A further input that shows the same problem stays in the issue. A
-   different problem found while validating or fixing, one that could be
-   accepted, declined, or validated on its own, gets its own issue, even when
-   the same PR will fix both. Link the issues to each other, and remove the
-   split-off part from the original issue's decision.
-4. **Label and retitle.** Set the status that the evidence supports. Correct the
-   type when the item turns out to be a different kind than it was filed as: a
-   discussion that ends in an accepted change becomes a bug, an enhancement, or
-   a feature request. Make the title name the confirmed problem or the accepted
-   request. Leave the reporter's description as the record and put corrections
-   in comments; when a later step makes one of your own comments wrong, edit it
-   and say that it was edited.
-5. **Close or keep open.** Close a declined or duplicate issue as not planned
-   and keep its disposition label. Keep an accepted issue open until its fix
+   claim, on current `main`. Post the commands, inputs, and results, and where
+   they differ from the report.
+2. **Decide.** Accept, narrow, or decline, settle the open design questions, and
+   post the decision, its reasoning, and the alternatives rejected.
+3. **Split.** A further input that shows the same problem stays. A different
+   problem that could be accepted, declined, or validated on its own gets its
+   own issue, even when one PR will fix both; link them, and remove the
+   split-off part from the original decision.
+4. **Label and retitle.** Set the status the evidence supports, and correct the
+   type when the item is another kind: a discussion that ends in an accepted
+   change becomes a bug, an enhancement, or a feature request. Make the title
+   name the confirmed problem or the accepted request. Leave the reporter's
+   description as the record and correct it in comments; edit your own comment
+   when a later step makes it wrong, and say so.
+5. **Close or keep open.** Close a declined or duplicate issue as not planned,
+   keeping its disposition label. Keep an accepted issue open until its fix
    merges. The fixing PR names it with a closing keyword such as `Fixes #123`,
    carries the same type label, and describes each issue separately when it
-   resolves more than one. After the merge, confirm that the issue closed and
-   remove its transient status.
+   resolves several. After the merge, confirm that the issue closed and remove
+   its transient status.
 
 File an issue for every defect or limit found during assigned work in this
-repository, instead of only mentioning it in a comment or PR description. Filing
-it is part of the assignment; resolving it is not. Give it a type label, and add
-a status only once it has been validated as above. Assignees, milestones, and
-projects are not used: labels, comments, and the links between issues and PRs
-carry the state.
+repository instead of only mentioning it; filing is part of the assignment,
+resolving is not. Give it a type label, and a status only once it is validated.
 
-Maintain labels as part of every issue or PR update, including answers, closure,
-and reopening. Follow the
-[contributor label policy](docs/contributing.md#issue-and-pull-request-labels)
-and [.github/labels.json](.github/labels.json): one primary type, at most one
-current status, and no priority labels. Reassess stale dispositions, remove
-transient statuses on completion, and keep GitHub and the tracked catalog in
-sync. Label changes do not replace explanatory comments or relevant PR links.
+Labels follow [`.github/labels.json`](./.github/labels.json), which holds their
+names, colors, and descriptions; keep GitHub in sync with it. Review labels
+whenever an item is answered, triaged, implemented, closed, or reopened; they do
+not replace explanatory comments or links to PRs.
 
-In an issue or PR's own body, comments, or reviews, refer to it as "this issue"
-or "this PR" rather than its number or a link to itself. GitHub flags these as
-self-references. Before publishing or editing, check references against the
-current issue or PR number. Preserve links to other issues and PRs, including
-fixing PRs and related work.
+- Every item has one `Type:` label and at most one `Status:` label, for its
+  current disposition or next action. A feature's implementation PR uses
+  `Type: Feature Request`. There are no priority labels, and assignees,
+  milestones, and projects are not used.
+- New items carry only a type until an assigned agent reviews them.
+  `Status: Confirmed` means a reproduced defect or an accepted request within
+  scope.
+- `Status: Needs Information` states the evidence needed; `Status: Blocked`
+  links the external dependency and the condition that unblocks it;
+  `Status: Can't Reproduce` follows a documented attempt with version, input,
+  and result.
+- A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
+  item explains the decision and keeps `Status: Won't Do`, and can be
+  reconsidered with new evidence. On reopening, replace the old disposition.
+- On completion, remove transient statuses and keep the type. A closed, unmerged
+  PR keeps its disposition.
+- `Good First Issue` goes only on a ready, well-explained beginner task, with
+  `Help Wanted`; remove both when the item closes or stops being ready.
 
-For each distinct request, separate the observed problem from its proposed
-solution and choose an appropriate home:
+In an issue or PR's own body, comments, or reviews, call it "this issue" or
+"this PR" rather than linking it, which GitHub shows as a self-reference. Keep
+links to other issues and PRs.
 
-- **Core defect or capability:** parsing, semantic preservation, supported
-  dialect behavior, generally useful lint/format operations, resolution,
-  diagnostics, or measured performance within the project's scope. A defect
-  found in one vault can still expose a generic problem.
-- **Consumer policy or workflow:** a workspace's naming conventions, document
-  templates, metadata fields, migration heuristics, or external-tool
-  orchestration. Prefer configuration, a consumer plugin, or a wrapper when
-  these can express the requirement. Obsidian support does not mean adopting
-  every vault's content conventions.
-- **Extension gap:** an otherwise appropriate consumer implementation cannot use
-  the supported API safely or practically. Identify the exact missing primitive
-  and evaluate that reusable capability separately from the original policy. Do
-  not add speculative hooks or relax semantic guards merely to accommodate one
+For each request, separate the observed problem from its proposed solution, and
+choose its home:
+
+- **Core defect or capability:** parsing, semantic preservation, dialect
+  behavior, generally useful lint and format operations, link resolution,
+  diagnostics, or measured performance. A defect found in one vault can still
+  expose a general problem.
+- **Consumer policy or workflow:** a workspace's naming conventions, templates,
+  metadata fields, migration heuristics, or orchestration of other tools, such
+  as matching file names to titles, placing metadata, guessing at accidental
+  Markdown markers, or updating modified dates. Prefer configuration, a plugin,
+  or a wrapper; Obsidian support does not mean adopting every vault's
+  conventions.
+- **Extension gap:** an appropriate consumer implementation cannot use the API
+  safely. Identify the missing primitive and evaluate it apart from the original
+  policy. Do not add speculative hooks or relax semantic guards for one
   consumer.
 
-Configurability, opt-in defaults, report-only behavior, safe edits, many
-findings in one corpus, and ease of implementation do not by themselves
-establish that a feature belongs in core. Conversely, plugin implementability
-alone is not a reason to reject a broadly useful built-in rule. Explain the
-general use case, why the package should own it, and the API and maintenance
-cost.
-
-Split issues containing independently decidable defects, features, or consumer
-policies before implementation when separate dispositions or validation are
-needed. Link the resulting issues and PRs, and do not let accepting one part
-implicitly accept the others. Record the scope decision and evidence in the
-issue or PR before coding. An out-of-scope request is a disposition, not a
-blocker awaiting a more detailed design. Reserve blockers for missing evidence,
-dependencies, or decisions needed by an otherwise accepted task.
-
-When asked to review existing additions without reverting them, report specific
-components to retain or remove and any genuine consumer API gaps. Preserve
-independent correctness fixes when proposing partial reversals of mixed PRs. Do
-not execute those reversals until authorized.
+Configurability, opt-in defaults, report-only behavior, many findings in one
+corpus, and ease of implementation do not by themselves put a feature in core,
+and plugin implementability alone is no reason to reject a broadly useful
+built-in rule. Explain the general use case, why the package should own it, and
+its API and maintenance cost, and record the scope decision before coding. An
+out-of-scope request is a disposition, not a blocker; reserve blockers for
+missing evidence, dependencies, or decisions that accepted work needs. When
+asked to review existing additions without reverting them, report what to keep
+or remove and any real API gaps, keep independent correctness fixes in proposed
+reversals, and do not revert until authorized.
 
 ## Implementation and verification
 
-- Preserve source outside enabled rules. Formatting must not change document
-  meaning or resolve ambiguous targets by guessing. Unknown constructs must
-  survive intact.
-- Keep document parsing, workspace resolution, rule execution, and file writes
-  separate. Plugins propose diagnostics and edits; the host validates and
+- Preserve source outside enabled rules. Formatting must not change a document's
+  meaning or resolve an ambiguous target by guessing, and unknown constructs
+  must survive intact.
+- Keep parsing, workspace resolution, rule execution, and file writes separate.
+  Rules and plugins propose diagnostics and edits; the host validates and
   applies them.
-- Every defect that changes document rendering needs a minimal regression
-  fixture. Test idempotence, semantic preservation, rule isolation, and
-  cross-platform paths where applicable.
-- Run `npm run check` and inspect the complete diff before committing. Review
-  packed files before changing packaging. Verify GitHub CI after pushing; fix
+- Every defect that changes rendering needs a minimal regression fixture. Test
+  idempotence, semantic preservation, rule isolation, and cross-platform paths
+  where they apply.
+- Run `npm run check` and inspect the complete diff before committing; review
+  the packed files before changing packaging. Verify CI after pushing and fix
   failures before reporting completion.
-- Do not add private source documents or credentials to diagnostic snapshots or
-  logs.
-- Keep dependencies and generated state inside this repository. Commit the
+- Keep dependencies and generated state inside the repository. Commit the
   lockfile, not caches.
-- When updating `typescript-eslint`, recheck its TypeScript support and revisit
-  the TypeScript 7 ignore in `.github/dependabot.yml` (PR #3). Remove the ignore
-  once the upgrade installs and passes checks without bypassing peer
-  constraints.
+- When updating `typescript-eslint`, recheck its TypeScript support and the
+  TypeScript 7 ignore in `.github/dependabot.yml`; remove the ignore once the
+  upgrade installs and passes without bypassing peer constraints.
+- Decide which release a change belongs to when it is assigned, by the
+  [versioning policy](./docs/versions.md): before 1.0, a change to the interface
+  that is not a defect fix waits for the next minor release. Say so in the PR.
 
-## Git workflow
+## Git and merging
 
-Use focused commits and push completed work. Work on feature branches after
-bootstrap. All changes to `main` go through pull requests, including version
-bumps, dependency updates, documentation, and agent instructions. This applies
-to prereleases as well as stable releases. Follow the release procedure linked
-from the README; preparing artifacts never authorizes publication. Do not
-rewrite shared history. Force-add this file when needed because some development
-environments globally ignore `AGENTS.md`.
+All changes to `main` go through pull requests, including version bumps,
+dependency updates, documentation, and these instructions. Use focused commits,
+push completed work, and do not rewrite shared history. Some environments ignore
+`AGENTS.md` globally; force-add it when needed.
 
-Merge PRs with a merge commit (`gh pr merge --merge --match-head-commit SHA`)
-after checking the exact PR head. Squash and rebase merging are disabled to
-preserve commit history and attribution. GitHub deletes merged source branches;
-switch back to `main` and fast-forward the local checkout before new work. Do
-not use administrator bypass or weaken protections to merge a failing PR.
+Merge with a merge commit after checking the exact head:
+`gh pr merge --merge --match-head-commit SHA`; squash and rebase merging are
+disabled to keep history and attribution. The ruleset requires branches to be up
+to date, so after each merge the other open PRs need `main` merged in and CI run
+again. Never use administrator bypass or weaken protections to merge a failing
+PR. GitHub deletes a merged PR's branch; fast-forward the local `main` before
+new work.
 
-When closing a PR, delete its source branch by default, including rejected or
-superseded PRs. Preserve it only when the operator asks or other active work
-depends on it. Check open PRs before deleting branches; never delete `main` or
-another contributor's fork branch. Prune stale tracking refs and remove local
-task branches after their work is merged or deliberately abandoned.
+Delete the source branch of a closed PR, rejected or superseded ones included,
+unless the operator asks to keep it or active work depends on it. Never delete
+`main` or another contributor's fork branch. Prune stale tracking refs and local
+task branches once their work is merged or abandoned.
 
-The active main and version-tag policies are recorded in `.github/rulesets/`.
-Keep those files and GitHub settings synchronized. Required checks bind to the
-three `verify (OS, NODE)` job names in `ci.yml` and GitHub Actions app 15368;
-renaming a job or changing the matrix requires updating the ruleset. CI runs for
-PRs and pushes to `main`, avoiding duplicate feature-branch runs. Zero required
-approvals is deliberate for a single-account, agent-maintained repo; PRs,
+`.github/rulesets/` records the policies for `main` and version tags; keep it
+and GitHub's settings in sync. The required checks bind to the three
+`verify (OS, NODE)` job names in `ci.yml` and to GitHub Actions, app 15368, so
+renaming a job or changing the matrix needs a ruleset update. Zero required
+approvals is deliberate for a single-account, agent-maintained repository; PRs,
 passing checks, and resolved review threads remain mandatory.
 
 ## Technical map
 
-- TypeScript ESM compiles with `tsc`; the package exports `dist/index.js`,
-  `dist/node.js` as `mdrefine/node`, and the `mdtools` executable at
-  `dist/cli/main.js`. The main entry never touches the filesystem;
-  `mdrefine/node` exposes `src/workspace/discovery.ts`, which the CLI uses for
-  discovery and per-document options, so change the two together. npm package,
-  CLI, and config names intentionally differ: `mdrefine`, `mdtools`, and
-  `mdtools.config.*`.
-- `src/syntax/` owns micromark/mdast parsing and Obsidian extensions;
-  `src/config/` resolves presets, schemas, overrides, and trusted plugins.
-  `src/core/` executes rules and validates edits; `src/workspace/` resolves
-  local targets and handles discovery and atomic writes. Rules propose edits;
-  they do not write files directly.
-- `src/config/load.ts` locates a plugin that is not named by path with
-  `import-meta-resolve`, a port of Node.js's own import resolution, and then
-  with CommonJS resolution. Node.js has no supported call that resolves an
-  import from another file's location without a flag or a warning. The list of
-  conditions there copies Node.js's defaults for an import and adds the ones the
-  process was started with (`--conditions`, `--no-addons`, also in
-  `NODE_OPTIONS`); recheck it when the supported Node.js range changes.
+- TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
+  `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdtools` command at
+  `dist/cli/main.js`. The names differ on purpose: package `mdrefine`, command
+  `mdtools`, configuration `mdtools.config.*`.
+- `src/syntax/` parses with micromark and mdast and holds the Obsidian
+  extensions; `src/config/` resolves presets, schemas, overrides, and plugins;
+  `src/core/` runs rules, suppressions, and the edit engine; `src/rules/` holds
+  the built-in rules; `src/workspace/` resolves link targets and handles
+  discovery, reading as UTF-8, and writes; `src/cli/` connects them. The main
+  entry never touches the filesystem. `mdrefine/node` exposes
+  `src/workspace/discovery.ts`, which the CLI uses for discovery and
+  per-document options, so change the two together.
+- `src/config/load.ts` locates a plugin not named by path with
+  `import-meta-resolve`, a port of Node.js's import resolution, and then with
+  CommonJS resolution, because Node.js has no supported call that resolves an
+  import from another file's location. Its conditions copy Node.js's defaults
+  plus those the process was started with (`--conditions`, `--no-addons`, also
+  in `NODE_OPTIONS`); recheck them when the supported Node.js range changes.
 - The dialect assumed when nothing names one is chosen in `resolveConfig`: the
-  caller's `defaultDialect`, which the CLI sets to `obsidian` for a document
-  inside a vault, and otherwise `fallbackDialect` (`github`), which
-  `createWorkspace` also uses for link targets. `src/workspace/vault.ts` holds
-  the one rule for which vault a document belongs to. Discovery applies it to
-  the folders it visits and `enclosingVault` to any other path; change both
-  together. Do not add another fallback; a dialect that reads a construct as an
-  ordinary paragraph lets reflow destroy it without tripping the semantic check.
-- `src/syntax/math.ts` is the project's own tokenizer for dollar math, adapted
-  from `micromark-extension-math` (notice in `THIRD_PARTY_NOTICES`, which ships
-  in the package) so that the package does not install KaTeX. `parse.ts` picks
-  the conditions for `$…$` per dialect, and `tests/unit/math-renderers.ts`
-  records what GitHub, Forgejo, Gitea, and Obsidian rendered. Apply a condition
-  to a dialect only when its renderer was observed to apply it: taking prose for
-  math is harmless, the reverse is not. To observe again, render the cases on
-  the renderer itself: for GitHub a file on a temporary branch, fetched through
-  the contents API with `Accept: application/vnd.github.html` (the Markdown API
-  renders comments, which differ); for Forgejo and Gitea the file view of a
-  local instance. Obsidian can only be observed by a person: give the cases as a
-  numbered list to paste into a note, and ask which lines show a formula in
-  Reading view and in Live Preview, with screenshots; the two views differ. Do
-  not assume that a condition seen for a space also holds for a tab or a line
-  break: for GitHub it did not.
-- Formatting applies inline, block, then document phases. Semantic fingerprints,
-  overlap checks, and convergence checks guard edits. Fix a rule's unsafe edit
-  rather than weakening the guard; preserve unsupported constructs, including
-  multiline inline code. Obsidian reflow needs verified strict line breaks.
-- `tests/unit/` calls `src/` directly; `tests/integration/` runs the built CLI
-  on real files and checks `examples/`, `benchmarks/`, and the documentation
-  against the tool. `docs/testing.md` says where a new test belongs. The
-  examples page, the rule and preset tables, and the benchmark page's row labels
-  are compared with the code, so update them in the same change.
-- `examples/` ships in the package. Each workspace's `after/` tree is exactly
-  what `format --write` makes of `before/`; regenerate it when formatting
-  behavior changes on purpose, and treat an unexpected difference as a
-  regression.
-- `npm run benchmark` is not part of `check` and never fails on a slow result.
-  The reference results in `docs/benchmarks.md` come from the Benchmark workflow
-  on a GitHub-hosted runner; replace them from a new run of that workflow, never
-  from a local machine. Runners differ in speed by almost a factor of two
-  between runs, so compare absolute times only between reports whose headers
-  name the same processor, and judge a change by the ratio columns or by
-  before-and-after runs on one machine.
+  caller's `defaultDialect`, which the CLI sets to `obsidian` inside a vault,
+  else `fallbackDialect` (`github`), which `createWorkspace` also uses.
+  `src/workspace/vault.ts` holds the one rule for which vault a document belongs
+  to; discovery applies it to the directories it visits and `enclosingVault` to
+  other paths, so change both together. Do not add another fallback: a dialect
+  that reads a construct as a paragraph lets wrapping destroy it without
+  tripping the semantic check.
+- `src/syntax/math.ts` is the project's own dollar-math tokenizer, adapted from
+  `micromark-extension-math` (notice in `THIRD_PARTY_NOTICES`, which ships) so
+  that the package does not install KaTeX. `parse.ts` picks the conditions per
+  dialect, and `tests/unit/math-renderers.ts` records what the renderers
+  rendered and how to observe them again. Apply a condition to a dialect only
+  when its renderer was observed to apply it.
+- Formatting applies inline, block, then document phases, guarded by semantic
+  fingerprints and convergence checks: a rule whose edits would change meaning
+  is left out and reported, and an overlapping edit waits for the next pass
+  (`src/core/engine.ts`). Fix a rule's unsafe edit rather than weakening a
+  guard; preserve unsupported constructs, including multiline inline code.
+  Obsidian wrapping needs verified strict line breaks.
+- `docs.test.ts` compares the examples page, the rule index, the preset table,
+  the library pages, the installation commands, and the changelog with the code,
+  and `benchmarks.test.ts` the benchmark page's headings and row labels. Each
+  example workspace's `after/` tree is exactly what `format --write` makes of
+  `before/`: regenerate it when formatting changes on purpose, and treat an
+  unexpected difference as a regression.
+- Replace the benchmark page's results only from a run of the Benchmark
+  workflow; a local report names its machine's processor and is never published.
+  Judge a change by the ratio columns or by runs before and after on one
+  machine.
 - The Vitest projects run one after the other (`sequence.groupOrder`), so that
-  process-heavy integration tests do not disturb the unit tests' time limits.
-- Follow the README for development commands. Markdown uses this tool at 80
-  columns; Prettier excludes Markdown. VitePress builds the public docs from
-  `main`; do not commit its cache or generated site. VitePress 2 is pinned to an
-  alpha to avoid the Vite 5 vulnerabilities in the older stable line.
+  integration processes do not disturb the unit tests' time limits.
+- The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
+  builds the site from `main`, with heading anchors generated as GitHub
+  generates them, so that the tool's link check validates the site's fragments;
+  do not commit its cache or output. VitePress 2 is pinned to an alpha to avoid
+  the Vite 5 vulnerabilities of the stable line.
 
-## Release operations
+## Releases
 
-Follow [the release procedure](docs/releases.md) for commands and prerequisites.
-Never rerun publication for an existing registry version or release tag. Update
-version metadata, the lockfile, release notes, and relevant examples together
-through a PR for each new release. Use exact SemVer tags without a `v` prefix,
-pointing to the tested merge commit.
-
-The npm trusted publisher is configured for `viell-dev/slop-markdown-tools`,
-`release.yml`, and environment `npm-release`, with direct publish permission.
-`NPM_PUBLISH_ENABLED=true` is a capability gate, not standing authorization to
-publish. The workflow still requires explicit dispatch with `publish=true`, the
-exact version, and the actual agent identity. Verify live settings when
-releasing; configuration was verified on 2026-09-18. Verify the workflow result
-and registry provenance for each authorized release. Do not store an npm token
-in GitHub.
-
-`npm run release:prepare` verifies and retains a tarball, manifest, and checksum
-in ignored `artifacts/`. Local artifacts are snapshots: regenerate after changes
-and compare registry integrity after publication. Never rebuild a replacement
-asset for an existing release. GitHub release immutability applies to releases
-created after it was enabled; beta.1 predates it, though its tag is protected.
-Upload all assets before publishing a future release. If npm succeeds but GitHub
-fails, finish only the missing GitHub step at the same source commit.
-
-Until the first stable release, `latest` follows the newest prerelease of any
-kind: after each authorized prerelease publication, run an authenticated local
-`npm dist-tag add mdrefine@VERSION latest` once the published version and its
-channel tag are verified. OIDC publication does not authenticate tag updates.
-Complete this step and verify both tags before reporting the release complete.
-Once stable releases exist, `latest` follows stable and prerelease channel tags
-such as `beta` remain separate. The initial local publication did not produce
-OIDC provenance.
-
-With npm 12, use an explicit local tarball path (`./artifacts/name.tgz`): a bare
-`artifacts/name.tgz` can be interpreted as a GitHub package spec. Pack JSON may
-be keyed by package name instead of an array. Test the installed command shim
-and public TypeScript declarations with `test:package`, not just the source CLI.
+Follow [RELEASING.md](./RELEASING.md). Preparing artifacts never authorizes
+publication; never rerun publication for an existing version or tag, and never
+store an npm token in GitHub. Verify the live trusted-publisher settings, the
+workflow's result, and the registry provenance for each authorized release.
 
 ## Attribution
 
 Identify the agent as `<model> via <harness>`, using the most specific
-human-readable model name and version the session exposes, without guessing
-missing details and without an email address. Commit trailers use
-`Assisted-by: <model> via <harness>` after a blank line. For issues, pull
-requests, reviews, comments, release notes, and other published prose, end with
-`🤖 Generated with <model> via <harness>`. Use the actual session identity;
-never leave literal placeholders in published content.
+human-readable model name and version the session exposes, without guessing and
+without an email address. Commit messages end with
+`Assisted-by: <model> via <harness>` after a blank line. Issues, pull requests,
+reviews, comments, release notes, and other published prose end with
+`🤖 Generated with <model> via <harness>`. Never leave placeholders in published
+content.
 
 `Assisted-by:` is the only permitted agent attribution trailer. Never add a
 `Co-Authored-By:` or `Signed-off-by:` trailer identifying an agent, model,
-harness, or AI service, in any capitalization, even when an `Assisted-by:`
-trailer is also present. Replace any agent attribution supplied by a harness or
-template with `Assisted-by:`; never retain both. Before committing, check the
-complete commit message for forbidden agent trailers, including any added
-automatically by tooling.
+harness, or AI service, in any capitalization, even next to `Assisted-by:`.
+Replace attribution that a harness or template supplies with `Assisted-by:`, and
+check the complete message, including what tooling adds, before committing.
 
-Do not append agent attribution footers to repository documents. The README's
-maintenance disclaimer covers them; keep attribution in commits and external
-posts.
+Do not add attribution footers to repository documents; the README's status
+section covers them.

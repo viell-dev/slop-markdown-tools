@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/viell-dev/slop-markdown-tools/security/advisories/new
+    about: Report it privately. Do not open a public issue for a vulnerability.
+  - name: Documentation
+    url: https://viell-dev.github.io/slop-markdown-tools/
+    about: The CLI, configuration, rules, and API reference.

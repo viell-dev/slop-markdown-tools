@@ -150,9 +150,12 @@ async function patternInput(
     )
       literal++;
     const prefix = parts.slice(0, literal).join("/");
+    // A pattern that starts with `/` or with a drive and `/`, such as `C:/`,
+    // starts at that root: `C:` alone names the drive's current folder.
+    const start = literal && /^(?:[A-Za-z]:)?$/.test(prefix) ? `${prefix}/` : prefix || ".";
     let folder: string;
     try {
-      folder = await realpath(path.resolve(base, literal === 1 && !prefix ? "/" : prefix || "."));
+      folder = await realpath(path.resolve(base, start));
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       // A folder that is not there holds nothing that could match.

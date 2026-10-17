@@ -1,25 +1,25 @@
 # Examples
 
-Working examples of configuring, running, and extending Markdown Tools. The
+Working examples of configuring, running, and extending mdrefine. The
 [examples page](https://viell-dev.github.io/slop-markdown-tools/examples.html)
 walks through each one with its input and output. The integration tests run
 every example, so what is here matches what the tool does.
 
 Run the commands below from a built checkout (`npm ci && npm run build`). In a
 project that installs the package, the same files are under
-`node_modules/mdrefine/examples/`, and `npx --no-install mdtools` replaces
+`node_modules/mdrefine/examples/`, and `npx mdtools` replaces
 `node dist/cli/main.js`.
 
 ## Starting configurations
 
 Copy one to the root of your documents as `mdtools.config.jsonc`.
 
-| File                               | For                                         |
-| ---------------------------------- | ------------------------------------------- |
-| [`github.jsonc`](github.jsonc)     | Repositories rendered by GitHub             |
-| [`forgejo.jsonc`](forgejo.jsonc)   | Codeberg and other Forgejo instances        |
-| [`gitea.jsonc`](gitea.jsonc)       | Gitea instances                             |
-| [`obsidian.jsonc`](obsidian.jsonc) | Obsidian vaults, with vault-root link paths |
+| File                               | For                                             |
+| ---------------------------------- | ----------------------------------------------- |
+| [`github.jsonc`](github.jsonc)     | Repositories rendered by GitHub                 |
+| [`forgejo.jsonc`](forgejo.jsonc)   | Codeberg and other Forgejo instances            |
+| [`gitea.jsonc`](gitea.jsonc)       | Gitea instances                                 |
+| [`obsidian.jsonc`](obsidian.jsonc) | Obsidian vaults, with vault-relative link paths |
 
 ## Workspaces before and after formatting
 
@@ -32,7 +32,7 @@ reports it afterwards.
   two guides for a repository on GitHub.
 - [`workspaces/obsidian-vault/`](workspaces/obsidian-vault/) is a small vault
   with wikilinks, an embed, callouts, a block reference, and an ignored template
-  folder.
+  directory.
 
 ```sh
 node dist/cli/main.js lint --root examples/workspaces/repository-docs/before
