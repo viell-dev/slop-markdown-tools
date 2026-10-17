@@ -449,7 +449,11 @@ intersecting it; a paragraph spanning a disabled line is therefore preserved as
 a whole. An enable directive closes matching disabled regions; `enable` without
 names closes all. Directives inside code are ordinary code. `disable-next-line`
 targets the immediately following physical line, including a blank line; place
-it directly above the content to suppress.
+it directly above the content to suppress. Lines end at a line feed, a carriage
+return, or both, as in CommonMark. Versions up to `0.2.0-rc.2` looked only for
+line feeds, so the directive did nothing in a document whose lines end with a
+carriage return alone, and in a document that mixes line endings it could apply
+to the wrong line or to two lines.
 
 ## Selection, output, and exit codes
 
