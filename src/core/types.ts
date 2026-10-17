@@ -116,6 +116,12 @@ export interface LinkResolution {
    */
   unreadable?: string[];
   /**
+   * With status `unreadable`: the symbolic link or junction inside the
+   * workspace through which the link's path leads to a place outside the
+   * workspace root, which bounds what the tool reads.
+   */
+  leavesRoot?: string;
+  /**
    * With status `resolved` in the Obsidian dialect: the target's path as
    * Obsidian counts it, from the folder of the linking note's vault, when that
    * folder is not the workspace root and the path so differs from `target`.

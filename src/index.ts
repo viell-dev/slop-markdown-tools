@@ -17,6 +17,6 @@ export {
 } from "./config/resolve.js";
 export { parse, range, textContent } from "./syntax/parse.js";
 export { createWorkspace } from "./workspace/index.js";
-export type { WorkspaceOptions, WorkspaceSource } from "./workspace/index.js";
+export type { LookupResult, WorkspaceOptions, WorkspaceSource } from "./workspace/index.js";
 export type * from "./core/types.js";
 export type { ObsidianComment, ObsidianHighlight, WikiLink } from "./syntax/obsidian.js";

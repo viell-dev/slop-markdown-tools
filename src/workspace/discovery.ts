@@ -4,7 +4,7 @@ import path from "node:path";
 import { resolveConfig } from "../config/resolve.js";
 import type { Config, Dialect, Plugin, ProcessOptions, Workspace } from "../core/types.js";
 import { pathError } from "./access.js";
-import { discover, vaultFor } from "./files.js";
+import { discover, unlistedLookup, vaultFor } from "./files.js";
 import type { Skipped } from "./files.js";
 import { createWorkspace } from "./index.js";
 import { excludeSelection } from "./selection.js";
@@ -141,6 +141,8 @@ export async function discoverFrom(
   // processed, and a view of it with each vault's line-break setting.
   const indexes = new Map<Dialect, Workspace>();
   const views = new Map<Dialect, Map<Vault, Workspace>>();
+  // Links into folders that discovery does not enter are checked on disk.
+  const lookup = unlistedLookup(set);
   function index(dialect: Dialect): Workspace {
     let workspace = indexes.get(dialect);
     if (workspace) return workspace;
@@ -156,6 +158,7 @@ export async function discoverFrom(
       // The vault at or above the root holds the whole workspace and needs no entry.
       vaults: set.vaults.flatMap((item) => (item.path ? [item.path] : [])),
       ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),
+      lookup,
     });
     indexes.set(dialect, workspace);
     return workspace;

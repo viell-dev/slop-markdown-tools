@@ -41,8 +41,8 @@ links.
   files can still be link targets.
 - Files that `.gitignore` excludes or that match the configuration's `ignore`
   patterns are not processed, and nested Git repositories, symbolic links, and
-  the directories `.git`, `.obsidian`, `node_modules`, `.npm-cache`, `dist`, and
-  `coverage` are not visited; see
+  the directories `.git`, `.obsidian`, `node_modules`, `dist`, and `coverage`
+  are not visited; see
   [ignored files](configuration.md#ignored-files-and-link-targets). A symbolic
   link named on the command line is an error. A file or directory named on the
   command line that these leave out is skipped with a warning that says why,
