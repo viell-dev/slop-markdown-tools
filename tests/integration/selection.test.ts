@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
@@ -209,6 +209,26 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     const generated = await discover(path.join(root, "generated"), [], []);
     expect(generated.selected).toEqual(["deep/kept.md", "kept.md"]);
     expect(generated.skipped).toEqual([]);
+  });
+  it.skipIf(!hasGit)("never run a file system monitor that the repository names", async () => {
+    // Git runs `core.fsmonitor` when it reads the index, as `git ls-files` does,
+    // so a repository that the tool lints could otherwise run a program of its own.
+    const root = await fixture({
+      "index.md": "# Index\n",
+      "monitor.sh": '#!/bin/sh\necho ran > "$(dirname "$0")/marker"\nexit 1\n',
+    });
+    // On Linux and macOS, Git runs only an executable monitor.
+    await chmod(path.join(root, "monitor.sh"), 0o755);
+    gitInit(root);
+    git(root, ["add", "index.md"]);
+    git(root, [
+      "config",
+      "core.fsmonitor",
+      path.join(root, "monitor.sh").split(path.sep).join("/"),
+    ]);
+    const set = await discover(root, [], []);
+    expect(set.selected).toEqual(["index.md"]);
+    await expect(readFile(path.join(root, "marker"), "utf8")).rejects.toThrow();
   });
   it.skipIf(!hasGit)(
     "read info/exclude where a .git file leads, as in a linked worktree or a submodule",

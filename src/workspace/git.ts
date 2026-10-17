@@ -92,7 +92,10 @@ const repositoryVariables = [
 ];
 /**
  * Run Git in the repository at `top`, for its exit status and what it
- * printed, or undefined where Git is not installed or does not start.
+ * printed, or undefined where Git is not installed or does not start. The
+ * repository's configuration can name a file system monitor, a program that
+ * Git runs when it reads the index; a workspace that the tool lints need not
+ * be trusted, so the monitor is turned off for every call.
  */
 function runGit(
   top: string,
@@ -105,7 +108,7 @@ function runGit(
   return new Promise((resolve) => {
     execFile(
       program,
-      args,
+      ["-c", "core.fsmonitor=false", ...args],
       { cwd: top, env, encoding: "utf8", maxBuffer: Infinity, windowsHide: true },
       (error, stdout) => {
         if (!error) resolve({ status: 0, stdout });
