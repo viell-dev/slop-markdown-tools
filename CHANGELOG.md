@@ -76,6 +76,11 @@ From `0.2.0-rc.2`:
 - `.gitignore` files decide as in Git: a deeper file can include again what a
   higher one excludes, and patterns match letter case exactly on Linux. Files
   that were left out before can be linted now, and the reverse.
+- Git's other ignore rules apply too: `.gitignore` files above the workspace
+  root, `.git/info/exclude`, and the global excludes file, while a file that Git
+  tracks is never ignored. With `--root` on a folder of a repository, or with a
+  global excludes file, files that were linted before can be left out now, and a
+  tracked file that a pattern matches is linted.
 - `.markdown` files are documents, and a file named on the command line is read
   as Markdown whatever its name. A hook that passes every changed file should
   pass only the Markdown ones.
@@ -225,6 +230,10 @@ From every prerelease:
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
 - Plugin rule option schemas are compiled once instead of for every document
   ([#241](https://github.com/viell-dev/slop-markdown-tools/pull/241)).
+- Many repeated headings, and many emphases on one line, no longer take time
+  that grows with the square of their number on Forgejo and Gitea, and `ignore`
+  and `overrides` patterns are compiled once instead of for every path
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - `.markdown` files are documents and link targets, and a file named on the
   command line is read as Markdown whatever its name
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
@@ -292,6 +301,11 @@ From every prerelease:
 - `.gitignore` files are applied as Git applies them, with negations in deeper
   files and letter case per platform
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
+- Git's ignore rules apply from the repository's top level, also above the
+  workspace root, together with `.git/info/exclude` and the global excludes
+  file. Inside a nested repository only its own rules apply, and none applies to
+  a file that Git tracks
+  ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
