@@ -101,8 +101,6 @@ interface Analysis {
   units: Unit[];
   items: Map<ListItem, Item>;
   containers: Map<Container, ContainerInfo>;
-  /** Lines of code, math, HTML, and other blocks whose whitespace is content. */
-  literal: Set<number>;
   /** Later lines of inline code, math, and other inline nodes that keep their whitespace. */
   sensitive: Set<number>;
   match(line: number): Matched;
@@ -145,7 +143,6 @@ function analyze(document: Document): Analysis {
   const units: Unit[] = [];
   const items = new Map<ListItem, Item>();
   const containers = new Map<Container, ContainerInfo>();
-  const literal = new Set<number>();
   const sensitive = new Set<number>();
   /** The innermost container of each line, by line index. */
   const innermost: (Container | undefined)[] = [];
@@ -198,13 +195,8 @@ function analyze(document: Document): Analysis {
         visit(child, child, unit);
         continue;
       }
-      if (!unit) continue;
-      if ("value" in child && typeof child.value === "string") {
-        // A block whose whitespace is part of its content, such as code.
-        for (let line = firstLine; line <= lastLine; line++) literal.add(line);
-        continue;
-      }
-      collectInline(child, unit);
+      // Code and other blocks that hold text as written have no inline nodes.
+      if (unit && !("value" in child)) collectInline(child, unit);
     }
   };
   /**
@@ -226,7 +218,8 @@ function analyze(document: Document): Analysis {
     if (keeps)
       for (let line = node.position!.start.line; line < node.position!.end.line; line++)
         sensitive.add(line);
-    if ("children" in node) for (const child of node.children as Nodes[]) collectInline(child, unit);
+    if ("children" in node)
+      for (const child of node.children as Nodes[]) collectInline(child, unit);
   };
   const readItem = (
     node: ListItem,
@@ -282,12 +275,43 @@ function analyze(document: Document): Analysis {
         if (item.last < item.first || (list.items[item.index + 1]?.first ?? Infinity) <= item.last)
           unit.valid = false;
 
+  const enclosing = (line: number) => {
+    const chain: Container[] = [];
+    for (let node = innermost[line]; node; node = containers.get(node)?.parent) chain.unshift(node);
+    return chain;
+  };
+  const chains = new Map<number, Container[]>();
+  /**
+   * The containers that a line passes through. A blank line belongs to every
+   * container that the line before it is in, until a later line closes them,
+   * though the tree ends a container at its last line with content: in a list
+   * item that ends with indented code, a blank line's spaces beyond the code's
+   * indentation become part of the code.
+   */
+  const blank = (line: number) => {
+    const { start, end } = lines[line]!;
+    const node = innermost[line];
+    return (
+      (!node || containers.get(node)!.first !== line) && /^[ \t>]*$/.test(source.slice(start, end))
+    );
+  };
+  const open = (line: number): Container[] => {
+    let from = line;
+    while (from > 0 && !chains.has(from) && !chains.has(from - 1) && blank(from)) from--;
+    for (let at = from; at <= line; at++) {
+      if (chains.has(at)) continue;
+      let chain = enclosing(at);
+      const before = at > 0 && blank(at) ? chains.get(at - 1) : undefined;
+      if (before && chain.every((node, index) => before[index] === node)) chain = before;
+      chains.set(at, chain);
+    }
+    return chains.get(line)!;
+  };
   const memo = new Map<number, Matched>();
   const match = (line: number): Matched => {
     const known = memo.get(line);
     if (known) return known;
-    const chain: Container[] = [];
-    for (let node = innermost[line]; node; node = containers.get(node)?.parent) chain.unshift(node);
+    const chain = open(line);
     const levels: Level[] = [];
     const result = { chain, levels };
     memo.set(line, result);
@@ -404,7 +428,7 @@ function analyze(document: Document): Analysis {
       return { ...level, kind: "lazy", indent: column - level.startColumn };
     return { ...level, kind: "content", end: at, endColumn: column };
   };
-  const analysis = { source, lines, units, items, containers, literal, sensitive, match };
+  const analysis = { source, lines, units, items, containers, sensitive, match };
   analyses.set(document, analysis);
   return analysis;
 }
@@ -454,10 +478,13 @@ function feasible(
     const change = delta.get(item) ?? 0;
     if (!change) continue;
     if (item.width === undefined) return false;
-    for (let line = item.first + 1; line <= item.last; line++) {
+    for (const line of linesWithBlanks(analysis, item.first + 1, item.last)) {
       const { chain, levels } = analysis.match(line);
       const at = chain.indexOf(item.node);
-      if (at < 0) return false;
+      if (at < 0) {
+        if (line > item.last) continue;
+        return false;
+      }
       const level = levels[at];
       if (!level) {
         const last = levels.at(-1);
@@ -490,21 +517,46 @@ function feasible(
   return true;
 }
 /**
- * Whether a blank line inside code or another block whose whitespace is
- * content can be reindented: its whitespace has no tabs and only list items
- * and footnote definitions lie below the level where it is blank.
+ * The items and footnote definitions whose prefixes a blank line's
+ * whitespace stands for, from the level where the line is blank down to the
+ * deepest container still open there; a block quote that the line has no `>`
+ * for ends there. Undefined when an item's columns are not known.
  */
+function blankPath(analysis: Analysis, chain: Container[], from: number) {
+  const path: (Item | undefined)[] = [];
+  let width = 0;
+  for (const node of chain.slice(from)) {
+    if (node.type === "blockquote") break;
+    if (node.type === "footnoteDefinition") {
+      path.push(undefined);
+      width += 4;
+      continue;
+    }
+    const item = analysis.items.get(node);
+    if (item?.width === undefined) return undefined;
+    path.push(item);
+    width += item.width;
+  }
+  return { items: path, width };
+}
+/** Whether a blank line can keep its whitespace beyond its containers' prefixes. */
 function blankFeasible(analysis: Analysis, line: number, chain: Container[], from: number) {
-  if (!analysis.literal.has(line)) return true;
+  const path = blankPath(analysis, chain, from);
+  if (!path) return false;
   const level = analysis.match(line).levels[from]!;
-  if (analysis.source.slice(level.start, analysis.lines[line]!.end).includes("\t")) return false;
-  return chain
-    .slice(from)
-    .every(
-      (node) =>
-        node.type === "footnoteDefinition" ||
-        (node.type === "listItem" && analysis.items.get(node)?.width !== undefined),
-    );
+  return (
+    !path.items.length ||
+    !analysis.source.slice(level.start, analysis.lines[line]!.end).includes("\t")
+  );
+}
+/** The line indexes from `first` to `last`, and the blank lines after them. */
+function* linesWithBlanks(analysis: Analysis, first: number, last: number) {
+  const { source, lines } = analysis;
+  for (let line = first; line <= last; line++) yield line;
+  for (let line = last + 1; line < lines.length; line++) {
+    if (!/^[ \t>]*$/.test(source.slice(lines[line]!.start, lines[line]!.end))) break;
+    yield line;
+  }
 }
 /**
  * Whether the line after an item that needs fewer columns stays out of it:
@@ -565,26 +617,19 @@ function shiftOps(
   const { lines } = analysis;
   const firstLine = Math.min(...unit.lists.map((list) => list.items[0]?.first ?? Infinity));
   const lastLine = Math.max(...unit.lists.map((list) => list.items.at(-1)?.last ?? -1));
-  for (let line = firstLine; line <= lastLine; line++) {
+  for (const line of linesWithBlanks(analysis, firstLine, lastLine)) {
     const { chain, levels } = analysis.match(line);
     for (const [at, level] of levels.entries()) {
       if (level.kind === "blank") {
-        if (!analysis.literal.has(line)) break;
-        let old = 0;
-        let change = 0;
-        for (const node of chain.slice(at)) {
-          const item = node.type === "listItem" ? analysis.items.get(node) : undefined;
-          if (node.type === "footnoteDefinition") old += 4;
-          else if (item?.width === undefined) {
-            change = 0;
-            break;
-          } else {
-            old += item.width;
-            change += delta.get(item) ?? 0;
-          }
-        }
+        // The whitespace beyond the prefixes of the containers still open
+        // stays: in code, it is part of the code.
+        const path = blankPath(analysis, chain, at);
+        if (!path) break;
+        const change = path.items.reduce((sum, item) => sum + ((item && delta.get(item)) ?? 0), 0);
         const indent =
-          level.indent >= old ? level.indent + change : Math.min(level.indent, old + change);
+          level.indent >= path.width
+            ? level.indent + change
+            : Math.min(level.indent, path.width + change);
         if (change && indent !== level.indent)
           ops.push({ start: level.start, end: lines[line]!.end, text: " ".repeat(indent) });
         break;
@@ -654,7 +699,7 @@ const listMarker: Rule = {
       const byLine = new Map<number, Item[]>();
       for (const item of target.keys())
         byLine.set(item.first, [...(byLine.get(item.first) ?? []), item]);
-      for (let changed = true; changed; ) {
+      for (let changed = true; changed;) {
         changed = false;
         for (const [line, onLine] of byLine) {
           const marked = (item: Item) =>
@@ -664,7 +709,9 @@ const listMarker: Rule = {
           let text = source.slice(start, end);
           for (const item of onLine)
             text =
-              text.slice(0, item.marker - start) + marked(item) + text.slice(item.marker - start + 1);
+              text.slice(0, item.marker - start) +
+              marked(item) +
+              text.slice(item.marker - start + 1);
           if (onLine.some((item) => thematicBreak.test(text.slice(item.marker - start)))) {
             for (const item of onLine)
               if (marked(item) !== source[item.marker]) kept.add(runOf.get(item)!);
@@ -693,9 +740,10 @@ function renumbered(digits: string[], numbering: string): string[] | undefined {
   if (digits.length < 2 || digits.some((value) => value.length > 1 && value.startsWith("0")))
     return undefined;
   const first = Number(digits[0]);
-  const same =
-    numbering === "same" || (numbering !== "ordered" && Number(digits[1]) === first);
-  const numbers = digits.map((value, index) => (index === 0 ? first : same ? first : first + index));
+  const same = numbering === "same" || (numbering !== "ordered" && Number(digits[1]) === first);
+  const numbers = digits.map((value, index) =>
+    index === 0 ? first : same ? first : first + index,
+  );
   if (numbers.some((value) => value > 999_999_999)) return undefined;
   return numbers.map((value, index) => (index === 0 ? digits[0]! : String(value)));
 }
