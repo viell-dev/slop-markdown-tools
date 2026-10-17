@@ -2,20 +2,19 @@
 
 The repository's
 [`examples/`](https://github.com/viell-dev/slop-markdown-tools/tree/main/examples)
-folder holds working examples, and the npm package ships the same files under
-`node_modules/mdrefine/examples/`. The test suite compares every file and every
-output shown on this page with what the tool produces, so the page cannot drift
-from the tool's behavior.
+directory holds working examples, and the package ships the same files under
+`node_modules/mdrefine/examples/`. The tests compare every file and output on
+this page with the tool.
 
-Commands are written for a
-[built checkout](quick-start.md#install-from-the-repository) and run from its
-root. With an installed package, use `npx --no-install mdtools` in place of
+The commands run from the root of a
+[built checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up).
+With the installed package, use `npx mdtools` in place of
 `node dist/cli/main.js`.
 
 ## Start from a configuration
 
-Four files hold a starting configuration, one for each hosting profile. Copy one
-to the root of your documents as `mdtools.config.jsonc`:
+Copy one of four starting configurations to the root of your documents as
+`mdtools.config.jsonc`:
 
 - [`examples/github.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/github.jsonc)
   for repositories rendered by GitHub.
@@ -24,17 +23,16 @@ to the root of your documents as `mdtools.config.jsonc`:
 - [`examples/gitea.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/gitea.jsonc)
   for Gitea instances.
 - [`examples/obsidian.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/obsidian.jsonc)
-  for Obsidian vaults, with links written as vault-root paths.
+  for Obsidian vaults, with links written as vault-relative paths.
 
-Each wraps prose at 80 columns and chooses a link style.
-[Configuration and rules](configuration.md) explains the options.
+Each wraps prose at 80 columns and chooses a link style; see
+[configuration](configuration.md).
 
 ## Format a repository's documentation
 
 `examples/workspaces/repository-docs/` holds a README and two guides twice:
 `before/` as someone might write them, and `after/` exactly as `format --write`
-leaves them. Its configuration selects the GitHub profile and enables two rules
-that no preset turns on:
+leaves them. The configuration adds two rules that no preset enables:
 
 [`examples/workspaces/repository-docs/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/before/mdtools.config.jsonc):
 
@@ -79,8 +77,8 @@ Follow the [setup guide](docs/guide.md) first, then read the [sensor reference](
 - [ ] Keep a week of history
 ````
 
-Preview the changes with `--diff`. To apply them with `--write`, copy `before/`
-somewhere else first so that the example stays as it is.
+Preview the changes with `--diff`. To try `--write`, copy `before/` elsewhere
+first.
 
 ```sh
 node dist/cli/main.js format --root examples/workspaces/repository-docs/before --diff
@@ -129,9 +127,9 @@ Each change comes from one rule of the configuration:
 - In `docs/guide.md`, `style/heading` turned an underlined heading into a `#`
   heading, and `docs/reference.md` gained its missing final newline.
 
-One thing did not change: the link to `docs/calibration.md`, a file that does
-not exist. Formatting never guesses a target, so linting the formatted tree
-still reports it, and exits with status `1`:
+The link to `docs/calibration.md`, a file that does not exist, did not change.
+Formatting never guesses a target, so `lint` still reports it and exits with
+code `1`:
 
 ```sh
 node dist/cli/main.js lint --root examples/workspaces/repository-docs/after
@@ -145,20 +143,20 @@ README.md:13:1: error links/valid: Missing local target: docs/calibration.md.
 ## Format an Obsidian vault
 
 `examples/workspaces/obsidian-vault/` is a small vault, again as `before/` and
-`after/`. The configuration sits at the vault root, next to `.obsidian/`, whose
-`app.json` sets `"strictLineBreaks": true`; without that setting the tool
-[does not reflow prose](obsidian.md#enable-source-wrapping).
+`after/`. The configuration sits at the vault's root, next to `.obsidian/`,
+whose `app.json` sets `"strictLineBreaks": true`, which
+[wrapping needs](obsidian.md#enable-wrapping).
 
 [`examples/workspaces/obsidian-vault/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/before/mdtools.config.jsonc):
 
 ```jsonc
 {
-  // An Obsidian vault; this file sits at the vault root, next to .obsidian/.
+  // An Obsidian vault; this file sits at the vault's root, next to .obsidian/.
   "extends": ["recommended", "obsidian"],
   // Templates contain placeholders, not prose. They stay valid link targets.
   "ignore": ["Templates/**"],
   "rules": {
-    // Spell Markdown links as vault-root paths in angle brackets.
+    // Spell Markdown links as vault-relative paths in angle brackets.
     "links/path": ["warn", { "style": "root", "brackets": "angle" }],
   },
 }
@@ -211,24 +209,22 @@ What to notice:
 
 - The callout type is lowercase, its title stays on its line, and its body is
   wrapped inside the quote.
-- `[[Tomatoes]]` is unchanged, because rewriting an unaliased wikilink would
-  change the text a reader sees. The aliased wikilink and the embed show no
-  target, so both now carry the vault-root path.
-- The Markdown link to the template uses a vault-root path in angle brackets, as
-  `links/path` is configured. The template itself is ignored: it is never linted
-  or formatted, but links to it still resolve.
+- `[[Tomatoes]]` is unchanged, because its target is its visible text. The
+  labeled wikilink and the embed do not show their target, so both now carry the
+  vault-relative path.
+- The Markdown link to the template is vault-relative, in angle brackets. The
+  template itself is ignored: never linted or formatted, but still a link
+  target.
 - In `Garden/Tomatoes.md`, the paragraph ending in `^harvest` is not reflowed,
   because a block identifier belongs to its paragraph's last line.
-- `Garden/Watering schedule.md` links to a note named `Compost` that does not
-  exist. As in the repository example, `lint` reports it before and after
-  formatting.
+- `Garden/Watering schedule.md` links to a note `Compost` that does not exist,
+  which `lint` reports before and after formatting.
 
 ## Write a plugin
 
-`examples/plugin/` adds two house rules to the built-in ones. A problem rule
-reports placeholder words and never edits. A style rule rewrites thematic breaks
-as `---`, but only where that cannot change what the document means.
-[Plugins and library API](plugins.md) describes the contract.
+`examples/plugin/` adds two rules. A problem rule reports placeholder words. A
+style rule rewrites thematic breaks as `---`, but only where that cannot change
+what the document means. [Plugins](plugins.md) describes the contract.
 
 [`examples/plugin/rules.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/rules.mjs):
 
@@ -329,8 +325,8 @@ export default {
 };
 ```
 
-The configuration loads the plugin, enables its preset, and passes options to
-one rule:
+The configuration loads the plugin, enables its preset, and sets one rule's
+options:
 
 [`examples/plugin/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/mdtools.config.jsonc):
 
@@ -362,7 +358,7 @@ Searching the notes with `grep TODO` is not reported: code is not prose.
 Ask for a review before publishing.
 ````
 
-Linting reports both, and does not report the `TODO` inside the code span:
+Linting reports both, but not the `TODO` inside the code span:
 
 ```sh
 node dist/cli/main.js lint --root examples/plugin
@@ -374,8 +370,7 @@ notes/release-checklist.md:7:1: warn house/thematic-break: Write this thematic b
 1 file(s) linted; 1 error(s), 1 warning(s).
 ```
 
-Formatting applies the style rule's edit and leaves the placeholder for a
-person:
+Formatting applies the style rule's edit and leaves the placeholder to a person:
 
 ```sh
 node dist/cli/main.js format --root examples/plugin --diff
@@ -400,7 +395,7 @@ notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeho
 
 ## Call the library
 
-The library takes strings and returns strings; it never reads or writes files.
+The [library](api.md) takes and returns strings; it never reads or writes files.
 The scripts import `mdrefine` by name, which works in a checkout and wherever
 the package is installed.
 
@@ -441,7 +436,7 @@ no final newline.
 changed: true; remaining diagnostics: 0
 ```
 
-To check links between documents, the host reads the files and passes them to
+To check links between documents, the script reads the files and passes them to
 `createWorkspace()`:
 
 [`examples/library/lint-folder.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/library/lint-folder.mjs):
@@ -505,8 +500,8 @@ README.md:13:1 error links/valid: Missing local target: docs/calibration.md.
 1 error(s)
 ```
 
-A host on Node.js can leave the choice of files to `mdrefine/node`, which finds
-and selects them the way the CLI does and prepares each document's options:
+`mdrefine/node` finds and selects the files as the CLI does, and prepares each
+document's options:
 
 [`examples/library/lint-workspace.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/library/lint-workspace.mjs):
 
@@ -556,8 +551,9 @@ README.md:13:1 error links/valid: Missing local target: docs/calibration.md.
 
 ## Automate checks
 
-A workflow for a repository that lists `mdrefine` in its `devDependencies` and
-has an `mdtools.config.jsonc` at its root:
+A GitHub Actions workflow for a repository that lists `mdrefine` in its
+`devDependencies`; [integrations](integrations.md#continuous-integration) covers
+Forgejo:
 
 [`examples/automation/github-actions.yml`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/automation/github-actions.yml):
 
@@ -587,9 +583,9 @@ jobs:
       - run: npx --no-install mdtools format --check
 ```
 
-For scripts and agents, `--json` prints one report object instead of text.
+The script
 [`summarize-report.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/automation/summarize-report.mjs)
-reads that report and counts diagnostics per rule:
+reads a `--json` report and counts diagnostics per rule:
 
 ```sh
 node dist/cli/main.js lint --root examples/plugin --json | node examples/automation/summarize-report.mjs
@@ -600,6 +596,3 @@ lint: 1 file(s), 2 diagnostic(s)
 1 error house/no-placeholder in 1 file(s)
 1 warn house/thematic-break in 1 file(s)
 ```
-
-[CLI workflows](cli.md) covers file selection, exit codes, and stdin;
-[configuration and rules](configuration.md) lists every rule and option.
