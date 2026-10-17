@@ -1087,10 +1087,10 @@ what it means, that is, when it:
 - has a hard line break, inline HTML, or a block identifier (`^id`) at its end;
 - has a line break that is content, inside math, inline HTML, an Obsidian
   comment, or a link's destination or title;
-- has a code span with a space or line break at both ends, one of them a line
-  break with spaces or tabs after it, such as one that opens at the end of a
-  line, goes on in an indented line, and ends with a space: the parser and
-  renderers remove different spaces from its ends;
+- has a code span with a space or line break at both ends that starts or ends
+  with a line break followed by spaces or tabs, such as one that opens at the
+  end of a line, goes on in an indented line, and ends with a space: the parser
+  and renderers remove different spaces from its ends;
 - has lines whose container markers the tool cannot reproduce;
 - starts with an alert or callout marker such as `[!NOTE]` in the CommonMark
   dialect; in the other dialects only the line with the marker, and an Obsidian
