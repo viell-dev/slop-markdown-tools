@@ -49,9 +49,10 @@ The comparison is only as good as the parser's reading:
   refused as a change of meaning. The parser also keeps the spaces and tabs that
   start a code span's next line, where CommonMark and GitHub leave them out, so
   that a span `npm run` continued by an indented `build` reads
-  `npm run    build`; the comparison ignores them, and `style/inline-code`
-  leaves them out when it joins the span ([issue
-  #265](https://github.com/viell-dev/slop-markdown-tools/issues/265)). Directly
+  `npm run    build`; the comparison ignores them, and `style/inline-code` and
+  `style/wrap` leave them out when they join the span ([issue
+  #265](https://github.com/viell-dev/slop-markdown-tools/issues/265), [issue
+  #285](https://github.com/viell-dev/slop-markdown-tools/issues/285)). Directly
   below a table that ends in a list item or block quote, the parser reads the
   lines of another table as text, where GitHub shows a table, so `style/wrap`
   and `style/block-spacing` leave text whose second line is a table delimiter
