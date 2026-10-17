@@ -128,7 +128,7 @@ JSON report and the exit code.
       ]
     }
   ],
-  "written": false
+  "written": []
 }
 ```
 
@@ -137,8 +137,10 @@ JSON report and the exit code.
   workspace root with forward slashes, and its `diagnostics`. With `format`,
   `changed` says whether the document changed or would change. With stdin,
   `format` adds `output`, the formatted text, unless `--check` is given.
-- `written` is `true` when `format --write` was allowed to write; it does not
-  count the files. Each entry's `changed` says which ones changed.
+- `written` lists the paths of the files that `format --write` wrote, in the
+  order of `files`. It is empty for `lint`, for `format` without `--write`, and
+  when nothing was written. A file whose entry has `changed` but that is not
+  listed was not written, and its diagnostics say why.
 - `skipped` appears only when something was skipped: one entry per directory or
   settings file, with `path`, `type` (`directory` or `file`), the system's error
   `code` or `INVALID` for content that could not be used, and a `message`.
@@ -164,9 +166,10 @@ and `engine/unwritable-file`.
 
 Warnings alone never fail a command without `--max-warnings`. `format` can
 succeed and still report problems that only a person can fix, so read its
-findings too. One document that cannot be formatted safely or read, or that a
-rule fails on, or one file that cannot be written, stops `format --write` from
-writing any file of the batch.
+findings too. `format --write` writes every document it formatted, also when
+another document cannot be read or written; each problem is reported for its own
+file, and the exit code is then `2`. A document with a rule whose edits were
+refused, or that a rule failed on, is written with the other rules' edits.
 
 ## Files that cannot be read or written
 
@@ -181,13 +184,14 @@ on the command line is an error. To leave a directory out without a warning,
 list it in a `.gitignore`.
 
 A selected document that cannot be read gets an `engine/unreadable-file` error;
-the other documents are processed, and the exit code is `2`. The system errors
-`EACCES` and `EPERM` count as not being permitted to read, and so does `EBUSY`,
-which Windows reports for a file that another program has locked. Any other read
-error stops the run with exit code `2`. So do a root, configuration file, or
-path on the command line that does not exist, cannot be read, or is of the wrong
-kind, as in `Input does not exist: notes/absent.md`, and a configuration file
-that cannot be read or a directory that refuses the search for one.
+the other documents are processed, and written with `--write`, and the exit code
+is `2`. The system errors `EACCES` and `EPERM` count as not being permitted to
+read, and so does `EBUSY`, which Windows reports for a file that another program
+has locked. Any other read error stops the run with exit code `2`. So do a root,
+configuration file, or path on the command line that does not exist, cannot be
+read, or is of the wrong kind, as in `Input does not exist: notes/absent.md`,
+and a configuration file that cannot be read or a directory that refuses the
+search for one.
 
 Documents are read as UTF-8, with or without a byte order mark. The tool does
 not guess another encoding: a guess can be wrong, and the supported renderers
@@ -206,16 +210,15 @@ exit code `2`, because reading notes in another dialect is not safe.
 
 `format --write` writes each changed file in place, into the existing file,
 which keeps everything about the file but its content; see
-[below](#what-writing-keeps). Before it writes anything, it checks that each
-file may be written and that its directory lets it create a trial file. A file
-that fails the check gets an `engine/unwritable-file` error, such as
-`The file may not be written (EACCES: permission denied); no file was written.`,
-and nothing is written: `written` is `false` and the exit code is `2`. A
-read-only file fails the check on every platform. A failure that the check
-cannot foresee, such as a file that another program has locked on Windows or a
-full disk, is reported for that file in the same way, while the other files are
-still written; `written` is then `true`, and the exit code is `2`. To format the
-other files, pass `--exclude` for the one that fails.
+[below](#what-writing-keeps). Before it writes a file, it checks that the file
+may be written and that its directory lets it create a trial file. A file that
+fails the check gets an `engine/unwritable-file` error, such as
+`The file may not be written (EACCES: permission denied); the file is unchanged.`,
+and is left alone; the other files are still written. A read-only file fails the
+check on every platform, and the tool never makes a file writable to write it. A
+failure that the check cannot foresee, such as a file that another program has
+locked on Windows or a full disk, is reported for that file in the same way.
+Either way the file is not listed in `written`, and the exit code is `2`.
 
 ### What writing keeps
 

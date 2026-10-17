@@ -22,7 +22,9 @@ Of two edits that overlap, the one that starts first is applied, and the other
 rule runs again in the next pass. The phases repeat until nothing changes, for
 at most eight passes. When rules undo each other or formatting does not settle,
 `format` returns the document as it was with an `engine/unsafe-format` error
-that names them. Either way, `format --write` writes no file of the batch.
+that names them. Either way the run ends with exit code `2`, and
+`format --write` still writes the other documents, and this one when the edits
+that were kept changed it.
 
 The comparison is only as good as the parser's reading:
 
