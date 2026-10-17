@@ -199,40 +199,53 @@ heading reads the same. Earlier lines of an underlined heading, headings with an
 
 | Preset        | Dialect   | Enabled rules                                                                                  |
 | ------------- | --------- | ---------------------------------------------------------------------------------------------- |
-| `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links                              |
+| `recommended` | Unchanged | Wrap at 80, `_` emphasis, `**` strong, final newline, valid links, content warnings            |
 | `github`      | GitHub    | Table alignment, lowercase completed task marker, uppercase alert marker                       |
 | `forgejo`     | Forgejo   | The `github` rules and `forgejo/heading-id`                                                    |
 | `codeberg`    | Forgejo   | Alias of `forgejo`                                                                             |
 | `gitea`       | Gitea     | The `github` rules and `forgejo/heading-id`                                                    |
 | `obsidian`    | Obsidian  | Table alignment, task marker, lowercase callout type, duplicate block IDs, soft-break settings |
 
-An omitted `extends` selects `recommended`. Explicit `extends` replaces that
-default, so use `["recommended", "obsidian"]` for both. `extends: []` enables
-nothing. Severity is `off`, `warn`, or `error`; supply options as
-`["warn", { ... }]`. Both `warn` and `error` style rules format when enabled.
-Problem rules report findings and never become formatting edits.
+The content warnings of `recommended` are `links/undefined-reference`,
+`links/unused-definition`, `links/empty`, `structure/heading-increment`,
+`content/image-alt`, and `content/table-columns`. An omitted `extends` selects
+`recommended`. Explicit `extends` replaces that default, so use
+`["recommended", "obsidian"]` for both. `extends: []` enables nothing. Severity
+is `off`, `warn`, or `error`; supply options as `["warn", { ... }]`. Both `warn`
+and `error` style rules format when enabled. Problem rules report findings and
+never become formatting edits.
 
 ## Built-in rules
 
-| Rule                          | Kind    | Options                                                                |
-| ----------------------------- | ------- | ---------------------------------------------------------------------- |
-| `style/wrap`                  | Style   | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`; see below |
-| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                               |
-| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                         |
-| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                         |
-| `style/final-newline`         | Style   | None; adds a missing final newline                                     |
-| `style/table`                 | Style   | None; aligns top-level GFM tables                                      |
-| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                         |
-| `style/block-spacing`         | Style   | None; blank lines around headings and lists, opt-in                    |
-| `links/valid`                 | Problem | None; local files and heading/block fragments                          |
-| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below              |
-| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                           |
-| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                              |
-| `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea |
-| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo  |
-| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                          |
-| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                           |
-| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                   |
+| Rule                          | Kind    | Options                                                                 |
+| ----------------------------- | ------- | ----------------------------------------------------------------------- |
+| `style/wrap`                  | Style   | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`; see below  |
+| `style/inline-code`           | Style   | None; joins multiline code spans, opt-in                                |
+| `style/emphasis`              | Style   | `marker`: `_` (default) or `*`                                          |
+| `style/strong`                | Style   | `marker`: `*` (default) or `_`                                          |
+| `style/final-newline`         | Style   | None; adds a missing final newline                                      |
+| `style/table`                 | Style   | None; aligns top-level GFM tables                                       |
+| `style/heading`               | Style   | None; converts eligible Setext headings to ATX                          |
+| `style/block-spacing`         | Style   | None; blank lines around headings and lists, opt-in                     |
+| `links/valid`                 | Problem | None; local files and heading/block fragments                           |
+| `links/path`                  | Style   | `style`, `brackets`, `extension`, `leadingDot`; see below               |
+| `links/notation`              | Style   | `style`: `markdown` or `wiki`; Obsidian only                            |
+| `links/undefined-reference`   | Problem | None; `[text][label]`, `[label][]`, and `[^label]` without a definition |
+| `links/unused-definition`     | Problem | None; link and footnote definitions that no reference uses              |
+| `links/empty`                 | Problem | None; links and images whose destination is empty or only `#`           |
+| `structure/initial-heading`   | Problem | None; a level-1 heading first, opt-in                                   |
+| `structure/heading-increment` | Problem | None; headings more than one level deeper than the one before           |
+| `structure/single-title`      | Problem | None; a second level-1 heading, opt-in                                  |
+| `structure/duplicate-heading` | Problem | None; sibling headings with the same text, opt-in                       |
+| `content/image-alt`           | Problem | None; images without alternative text                                   |
+| `content/table-columns`       | Problem | None; table rows with more or fewer cells than the header               |
+| `content/code-language`       | Problem | None; fenced code blocks without a language, opt-in                     |
+| `github/task-marker`          | Style   | None; `[X]` becomes `[x]`                                               |
+| `github/alert-marker`         | Style   | None; known alert types become uppercase on GitHub, Forgejo, and Gitea  |
+| `forgejo/heading-id`          | Problem | None; heading ids that are not text, which break rendering on Forgejo   |
+| `obsidian/callout-marker`     | Style   | None; Obsidian callout types become lowercase                           |
+| `obsidian/block-reference`    | Problem | None; duplicate trailing `^block-id` markers                            |
+| `obsidian/strict-line-breaks` | Problem | None; report unverified/incompatible reflow settings                    |
 
 ## Plugins
 

@@ -31,6 +31,12 @@ export const presets: Record<string, Config> = {
       "style/strong": ["warn", { marker: "*" }],
       "style/final-newline": "warn",
       "links/valid": "error",
+      "links/undefined-reference": "warn",
+      "links/unused-definition": "warn",
+      "links/empty": "warn",
+      "structure/heading-increment": "warn",
+      "content/image-alt": "warn",
+      "content/table-columns": "warn",
     },
   },
   github: {

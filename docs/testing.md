@@ -28,11 +28,13 @@ rule leaves the source as written.
 | File                   | Covers                                                                                                                                    |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `engine.test.ts`       | Edit application, formatting phases, safety checks, configuration, plugins                                                                |
-| `rules.test.ts`        | Each built-in style and problem rule, per dialect                                                                                         |
+| `rules.test.ts`        | Style, link, and dialect rules, per dialect                                                                                               |
 | `wrap.test.ts`         | Prose wrapping, including property-based tests and a linear-time check                                                                    |
 | `callout-wrap.test.ts` | Wrapping inside Obsidian callouts                                                                                                         |
 | `links.test.ts`        | Link and fragment resolution for every dialect, including generated anchors and unreadable paths                                          |
 | `structure.test.ts`    | Document structure rules                                                                                                                  |
+| `references.test.ts`   | Reference, definition, and empty-link problem rules                                                                                       |
+| `content.test.ts`      | Image text, table columns, and code block languages                                                                                       |
 | `math.test.ts`         | Where dollar math begins and ends in each dialect, compared with what GitHub, Forgejo, Gitea, and Obsidian rendered (`math-renderers.ts`) |
 
 A defect in how a rule reads or rewrites Markdown belongs here, as the smallest
