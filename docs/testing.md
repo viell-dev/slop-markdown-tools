@@ -50,6 +50,7 @@ documentation that no longer matches the tool.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `cli.test.ts`        | Commands, flags, exit codes, discovery, ignore rules, the assumed dialect, and write safeguards                     |
 | `workflows.test.ts`  | Whole tasks: mixed-dialect workspaces, CRLF files, byte order marks, non-ASCII paths, JSON reports, plugin loading  |
+| `node.test.ts`       | `mdrefine/node`: discovery and per-document options, compared with the CLI's JSON report                            |
 | `examples.test.ts`   | Every example: configurations load, `before/` formats into `after/`, scripts print what is shown                    |
 | `docs.test.ts`       | Documentation against the code: rule and preset tables, configuration snippets, the examples page, code block width |
 | `benchmarks.test.ts` | The benchmark suite runs, and its synthetic documents format cleanly                                                |

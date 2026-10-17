@@ -30,6 +30,8 @@ try {
   for (const required of [
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/node.js",
+    "dist/node.d.ts",
     "dist/cli/main.js",
     "LICENSE",
     "THIRD_PARTY_NOTICES",
@@ -91,6 +93,20 @@ try {
     { encoding: "utf8", cwd: directory },
   );
   assert.equal(output, "A _small_ note.\n");
+  // The filesystem entry discovers the consumer's own documents.
+  await writeFile(path.join(directory, "note.md"), "A *small* note.\n");
+  const discovered = execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import {format} from ${JSON.stringify(manifest.name)}; import {discoverWorkspace} from ${JSON.stringify(`${manifest.name}/node`)};
+const d = await discoverWorkspace({root: ".", inputs: ["note.md"]});
+process.stdout.write(d.selected.join(",") + ":" + format(d.read("note.md"), d.options("note.md")).output);`,
+    ],
+    { encoding: "utf8", cwd: directory },
+  );
+  assert.equal(discovered, "note.md:A _small_ note.\n");
   // A shipped example imports the package by name from inside the installed package.
   assert.equal(
     execFileSync(
@@ -104,6 +120,7 @@ try {
   await writeFile(
     consumer,
     `import { format, parse, resolveConfig, type Dialect, type Plugin, type ProcessOptions } from ${JSON.stringify(manifest.name)};
+import { discoverWorkspace, type DiscoverOptions, type Skipped, type WorkspaceDiscovery } from ${JSON.stringify(`${manifest.name}/node`)};
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem",
   check: ({ document }) => document.tree.children.length ? [] : [{ start: 0, message: "Empty" }],
@@ -111,6 +128,10 @@ const plugin: Plugin = { name: "consumer", rules: { sample: {
 const options: ProcessOptions = { plugins: [plugin], defaultDialect: "obsidian" };
 const output: string = format("Text", options).output;
 const assumed: Dialect = resolveConfig({}, "note.md", [plugin], "codeberg").dialect; void assumed;
+const discoverOptions: DiscoverOptions = { root: ".", inputs: [], documents: { "a.md": "Text" } };
+const discovery: WorkspaceDiscovery = await discoverWorkspace(discoverOptions);
+const skipped: readonly Skipped[] = discovery.skipped; void skipped;
+const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
 for (const node of parse(output, "obsidian").tree.children) {
   if (node.type === "paragraph") for (const child of node.children) {
     if (child.type === "wikiLink") { const target: string | undefined = child.target; void target; }

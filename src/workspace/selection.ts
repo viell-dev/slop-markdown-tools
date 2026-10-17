@@ -2,11 +2,12 @@ import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { pathError, refusal } from "./access.js";
 
-/** Exclusions are literal paths relative to cwd, never glob patterns. */
+/** Exclusions are literal paths, relative to `base`, never glob patterns. */
 export async function excludeSelection(
   root: string,
   selected: string[],
   exclusions: string[],
+  base = process.cwd(),
 ): Promise<string[]> {
   // Resolve filesystem aliases (including Windows short names) consistently
   // with discovery, while allowing exclusions for paths that do not exist yet.
@@ -25,7 +26,7 @@ export async function excludeSelection(
     exclusions.map(async (input) => {
       let actual: string;
       try {
-        actual = await canonical(path.resolve(input));
+        actual = await canonical(path.resolve(base, input));
       } catch (error) {
         // Without the real path nothing tells which file the exclusion stands for,
         // so the run must not carry on and process it.

@@ -85,11 +85,17 @@ export async function vaultFor(set: FileSet, name: string): Promise<Vault | unde
   if (described.skipped) set.skipped.push(described.skipped);
   return described.vault;
 }
+/**
+ * The files of the workspace at `rootPath`, and the documents that `supplied`
+ * files and folders select, or all of them when `supplied` is empty. Relative
+ * inputs are resolved from `base`.
+ */
 export async function discover(
   rootPath: string,
   supplied: string[],
   excluded: string[],
   resolve: ResolveOptions = {},
+  base = process.cwd(),
 ): Promise<FileSet> {
   const root = await realpath(rootPath);
   const files: Record<string, WorkspaceSource> = {};
@@ -99,7 +105,7 @@ export async function discover(
   /** The folders that are vaults, by the part of the workspace that each holds. */
   const vaultFolders = new Map<string, string>();
   for (const input of supplied.length ? supplied : [root]) {
-    const absolute = path.resolve(input);
+    const absolute = path.resolve(base, input);
     let resolved: string;
     try {
       if ((await lstat(absolute)).isSymbolicLink())

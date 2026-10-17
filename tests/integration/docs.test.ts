@@ -207,4 +207,18 @@ describe("library API", () => {
     ]);
     for (const name of Object.keys(built)) expect(documented, name).toContain(name);
   });
+  it("has a filesystem entry that is the same built as in the source, and is documented", async () => {
+    const source = (await import("../../src/node.js")) as Record<string, unknown>;
+    const built = (await import(
+      pathToFileURL(path.join(repository, "dist/node.js")).href
+    )) as Record<string, unknown>;
+    expect(Object.keys(built).sort()).toEqual(Object.keys(source).sort());
+    const page = read("docs/plugins.md");
+    const imported = [...page.matchAll(/import \{([^}]+)\} from "mdrefine\/node"/g)].flatMap(
+      (match) => match[1]!.split(",").map((name) => name.trim()),
+    );
+    for (const name of Object.keys(built)) expect(imported, name).toContain(name);
+    const manifest = JSON.parse(read("package.json")) as { exports: Record<string, unknown> };
+    expect(Object.keys(manifest.exports)).toEqual([".", "./node"]);
+  });
 });
