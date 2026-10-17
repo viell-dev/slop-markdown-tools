@@ -453,7 +453,7 @@ export const linkRules: Record<string, Rule> = {
             .replaceAll(">", "%3E");
         if (
           document.dialect === "gitea" &&
-          (giteaPyLine(document.source, start, end) || replacement.includes("_.py")) &&
+          (giteaPyLine(document, start, end) || replacement.includes("_.py")) &&
           giteaUnderscores(original) !== giteaUnderscores(replacement)
         )
           return;

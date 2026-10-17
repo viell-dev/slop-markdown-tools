@@ -92,9 +92,13 @@ yet", keep the other tool for that check.
 | `proseWrap: "never"`                                                             | None yet                                                                                              |
 | `_` for emphasis; MD049 (emphasis style)                                         | [`style/emphasis`](rules.md#styleemphasis)                                                            |
 | `**` for strong text; MD050 (strong style)                                       | [`style/strong`](rules.md#stylestrong)                                                                |
-| `#` headings; MD003 (heading style)                                              | [`style/heading`](rules.md#styleheading), for `#` headings only                                       |
-| Aligned tables; MD055 (table pipe style)                                         | [`style/table`](rules.md#styletable), for tables outside lists and quotes                             |
+| `#` headings without closing `#`; MD003 (heading style)                          | [`style/heading`](rules.md#styleheading), whose default converts underlined ones, unlike Prettier     |
+| Aligned or compact tables; MD055, MD060 (table style)                            | [`style/table`](rules.md#styletable), for tables outside lists and quotes                             |
 | Blank lines between blocks; MD022, MD032 (blank lines around headings and lists) | [`style/block-spacing`](rules.md#styleblock-spacing), for headings and lists                          |
+| Backtick code fences; MD046, MD048 (code block and fence style)                  | [`style/code-fence`](rules.md#stylecode-fence), which leaves indented code blocks as written          |
+| `---` for thematic breaks; MD035                                                 | [`style/thematic-break`](rules.md#stylethematic-break)                                                |
+| Trailing spaces; MD009                                                           | [`style/trailing-space`](rules.md#styletrailing-space), which keeps hard line breaks                  |
+| Repeated blank lines; MD012                                                      | [`style/blank-lines`](rules.md#styleblank-lines), with a `maximum`                                    |
 | Final newline; MD047                                                             | [`style/final-newline`](rules.md#stylefinal-newline)                                                  |
 | MD041 (first line is a heading)                                                  | [`structure/initial-heading`](rules.md#structureinitial-heading)                                      |
 | MD051 (link fragments)                                                           | [`links/valid`](rules.md#linksvalid), which also checks that local files exist                        |
@@ -110,10 +114,8 @@ yet", keep the other tool for that check.
 | `-` for bullets; MD004 (list style)                                              | [`style/list-marker`](rules.md#stylelist-marker), with MD004's `consistent` and `sublist`             |
 | `1.` and numbering; MD029 (ordered list prefix)                                  | [`style/ordered-list`](rules.md#styleordered-list); `same` stands for MD029's `one` and `zero`        |
 | One space after list markers, list indentation; MD005, MD007, MD030              | [`style/list-indent`](rules.md#stylelist-indent), with MD030's spacing and MD007's `indent`           |
-| Code block and fence style; MD046, MD048                                         | None yet                                                                                              |
-| `---` for thematic breaks; MD035                                                 | None yet; the [plugin example](examples.md#write-a-plugin) adds one                                   |
-| Trailing spaces, tabs, repeated blank lines; MD009, MD010, MD012                 | None yet                                                                                              |
 | Inline HTML, bare URLs; MD033, MD034                                             | None yet                                                                                              |
+| Hard tabs; MD010                                                                 | None yet                                                                                              |
 | Formatting the code inside code blocks                                           | None yet                                                                                              |
 | `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)                                   |
 | Custom rules                                                                     | [Plugins](plugins.md)                                                                                 |

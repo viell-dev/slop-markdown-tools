@@ -62,14 +62,16 @@ Create `mdtools.config.jsonc` at the root of your documents:
 The `$schema` line lets your editor complete and check the settings; see [JSON
 Schema](configuration.md#json-schema).
 
-`recommended` wraps prose at 80 columns, writes emphasis as `_text_` and strong
-text as `**text**`, writes list items as `- item` and `1. item`, ends every file
-with a line break, and checks local links. It also warns about
-[problems](rules.md) that show on the rendered page, such as a reference without
-a definition, a skipped heading level, or an image without alternative text. The
-second [preset](configuration.md#presets) names where your documents are
-rendered and so their [dialect](dialects.md): replace `github` with `forgejo`
-(or `codeberg`), `gitea`, or `obsidian`. For plain CommonMark, keep only
+`recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
+text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
+code fences with backticks, and thematic breaks as `---`; aligns tables; removes
+trailing spaces and repeated blank lines; ends every file with a line break; and
+checks local links. It also warns about [problems](rules.md) that show on the
+rendered page, such as a reference without a definition, a skipped heading
+level, or an image without alternative text. The second
+[preset](configuration.md#presets) names where your documents are rendered and
+so their [dialect](dialects.md): replace `github` with `forgejo` (or
+`codeberg`), `gitea`, or `obsidian`. For plain CommonMark, keep only
 `recommended` and add `"dialect": "commonmark"`.
 
 Without a configuration file, the `recommended` rules apply, and documents are

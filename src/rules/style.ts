@@ -6,6 +6,7 @@ import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { labelEnd, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
+import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -25,14 +26,73 @@ function lineBounds(source: string, start: number, end: number): [number, number
   return [lineStart, lineEnd];
 }
 /**
+ * Where a document's line breaks are, and where the strings that rules look
+ * for on a line occur, all sorted. Rules ask about the line of every emphasis
+ * or code span; searching the line itself each time took time that grows with
+ * the square of a long line's length.
+ */
+interface LineIndex {
+  breaks: number[];
+  found: Map<string, number[]>;
+}
+const lineIndexes = new WeakMap<Document, LineIndex>();
+function lineIndex(document: Document): LineIndex {
+  let index = lineIndexes.get(document);
+  if (!index) {
+    const breaks: number[] = [];
+    for (let at = 0; at < document.source.length; at++)
+      if (document.source[at] === "\r" || document.source[at] === "\n") breaks.push(at);
+    lineIndexes.set(document, (index = { breaks, found: new Map() }));
+  }
+  return index;
+}
+/** The number of values in the sorted `values` that are less than `limit`. */
+function countBelow(values: number[], limit: number): number {
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (values[middle]! < limit) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+/** `lineBounds` for a document, from its line index. */
+function indexedLineBounds(document: Document, start: number, end: number): [number, number] {
+  const { breaks } = lineIndex(document);
+  const before = countBelow(breaks, start);
+  const after = countBelow(breaks, end);
+  return [before ? breaks[before - 1]! + 1 : 0, breaks[after] ?? document.source.length];
+}
+/**
+ * Where `text` occurs in the document between `from` and `to`, wholly: the
+ * last occurrence, or -1 for none.
+ */
+function lastWithin(document: Document, text: string, from: number, to: number): number {
+  const { found } = lineIndex(document);
+  let positions = found.get(text);
+  if (!positions) {
+    positions = [];
+    for (
+      let at = document.source.indexOf(text);
+      at >= 0;
+      at = document.source.indexOf(text, at + 1)
+    )
+      positions.push(at);
+    found.set(text, positions);
+  }
+  const last = positions[countBelow(positions, to - text.length + 1) - 1];
+  return last !== undefined && last >= from ? last : -1;
+}
+/**
  * Gitea does not parse a `_` run as an emphasis delimiter when the next `_` on
  * its physical line starts `_.py`, or when the run itself does and no `_`
  * follows, so `__init__.py` stays literal. The outcome depends on everything
  * else on the line, code spans included: a line containing `_.py` before or
  * after an edit can gain or lose emphasis when markers change or lines join.
  */
-export function giteaPyLine(source: string, start: number, end: number): boolean {
-  return source.slice(...lineBounds(source, start, end)).includes("_.py");
+export function giteaPyLine(document: Document, start: number, end: number): boolean {
+  return lastWithin(document, "_.py", ...indexedLineBounds(document, start, end)) >= 0;
 }
 /** Forgejo and its upstream Gitea build on goldmark with shared extensions. */
 const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", gitea: "Gitea" };
@@ -41,12 +101,11 @@ const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", g
  * Gitea where enabled, render as math. GFM parses emphasis and code spans
  * there, and changing them would change the formula.
  */
-function inForgeMath(source: string, start: number, end: number): boolean {
-  const [lineStart, lineEnd] = lineBounds(source, start, end);
-  const before = source.slice(lineStart, start);
+export function inForgeMath(document: Document, start: number, end: number): boolean {
+  const [lineStart, lineEnd] = indexedLineBounds(document, start, end);
   return (
-    before.lastIndexOf("\\(") > before.lastIndexOf("\\)") &&
-    source.slice(end, lineEnd).includes("\\)")
+    lastWithin(document, "\\(", lineStart, start) > lastWithin(document, "\\)", lineStart, start) &&
+    lastWithin(document, "\\)", end, lineEnd) >= 0
   );
 }
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
@@ -76,14 +135,14 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           (index) => document.source[index],
         );
         if (neighbours.includes(marker[0]!)) return;
-        if (goldmarkForges[document.dialect] && inForgeMath(document.source, start, end)) return;
+        if (goldmarkForges[document.dialect] && inForgeMath(document, start, end)) return;
         // Forgejo, and Gitea before 1.26, build a heading's anchor from its last
         // line as written, keeping `_` and dropping `*`, and both read a trailing
         // `{...}` block as attributes before they parse emphasis.
         if (changesForgeHeading(document, start, end)) return;
         if (
           document.dialect === "gitea" &&
-          (giteaPyLine(document.source, start, end) ||
+          (giteaPyLine(document, start, end) ||
             document.source.startsWith(".py", end) ||
             document.source.startsWith(".py", start + size))
         )
@@ -725,12 +784,14 @@ const wrap: Rule = {
 };
 
 const table: Rule = {
-  description: "Align GFM table cells while preserving their inline source.",
+  description: "Align or compact GFM table cells while preserving their inline source.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({}),
-  check({ document }) {
+  schema: optionsSchema({ style: { enum: ["aligned", "compact"] } }),
+  check({ document, options }) {
     const findings: Finding[] = [];
+    // A compact table has one space around each cell and the shortest delimiters.
+    const compact = options.style === "compact";
     const newline = lineEnding(document.source);
     walk(document.tree, "table", (node) => {
       const [start, end] = range(node);
@@ -747,13 +808,12 @@ const table: Rule = {
       const count = node.align?.length ?? rows[0]?.length ?? 0;
       if (rows.some((row) => row.length > count)) return;
       const widths = Array.from({ length: count }, (_, i) =>
-        Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
+        compact ? 3 : Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
       );
+      const pad = (cell: string, i: number) =>
+        compact ? cell : cell + " ".repeat(widths[i]! - stringWidth(cell));
       // Keep each row's own cell count: adding cells to a short row changes the parsed table.
-      const rendered = rows.map(
-        (row) =>
-          `| ${row.map((cell, i) => cell + " ".repeat(widths[i]! - stringWidth(cell))).join(" | ")} |`,
-      );
+      const rendered = rows.map((row) => `| ${row.map(pad).join(" | ")} |`);
       rendered.splice(
         1,
         0,
@@ -773,7 +833,7 @@ const table: Rule = {
         findings.push({
           start,
           end,
-          message: "Align table cells.",
+          message: compact ? "Write the table compactly." : "Align table cells.",
           edit: { start, end, text: replacement },
         });
     });
@@ -816,6 +876,8 @@ function together(
   const [afterStart, afterEnd] = range(after);
   // Front matter is not part of the document's text.
   if (["yaml", "toml"].includes(before.type)) return true;
+  // An unclosed HTML comment or block at the end of a list would take in the blank line.
+  if (takesLines(before)) return true;
   // Other tools, too, read a comment as applying to the line below it, and
   // `mdtools-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
@@ -920,7 +982,7 @@ export const styleRules: Record<string, Rule> = {
         // text line, and Forgejo also builds the anchor from that line alone.
         // Joining lines would change what that line holds.
         if (start < headingEnd) return;
-        if (document.dialect === "gitea" && giteaPyLine(document.source, start, end)) return;
+        if (document.dialect === "gitea" && giteaPyLine(document, start, end)) return;
         // Joining lines could put a `\(` and `\)` on one line and turn them into math.
         if (forge) {
           const lines = document.source.slice(...lineBounds(document.source, start, end));
@@ -948,8 +1010,10 @@ export const styleRules: Record<string, Rule> = {
     kind: "style",
     phase: "document",
     schema: optionsSchema({}),
-    check({ document: { source } }) {
-      if (!source || /[\r\n]$/.test(source)) return [];
+    check({ document }) {
+      const { source } = document;
+      // An unclosed block at the end, such as an HTML comment, would take in the line ending.
+      if (!source || /[\r\n]$/.test(source) || takesFinalLineEnding(document)) return [];
       return [
         {
           start: source.length,
@@ -960,19 +1024,63 @@ export const styleRules: Record<string, Rule> = {
     },
   },
   "style/heading": {
-    description: "Use ATX headings.",
+    description: "Use ATX or Setext headings, without closing sequences.",
     kind: "style",
     phase: "block",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({
+      style: { enum: ["atx", "setext", "consistent"] },
+      closing: { enum: ["remove", "keep"] },
+    }),
+    check({ document, options }) {
       const findings: Finding[] = [];
+      const { source } = document;
+      // Only levels 1 and 2 can be underlined; deeper headings keep their `#`.
+      const underlined = underlinedHeadings(document, options.style);
       walk(document.tree, "heading", (node) => {
-        const [start, end] = range(node);
-        if (document.source[start] === "#" || node.position!.start.column !== 1) return;
+        const [headingStart, end] = range(node);
         const first = node.children[0];
         const last = node.children.at(-1);
-        if (!first || !last) return;
-        let text = document.source.slice(range(first)[0], range(last)[1]);
+        // An ATX heading is one line, a Setext heading also has its underline.
+        if (!/[\r\n]/.test(source.slice(headingStart, end))) {
+          const edit = underlined ? underlineEdit(document, node) : undefined;
+          if (edit) {
+            findings.push({
+              start: edit.start,
+              end: edit.end,
+              message: "Use an underlined heading.",
+              edit,
+            });
+            return;
+          }
+          if (options.closing === "keep") return;
+          const textEnd = last
+            ? range(last)[1]
+            : headingStart + /^#*/.exec(source.slice(headingStart))![0].length;
+          const lineEnd = lineBounds(source, textEnd, textEnd)[1];
+          if (!/^[ \t]+#+[ \t]*$/.test(source.slice(textEnd, lineEnd))) return;
+          // Gitea before 1.26 reads an attribute block that a closing sequence
+          // follows, and Forgejo and later Gitea versions do not.
+          if (
+            goldmarkForges[document.dialect] &&
+            first &&
+            headingAttributeBlock(source.slice(range(first)[0], textEnd))
+          )
+            return;
+          findings.push({
+            start: textEnd,
+            end: lineEnd,
+            message: "Remove the closing # sequence.",
+            edit: { start: textEnd, end: lineEnd, text: "" },
+          });
+          return;
+        }
+        if (underlined || !first || !last) return;
+        // Below link reference definitions, the heading's position starts at
+        // the first definition; its own text starts on a later line. Headings
+        // that are indented or inside lists or block quotes are left as written.
+        const start = range(first)[0];
+        if (lineBounds(source, start, start)[0] !== start) return;
+        let text = source.slice(start, range(last)[1]);
         if (/[\r\n]/.test(text)) return;
         // A trailing run of # after whitespace would become an ATX closing
         // sequence and disappear from the heading; escape its first character.

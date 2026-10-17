@@ -25,9 +25,15 @@ export interface Slugger {
  * authors, so links use the bare anchor. A generated anchor that already starts
  * with the prefix is not prefixed again: `## user-content-setup` is reached as
  * `#setup`, and a later `## Setup` becomes `#setup-1`.
+ *
+ * The renderers try `-1`, `-2`, ... from the start for each repeat, which takes
+ * time that grows with the square of the repeats. Each anchor here keeps the
+ * number to try next, as GitHub's anchor library does: every number below it
+ * is taken, and stays taken, so the search from there finds the same one.
  */
 function createSlugger(clean: (text: string) => string): Slugger {
   const seen = new Set<string>();
+  const next = new Map<string, number>();
   return {
     custom(id) {
       const anchor = id.replace(/^user-content-/, "");
@@ -40,10 +46,11 @@ function createSlugger(clean: (text: string) => string): Slugger {
         seen.add(result);
         return result;
       }
-      for (let i = 1; ; i++) {
+      for (let i = next.get(result) ?? 1; ; i++) {
         const candidate = `${result}-${i}`;
         if (!seen.has(candidate)) {
           seen.add(candidate);
+          next.set(result, i + 1);
           return candidate;
         }
       }

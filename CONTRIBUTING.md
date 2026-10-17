@@ -101,17 +101,19 @@ A defect in how a rule reads or rewrites Markdown belongs here, as the smallest
 synthetic document that shows it, usually checked together with the contracts of
 every formatting change: formatting the output again changes nothing, the parsed
 meaning is unchanged, and disabling the rule leaves the source as written. Rules
-are tested in `rules.test.ts`, list rules in `lists.test.ts`, problem rules in
+are tested in `rules.test.ts`, list rules in `lists.test.ts`, code fences,
+thematic breaks, and blank space in `blocks.test.ts`, problem rules in
 `references.test.ts`, `structure.test.ts`, and `content.test.ts`, wrapping in
 `wrap.test.ts` and `callout-wrap.test.ts`, links in `links.test.ts`, dollar math
 in `math.test.ts` against the renderers' output recorded in `math-renderers.ts`,
 and the engine, configuration, and plugins in `engine.test.ts`.
 
 `tests/integration/` runs the built CLI as a child process in temporary
-workspaces, and runs `examples/` and `benchmarks/` as they are. A defect in what
-the tool selects, prints, writes, or how it exits belongs here: `cli.test.ts`
-for commands and options, `selection.test.ts` for which files a run selects,
-compared with Git's own `.gitignore` decisions, `workflows.test.ts` for whole
+workspaces, and runs `examples/` and `benchmarks/` as they are, without the
+machine's user and system Git settings, which would change what Git ignores. A
+defect in what the tool selects, prints, writes, or how it exits belongs here:
+`cli.test.ts` for commands and options, `selection.test.ts` for which files a
+run selects, compared with Git's own decisions, `workflows.test.ts` for whole
 tasks, `node.test.ts` for `mdrefine/node`, and `examples.test.ts` and
 `docs.test.ts` for the examples and documentation. `support.ts` holds the
 helpers: `fixture()` writes a temporary workspace, `run()` starts the CLI,

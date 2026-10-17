@@ -6,10 +6,10 @@ This guide takes a new board from the box to its first published reading. Allow 
 1)  Connect the board over USB and wait until the status light stops blinking. A steady light means the sensors have settled and the readings can be trusted.
 2)  Copy `station.toml` to the board and set the publishing interval:
 
-    ```toml
+    ~~~toml
     [publish]
     interval_seconds = 60   # Lines in code blocks are never wrapped, however long they are.
-    ```
+    ~~~
 
 3)  Open the page listed under [Usage](../README.md#usage) and check that all three readings appear.
 

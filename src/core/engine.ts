@@ -6,6 +6,7 @@ import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
 import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
+import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
@@ -35,6 +36,7 @@ import type {
  */
 export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze({
   ...styleRules,
+  ...blockRules,
   ...dialectRules,
   ...linkRules,
   ...structureRules,
