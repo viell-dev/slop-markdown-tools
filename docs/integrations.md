@@ -31,7 +31,7 @@ it runs, and adds what the commands changed to the commit, configure it in
 ```json
 {
   "lint-staged": {
-    "*.md": ["mdtools format --write", "mdtools lint --max-warnings 0"]
+    "*.{md,markdown}": ["mdtools format --write", "mdtools lint --max-warnings 0"]
   }
 }
 ```
@@ -42,7 +42,7 @@ the commit adds or changes:
 
 ```sh
 #!/bin/sh
-git diff --cached --name-only -z --diff-filter=ACMR -- '*.md' |
+git diff --cached --name-only -z --diff-filter=ACMR -- '*.md' '*.markdown' |
   xargs -0 -r npx mdtools lint --max-warnings 0 --
 ```
 

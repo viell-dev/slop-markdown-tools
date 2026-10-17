@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
-import { replacementFailure, replacementProblem, writeAtomic } from "../workspace/files.js";
+import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/files.js";
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
@@ -162,10 +162,12 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       if (result.changed) changes.push({ file: name, before: source, after: result.output });
     }
   }
-  // A file that could not be formatted safely, could not be read at all, had
-  // a rule fail on it, or could not be written is a failure to operate:
-  // nothing of the batch is written, and the run ends with status 2.
-  let unsafe =
+  // A document that could not be read, had a rule refused or failing on it, or
+  // could not be written is a failure to operate, reported for its own file,
+  // and the run ends with status 2. Files do not depend on one another's
+  // content, so every other changed document is still written, and so is the
+  // result of one with a refused or failing rule, which the engine checked.
+  const failed =
     unread.length > 0 ||
     reports.some((report) => report.diagnostics.some((item) => failures.has(item.rule)));
   // Changed files that could not be written, each reported for its file.
@@ -183,22 +185,20 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         column: 1,
       });
   };
-  if (flags.write && !unsafe) {
-    // What can be seen before writing stops the whole batch, instead of being
-    // found part-way through it.
+  // The files that were written, in the order of the report.
+  const written: string[] = [];
+  if (flags.write)
     for (const change of changes) {
-      const problem = await replacementProblem(path.join(discovery.root, change.file));
-      if (problem) refuse(change.file, `${problem}; no file was written`);
-    }
-    unsafe = unwritten.length > 0;
-  }
-  let written = 0;
-  if (flags.write && !unsafe)
-    for (const change of changes) {
-      // Each file is replaced on its own, so a failure leaves the others to be written.
+      const file = path.join(discovery.root, change.file);
+      // A file that may not be written, such as a read-only one, is left alone.
+      const problem = await replacementProblem(file);
+      if (problem) {
+        refuse(change.file, `${problem}; the file is unchanged`);
+        continue;
+      }
       try {
-        await writeAtomic(path.join(discovery.root, change.file), change.before, change.after);
-        written++;
+        await writeFormatted(file, change.before, change.after);
+        written.push(change.file);
       } catch (error) {
         const failure = replacementFailure(error);
         if (!failure) throw error;
@@ -215,7 +215,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           version: manifest.version,
           mode,
           files: reports,
-          written: flags.write === true && !unsafe,
+          written,
           ...(discovery.skipped.length ? { skipped: discovery.skipped } : {}),
         },
         null,
@@ -243,8 +243,8 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       const outcome =
         mode === "lint"
           ? `${count("error")} error(s), ${count("warn")} warning(s)`
-          : flags.write && !unsafe
-            ? `${written} written`
+          : flags.write
+            ? `${written.length} written`
             : `${changes.length} would change`;
       process.stderr.write(
         `${discovery.selected.length - unread.length} file(s) ${mode === "lint" ? "linted" : "processed"}; ${outcome}${unread.length ? `; ${unread.length} could not be read` : ""}${unwritten.length ? `; ${unwritten.length} could not be written` : ""}.\n`,
@@ -254,17 +254,21 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const errors = count("error") > 0;
   const tooManyWarnings = flags.maxWarnings !== undefined && count("warn") > flags.maxWarnings;
   process.exitCode =
-    unsafe || unwritten.length > 0
+    failed || unwritten.length > 0
       ? 2
       : errors || tooManyWarnings || (flags.check && changes.length > 0)
         ? 1
         : 0;
 }
 common(
-  program.command("lint").argument("[paths...]", "Markdown files/directories, or - for stdin"),
+  program
+    .command("lint")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 ).action((inputs: string[], flags: Flags) => run("lint", inputs, flags));
 common(
-  program.command("format").argument("[paths...]", "Markdown files/directories, or - for stdin"),
+  program
+    .command("format")
+    .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 )
   .option("--check", "Fail if formatting changes would be needed")
   .option("--diff", "Preview the complete diff (default for file inputs)")

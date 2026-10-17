@@ -70,6 +70,19 @@ export function denyRead(file: string): void {
   execFileSync(path.join(system32, "icacls.exe"), [file, "/deny", `*${user()}:(RD)`]);
 }
 /**
+ * On Windows, deny the current user writing a file's content until the current
+ * test ends. The read-only check that the tool makes before writing does not
+ * see it; opening the file for writing fails with `EPERM`.
+ */
+export function denyWrite(file: string): void {
+  denied.push(file);
+  execFileSync(path.join(system32, "icacls.exe"), [file, "/deny", `*${user()}:(WD)`]);
+}
+/** Run one of Windows's own programs, such as `icacls.exe`, and return what it printed. */
+export function windowsTool(program: string, args: string[]): string {
+  return execFileSync(path.join(system32, program), args, { encoding: "utf8" });
+}
+/**
  * Link `target` from `file`, both directories: a junction on Windows, which
  * needs no privilege, and a symbolic link elsewhere.
  */

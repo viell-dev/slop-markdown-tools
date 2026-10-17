@@ -10,22 +10,39 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   verify:
+    # The ruleset for main requires the jobs named verify (ubuntu-latest, 22),
+    # verify (ubuntu-latest, 24), and verify (windows-latest, 24), so the name
+    # uses the major version in `node`, not the exact `node-version`. Node.js
+    # 22.12.0 is the lowest version that package.json supports. The Node.js 26
+    # job is not required and may fail without failing the workflow.
+    name: verify (${{ matrix.os }}, ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             node: 22
+            node-version: 22.12.0
           - os: ubuntu-latest
             node: 24
+            node-version: 24
           - os: windows-latest
             node: 24
+            node-version: 24
+          - os: ubuntu-latest
+            node: 26
+            node-version: 26
+            optional: true
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    continue-on-error: ${{ matrix.optional == true }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node }}
+          node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
       - if: runner.os == 'Linux' && matrix.node == 24
