@@ -118,12 +118,17 @@ const result = format(files["Note.md"], { path: "Note.md", config, workspace, de
 `parse`, `range`, `textContent`, `resolveConfig`, `validateConfig`,
 `configSchema`, `presets`, `dialects`, `dialectAliases`, `canonicalDialect`,
 `builtInRules`, `ruleRegistry`, `applyEdits`, and `semanticFingerprint` are also
-exported. `range(node)` returns `[start, end]` UTF-16 offsets into the original
-source. `configSchema` is the configuration's JSON Schema, and
-`validateConfig(value)` throws when a value does not match it; rule-specific
-schemas live on rule objects. `canonicalDialect(name)` maps an alias such as
-`codeberg` to the dialect that rules and the workspace see (`forgejo`);
-`document.dialect` is always canonical.
+exported. `range(node)` returns `[start, end]` UTF-16 offsets into
+`document.source`. That is the text given to `parse`, without a byte order mark
+(U+FEFF) at its start, which some editors write in UTF-8 files; rules never see
+the mark. `lint` and `format` report positions and edits in the text as given,
+mark included, so `applyEdits` applies them to that text, and formatted output
+keeps the mark. `0.2.0-rc.2` and earlier kept the mark in `document.source`
+while the positions in the tree skipped it. `configSchema` is the
+configuration's JSON Schema, and `validateConfig(value)` throws when a value
+does not match it; rule-specific schemas live on rule objects.
+`canonicalDialect(name)` maps an alias such as `codeberg` to the dialect that
+rules and the workspace see (`forgejo`); `document.dialect` is always canonical.
 
 ## Rule plugins
 

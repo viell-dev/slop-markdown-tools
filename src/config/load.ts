@@ -8,6 +8,7 @@ import type { Config, Plugin } from "../core/types.js";
 import { configProblem, validateConfig } from "./resolve.js";
 import { exists, pathError, refusal, refusalText } from "../workspace/access.js";
 import { isVault } from "../workspace/vault.js";
+import { splitByteOrderMark } from "../syntax/parse.js";
 
 export interface LoadedConfig {
   config: Config;
@@ -78,7 +79,9 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
       }
     } else {
       const errors: ParseError[] = [];
-      value = parse(text, errors, {
+      // RFC 8259 lets a parser ignore a byte order mark, which some Windows
+      // programs write at the start of a UTF-8 file; error offsets count after it.
+      value = parse(splitByteOrderMark(text)[1], errors, {
         allowTrailingComma: true,
         disallowComments: file.endsWith(".json"),
       });

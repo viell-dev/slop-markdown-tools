@@ -303,6 +303,18 @@ describe("local target resolution", () => {
     expect(index.resolve("Doc.md", "Target.md#install", "forgejo").fragmentExists).toBe(false);
     expect(reads).toHaveBeenCalledTimes(1);
   });
+  it("reads the anchors of a target that starts with a byte order mark", () => {
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Target.md": `${String.fromCharCode(0xfeff)}## Install {#setup}\n\nText. ^id\n`,
+    });
+    const exists = (fragment: string, dialect: Dialect) =>
+      index.resolve("Doc.md", `Target.md#${fragment}`, dialect).fragmentExists;
+    expect(exists("setup", "forgejo")).toBe(true);
+    expect(exists("install", "forgejo")).toBe(false);
+    expect(exists("install-setup", "github")).toBe(true);
+    expect(exists("^id", "obsidian")).toBe(true);
+  });
 });
 describe("Obsidian case-insensitive resolution", () => {
   const files = {

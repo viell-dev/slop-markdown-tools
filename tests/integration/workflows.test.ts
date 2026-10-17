@@ -121,6 +121,37 @@ describe("line endings and file names", () => {
     );
     expect(run(root, ["format", "--check"]).status).toBe(0);
   });
+  it("keeps a byte order mark through a write and reads a configuration file that has one", async () => {
+    // Windows PowerShell 5.1 writes the mark with `Set-Content -Encoding UTF8`.
+    const mark = String.fromCharCode(0xfeff);
+    const root = await fixture({
+      "mdtools.config.json": `${mark}{ "extends": ["recommended", "github"] }\n`,
+      "note.md": `${mark}# Title\n\nA *small* paragraph.\n`,
+    });
+    const linted = run(root, ["lint"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).toBe(
+      'note.md:3:3: warn style/emphasis: Use "_" for emphasis.\n' +
+        'note.md:3:9: warn style/emphasis: Use "_" for emphasis.\n' +
+        "1 file(s) linted; 0 error(s), 2 warning(s).\n",
+    );
+    const applied = run(root, ["format", "--write"]);
+    expect(applied.status, applied.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(
+      `${mark}# Title\n\nA _small_ paragraph.\n`,
+    );
+    expect(run(root, ["format", "--check"]).status).toBe(0);
+    // A configuration file named explicitly, and one with comments, may start with the mark too.
+    await writeFile(path.join(root, "other.jsonc"), `${mark}// Comment\n{ "dialect": "gitea" }\n`);
+    const explained = run(root, ["config", "--config", "other.jsonc", "explain", "note.md"]);
+    expect(explained.status, explained.stderr).toBe(0);
+    expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
+    // The mark does not hide other errors, and their offsets count after it.
+    await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
+    expect(run(root, ["lint"]).stderr).toBe(
+      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")}: ValueExpected at offset 13\n`,
+    );
+  });
   it("resolves and rewrites links to files with spaces and non-ASCII names", async () => {
     const root = await fixture({
       "mdtools.config.jsonc": `{
