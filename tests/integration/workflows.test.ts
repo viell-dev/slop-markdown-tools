@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { importConditions } from "../../src/config/load.js";
@@ -10,6 +10,7 @@ import { cli, fixture, manifest, run, tree } from "./support.js";
 interface Report {
   version: string;
   mode: string;
+  root: string;
   written: string[];
   files: { path: string; changed?: boolean; output?: string; diagnostics: Diagnostic[] }[];
 }
@@ -146,10 +147,10 @@ describe("line endings and file names", () => {
     const explained = run(root, ["config", "--config", "other.jsonc", "explain", "note.md"]);
     expect(explained.status, explained.stderr).toBe(0);
     expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
-    // The mark does not hide other errors, and their offsets count after it.
+    // The mark does not hide other errors, and their columns count after it.
     await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
     expect(run(root, ["lint"]).stderr).toBe(
-      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")}: ValueExpected at offset 13\n`,
+      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")} at line 1, column 14: a value is expected\n`,
     );
   });
   it("resolves and rewrites links to files with spaces and non-ASCII names", async () => {
@@ -230,8 +231,11 @@ describe("reports for scripts and agents", () => {
     expect(linted.status).toBe(1);
     expect(linted.stderr).toBe("");
     const result = report(linted.stdout);
-    expect(Object.keys(result)).toEqual(["version", "mode", "files", "written"]);
+    expect(Object.keys(result)).toEqual(["version", "mode", "root", "files", "written"]);
     expect(result).toMatchObject({ version: manifest.version, mode: "lint", written: [] });
+    // The root that the paths of `files` are relative to, as an absolute path of the system.
+    expect(path.isAbsolute(result.root)).toBe(true);
+    expect(await realpath(result.root)).toBe(await realpath(root));
     expect(Object.keys(result.files[0]!)).toEqual(["path", "diagnostics"]);
     const [opening, closing, missing, ...rest] = result.files[0]!.diagnostics;
     expect(rest).toEqual([]);
@@ -621,6 +625,13 @@ describe("plugins named in a configuration", () => {
     );
     expect(await refused("sample-plugin", files, "Invalid plugin")).toBe(
       'its default export must be an object with a string "name".\n',
+    );
+  });
+  it("rejects a plugin named engine, whose findings would pass for the engine's own", async () => {
+    const code =
+      'export default { name: "engine", rules: { "unsafe-format": { kind: "problem", description: "x", check: () => [{ start: 0, message: "not the engine" }] } } };';
+    expect(await refused("./rules.mjs", { "rules.mjs": code }, "Invalid plugin")).toBe(
+      "its name, engine, is reserved for the engine's own diagnostics.\n",
     );
   });
 });

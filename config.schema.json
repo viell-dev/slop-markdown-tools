@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mdtools configuration",
+  "description": "Configuration of the mdtools command of mdrefine: https://viell-dev.github.io/slop-markdown-tools/configuration.html",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "The JSON Schema for editors; the tool ignores it.",
+      "type": "string"
+    },
+    "resolve": {
+      "description": "Files that links may lead to, which are never linted or formatted.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gitIgnored": {
+          "description": "Files that .gitignore files exclude are link targets. Default: false.",
+          "type": "boolean"
+        },
+        "nestedRepositories": {
+          "description": "Files of nested Git repositories are link targets. Default: false.",
+          "type": "boolean"
+        }
+      }
+    },
+    "extends": {
+      "description": "Presets to start from, in order: a preset name or a list of them. Without it, the configuration starts from recommended.",
+      "anyOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+    },
+    "dialect": { "$ref": "#/definitions/dialect" },
+    "rules": { "$ref": "#/definitions/rules" },
+    "ignore": {
+      "description": "Path patterns of documents that are never linted or formatted, matched with their letter case. They stay link targets.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "plugins": {
+      "description": "Plugins to load: files relative to this file, or package names.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "overrides": {
+      "description": "Settings for the documents that match one of the patterns in files.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["files"],
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "description": "Path patterns, matched with their letter case against paths relative to the workspace root.",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "dialect": { "$ref": "#/definitions/dialect" },
+          "rules": { "$ref": "#/definitions/rules" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "dialect": {
+      "description": "The renderer whose syntax documents are read in. When nothing names one, github is assumed, or obsidian inside a vault.",
+      "enum": ["commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian"]
+    },
+    "severity": { "enum": ["off", "warn", "error"] },
+    "rules": {
+      "description": "Rule IDs and their settings: a severity, or a list of a severity and the rule's options, as in [\"warn\", { \"width\": 100 }].",
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          { "$ref": "#/definitions/severity" },
+          {
+            "type": "array",
+            "items": [{ "$ref": "#/definitions/severity" }],
+            "minItems": 1,
+            "maxItems": 1
+          },
+          {
+            "type": "array",
+            "items": [{ "$ref": "#/definitions/severity" }, { "type": "object" }],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        ]
+      }
+    }
+  }
+}
