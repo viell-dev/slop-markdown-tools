@@ -64,7 +64,9 @@ policy. Known couplings:
   names in `ci.yml`.
 - Versions and requirements: `package.json`, the lockfile, the installation
   commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
-  and CONTRIBUTING.md, and `CHANGELOG.md`.
+  and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
+  also sets the `node-version` of the CI job labeled `22` and the major version
+  of `@types/node`, whose major updates `.github/dependabot.yml` ignores.
 
 Drift found along the way is a defect. Correct it in the same PR when it lies in
 what the PR already changes; otherwise file an issue rather than widening the
@@ -210,11 +212,13 @@ unless the operator asks to keep it or active work depends on it. Never delete
 task branches once their work is merged or abandoned.
 
 `.github/rulesets/` records the policies for `main` and version tags; keep it
-and GitHub's settings in sync. The required checks bind to the three
-`verify (OS, NODE)` job names in `ci.yml` and to GitHub Actions, app 15368, so
-renaming a job or changing the matrix needs a ruleset update. Zero required
-approvals is deliberate for a single-account, agent-maintained repository; PRs,
-passing checks, and resolved review threads remain mandatory.
+and GitHub's settings in sync. The required checks bind to three
+`verify (OS, NODE)` job names in `ci.yml`, where `NODE` is the matrix's major
+version label rather than its exact `node-version`, and to GitHub Actions, app
+15368, so renaming one of those jobs needs a ruleset update. The Node.js 26 job
+is not required. Zero required approvals is deliberate for a single-account,
+agent-maintained repository; PRs, passing checks, and resolved review threads
+remain mandatory.
 
 ## Technical map
 
@@ -269,10 +273,11 @@ passing checks, and resolved review threads remain mandatory.
 - The Vitest projects run one after the other (`sequence.groupOrder`), so that
   integration processes do not disturb the unit tests' time limits.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
-  builds the site from `main`, with heading anchors generated as GitHub
-  generates them, so that the tool's link check validates the site's fragments;
-  do not commit its cache or output. VitePress 2 is pinned to an alpha to avoid
-  the Vite 5 vulnerabilities of the stable line.
+  builds the site, with heading anchors generated as GitHub generates them, so
+  that the tool's link check validates the site's fragments; CI builds it for
+  every PR, and the Pages workflow deploys it from the newest stable release's
+  tag. Do not commit its cache or output. VitePress 2 is pinned to an alpha to
+  avoid the Vite 5 vulnerabilities of the stable line.
 
 ## Releases
 

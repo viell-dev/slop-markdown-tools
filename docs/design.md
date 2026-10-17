@@ -22,7 +22,9 @@ Of two edits that overlap, the one that starts first is applied, and the other
 rule runs again in the next pass. The phases repeat until nothing changes, for
 at most eight passes. When rules undo each other or formatting does not settle,
 `format` returns the document as it was with an `engine/unsafe-format` error
-that names them. Either way, `format --write` writes no file of the batch.
+that names them. Either way the run ends with exit code `2`, and
+`format --write` still writes the other documents, and this one when the edits
+that were kept changed it.
 
 The comparison is only as good as the parser's reading:
 
@@ -73,9 +75,10 @@ Files:
   be wrong and the renderers read Markdown as UTF-8, and it is not decoded with
   replacement characters, which the next edit would write into the file. See
   [files that cannot be read](cli.md#files-that-cannot-be-read-or-written).
-- A file that `format --write` replaces loses its creation time, extended
-  attributes, and its own access control entries; see [what a replaced file
-  keeps](cli.md#what-a-replaced-file-keeps).
+- `format --write` writes into the existing file, which keeps its permissions
+  and attributes but is not atomic: a crash or power failure during the write
+  can leave the file incomplete; see [what writing
+  keeps](cli.md#what-writing-keeps).
 
 Syntax:
 
