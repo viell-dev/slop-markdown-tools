@@ -61,6 +61,8 @@ interface ListGroup {
   items: Item[];
   /** The nearest block quote, list item, or footnote definition around it. */
   parent: Container | undefined;
+  /** The list directly before it, which its first line could continue. */
+  previous: ListGroup | undefined;
 }
 /** Adjacent lists outside other lists, with the lists nested in them. */
 interface Unit {
@@ -109,6 +111,8 @@ interface Op {
   start: number;
   end: number;
   text: string;
+  /** What the change does, for the finding when it is the first one. */
+  message?: string;
 }
 
 const tabStop = (column: number) => column + 4 - (column % 4);
@@ -151,6 +155,7 @@ function analyze(document: Document): Analysis {
     const children = node.children as Nodes[];
     let group: Unit | undefined;
     let run: ListGroup[] | undefined;
+    let before: ListGroup | undefined;
     for (let index = 0; index < children.length; index++) {
       const child = children[index]!;
       if (!located(child)) {
@@ -178,7 +183,13 @@ function analyze(document: Document): Analysis {
           run = [];
           target.runs.push(run);
         }
-        const list: ListGroup = { node: child, items: [], parent };
+        const list: ListGroup = {
+          node: child,
+          items: [],
+          parent,
+          previous: children[index - 1]?.type === "list" ? before : undefined,
+        };
+        before = list;
         run.push(list);
         target.lists.push(list);
         for (const [position, entry] of child.children.entries()) {
@@ -506,7 +517,7 @@ function feasible(
       }
       const lineEnd = lines[line]!.end;
       if (mode === "start") {
-        if (!onlySpaces(source, level.start, level.start - change)) return false;
+        if (change < 0 && !onlySpaces(source, level.start, level.start - change)) return false;
         if (structuralTab(source, level.start, lineEnd)) return false;
       } else {
         if (change < 0 && !onlySpaces(source, level.end + change, level.end)) return false;
@@ -644,15 +655,23 @@ function shiftOps(
       const item = analysis.items.get(level.node)!;
       const change = delta.get(item) ?? 0;
       if (!change || line === item.first) continue;
-      if (mode === "start") ops.push({ start: level.start, end: level.start - change, text: "" });
+      if (mode === "start")
+        ops.push(
+          change > 0
+            ? { start: level.start, end: level.start, text: " ".repeat(change) }
+            : { start: level.start, end: level.start - change, text: "" },
+        );
       else if (change > 0) ops.push({ start: level.end, end: level.end, text: " ".repeat(change) });
       else ops.push({ start: level.end + change, end: level.end, text: "" });
     }
   }
   return ops;
 }
-/** One finding for a unit's changes, with the edit that makes all of them. */
-function unitFinding(source: string, ops: Op[], message: string): Finding | undefined {
+/**
+ * One finding for a unit's changes, with the edit that makes all of them and
+ * the message of the first change that has one.
+ */
+function unitFinding(source: string, ops: Op[]): Finding | undefined {
   if (!ops.length) return undefined;
   ops.sort((a, b) => a.start - b.start || a.end - b.end);
   for (let index = 1; index < ops.length; index++)
@@ -666,6 +685,7 @@ function unitFinding(source: string, ops: Op[], message: string): Finding | unde
     cursor = op.end;
   }
   text += source.slice(cursor, end);
+  const message = ops.find((op) => op.message)?.message ?? "Format the list.";
   return { start, end, message, edit: { start, end, text } };
 }
 
@@ -675,15 +695,51 @@ const nextBullet = (marker: string) => bullets[(bullets.indexOf(marker as "-") +
 /** A line that reads as a thematic break. */
 const thematicBreak = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 
+/** The number of bullet lists that a list is nested in. */
+function bulletDepth(analysis: Analysis, list: ListGroup): number {
+  let depth = 0;
+  for (let node = list.parent; node; node = analysis.containers.get(node)?.parent)
+    if (node.type === "listItem" && !analysis.items.get(node)?.list.node.ordered) depth++;
+  return depth;
+}
+/**
+ * The marker that each bullet list of a document gets before lists that
+ * follow one another alternate: the configured one, the first list's with
+ * `consistent`, or with `sublist` the first list's at each depth, unless the
+ * depth above has that marker, in which case the next one.
+ */
+function bulletMarkers(analysis: Analysis, marker: string): (list: ListGroup) => string {
+  if (marker !== "consistent" && marker !== "sublist") return () => marker;
+  const { source } = analysis;
+  const lists = analysis.units.flatMap((unit) =>
+    unit.lists.filter((list) => !list.node.ordered && list.items.length),
+  );
+  const written = (list: ListGroup) => source[list.items[0]!.marker]!;
+  if (marker === "consistent") {
+    const first = lists[0] ? written(lists[0]) : "-";
+    return () => first;
+  }
+  const byDepth: string[] = [];
+  const depths = new Map(lists.map((list) => [list, bulletDepth(analysis, list)]));
+  for (const list of lists) {
+    const depth = depths.get(list)!;
+    // The lists that a list is nested in come before it.
+    if (byDepth[depth] !== undefined) continue;
+    const own = written(list);
+    byDepth[depth] = depth && own === byDepth[depth - 1] ? nextBullet(own) : own;
+  }
+  return (list) => byDepth[depths.get(list) ?? 0] ?? "-";
+}
+
 const listMarker: Rule = {
   description: "Use one bullet list marker, and the next one for a list that follows another.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({ marker: { enum: [...bullets] } }),
+  schema: optionsSchema({ marker: { enum: [...bullets, "consistent", "sublist"] } }),
   check({ document, options }) {
     const analysis = analyze(document);
     const { source, lines } = analysis;
-    const preferred = String(options.marker ?? "-");
+    const base = bulletMarkers(analysis, String(options.marker ?? "-"));
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;
@@ -691,6 +747,7 @@ const listMarker: Rule = {
       const runOf = new Map<Item, ListGroup[]>();
       for (const run of unit.runs) {
         if (run[0]!.node.ordered) continue;
+        const preferred = base(run[0]!);
         run.forEach((list, index) => {
           for (const item of list.items) {
             target.set(item, index % 2 ? nextBullet(preferred) : preferred);
@@ -727,13 +784,13 @@ const listMarker: Rule = {
       const ops: Op[] = [];
       for (const [item, marker] of target)
         if (!kept.has(runOf.get(item)!) && source[item.marker] !== marker)
-          ops.push({ start: item.marker, end: item.marker + 1, text: marker });
-      ops.sort((a, b) => a.start - b.start);
-      const finding = unitFinding(
-        source,
-        ops,
-        `Use ${JSON.stringify(ops[0]?.text ?? preferred)} as the bullet list marker.`,
-      );
+          ops.push({
+            start: item.marker,
+            end: item.marker + 1,
+            text: marker,
+            message: `Use ${JSON.stringify(marker)} as the bullet list marker.`,
+          });
+      const finding = unitFinding(source, ops);
       if (finding) findings.push(finding);
     }
     return findings;
@@ -758,13 +815,20 @@ const orderedList: Rule = {
   kind: "style",
   phase: "block",
   schema: optionsSchema({
-    delimiter: { enum: [".", ")"] },
+    delimiter: { enum: [".", ")", "consistent"] },
     numbering: { enum: ["auto", "ordered", "same"] },
   }),
   check({ document, options }) {
     const analysis = analyze(document);
     const { source } = analysis;
-    const preferred = String(options.delimiter ?? ".");
+    let preferred = String(options.delimiter ?? ".");
+    if (preferred === "consistent") {
+      // The delimiter of the document's first ordered list.
+      const first = analysis.units
+        .flatMap((unit) => unit.lists)
+        .find((list) => list.node.ordered && list.items.length);
+      preferred = first ? source[first.items[0]!.markerEnd - 1]! : ".";
+    }
     const other = preferred === "." ? ")" : ".";
     const numbering = String(options.numbering ?? "auto");
     const findings: Finding[] = [];
@@ -776,7 +840,6 @@ const orderedList: Rule = {
           run.forEach((list, index) => delimiter.set(list, index % 2 ? other : preferred));
       const ops: Op[] = [];
       const delta = new Map<Item, number>();
-      let message: string | undefined;
       for (const list of unit.lists) {
         if (!list.node.ordered) continue;
         const digits = list.items.map((item) => item.digits);
@@ -803,39 +866,89 @@ const orderedList: Rule = {
         for (const item of list.items) {
           const text = numbers[item.index]! + mark;
           if (source.slice(item.marker, item.markerEnd) === text) continue;
-          ops.push({ start: item.marker, end: item.markerEnd, text });
-          if (message === undefined)
-            message =
+          ops.push({
+            start: item.marker,
+            end: item.markerEnd,
+            text,
+            message:
               source[item.markerEnd - 1] !== mark
                 ? `Use ${JSON.stringify(mark)} after list item numbers.`
-                : `Number this list item ${numbers[item.index]}.`;
+                : `Number this list item ${numbers[item.index]}.`,
+          });
         }
       }
       for (const op of shiftOps(analysis, unit, delta, "end")) ops.push(op);
-      ops.sort((a, b) => a.start - b.start);
-      const finding = unitFinding(source, ops, message ?? "Renumber the list.");
+      const finding = unitFinding(source, ops);
       if (finding) findings.push(finding);
     }
     return findings;
   },
 };
 
+/** The columns from an item's marker to its text. */
+const reachOf = (item: Item, spacing = item.spacing) =>
+  item.markerEnd - item.marker + (item.blankFirst || item.spacing >= 5 ? 1 : spacing);
+const spaces = { type: "integer", minimum: 1, maximum: 4 };
+
 const listIndent: Rule = {
-  description: "Start list items at their container's edge with one space after the marker.",
+  description: "Indent list items consistently, with the configured spaces after the marker.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({}),
-  check({ document }) {
+  schema: optionsSchema({
+    bulletSpaces: spaces,
+    orderedSpaces: spaces,
+    bulletSpacesMultiline: spaces,
+    orderedSpacesMultiline: spaces,
+    nestedIndent: { type: "integer", minimum: 1, maximum: 8 },
+  }),
+  check({ document, options }) {
     const analysis = analyze(document);
     const { source, lines } = analysis;
+    const bullet = Number(options.bulletSpaces ?? 1);
+    const ordered = Number(options.orderedSpaces ?? 1);
+    const spacing = {
+      bullet: [bullet, Number(options.bulletSpacesMultiline ?? bullet)],
+      ordered: [ordered, Number(options.orderedSpacesMultiline ?? ordered)],
+    };
+    const nested = options.nestedIndent === undefined ? undefined : Number(options.nestedIndent);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;
       const ops: Op[] = [];
       const delta = new Map<Item, number>();
+      // The columns from each item's marker to its text once the rule is done,
+      // and the fewest columns that its lines can need then.
+      const reach = new Map<Item, number>();
+      const lowest = new Map<Item, number>();
       for (const list of unit.lists) {
-        // Reading the first item's marker line also reads the others'.
         for (const item of list.items) analysis.match(item.first);
+        // As in markdownlint, a list whose items each take one line, with no
+        // blank line between them, gets the spacing for single lines.
+        const single = list.items.every(
+          (item, index) =>
+            item.first === item.last && (!index || item.first === list.items[index - 1]!.last + 1),
+        );
+        const wanted = spacing[list.node.ordered ? "ordered" : "bullet"][single ? 0 : 1]!;
+        const holder =
+          list.parent?.type === "listItem" ? analysis.items.get(list.parent) : undefined;
+        // A nested list starts under its item's text, or as many columns from
+        // the item's marker as configured, where CommonMark lets it start. On
+        // the item's own marker line, columns before the nested marker would
+        // be the item's spacing, so a list that starts there stays. A first
+        // line that the last item of the list before it would continue would
+        // join that item.
+        const before = list.previous?.items.at(-1);
+        const indent =
+          nested !== undefined && holder && list.items[0]?.first !== holder.first
+            ? Math.max(
+                0,
+                Math.min(
+                  3,
+                  nested - (reach.get(holder) ?? reachOf(holder)),
+                  (before ? (lowest.get(before) ?? 0) : Infinity) - 1,
+                ),
+              )
+            : 0;
         const marks: Op[] = [];
         const changes = new Map<Item, number>();
         let possible = true;
@@ -845,36 +958,61 @@ const listIndent: Rule = {
             break;
           }
           const offset = item.offset!;
-          // One space, unless the item starts with indented code, which
-          // depends on the spacing, or with a blank line, which has none.
-          const spacing = item.blankFirst || item.spacing >= 5 ? 0 : item.spacing - 1;
-          if (!offset && !spacing) continue;
+          // The spacing stays where the item starts with indented code, which
+          // depends on it, or with a blank line, which has none.
+          const keep = item.blankFirst || item.spacing >= 5;
+          const target = keep ? item.spacing : wanted;
+          if (offset === indent && target === item.spacing) continue;
           const lineEnd = lines[item.first]!.end;
           if (
-            (offset && !onlySpaces(source, item.start, item.marker)) ||
-            (spacing && !onlySpaces(source, item.markerEnd, item.spaceEnd)) ||
+            (offset !== indent && !onlySpaces(source, item.start, item.marker)) ||
+            (target !== item.spacing && !onlySpaces(source, item.markerEnd, item.spaceEnd)) ||
             structuralTab(source, item.start, lineEnd)
           ) {
             possible = false;
             break;
           }
-          if (offset) marks.push({ start: item.start, end: item.marker, text: "" });
-          if (spacing) marks.push({ start: item.markerEnd, end: item.spaceEnd, text: " " });
-          changes.set(item, -(offset + spacing));
+          const count = (value: number) => (value === 1 ? "one space" : `${value} spaces`);
+          if (offset !== indent)
+            marks.push({
+              start: item.start,
+              end: item.marker,
+              text: " ".repeat(indent),
+              message: indent
+                ? `Indent the list marker by ${count(indent)}.`
+                : "Remove the indentation before the list marker.",
+            });
+          if (target !== item.spacing)
+            marks.push({
+              start: item.markerEnd,
+              end: item.spaceEnd,
+              text: " ".repeat(target),
+              message: `Put ${count(target)} after the list marker.`,
+            });
+          const change = indent - offset + (keep ? 0 : target - item.spacing);
+          if (change) changes.set(item, change);
         }
-        if (!possible || !changes.size) continue;
         const minimum = (item: Item) =>
-          (!list.node.ordered ? 1 : item.index ? 2 : item.digits.length + 1) + 1;
-        if (!feasible(analysis, list, changes, "start", minimum, "move")) continue;
+          indent +
+          (!list.node.ordered ? 1 : item.index ? 2 : item.digits.length + 1) +
+          (item.blankFirst || item.spacing >= 5 ? 1 : wanted);
+        const accepted =
+          possible &&
+          marks.length > 0 &&
+          feasible(analysis, list, changes, "start", minimum, "move");
+        for (const item of list.items) {
+          reach.set(item, accepted ? reachOf(item, wanted) : reachOf(item));
+          const narrowest =
+            (!list.node.ordered ? 1 : item.index ? 2 : item.digits.length + 1) +
+            (item.blankFirst || item.spacing >= 5 ? 1 : accepted ? wanted : item.spacing);
+          lowest.set(item, (accepted ? indent : (item.offset ?? 0)) + narrowest);
+        }
+        if (!accepted) continue;
         for (const op of marks) ops.push(op);
         for (const [item, change] of changes) delta.set(item, change);
       }
       for (const op of shiftOps(analysis, unit, delta, "start")) ops.push(op);
-      const finding = unitFinding(
-        source,
-        ops,
-        "Start each list item at its container's edge, with one space after the marker.",
-      );
+      const finding = unitFinding(source, ops);
       if (finding) findings.push(finding);
     }
     return findings;

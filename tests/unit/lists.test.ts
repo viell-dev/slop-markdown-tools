@@ -81,6 +81,20 @@ describe("style/list-marker", () => {
     expect(formatted("+ - -\n- b\n", config)).toBe("+ - -\n- b\n");
     expect(formatted("+ - -\n+ a\n", config)).toBe("+ - -\n+ a\n");
   });
+  it("keeps the document's first marker with consistent, and one per level with sublist", () => {
+    const consistent = only({ "style/list-marker": ["warn", { marker: "consistent" }] });
+    expect(formatted("* a\n\n- b\n\n+ c\n  - d\n", consistent)).toBe("* a\n\n+ b\n\n* c\n  * d\n");
+    expect(formatted("+ a\n  - b\n", consistent)).toBe("+ a\n  + b\n");
+    const sublist = only({ "style/list-marker": ["warn", { marker: "sublist" }] });
+    // Each level keeps its first list's marker, unless the level above has it.
+    expect(formatted("* a\n  * b\n    * c\n  * e\n", sublist)).toBe("* a\n  + b\n    * c\n  + e\n");
+    expect(formatted("- a\n  * b\n- c\n  - d\n", sublist)).toBe("- a\n  * b\n- c\n  * d\n");
+    // Lists inside numbered items count from their own level.
+    expect(formatted("- a\n\n1. b\n   * c\n", sublist)).toBe("- a\n\n1. b\n   - c\n");
+    expect(() =>
+      format("- a\n", { config: only({ "style/list-marker": ["warn", { marker: "x" }] }) }),
+    ).toThrow("Invalid options for style/list-marker");
+  });
   it("reports one finding for a group of lists, at the first marker it changes", () => {
     expect(lint("* a\n- b\n- c\n", { config })).toEqual([
       {
@@ -122,6 +136,11 @@ describe("style/ordered-list", () => {
     ["auto", "2. a\n4. b\n", "2. a\n3. b\n"],
   ])("numbers with %j", (numbering, source, output) => {
     expect(formatted(source, only({ "style/ordered-list": ["warn", { numbering }] }))).toBe(output);
+  });
+  it("keeps the document's first delimiter with consistent", () => {
+    const consistent = only({ "style/ordered-list": ["warn", { delimiter: "consistent" }] });
+    expect(formatted("1) a\n\n- x\n\n1. b\n", consistent)).toBe("1) a\n\n- x\n\n1) b\n");
+    expect(formatted("1. a\n\n- x\n\n1) b\n", consistent)).toBe("1. a\n\n- x\n\n1. b\n");
   });
   it("uses the delimiter `)`, and alternates between lists that follow each other", () => {
     const parenthesis = only({ "style/ordered-list": ["warn", { delimiter: ")" }] });
@@ -211,6 +230,46 @@ describe("style/list-indent", () => {
     ["-   a\n\n    ```\n    \tx\n    ```\n"],
   ])("keeps %j", (source) => {
     expect(formatted(source, config)).toBe(source);
+  });
+  it.each([
+    [
+      { bulletSpaces: 3, orderedSpaces: 2 },
+      "- a\n- b\n\n1. c\n   more\n\n   - d\n",
+      "-   a\n-   b\n\n1.  c\n    more\n\n    -   d\n",
+    ],
+    // Like markdownlint, multiline spacing applies to a list with an item of
+    // more than one line or with blank lines between its items.
+    [
+      { bulletSpacesMultiline: 3, orderedSpacesMultiline: 2 },
+      "- a\n- b\n\n* c\n\n  more\n\n1. x\n2. y\n\n3. z\n",
+      "- a\n- b\n\n*   c\n\n    more\n\n1.  x\n2.  y\n\n3.  z\n",
+    ],
+    [
+      { nestedIndent: 4 },
+      "- a\n  - b\n    - c\n1. x\n   - y\n10. z\n    - w\n",
+      "- a\n    - b\n        - c\n1. x\n    - y\n10. z\n    - w\n",
+    ],
+    [{ nestedIndent: 4, bulletSpaces: 3 }, "- a\n  - b\n", "-   a\n    -   b\n"],
+    [{ nestedIndent: 8 }, "- a\n  - b\n", "- a\n     - b\n"],
+    // A list on its item's marker line has no choice of indentation: columns
+    // before it are the item's spacing.
+    [{ nestedIndent: 4 }, "- - a\n  - b\n", "- - a\n  - b\n"],
+    // A list after another one stays out of that list's last item.
+    [{ nestedIndent: 4 }, "- * x\n  1. y\n", "- * x\n   1. y\n"],
+    // Indented code that starts an item keeps its spacing.
+    [{ bulletSpaces: 3 }, "-     code\n", "-     code\n"],
+  ])("with %j writes %j as %j", (options, source, output) => {
+    expect(formatted(source, only({ "style/list-indent": ["warn", options] }))).toBe(output);
+  });
+  it.each([
+    [{ bulletSpaces: 5 }, "bulletSpaces must be <= 4"],
+    [{ orderedSpacesMultiline: 0 }, "orderedSpacesMultiline must be >= 1"],
+    [{ nestedIndent: 9 }, "nestedIndent must be <= 8"],
+    [{ spaces: 2 }, "must NOT have additional properties"],
+  ])("rejects the options %j", (options, message) => {
+    expect(() =>
+      format("- a\n", { config: only({ "style/list-indent": ["warn", options] }) }),
+    ).toThrow(message);
   });
   it("keeps Obsidian comments and wikilinks", () => {
     const obsidian = only({ "style/list-indent": "warn" }, "obsidian");
@@ -348,22 +407,46 @@ describe("the list rules together", () => {
           });
         });
     };
+    const count = fc.integer({ min: 1, max: 4 });
+    // The rules' options, or none for the defaults.
+    const settings = fc.option(
+      fc.record({
+        marker: fc.constantFrom("-", "*", "+", "consistent", "sublist"),
+        delimiter: fc.constantFrom(".", ")", "consistent"),
+        numbering: fc.constantFrom("auto", "ordered", "same"),
+        bulletSpaces: count,
+        orderedSpaces: count,
+        bulletSpacesMultiline: count,
+        orderedSpacesMultiline: count,
+        nestedIndent: fc.integer({ min: 1, max: 8 }),
+      }),
+      { nil: undefined },
+    );
     fc.assert(
       fc.property(
         fc.array(tree, { minLength: 1, maxLength: 3 }),
         fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 40 }),
         fc.constantFrom(...dialects),
         fc.constantFrom("\n", "\r\n"),
-        (blocks, spaces, dialect, newline) => {
+        settings,
+        (blocks, spaces, dialect, newline, options) => {
           const lines: string[] = [];
           blocks.forEach((block, index) => {
             if (index) lines.push("");
             render(block, "", "", lines, [...spaces]);
           });
-          formatted(lines.join(newline) + newline, only(rules, dialect));
+          const { marker, delimiter, numbering, ...indent } = options ?? {};
+          const configured = options
+            ? {
+                "style/list-marker": ["warn", { marker }],
+                "style/ordered-list": ["warn", { delimiter, numbering }],
+                "style/list-indent": ["warn", indent],
+              }
+            : rules;
+          formatted(lines.join(newline) + newline, only(configured as typeof rules, dialect));
         },
       ),
-      { numRuns: 400, seed: 20261017 },
+      { numRuns: 500, seed: 20261017 },
     );
   }, 60_000);
 });
