@@ -90,7 +90,9 @@ breaks in Reading view. Preserve the file's other settings when changing this
 value. The CLI checks it and never edits the settings file itself. If it is not
 permitted to read the file, or the file is not valid JSON, it warns and leaves
 paragraphs as written; see
-[paths that cannot be read](configuration.md#paths-that-cannot-be-read).
+[paths that cannot be read](configuration.md#paths-that-cannot-be-read). A byte
+order mark at the start of the file is ignored; versions up to `0.2.0-rc.2`
+reported such a file as not valid JSON.
 
 If that setting is not appropriate for your vault, disable `style/wrap`. Other
 enabled rules can still run.
