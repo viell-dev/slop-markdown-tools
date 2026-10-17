@@ -135,9 +135,10 @@ From every prerelease:
   with a blank line
   ([#190](https://github.com/viell-dev/slop-markdown-tools/pull/190)).
 - Four style rules in `recommended`: `style/code-fence`, `style/thematic-break`,
-  `style/blank-lines`, and `style/trailing-space`. `style/heading` also removes
-  closing `#` sequences, with the option `closing`, and joins `recommended` with
-  `style/table`
+  `style/blank-lines`, and `style/trailing-space`, with markdownlint's choices
+  as options. `style/heading` also removes closing `#` sequences and can write
+  underlined headings (options `closing` and `style`), `style/table` can write
+  compact tables (option `style`), and both join `recommended`
   ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 - `lint` and `format` accept `ranges` to work on parts of a document, and
   `format` returns their `scope`

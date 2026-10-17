@@ -90,13 +90,13 @@ yet", keep the other tool for that check.
 | `proseWrap: "never"`                                                             | None yet                                                                                              |
 | `_` for emphasis; MD049 (emphasis style)                                         | [`style/emphasis`](rules.md#styleemphasis)                                                            |
 | `**` for strong text; MD050 (strong style)                                       | [`style/strong`](rules.md#stylestrong)                                                                |
-| `#` headings without closing `#`; MD003 (heading style)                          | [`style/heading`](rules.md#styleheading), which also converts underlined headings, unlike Prettier    |
-| Aligned tables; MD055 (table pipe style)                                         | [`style/table`](rules.md#styletable), for tables outside lists and quotes                             |
+| `#` headings without closing `#`; MD003 (heading style)                          | [`style/heading`](rules.md#styleheading), whose default converts underlined ones, unlike Prettier     |
+| Aligned or compact tables; MD055, MD060 (table style)                            | [`style/table`](rules.md#styletable), for tables outside lists and quotes                             |
 | Blank lines between blocks; MD022, MD032 (blank lines around headings and lists) | [`style/block-spacing`](rules.md#styleblock-spacing), for headings and lists                          |
 | Backtick code fences; MD046, MD048 (code block and fence style)                  | [`style/code-fence`](rules.md#stylecode-fence), which leaves indented code blocks as written          |
 | `---` for thematic breaks; MD035                                                 | [`style/thematic-break`](rules.md#stylethematic-break)                                                |
 | Trailing spaces; MD009                                                           | [`style/trailing-space`](rules.md#styletrailing-space), which keeps hard line breaks                  |
-| Repeated blank lines; MD012                                                      | [`style/blank-lines`](rules.md#styleblank-lines)                                                      |
+| Repeated blank lines; MD012                                                      | [`style/blank-lines`](rules.md#styleblank-lines), with a `maximum`                                    |
 | Final newline; MD047                                                             | [`style/final-newline`](rules.md#stylefinal-newline)                                                  |
 | MD041 (first line is a heading)                                                  | [`structure/initial-heading`](rules.md#structureinitial-heading)                                      |
 | MD051 (link fragments)                                                           | [`links/valid`](rules.md#linksvalid), which also checks that local files exist                        |

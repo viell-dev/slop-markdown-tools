@@ -31,15 +31,15 @@ the built-in rules; [plugins](plugins.md) can add more.
 | `structure/heading-increment` | Problem | No             | `recommended`                                           | All                               | None                                                        |
 | `structure/initial-heading`   | Problem | No             | None                                                    | All                               | None                                                        |
 | `structure/single-title`      | Problem | No             | None                                                    | All                               | None                                                        |
-| `style/blank-lines`           | Style   | Yes            | `recommended`                                           | All                               | None                                                        |
+| `style/blank-lines`           | Style   | Yes            | `recommended`                                           | All                               | `maximum`                                                   |
 | `style/block-spacing`         | Style   | Yes            | None                                                    | All                               | None                                                        |
 | `style/code-fence`            | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
 | `style/emphasis`              | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
 | `style/final-newline`         | Style   | Yes            | `recommended`                                           | All                               | None                                                        |
-| `style/heading`               | Style   | Yes            | `recommended`                                           | All                               | `closing`                                                   |
+| `style/heading`               | Style   | Yes            | `recommended`                                           | All                               | `style`, `closing`                                          |
 | `style/inline-code`           | Style   | Yes            | None                                                    | All                               | None                                                        |
 | `style/strong`                | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/table`                 | Style   | Yes            | `recommended`, `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | None                                                        |
+| `style/table`                 | Style   | Yes            | `recommended`, `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | `style`                                                     |
 | `style/thematic-break`        | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
 | `style/trailing-space`        | Style   | Yes            | `recommended`                                           | All                               | `hardBreak`                                                 |
 | `style/wrap`                  | Style   | Yes            | `recommended`                                           | All                               | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
@@ -533,11 +533,12 @@ title: Install
 
 ## `style/blank-lines`
 
-Collapses blank lines in a row into one, and removes blank lines at the start
-and at the end of a document. The line break that ends the last line stays;
-[`style/final-newline`](#stylefinal-newline) adds it where it is missing. Inside
-a block quote, a line of only `>` markers is a blank line, and a repeated one is
-removed the same way.
+Collapses blank lines in a row to at most `maximum` of them, and removes blank
+lines at the start and at the end of a document. The option `maximum` is an
+integer of at least 1; the default is 1. The line break that ends the last line
+stays; [`style/final-newline`](#stylefinal-newline) adds it where it is missing.
+Inside a block quote, a line of only `>` markers is a blank line, and repeated
+ones are removed the same way.
 
 Before, with three blank lines between the blocks and two at the end:
 
@@ -624,8 +625,9 @@ or what a comment applies to:
 Writes the fences of a fenced code block with one marker, and as long as its
 content allows: three characters, or one more than the longest line inside that
 holds only the marker, which would otherwise close the block. The option
-`marker` is ``"```"`` (the default) or `"~~~"`. The info string and the content
-are left as written.
+`marker` is ``"```"`` (the default), `"~~~"`, or `"consistent"`, which takes the
+marker of the document's first fence. The info string and the content are left
+as written.
 
 Before:
 
@@ -677,11 +679,21 @@ fence whose last line is blank space.
 
 ## `style/heading`
 
-Writes headings with `#` marks and without closing `#` sequences. It turns a
-heading underlined with `===` or `---` into a `#` heading of the same level, and
-removes the closing sequence of a `#` heading with the blank space around it.
-The option `closing` is `"remove"` (the default) or `"keep"`, which leaves
-closing sequences as written.
+Writes headings in one style and without closing `#` sequences. By default it
+turns a heading underlined with `===` or `---` into a `#` heading of the same
+level, and removes the closing sequence of a `#` heading with the blank space
+around it.
+
+| Option    | Values                              | Default    |
+| --------- | ----------------------------------- | ---------- |
+| `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
+| `closing` | `"remove"`, `"keep"`                | `"remove"` |
+
+- `style`: `atx` writes `#` headings. `setext` underlines headings of levels 1
+  and 2 and keeps `#` for deeper levels, which cannot be underlined.
+  `consistent` follows the document's first heading: `setext` when it is
+  underlined, otherwise `atx`.
+- `closing`: `keep` leaves the closing sequences of `#` headings as written.
 
 Before:
 
@@ -705,6 +717,15 @@ it is not taken for a closing sequence. Underlined headings of more than one
 line, and those inside lists or block quotes, are left as written. On Forgejo
 and Gitea, a closing sequence after an attribute block such as `{#id}` stays,
 because Gitea before 1.26 reads the block only when the sequence follows it.
+
+With `setext`, a `#` heading is underlined only where its text can stand on a
+line of its own as the same heading: at the start of a line of the document, not
+in a list or block quote, below a blank line or at the start of the document,
+because directly below text its line would continue the paragraph. It keeps its
+`#` when its text starts like another block, such as a list item, block quote,
+thematic break, fence, HTML, or link reference definition, when it contains `|`,
+which `---` below it could make a table, or when it ends with a backslash, and
+on Forgejo and Gitea when it contains `{`.
 
 ## `style/inline-code`
 
@@ -750,9 +771,11 @@ A **bold** claim.
 
 Aligns a table: every cell of a column is padded to the column's width, measured
 in display columns, and the delimiter row keeps each column's alignment. The
-text of each cell is left as written, and so is the number of cells in each row.
-A table inside a list or block quote, and one with a row that has more cells
-than its header, are left as written.
+option `style` is `"aligned"` (the default) or `"compact"`, which writes one
+space on each side of a cell's text and delimiters of three characters, such as
+`| :-- | --: |`. The text of each cell is left as written, and so is the number
+of cells in each row. A table inside a list or block quote, and one with a row
+that has more cells than its header, are left as written.
 
 Before:
 
@@ -773,7 +796,8 @@ After:
 ## `style/thematic-break`
 
 Writes thematic breaks with one marker. The option `marker` is `"---"` (the
-default), `"***"`, or `"___"`. Blank space before and after the break stays.
+default), `"***"`, `"___"`, or `"consistent"`, which takes the character of the
+document's first break. Blank space before and after the break stays.
 
 Before:
 
