@@ -558,9 +558,9 @@ an `engine/rule-error` error at line 1 that names the rule and the reason, as in
 `Rule local/example failed (TypeError: …); the rule was skipped for this document.`
 The other rules still run, and the other documents are still processed. With
 either diagnostic the exit code is `2`, in `lint` and `format` alike, and
-`format --write` writes none of the batch. Versions up to `0.2.0-rc.2`
-stopped `lint` at a failing rule with its bare message, naming neither file nor
-rule, and reported it in `format` as `engine/unsafe-format`.
+`format --write` writes none of the batch. Versions up to `0.2.0-rc.2` stopped
+`lint` at a failing rule with its bare message, naming neither file nor rule,
+and reported it in `format` as `engine/unsafe-format`.
 
 ## Paths that cannot be read
 
