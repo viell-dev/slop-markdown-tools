@@ -72,11 +72,12 @@ function prepare(options: ProcessOptions) {
   }
   return { config, rules };
 }
+/** CommonMark's line endings. */
+const lineBreaks = /\r\n|\r|\n/g;
 /** Offsets where each line starts, computed once per source so findings locate in O(log lines). */
 function lineStarts(source: string): number[] {
   const starts = [0];
-  for (let at = source.indexOf("\n"); at >= 0; at = source.indexOf("\n", at + 1))
-    starts.push(at + 1);
+  for (const match of source.matchAll(lineBreaks)) starts.push(match.index + match[0].length);
   return starts;
 }
 function diagnostic(
@@ -232,7 +233,7 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
     }
     if (calloutHeader && document.dialect === "obsidian" && node.type === "paragraph") {
       const [start, end] = range(node);
-      const header = document.source.slice(start, end).split(/\r?\n/, 1)[0]!;
+      const header = document.source.slice(start, end).split(/\r\n|\r|\n/, 1)[0]!;
       if (/^\[![\w-]+\]/.test(header)) {
         // CommonMark merges title and body into one paragraph. Preserve their boundary too.
         const title = header.replace(
