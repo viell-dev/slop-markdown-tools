@@ -623,6 +623,13 @@ describe("plugins named in a configuration", () => {
       'its default export must be an object with a string "name".\n',
     );
   });
+  it("rejects a plugin named engine, whose findings would pass for the engine's own", async () => {
+    const code =
+      'export default { name: "engine", rules: { "unsafe-format": { kind: "problem", description: "x", check: () => [{ start: 0, message: "not the engine" }] } } };';
+    expect(await refused("./rules.mjs", { "rules.mjs": code }, "Invalid plugin")).toBe(
+      "its name, engine, is reserved for the engine's own diagnostics.\n",
+    );
+  });
 });
 
 describe("commands that must not write", () => {

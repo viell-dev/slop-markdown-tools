@@ -6,6 +6,7 @@ import { parse, printParseErrorCode } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Config, Plugin } from "../core/types.js";
 import { configProblem, validateConfig } from "./resolve.js";
+import { reservedPluginName } from "../core/engine.js";
 import { exists, pathError, refusal, refusalText } from "../workspace/access.js";
 import { isVault } from "../workspace/vault.js";
 import { splitByteOrderMark } from "../syntax/parse.js";
@@ -200,6 +201,10 @@ async function loadPlugin(specifier: string, file: string): Promise<Plugin> {
   )
     throw new Error(
       `Invalid plugin "${specifier}" named in ${file}: its default export must be an object with a string "name".`,
+    );
+  if (plugin.name === reservedPluginName)
+    throw new Error(
+      `Invalid plugin "${specifier}" named in ${file}: its name, ${reservedPluginName}, is reserved for the engine's own diagnostics.`,
     );
   return plugin as Plugin;
 }

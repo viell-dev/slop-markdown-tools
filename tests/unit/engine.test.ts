@@ -741,6 +741,7 @@ describe("rules that fail", () => {
       throw caught;
     });
     expect(() => lint(source, { ...rethrown, workspace })).toThrow(error);
+    expect(() => format(source, { ...rethrown, workspace })).toThrow(error);
     // A rule that handles the error itself is not failing; one that throws its own is.
     const handled = lint(source, {
       ...asking((caught) => [{ start: 0, message: caught === error ? "Same" : "Other" }]),
@@ -755,6 +756,20 @@ describe("rules that fail", () => {
     expect(ruleErrors(lint(source, { ...replaced, workspace }))).toMatchObject([
       { message: expect.stringContaining("failed (Error: Own)") },
     ]);
+    expect(ruleErrors(format(source, { ...replaced, workspace }).diagnostics)).toMatchObject([
+      { message: expect.stringContaining("failed (Error: Own)") },
+    ]);
+  });
+  it("rejects a plugin named engine, whose findings would pass for the engine's own", () => {
+    const check = () => [{ start: 0, message: "not the engine" }];
+    const plugins: Plugin[] = [
+      { name: "engine", rules: { "unsafe-format": { kind: "problem", description: "x", check } } },
+    ];
+    const message = "Invalid plugin name: engine is reserved for the engine's own diagnostics";
+    expect(() => ruleRegistry(plugins)).toThrow(message);
+    const config: Config = { extends: [], rules: { "engine/unsafe-format": "warn" } };
+    for (const run of [lint, format])
+      expect(() => run("Text.\n", { plugins, config })).toThrow(message);
   });
   it("checks offsets in the text that rules see, without a byte order mark", () => {
     const mark = String.fromCharCode(0xfeff);

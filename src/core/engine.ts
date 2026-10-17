@@ -71,6 +71,12 @@ function ruleProblem(rule: unknown): string | undefined {
   return undefined;
 }
 /**
+ * The prefix of the engine's own diagnostics, such as `engine/rule-error`. A
+ * plugin of this name could report findings that pass for the engine's, which
+ * concern the whole document and make the CLI exit with code 2.
+ */
+export const reservedPluginName = "engine";
+/**
  * The built-in rules and those of `plugins`, by rule ID. A plugin rule that
  * does not have the shape of a `Rule` is an error that names it.
  */
@@ -78,6 +84,10 @@ export function ruleRegistry(plugins: Plugin[] = []): Record<string, Rule> {
   const rules = { ...builtInRules };
   const names = new Set<string>();
   for (const plugin of plugins) {
+    if (plugin.name === reservedPluginName)
+      throw new Error(
+        `Invalid plugin name: ${reservedPluginName} is reserved for the engine's own diagnostics`,
+      );
     if (!/^[a-z][a-z\d-]*$/.test(plugin.name) || names.has(plugin.name))
       throw new Error(`Invalid or duplicate plugin name: ${plugin.name}`);
     names.add(plugin.name);
@@ -207,6 +217,19 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
   return undefined;
 }
 /**
+ * The workspace of a run as the engine and its rules use it, and the errors
+ * that it threw. Such an error is the host's, such as a file that could not be
+ * read, and neither a rule's nor a refusal to format: it stops the run.
+ */
+interface Host {
+  workspace?: Workspace;
+  errors: Set<unknown>;
+}
+function host(workspace: Workspace | undefined): Host {
+  const errors = new Set<unknown>();
+  return workspace ? { workspace: guarded(workspace, errors), errors } : { errors };
+}
+/**
  * `workspace` as rules see it. What its `resolve` throws is added to `errors`:
  * such an error is the host's, such as a file that could not be read, and not
  * the rule's. Rules still see it as it was thrown.
@@ -248,14 +271,12 @@ function inspect(
   document: Document,
   config: ResolvedConfig,
   rules: Record<string, Rule>,
-  host?: Workspace,
+  { workspace, errors: hostErrors }: Host,
   include: (rule: Rule) => boolean = () => true,
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
   const starts = lineStarts(document.source);
-  const hostErrors = new Set<unknown>();
-  const workspace = host && guarded(host, hostErrors);
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
     const rule = rules[name]!;
@@ -311,7 +332,7 @@ export function lint(source: string, options: ProcessOptions = {}): Diagnostic[]
   const { config, rules } = prepare(options);
   const [mark, text] = splitByteOrderMark(source);
   const document = parse(text, config.dialect, options.path, options.plugins);
-  const diagnostics = inspect(document, config, rules, options.workspace);
+  const diagnostics = inspect(document, config, rules, host(options.workspace));
   // Ranges count the marks, and the document's positions do not.
   const scope =
     options.ranges && widen(document.tree, document.source, shifted(options.ranges, -mark.length));
@@ -543,6 +564,9 @@ function formatText(
   ranges: SourceRange[] | undefined,
 ): FormatResult {
   const { config, rules } = prepare(options);
+  // What the workspace throws stops formatting, as it stops `lint`.
+  const hosted = host(options.workspace);
+  const { workspace } = hosted;
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);
   // Where edits may apply, in the positions of the current output.
@@ -563,10 +587,10 @@ function formatText(
   const check = (candidate: string) => {
     const parsed = parse(candidate, config.dialect, options.path, options.plugins);
     // Every document accepted so far means what the original means, so the current one serves.
-    fingerprint ??= semanticFingerprint(document, options.workspace);
+    fingerprint ??= semanticFingerprint(document, workspace);
     return {
       document: parsed,
-      safe: semanticFingerprint(parsed, options.workspace) === fingerprint,
+      safe: semanticFingerprint(parsed, workspace) === fingerprint,
     };
   };
   const seen = new Set([source]);
@@ -592,7 +616,7 @@ function formatText(
           document,
           config,
           rules,
-          options.workspace,
+          hosted,
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
         findings.push(...diagnostics);
@@ -647,18 +671,12 @@ function formatText(
       if (output === before) {
         // No phase changed the document, so every style finding of this pass
         // describes the final document; only the non-style rules still need to run.
-        const remaining = inspect(
-          document,
-          config,
-          rules,
-          options.workspace,
-          (rule) => rule.kind !== "style",
-        );
+        const remaining = inspect(document, config, rules, hosted, (rule) => rule.kind !== "style");
         // A refusal of this pass was tried on the final text, unless one
         // phase undid what an earlier one did.
         const starts = refused.length ? lineStarts(output) : [];
         const refusals = refused.map(({ rule, before: tried, after }) => {
-          const start = tried.source === output ? divergence(tried, after, options.workspace) : 0;
+          const start = tried.source === output ? divergence(tried, after, workspace) : 0;
           const { line } = diagnostic(starts, rule, "error", { start, message: "" });
           return diagnostic(starts, "engine/unsafe-format", "error", {
             start,
@@ -682,6 +700,7 @@ function formatText(
       `Formatting by ${listed(applied)} did not converge in eight passes; the document was left unchanged.`,
     );
   } catch (error) {
+    if (hosted.errors.has(error)) throw error;
     return unchanged(error instanceof Error ? error.message : String(error));
   }
 }
