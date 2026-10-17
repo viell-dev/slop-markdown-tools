@@ -28,9 +28,9 @@ npx mdtools lint
 `lint` reports what the enabled rules find and never changes a file. Without
 paths it checks every document of the workspace: each file ending in `.md` below
 the configuration file's directory, or else below the Git repository or vault
-you run it in; see
-[which files are processed](cli.md#which-files-are-processed). Add `--json` for
-a report that scripts can read, or `--max-warnings 0` to fail on warnings too.
+you run it in; see [which files are
+processed](cli.md#which-files-are-processed). Add `--json` for a report that
+scripts can read, or `--max-warnings 0` to fail on warnings too.
 
 ## Preview and write
 

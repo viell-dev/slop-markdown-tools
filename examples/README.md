@@ -1,9 +1,9 @@
 # Examples
 
-Working examples of configuring, running, and extending mdrefine. The
-[examples page](https://viell-dev.github.io/slop-markdown-tools/examples.html)
-walks through each one with its input and output. The integration tests run
-every example, so what is here matches what the tool does.
+Working examples of configuring, running, and extending mdrefine. The [examples
+page](https://viell-dev.github.io/slop-markdown-tools/examples.html) walks
+through each one with its input and output. The integration tests run every
+example, so what is here matches what the tool does.
 
 Run the commands below from a built checkout (`npm ci && npm run build`). In a
 project that installs the package, the same files are under

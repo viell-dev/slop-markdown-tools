@@ -85,8 +85,8 @@ loaded plugins. The library exports the same schema as
 A **preset** is a named set of rule settings. The **dialect** is a separate
 setting: it names the renderer whose syntax documents are read in, such as
 GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
-break. Each preset except `recommended` also sets a dialect. The
-[rule index](rules.md) shows which rules each preset enables.
+break. Each preset except `recommended` also sets a dialect. The [rule
+index](rules.md) shows which rules each preset enables.
 
 | Preset        | Sets the dialect | For                                                                                                                |
 | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -156,11 +156,11 @@ macOS, where `.gitignore` files and patterns on the command line
 that are never linted or formatted. They remain link targets, so links to them
 are still checked.
 
-The CLI also leaves out what `.gitignore` files exclude, decided
-[as Git decides it](cli.md#which-files-are-processed), nested Git repositories,
-symbolic links, and the directories `.git`, `.obsidian`, `node_modules`, `dist`,
-and `coverage`. `resolve` makes two of these available as link targets, without
-ever selecting them for linting or formatting:
+The CLI also leaves out what `.gitignore` files exclude, decided [as Git decides
+it](cli.md#which-files-are-processed), nested Git repositories, symbolic links,
+and the directories `.git`, `.obsidian`, `node_modules`, `dist`, and `coverage`.
+`resolve` makes two of these available as link targets, without ever selecting
+them for linting or formatting:
 
 ```jsonc
 {

@@ -65,8 +65,8 @@ Verify these once per release rather than setting them up again:
 ## Publish
 
 Merge the release pull request after its checks pass, and review the version,
-the changelog section, and the package manifest once more. Then
-dispatch **Release** on `main` with the exact version, `publish: true`, and the
+the changelog section, and the package manifest once more. Then dispatch
+**Release** on `main` with the exact version, `publish: true`, and the
 publishing agent's identity as `model via harness`. The workflow builds and
 checks the package again, verifies the artifact's checksum, publishes the tested
 tarball with provenance under `publishConfig.tag`, which it checks against the

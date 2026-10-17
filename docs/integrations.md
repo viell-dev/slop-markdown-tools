@@ -124,5 +124,5 @@ its position, and, for a style rule, the edit it proposes. A safe loop is:
 `format --diff` to see the changes, `format --write` to apply them, then `lint`
 again for what needs a person. The [examples](examples.md#automate-checks)
 include a script that summarizes a report. To report a defect of the tool,
-follow the
-[contribution guide](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#report-a-defect).
+follow the [contribution
+guide](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#report-a-defect).
