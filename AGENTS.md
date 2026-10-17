@@ -249,8 +249,8 @@ passing checks, and resolved review threads remain mandatory.
 - `src/syntax/` owns micromark/mdast parsing and Obsidian extensions;
   `src/config/` resolves presets, schemas, overrides, and trusted plugins.
   `src/core/` executes rules and validates edits; `src/workspace/` resolves
-  local targets and handles discovery and atomic writes. Rules propose edits;
-  they do not write files directly.
+  local targets and handles discovery and file writes. Rules propose edits; they
+  do not write files directly.
 - `src/config/load.ts` locates a plugin that is not named by path with
   `import-meta-resolve`, a port of Node.js's own import resolution, and then
   with CommonJS resolution. Node.js has no supported call that resolves an

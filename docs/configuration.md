@@ -522,8 +522,8 @@ formatting command can still report remaining lint problems. Inspect its exit
 code and diagnostics. An unsafe-format diagnostic blocks the complete batch's
 write phase, and so does a selected document that
 [cannot be read](#paths-that-cannot-be-read) or a changed file that
-[cannot be written](#files-that-cannot-be-written). Replacement is atomic per
-file, not a workspace-wide transaction: a file that fails while the batch is
+[cannot be written](#files-that-cannot-be-written). Each file is written on its
+own, not as a workspace-wide transaction: a file that fails while the batch is
 being written is reported, and the others are still written.
 
 ## Paths that cannot be read
@@ -626,13 +626,13 @@ characters into the file when `format --write` changed anything in it.
 
 ## Files that cannot be written
 
-`format --write` replaces each file it changes with a new file written beside
-it, so that a file is never left half written; the files that it writes in place
-instead are [described below](#what-a-replaced-file-keeps). Before it writes
-anything, it checks that each file it is about to change may be written and that
-the file's folder lets it create the new file there. A file that fails the check
-is reported as an error diagnostic for that file, with the rule ID
-`engine/unwritable-file` at line 1 and the system's reason, such as
+`format --write` writes each file it changes in place, into the existing file,
+which keeps everything about the file but its content; see
+[what writing keeps](#what-writing-keeps). Before it writes anything, it checks
+that each file it is about to change may be written and that the file's folder
+lets it create a trial file there. A file that fails the check is reported as an
+error diagnostic for that file, with the rule ID `engine/unwritable-file` at
+line 1 and the system's reason, such as
 `The file may not be written (EACCES: permission denied); no file was written.`
 Nothing of the batch is written, `written` is `false` in the JSON report, and
 the exit code is `2`, as for a document that cannot be read; pass `--exclude`
@@ -644,32 +644,44 @@ batch on Windows.
 A failure that the check cannot foresee is reported for its file in the same
 way, as in
 `The file could not be written (EPERM: operation not permitted) and is unchanged.`
-That happens on Windows for a file that another program has open, and on every
-platform when a file changed on disk during the run or the disk is full. The
-other files of the batch are still written, `written` is `true`, and the exit
-code is `2`. Versions up to `0.2.0-rc.2` stopped at such a file with the
-system's message, after writing the files before it.
+That happens on Windows for a file that another program has locked, or that a
+permission given to the file forbids the user to write, and on every platform
+when a file changed on disk during the run or the disk is full. The other files
+of the batch are still written, `written` is `true`, and the exit code is `2`.
+Versions up to `0.2.0-rc.2` stopped at such a file with the system's message,
+after writing the files before it.
 
-### What a replaced file keeps
+### What writing keeps
 
-The new file gets the content and the permission bits of the file it replaces.
-It is a new file, though, and it loses what Node.js can neither read nor set:
-the creation time, extended attributes, and access control list entries given to
-the file itself, and on Windows also attributes such as Hidden and alternate
-data streams, such as the mark of a downloaded file. A Windows file's
-permissions are such entries, so the replaced file has only the permissions that
-its folder passes on, which can let more users read it than before.
+Writing into the existing file keeps everything about it except its content and
+its modification time: its permissions, including those given to the file itself
+on Windows and access control lists on Linux and macOS, its owner and group,
+attributes such as Hidden, extended attributes, alternate data streams such as
+the mark of a downloaded file, its creation time, and its other names if it has
+hard links. A file whose two names are both selected documents is written once
+and counted for each.
 
-Two kinds of file are written in place instead, into the existing file, which
-keeps all of that. One is a file with more than one name, a hard link: a
-replacement would give one name the new content and leave the old content under
-the others. The other, on Linux and macOS, is a file whose replacement would get
-another owner or group, which happens when the tool runs as another user than
-the file's owner, or when the file's group is not the one that new files in its
-folder get. Writing in place is not atomic. The new content is first written
-beside the file, which shows that it fits on the disk, but a failure while the
-file itself is being written can leave it incomplete, and is reported as
-`The file could not be written completely (EIO: i/o error) and may be incomplete.`
-A file whose two names are both selected documents is written once and counted
-for each. Versions up to `0.2.0-rc.2` replaced every file, which left the other
-names of a hard link with the old content and could change a file's group.
+Writing in place is not atomic, and the tool makes up for that as far as it can.
+Before it writes a file, it writes a trial file of the same size beside it,
+holding random bytes, and removes it again, which shows that the new content
+fits on the disk. Just before writing, it checks through the open file that the
+file still holds exactly the bytes it read. If writing then fails part way, it
+writes those bytes back and says whether that worked, as in
+`The file could not be written (EIO: i/o error), and its content from before formatting was written back.`
+or, when that fails too,
+`… and writing its content from before formatting back failed too (EIO: i/o error); it may be incomplete.`
+
+Nothing protects a file from a crash of the computer or a power failure while it
+is being written. The file can then be left incomplete, with part of the new
+content and part of the old, and a later run of the tool cannot repair it; keep
+documents that matter in version control or a backup. A program that reads the
+file at that moment can see it half written too. A crash during the trial write
+can leave the trial file behind; it is named `.mdtools-` followed by a random
+name and `.tmp`, holds no document text, and can be deleted.
+
+Versions up to `0.2.0-rc.2` replaced each file with a new one written beside it,
+which no crash could leave half written, but which lost what Node.js cannot copy
+to a new file: the other names of a hard link kept the old content, the owner
+and group could change, and on Windows the permissions given to the file itself
+were dropped, so that it had only those its folder passes on, which could let
+more users read it.

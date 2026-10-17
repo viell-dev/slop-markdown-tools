@@ -62,11 +62,13 @@ path's permissions away until the test ends, with a Unix mode. Tests that use it
 are skipped on Windows and for the root user, who reads anything. On Windows,
 `denyRead()` takes away the right to read a file or list a directory through the
 path's access control list instead, and a smaller set of tests checks the same
-behavior with it. `linkDirectory()` links a directory, as a junction on Windows,
-which needs no privilege there; a test that links a file needs `canSymlink`,
-because Windows allows that only in Developer Mode or for administrators.
-`links.test.ts` covers the library's part of unreadable paths everywhere, by
-telling the workspace which paths are unreadable.
+behavior with it. `denyWrite()` takes away the right to write a file's content
+the same way, and `windowsTool()` runs one of Windows's own programs, such as
+`icacls.exe` or `attrib.exe`. `linkDirectory()` links a directory, as a junction
+on Windows, which needs no privilege there; a test that links a file needs
+`canSymlink`, because Windows allows that only in Developer Mode or for
+administrators. `links.test.ts` covers the library's part of unreadable paths
+everywhere, by telling the workspace which paths are unreadable.
 
 A defect in how the tool behaves as a program belongs here: which files it
 selects, what it prints, what it writes, and how it exits.
