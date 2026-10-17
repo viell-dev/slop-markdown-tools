@@ -1111,8 +1111,9 @@ describe("files that could not be read", () => {
     dialect,
     rules: { "links/valid": severity },
   });
-  // EBUSY: on Windows, another program can lock a file against reading.
-  it.each(["EACCES", "EPERM", "EBUSY"])(
+  // EBUSY: on Windows, another program can lock a file against reading. The last
+  // is the code for bytes that are not UTF-8 text.
+  it.each(["EACCES", "EPERM", "EBUSY", "ERR_ENCODING_INVALID_ENCODED_DATA"])(
     "resolves a fragment in a file whose loader fails with %s as unreadable",
     (code) => {
       const load = refuse(code);
@@ -1136,6 +1137,19 @@ describe("files that could not be read", () => {
       expect(index.resolve("Doc.md", "Open.md#open", "github").fragmentExists).toBe(true);
     },
   );
+  it("takes the error of a fatal TextDecoder for bytes that are not UTF-8 as that code", () => {
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    const index = createWorkspace({
+      "Doc.md": "",
+      "Latin.md": () => decoder.decode(Uint8Array.from([0x23, 0x20, 0xe9])),
+    });
+    expect(index.resolve("Doc.md", "Latin.md#section", "github")).toEqual({
+      status: "unreadable",
+      target: "Latin.md",
+      fragment: "section",
+      unreadable: ["Latin.md"],
+    });
+  });
   it("lets any other loader error through", () => {
     for (const error of [
       Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" }),

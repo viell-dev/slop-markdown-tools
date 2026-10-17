@@ -606,13 +606,32 @@ reading, with the reason `EBUSY: resource busy or locked`; versions up to
 as a path that disappeared during the run or a failing device, stops the run
 with exit code `2`.
 
+Documents are read as UTF-8, with or without a byte order mark, and the tool
+does not guess another encoding: a guess can be wrong, and the supported
+renderers read Markdown as UTF-8. A selected document that is not valid UTF-8 is
+reported in the same way as one that cannot be read, with
+`engine/unreadable-file` and a message that says what was found, as in
+`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
+So is a file that starts with a UTF-16 or UTF-32 byte order mark, which Windows
+PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as UTF-16
+text without a mark does for every ASCII character. Save such a file as UTF-8 to
+process it. A link to a heading or block in it is reported as
+`Fragment could not be checked`, as for a file that cannot be read. Text on
+stdin that is not UTF-8 stops the command with exit code `2` and a message such
+as
+`mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
+Versions up to `0.2.0-rc.2` decoded every file and stdin as UTF-8 without
+checking, replaced what was not UTF-8 with the character U+FFFD, and wrote those
+characters into the file when `format --write` changed anything in it.
+
 ## Files that cannot be written
 
 `format --write` replaces each file it changes with a new file written beside
-it, so that a file is never left half written. Before it writes anything, it
-checks that each file it is about to change may be written and that the file's
-folder lets it create the new file there. A file that fails the check is
-reported as an error diagnostic for that file, with the rule ID
+it, so that a file is never left half written; the files that it writes in place
+instead are [described below](#what-a-replaced-file-keeps). Before it writes
+anything, it checks that each file it is about to change may be written and that
+the file's folder lets it create the new file there. A file that fails the check
+is reported as an error diagnostic for that file, with the rule ID
 `engine/unwritable-file` at line 1 and the system's reason, such as
 `The file may not be written (EACCES: permission denied); no file was written.`
 Nothing of the batch is written, `written` is `false` in the JSON report, and
@@ -630,3 +649,27 @@ platform when a file changed on disk during the run or the disk is full. The
 other files of the batch are still written, `written` is `true`, and the exit
 code is `2`. Versions up to `0.2.0-rc.2` stopped at such a file with the
 system's message, after writing the files before it.
+
+### What a replaced file keeps
+
+The new file gets the content and the permission bits of the file it replaces.
+It is a new file, though, and it loses what Node.js can neither read nor set:
+the creation time, extended attributes, and access control list entries given to
+the file itself, and on Windows also attributes such as Hidden and alternate
+data streams, such as the mark of a downloaded file. A Windows file's
+permissions are such entries, so the replaced file has only the permissions that
+its folder passes on, which can let more users read it than before.
+
+Two kinds of file are written in place instead, into the existing file, which
+keeps all of that. One is a file with more than one name, a hard link: a
+replacement would give one name the new content and leave the old content under
+the others. The other, on Linux and macOS, is a file whose replacement would get
+another owner or group, which happens when the tool runs as another user than
+the file's owner, or when the file's group is not the one that new files in its
+folder get. Writing in place is not atomic. The new content is first written
+beside the file, which shows that it fits on the disk, but a failure while the
+file itself is being written can leave it incomplete, and is reported as
+`The file could not be written completely (EIO: i/o error) and may be incomplete.`
+A file whose two names are both selected documents is written once and counted
+for each. Versions up to `0.2.0-rc.2` replaced every file, which left the other
+names of a hard link with the old content and could change a file's group.
