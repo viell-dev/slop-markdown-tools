@@ -103,15 +103,17 @@ configuration, and plugins in `engine.test.ts`.
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are. A defect in what
 the tool selects, prints, writes, or how it exits belongs here: `cli.test.ts`
-for commands and options, `workflows.test.ts` for whole tasks, `node.test.ts`
-for `mdrefine/node`, and `examples.test.ts` and `docs.test.ts` for the examples
-and documentation. `support.ts` holds the helpers: `fixture()` writes a
-temporary workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take
-away read permission on Unix and on Windows, `denyWrite()` takes away write
-permission on Windows, `windowsTool()` runs a program of Windows such as
-`icacls.exe`, and `linkDirectory()` links a directory, as a junction on Windows.
-Tests that need Unix permission modes are skipped on Windows and for the root
-user, and one that links a file needs `canSymlink`.
+for commands and options, `selection.test.ts` for which files a run selects,
+compared with Git's own `.gitignore` decisions, `workflows.test.ts` for whole
+tasks, `node.test.ts` for `mdrefine/node`, and `examples.test.ts` and
+`docs.test.ts` for the examples and documentation. `support.ts` holds the
+helpers: `fixture()` writes a temporary workspace, `run()` starts the CLI,
+`restrict()` and `denyRead()` take away read permission on Unix and on Windows,
+`denyWrite()` takes away write permission on Windows, `windowsTool()` runs a
+program of Windows such as `icacls.exe`, and `linkDirectory()` links a
+directory, as a junction on Windows. Tests that need Unix permission modes are
+skipped on Windows and for the root user, and one that links a file needs
+`canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. A few unit tests guard against
