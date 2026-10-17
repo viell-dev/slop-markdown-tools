@@ -16,9 +16,10 @@ command, `mdtools` prints the help on stderr and exits with code `2`, as it does
 for every mistake on the command line, such as an unknown option.
 
 `rules` prints one line per rule: its ID, kind, and description, separated by
-tabs. It finds the configuration as `lint` does, or reads the one that
-`--config` names. With `--json` it prints `{ "rules": [...] }`, each rule an
-object with its `id`, `kind`, and `description`.
+tabs. It looks for the configuration from the current directory, as `lint` does,
+or reads the one that `--config` names. With `--json` it prints
+`{ "rules": [...] }`, each rule an object with its `id`, `kind`, and
+`description`.
 
 ## Options
 
