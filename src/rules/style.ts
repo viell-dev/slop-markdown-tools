@@ -5,6 +5,7 @@ import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
+import { takesLines } from "./blocks.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -591,6 +592,8 @@ function together(
   const [afterStart, afterEnd] = range(after);
   // Front matter is not part of the document's text.
   if (["yaml", "toml"].includes(before.type)) return true;
+  // An unclosed HTML comment or block at the end of a list would take in the blank line.
+  if (takesLines(before)) return true;
   // Other tools, too, read a comment as applying to the line below it, and
   // `mdtools-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
@@ -727,8 +730,10 @@ export const styleRules: Record<string, Rule> = {
     kind: "style",
     phase: "document",
     schema: optionsSchema({}),
-    check({ document: { source } }) {
-      if (!source || /[\r\n]$/.test(source)) return [];
+    check({ document }) {
+      const { source } = document;
+      // An unclosed HTML comment or block at the end would take in the line ending.
+      if (!source || /[\r\n]$/.test(source) || takesLines(document.tree)) return [];
       return [
         {
           start: source.length,
@@ -739,19 +744,48 @@ export const styleRules: Record<string, Rule> = {
     },
   },
   "style/heading": {
-    description: "Use ATX headings.",
+    description: "Use ATX headings without closing sequences.",
     kind: "style",
     phase: "block",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({ closing: { enum: ["remove", "keep"] } }),
+    check({ document, options }) {
       const findings: Finding[] = [];
+      const { source } = document;
       walk(document.tree, "heading", (node) => {
-        const [start, end] = range(node);
-        if (document.source[start] === "#" || node.position!.start.column !== 1) return;
+        const [headingStart, end] = range(node);
         const first = node.children[0];
         const last = node.children.at(-1);
+        // An ATX heading is one line, a Setext heading also has its underline.
+        if (!/[\r\n]/.test(source.slice(headingStart, end))) {
+          if (options.closing === "keep") return;
+          const textEnd = last
+            ? range(last)[1]
+            : headingStart + /^#*/.exec(source.slice(headingStart))![0].length;
+          const lineEnd = lineBounds(source, textEnd, textEnd)[1];
+          if (!/^[ \t]+#+[ \t]*$/.test(source.slice(textEnd, lineEnd))) return;
+          // Gitea before 1.26 reads an attribute block that a closing sequence
+          // follows, and Forgejo and later Gitea versions do not.
+          if (
+            goldmarkForges[document.dialect] &&
+            first &&
+            headingAttributeBlock(source.slice(range(first)[0], textEnd))
+          )
+            return;
+          findings.push({
+            start: textEnd,
+            end: lineEnd,
+            message: "Remove the closing # sequence.",
+            edit: { start: textEnd, end: lineEnd, text: "" },
+          });
+          return;
+        }
         if (!first || !last) return;
-        let text = document.source.slice(range(first)[0], range(last)[1]);
+        // Below link reference definitions, the heading's position starts at
+        // the first definition; its own text starts on a later line. Headings
+        // that are indented or inside lists or block quotes are left as written.
+        const start = range(first)[0];
+        if (lineBounds(source, start, start)[0] !== start) return;
+        let text = source.slice(start, range(last)[1]);
         if (/[\r\n]/.test(text)) return;
         // A trailing run of # after whitespace would become an ATX closing
         // sequence and disappear from the heading; escape its first character.

@@ -1244,6 +1244,12 @@ describe("the dialect assumed when none is named", () => {
   const footnotes = "Text with two notes.[^1][^2]\n\n[^1]: First note.\n[^2]: Second note.\n";
   const footnote = "Text with a note.[^1]\n\n[^1]: Text.\n";
   const commonmark: Config = { dialect: "commonmark" };
+  // `recommended` aligns tables, which it would not do to a paragraph.
+  const aligned = "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n";
+  const wideAligned =
+    "| Sensor name in a long header cell      | Unit of measurement in a long header cell | Notes             |\n" +
+    "| -------------------------------------- | ----------------------------------------- | ----------------- |\n" +
+    "| Temperature measured at the north wall | Degrees Celsius, to one decimal place     | Calibrated yearly |\n";
   it("is GitHub, for a configuration, a preset, or a workspace that names none", () => {
     expect(resolveConfig().dialect).toBe("github");
     expect(resolveConfig({ extends: ["recommended"] }).dialect).toBe("github");
@@ -1258,16 +1264,18 @@ describe("the dialect assumed when none is named", () => {
     }
   });
   it.each([
-    ["a table with outer pipes", table],
-    ["a table without outer pipes", bareTable],
-    ["a table wider than 80 columns", wideTable],
-    ["two consecutive footnote definitions", footnotes],
-  ])("leaves %s as written", (_, source) => {
+    ["a table with outer pipes", table, aligned],
+    ["a table without outer pipes", bareTable, aligned],
+    ["a table wider than 80 columns", wideTable, wideAligned],
+    ["two consecutive footnote definitions", footnotes, footnotes],
+  ])("keeps %s, which is not prose to wrap", (_, source, output) => {
     // No configuration: the `recommended` preset, which wraps prose at 80 columns.
     const result = format(source);
-    expect(result).toEqual({ output: source, changed: false, diagnostics: [] });
+    expect(result.output).toBe(output);
+    expect(result.diagnostics.filter((item) => item.rule !== "style/table")).toEqual([]);
     expect(format(source, { config: { dialect: "github" } })).toEqual(result);
-    expect(lint(source)).toEqual([]);
+    expect(format(output)).toEqual({ output, changed: false, diagnostics: [] });
+    expect(lint(output)).toEqual([]);
   });
   it("reads a footnote definition as a footnote, not as a link to a missing file", () => {
     const workspace = createWorkspace({ "note.md": footnote });
@@ -1303,10 +1311,10 @@ describe("the dialect assumed when none is named", () => {
   });
   it("assumes the dialect only; the rules of the github preset still need the preset", () => {
     expect(Object.keys(resolveConfig().rules)).toEqual(Object.keys(presets.recommended!.rules!));
-    const source = `${table}\n- [X] Done\n\n> [!note]\n> Text.\n`;
+    const source = `${aligned}\n- [X] Done\n\n> [!note]\n> Text.\n`;
     expect(formatted(source)).toBe(source);
     expect(formatted(source, { config: { extends: ["recommended", "github"] } })).toBe(
-      "| Sensor      | Unit |\n| ----------- | ---- |\n| Temperature | °C   |\n\n- [x] Done\n\n> [!NOTE]\n> Text.\n",
+      `${aligned}\n- [x] Done\n\n> [!NOTE]\n> Text.\n`,
     );
   });
   it("gives way to a dialect named by the configuration, a preset, or an override", () => {
@@ -1316,8 +1324,10 @@ describe("the dialect assumed when none is named", () => {
     const config: Config = { overrides: [{ files: ["plain/**"], dialect: "commonmark" }] };
     expect(resolveConfig(config, "plain/a.md").dialect).toBe("commonmark");
     expect(resolveConfig(config, "docs/a.md").dialect).toBe("github");
-    expect(formatted(table, { config, path: "plain/a.md" })).not.toBe(table);
-    expect(formatted(table, { config, path: "docs/a.md" })).toBe(table);
+    expect(formatted(table, { config, path: "plain/a.md" })).toBe(
+      "| Sensor | Unit | |---|---| | Temperature | °C |\n",
+    );
+    expect(formatted(table, { config, path: "docs/a.md" })).toBe(aligned);
   });
 });
 
