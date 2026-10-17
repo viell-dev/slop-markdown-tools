@@ -196,7 +196,11 @@ thousands of files.
   size suggests: doubling one from 96 kB to 192 kB tripled the time, about
   twenty times as long as the same text read as CommonMark. The cause is in the
   parser, and GitHub's literal autolinks, which every dialect but CommonMark
-  reads, bring it out. Lists and tables of that size are not affected.
+  reads, bring it out. Lists and tables of that size are not affected. Square
+  brackets are the worst case, in every dialect: a single paragraph of 70 kB
+  made only of bracketed references such as `[a][b]` took from 1 to more than 30
+  seconds to parse, while one of 35 kB took a fraction of a second
+  ([issue #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of
   about 1.8 in every absolute time, while the "compared with parsing" ratios and
