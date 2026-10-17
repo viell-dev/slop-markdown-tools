@@ -117,3 +117,17 @@ node dist/cli/main.js format - --stdin-filepath notes/example.md < input.md > ou
 `--stdin-filepath` supplies the path used for configuration and link resolution.
 Stdin formatting writes Markdown to stdout and diagnostics to stderr unless
 `--json` is selected. It cannot be combined with `--write`.
+
+The example uses the redirection of a POSIX shell or of `cmd`, which pass the
+bytes unchanged. PowerShell has no `<` operator, and it changes text that it
+pipes into a program: it adds a line break at the end, or turns every line
+ending into CRLF when it pipes lines, and Windows PowerShell 5.1 also replaces
+characters outside ASCII with `?` and writes `>` output as UTF-16. In
+PowerShell, run the redirection through `cmd`:
+
+```powershell
+cmd /c "node dist/cli/main.js format - --stdin-filepath notes/example.md < input.md > output.md"
+```
+
+To format files in place, pass them as arguments with `--diff` or `--write`
+instead; that needs no redirection in any shell.
