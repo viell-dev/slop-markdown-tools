@@ -572,6 +572,9 @@ or what a comment applies to:
 - Directly below a table that ends in a list item or block quote: text whose
   second line holds a `|`. The parser reads a table there as text, where GitHub
   reads a table, and a blank line would make it a table for the parser too.
+- In a block quote, below a list whose last item ends in an empty footnote
+  definition, such as `> - [^1]:`. The parser would count the new line of `>` as
+  part of the item and read the list as loose.
 
 ## `style/emphasis`
 

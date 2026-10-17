@@ -329,7 +329,8 @@ From every prerelease:
   `*a _b* c_` or `*****a***`, markers next to dollar math or across the line of
   a callout's or alert's marker, code spans whose joined line would form an
   Obsidian highlight or wikilink, change that line, or pair with earlier
-  backticks, and a table below one that ends in a list item or block quote
+  backticks, a table below one that ends in a list item or block quote, and a
+  list in a quote that ends in an empty footnote definition
   ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
 - `style/inline-code` leaves out the spaces and tabs that start a code span's
   next line when it joins the span, as CommonMark and GitHub do; before,

@@ -146,6 +146,13 @@ describe("style/block-spacing", () => {
     ["- | a |\n  | - |\n| b |\n| - |\n"],
     ["> - | a |\n>   | - |\n> | b |\n> | - |\n"],
     ["> | a |\n> | - |\n| b |\n| - |\n---\n"],
+    ["- > | a |\n  > | - |\n| a |\n| - |\n"],
+    ["> - $$\n>   $$\n>   | a |\n>   | - |\n> a | b\n> --|--\n"],
+    // In a quote, a line of `>` below an empty footnote definition at the end
+    // of a list item would make the item loose.
+    ["> - [^2]:\n> Text\n"],
+    ["> - - [^2]:\n> # H\n"],
+    ["> > - [^2]:\n> > # H\n"],
   ])("leaves %j unchanged", (source) => {
     expect(spaced(source)).toBe(source);
     expect(lint(source, { config: only(rule, "github") })).toEqual([]);
@@ -154,6 +161,11 @@ describe("style/block-spacing", () => {
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
       "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
+  });
+  it("still separates a footnote definition with text, or one outside a quote", () => {
+    expect(spaced("> - [^2]: note\n> # H\n")).toBe("> - [^2]: note\n>\n> # H\n");
+    expect(spaced("- [^2]:\n# H\n")).toBe("- [^2]:\n\n# H\n");
+    expect(spaced("> [^2]:\n> # H\n")).toBe("> [^2]:\n>\n> # H\n");
   });
   it("still separates other text below a table in a list", () => {
     expect(spaced("- | a |\n  | - |\nText\n")).toBe("- | a |\n  | - |\n\nText\n");

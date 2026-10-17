@@ -1194,6 +1194,17 @@ function together(
     source.slice(afterStart, afterEnd).split(lineBreak)[1]?.includes("|")
   )
     return true;
+  // In a block quote, the parser counts a line of quote markers below a list
+  // that ends in an empty footnote definition as part of the list item, which
+  // makes the item loose.
+  const last = lastBlock(before);
+  if (
+    parent.type === "blockquote" &&
+    before.type === "list" &&
+    last.type === "footnoteDefinition" &&
+    !last.children.length
+  )
+    return true;
   // Directly below text or a link reference definition, the parser does not
   // start a list that would be empty or not start at 1, though it does below
   // a blank line: there, `- -` is a list item holding the text `-`, and `-`
