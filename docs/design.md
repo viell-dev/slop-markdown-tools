@@ -122,5 +122,7 @@ Scale:
   cache, worker pool, watch mode, editor extension, or language server. Start-up
   takes about a quarter of a second.
 - While a document is parsed, it needs about 70 to 130 times its size in memory,
-  and a single paragraph of 100 kB or more full of inline syntax parses slowly.
-  [Benchmarks](benchmarks.md) has the measurements.
+  and a single paragraph of 100 kB or more full of inline syntax parses slowly;
+  one made of tens of thousands of square brackets can take seconds from about
+  50 kB. [Benchmarks](benchmarks.md#limits-of-these-numbers) has the
+  measurements.
