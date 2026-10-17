@@ -198,8 +198,16 @@ describe("wrapping controls", () => {
     ["A long line with many words that will not be reflowed.  \nNext line.\n", "hard line break"],
     ["A long line with many words that will not be reflowed. ^id\n", "block identifier"],
     [
-      "A long line with a `code span that crosses\na line` and more words than the configured width.\n",
-      "multiline inline syntax",
+      "A long line with $math that crosses\na line$ and more words than the configured width.\n",
+      "line break in math",
+    ],
+    [
+      "A long line with [a link](https://example.test\n'and its title') and more words than the width.\n",
+      "line break in a link destination or title",
+    ],
+    [
+      "- A list item with more words than the configured width.\n one space short\n",
+      "unsupported continuation",
     ],
     ["A long line with <b>inline HTML</b> and many more words.\n", "inline HTML"],
   ])("optionally reports protected over-width paragraphs", (source, reason) => {
@@ -210,10 +218,10 @@ describe("wrapping controls", () => {
     expect(lint(source!, { config: wrap() })).toEqual([]);
   });
   it.each([
-    "[a label](<https://example.test/a long path with protected spaces>)",
+    "[label](<https://example.test/a long path with protected spaces>)",
     "![an image](https://example.test/a-very-long-unbreakable-image)",
     "`a code span with spaces that cannot be split by wrapping`",
-    "**an emphasized phrase that the wrapper preserves as one atom**",
+    "$a formula with spaces that the wrapper preserves as one atom$",
     "an_indivisible_word_that_exceeds_the_configured_width",
   ])("classifies protected hard-break atoms independently: %s", (atom) => {
     for (const newline of ["\n", "\r\n"]) {
@@ -248,7 +256,7 @@ describe("wrapping controls", () => {
     expect(verify(spaced, wrap({ reportUnreflowed: true })).diagnostics[0]?.message).toContain(
       "hard line break",
     );
-    const adjacent = `${"x".repeat(25)}[a label](target)  \nnext\n`;
+    const adjacent = `${"x".repeat(25)}[a_label](target)  \nnext\n`;
     const result = verify(adjacent, wrap({ reportUnreflowed: true, reportUnbreakable: true }));
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]?.message).toContain("unbreakable atom");
@@ -373,6 +381,152 @@ describe("a block marker as a paragraph's first word", () => {
     const output = verify(source, wrap()).output;
     expect(output).not.toBe(source);
     expect(output.replace(/\n(?!$)/g, " ")).toBe(source);
+  });
+});
+describe("words that could open a block at the start of a line", () => {
+  it.each(["--config", "*delta*", "#tag", "#123", "-5", "+1", "1.5", "***bold***", "=>", "|x|"])(
+    "lets the ordinary word %s start a line",
+    (word) => {
+      const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb ${word} more words follow here.\n`;
+      expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(
+        `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb\n${word} more words follow here.\n`,
+      );
+    },
+  );
+  it("keeps a sentence of command-line options within the width", () => {
+    const source =
+      "Pass --config, --root, --dialect, --width, --max-warnings, --fix, --check, and --diff to the command when you need them.\n";
+    expect(verify(source, { ...wrap({ width: 30 }), dialect: "github" }).output).toBe(
+      "Pass --config, --root,\n--dialect, --width,\n--max-warnings, --fix,\n--check, and --diff to the\ncommand when you need them.\n",
+    );
+  });
+  it.each([
+    ["* * *", true],
+    ["- - -", true],
+    ["_ _ _", true],
+    ["** *", true],
+    ["__ _", true],
+    ["-- -", true],
+    ["= =", true],
+    // CommonMark has no tables.
+    ["| --- | --- |", false],
+    [":-- --:", false],
+  ] as const)(
+    "keeps the words of %j off the start of a line, which they would make a block",
+    (words, everywhere) => {
+      for (const width of [20, 25, 30, 40]) {
+        for (const dialect of ["commonmark", "github", "obsidian"] as const) {
+          if (dialect === "commonmark" && !everywhere) continue;
+          const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+          const source = `Header a | b and more words ${words} and words after them ${words}\n`;
+          const output = verify(source, { ...wrap({ width }), dialect }, workspace).output;
+          for (const line of output.split("\n").slice(1))
+            expect(line.startsWith(words.slice(0, 2)), JSON.stringify(output)).toBe(false);
+        }
+      }
+    },
+  );
+  it("keeps a table delimiter row from starting a line", () => {
+    const source = "Columns a | b |---|---|\n";
+    for (const dialect of ["github", "forgejo", "gitea", "obsidian"] as const) {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      expect(verify(source, { ...wrap({ width: 20 }), dialect }, workspace).output).toBe(
+        "Columns a |\nb |---|---|\n",
+      );
+    }
+    // CommonMark has no tables, so a delimiter row is a word like any other.
+    expect(
+      verify("Columns a | b and |---|---| rows\n", {
+        ...wrap({ width: 20 }),
+        dialect: "commonmark",
+      }).output,
+    ).toBe("Columns a | b and\n|---|---| rows\n");
+  });
+});
+describe("a tab in a container prefix", () => {
+  /** A line's width, with a tab advancing to the next multiple of four columns. */
+  function columns(line: string): number {
+    let width = 0;
+    for (const character of line) width = character === "\t" ? width + 4 - (width % 4) : width + 1;
+    return width;
+  }
+  const words = "word ".repeat(20).trim();
+  it.each(["-\t", "1.\t", "- [ ]\t", ">\t", "-\t-\t", "> -\t"])(
+    "counts the tab of %j to the next tab stop",
+    (prefix) => {
+      for (const measure of ["columns", "codepoints"]) {
+        const output = verify(`${prefix}${words}\n`, {
+          ...wrap({ measure }),
+          dialect: "github",
+        }).output;
+        const lines = output.trimEnd().split("\n");
+        expect(lines.length).toBeGreaterThan(2);
+        expect(
+          lines.every((line) => columns(line) <= 40),
+          JSON.stringify(output),
+        ).toBe(true);
+        expect(
+          lines.some((line) => columns(line) > 35),
+          JSON.stringify(output),
+        ).toBe(true);
+      }
+    },
+  );
+  it("measures the issue's list item at 40 columns", () => {
+    expect(verify(`-\t${words}\n`, { ...wrap(), dialect: "github" }).output).toBe(
+      "-\tword word word word word word word\n \tword word word word word word word\n \tword word word word word word\n",
+    );
+  });
+});
+describe("a paragraph's first word that would be a block on its own", () => {
+  const url = "https://example.com/a/very/long/address/that/does/not/fit/on/a/line";
+  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps a link reference definition from forming in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      for (const width of [20, 40, 80]) {
+        const config: Config = { ...wrap({ width }), dialect };
+        for (const source of [
+          `[Note]: see ${url} for details.\n`,
+          `[A longer note]: see ${url} for details.\n`,
+          `[Note]:\nsee ${url} for details.\n`,
+          `[Note]: see "a quoted title" and ${url} for details.\n`,
+          `[Note]: see 'a quoted title' ${url}\nfor details.\n`,
+          `> [Note]: see ${url} for details.\n`,
+        ]) {
+          const output = verify(source, config, workspace).output;
+          expect(output.split("\n").length, JSON.stringify(source)).toBeGreaterThan(2);
+        }
+      }
+    },
+  );
+  it("keeps the issue's example a paragraph", () => {
+    const source =
+      "[Note]: see https://example.com/a/very/long/address/that/does/not/fit/on/the/first/line for details.\n";
+    expect(verify(source, { ...wrap({ width: 80 }), dialect: "github" }).output).toBe(
+      "[Note]: see https://example.com/a/very/long/address/that/does/not/fit/on/the/first/line\nfor details.\n",
+    );
+  });
+  it.each(["***", "---", "___", "+++", "$$", "```js"])(
+    "keeps the next word on the first line after %j",
+    (word) => {
+      for (const dialect of ["commonmark", "github", "obsidian"] as const) {
+        const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+        // A backtick or a `$` on the line keeps a fence or math from opening.
+        const source = `${word} ${url} \`c\` and more words here, a$ b.\n`;
+        const output = verify(source, { ...wrap(), dialect }, workspace).output;
+        expect(output, dialect).not.toBe(source);
+        // CommonMark has no math.
+        if (word !== "$$" || dialect !== "commonmark")
+          expect(output.startsWith(`${word} ${url}`), dialect).toBe(true);
+      }
+    },
+  );
+  it("keeps the words of a fence's line together up to the one that stops it opening", () => {
+    const source = "```js a b c d e f g h `y` more words here\n";
+    expect(verify(source, { ...wrap({ width: 20 }), dialect: "github" }).output).toBe(
+      "```js a b c d e f g h `y`\nmore words here\n",
+    );
   });
 });
 describe("a lazy first line", () => {
@@ -609,10 +763,199 @@ describe("inline syntax that spans lines", () => {
   // Issue #201: with CR line endings the line break inside the link went unnoticed.
   it.each(["\n", "\r\n", "\r"])("leaves the paragraph as written with %j", (newline) => {
     const config: Config = { extends: [], rules: { "style/wrap": ["warn", { width: 30 }] } };
-    for (const inline of [`[long link${newline}label](https://example.com)`, `*a${newline}b*`]) {
+    for (const inline of [`[link](https://example.com${newline}"title")`, `$a${newline}b$`]) {
       const source = `Some text with ${inline} and more words here to wrap.${newline}`;
       expect(format(source, { config }).output, JSON.stringify(source)).toBe(source);
     }
+  });
+});
+describe("line breaks inside link text, emphasis, and code spans", () => {
+  const dialects = ["commonmark", "github", "forgejo", "gitea", "obsidian"] as const;
+  const workspace = createWorkspace({}, { strictLineBreaks: true });
+  const definitions = "\n\n[shortcut text]: /a\n[ref]: /b\n";
+  // Each construct, written across a line break as `|`.
+  const constructs = [
+    "[the text|of a link](https://example.com/guide)",
+    "![an image|description](image.png)",
+    "![an image|description](image.png 'with a title')",
+    "*an emphasized|phrase*",
+    "_an emphasized|phrase_",
+    "**strong|text**",
+    "***strong and|emphasized***",
+    "`a code|span`",
+    "``a `code`|span``",
+    "[shortcut|text]",
+    "[shortcut|text][]",
+    "[full|text][ref]",
+    "![shortcut|text]",
+    "[`code in|link text`](u)",
+  ];
+  const gfmConstructs = ["~~struck|out~~", "~struck|out~"];
+  it.each(dialects)("reflows across them like across a space in the %s dialect", (dialect) => {
+    const config: Config = { ...wrap({ width: 20 }), dialect };
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      for (const construct of [...constructs, ...(dialect === "commonmark" ? [] : gfmConstructs)]) {
+        const paragraph = (separator: string) =>
+          `Some words ${construct.replace("|", separator)} and more words after it.`;
+        const definitionLines = definitions.replaceAll("\n", newline);
+        const source = paragraph(newline) + definitionLines;
+        const result = verify(source, config, workspace);
+        expect(result.output, JSON.stringify(source)).toBe(
+          verify(paragraph(" ") + definitionLines, config, workspace).output,
+        );
+        expect(result.output).not.toBe(source);
+      }
+    }
+  });
+  it("reflows a paragraph that another formatter wrapped at a smaller width", () => {
+    const source =
+      "Text that another formatter wrapped at sixty columns breaks\nlines inside [the text of a\nlink](https://example.com/guide), inside _an emphasized\nphrase_, inside **strong\ntext**, and inside ~~struck\nout words~~, all of which render as spaces.\n";
+    expect(verify(source, { ...wrap({ width: 80 }), dialect: "github" }).output).toBe(
+      "Text that another formatter wrapped at sixty columns breaks lines inside [the\ntext of a link](https://example.com/guide), inside _an emphasized phrase_,\ninside **strong text**, and inside ~~struck out words~~, all of which render as\nspaces.\n",
+    );
+  });
+  it.each([
+    ["- ", "  "],
+    ["> ", "> "],
+    ["> - ", ">   "],
+    ["1. > ", "   > "],
+    ["> > ", "> > "],
+  ])("joins the lines of each construct in containers (%j)", (prefix, continuation) => {
+    const source = `${prefix}Item with **bold [link\n${continuation}text](u) more** and \`code\n${continuation}span\` and ![an\n${continuation}image](i.png) at its end.\n`;
+    const output = verify(source, { ...wrap({ width: 30 }), dialect: "github" }).output;
+    expect(output).toContain("`code span`");
+    expect(output).toContain("![an image](i.png)");
+    const lines = output.trimEnd().split("\n");
+    expect(lines.slice(1).every((line) => line.startsWith(continuation))).toBe(true);
+  });
+  it("keeps a task item's code span whose next line is indented below the checkbox", () => {
+    // The item's content starts after `- `, so the parser reads the indentation
+    // below the checkbox as part of the code span, and GitHub does not.
+    const source = "- [ ] Item with words and `code\n      span` and more words after it.\n";
+    const config: Config = { ...wrap({ width: 30, reportUnreflowed: true }), dialect: "github" };
+    expect(verify(source, config).diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: line break in a code span followed by a space or tab (width 30 columns).",
+    ]);
+    const linked = "- [ ] Item with words and [a\n      link](u) and more words after it.\n";
+    expect(verify(linked, config).output).toBe(
+      "- [ ] Item with words and [a\n      link](u) and more words\n      after it.\n",
+    );
+  });
+  it.each([
+    "**bold [link\ntext](u) more bold words**",
+    "[**strong\ntext** and more link text](u)",
+    "[![image\nalt](i.png)](u)",
+    "*em `code\nspan` em and more emphasized words*",
+    "~~struck *em\nphrase* and more struck words~~",
+    "[link text with `code\nspan` inside](u)",
+  ])("reflows nested constructs: %j", (inline) => {
+    const source = `Text with ${inline} and words after it.\n`;
+    for (const width of [20, 30, 40, 60]) {
+      const config: Config = { ...wrap({ width }), dialect: "github" };
+      expect(verify(source, config).output).toBe(verify(source.replace("\n", " "), config).output);
+    }
+  });
+  it("wraps inside link text and emphasis but keeps code spans, images, and destinations whole", () => {
+    const source =
+      "A **long phrase in strong text** and [a link with long text](https://example.com/a-long-destination) and `a code span` and ![an image description](i.png).\n";
+    expect(verify(source, { ...wrap({ width: 30 }), dialect: "github" }).output).toBe(
+      "A **long phrase in strong\ntext** and [a link with long\ntext](https://example.com/a-long-destination)\nand `a code span` and\n![an image description](i.png).\n",
+    );
+  });
+  it("keeps whole a container that holds inline HTML, whose whitespace can matter", () => {
+    const source =
+      "Some words *with <span>inline HTML</span> inside an emphasized phrase* and more words.\n";
+    expect(verify(source, { ...wrap({ width: 30 }), dialect: "github" }).output).toBe(
+      "Some words\n*with <span>inline HTML</span> inside an emphasized phrase*\nand more words.\n",
+    );
+  });
+  it("keeps Obsidian highlights and wikilinks whole inside emphasis", () => {
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    const source =
+      "Note with *emphasis around ==a highlight here== and [[A wiki link|its alias]]\nand more* words.\n";
+    const output = verify(source, { ...wrap({ width: 20 }), dialect: "obsidian" }, workspace);
+    expect(output.output).toContain("==a highlight here==");
+    expect(output.output).toContain("[[A wiki link|its alias]]");
+  });
+  it.each([
+    ["[a link](https://example.com\n'title')", "line break in a link destination or title"],
+    ["[a link](\nhttps://example.com)", "line break in a link destination or title"],
+    ["![an image](i.png\n'title')", "line break in a link destination or title"],
+    ["[full text][long\nref]", "line break in a link destination or title"],
+    ["$a\nb$", "line break in math"],
+    ["*em <b>html\nb</b> em*", "line break in inline HTML"],
+    ["`code\n continued`", "line break in a code span followed by a space or tab"],
+    ["`code\n\tcontinued`", "line break in a code span followed by a space or tab"],
+    ["![image  \ndescription](i.png)", "hard line break"],
+    ["![image\\\ndescription](i.png)", "hard line break"],
+    ["*em  \nphrase*", "hard line break"],
+  ])("keeps %j as written, where the line ending is content", (inline, reason) => {
+    const source = `Some text with ${inline} and more words that run past the width.\n\n[long ref]: /u\n`;
+    const config: Config = { ...wrap({ width: 30, reportUnreflowed: true }), dialect: "github" };
+    const result = verify(source, config);
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.map((item) => item.message)).toEqual([
+      `Paragraph not reflowed: ${reason} (width 30 columns).`,
+    ]);
+  });
+  it("keeps an Obsidian comment that spans lines as written", () => {
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    const source = "Some text with %%a comment\nacross lines%% and more words past the width.\n";
+    const config: Config = { ...wrap({ reportUnreflowed: true }), dialect: "obsidian" };
+    expect(verify(source, config, workspace).diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: line break in an Obsidian comment (width 40 columns).",
+    ]);
+  });
+  it("reflows generated paragraphs of links, emphasis, and code without changing them", () => {
+    const words = fc.constantFrom("word", "longer-word", "a", "x.", "--flag", "#tag", "-5", "*");
+    const inline = fc.oneof(
+      words,
+      fc.constantFrom(
+        "*em|phrase*",
+        "**strong|words here**",
+        "_under|score_",
+        "[link|text](https://example.com/path)",
+        "[a|b][ref]",
+        "[shortcut|text]",
+        "`code|span`",
+        "``co`de|span``",
+        "![image|alt](i.png)",
+        "~~struck|out~~",
+        "[**bold|link** text](u)",
+        "*em [link|in em](u) em*",
+        "[`code|in link`](u)",
+      ),
+    );
+    const pieces = fc.array(fc.tuple(inline, fc.constantFrom(" ", "\n", "\n", "\r\n")), {
+      minLength: 1,
+      maxLength: 16,
+    });
+    const containers = fc.constantFrom(["", ""], ["- ", "  "], ["> ", "> "], ["- [x] ", "      "]);
+    fc.assert(
+      fc.property(
+        containers,
+        pieces,
+        fc.integer({ min: 20, max: 50 }),
+        fc.constantFrom(...dialects),
+        ([prefix, continuation], parts, width, dialect) => {
+          // The separator after each piece also replaces the `|` inside it.
+          const content = parts
+            .map(([piece, separator]) => `${piece.replace("|", separator)}${separator}`)
+            .join("")
+            .trimEnd();
+          const lines = content.replace(/\r\n|\n/g, (ending) => ending + continuation);
+          const source = `${prefix}${lines}\n\n[ref]: /u\n[shortcut text]: /v\n`;
+          const config: Config = { ...wrap({ width }), dialect };
+          const result = format(source, { config, workspace });
+          expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+          expect(format(result.output, { config, workspace }).output).toBe(result.output);
+          expect(semanticFingerprint(parse(result.output, dialect))).toBe(
+            semanticFingerprint(parse(source, dialect)),
+          );
+        },
+      ),
+      { numRuns: 400, seed: 20261017 },
+    );
   });
 });
 describe("multiline code spans", () => {
@@ -712,7 +1055,6 @@ describe("Obsidian callout overflow", () => {
       [`${title}\n`, "obsidian"],
       [`> Earlier paragraph.\n>\n> ${title}\n`, "obsidian"],
       [`> ${title}\n`, "commonmark"],
-      [`> ${title}\n`, "github"],
       [
         "An ordinary paragraph with many breakable words and a trailing block identifier. ^block\n",
         "obsidian",

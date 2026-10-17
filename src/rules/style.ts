@@ -230,6 +230,14 @@ interface InlineAtom {
   from: number;
   to: number;
   joining: Joining;
+  /** A code span's parsed content. */
+  value?: string;
+}
+/** The content of a code span written on one line, as CommonMark reads it. */
+function codeSpanValue(source: string): string {
+  const fence = /^`*/.exec(source)![0].length;
+  const value = source.slice(fence, source.length - fence);
+  return /^ [^]* $/.test(value) && /[^ ]/.test(value) ? value.slice(1, -1) : value;
 }
 /**
  * Inline containers whose text reflow wraps like the paragraph's own: a line
@@ -288,7 +296,8 @@ function inlineAtoms(
           atoms.push({ from: close, to: b, joining: destination });
         }
         visit(child);
-      } else if (child.type === "inlineCode") atoms.push({ from: a, to: b, joining: "code" });
+      } else if (child.type === "inlineCode")
+        atoms.push({ from: a, to: b, joining: "code", value: child.value });
       else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
         const close = labelEnd(child)!;
         atoms.push({ from: a, to: close, joining: "description" });
@@ -520,6 +529,26 @@ const wrap: Rule = {
         ? forgeProtections(source, start, end, forge)
         : { ranges: [] as Range[] };
       for (const [from, to] of protections.ranges) protection.add(from, to);
+      // A code span is joined only when its content reads the same on one line.
+      // The parser keeps a space or tab at the start of the span's next line,
+      // which CommonMark renderers such as GitHub's drop, and it reads the
+      // indentation below a task item's checkbox as such a space.
+      const codeBreak = { reason: "line break in a code span followed by a space or tab" };
+      for (const atom of inline.atoms) {
+        if (atom.joining !== "code") continue;
+        const lines = source.slice(atom.from, atom.to).split(lineBreak);
+        if (lines.length < 2) continue;
+        const content = lines.map((line, i) =>
+          i && continuation && line.startsWith(continuation)
+            ? line.slice(continuation.length)
+            : line,
+        );
+        if (
+          content.slice(1).some((line) => /^[ \t]/.test(line)) ||
+          codeSpanValue(content.join(" ")) !== atom.value!.replace(/\r\n|\r|\n/g, " ")
+        )
+          atom.joining = codeBreak;
+      }
       const reportUnbreakable = () =>
         findings.push({
           start,
@@ -624,12 +653,8 @@ const wrap: Rule = {
           if (!joining) words.push(" ");
           else if (last === undefined || /^[ \t]+$/.test(last))
             failure = "line break in inline syntax";
-          else if (joining === "code") {
-            // Micromark keeps a space or tab at the start of a code span's next
-            // line, while CommonMark renderers such as GitHub's drop it.
-            if (/^[ \t]/.test(line)) failure = "line break in a code span before a space or tab";
-            else words[words.length - 1] = `${last} `;
-          } else if (joining === "description") {
+          else if (joining === "code") words[words.length - 1] = `${last} `;
+          else if (joining === "description") {
             // Two spaces or a backslash before the line ending make a hard break.
             if (/(?: {2}|\\)$/.test(last)) failure = "hard line break";
             const trimmed = line.replace(/^[ \t]+/, "");
