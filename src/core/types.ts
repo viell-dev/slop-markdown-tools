@@ -136,9 +136,30 @@ export interface ProcessOptions {
    * document inside an Obsidian vault, wherever the vault lies in the workspace.
    */
   defaultDialect?: DialectName;
+  /**
+   * Parts of the source to lint or format, as half-open UTF-16 offsets into
+   * the text as given. Each range is widened to the complete blocks that it
+   * touches, such as paragraphs, headings, tables, and code blocks, also inside
+   * lists and block quotes. `lint` then returns the diagnostics that start in
+   * those parts, and `format` applies only edits that lie wholly in them, so
+   * that the rest of the text stays as it is. The whole document is still
+   * parsed and checked. Omitted, the whole document is processed; an empty
+   * list processes nothing.
+   */
+  ranges?: SourceRange[];
+}
+/** A part of a text, as half-open UTF-16 offsets. */
+export interface SourceRange {
+  start: number;
+  end: number;
 }
 export interface FormatResult {
   output: string;
   changed: boolean;
   diagnostics: Diagnostic[];
+  /**
+   * With `ranges`: the parts of the output that formatting was limited to,
+   * each range widened to its blocks and moved by the edits applied in it.
+   */
+  scope?: SourceRange[];
 }

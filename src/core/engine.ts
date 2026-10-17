@@ -8,6 +8,7 @@ import { structureRules } from "../rules/structure.js";
 import { linkRules } from "../rules/links.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
 import { suppressions } from "./directives.js";
+import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
 import type {
   Diagnostic,
   Document,
@@ -18,6 +19,7 @@ import type {
   ProcessOptions,
   ResolvedConfig,
   Rule,
+  SourceRange,
   Workspace,
 } from "./types.js";
 
@@ -137,12 +139,36 @@ function located(diagnostics: Diagnostic[], mark: string): Diagnostic[] {
   }));
 }
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
+  if (options.ranges) checkRanges(options.ranges, source);
   const { config, rules } = prepare(options);
   const [mark, text] = splitByteOrderMark(source);
   const document = parse(text, config.dialect, options.path, options.plugins);
-  return located(inspect(document, config, rules, options.workspace), mark);
+  const diagnostics = inspect(document, config, rules, options.workspace);
+  // Ranges count the marks, and the document's positions do not.
+  const scope = options.ranges && widen(document.tree, shifted(options.ranges, -mark.length));
+  return located(
+    scope ? diagnostics.filter((item) => covers(scope, item.start)) : diagnostics,
+    mark,
+  );
 }
 export function applyEdits(source: string, edits: Edit[]): string {
+  const accepted = acceptedEdits(source, edits);
+  // Assemble the result in one pass; rebuilding the string per edit is quadratic.
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const edit of accepted) {
+    parts.push(source.slice(cursor, edit.start), edit.text);
+    cursor = edit.end;
+  }
+  parts.push(source.slice(cursor));
+  return parts.join("");
+}
+/**
+ * The edits that `applyEdits` applies, sorted by position and without repeats
+ * of the same edit. An edit outside the source, or overlapping another one, is
+ * an error.
+ */
+function acceptedEdits(source: string, edits: Edit[]): Edit[] {
   const sorted = [...edits].sort((a, b) => a.start - b.start || a.end - b.end);
   let previous: Edit | undefined;
   const accepted: Edit[] = [];
@@ -169,15 +195,7 @@ export function applyEdits(source: string, edits: Edit[]): string {
     accepted.push(edit);
     previous = edit;
   }
-  // Assemble the result in one pass; rebuilding the string per edit is quadratic.
-  const parts: string[] = [];
-  let cursor = 0;
-  for (const edit of accepted) {
-    parts.push(source.slice(cursor, edit.start), edit.text);
-    cursor = edit.end;
-  }
-  parts.push(source.slice(cursor));
-  return parts.join("");
+  return accepted;
 }
 /** Compare semantic trees, with link identity supplied by the selected renderer's resolver. */
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
@@ -252,18 +270,34 @@ export function semanticFingerprint(document: Document, workspace?: Workspace): 
  * and are not part of what the rules see.
  */
 export function format(source: string, options: ProcessOptions = {}): FormatResult {
+  if (options.ranges) checkRanges(options.ranges, source);
   const [mark, text] = splitByteOrderMark(source);
-  const result = formatText(text, options);
+  // Ranges count the marks, and the document's positions do not.
+  const result = formatText(text, options, options.ranges && shifted(options.ranges, -mark.length));
   return {
     output: mark + result.output,
     changed: result.changed,
     diagnostics: located(result.diagnostics, mark),
+    ...(result.scope ? { scope: shifted(result.scope, mark.length) } : {}),
   };
 }
-function formatText(source: string, options: ProcessOptions): FormatResult {
+/** Format a document without byte order marks, limited to `ranges` in its positions. */
+function formatText(
+  source: string,
+  options: ProcessOptions,
+  ranges: SourceRange[] | undefined,
+): FormatResult {
   const { config, rules } = prepare(options);
   let output = source;
   let document = parse(source, config.dialect, options.path, options.plugins);
+  // Where edits may apply, in the positions of the current output.
+  const initial = ranges && widen(document.tree, ranges);
+  let scope = initial;
+  // Engine findings concern the whole document and are always reported.
+  const reported = (items: Diagnostic[]) =>
+    scope
+      ? items.filter((item) => item.rule.startsWith("engine/") || covers(scope!, item.start))
+      : items;
   // The original fingerprint is only needed once an edit produces a candidate.
   let fingerprint: string | undefined;
   const seen = new Set([source]);
@@ -280,9 +314,13 @@ function formatText(source: string, options: ProcessOptions): FormatResult {
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
         findings.push(...diagnostics);
-        const edits = diagnostics.flatMap((item) => (item.edit ? [item.edit] : []));
+        // With ranges, an edit that reaches outside them is not applied.
+        const edits = diagnostics.flatMap((item) =>
+          item.edit && (!scope || holds(scope, item.edit)) ? [item.edit] : [],
+        );
         if (!edits.length) continue;
-        const candidate = applyEdits(output, edits);
+        const accepted = acceptedEdits(output, edits);
+        const candidate = applyEdits(output, accepted);
         if (candidate === output) continue;
         const candidateDocument = parse(candidate, config.dialect, options.path, options.plugins);
         fingerprint ??= semanticFingerprint(document, options.workspace);
@@ -294,6 +332,7 @@ function formatText(source: string, options: ProcessOptions): FormatResult {
         // Rules consume the document without mutating it. Reuse the validated
         // tree until another phase changes its source, including final diagnostics.
         document = candidateDocument;
+        if (scope) scope = moved(scope, accepted);
       }
       if (output === before) {
         // No phase changed the document, so every style finding of this pass
@@ -308,7 +347,8 @@ function formatText(source: string, options: ProcessOptions): FormatResult {
         return {
           output,
           changed: output !== source,
-          diagnostics: [...findings, ...remaining].sort(sortDiagnostics),
+          diagnostics: reported([...findings, ...remaining]).sort(sortDiagnostics),
+          ...(scope ? { scope } : {}),
         };
       }
       if (seen.has(output))
@@ -328,6 +368,7 @@ function formatText(source: string, options: ProcessOptions): FormatResult {
           message: error instanceof Error ? error.message : String(error),
         }),
       ],
+      ...(initial ? { scope: initial } : {}),
     };
   }
 }
