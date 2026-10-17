@@ -2,9 +2,11 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { Ajv } from "ajv";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Code, RootContent } from "mdast";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
 import { manifest, repository } from "./support.js";
@@ -86,6 +88,35 @@ describe("configuration and dialect references", () => {
     const reference = read("docs/dialects.md");
     for (const dialect of [...dialects, ...Object.keys(dialectAliases)])
       expect(reference).toContain(`\`${dialect}\``);
+  });
+});
+
+describe("configuration schema", () => {
+  const published = JSON.parse(read("config.schema.json")) as Record<string, unknown>;
+  it("is the schema that the tool enforces", () => {
+    // `npm run schema` writes the file from the schema in src/config/resolve.ts.
+    expect(published).toEqual(library.configSchema);
+  });
+  it("accepts the repository's configuration files on its own, and is shipped", () => {
+    const validate = new Ajv({ allErrors: true }).compile(published);
+    const files = [
+      "mdtools.config.jsonc",
+      ...readdirSync(path.join(repository, "examples"), { recursive: true, encoding: "utf8" })
+        .filter((name) => name.endsWith(".jsonc"))
+        .map((name) => `examples/${name.split(path.sep).join("/")}`),
+    ];
+    expect(files.length).toBeGreaterThan(5);
+    for (const file of files) {
+      const value = parseJsonc(read(file)) as unknown;
+      expect(validate(value), `${file}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+    expect(validate({ extends: 5 })).toBe(false);
+    const packaged = JSON.parse(read("package.json")) as {
+      files: string[];
+      exports: Record<string, unknown>;
+    };
+    expect(packaged.files).toContain("config.schema.json");
+    expect(packaged.exports["./config.schema.json"]).toBe("./config.schema.json");
   });
 });
 
@@ -240,6 +271,42 @@ describe("documentation site", () => {
 });
 
 describe("library API", () => {
+  it("has a doc comment for every export and every member that it declares", () => {
+    const entries = ["dist/index.d.ts", "dist/node.d.ts"].map((file) =>
+      path.join(repository, file),
+    );
+    const program = ts.createProgram(entries, {
+      module: ts.ModuleKind.NodeNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+      noEmit: true,
+      types: [],
+    });
+    const checker = program.getTypeChecker();
+    const dist = path.join(repository, "dist");
+    // Members that a dependency declares, such as an mdast node's `position`, are its own.
+    const declaredHere = (symbol: ts.Symbol) =>
+      (symbol.getDeclarations() ?? []).some((declaration) =>
+        path.resolve(declaration.getSourceFile().fileName).startsWith(dist),
+      );
+    const documented = (symbol: ts.Symbol) => symbol.getDocumentationComment(checker).length > 0;
+    const missing: string[] = [];
+    let count = 0;
+    for (const entry of entries) {
+      const module = checker.getSymbolAtLocation(program.getSourceFile(entry)!)!;
+      for (const exported of checker.getExportsOfModule(module)) {
+        count++;
+        const symbol =
+          exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
+        if (!documented(symbol)) missing.push(exported.name);
+        if (symbol.flags & ts.SymbolFlags.Interface)
+          for (const member of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol)))
+            if (declaredHere(member) && !documented(member))
+              missing.push(`${exported.name}.${member.name}`);
+      }
+    }
+    expect(count).toBeGreaterThan(40);
+    expect(missing).toEqual([]);
+  });
   it("is the same in the built package as in the source, and is documented", async () => {
     const built = (await import(
       pathToFileURL(path.join(repository, "dist/index.js")).href
@@ -267,7 +334,12 @@ describe("library API", () => {
     );
     for (const name of Object.keys(built)) expect(imported, name).toContain(name);
     const manifest = JSON.parse(read("package.json")) as { exports: Record<string, unknown> };
-    expect(Object.keys(manifest.exports)).toEqual([".", "./node"]);
+    expect(Object.keys(manifest.exports)).toEqual([
+      ".",
+      "./node",
+      "./config.schema.json",
+      "./package.json",
+    ]);
   });
 });
 

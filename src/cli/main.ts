@@ -51,12 +51,14 @@ const program = new Command()
   .exitOverride();
 const configOption = [
   "--config <file>",
-  "Use this JSON, JSONC, or .mjs configuration file instead of searching for one",
+  "Use this JSON, JSONC, or JavaScript configuration file instead of searching for one",
 ] as const;
 /** The dialects, each with its other names, as in "forgejo (alias: codeberg)". */
 const dialectList = dialects
   .map((dialect) => {
-    const aliases = Object.keys(dialectAliases).filter((name) => dialectAliases[name] === dialect);
+    const aliases = Object.entries(dialectAliases).flatMap(([name, of]) =>
+      of === dialect ? [name] : [],
+    );
     return aliases.length ? `${dialect} (alias: ${aliases.join(", ")})` : dialect;
   })
   .join(", ");
@@ -403,12 +405,12 @@ workspaceOptions(
         root,
         config: source ?? null,
         path: name,
-        effective: resolveConfig(
+        effective: resolveConfig({
           config,
-          name,
+          path: name,
           plugins,
-          assumedDialect(await enclosingVault(path.join(actual, name))),
-        ),
+          defaultDialect: assumedDialect(await enclosingVault(path.join(actual, name))),
+        }),
       },
       null,
       2,

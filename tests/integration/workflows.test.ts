@@ -147,10 +147,10 @@ describe("line endings and file names", () => {
     const explained = run(root, ["config", "--config", "other.jsonc", "explain", "note.md"]);
     expect(explained.status, explained.stderr).toBe(0);
     expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
-    // The mark does not hide other errors, and their offsets count after it.
+    // The mark does not hide other errors, and their columns count after it.
     await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
     expect(run(root, ["lint"]).stderr).toBe(
-      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")}: ValueExpected at offset 13\n`,
+      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")} at line 1, column 14: a value is expected\n`,
     );
   });
   it("resolves and rewrites links to files with spaces and non-ASCII names", async () => {
@@ -625,6 +625,13 @@ describe("plugins named in a configuration", () => {
     );
     expect(await refused("sample-plugin", files, "Invalid plugin")).toBe(
       'its default export must be an object with a string "name".\n',
+    );
+  });
+  it("rejects a plugin named engine, whose findings would pass for the engine's own", async () => {
+    const code =
+      'export default { name: "engine", rules: { "unsafe-format": { kind: "problem", description: "x", check: () => [{ start: 0, message: "not the engine" }] } } };';
+    expect(await refused("./rules.mjs", { "rules.mjs": code }, "Invalid plugin")).toBe(
+      "its name, engine, is reserved for the engine's own diagnostics.\n",
     );
   });
 });

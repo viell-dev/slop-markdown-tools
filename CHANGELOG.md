@@ -88,6 +88,19 @@ From `0.2.0-rc.2`:
   Forgejo, and Gitea alerts, and before words such as `--config` or
   `**strong**`. A check that runs `format --check` fails on documents formatted
   by an earlier version until `format --write` runs once.
+- In the library, `resolveConfig` takes one options object,
+  `{ path, config, plugins, defaultDialect }`, as `lint` and `format` do, so
+  their options serve as they are. A call with the four separate arguments of
+  the prereleases throws an error that says so.
+- `presets`, `builtInRules`, `dialects`, `dialectAliases`, and `configSchema`
+  are frozen, and a change to them throws a `TypeError`; change a copy instead.
+- In the library's types, `WikiLink`, `ObsidianComment`, and `ObsidianHighlight`
+  replace `ObsidianLiteral`, `Rule.schema` is a `JsonSchema` instead of Ajv's
+  schema type, and the lists and records in `Config` are read-only: replace a
+  list or the `rules` of a configuration instead of changing it in place.
+- `format` throws an error that the workspace throws, such as a loader's `EIO`,
+  as `lint` does, instead of reporting it as `engine/unsafe-format`.
+- A plugin named `engine` is rejected.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -131,6 +144,15 @@ From every prerelease:
 - `--quiet` reports errors only, and `rules` lists the rules of the
   configuration's plugins too, also as JSON with `--json`
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- The CLI finds `mdtools.config.js` and `mdtools.config.cjs`, `extends` accepts
+  a single preset name, and a rule's setting can be its severity alone in a
+  list, as in `["warn"]`. The package ships the configuration's JSON Schema as
+  `config.schema.json`, which the documentation site serves as well, for editors
+  to complete and check configuration files
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
+- The library loads with `require()`, exports `mdrefine/package.json`, and has a
+  doc comment for every export; the package lists `keywords`
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
 - Nine problem rules: `links/undefined-reference`, `links/unused-definition`,
   `links/empty`, `structure/heading-increment`, `content/image-alt`, and
   `content/table-columns` in `recommended`, and the optional
@@ -166,6 +188,14 @@ From every prerelease:
   documents outside the workspace, and the `obsidian/strict-line-breaks` message
   speaks to both command-line and library users
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- Configuration and rule option errors name the setting as it is written, in
+  plain words, and list the allowed values, as in
+  `"extends[1]" must be a preset name, not 5`; a JSON syntax error gives its
+  line and column
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
+- `resolveConfig` takes an options object, the exported tables are frozen and
+  typed read-only, and the types of Obsidian nodes and rule schemas are their
+  own ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
 - `format --write` refuses read-only files on every platform, and reports a file
   that fails with `engine/unwritable-file`
   ([#177](https://github.com/viell-dev/slop-markdown-tools/pull/177)).
@@ -219,6 +249,19 @@ From every prerelease:
 - `--stdin-filepath` accepts a document inside a root that is reached through a
   link or a Windows junction
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
+- The configuration and command-line pages say that configuration patterns match
+  letter case on every system, while `.gitignore` files and input patterns
+  ignore it on Windows and macOS
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
+- `format` stops on an error of the workspace, as `lint` does, instead of
+  reporting it as `engine/unsafe-format`, and a plugin named `engine`, whose
+  findings would pass for the engine's own, is rejected
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
+- `parse` reads a document in the dialect that an alias such as `codeberg`
+  stands for, so Forgejo's rules apply to it, and the type declarations no
+  longer need `@types/mdast` from another package, which a strict installation
+  such as pnpm's does not provide
+  ([#261](https://github.com/viell-dev/slop-markdown-tools/pull/261)).
 - Documents and JSON configuration files that start with a byte order mark are
   read correctly
   ([#174](https://github.com/viell-dev/slop-markdown-tools/pull/174)).
