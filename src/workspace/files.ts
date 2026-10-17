@@ -430,6 +430,11 @@ export async function discover(
     });
   }
   const { lead, fromTop, shown, failed, repositoryLayers, isTracked } = gitRules(root, top);
+  // Compiled once: compiling a pattern costs more than matching it.
+  const ignorePatterns = excluded.map((pattern) => ({
+    pattern,
+    matcher: new Minimatch(pattern, { dot: true }),
+  }));
   const files: Record<string, WorkspaceSource> = {};
   const directories: string[] = [];
   const unlisted: string[] = [];
@@ -636,7 +641,7 @@ export async function discover(
         files[name] =
           markdown || request ? () => (cached ??= decodeText(readFileSync(full), name)) : null;
         if (!(markdown || request) || targetOnly || gitIgnored) continue;
-        const pattern = excluded.find((item) => minimatch(name, item, { dot: true }));
+        const pattern = ignorePatterns.find((item) => item.matcher.match(name))?.pattern;
         if (pattern !== undefined) {
           if (request)
             request.reason ??= `matched by the configuration's ignore pattern "${pattern}"`;

@@ -1,5 +1,5 @@
 import { Ajv } from "ajv";
-import { minimatch } from "minimatch";
+import { Minimatch } from "minimatch";
 import type {
   Config,
   Dialect,
@@ -147,6 +147,22 @@ function addRules(target: Record<string, RuleSetting>, rules: Config["rules"] = 
     });
 }
 /**
+ * The matchers of override patterns, by pattern. A configuration is resolved
+ * for every document, and compiling its patterns each time cost several times
+ * as much as matching them.
+ */
+const overridePatterns = new Map<string, Minimatch>();
+function overridePattern(pattern: string): Minimatch {
+  let matcher = overridePatterns.get(pattern);
+  if (!matcher) {
+    // A process that loads many configurations keeps only recent patterns.
+    if (overridePatterns.size >= 1000) overridePatterns.clear();
+    matcher = new Minimatch(pattern, { dot: true });
+    overridePatterns.set(pattern, matcher);
+  }
+  return matcher;
+}
+/**
  * The configuration in effect for the document at `path`. `defaultDialect` is
  * the dialect to assume when neither the configuration, a preset, nor a
  * matching override names one: `github` unless the caller knows better, as the
@@ -189,12 +205,9 @@ export function resolveConfig(
   }
   if (config.extends === undefined) merge(presets.recommended!, []);
   merge(config, []);
+  const document = path.replaceAll("\\", "/");
   for (const override of overrides) {
-    if (
-      override.files.some((pattern) =>
-        minimatch(path.replaceAll("\\", "/"), pattern, { dot: true }),
-      )
-    ) {
+    if (override.files.some((pattern) => overridePattern(pattern).match(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       addRules(result.rules, override.rules);
     }
