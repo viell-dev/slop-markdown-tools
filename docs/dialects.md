@@ -145,9 +145,11 @@ line as written, `style/emphasis`, `style/strong`, and `links/path` leave that
 line unchanged in a heading without a custom `id`: rewriting
 `## Emph *star* end` to `_star_` would move its anchor and break every link to
 it. `style/inline-code` does not join a code span across the lines of a heading,
-and `style/heading` escapes a `#` run in front of a block (`# Run \## {#id}`).
-The semantic check compares these blocks and anchors too, so an edit by any rule
-or plugin that would change them is refused.
+and `style/heading` escapes a `#` run in front of a block (`# Run \## {#id}`)
+and keeps a closing sequence after one (`## Install {#setup} ##`), which Gitea
+before 1.26 reads as attributes too. The semantic check compares these blocks
+and anchors too, so an edit by any rule or plugin that would change them is
+refused.
 
 **Gitea and `_.py`.** Gitea 1.26 and later render `__init__.py` literally
 instead of as emphasis, in headings too, whose anchor is then `#__init__py`.

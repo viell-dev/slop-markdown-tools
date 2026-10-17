@@ -51,7 +51,7 @@ The README before formatting:
 
 [`examples/workspaces/repository-docs/before/README.md`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/before/README.md):
 
-````md
+```md
 # Weather Station
 
 Weather Station collects *temperature*, *humidity*, and *pressure* readings from a sensor board and publishes them as a small web page that updates every minute.
@@ -73,7 +73,7 @@ Follow the [setup guide](docs/guide.md) first, then read the [sensor reference](
 
 - [X] Publish readings every minute
 - [ ] Keep a week of history
-````
+```
 
 Preview the changes with `--diff`. To try `--write`, copy `before/` elsewhere
 first.
@@ -86,7 +86,7 @@ The same README afterwards:
 
 [`examples/workspaces/repository-docs/after/README.md`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/after/README.md):
 
-````md
+```md
 # Weather Station
 
 Weather Station collects _temperature_, _humidity_, and _pressure_ readings from
@@ -112,7 +112,7 @@ sensor.
 
 - [x] Publish readings every minute
 - [ ] Keep a week of history
-````
+```
 
 Each change comes from one rule of the configuration:
 
@@ -167,7 +167,7 @@ The vault's home note before formatting:
 
 [`examples/workspaces/obsidian-vault/before/Home.md`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/before/Home.md):
 
-````md
+```md
 # Home
 
 This vault tracks the kitchen garden. Start with [[Tomatoes]] or jump straight to the [[Watering schedule#Summer|summer watering plan]].
@@ -181,13 +181,13 @@ This vault tracks the kitchen garden. Start with [[Tomatoes]] or jump straight t
 - [ ] Order *more* seed trays
 
 ![[Tomatoes#^harvest]]
-````
+```
 
 And afterwards:
 
 [`examples/workspaces/obsidian-vault/after/Home.md`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/after/Home.md):
 
-````md
+```md
 # Home
 
 This vault tracks the kitchen garden. Start with [[Tomatoes]] or jump straight
@@ -204,7 +204,7 @@ to the [[Garden/Watering schedule#Summer|summer watering plan]].
 - [ ] Order _more_ seed trays
 
 ![[Garden/Tomatoes#^harvest]]
-````
+```
 
 What to notice:
 
@@ -341,7 +341,7 @@ A note that triggers both rules:
 
 [`examples/plugin/notes/release-checklist.md`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/notes/release-checklist.md):
 
-````md
+```md
 # Release checklist
 
 Draft the announcement. TODO: add the download link.
@@ -351,7 +351,7 @@ Searching the notes with `grep TODO` is not reported: code is not prose.
 ##   Before publishing
 
 Ask for a review.
-````
+```
 
 Linting reports both, but not the `TODO` inside the code span:
 

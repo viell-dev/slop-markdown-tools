@@ -56,14 +56,14 @@ GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
 break. Each preset except `recommended` also sets a dialect. The
 [rule index](rules.md) shows which rules each preset enables.
 
-| Preset        | Sets the dialect | For                                                                                                                |
-| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `recommended` | No               | Any document: wrapping at 80 columns, emphasis markers, final newline, valid links, problems that show on the page |
-| `github`      | `github`         | Documents rendered by GitHub                                                                                       |
-| `forgejo`     | `forgejo`        | Documents rendered by Forgejo, such as on Codeberg                                                                 |
-| `codeberg`    | `forgejo`        | The `forgejo` preset under another name                                                                            |
-| `gitea`       | `gitea`          | Documents rendered by Gitea                                                                                        |
-| `obsidian`    | `obsidian`       | An Obsidian vault                                                                                                  |
+| Preset        | Sets the dialect | For                                                                                                             |
+| ------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `recommended` | No               | Any document: wrapping at 80 columns, markers, blank space, tables, valid links, problems that show on the page |
+| `github`      | `github`         | Documents rendered by GitHub                                                                                    |
+| `forgejo`     | `forgejo`        | Documents rendered by Forgejo, such as on Codeberg                                                              |
+| `codeberg`    | `forgejo`        | The `forgejo` preset under another name                                                                         |
+| `gitea`       | `gitea`          | Documents rendered by Gitea                                                                                     |
+| `obsidian`    | `obsidian`       | An Obsidian vault                                                                                               |
 
 Without `extends`, the configuration starts from `recommended`. An `extends`
 list replaces that default, so name both, as in `["recommended", "github"]`;
