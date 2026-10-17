@@ -104,7 +104,6 @@ From every prerelease:
 - `format --write` writes hard-linked files, and on Linux and macOS files whose
   replacement would get another owner or group, in place
   ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
-
 - The documentation is restructured, with new pages for the rules, dialects,
   integrations, the library API, versions, and this changelog, and the release
   notes come from this file
