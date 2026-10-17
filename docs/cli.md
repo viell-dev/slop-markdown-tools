@@ -68,13 +68,17 @@ dialect, and links. It must lie inside the workspace; without it the path is
 `stdin.md` at the workspace root. `format -` prints the formatted document on
 stdout, or the diff with `--diff`, or nothing with `--check`; it cannot be
 combined with `--write`. `lint -` prints its findings. Neither prints a summary
-line.
+line. Stdin must be [UTF-8 text](#files-that-cannot-be-read-or-written), with or
+without a byte order mark; anything else stops the command with exit code `2`
+and a message such as
+`mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
 
 The redirection above, in a POSIX shell or in `cmd`, passes the bytes unchanged.
 PowerShell has no `<` operator, and text that it pipes into a program gains a
 line break at its end, or CRLF line endings when piped line by line; Windows
 PowerShell 5.1 also replaces characters outside ASCII and writes `>` output as
-UTF-16. In PowerShell, run the redirection through `cmd`:
+UTF-16, which the tool refuses to read. In PowerShell, run the redirection
+through `cmd`:
 
 ```powershell
 cmd /c "npx mdtools format - --stdin-filepath notes/example.md < input.md > output.md"
@@ -183,16 +187,26 @@ path on the command line that does not exist, cannot be read, or is of the wrong
 kind, as in `Input does not exist: notes/absent.md`, and a configuration file
 that cannot be read or a directory that refuses the search for one.
 
+Documents are read as UTF-8, with or without a byte order mark. The tool does
+not guess another encoding: a guess can be wrong, and the supported renderers
+read Markdown as UTF-8. A selected document that is not UTF-8 text gets the same
+`engine/unreadable-file` error, with a message that says what was found, as in
+`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
+So does a file that starts with a UTF-16 or UTF-32 byte order mark, which
+Windows PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as
+UTF-16 text without a mark does. Save such a file as UTF-8 to process it. A link
+to a heading in it is reported as `Fragment could not be checked`.
+
 A vault's `.obsidian/app.json` that cannot be read, or that is not valid JSON,
 gets a warning, and the vault's notes are not wrapped. When the system does not
 let the tool find out whether a directory is a vault, the command stops with
 exit code `2`, because reading notes in another dialect is not safe.
 
 `format --write` writes each changed file as a new file beside it and then
-replaces the old one, so that no file is ever half written. Before it writes
-anything, it checks that each file may be written and that its directory lets it
-create the new file. A file that fails the check gets an
-`engine/unwritable-file` error, such as
+replaces the old one, so that no file is ever half written; the exceptions are
+[below](#what-a-replaced-file-keeps). Before it writes anything, it checks that
+each file may be written and that its directory lets it create the new file. A
+file that fails the check gets an `engine/unwritable-file` error, such as
 `The file may not be written (EACCES: permission denied); no file was written.`,
 and nothing is written: `written` is `false` and the exit code is `2`. A
 read-only file fails the check on every platform. A failure that the check
@@ -200,3 +214,24 @@ cannot foresee, such as a file that another program holds open on Windows or a
 full disk, is reported for that file in the same way, while the other files are
 still written; `written` is then `true`, and the exit code is `2`. To format the
 other files, pass `--exclude` for the one that fails.
+
+### What a replaced file keeps
+
+A replaced file keeps its content and its permission bits. As a new file, it
+loses what Node.js can neither read nor set: the creation time, extended
+attributes, and access control list entries given to the file itself, and on
+Windows also attributes such as Hidden and alternate data streams, such as the
+mark of a downloaded file. On Windows, the replaced file therefore has only the
+permissions that its directory passes on, which can let more users read it than
+before.
+
+Two kinds of file are written in place instead, and keep all of that: a file
+with more than one name, a hard link, whose other names would otherwise keep the
+old content; and, on Linux and macOS, a file whose replacement would get another
+owner or group, as when the tool runs as another user than the file's owner.
+Writing in place is not atomic. The new content is first written beside the
+file, which shows that it fits on the disk, but a failure while the file itself
+is written can leave it incomplete, and is reported as
+`The file could not be written completely (EIO: i/o error) and may be incomplete.`
+A file whose two names are both selected documents is written once and counted
+for each.

@@ -226,10 +226,10 @@ passing checks, and resolved review threads remain mandatory.
   extensions; `src/config/` resolves presets, schemas, overrides, and plugins;
   `src/core/` runs rules, suppressions, and the edit engine; `src/rules/` holds
   the built-in rules; `src/workspace/` resolves link targets and handles
-  discovery and atomic writes; `src/cli/` connects them. The main entry never
-  touches the filesystem. `mdrefine/node` exposes `src/workspace/discovery.ts`,
-  which the CLI uses for discovery and per-document options, so change the two
-  together.
+  discovery, reading as UTF-8, and writes; `src/cli/` connects them. The main
+  entry never touches the filesystem. `mdrefine/node` exposes
+  `src/workspace/discovery.ts`, which the CLI uses for discovery and
+  per-document options, so change the two together.
 - `src/config/load.ts` locates a plugin not named by path with
   `import-meta-resolve`, a port of Node.js's import resolution, and then with
   CommonJS resolution, because Node.js has no supported call that resolves an

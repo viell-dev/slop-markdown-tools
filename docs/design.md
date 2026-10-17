@@ -60,6 +60,16 @@ Formatting:
 - There is no formatting of code inside code blocks, no change of front matter
   or other metadata, no generation of documents, and no renaming of files.
 
+Files:
+
+- Only UTF-8 text is read. Another encoding is not guessed, because a guess can
+  be wrong and the renderers read Markdown as UTF-8, and it is not decoded with
+  replacement characters, which the next edit would write into the file. See
+  [files that cannot be read](cli.md#files-that-cannot-be-read-or-written).
+- A file that `format --write` replaces loses its creation time, extended
+  attributes, and its own access control entries; see
+  [what a replaced file keeps](cli.md#what-a-replaced-file-keeps).
+
 Syntax:
 
 - Obsidian inline comments that span several paragraphs are not fully read;

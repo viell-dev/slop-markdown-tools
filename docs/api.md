@@ -85,9 +85,11 @@ maps each path, relative to the workspace root with forward slashes, to one of:
   Forgejo and Gitea differ, so a loader is called once more when the same target
   is checked for another of these groups. A loader must return the same text
   each time, so create a new workspace when files change. A loader that throws
-  an error whose `code` is `EACCES`, `EPERM`, or `EBUSY` makes a link to a
-  heading in that file resolve as `unreadable`, while a link to the file itself
-  still resolves; any other error propagates.
+  an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`, or
+  `ERR_ENCODING_INVALID_ENCODED_DATA`, which a `TextDecoder` created with
+  `fatal: true` throws for a file that is not valid in its encoding, makes a
+  link to a heading in that file resolve as `unreadable`, while a link to the
+  file itself still resolves; any other error propagates.
 
 | `WorkspaceOptions` | Meaning                                                                                                                     |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
@@ -167,9 +169,12 @@ and writes nothing: pass the configuration as `config`, plugin objects as
 The result has `root`, the root's real path; `selected`, the documents as sorted
 forward-slash paths relative to it; and `skipped`, with the entries of the JSON
 report's `skipped` list. `read(name)` returns a selected document's text, read
-when first needed and then kept, so one result is a snapshot for one run; an
+when first needed and then kept, so one result is a snapshot for one run. An
 error with the code `EACCES`, `EPERM`, or `EBUSY` means the file could not be
-read. `options(name)` returns what the CLI passes to `lint` and `format` for the
+read, and one with the code `ERR_ENCODING_INVALID_ENCODED_DATA` that it is not
+[UTF-8 text](cli.md#files-that-cannot-be-read-or-written), as its message says,
+such as `Not UTF-8 text: notes/old.md (byte 0xE9 on line 1 is not valid UTF-8)`.
+`options(name)` returns what the CLI passes to `lint` and `format` for the
 document. Both throw for a name that is not selected. A root or input that
 cannot be used is an error in the CLI's words, such as
 `Input does not exist: notes/absent.md`.

@@ -29,6 +29,14 @@ From `0.2.0-rc.2`:
   line.
 - A file locked by another program on Windows (`EBUSY`) is handled like one that
   may not be read, instead of stopping every command.
+- A document that is not UTF-8 text gets an `engine/unreadable-file` error, and
+  stdin that is not stops the command with exit code `2`. Before, such text was
+  decoded with U+FFFD in place of what was not UTF-8, and `format --write` wrote
+  those characters into the file. Save such files as UTF-8.
+- A file with more than one name, and on Linux and macOS a file whose
+  replacement would get another owner or group, is written in place. Before,
+  every file was replaced, which left the other names of a hard link with the
+  old content and could change a file's group.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -89,6 +97,13 @@ From every prerelease:
 - A file locked by another program on Windows counts as one that may not be
   read, in the CLI and in `createWorkspace` loaders
   ([#177](https://github.com/viell-dev/slop-markdown-tools/pull/177)).
+- Documents and stdin that are not UTF-8 text are refused instead of being
+  damaged, and `createWorkspace` treats a loader error with the code
+  `ERR_ENCODING_INVALID_ENCODED_DATA` as an unreadable target
+  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
+- `format --write` writes hard-linked files, and on Linux and macOS files whose
+  replacement would get another owner or group, in place
+  ([#234](https://github.com/viell-dev/slop-markdown-tools/pull/234)).
 
 ### Fixed
 
