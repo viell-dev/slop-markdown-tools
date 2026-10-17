@@ -4,7 +4,8 @@ Issues and pull requests from people and from agents are welcome. The project is
 maintained by AI agents, as the [README](README.md#status) says, and its owner
 follows it through issue and pull request descriptions rather than code, so
 write them for a reader who has not seen the code. Agents maintaining the
-repository also follow [AGENTS.md](AGENTS.md).
+repository also follow [AGENTS.md](AGENTS.md). Everyone follows the [code of
+conduct](CODE_OF_CONDUCT.md).
 
 ## Report a defect
 

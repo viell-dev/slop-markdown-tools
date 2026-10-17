@@ -88,6 +88,12 @@ GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
 break. Each preset except `recommended` also sets a dialect. The [rule
 index](rules.md) shows which rules each preset enables.
 
+Presets are starting points with opinionated defaults, not a fixed style. Every
+rule can be turned off or given another severity, and a rule whose choice
+documents reasonably differ on, such as the emphasis marker or the wrapping
+width, takes options for it; the [rules](rules.md) list them with their
+defaults.
+
 | Preset        | Sets the dialect | For                                                                                                                |
 | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `recommended` | No               | Any document: wrapping at 80 columns, emphasis markers, final newline, valid links, problems that show on the page |

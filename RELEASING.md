@@ -20,7 +20,12 @@ On a branch, in one pull request:
    `docs/quick-start.md`, which the tests compare with the version, the
    `version` default of `.github/workflows/release.yml`, and every example and
    document that names the version.
-4. Run the checks below, push, and wait for CI.
+4. Refresh the indirect dependencies with `npm update`, so that the tests run
+   with what a fresh installation of the package gets. The lockfile does not
+   ship, and Dependabot updates only the direct dependencies. Check first that
+   every updated package is at least seven days old and comes from its known
+   maintainers (`npm view NAME time maintainers`).
+5. Run the checks below, push, and wait for CI.
 
 Review and merge it like any other pull request. Merging publishes nothing and
 leaves the documentation site as it is.
@@ -55,6 +60,10 @@ Verify these once per release rather than setting them up again:
   `mdrefine` names the user `viell-dev`, the repository `slop-markdown-tools`,
   the workflow `release.yml`, and the environment `npm-release`, with direct
   publishing allowed. No npm token is stored in GitHub.
+- The package's publishing access on npm is "Require two-factor authentication
+  and disallow tokens". Trusted publishing still works; publishing with a token
+  does not, and a change made by hand on the account, such as a dist-tag, asks
+  for the second factor.
 - The GitHub environment `npm-release` is restricted to `main`.
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
 - GitHub Pages uses GitHub Actions as its source, and the environment
