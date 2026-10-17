@@ -26,14 +26,73 @@ function lineBounds(source: string, start: number, end: number): [number, number
   return [lineStart, lineEnd];
 }
 /**
+ * Where a document's line breaks are, and where the strings that rules look
+ * for on a line occur, all sorted. Rules ask about the line of every emphasis
+ * or code span; searching the line itself each time took time that grows with
+ * the square of a long line's length.
+ */
+interface LineIndex {
+  breaks: number[];
+  found: Map<string, number[]>;
+}
+const lineIndexes = new WeakMap<Document, LineIndex>();
+function lineIndex(document: Document): LineIndex {
+  let index = lineIndexes.get(document);
+  if (!index) {
+    const breaks: number[] = [];
+    for (let at = 0; at < document.source.length; at++)
+      if (document.source[at] === "\r" || document.source[at] === "\n") breaks.push(at);
+    lineIndexes.set(document, (index = { breaks, found: new Map() }));
+  }
+  return index;
+}
+/** The number of values in the sorted `values` that are less than `limit`. */
+function countBelow(values: number[], limit: number): number {
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (values[middle]! < limit) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+/** `lineBounds` for a document, from its line index. */
+function indexedLineBounds(document: Document, start: number, end: number): [number, number] {
+  const { breaks } = lineIndex(document);
+  const before = countBelow(breaks, start);
+  const after = countBelow(breaks, end);
+  return [before ? breaks[before - 1]! + 1 : 0, breaks[after] ?? document.source.length];
+}
+/**
+ * Where `text` occurs in the document between `from` and `to`, wholly: the
+ * last occurrence, or -1 for none.
+ */
+function lastWithin(document: Document, text: string, from: number, to: number): number {
+  const { found } = lineIndex(document);
+  let positions = found.get(text);
+  if (!positions) {
+    positions = [];
+    for (
+      let at = document.source.indexOf(text);
+      at >= 0;
+      at = document.source.indexOf(text, at + 1)
+    )
+      positions.push(at);
+    found.set(text, positions);
+  }
+  const last = positions[countBelow(positions, to - text.length + 1) - 1];
+  return last !== undefined && last >= from ? last : -1;
+}
+/**
  * Gitea does not parse a `_` run as an emphasis delimiter when the next `_` on
  * its physical line starts `_.py`, or when the run itself does and no `_`
  * follows, so `__init__.py` stays literal. The outcome depends on everything
  * else on the line, code spans included: a line containing `_.py` before or
  * after an edit can gain or lose emphasis when markers change or lines join.
  */
-export function giteaPyLine(source: string, start: number, end: number): boolean {
-  return source.slice(...lineBounds(source, start, end)).includes("_.py");
+export function giteaPyLine(document: Document, start: number, end: number): boolean {
+  return lastWithin(document, "_.py", ...indexedLineBounds(document, start, end)) >= 0;
 }
 /** Forgejo and its upstream Gitea build on goldmark with shared extensions. */
 const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", gitea: "Gitea" };
@@ -42,12 +101,11 @@ const goldmarkForges: Partial<Record<Dialect, string>> = { forgejo: "Forgejo", g
  * Gitea where enabled, render as math. GFM parses emphasis and code spans
  * there, and changing them would change the formula.
  */
-function inForgeMath(source: string, start: number, end: number): boolean {
-  const [lineStart, lineEnd] = lineBounds(source, start, end);
-  const before = source.slice(lineStart, start);
+export function inForgeMath(document: Document, start: number, end: number): boolean {
+  const [lineStart, lineEnd] = indexedLineBounds(document, start, end);
   return (
-    before.lastIndexOf("\\(") > before.lastIndexOf("\\)") &&
-    source.slice(end, lineEnd).includes("\\)")
+    lastWithin(document, "\\(", lineStart, start) > lastWithin(document, "\\)", lineStart, start) &&
+    lastWithin(document, "\\)", end, lineEnd) >= 0
   );
 }
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
@@ -77,14 +135,14 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
           (index) => document.source[index],
         );
         if (neighbours.includes(marker[0]!)) return;
-        if (goldmarkForges[document.dialect] && inForgeMath(document.source, start, end)) return;
+        if (goldmarkForges[document.dialect] && inForgeMath(document, start, end)) return;
         // Forgejo, and Gitea before 1.26, build a heading's anchor from its last
         // line as written, keeping `_` and dropping `*`, and both read a trailing
         // `{...}` block as attributes before they parse emphasis.
         if (changesForgeHeading(document, start, end)) return;
         if (
           document.dialect === "gitea" &&
-          (giteaPyLine(document.source, start, end) ||
+          (giteaPyLine(document, start, end) ||
             document.source.startsWith(".py", end) ||
             document.source.startsWith(".py", start + size))
         )
@@ -924,7 +982,7 @@ export const styleRules: Record<string, Rule> = {
         // text line, and Forgejo also builds the anchor from that line alone.
         // Joining lines would change what that line holds.
         if (start < headingEnd) return;
-        if (document.dialect === "gitea" && giteaPyLine(document.source, start, end)) return;
+        if (document.dialect === "gitea" && giteaPyLine(document, start, end)) return;
         // Joining lines could put a `\(` and `\)` on one line and turn them into math.
         if (forge) {
           const lines = document.source.slice(...lineBounds(document.source, start, end));

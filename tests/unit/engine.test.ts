@@ -1153,6 +1153,27 @@ describe("configuration and plugins", () => {
       }).rules["style/wrap"],
     ).toBe("off");
   });
+  it("matches override patterns without compiling them for every document", () => {
+    const paths = Array.from({ length: 5000 }, (_, index) => `docs/part-${index % 50}/${index}.md`);
+    // Patterns that match none of the paths, so that each is tried for each.
+    const files = Array.from({ length: 8 }, (_, index) => `drafts-${index}/**/*.md`);
+    const overridden: Config = { overrides: [{ files, rules: { "style/wrap": "off" } }] };
+    const fastest = (config: Config) => {
+      let best = Infinity;
+      for (let run = 0; run < 5; run++) {
+        const started = performance.now();
+        for (const path of paths) resolveConfig({ config, path });
+        best = Math.min(best, performance.now() - started);
+      }
+      return best;
+    };
+    expect(resolveConfig({ config: overridden, path: "drafts-3/a/b.md" }).rules["style/wrap"]).toBe(
+      "off",
+    );
+    // Resolving without overrides is the baseline. Compiling the patterns for
+    // each document took about fifteen times as long as that.
+    expect(fastest(overridden) / fastest({})).toBeLessThan(6);
+  });
   it("rejects unknown configuration, rules, options, and preset cycles", () => {
     expect(() => lint("", { config: { rules: { typo: "warn" } } })).toThrow("Unknown rule");
     expect(() => lint("", { config: { rules: { "style/wrap": ["warn", { width: 2 }] } } })).toThrow(

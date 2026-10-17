@@ -50,18 +50,27 @@ links.
 - Files whose names end in `.md` or `.markdown`, in any case, are documents. A
   file named on the command line is read as Markdown whatever its name. Other
   files can still be link targets.
-- Files that `.gitignore` excludes or that match the configuration's `ignore`
-  patterns are not processed, and nested Git repositories, symbolic links, and
-  the directories `.git`, `.obsidian`, `node_modules`, `dist`, and `coverage`
-  are not visited; see [ignored
+- Files that Git ignores or that match the configuration's `ignore` patterns are
+  not processed, and nested Git repositories, symbolic links, and the
+  directories `.git`, `.obsidian`, `node_modules`, `dist`, and `coverage` are
+  not visited; see [ignored
   files](configuration.md#ignored-files-and-link-targets). A symbolic link named
   on the command line is an error. A file or directory named on the command line
   that these leave out is skipped with a warning that says why, such as
   `Skipped ignored input: generated/x.md (in generated, which "generated/" in .gitignore matches)`,
   and the exit code does not change.
-- `.gitignore` files apply as in Git: the deepest one with a pattern that
-  matches a path decides, so a negated pattern there includes a file again, but
-  nothing below an excluded directory can be included. Letter case is ignored on
+- Git's ignore rules apply as in Git. A path is checked against each
+  `.gitignore` from the deepest up to the repository's top level, including
+  those above the workspace root, then the repository's `.git/info/exclude`,
+  then the global excludes file (`core.excludesFile`, by default
+  `~/.config/git/ignore`), and the first with a pattern that matches decides. So
+  a negated pattern includes a file again, but nothing below an excluded
+  directory can be included, and nothing in a workspace root that Git ignores is
+  processed, except files that Git tracks, which it never ignores. Inside a
+  nested repository only its own rules apply, and outside a repository only the
+  workspace's `.gitignore` files. The tool asks Git which global excludes file
+  it reads and which files it tracks; without Git installed, that file is not
+  read and tracked files are ignored like the others. Letter case is ignored on
   Windows and macOS, as Git does there by default, and not elsewhere. The
   configuration's `ignore` and `overrides` patterns match case exactly on every
   system, so that a shared configuration applies to the same files everywhere.
@@ -212,9 +221,10 @@ refused, or that a rule failed on, is written with the other rules' edits.
 A directory that the system does not let the tool read is skipped: it is
 reported once as a warning, or in the report's `skipped` list, and the rest of
 the workspace is processed. This includes a directory that can be listed but not
-entered or the reverse, and one whose `.gitignore` cannot be read. The warning
-does not change the exit code and is not counted by `--max-warnings`. A link
-into a skipped directory is reported as not checkable rather than missing; see
+entered or the reverse, one whose `.gitignore` cannot be read, and a nested
+repository whose `.git/info/exclude` cannot be read. The warning does not change
+the exit code and is not counted by `--max-warnings`. A link into a skipped
+directory is reported as not checkable rather than missing; see
 [`links/valid`](rules.md#linksvalid). Naming the directory, or a path inside it,
 on the command line is an error. To leave a directory out without a warning,
 list it in a `.gitignore`.
@@ -227,7 +237,8 @@ has locked. Any other read error stops the run with exit code `2`. So do a root,
 configuration file, or path on the command line that does not exist, cannot be
 read, or is of the wrong kind, as in `Input does not exist: notes/absent.md`,
 and a configuration file that cannot be read or a directory that refuses the
-search for one.
+search for one. A file of Git's ignore rules that applies to the root, such as a
+`.gitignore` above it, that cannot be read stops the run too.
 
 Documents are read as UTF-8, with or without a byte order mark. The tool does
 not guess another encoding: a guess can be wrong, and the supported renderers

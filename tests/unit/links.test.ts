@@ -11,10 +11,17 @@ import {
   textContent,
 } from "../../src/index.js";
 import type { Config, Dialect, Document, LookupResult, Plugin } from "../../src/index.js";
+import fc from "fast-check";
 import {
   headingAttributeBlock,
   headingAttributes,
 } from "../../src/workspace/heading-attributes.js";
+import {
+  createForgejoSlugger,
+  createGiteaSlugger,
+  forgejoAnchor,
+  giteaAnchor,
+} from "../../src/workspace/slug.js";
 
 // Count the attribute-block reads that only the Forgejo and Gitea anchors need.
 vi.mock("../../src/workspace/heading-attributes.js", async (importOriginal) => {
@@ -1576,6 +1583,84 @@ describe("Gitea heading anchors", () => {
     });
     expect(lint("[x](Note.md#test01)\n", options("gitea"))).toEqual([]);
     expect(lint("[x](Note.md#test01)\n", options("forgejo"))).toHaveLength(1);
+  });
+});
+describe("repeated heading anchors on Forgejo and Gitea", () => {
+  /** A heading's text, or an `id` that its attributes set. */
+  type Step = { text: string } | { id: string };
+  /** The renderers' numbering, which searches from `-1` for each repeat. */
+  function rendered(steps: Step[], clean: (text: string) => string): string[] {
+    const seen = new Set<string>();
+    return steps.map((step) => {
+      if ("id" in step) {
+        const anchor = step.id.replace(/^user-content-/, "");
+        if (anchor !== step.id) seen.add(anchor);
+        return anchor;
+      }
+      const result = (clean(step.text) || "heading").replace(/^user-content-/, "");
+      for (let i = 0; ; i++) {
+        const candidate = i ? `${result}-${i}` : result;
+        if (!seen.has(candidate)) {
+          seen.add(candidate);
+          return candidate;
+        }
+      }
+    });
+  }
+  const sluggers = [
+    ["forgejo", createForgejoSlugger, forgejoAnchor],
+    ["gitea", createGiteaSlugger, giteaAnchor],
+  ] as const;
+  it.each(sluggers)("number repeats as the %s renderer does", (_, create, clean) => {
+    // Texts whose anchors collide with the numbered anchors of others.
+    const step = fc.oneof(
+      fc.constantFrom(
+        "Same",
+        "Same 1",
+        "Same-1",
+        "same 2",
+        "Same 1 1",
+        "Other",
+        "...",
+        "Heading 1",
+      ),
+      fc.constantFrom("a", "same-3", "user-content-same-2", "user-content-heading").map((id) => ({
+        id,
+      })),
+    );
+    fc.assert(
+      fc.property(
+        fc.array(
+          step.map((value) => (typeof value === "string" ? { text: value } : value)),
+          { maxLength: 40 },
+        ),
+        (steps) => {
+          const slugger = create();
+          const anchors = steps.map((item) =>
+            "id" in item ? slugger.custom(item.id) : slugger.slug(item.text),
+          );
+          expect(anchors).toEqual(rendered(steps, clean));
+        },
+      ),
+    );
+  });
+  it.each(sluggers)("number many repeats on %s in linear time", (_, create) => {
+    const count = 10000;
+    const fastest = (texts: string[]) => {
+      let best = Infinity;
+      for (let run = 0; run < 5; run++) {
+        const slugger = create();
+        const started = performance.now();
+        for (const text of texts) slugger.slug(text);
+        best = Math.min(best, performance.now() - started);
+      }
+      return best;
+    };
+    const repeated = Array.from({ length: count }, () => "Fixed");
+    const distinct = Array.from({ length: count }, (_, index) => `Fixed ${index}`);
+    // Distinct headings need no numbers, which makes them a linear baseline.
+    // Searching from `-1` for each repeat took thousands of times as long.
+    expect(fastest(repeated) / fastest(distinct)).toBeLessThan(10);
   });
 });
 describe("Forgejo and Gitea heading attributes", () => {
