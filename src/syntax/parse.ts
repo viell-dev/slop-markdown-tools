@@ -1,4 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
+import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
@@ -20,6 +21,31 @@ const gfmTree = gfmFromMarkdown().map((extension) => {
   delete copy.transforms;
   return copy;
 });
+
+/** The offset of the `]` that closes the text of each link and image, by node. */
+const labelEnds = new WeakMap<Nodes, number>();
+/**
+ * Record where the text of a link or image ends. The tree keeps an image's
+ * description only as plain text, so its source positions are otherwise lost.
+ */
+const labelEndTree: TreeExtension = {
+  exit: {
+    // A label has an opening and a closing marker; the closing one comes last.
+    labelMarker(token) {
+      // The label's fragment is on top of the stack, and the link or image below it.
+      const node = this.stack[this.stack.length - 2];
+      if (node?.type === "link" || node?.type === "image") labelEnds.set(node, token.start.offset);
+    },
+  },
+};
+/**
+ * Where the text of a link or the description of an image ends in the source:
+ * the offset of its closing `]`. Undefined for other nodes and for nodes that
+ * `parse` did not make.
+ */
+export function labelEnd(node: Nodes): number | undefined {
+  return labelEnds.get(node);
+}
 
 /**
  * Whose conditions for `$…$` in running text each dialect follows, as observed
@@ -58,7 +84,7 @@ export function parse(
 ): Document {
   source = splitByteOrderMark(source)[1];
   const extensions = [frontmatter(["yaml", "toml"])];
-  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"])];
+  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"]), labelEndTree];
   // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
   // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
   // that is protected by rules rather than parsed.

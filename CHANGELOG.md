@@ -1,12 +1,12 @@
 # Changelog
 
-Notable changes to mdrefine, newest first. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and version numbers
-follow the
-[versioning policy](https://viell-dev.github.io/slop-markdown-tools/versions.html).
-Each release's section is also its
-[GitHub release](https://github.com/viell-dev/slop-markdown-tools/releases)'s
-notes; the prereleases' notes there are longer than their entries here.
+Notable changes to mdrefine, newest first. The format follows [Keep a
+Changelog](https://keepachangelog.com/en/1.1.0/), and version numbers follow the
+[versioning
+policy](https://viell-dev.github.io/slop-markdown-tools/versions.html). Each
+release's section is also its [GitHub
+release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
+prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
@@ -46,8 +46,8 @@ From `0.2.0-rc.2`:
   Node.js cannot copy: the other names of a hard link kept the old content, and
   on Windows the file's own permissions were dropped, which could let more users
   read it. A crash or power failure during the write can now leave a file
-  incomplete; see
-  [what writing keeps](https://viell-dev.github.io/slop-markdown-tools/cli.html#what-writing-keeps).
+  incomplete; see [what writing
+  keeps](https://viell-dev.github.io/slop-markdown-tools/cli.html#what-writing-keeps).
 - When a rule's edits would change a document's meaning, `format` keeps the
   other rules' edits, so `--diff` and the library's output show them, and
   reports that rule with `engine/unsafe-format` at the line where the meaning
@@ -73,6 +73,11 @@ From `0.2.0-rc.2`:
   and is an error only when it matches no document.
 - `.npm-cache` is an ordinary directory, linted like any other unless
   `.gitignore` or `ignore` leaves it out.
+- `style/wrap` wraps more: across line breaks in links, emphasis, and code
+  spans, inside the text of links and emphasis, in the bodies of GitHub,
+  Forgejo, and Gitea alerts, and before words such as `--config` or
+  `**strong**`. A check that runs `format --check` fails on documents formatted
+  by an earlier version until `format --write` runs once.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -106,10 +111,10 @@ From `0.2.0-rc.1` or earlier, also:
 From every prerelease:
 
 - The command line, the configuration, the JSON report, and the library now
-  follow the
-  [versioning policy](https://viell-dev.github.io/slop-markdown-tools/versions.html).
-  npm's `latest` tag names the newest stable release; release candidates no
-  longer move it.
+  follow the [versioning
+  policy](https://viell-dev.github.io/slop-markdown-tools/versions.html). npm's
+  `latest` tag names the newest stable release; release candidates no longer
+  move it.
 
 ### Added
 
@@ -173,6 +178,13 @@ From every prerelease:
 - The documentation site describes the newest stable release instead of the
   unreleased state of `main`
   ([#257](https://github.com/viell-dev/slop-markdown-tools/pull/257)).
+- `style/wrap` reflows a paragraph with a line break inside a link's text, an
+  image description, emphasis, strong text, strikethrough, or a code span, and
+  can break lines inside the text of links and emphasis
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
+  line with its marker, as it does for Obsidian callouts
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
 
 ### Fixed
 
@@ -185,6 +197,16 @@ From every prerelease:
   Obsidian paragraph holds `==`, `[[`, or `]]` outside its highlights and links,
   or when the first line is lazy
   ([#200](https://github.com/viell-dev/slop-markdown-tools/pull/200)).
+- `style/wrap` lets words that only start like a block marker, such as
+  `--config`, `#tag`, or `-5`, begin a line, and keeps a table delimiter row
+  from beginning one
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` keeps a paragraph's first line from becoming a link reference
+  definition, a thematic break, or display math instead of refusing the document
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` counts a tab in a list item's prefix up to the next tab stop
+  instead of as no width
+  ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
 - A carriage return alone ends a line for suppression directives, diagnostic
   positions, callout titles, and `style/wrap`
   ([#196](https://github.com/viell-dev/slop-markdown-tools/pull/196),
@@ -233,47 +255,48 @@ dialect inside a vault. Vaults are recognized anywhere in a workspace, and their
 links resolve within them. Directories and files that may not be read no longer
 stop a run. `$` math follows each renderer. Plugin packages resolve like an
 `import`. Messages are clearer, link checks need about half the memory, and the
-package ships examples.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.2).
+package ships examples. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.2).
 
 ## 0.2.0-rc.1 - 2026-10-03
 
 New `forgejo` and `gitea` dialects and presets, with `codeberg` as another name
 for `forgejo`. Fragments are checked against the anchors that each renderer
 generates, Forgejo and Gitea heading attributes are preserved, and
-`forgejo/heading-id` reports ids that break rendering.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.1).
+`forgejo/heading-id` reports ids that break rendering. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.1).
 
 ## 0.1.0-rc.1 - 2026-09-21
 
 Five built-in rules no longer propose edits that made formatting refuse ordinary
 documents. Obsidian links match without regard to case, new line breaks follow a
 document's first line ending, and applying many edits takes linear time.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-rc.1).
+[Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-rc.1).
 
 ## 0.1.0-beta.4 - 2026-09-18
 
 `style/wrap` wraps an Obsidian callout's body directly below its title, and
-reports a long title with `reportUnbreakable`.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.4).
+reports a long title with `reportUnbreakable`. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.4).
 
 ## 0.1.0-beta.3 - 2026-09-18
 
 `style/wrap`'s report options tell breakable prose from unbreakable atoms, and
-formatting is more than twice as fast.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.3).
+formatting is more than twice as fast. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.3).
 
 ## 0.1.0-beta.2 - 2026-09-18
 
 New `style/inline-code` and `structure/initial-heading` rules, the `measure`,
 `reportUnreflowed`, and `reportUnbreakable` options of `style/wrap`, the
 `resolve` settings, and `--exclude`. Link resolution fixes, and workspaces with
-source loaders.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.2).
+source loaders. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.2).
 
 ## 0.1.0-beta.1 - 2026-09-18
 
 The first public release: `lint` and `format` for CommonMark, GitHub Markdown,
 and Obsidian, with presets, overrides, suppression comments, plugins, and link
-checks.
-[Release notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.1).
+checks. [Release
+notes](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.1.0-beta.1).

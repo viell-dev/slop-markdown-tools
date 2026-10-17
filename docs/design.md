@@ -32,14 +32,14 @@ The comparison is only as good as the parser's reading:
   Obsidian's renderer.
 - It reads the document in its dialect, so it cannot notice that the dialect is
   wrong. In CommonMark a table is an ordinary paragraph, and joining its lines
-  changes nothing that CommonMark sees. This is why the tool
-  [assumes a dialect](dialects.md#the-assumed-dialect) with more syntax, not
-  less, when none is named.
+  changes nothing that CommonMark sees. This is why the tool [assumes a
+  dialect](dialects.md#the-assumed-dialect) with more syntax, not less, when
+  none is named.
 - The parser, micromark, follows CommonMark closely but not everywhere. Directly
   below a paragraph, a list item that begins with another list marker, as in
   `- 2. Step` or `- -`, is read as a list item holding text, where CommonMark
-  and GitHub read a nested list
-  ([issue #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
+  and GitHub read a nested list ([issue
+  #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
   Formatting cannot change such a document's meaning, because the comparison
   uses the same reading before and after, but rules see text where GitHub shows
   a list, and the rules that would change such a place leave it as written.
@@ -59,8 +59,9 @@ to a dialect only when its renderer was seen to apply it.
 
 Formatting:
 
-- A link, code span, or word longer than the line stays whole and exceeds the
-  width. The width is a target, not a license to split syntax.
+- A code span, an image, a link's destination, or a word longer than the line
+  stays whole and exceeds the width. The width is a target, not a license to
+  split syntax.
 - Paragraphs that wrapping cannot reconstruct safely are left as written;
   [`style/wrap`](rules.md#stylewrap) lists them, and its `reportUnreflowed`
   option reports them.
@@ -80,8 +81,8 @@ Files:
   [files that cannot be read](cli.md#files-that-cannot-be-read-or-written).
 - `format --write` writes into the existing file, which keeps its permissions
   and attributes but is not atomic: a crash or power failure during the write
-  can leave the file incomplete; see
-  [what writing keeps](cli.md#what-writing-keeps).
+  can leave the file incomplete; see [what writing
+  keeps](cli.md#what-writing-keeps).
 
 Syntax:
 
@@ -109,8 +110,8 @@ Links:
   that finds no readable note is reported as not checkable, and one that finds a
   single note is accepted but never rewritten.
 - With the workspace root inside a vault, links to notes outside the root cannot
-  be checked; see
-  [Obsidian vaults](obsidian.md#a-workspace-root-inside-a-vault).
+  be checked; see [Obsidian
+  vaults](obsidian.md#a-workspace-root-inside-a-vault).
 - Heading anchors are modeled as each renderer generates them, with these
   exceptions: character references inside tags that GitHub shows as text; on
   Gitea, the number of a footnote reference in a heading, and Markdown inside

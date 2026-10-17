@@ -1,7 +1,7 @@
 # Security policy
 
-Report a suspected vulnerability through
-[GitHub's private vulnerability reporting](https://github.com/viell-dev/slop-markdown-tools/security/advisories/new),
+Report a suspected vulnerability through [GitHub's private vulnerability
+reporting](https://github.com/viell-dev/slop-markdown-tools/security/advisories/new),
 with the affected version, the configuration, and a minimal synthetic example.
 Do not put exploitable details or private documents in a public issue.
 
