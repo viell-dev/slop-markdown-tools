@@ -78,13 +78,13 @@ and with `--check` fails when a document would change.
 ```
 
 `recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
-text as `**text**`, headings with `#`, code fences with backticks, and thematic
-breaks as `---`; aligns tables; removes trailing spaces and repeated blank
-lines; ends files with a line break; and checks links. It also warns about
-references without a definition, unused definitions, empty links, skipped
-heading levels, images without alternative text, and table rows with the wrong
-number of cells. Use `forgejo`, `codeberg`, `gitea`, or `obsidian` in place of
-`github` for documents rendered there.
+text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
+code fences with backticks, and thematic breaks as `---`; aligns tables; removes
+trailing spaces and repeated blank lines; ends files with a line break; and
+checks links. It also warns about references without a definition, unused
+definitions, empty links, skipped heading levels, images without alternative
+text, and table rows with the wrong number of cells. Use `forgejo`, `codeberg`,
+`gitea`, or `obsidian` in place of `github` for documents rendered there.
 
 ## Documentation
 

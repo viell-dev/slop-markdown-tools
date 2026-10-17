@@ -71,8 +71,8 @@ Follow the [setup guide](docs/guide.md) first, then read the [sensor reference](
 | Humidity | % | Yes |
 | Pressure | hPa | Since 1.2 |
 
-- [X] Publish readings every minute
-- [ ] Keep a week of history
+* [X] Publish readings every minute
+* [ ] Keep a week of history
 ```
 
 Preview the changes with `--diff`. To try `--write`, copy `before/` elsewhere
@@ -120,10 +120,14 @@ Each change comes from one rule of the configuration:
   keep their lines.
 - `style/emphasis` and `style/strong` chose `_` and `**`.
 - `github/alert-marker` and `github/task-marker` normalized `[!note]` and `[X]`.
+- `style/list-marker` wrote the task list with `-`.
 - `style/table` aligned the table.
 - `links/path` put `./` in front of the links it could resolve.
 - In `docs/guide.md`, `style/heading` turned an underlined heading into a `#`
-  heading, and `style/code-fence` wrote the `~~~` code fence with backticks.
+  heading, `style/ordered-list` wrote `1)` as `1.`, `style/list-indent` left one
+  space after each number and moved the code block in the second step with the
+  step's text, and `style/code-fence` wrote the block's `~~~` fence with
+  backticks.
 - In `docs/reference.md`, `style/heading` removed the closing `##` of a heading,
   `style/blank-lines` removed two repeated blank lines, and
   `style/final-newline` added the missing final newline.

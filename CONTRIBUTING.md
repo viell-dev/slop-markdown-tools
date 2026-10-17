@@ -101,12 +101,12 @@ A defect in how a rule reads or rewrites Markdown belongs here, as the smallest
 synthetic document that shows it, usually checked together with the contracts of
 every formatting change: formatting the output again changes nothing, the parsed
 meaning is unchanged, and disabling the rule leaves the source as written. Rules
-are tested in `rules.test.ts`, code fences, thematic breaks, and blank space in
-`blocks.test.ts`, problem rules in `references.test.ts`, `structure.test.ts`,
-and `content.test.ts`, wrapping in `wrap.test.ts` and `callout-wrap.test.ts`,
-links in `links.test.ts`, dollar math in `math.test.ts` against the renderers'
-output recorded in `math-renderers.ts`, and the engine, configuration, and
-plugins in `engine.test.ts`.
+are tested in `rules.test.ts`, list rules in `lists.test.ts`, code fences,
+thematic breaks, and blank space in `blocks.test.ts`, problem rules in
+`references.test.ts`, `structure.test.ts`, and `content.test.ts`, wrapping in
+`wrap.test.ts` and `callout-wrap.test.ts`, links in `links.test.ts`, dollar math
+in `math.test.ts` against the renderers' output recorded in `math-renderers.ts`,
+and the engine, configuration, and plugins in `engine.test.ts`.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the

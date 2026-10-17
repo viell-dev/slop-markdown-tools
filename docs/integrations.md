@@ -111,7 +111,9 @@ yet", keep the other tool for that check.
 | MD045 (image alternative text)                                                   | [`content/image-alt`](rules.md#contentimage-alt)                                                      |
 | MD056 (table column count)                                                       | [`content/table-columns`](rules.md#contenttable-columns)                                              |
 | MD040 (code block language)                                                      | [`content/code-language`](rules.md#contentcode-language)                                              |
-| List markers, numbering, and indentation; MD004, MD005, MD007, MD029, MD030      | None yet                                                                                              |
+| `-` for bullets; MD004 (list style)                                              | [`style/list-marker`](rules.md#stylelist-marker), with MD004's `consistent` and `sublist`             |
+| `1.` and numbering; MD029 (ordered list prefix)                                  | [`style/ordered-list`](rules.md#styleordered-list); `same` stands for MD029's `one` and `zero`        |
+| One space after list markers, list indentation; MD005, MD007, MD030              | [`style/list-indent`](rules.md#stylelist-indent), with MD030's spacing and MD007's `indent`           |
 | Inline HTML, bare URLs; MD033, MD034                                             | None yet                                                                                              |
 | Hard tabs; MD010                                                                 | None yet                                                                                              |
 | Formatting the code inside code blocks                                           | None yet                                                                                              |
