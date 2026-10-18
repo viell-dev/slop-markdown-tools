@@ -538,6 +538,34 @@ describe("links rewritten in a table cell, where a | must stay escaped (#347)", 
     expect(run(notation("wiki"), "See [alias](Target.md)\n")).toBe("See [[Target.md|alias]]\n");
     expect(run(notation("markdown"), "[[Target|a|b]]\n")).toBe("[a|b](<Target>)\n");
   });
+  it("escapes a | from a folder name in a new destination in a table cell", () => {
+    const repository = createWorkspace(
+      { "docs/Doc.md": "", "docs/x|y/b.md": "# B\n" },
+      { dialect: "github" },
+    );
+    const options = {
+      path: "docs/Doc.md",
+      workspace: repository,
+      config: {
+        extends: [],
+        dialect: "github",
+        rules: { "links/path": ["warn", { style: "relative" }] },
+      } satisfies Config,
+    };
+    const relative = (source: string) => {
+      const result = format(source, options);
+      expect(
+        result.diagnostics.filter((item) => item.rule.startsWith("engine/")),
+        source,
+      ).toEqual([]);
+      expect(lint(result.output, options), source).toEqual([]);
+      return result.output;
+    };
+    expect(relative(table("[b](./x%7Cy/../x%7Cy/b.md)"))).toBe(table("[b](x\\|y/b.md)"));
+    expect(relative(table("[b](<./x%7Cy/../x%7Cy/b.md>)"))).toBe(table("[b](<x\\|y/b.md>)"));
+    expect(relative(table("[b](x\\|y/b.md)"))).toBe(table("[b](x\\|y/b.md)"));
+    expect(relative("[b](./x%7Cy/../x%7Cy/b.md)\n")).toBe("[b](x|y/b.md)\n");
+  });
 });
 describe("Obsidian case-insensitive resolution", () => {
   const files = {

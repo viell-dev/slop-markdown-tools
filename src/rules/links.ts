@@ -257,6 +257,13 @@ function named(paths: string[]): string {
     : paths.join(", ");
 }
 
+/** The nodes inside table cells, where a `|` that is not escaped ends the cell. */
+function inTableCells(tree: Nodes): Set<Nodes> {
+  const nodes = new Set<Nodes>();
+  walk(tree, "tableCell", (cell) => walk(cell, (child) => nodes.add(child)));
+  return nodes;
+}
+
 export const linkRules: Record<string, Rule> = {
   "links/valid": {
     description: "Check local link destinations and dialect-specific heading/block references.",
@@ -325,6 +332,7 @@ export const linkRules: Record<string, Rule> = {
     }),
     check({ document, options, workspace }) {
       const findings: Finding[] = [];
+      let inCell: Set<Nodes> | undefined;
       walk(document.tree, (node) => {
         const url = destination(node);
         if (url === undefined || !workspace) return;
@@ -459,6 +467,9 @@ export const linkRules: Record<string, Rule> = {
             .replaceAll(")", "%29")
             .replaceAll("<", "%3C")
             .replaceAll(">", "%3E");
+        // A file or folder name can hold a `|`, which would end a table cell.
+        if (replacement.includes("|") && (inCell ??= inTableCells(document.tree)).has(node))
+          replacement = replacement.replaceAll("|", "\\|");
         if (
           document.dialect === "gitea" &&
           (giteaPyLine(document, start, end) || replacement.includes("_.py")) &&
@@ -487,9 +498,7 @@ export const linkRules: Record<string, Rule> = {
     check({ document, options, workspace }) {
       if (document.dialect !== "obsidian" || !workspace) return [];
       const findings: Finding[] = [];
-      // In a table cell a `|` that is not escaped ends the cell.
-      const inCell = new Set<Nodes>();
-      walk(document.tree, "tableCell", (cell) => walk(cell, (child) => inCell.add(child)));
+      const inCell = inTableCells(document.tree);
       walk(document.tree, (node) => {
         const [start, end] = range(node);
         const pipe = inCell.has(node) ? "\\|" : "|";
