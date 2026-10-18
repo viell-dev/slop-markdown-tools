@@ -677,7 +677,9 @@ or what a comment applies to:
   blocks of a list item makes the list loose, which changes how it renders.
 - Front matter and the block below it.
 - A list that ends inside an HTML comment or another HTML block without its end
-  marker, which would take the blank line in.
+  marker, which would take the blank line in. The same goes for a list whose
+  last item ends in a fenced code block without its closing fence: renderers put
+  the blank line into the code, although the parser does not.
 - A heading or list directly below an HTML comment or below a
   `mdtools-disable-next-line` directive, which apply to the line below them.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
@@ -691,7 +693,9 @@ or what a comment applies to:
 - Text that the parser reads where renderers read a list, such as `- 2. Step`
   directly below text: the list or quote that starts with it, the blocks
   indented below it, and a list after them, which renderers read as part of that
-  list (see [how it works](design.md#safety-model)).
+  list, and text on the line directly below the list item or quote that it ends,
+  which renderers read as more of it (see [how it
+  works](design.md#safety-model)).
 - Directly below a table that ends in a list item or block quote: text whose
   second line is a table delimiter row. The parser reads a table there as text,
   where GitHub reads a table, and a blank line would make it a table for the

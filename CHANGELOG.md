@@ -8,6 +8,19 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- `style/block-spacing` adds no blank line below a list whose last item ends in
+  a fenced code block without its closing fence. Renderers put that line into
+  the code, while the parser does not, so the safety check did not see the
+  change.
+- `style/block-spacing` adds no blank line between text that the parser reads as
+  an underlined heading in place of a list, at the end of a list item or block
+  quote, and text on the line below it. Renderers read that text as more of the
+  list item's text, and the blank line split it off.
+
 ## 0.2.2 - 2026-10-18
 
 ### Fixed
