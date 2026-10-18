@@ -178,6 +178,35 @@ describe.each(targets)("rendering by $renderer", (target) => {
   );
 });
 
+describe.each(targets)("rendering by $renderer of lists that the parser misreads", (target) => {
+  // The parser reads these lists as text, and the blocks below them outside the list
+  // (issue #191). Before, formatting joined lists, moved a list out of an item, changed
+  // code, turned a list into a heading, and made lists loose.
+  it.each([
+    "Text\n- 2. Step\n  1) Next\n",
+    "Text\n> 2. a\n> 1) b\n",
+    "    code\n\n2. Two\n1) Three\n",
+    "_\n- 0.     *r*\n",
+    "    code\n\n2. a\n---\n",
+    "Text\n- 2. Step\n     1) Next\n",
+    "    code\n\n2. Two\n   - Sub\n",
+    "    code\n\n-\n* x\n",
+    "Text\n- -\n  * x\n",
+    "    code\n\n- \n  * x\n",
+    "    code\n\n2) b\n   # H\n   Text\n",
+    "Text\n1. 2) b\n   ===\n   *c*\n   1) d\n",
+    "Text\n> 1.\n> ===\n> ---\n",
+    "    code\n\n2. Two\n   # H\n1. Three\n",
+  ])("does not change for %j", (source) => {
+    const config: Config = {
+      ...target.config,
+      rules: { "style/block-spacing": "warn", "style/wrap": ["warn", { width: 20 }] },
+    };
+    expect(difference(source, target.config, target.render)).toBeUndefined();
+    expect(difference(source, config, target.render)).toBeUndefined();
+  });
+});
+
 describe("normalizeHtml", () => {
   it("ignores whitespace that a browser does not show", () => {
     expect(normalizeHtml("<p>a\nb  c</p>\n<ul>\n<li>d</li>\n</ul>\n")).toBe(
