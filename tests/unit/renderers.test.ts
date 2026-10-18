@@ -144,7 +144,7 @@ function difference(
     `after:  …${around(after)}…`,
   ].join("\n");
 }
-/** Fail with the cases that render differently unexpectedly, and the known ones that no longer do. */
+/** Fail with the cases that render differently unexpectedly, and the known ones that do not. */
 function expectKnown(renderer: string, cases: string[], differing: Map<string, string>) {
   const entries = new Map(known[renderer]!.map((entry) => [entry.case, entry.issue]));
   const unexpected = [...differing].filter(([name]) => !entries.has(name));
