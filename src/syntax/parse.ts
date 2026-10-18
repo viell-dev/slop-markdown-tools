@@ -182,20 +182,21 @@ const literalOpener = /^ {0,3}(?:`{3,}|~{3,}|\$\$|<)/m;
 /** Blocks in which a `---` or `+++` line is content, not a closing line. */
 const literalBlocks = new Set(["code", "html", "math"]);
 /**
- * Whether `source` opens front matter that no line closes. The front matter
- * extension opens it at a first line of `---` or `+++` followed only by spaces
- * or tabs, and closes it at the next line of the same fence, also followed only
- * by spaces or tabs. Without a closing line, the document has no front matter,
- * but the extension then reads the lists and block quotes below as paragraphs
- * (issue #278, micromark/micromark-extension-frontmatter#5).
+ * The fence, `---` or `+++`, of front matter that the first line of `source`
+ * opens and no line closes. The front matter extension opens front matter at a
+ * first line of `---` or `+++` followed only by spaces or tabs, and closes it
+ * at the next line of the same fence, also followed only by spaces or tabs.
+ * Without a closing line the document has no front matter, but the extension
+ * then reads the lists and block quotes below as paragraphs (issue #278,
+ * micromark/micromark-extension-frontmatter#5). An edit that writes such a line
+ * below makes front matter of everything above it.
  */
-function unclosedFrontMatter(source: string): boolean {
+export function unclosedFrontMatter(source: string): "---" | "+++" | undefined {
   const opening = /^(---|\+\+\+)[ \t]*(?:\r\n|\r|\n)/.exec(source);
-  if (!opening) return false;
-  const fence = opening[1] === "---" ? "---" : "\\+\\+\\+";
-  return !new RegExp(`(?:^|\\r|\\n)${fence}[ \\t]*(?:\\r|\\n|$)`).test(
-    source.slice(opening[0].length),
-  );
+  if (!opening) return undefined;
+  const fence = opening[1] as "---" | "+++";
+  const closing = new RegExp(`(?:^|\\r|\\n)${fence.replaceAll("+", "\\+")}[ \\t]*(?:\\r|\\n|$)`);
+  return closing.test(source.slice(opening[0].length)) ? undefined : fence;
 }
 
 /**
