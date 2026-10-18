@@ -54,7 +54,15 @@ credentials out of diagnostic snapshots and logs.
 
 A defect in a dependency gets a blocked issue here, with everything needed to
 report and verify it without testing again: the inputs, the versions, what
-reference implementations produce, the reproduction, and what unblocks it.
+reference implementations produce, the reproduction, and what unblocks it. It
+also gets a row in the pinned overview, #330, which lists every upstream defect,
+how it is handled here, and what was reported, and logs each report and each
+check for a response. Once nothing here waits on the defect, because a
+workaround keeps renderers showing the same or the limit is documented, close
+its issue as not planned with `Status: Blocked`, and say so in #330. Reopen it
+when upstream releases a fix, when the workaround falls short, or when a
+maintainer's answer changes the plan.
+
 Posting a report to another project needs the owner's decision for that report.
 A report:
 
@@ -75,8 +83,8 @@ every upstream defect:
 - work around it here wherever it could change what a renderer shows, as rules'
   protections and the check in `parse()` for #278 do, and keep its blocked issue
   as the record of the defect and of what would unblock it;
-- check the open reports for responses while working on the project, and record
-  what a maintainer says in the tracking issue.
+- check the open reports for responses while working on the project, record what
+  a maintainer says in the tracking issue, and log the check in #330.
 
 ## Keeping the repository consistent
 
@@ -160,9 +168,10 @@ not replace explanatory comments or links to PRs.
   `Status: Confirmed` means a reproduced defect or an accepted request within
   scope.
 - `Status: Needs Information` states the evidence needed; `Status: Blocked`
-  links the external dependency and the condition that unblocks it;
-  `Status: Can't Reproduce` follows a documented attempt with version, input,
-  and result.
+  links the external dependency and the condition that unblocks it, and stays on
+  an upstream defect that is closed while parked (see "Reports to other
+  projects"); `Status: Can't Reproduce` follows a documented attempt with
+  version, input, and result.
 - A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
   item explains the decision and keeps `Status: Won't Do`, and can be
   reconsidered with new evidence. On reopening, replace the old disposition.
