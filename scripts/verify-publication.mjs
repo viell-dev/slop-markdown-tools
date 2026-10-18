@@ -6,8 +6,9 @@
 // must match TARBALL. The registry must report a SLSA provenance attestation for the version,
 // and the attestation must name the tarball's SHA-512 digest, this repository's Release
 // workflow, and, when given, COMMIT as the source. Just after publication the registry can
-// answer 404 for about a minute, so a missing version or attestation is retried for that long;
-// a checksum or provenance that differs fails at once. The Release workflow runs this script
+// answer 404 for more than a minute (73 seconds for 0.2.0-rc.3, issue #301), so a missing
+// version or attestation is retried for five minutes; a checksum or provenance that differs
+// fails at once. The Release workflow runs this script
 // after publishing; run it by hand to check a publication whose workflow did not finish.
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
@@ -26,7 +27,7 @@ const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.
 const repository = manifest.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
 const workflow = ".github/workflows/release.yml";
 const provenance = "https://slsa.dev/provenance/v1";
-const attempts = 12;
+const attempts = 60;
 const pause = 5000;
 
 /** Fetch JSON from `url`, retrying while it is missing or `missing(body)` names what is absent. */
