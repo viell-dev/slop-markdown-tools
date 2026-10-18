@@ -823,9 +823,11 @@ After:
 
 A trailing run of `#` in the text of an underlined heading is escaped, so that
 it is not taken for a closing sequence. Underlined headings of more than one
-line, and those inside lists or block quotes, are left as written. On Forgejo
-and Gitea, a closing sequence after an attribute block such as `{#id}` stays,
-because Gitea before 1.26 reads the block only when the sequence follows it.
+line, those inside lists or block quotes, and one directly below TOML front
+matter, whose lines renderers without TOML front matter read as part of the
+heading, are left as written. On Forgejo and Gitea, a closing sequence after an
+attribute block such as `{#id}` stays, because Gitea before 1.26 reads the block
+only when the sequence follows it.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not
@@ -946,6 +948,12 @@ These are left as written:
   another block once inside the item.
 - A list with a tab in an item's indentation, such as one that Obsidian indented
   with tabs.
+- A list directly below TOML front matter that cannot interrupt a paragraph: a
+  numbered list that does not start at 1, or one whose first item starts with a
+  blank line, and the lists that directly follow it. Renderers without TOML
+  front matter read the front matter's lines as a paragraph, which such a list
+  continues as text. `style/list-marker` and `style/ordered-list` leave these
+  lists as written too.
 
 ## `style/list-marker`
 
@@ -968,7 +976,9 @@ A bullet list that directly follows another one is a separate list only because
 its marker differs, so it gets the next marker in the order `-`, `*`, `+`, and
 the list after that the first one again. A list whose new marker would make a
 line read as a thematic break, as `+ - -` would with `-`, keeps its markers, and
-so do the lists next to it.
+so do the lists next to it. So does a list directly below TOML front matter
+whose first item starts with a blank line, as for
+[`style/list-indent`](#stylelist-indent).
 
 Before:
 
@@ -1015,7 +1025,9 @@ number gets wider or narrower, as from `9.` to `10.`, the item's other lines
 move with its text. A list keeps its numbers where that would move a line into
 or out of an item, as for [`style/list-indent`](#stylelist-indent), and where
 the numbers are written with leading zeros, as in `01.`, or would need more than
-nine digits.
+nine digits. A list directly below TOML front matter that does not start at 1,
+or whose first item starts with a blank line, keeps its delimiter and numbers,
+as for `style/list-indent`.
 
 Before:
 
@@ -1120,6 +1132,10 @@ means:
   start of front matter.
 - With `---`, at the start of a line below a first line of `---` that no line
   closes, which `---` would close as front matter.
+- Directly below TOML front matter, a break that is or would become `---`,
+  because renderers without TOML front matter read the front matter's lines as a
+  paragraph that `---` underlines as a heading; see the [safety
+  model](design.md#safety-model).
 
 ## `style/trailing-space`
 

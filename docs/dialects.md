@@ -20,16 +20,19 @@ what is text, and so what formatting has to leave alone. Choose it in the
 | Wikilinks, embeds, highlights (`==…==`), comments (`%%…%%`), `^block-ids` | No         | No     | No      | No    | Yes      |
 
 GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian dialects,
-and the rules for GitHub Markdown apply to all three. Obsidian marks
-strikethrough with two tildes only, so `~a~` is text there. The syntax that only
-Forgejo and Gitea have is protected from formatting rather than parsed; see
-[Forgejo and Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as
-an Obsidian plugin's, is read as text: use a suppression comment or an `ignore`
-pattern for it. Site-generator syntax is read as text too, but its lines are
-kept: [`style/wrap`](rules.md#stylewrap) leaves a paragraph as written when one
-of its lines starts with a container such as Docusaurus's `:::note` or a
-template tag such as Liquid's `{% tab %}` or `{{ title }}`, because site
-generators read them by line.
+and the rules for GitHub Markdown apply to all three. TOML front matter is read
+in every dialect for site generators, though the renderers read its lines as a
+paragraph, and formatting keeps the meaning of [both
+readings](design.md#safety-model). Obsidian marks strikethrough with two tildes
+only, so `~a~` is text there. The syntax that only Forgejo and Gitea have is
+protected from formatting rather than parsed; see [Forgejo and
+Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as an Obsidian
+plugin's, is read as text: use a suppression comment or an `ignore` pattern for
+it. Site-generator syntax is read as text too, but its lines are kept:
+[`style/wrap`](rules.md#stylewrap) leaves a paragraph as written when one of its
+lines starts with a container such as Docusaurus's `:::note` or a template tag
+such as Liquid's `{% tab %}` or `{{ title }}`, because site generators read them
+by line.
 
 An alert's or callout's marker is read from the text, as GitHub reads it, so
 `> \[!NOTE]` and `> &#91;!NOTE]` are alerts too. Formatting keeps the line of

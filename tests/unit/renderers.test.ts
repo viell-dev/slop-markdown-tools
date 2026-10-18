@@ -39,12 +39,6 @@ const inputs: Known[] = [
     input: "    code\n\n2. Two\n1) Three\n",
     issue: 191,
   },
-  // Renderers without TOML front matter read its lines as a paragraph, which "---" underlines.
-  {
-    case: "a thematic break below TOML front matter",
-    input: "+++\ntitle = 1\n+++\n* * *\n",
-    issue: 333,
-  },
 ];
 /**
  * The cases whose rendering formatting changes, by renderer. Every one has to differ still, so
@@ -53,14 +47,8 @@ const inputs: Known[] = [
  * smaller input that shows the same difference.
  */
 const known: Record<string, Known[]> = {
-  "commonmark.js": [
-    // "+++\n+++\n___\n" becomes "+++\n+++\n---\n", as in the TOML front matter input.
-    { case: "generated 1/14", issue: 333 },
-    ...inputs,
-  ],
+  "commonmark.js": inputs,
   "markdown-it": [
-    // The same document as for commonmark.js.
-    { case: "generated 1/14", issue: 333 },
     // markdown-it keeps the indentation of a code span's next line, as the parser does, where
     // GitHub and commonmark.js leave it out, and the tool writes code spans as they read them.
     // "`\n `\n" becomes "` `\n".
