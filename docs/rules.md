@@ -165,7 +165,9 @@ Writes the type of a GitHub alert in capitals. The renderers accept any case for
 the five types `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`, and their
 documentation spells them in capitals. Other types are not alerts there and are
 left as written, and so is a marker written with an escape or a character
-reference, such as `\[!note]`.
+reference, such as `\[!note]`. So is a marker that GitHub shows as text: one in
+a block quote inside another quote or a list, one followed by text on its line,
+and one with nothing below it in the quote.
 
 Before:
 
@@ -859,6 +861,9 @@ joined line would read differently:
   marker, which holds an Obsidian callout's title.
 - Where the joined span needs a different number of backticks than it has, and
   an earlier run of that many in the same paragraph would pair with them.
+- Where a line inside the span ends with a backslash: where its backticks do not
+  pair, as on GitHub after an unpaired longer run, that backslash is a hard line
+  break. `style/wrap` keeps such a paragraph as written too.
 
 Before:
 
@@ -1105,8 +1110,9 @@ Text.
 A break is left as written where the new marker would change what the document
 means:
 
-- With `---`, directly below a paragraph or a link reference definition, which
-  `---` would underline as a heading.
+- With `---`, directly below a paragraph, a link reference definition, or
+  display math, which `---` would underline as a heading; GitHub builds display
+  math from a paragraph.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
 - At the start of a document, with `---`, which would open front matter if a

@@ -19,12 +19,24 @@ function calloutRule(obsidian: boolean): Rule {
       if (obsidian ? document.dialect !== "obsidian" : !githubAlerts.has(document.dialect))
         return [];
       const findings: Finding[] = [];
-      walk(document.tree, "blockquote", (node) => {
+      walk(document.tree, "blockquote", (node, _index, parent) => {
         const child = node.children[0];
         if (child?.type !== "paragraph") return;
-        const start = range(child)[0];
+        const [start, end] = range(child);
         const match = /^\[!([\w-]+)\]/.exec(document.source.slice(start));
         if (!match) return;
+        // GitHub shows an alert only in a block quote at the top level, with
+        // the marker alone on its first line and content below it; elsewhere
+        // the marker is text, whose letters would change (issue #334).
+        if (!obsidian) {
+          const lineEnd = /\r\n|\r|\n|$/.exec(document.source.slice(start + match[0].length))!;
+          const rest = document.source.slice(
+            start + match[0].length,
+            start + match[0].length + lineEnd.index,
+          );
+          const below = start + match[0].length + lineEnd.index < end || node.children.length > 1;
+          if (parent?.type !== "root" || /[^ \t]/.test(rest) || !below) return;
+        }
         const original = match[1]!;
         if (
           !obsidian &&
