@@ -86,9 +86,9 @@ exact versions without a `v` prefix.
 A last job, with read-only access, then checks the publication: the registry's
 `integrity` and `shasum` must match the tested tarball, and the version's
 provenance must name that tarball, the Release workflow, and the workflow's
-commit. It waits up to a minute for the registry to know the version. If only
-this job failed, re-run it with `gh run rerun RUN --failed`; it does not publish
-again. When the Release run succeeds for a stable version, the **Pages**
+commit. It waits up to five minutes for the registry to know the version. If
+only this job failed, re-run it with `gh run rerun RUN --failed`; it does not
+publish again. When the Release run succeeds for a stable version, the **Pages**
 workflow builds the documentation site from the new tag and deploys it; a
 prerelease leaves the site on the newest stable release. To deploy a release's
 site by hand, dispatch **Pages** on `main` with the version as its `tag`.
