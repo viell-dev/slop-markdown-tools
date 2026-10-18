@@ -81,8 +81,9 @@ From `0.2.0-rc.2`:
   form, turn its rule off or set its option, such as
   `"style/heading": ["warn", { "closing": "keep" }]`.
 - `.gitignore` files decide as in Git: a deeper file can include again what a
-  higher one excludes, and patterns match letter case exactly on Linux. Files
-  that were left out before can be linted now, and the reverse.
+  higher one excludes, and patterns match letter case exactly unless the
+  repository's `core.ignorecase` is on, as Git sets it on Windows and macOS.
+  Files that were left out before can be linted now, and the reverse.
 - Git's other ignore rules apply too: `.gitignore` files above the workspace
   root, `.git/info/exclude`, and the global excludes file, while a file that Git
   tracks is never ignored. With `--root` on a folder of a repository, or with a
@@ -342,6 +343,10 @@ From every prerelease:
   file. Inside a nested repository only its own rules apply, and none applies to
   a file that Git tracks
   ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
+- Git's ignore rules match letter case as each repository's `core.ignorecase`
+  says, and each repository, also a nested one, uses the global excludes file
+  that its own settings name
+  ([#287](https://github.com/viell-dev/slop-markdown-tools/pull/287)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).

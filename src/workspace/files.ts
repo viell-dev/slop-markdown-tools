@@ -12,13 +12,7 @@ import { minimatch, Minimatch } from "minimatch";
 import { exists, pathError, refusal, refusalText, systemErrorText } from "./access.js";
 import type { RefusalCode } from "./access.js";
 import { decodeText } from "./encoding.js";
-import {
-  excludesFile,
-  globalExcludesFile,
-  optionalText,
-  repositoryTop,
-  trackedFiles,
-} from "./git.js";
+import { excludesFile, ignoreSettings, optionalText, repositoryTop, trackedFiles } from "./git.js";
 import { isMarkdownName } from "./index.js";
 import { enclosingVault, isVault, lineBreakSetting } from "./vault.js";
 import type { SettingsProblem, Vault } from "./vault.js";
@@ -65,10 +59,10 @@ function showFile(show: PathText, file: string): string {
  */
 const alwaysSkipped = new Set([".git", ".obsidian", "node_modules", "dist", "coverage"]);
 /**
- * Whether letter case is ignored where Git and the file system usually ignore
- * it. Git sets `core.ignorecase` when it creates a repository on a file system
- * that ignores case, as those of Windows and macOS do by default, and leaves it
- * off elsewhere; `.gitignore` patterns then match accordingly.
+ * Whether letter case is ignored where the file system usually ignores it, as
+ * those of Windows and macOS do by default. Git turns `core.ignorecase` on when
+ * it creates a repository on such a file system, and `.gitignore` patterns
+ * match accordingly; where Git cannot say, this stands in for the setting.
  */
 const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
 /**
@@ -98,6 +92,8 @@ interface IgnoreLayer {
   file: string;
   /** The file's text. */
   text: string;
+  /** Whether its patterns match without regard to letter case, as its repository says. */
+  ignoreCase: boolean;
   matcher: Ignore;
 }
 /** A gitignore pattern that matches exactly one folder, at a path relative to the file's folder. */
@@ -123,7 +119,7 @@ function ignoreScopes(at: string, layers: IgnoreLayer[]) {
       const folders = inner
         .split("/")
         .map((_, index, parts) => parts.slice(0, index + 1).join("/"));
-      matcher = ignore({ ignorecase: caseInsensitive })
+      matcher = ignore({ ignorecase: layer.ignoreCase })
         .add(layer.text)
         .add(folders.map((folder) => `!${folderOnly(folder)}`));
     }
@@ -148,9 +144,12 @@ function gitIgnoreRule(
   }
   return undefined;
 }
-/** The layer of the rules `text`, read from `file`, for the folder `base`. */
-function ignoreLayer(base: string, file: string, text: string): IgnoreLayer {
-  return { base, file, text, matcher: ignore({ ignorecase: caseInsensitive }).add(text) };
+/**
+ * The layer of the rules `text`, read from `file`, for the folder `base`, in a
+ * repository that ignores letter case or not.
+ */
+function ignoreLayer(base: string, file: string, text: string, ignoreCase: boolean): IgnoreLayer {
+  return { base, file, text, ignoreCase, matcher: ignore({ ignorecase: ignoreCase }).add(text) };
 }
 /** A path that the user named among the inputs. */
 interface NamedInput {
@@ -377,24 +376,28 @@ function gitRules(root: string, top: string | undefined) {
   /** The file whose read failed, as messages name it. */
   const failed = (error: unknown, fallback: string) =>
     shown((error as NodeJS.ErrnoException).path ?? fallback);
-  /** The global excludes file's rules, found once, from the first repository found. */
-  let global: Promise<IgnoreLayer | undefined> | undefined;
-  /** The tracked files, from the top level, and the folders that hold them. */
-  const tracked = new Set<string>();
-  const holding = new Set<string>();
-  const fold = (name: string) => (caseInsensitive ? name.toLowerCase() : name);
+  /**
+   * The tracked files, from the top level, and the folders that hold them,
+   * each kept as its repository compares letter case: as they are, or in lower
+   * case.
+   */
+  const exact = { tracked: new Set<string>(), holding: new Set<string>() };
+  const folded = { tracked: new Set<string>(), holding: new Set<string>() };
   /**
    * The rules for the top level of the repository in `directory`, `base` from
    * the outer repository's top level, with the lowest precedence first: the
-   * global excludes file, then the repository's `info/exclude`. What the
+   * global excludes file that the repository's settings name, then its
+   * `info/exclude`; and whether its patterns ignore letter case. What the
    * repository tracks is recorded on the way.
    */
-  async function repositoryLayers(directory: string, base: string): Promise<IgnoreLayer[]> {
-    global ??= globalExcludesFile(directory).then(async (file) => {
-      const text = file === undefined ? undefined : await optionalText(file);
-      return text === undefined ? undefined : ignoreLayer("", shown(file!), text);
-    });
-    const shared = global;
+  async function repositoryLayers(
+    directory: string,
+    base: string,
+  ): Promise<{ layers: IgnoreLayer[]; ignoreCase: boolean }> {
+    const settings = ignoreSettings(directory).then(async (found) => ({
+      ...found,
+      text: found.excludesFile === undefined ? undefined : await optionalText(found.excludesFile),
+    }));
     const listed = trackedFiles(directory);
     let text: string | undefined;
     let exclude: string | undefined;
@@ -404,22 +407,36 @@ function gitRules(root: string, top: string | undefined) {
     } finally {
       // Git runs in the repository's folder, which Windows does not let anyone
       // remove until it is done, so discovery waits for it also after a failure.
-      await Promise.allSettled([shared, listed]);
+      await Promise.allSettled([settings, listed]);
     }
+    const global = await settings;
+    // Where Git cannot say, case is compared as the file system usually does.
+    const ignoreCase = global.ignoreCase ?? caseInsensitive;
+    const sets = ignoreCase ? folded : exact;
     for (const name of (await listed) ?? []) {
-      let at = fold(base ? `${base}/${name}` : name);
-      tracked.add(at);
-      for (at = path.posix.dirname(at); at !== "." && !holding.has(at); at = path.posix.dirname(at))
-        holding.add(at);
+      let at = base ? `${base}/${name}` : name;
+      if (ignoreCase) at = at.toLowerCase();
+      sets.tracked.add(at);
+      for (
+        at = path.posix.dirname(at);
+        at !== "." && !sets.holding.has(at);
+        at = path.posix.dirname(at)
+      )
+        sets.holding.add(at);
     }
-    const layer = await shared;
-    return [
-      ...(layer ? [{ ...layer, base }] : []),
-      ...(text === undefined ? [] : [ignoreLayer(base, shown(exclude!), text)]),
-    ];
+    const layers: IgnoreLayer[] = [];
+    if (global.text !== undefined)
+      layers.push(ignoreLayer(base, shown(global.excludesFile!), global.text, ignoreCase));
+    if (text !== undefined) layers.push(ignoreLayer(base, shown(exclude!), text, ignoreCase));
+    return { layers, ignoreCase };
   }
-  /** Whether Git tracks the path `at`, from the top level, or a file in that folder. */
-  const isTracked = (at: string) => tracked.has(fold(at)) || holding.has(fold(at));
+  /** Whether a repository tracks the path `at`, from the top level, or a file in that folder. */
+  function isTracked(at: string): boolean {
+    if (exact.tracked.has(at) || exact.holding.has(at)) return true;
+    if (!folded.tracked.size) return false;
+    const lower = at.toLowerCase();
+    return folded.tracked.has(lower) || folded.holding.has(lower);
+  }
   return { lead, fromTop, shown, failed, repositoryLayers, isTracked };
 }
 /**
@@ -540,17 +557,19 @@ export async function discover(
   }
   /** The rules that apply at the root, from the repository's top level down. */
   let rootLayers: IgnoreLayer[] = [];
+  /** Whether the rules of the repository that holds the root ignore letter case. */
+  let rootIgnoreCase = caseInsensitive;
   /** The folder at or above the root that Git ignores, from the top level, and the rule. */
   let ignoredRoot: { folder: string; file: string; pattern: string } | undefined;
   if (top) {
     try {
-      rootLayers = await repositoryLayers(top, "");
+      ({ layers: rootLayers, ignoreCase: rootIgnoreCase } = await repositoryLayers(top, ""));
       const parts = lead ? lead.split("/") : [];
       for (let index = 0; index < parts.length && !ignoredRoot; index++) {
         const at = parts.slice(0, index).join("/");
         const file = path.join(top, ...parts.slice(0, index), ".gitignore");
         const text = await optionalText(file);
-        if (text !== undefined) rootLayers.push(ignoreLayer(at, shown(file), text));
+        if (text !== undefined) rootLayers.push(ignoreLayer(at, shown(file), text, rootIgnoreCase));
         const rule = gitIgnoreRule(ignoreScopes(at, rootLayers), parts[index]!, true);
         if (rule) ignoredRoot = { folder: parts.slice(0, index + 1).join("/"), ...rule };
       }
@@ -559,13 +578,15 @@ export async function discover(
     }
   }
   /**
-   * Visit a directory. Below a folder that Git's rules exclude, nothing can be
-   * included again, as in Git, except what Git tracks. Such a folder is visited
-   * for what it tracks, and otherwise only for link targets.
+   * Visit a directory, whose repository's rules ignore letter case or not.
+   * Below a folder that Git's rules exclude, nothing can be included again, as
+   * in Git, except what Git tracks. Such a folder is visited for what it
+   * tracks, and otherwise only for link targets.
    */
   async function walk(
     relative: string,
     inherited: IgnoreLayer[],
+    ignoreCase: boolean,
     targetOnly = false,
     gitIgnoredAbove = false,
   ) {
@@ -580,7 +601,7 @@ export async function discover(
       if (!gitIgnoredAbove && (await exists(rules))) {
         reading = relative ? `${relative}/.gitignore` : ".gitignore";
         const text = await readFile(rules, "utf8");
-        layers.push(ignoreLayer(fromTop(relative), reading, text));
+        layers.push(ignoreLayer(fromTop(relative), reading, text, ignoreCase));
         reading = relative;
       }
       entries = await readdir(directory, { withFileTypes: true });
@@ -645,8 +666,8 @@ export async function discover(
               input.path === name ? "a nested repository" : `in ${show(name)}, a nested repository`,
           );
         if (nested && resolve.nestedRepositories !== true) continue;
-        // Inside a nested repository, only its own rules apply, as in Git.
-        let inner = layers;
+        // Inside a nested repository, only its own rules and settings apply, as in Git.
+        let inner = { layers, ignoreCase };
         if (nested && !gitIgnored)
           try {
             inner = await repositoryLayers(full, fromTop(name));
@@ -656,7 +677,8 @@ export async function discover(
           }
         await walk(
           name,
-          inner,
+          inner.layers,
+          inner.ignoreCase,
           targetOnly || gitIgnored || nested,
           nested && !gitIgnored ? false : gitExcluded,
         );
@@ -685,7 +707,7 @@ export async function discover(
       }
     }
   }
-  await walk("", rootLayers, false, ignoredRoot !== undefined);
+  await walk("", rootLayers, rootIgnoreCase, false, ignoredRoot !== undefined);
   // Nothing that Git does not track is processed in a root that Git ignores.
   let rootIgnored: ((show: PathText) => string) | undefined;
   if (ignoredRoot) {
