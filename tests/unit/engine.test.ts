@@ -594,6 +594,79 @@ describe("front matter that would end inside a code block", () => {
   });
 });
 
+describe("a first line that opens no front matter", () => {
+  // Below a first line of `---` or `+++` that no line closes, the front matter
+  // extension read lists and block quotes as paragraphs, and wrapping joined
+  // them to the line above, which GitHub showed as text (issue #278).
+  const types = (source: string, dialect: Dialect) =>
+    parse(source, dialect).tree.children.map((node) => node.type);
+  const preset = (dialect: Dialect, rules: Config["rules"] = {}): ProcessOptions => ({
+    config: {
+      extends: dialect === "commonmark" ? ["recommended"] : ["recommended", dialect],
+      dialect,
+      rules,
+    },
+    workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
+  });
+  it.each(dialects)("reads the lists and block quotes below it in the %s dialect", (dialect) => {
+    const mark = String.fromCharCode(0xfeff);
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const before of ["", mark])
+        for (const [source, children] of [
+          ["---\n- One\n- Two\n", ["thematicBreak", "list"]],
+          ["---\n\n> Quote\n", ["thematicBreak", "blockquote"]],
+          ["---\ntitle: a\n\n* b\n", ["thematicBreak", "paragraph", "list"]],
+          ["+++\nx = 1\n\n- item\n", ["paragraph", "list"]],
+          // Spaces or tabs after the fence still let it open front matter.
+          ["---  \n1. One\n", ["thematicBreak", "list"]],
+          ["+++\t\n> Quote", ["paragraph", "blockquote"]],
+          // A longer fence, an indented one, or the other one closes nothing.
+          ["---\n- a\n----\n", ["thematicBreak", "list", "thematicBreak"]],
+          ["---\n- a\n ---\n", ["thematicBreak", "list", "thematicBreak"]],
+          ["+++\n- a\n---\n", ["paragraph", "list", "thematicBreak"]],
+        ] as const)
+          expect(types(before + source.replaceAll("\n", newline), dialect)).toEqual(children);
+  });
+  it.each(dialects)("still reads front matter that a line closes in the %s dialect", (dialect) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const [source, children] of [
+        ["---\n---\n* b\n", ["yaml", "list"]],
+        ["---  \ntitle: a\n---\t\n* b\n", ["yaml", "list"]],
+        ["+++\nx = 1\n+++", ["toml"]],
+        ["---\n- a\n---", ["yaml"]],
+      ] as const)
+        expect(types(source.replaceAll("\n", newline), dialect)).toEqual(children);
+  });
+  it.each(dialects)(
+    "keeps the lists and block quotes below it with the recommended preset in the %s dialect",
+    (dialect) => {
+      for (const [source, output] of [
+        ["+++\n- a\n\n+++ b\n", "+++\n- a\n\n+++ b\n"],
+        ["---\nText\n- One\n", "---\nText\n- One\n"],
+        ["---\nText\n> *quote*\n", "---\nText\n> _quote_\n"],
+        ["---\ntitle: a\n1) One\n", "---\ntitle: a\n1. One\n"],
+      ] as const)
+        expect(formatted(source, preset(dialect))).toBe(output);
+    },
+  );
+  it.each(dialects)("writes no line of --- alone below it in the %s dialect", (dialect) => {
+    // Such a line would close the front matter, and the safety check refused
+    // every edit of the rule that wrote it.
+    expect(formatted("---\n\nText *a*.\n\n***\n\n___\n", preset(dialect))).toBe(
+      "---\n\nText _a_.\n\n***\n\n___\n",
+    );
+    const setext = preset(dialect, { "style/heading": ["warn", { style: "setext" }] });
+    expect(formatted("---\n\n## Foo\n\nText.\n", setext)).toBe("---\n\nFoo\n----\n\nText.\n");
+    // A break that is not at the start of its line closes nothing, and `---`
+    // does not close front matter that `+++` opens.
+    expect(formatted("---\n\n> ***\n", preset(dialect))).toBe("---\n\n> ---\n");
+    expect(formatted("+++\n\n***\n", preset(dialect))).toBe("+++\n\n---\n");
+    // The first line itself takes the configured marker.
+    const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
+    expect(formatted("---\n\nText.\n", stars)).toBe("***\n\nText.\n");
+  });
+});
+
 describe("a rule whose edits would change the meaning", () => {
   /** A block rule that puts a list marker before the paragraphs starting with one of `targets`. */
   const listing = (name: string, targets: string[]): Rule => ({

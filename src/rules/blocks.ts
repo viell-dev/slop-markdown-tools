@@ -1,7 +1,12 @@
 import type { Code, Heading, Nodes } from "mdast";
 import stringWidth from "string-width";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
-import { range, startsWithMarker } from "../syntax/parse.js";
+import {
+  frontMatterReading,
+  range,
+  startsWithMarker,
+  unclosedFrontMatter,
+} from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
 
 /** A JSON Schema for an options object with these properties and no others. */
@@ -164,7 +169,10 @@ export function underlineEdit(document: Document, node: Heading): Edit | undefin
   // Forgejo and Gitea open a definition or display math with these.
   if (/^(?::[ \t]|\\\[)/.test(text)) return undefined;
   const newline = /\r\n|\r|\n/.exec(source)?.[0] ?? "\n";
-  const underline = (node.depth === 1 ? "=" : "-").repeat(Math.max(3, stringWidth(text)));
+  // Below a first line of `---` that opens no front matter, an underline of
+  // `---` alone would close it (issue #278).
+  const shortest = node.depth === 2 && unclosedFrontMatter(source) === "---" ? 4 : 3;
+  const underline = (node.depth === 1 ? "=" : "-").repeat(Math.max(shortest, stringWidth(text)));
   return { start, end: lineEnd(source, start), text: `${text}${newline}${underline}` };
 }
 
@@ -279,9 +287,23 @@ const thematicBreak: Rule = {
       // The break's range includes blank space after its markers.
       const end = start + source.slice(start, last).replace(/[ \t]+$/, "").length;
       if (source.slice(start, end) === marker) return;
-      // At the start of the document, `---` is tried as front matter, and when
-      // that fails the parser reads the document after it differently.
-      if (start === 0 && (marker === "---" || source.startsWith("---"))) return;
+      // At the start of the document, a break written `---` would open front
+      // matter if a later line closed it, as a line of `---` alone does, also
+      // one that this rule writes. A first-line `---` that the parser reads as a
+      // break and site generators as front matter stays (issue #295).
+      if (
+        start === 0 &&
+        (marker === "---" || (source.startsWith("---") && frontMatterReading(document.tree)))
+      )
+        return;
+      // Below a first line of `---` that opens no front matter, a line of `---`
+      // alone would close it (issue #278).
+      if (
+        marker === "---" &&
+        lineStart(source, start) === start &&
+        unclosedFrontMatter(source) === "---"
+      )
+        return;
       // On the line of list items whose markers are the new marker's character,
       // the items and the break would become one thematic break, as `- ---`,
       // `1. - ---`, and `* ***` are.
