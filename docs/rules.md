@@ -1194,9 +1194,11 @@ what it means, that is, when it:
 - has a line break that is content, inside math, inline HTML, an Obsidian
   comment, or a link's destination or title;
 - has lines whose container markers the tool cannot reproduce;
-- starts with an alert or callout marker such as `[!NOTE]` in the CommonMark
-  dialect; in the other dialects only the line with the marker, and an Obsidian
-  callout's title on it, stays as it is, and the body is wrapped;
+- opens a block quote with an alert or callout marker such as `[!NOTE]` in the
+  CommonMark dialect; in the other dialects only the line with the marker, and
+  an Obsidian callout's title on it, stays as it is, and the body is wrapped. A
+  paragraph elsewhere that starts with a linked image, `[![…](…)](…)`, is
+  wrapped;
 - starts with a bare `-`, `+`, `*`, `1.`, `1)`, `#`, or `>` followed by more
   words, which joining would turn into a block;
 - starts directly below a link reference definition without that definition's

@@ -305,6 +305,10 @@ From every prerelease:
   the front matter. Before, rules could change the block's content, such as a
   `___` in code into `---`, which GitHub shows
   ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
+- `style/wrap` wraps a paragraph that starts with a linked image, such as a
+  badge, unless it opens a block quote. Before, it was left as written, as if it
+  started with a callout's marker
+  ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
 - A plugin rule's option schema of `false` refuses options, and an asynchronous
   schema (`$async`) is refused when the rule set is built instead of crashing
   Node.js after the run

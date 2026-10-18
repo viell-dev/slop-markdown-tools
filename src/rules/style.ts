@@ -1046,11 +1046,15 @@ const wrap: Rule = {
           });
         if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
       };
-      // Below the line of a marker, the paragraph's text no longer starts the lines to wrap.
+      // Only the first paragraph of a block quote can be a callout, so a
+      // paragraph elsewhere that starts with a linked image, `[![`, is wrapped.
+      // Below the line of a marker, the paragraph's text no longer starts the
+      // lines to wrap.
       const markerLike = /^\[![^\]]+\]/;
-      const startsLikeMarker = belowHeader
-        ? markerLike.test(original)
-        : startsWithMarker(original, node, markerLike);
+      const startsLikeMarker =
+        parent?.type === "blockquote" &&
+        index === 0 &&
+        (belowHeader ? markerLike.test(original) : startsWithMarker(original, node, markerLike));
       const reason = inline.breaks.length
         ? "hard line break"
         : children.some((child) => child.type === "html")

@@ -688,6 +688,39 @@ describe("site-generator syntax at the start of a line", () => {
     ]);
   });
 });
+describe("a paragraph that starts with a linked image", () => {
+  // `[![Build](…)](…)` starts like a callout's `[!type]`, but only the first
+  // paragraph of a block quote can be a callout.
+  const badge = "[![Build](https://example.com/b.svg)](https://example.com/ci)";
+  const text = "A paragraph that starts with a badge and is long enough to wrap.";
+  it.each(["commonmark", "github", "obsidian"] as const)(
+    "is wrapped outside a block quote in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      for (const [before, after] of [
+        [
+          `${badge} ${text}\n`,
+          `${badge}\nA paragraph that starts with a badge and\nis long enough to wrap.\n`,
+        ],
+        [
+          `- ${badge} ${text}\n`,
+          `- ${badge}\n  A paragraph that starts with a badge\n  and is long enough to wrap.\n`,
+        ],
+        [
+          `> First.\n>\n> ${badge} ${text}\n`,
+          `> First.\n>\n> ${badge}\n> A paragraph that starts with a badge\n> and is long enough to wrap.\n`,
+        ],
+      ] as const)
+        expect(verify(before, { ...wrap(), dialect }, workspace).output).toBe(after);
+    },
+  );
+  it("is kept as written as the first paragraph of a block quote", () => {
+    const source = `> ${badge} ${text}\n`;
+    expect(lint(source, { config: wrap({ reportUnreflowed: true }) })).toMatchObject([
+      { message: "Paragraph not reflowed: callout header (width 40 columns)." },
+    ]);
+  });
+});
 describe("Obsidian markers that joined lines could pair", () => {
   const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
   const obsidian: Config = {
@@ -1229,13 +1262,16 @@ describe("Obsidian callout overflow", () => {
   });
 
   it("does not reclassify ordinary paragraphs, other dialects, or later quote paragraphs", () => {
-    for (const [source, dialect] of [
-      [`${title}\n`, "obsidian"],
-      [`> Earlier paragraph.\n>\n> ${title}\n`, "obsidian"],
-      [`> ${title}\n`, "commonmark"],
+    // Only the first paragraph of a block quote can be a callout, so the others
+    // are wrapped like any paragraph (issue #299).
+    for (const [source, dialect, message] of [
+      [`${title}\n`, "obsidian", "Reflow paragraph to 60 columns."],
+      [`> Earlier paragraph.\n>\n> ${title}\n`, "obsidian", "Reflow paragraph to 60 columns."],
+      [`> ${title}\n`, "commonmark", "Paragraph not reflowed: callout header"],
       [
         "An ordinary paragraph with many breakable words and a trailing block identifier. ^block\n",
         "obsidian",
+        "Paragraph not reflowed: block identifier",
       ],
     ] as const) {
       const config: Config = {
@@ -1244,7 +1280,7 @@ describe("Obsidian callout overflow", () => {
       };
       const diagnostics = lint(source, { config, workspace });
       expect(diagnostics).toHaveLength(1);
-      expect(diagnostics[0]?.message).toContain("Paragraph not reflowed");
+      expect(diagnostics[0]?.message).toContain(message);
     }
   });
 
