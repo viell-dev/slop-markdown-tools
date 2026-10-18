@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, `style/wrap` keeps the text of a link on one line and
+  moves the link whole to the next line where it does not fit, and joins link
+  text written across lines. Obsidian's Live Preview shows a link whose text
+  spans lines as Markdown source. `0.2.0-rc.3` broke lines inside link text in
+  every dialect; elsewhere it still does, as GitHub, Forgejo, and Gitea render
+  such links
+  ([#311](https://github.com/viell-dev/slop-markdown-tools/pull/311)).
 - Lists and block quotes below a first line of `---` or `+++` that no later line
   closes are read as lists and block quotes, as renderers show them. Before, the
   parser read them as paragraphs, and `style/wrap` joined them to the line

@@ -80,7 +80,8 @@ describe("direct Obsidian callout body reflow", () => {
     const source =
       "> [!note] Title with `code`\n> Text with **strong words**, [a link](https://example.test),\n> `code words`, and enough ordinary words to wrap several times.\n";
     expect(verify(source).output).toBe(
-      "> [!note] Title with `code`\n> Text with **strong words**, [a\n> link](https://example.test),\n> `code words`, and enough ordinary\n> words to wrap several times.\n",
+      // A link's text stays on one line in Obsidian (issue #306).
+      "> [!note] Title with `code`\n> Text with **strong words**,\n> [a link](https://example.test),\n> `code words`, and enough ordinary\n> words to wrap several times.\n",
     );
   });
 
