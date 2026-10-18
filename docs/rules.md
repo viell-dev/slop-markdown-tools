@@ -10,48 +10,54 @@ Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
 the built-in rules and those of the configuration's [plugins](plugins.md).
 
-| Rule                          | Kind    | `format` fixes | Presets                                                 | Dialects                          | Options                                                     |
-| ----------------------------- | ------- | -------------- | ------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
-| `content/code-language`       | Problem | No             | None                                                    | All                               | None                                                        |
-| `content/image-alt`           | Problem | No             | `recommended`                                           | All                               | None                                                        |
-| `content/table-columns`       | Problem | No             | `recommended`                                           | All but CommonMark                | None                                                        |
-| `forgejo/heading-id`          | Problem | No             | `forgejo`, `gitea` (error)                              | Forgejo, Gitea                    | None                                                        |
-| `github/alert-marker`         | Style   | Yes            | `github`, `forgejo`, `gitea`                            | GitHub, Forgejo, Gitea            | None                                                        |
-| `github/task-marker`          | Style   | Yes            | `github`, `forgejo`, `gitea`, `obsidian`                | All but CommonMark                | None                                                        |
-| `links/empty`                 | Problem | No             | `recommended`                                           | All                               | None                                                        |
-| `links/notation`              | Style   | Yes            | None                                                    | Obsidian                          | `style`, required                                           |
-| `links/path`                  | Style   | Yes            | None                                                    | All; some options Obsidian only   | `style`, `brackets`, `extension`, `leadingDot`              |
-| `links/undefined-reference`   | Problem | No             | `recommended`                                           | All; footnotes all but CommonMark | None                                                        |
-| `links/unused-definition`     | Problem | No             | `recommended`                                           | All                               | None                                                        |
-| `links/valid`                 | Problem | No             | `recommended` (error)                                   | All                               | None                                                        |
-| `obsidian/block-reference`    | Problem | No             | `obsidian` (error)                                      | Obsidian                          | None                                                        |
-| `obsidian/callout-marker`     | Style   | Yes            | `obsidian`                                              | Obsidian                          | None                                                        |
-| `obsidian/strict-line-breaks` | Problem | No             | `obsidian`                                              | Obsidian                          | None                                                        |
-| `structure/duplicate-heading` | Problem | No             | None                                                    | All                               | None                                                        |
-| `structure/heading-increment` | Problem | No             | `recommended`                                           | All                               | None                                                        |
-| `structure/initial-heading`   | Problem | No             | None                                                    | All                               | None                                                        |
-| `structure/single-title`      | Problem | No             | None                                                    | All                               | None                                                        |
-| `style/blank-lines`           | Style   | Yes            | `recommended`                                           | All                               | `maximum`                                                   |
-| `style/block-spacing`         | Style   | Yes            | None                                                    | All                               | None                                                        |
-| `style/code-fence`            | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/emphasis`              | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/final-newline`         | Style   | Yes            | `recommended`                                           | All                               | None                                                        |
-| `style/heading`               | Style   | Yes            | `recommended`                                           | All                               | `style`, `closing`                                          |
-| `style/inline-code`           | Style   | Yes            | None                                                    | All                               | None                                                        |
-| `style/list-indent`           | Style   | Yes            | `recommended`                                           | All                               | Spaces after markers, `nestedIndent`                        |
-| `style/list-marker`           | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/ordered-list`          | Style   | Yes            | `recommended`                                           | All                               | `delimiter`, `numbering`                                    |
-| `style/strong`                | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/table`                 | Style   | Yes            | `recommended`, `github`, `forgejo`, `gitea`, `obsidian` | All but CommonMark                | `style`                                                     |
-| `style/thematic-break`        | Style   | Yes            | `recommended`                                           | All                               | `marker`                                                    |
-| `style/trailing-space`        | Style   | Yes            | `recommended`                                           | All                               | `hardBreak`                                                 |
-| `style/wrap`                  | Style   | Yes            | `recommended`                                           | All                               | `width`, `measure`, `reportUnreflowed`, `reportUnbreakable` |
+🎨 marks a style rule, whose findings `format` fixes, and 🔍 a problem rule,
+which is reported only. ✅ is yes and ❌ no. Each rule's section names its
+presets, dialects, and options.
 
-A preset enables its rules as warnings, unless the table says error. The
-`codeberg` preset is the `forgejo` preset under another name. In a dialect that
-the Dialects column does not name, the rule finds nothing.
+| Rule                          | Kind | `recommended` | Dialect preset | Options |
+| ----------------------------- | :--: | :-----------: | :------------: | :-----: |
+| `content/code-language`       | 🔍   | ❌            | ❌             | ❌      |
+| `content/image-alt`           | 🔍   | ✅            | ❌             | ❌      |
+| `content/table-columns`       | 🔍   | ✅            | ❌             | ❌      |
+| `forgejo/heading-id`          | 🔍   | ❌            | ✅ (error)     | ❌      |
+| `github/alert-marker`         | 🎨   | ❌            | ✅             | ❌      |
+| `github/task-marker`          | 🎨   | ❌            | ✅             | ❌      |
+| `links/empty`                 | 🔍   | ✅            | ❌             | ❌      |
+| `links/notation`              | 🎨   | ❌            | ❌             | ✅      |
+| `links/path`                  | 🎨   | ❌            | ❌             | ✅      |
+| `links/undefined-reference`   | 🔍   | ✅            | ❌             | ❌      |
+| `links/unused-definition`     | 🔍   | ✅            | ❌             | ❌      |
+| `links/valid`                 | 🔍   | ✅ (error)    | ❌             | ❌      |
+| `obsidian/block-reference`    | 🔍   | ❌            | ✅ (error)     | ❌      |
+| `obsidian/callout-marker`     | 🎨   | ❌            | ✅             | ❌      |
+| `obsidian/strict-line-breaks` | 🔍   | ❌            | ✅             | ❌      |
+| `structure/duplicate-heading` | 🔍   | ❌            | ❌             | ❌      |
+| `structure/heading-increment` | 🔍   | ✅            | ❌             | ❌      |
+| `structure/initial-heading`   | 🔍   | ❌            | ❌             | ❌      |
+| `structure/single-title`      | 🔍   | ❌            | ❌             | ❌      |
+| `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/block-spacing`         | 🎨   | ❌            | ❌             | ❌      |
+| `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
+| `style/emphasis`              | 🎨   | ✅            | ❌             | ✅      |
+| `style/final-newline`         | 🎨   | ✅            | ❌             | ❌      |
+| `style/heading`               | 🎨   | ✅            | ❌             | ✅      |
+| `style/inline-code`           | 🎨   | ❌            | ❌             | ❌      |
+| `style/list-indent`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/list-marker`           | 🎨   | ✅            | ❌             | ✅      |
+| `style/ordered-list`          | 🎨   | ✅            | ❌             | ✅      |
+| `style/strong`                | 🎨   | ✅            | ❌             | ✅      |
+| `style/table`                 | 🎨   | ✅            | ✅             | ✅      |
+| `style/thematic-break`        | 🎨   | ✅            | ❌             | ✅      |
+| `style/trailing-space`        | 🎨   | ✅            | ❌             | ✅      |
+| `style/wrap`                  | 🎨   | ✅            | ❌             | ✅      |
+
+A preset enables its rules as warnings, unless the rule's section says error.
+The `codeberg` preset is the `forgejo` preset under another name. In a dialect
+that a rule's section does not name, the rule finds nothing.
 
 ## `content/code-language`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
 
 Reports a fenced code block that does not name its language after the opening
 fence. GitHub, Forgejo, Gitea, and Obsidian highlight code by the language its
@@ -76,6 +82,9 @@ npm test
 
 ## `content/image-alt`
 
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
+none.
+
 Reports an image without alternative text, the text between the brackets of
 `![text](chart.png)`. Screen readers read it in place of the image, and browsers
 show it when the image does not load. Text that is only blank space counts as
@@ -96,6 +105,9 @@ Not reported:
 ```
 
 ## `content/table-columns`
+
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all but
+CommonMark. Options: none.
 
 Reports a table row with more or fewer cells than the header row. As the GFM
 specification requires, renderers drop the extra cells of a longer row without a
@@ -123,6 +135,9 @@ Not reported:
 
 ## `forgejo/heading-id`
 
+**Problem rule**, reported only. Presets: `forgejo`, `gitea` (error). Dialects:
+Forgejo, Gitea. Options: none.
+
 Reports a heading attribute block whose `id` is not text, such as `{id=5}`,
 `{id=true}`, or a list. Forgejo, and Gitea before 1.26, render nothing at all
 for a document that contains one; Gitea 1.26 and later render the heading
@@ -142,6 +157,9 @@ Not reported:
 ```
 
 ## `github/alert-marker`
+
+**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`.
+Dialects: GitHub, Forgejo, Gitea. Options: none.
 
 Writes the type of a GitHub alert in capitals. The renderers accept any case for
 the five types `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`, and their
@@ -164,6 +182,9 @@ After:
 
 ## `github/task-marker`
 
+**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`,
+`obsidian`. Dialects: all but CommonMark. Options: none.
+
 Writes the mark of a completed task as a lowercase `x`.
 
 Before:
@@ -179,6 +200,9 @@ After:
 ```
 
 ## `links/empty`
+
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
+none.
 
 Reports a link or image whose destination is empty, as in `[guide]()`, or only
 `#`, which leads to the top of the page. Both are usually placeholders that were
@@ -199,6 +223,9 @@ See the [setup guide](#setup).
 ```
 
 ## `links/notation`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: Obsidian. Options:
+`style`, required.
 
 Converts Obsidian links between Markdown and wikilink notation. The `style`
 option is required; without it the rule does nothing.
@@ -232,6 +259,9 @@ With `links/path` also on, a link that both change gets its notation first and
 its path in the next pass, the same result as running them one after the other.
 
 ## `links/path`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all; some options
+Obsidian only. Options: `style`, `brackets`, `extension`, `leadingDot`.
 
 Rewrites the destination of a local link to the configured spelling. A link is
 rewritten only when its target exists and its fragment, if any, is found, and
@@ -280,6 +310,9 @@ See the [guide](./docs/guide.md#setup).
 
 ## `links/undefined-reference`
 
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all;
+footnotes all but CommonMark. Options: none.
+
 Reports a reference whose label has no definition in the document: a full
 reference `[text][label]`, a collapsed reference `[label][]`, and, in every
 dialect but CommonMark, a footnote reference `[^label]`. The renderer shows such
@@ -309,6 +342,9 @@ See the [installation guide][Setup] and press [Enter].
 
 ## `links/unused-definition`
 
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
+none.
+
 Reports a reference definition or footnote that no reference in the document
 uses. A definition that only a shortcut reference `[label]` uses counts as used.
 A second definition of the same label is reported too, because the renderers use
@@ -333,6 +369,9 @@ See the [guide][setup] and the [changelog].
 ```
 
 ## `links/valid`
+
+**Problem rule**, reported only. Presets: `recommended` (error). Dialects: all.
+Options: none.
 
 Reports a local link, image, wikilink, embed, or reference definition whose
 target does not exist, and a fragment (`#heading`, `#^block`) that its target
@@ -376,6 +415,9 @@ See the [guide](docs/guide.md#setup).
 
 ## `obsidian/block-reference`
 
+**Problem rule**, reported only. Presets: `obsidian` (error). Dialects:
+Obsidian. Options: none.
+
 Reports a block identifier that a note uses more than once: `^` and Latin
 letters, digits, and hyphens at the end of a paragraph or heading, or alone on
 the line after a list or quote, as Obsidian defines it. A link to `#^id` can
@@ -390,6 +432,9 @@ Second idea. ^idea
 ```
 
 ## `obsidian/callout-marker`
+
+**Style rule**, fixed by `format`. Presets: `obsidian`. Dialects: Obsidian.
+Options: none.
 
 Writes the type of an Obsidian callout in lowercase, custom types included. The
 title and the body are left as written.
@@ -408,6 +453,9 @@ After:
 
 ## `obsidian/strict-line-breaks`
 
+**Problem rule**, reported only. Presets: `obsidian`. Dialects: Obsidian.
+Options: none.
+
 Reports, once per note, that `style/wrap` leaves the note as written because the
 vault's "Strict line breaks" setting is not known to be on. Without that
 setting, Obsidian's Reading view shows every line break in a paragraph, so
@@ -418,6 +466,8 @@ it and never changes it. The finding is at line 1, and its message begins
 vaults](obsidian.md#enable-wrapping).
 
 ## `structure/duplicate-heading`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
 
 Reports a heading with the same text as an earlier heading under the same parent
 heading. Two "Setup" sections side by side make a table of contents ambiguous,
@@ -451,6 +501,9 @@ Not reported:
 
 ## `structure/heading-increment`
 
+**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
+none.
+
 Reports a heading more than one level deeper than the heading before it, such as
 a level-3 heading directly after a level-1 heading. Readers who move through a
 document by its headings, with a screen reader or a table of contents, rely on
@@ -483,6 +536,8 @@ Not reported:
 
 ## `structure/initial-heading`
 
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
 Requires the first block of a document, after optional YAML or TOML front
 matter, to be a level-1 heading. Underlined (`===`) headings count as well as
 `#` headings; [`style/heading`](#styleheading) turns them into `#` headings. An
@@ -510,6 +565,8 @@ title: Notes
 
 ## `structure/single-title`
 
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
 Reports a second level-1 heading in a document. A document has one title, and
 further level-1 headings usually belong one level down. A `title` key in YAML or
 TOML front matter counts as the title; every level-1 heading is then reported.
@@ -535,6 +592,9 @@ title: Install
 ```
 
 ## `style/blank-lines`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `maximum`.
 
 Collapses blank lines in a row to at most `maximum` of them, and removes blank
 lines at the start and at the end of a document. The option `maximum` is an
@@ -578,6 +638,8 @@ number changes what the document means:
   follow and as tight when one does.
 
 ## `style/block-spacing`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
 
 Separates every heading and every list from the blocks before and after it with
 a blank line, in the document and in block quotes at any depth. It adds one
@@ -632,6 +694,9 @@ or what a comment applies to:
 
 ## `style/code-fence`
 
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `marker`.
+
 Writes the fences of a fenced code block with one marker, and as long as its
 content allows: three characters, or one more than the longest line inside that
 holds only the marker, which would otherwise close the block. The option
@@ -659,6 +724,9 @@ Indented code blocks have no fence and are left as written. So is a `~~~` fence
 whose info string contains a backtick, because a backtick fence cannot have one.
 
 ## `style/emphasis`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `marker`.
 
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
 `"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
@@ -694,6 +762,9 @@ so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
 
 ## `style/final-newline`
 
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: none.
+
 Ends a document that is not empty with a line break, using the document's own
 line ending. A file whose last line has no line break is changed; an empty file
 is not. Nothing is added where the line break would become part of the last
@@ -702,6 +773,9 @@ comment without its closing `%%`, or a code or math block without its closing
 fence whose last line is blank space.
 
 ## `style/heading`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `style`, `closing`.
 
 Writes headings in one style and without closing `#` sequences. By default it
 turns a heading underlined with `===` or `---` into a `#` heading of the same
@@ -753,6 +827,8 @@ on Forgejo and Gitea when it contains `{`.
 
 ## `style/inline-code`
 
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+
 Joins a code span that is written across lines onto one line. A line break
 inside a code span renders as a space, so the content stays the same, and the
 spaces and tabs that start the next line are left out, as CommonMark and GitHub
@@ -784,6 +860,9 @@ Run `npm run build` before the tests.
 ```
 
 ## `style/list-indent`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: spaces after markers, `nestedIndent`.
 
 Puts the configured spaces, one by default, between a list marker and the item's
 text, and starts each item where its container's text starts: at the start of
@@ -851,6 +930,9 @@ These are left as written:
 
 ## `style/list-marker`
 
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `marker`.
+
 Writes every bullet list with one marker.
 
 | Option   | Values                                              | Default |
@@ -888,6 +970,9 @@ After:
 ```
 
 ## `style/ordered-list`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `delimiter`, `numbering`.
 
 Writes the numbers of ordered lists with one delimiter and numbers the items
 consistently.
@@ -931,6 +1016,9 @@ After:
 
 ## `style/strong`
 
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `marker`.
+
 Writes strong emphasis with one marker. The option `marker` is `"*"` (the
 default) or `"_"`. The exceptions of `style/emphasis` apply.
 
@@ -947,6 +1035,9 @@ A **bold** claim.
 ```
 
 ## `style/table`
+
+**Style rule**, fixed by `format`. Presets: `recommended`, `github`, `forgejo`,
+`gitea`, `obsidian`. Dialects: all but CommonMark. Options: `style`.
 
 Aligns a table: every cell of a column is padded to the column's width, measured
 in display columns, and the delimiter row keeps each column's alignment. The
@@ -973,6 +1064,9 @@ After:
 ```
 
 ## `style/thematic-break`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `marker`.
 
 Writes thematic breaks with one marker. The option `marker` is `"---"` (the
 default), `"***"`, `"___"`, or `"consistent"`, which takes the character of the
@@ -1006,6 +1100,9 @@ means:
 
 ## `style/trailing-space`
 
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `hardBreak`.
+
 Removes spaces and tabs at the end of lines. A hard line break written as two or
 more spaces keeps them. The option `hardBreak` is `"keep"` (the default) or
 `"backslash"`, which writes such a break as a backslash, so that it is visible
@@ -1035,6 +1132,9 @@ paragraph that starts like a link reference definition (`[label]:`), and on
 Forgejo and Gitea inside `\(...\)` math.
 
 ## `style/wrap`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
 line break inside a paragraph renders as a space, so the rendered text stays the
