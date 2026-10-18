@@ -2,7 +2,9 @@ import type { Code, Heading, Nodes } from "mdast";
 import stringWidth from "string-width";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
 import {
+  belowTomlFrontMatter,
   frontMatterReading,
+  joinsTomlFrontMatter,
   range,
   startsWithMarker,
   unclosedFrontMatter,
@@ -302,6 +304,14 @@ const thematicBreak: Rule = {
         marker === "---" &&
         lineStart(source, start) === start &&
         unclosedFrontMatter(source) === "---"
+      )
+        return;
+      // Renderers without TOML front matter read its lines as a paragraph,
+      // which a line of `---` directly below underlines as a heading, as one
+      // written there already does (issue #333).
+      if (
+        (marker === "---" && belowTomlFrontMatter(document.tree, node)) ||
+        joinsTomlFrontMatter(document.tree, node)
       )
         return;
       // On the line of list items whose markers are the new marker's character,

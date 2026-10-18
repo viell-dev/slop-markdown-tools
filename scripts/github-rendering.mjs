@@ -41,14 +41,7 @@ import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
  * documents of a seed change with the generator and with formatting; check the entries again
  * when either changes. The comment after an entry is a smaller input that shows the difference.
  */
-const known = [
-  // "+++\ntitle = 1\n+++\n___\n" becomes "+++\ntitle = 1\n+++\n---\n", which GitHub reads as a
-  // heading.
-  { seed: 1, index: 14, issue: 333 },
-  // "+++\ntitle = 1\n+++\ncandle\n-----\n" becomes "+++\ntitle = 1\n+++\n## candle\n", where
-  // GitHub's heading held the front matter's lines.
-  { seed: 5, index: 16, issue: 333 },
-];
+const known = [];
 
 const usage =
   "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]\n";

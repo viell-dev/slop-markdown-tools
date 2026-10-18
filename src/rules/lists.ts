@@ -1,6 +1,7 @@
 import type { Blockquote, FootnoteDefinition, List, ListItem, Nodes, Parents } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { misreadLists } from "../syntax/misread-lists.js";
+import { joinsTomlFrontMatter } from "../syntax/parse.js";
 import { optionsSchema } from "./style.js";
 
 /**
@@ -288,6 +289,12 @@ function analyze(document: Document): Analysis {
     return item;
   };
   visit(document.tree, undefined, undefined);
+  // Renderers without TOML front matter read its lines as a paragraph, which
+  // a list directly below continues where it cannot interrupt one: a numbered
+  // list that does not start at 1, or one whose first item starts with a blank
+  // line (issue #333).
+  const below = units[0]?.lists[0];
+  if (below && joinsTomlFrontMatter(document.tree, below.node)) units[0]!.valid = false;
   for (const item of items.values()) item.last = containers.get(item.node)?.last ?? item.first;
   for (const unit of units)
     for (const list of unit.lists)

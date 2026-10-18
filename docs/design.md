@@ -89,6 +89,17 @@ The comparison is only as good as the parser's reading:
   document, a rule whose edits would change either, such as joining the lines of
   the front matter, is refused ([issue
   #295](https://github.com/viell-dev/slop-markdown-tools/issues/295)).
+- TOML front matter, between lines of `+++`, is read in every dialect, for site
+  generators. GitHub, Forgejo, Gitea, Obsidian, commonmark.js, and markdown-it
+  have no TOML front matter and read its lines as a paragraph, which the block
+  directly below, with no blank line between, can continue as text or underline
+  as a heading. An edit has to keep the meaning of both readings, and the rules
+  that would change that block's reading leave it as written: a thematic break
+  that is or would become `---`, an underlined heading, and a list that cannot
+  interrupt a paragraph, such as a numbered list that does not start at 1
+  ([issue #333](https://github.com/viell-dev/slop-markdown-tools/issues/333)).
+  YAML front matter, outside the case above, is read as front matter only, as
+  GitHub's file view, Forgejo, Gitea, and Obsidian read it.
 
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on

@@ -175,6 +175,50 @@ export function frontMatterReading(tree: Root): Root | undefined {
   return frontMatterReadings.get(tree);
 }
 /**
+ * The reading without front matter of a document that `parse` read with TOML
+ * front matter, made when it is first asked for, by the tree of the reading
+ * with it.
+ */
+const tomlReadings = new WeakMap<Root, () => Root>();
+/**
+ * The other reading of a document, whose meaning an edit has to keep too:
+ * `frontMatterReading`, or, for a document that `parse` read with TOML front
+ * matter, the reading without it. Site generators read TOML front matter, and
+ * GitHub, Forgejo, Gitea, Obsidian, commonmark.js, and markdown-it read its
+ * lines as a paragraph, which the line below it can continue or underline as a
+ * heading (issue #333). Undefined for other trees.
+ */
+export function otherReading(tree: Root): Root | undefined {
+  return frontMatterReadings.get(tree) ?? tomlReadings.get(tree)?.();
+}
+/**
+ * Whether `node` is the first block below a document's TOML front matter and
+ * starts on the line after it, where renderers without TOML front matter can
+ * read it as part of the paragraph that the front matter's lines make.
+ */
+export function belowTomlFrontMatter(tree: Root, node: Nodes): boolean {
+  const [matter, block] = tree.children;
+  // The tree's types know YAML front matter only; the parser also reads TOML.
+  const end = matter?.type === ("toml" as string) ? matter.position?.end.line : undefined;
+  return end !== undefined && block === node && block.position?.start.line === end + 1;
+}
+/**
+ * Whether renderers without TOML front matter read the first line of `node`,
+ * the block directly below a document's TOML front matter, as part of the
+ * paragraph that the front matter's lines make: as its text, as for a list
+ * that cannot interrupt a paragraph, or as the underline that makes it a
+ * heading.
+ */
+export function joinsTomlFrontMatter(tree: Root, node: Nodes): boolean {
+  const plain = belowTomlFrontMatter(tree, node) ? tomlReadings.get(tree)?.() : undefined;
+  if (!plain) return false;
+  const line = node.position!.start.line;
+  return plain.children.some(
+    ({ position }) =>
+      position !== undefined && position.start.line < line && position.end.line >= line,
+  );
+}
+/**
  * A line of front matter that could open a block whose content is literal: a
  * code fence, display math, or an HTML block.
  */
@@ -210,9 +254,10 @@ export function unclosedFrontMatter(source: string): "---" | "+++" | undefined {
  * Front matter whose `---` or `+++` closes it inside a code block, an HTML
  * block, or display math, opened by a line of the front matter, is read as
  * Markdown: the document is read without it (issue #295), and
- * `frontMatterReading` gives the other reading. A document whose first line
- * would open front matter that no line closes is read without the front matter
- * extension, as renderers read it (issue #278).
+ * `frontMatterReading` gives the other reading. For a document read with TOML
+ * front matter, `otherReading` gives the reading without it (issue #333). A
+ * document whose first line would open front matter that no line closes is
+ * read without the front matter extension, as renderers read it (issue #278).
  */
 export function parse(
   source: string,
@@ -251,9 +296,10 @@ export function parse(
     }
     return fromMarkdown(source, { extensions, mdastExtensions });
   };
-  let result = tree(!unclosedFrontMatter(source));
+  const result = tree(!unclosedFrontMatter(source));
   // The tree's types know YAML front matter only; the parser also reads TOML.
   const matter = result.children[0] as { type: string; value?: string } | undefined;
+  let plain: Root | undefined;
   // Only front matter with a line that could open such a block is read again.
   // It is given up only when the line that closes it is content of that block
   // in the other reading, which a multiline TOML string or a YAML block
@@ -263,7 +309,7 @@ export function parse(
     literalOpener.test(matter.value ?? "")
   ) {
     const closing = result.children[0]!.position!.end.line;
-    const plain = tree(false);
+    plain = tree(false);
     if (
       plain.children.some(
         (node) =>
@@ -273,9 +319,10 @@ export function parse(
       )
     ) {
       frontMatterReadings.set(plain, result);
-      result = plain;
+      return { source, dialect: read, path, tree: plain };
     }
   }
+  if (matter?.type === "toml") tomlReadings.set(result, () => (plain ??= tree(false)));
   return { source, dialect: read, path, tree: result };
 }
 
