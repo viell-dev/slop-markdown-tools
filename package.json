@@ -1,6 +1,6 @@
 {
   "name": "mdrefine",
-  "version": "0.2.0-rc.3",
+  "version": "0.2.0",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian",
   "keywords": [
     "markdown",
@@ -37,7 +37,7 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/",
-    "tag": "rc"
+    "tag": "latest"
   },
   "exports": {
     ".": {
