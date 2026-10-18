@@ -10,10 +10,10 @@ prereleases' notes there are longer than their entries here.
 
 ## 0.2.0 - 2026-10-18
 
-The first stable release. It holds everything in the prereleases below, and the
-changes since `0.2.0-rc.3` listed here. From this release on, npm's `latest` tag
-names the newest stable release, and prereleases stay under `rc` and `beta`; the
-[versioning
+The first stable release. It holds everything in the earlier prereleases, and
+the changes since `0.2.0-rc.3` listed here. From this release on, npm's `latest`
+tag names the newest stable release, and prereleases stay under `rc` and `beta`;
+the [versioning
 policy](https://viell-dev.github.io/slop-markdown-tools/versions.html) says what
 a version number promises.
 
@@ -28,9 +28,10 @@ From `0.2.0-rc.3`:
 - A document from stdin whose `--stdin-filepath` is ignored is no longer
   processed: `lint -` reports nothing and `format -` prints it unchanged, with a
   warning. In `mdrefine/node`, `discoverWorkspace` no longer selects `documents`
-  whose paths are ignored and lists them in `skipped`.
+  whose paths are ignored but lists them in `skipped`.
 
-From an earlier prerelease, also read the upgrade notes of `0.2.0-rc.3`.
+From an earlier prerelease, also read the upgrade notes of
+[0.2.0-rc.3](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.3).
 
 ### Added
 
