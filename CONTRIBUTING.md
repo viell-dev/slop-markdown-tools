@@ -120,7 +120,7 @@ GitHub's rendering in the same way every week, through its Markdown API. Run it
 by hand with `gh workflow run rendering.yml`, optionally with `-f seed=N` to
 repeat a run's new seed, or locally after a build with
 `node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
-about fifteen minutes; its first lines say what it compares.
+ten to fifteen minutes; its first lines say what it compares.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the

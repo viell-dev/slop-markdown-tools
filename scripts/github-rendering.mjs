@@ -24,8 +24,8 @@
 // Needs a build (npm run build) and an authenticated gh: GH_TOKEN in GitHub Actions, or
 // `gh auth login`. GitHub asks for one request at a time and a pause between those that use
 // POST, so the requests are made one after the other, a second apart: 150 documents make up
-// to 600 requests and take about 15 minutes. The Rendering workflow runs this every week, and
-// by hand with `gh workflow run rendering.yml`.
+// to 600 requests and take ten to fifteen minutes. The Rendering workflow runs this every
+// week, and by hand with `gh workflow run rendering.yml`.
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { randomInt } from "node:crypto";
