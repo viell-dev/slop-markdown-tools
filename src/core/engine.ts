@@ -61,6 +61,10 @@ function ruleProblem(rule: unknown): string | undefined {
     (!schema || typeof schema !== "object" || Array.isArray(schema))
   )
     return `its schema is ${shown(schema)}, not a JSON Schema`;
+  // Options are checked before each run, synchronously; an asynchronous
+  // check would come back after the run, too late to stop it.
+  if (schema && typeof schema === "object" && (schema as { $async?: unknown }).$async === true)
+    return "its schema is asynchronous ($async), and options are checked synchronously";
   return undefined;
 }
 /**
@@ -120,6 +124,11 @@ function optionsValidator(name: string, schema: JsonSchema): ValidateFunction {
         { cause: error },
       );
     }
+    // A schema can become asynchronous through one that it refers to.
+    if ((validate as { $async?: unknown }).$async === true)
+      throw new Error(
+        `Invalid rule ${name}: its schema is asynchronous ($async), and options are checked synchronously`,
+      );
     compiledSchemas.set(schema, validate);
   }
   return validate;
@@ -134,7 +143,12 @@ function prepare(options: ProcessOptions) {
     if (!Object.hasOwn(rules, name)) throw new Error(`Unknown rule: ${name}`);
     const rule = rules[name]!;
     const enabled = setting(value);
-    if (rule.schema && enabled.severity !== "off") {
+    // A schema of `false` means that the rule takes no options. A setting that
+    // gives none is checked as empty options, which `false` would refuse too.
+    if (rule.schema === false && enabled.severity !== "off") {
+      if (Object.keys(enabled.options).length)
+        throw new Error(`Invalid options for ${name}: the rule takes no options`);
+    } else if (rule.schema !== undefined && enabled.severity !== "off") {
       const validate = optionsValidator(name, rule.schema);
       if (!validate(enabled.options))
         throw new Error(

@@ -82,8 +82,10 @@ A rule is an object with a `description`, a `kind`, an optional `schema` and
   can propose edits, which `format` applies. `format` ignores the edits of
   problem rules.
 - `schema` is a JSON Schema for the rule's options. The options a configuration
-  gives are checked against it, and a rule without a schema accepts any options.
-  Each schema is compiled once, for all documents.
+  gives are checked against it, and a rule without a schema accepts any options;
+  `false` means that the rule takes none. Each schema is compiled once, for all
+  documents. Options are checked synchronously, so an asynchronous schema
+  (`$async`) is refused.
 - `check({ document, options, workspace })` receives the parsed `document`
   (`source`, `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) tree with source positions), the
