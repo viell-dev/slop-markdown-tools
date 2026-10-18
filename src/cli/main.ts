@@ -8,6 +8,7 @@ import { format, lint, ruleRegistry } from "../core/engine.js";
 import { loadConfig } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
 import {
+  isIgnoredInput,
   replacementFailure,
   replacementProblem,
   skippedMessage,
@@ -31,6 +32,8 @@ interface Flags {
   maxWarnings?: number;
   exclude?: string[];
   quiet?: boolean;
+  /** False with `--no-warn-ignored`. */
+  warnIgnored?: boolean;
   fix?: boolean;
 }
 const manifest = JSON.parse(
@@ -90,6 +93,10 @@ function common(command: Command): Command {
       )
       .option("--json", "Machine-readable output")
       .option("--quiet", "Report errors only: leave warnings out of the report and its counts")
+      .option(
+        "--no-warn-ignored",
+        "Do not warn about named files and directories that are skipped as ignored",
+      )
       .option("--stdin-filepath <file>", "Filename context for stdin")
       .option(
         "--max-warnings <count>",
@@ -324,8 +331,10 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     const shown = (name: string) =>
       path.relative(here, path.join(discovery.root, name)).split(path.sep).join("/");
     // Warnings about the run, not about a document: they do not change the exit status.
+    // A caller that passes every changed file can leave out those about ignored ones.
     for (const item of discovery.skipped)
-      process.stderr.write(`mdtools: warning: ${skippedMessage(item, shown)}\n`);
+      if (flags.warnIgnored !== false || !isIgnoredInput(item))
+        process.stderr.write(`mdtools: warning: ${skippedMessage(item, shown)}\n`);
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? "");
     else if (mode === "format" && !flags.check && !flags.write)

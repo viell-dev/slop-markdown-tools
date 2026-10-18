@@ -456,6 +456,7 @@ describe("the command line", () => {
       "--exclude",
       "--json",
       "--quiet",
+      "--no-warn-ignored",
       "--stdin-filepath",
       "--max-warnings",
       "--help",

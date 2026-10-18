@@ -10,6 +10,13 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Added
+
+- `--no-warn-ignored` leaves out the warning for a file or directory named on
+  the command line that the tool skips as ignored, for hooks and scripts that
+  pass every changed file. The JSON report still lists it in `skipped`
+  ([#311](https://github.com/viell-dev/slop-markdown-tools/pull/311)).
+
 ### Fixed
 
 - Lists and block quotes below a first line of `---` or `+++` that no later line

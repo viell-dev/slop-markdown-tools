@@ -34,6 +34,7 @@ and exclude one another.
 | `--exclude <path>`        | Leave out a file or a directory. Repeat it for more.                                                                                                               |
 | `--json`                  | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                   |
 | `--quiet`                 | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                               |
+| `--no-warn-ignored`       | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                                 |
 | `--stdin-filepath <file>` | The path of the document read from [stdin](#read-from-stdin).                                                                                                      |
 | `--max-warnings <count>`  | Exit with code `1` when there are more warnings than this.                                                                                                         |
 | `--check`                 | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                   |
@@ -58,7 +59,11 @@ links.
   on the command line is an error. A file or directory named on the command line
   that these leave out is skipped with a warning that says why, such as
   `Skipped ignored input: generated/x.md (in generated, which "generated/" in .gitignore matches)`,
-  and the exit code does not change.
+  and the exit code does not change. `--no-warn-ignored` leaves this warning
+  out, so that a hook or script can pass every changed file without repeating
+  the ignore rules; the JSON report still lists the input in `skipped`, and the
+  other warnings, such as the one for a workspace root that Git ignores, still
+  print.
 - Git's ignore rules apply as in Git. A path is checked against each
   `.gitignore` from the deepest up to the repository's top level, including
   those above the workspace root, then the repository's `.git/info/exclude`,
