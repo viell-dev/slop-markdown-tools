@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
-import { createTwoFilesPatch } from "diff";
 import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +16,7 @@ import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
+import { unifiedDiff } from "./diff.js";
 import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
@@ -331,7 +331,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     else if (mode === "format" && !flags.check && !flags.write)
       for (const change of changes)
         process.stdout.write(
-          createTwoFilesPatch(
+          unifiedDiff(
             `a/${shown(change.file)}`,
             `b/${shown(change.file)}`,
             change.before,
