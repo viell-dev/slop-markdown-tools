@@ -498,10 +498,10 @@ export const linkRules: Record<string, Rule> = {
     check({ document, options, workspace }) {
       if (document.dialect !== "obsidian" || !workspace) return [];
       const findings: Finding[] = [];
-      const inCell = inTableCells(document.tree);
+      let inCell: Set<Nodes> | undefined;
       walk(document.tree, (node) => {
         const [start, end] = range(node);
-        const pipe = inCell.has(node) ? "\\|" : "|";
+        const pipe = () => ((inCell ??= inTableCells(document.tree)).has(node) ? "\\|" : "|");
         let replacement: string | undefined;
         if (
           options.style === "markdown" &&
@@ -510,7 +510,8 @@ export const linkRules: Record<string, Rule> = {
           node.label !== undefined
         ) {
           if (/[[\]<>\\\r\n]/.test(node.target ?? "") || /[*_`[\]\\]/.test(node.label)) return;
-          replacement = `[${node.label.replaceAll("|", pipe)}](<${node.target}>)`;
+          const label = node.label.includes("|") ? node.label.replaceAll("|", pipe()) : node.label;
+          replacement = `[${label}](<${node.target}>)`;
         } else if (
           options.style === "wiki" &&
           node.type === "link" &&
@@ -521,7 +522,7 @@ export const linkRules: Record<string, Rule> = {
           const label = node.children[0].value;
           const target = wikiTarget(node.url);
           if (target === undefined || /[[\]|\r\n]/.test(label)) return;
-          replacement = `[[${target}${pipe}${label}]]`;
+          replacement = `[[${target}${pipe()}${label}]]`;
         }
         const url = destination(node);
         if (!replacement || url === undefined) return;
