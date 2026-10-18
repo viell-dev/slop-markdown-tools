@@ -257,6 +257,13 @@ function named(paths: string[]): string {
     : paths.join(", ");
 }
 
+/** The nodes inside table cells, where a `|` that is not escaped ends the cell. */
+function inTableCells(tree: Nodes): Set<Nodes> {
+  const nodes = new Set<Nodes>();
+  walk(tree, "tableCell", (cell) => walk(cell, (child) => nodes.add(child)));
+  return nodes;
+}
+
 export const linkRules: Record<string, Rule> = {
   "links/valid": {
     description: "Check local link destinations and dialect-specific heading/block references.",
@@ -325,6 +332,7 @@ export const linkRules: Record<string, Rule> = {
     }),
     check({ document, options, workspace }) {
       const findings: Finding[] = [];
+      let inCell: Set<Nodes> | undefined;
       walk(document.tree, (node) => {
         const url = destination(node);
         if (url === undefined || !workspace) return;
@@ -424,8 +432,16 @@ export const linkRules: Record<string, Rule> = {
         if (node.type === "wikiLink") {
           if (/[[\]|\r\n]/.test(replacement)) return;
           if (!node.embed && node.label === undefined && replacement !== node.target) return;
-          replacement = `${node.embed ? "!" : ""}[[${replacement}${node.label === undefined ? "" : `|${node.label}`}]]`;
-          if (replacement !== document.source.slice(start, end))
+          // Only the destination changes. The divider stays as written, `|` or
+          // `\|`, which a table cell needs, and so do the label and an embed's size.
+          const raw = document.source.slice(start, end);
+          const open = node.embed ? 3 : 2;
+          const divider = raw.indexOf("|", open);
+          const targetEnd =
+            divider < 0 ? raw.length - 2 : raw[divider - 1] === "\\" ? divider - 1 : divider;
+          if (raw.slice(open, targetEnd) !== node.target) return;
+          replacement = raw.slice(0, open) + replacement + raw.slice(targetEnd);
+          if (replacement !== raw)
             findings.push({
               start,
               end,
@@ -451,6 +467,9 @@ export const linkRules: Record<string, Rule> = {
             .replaceAll(")", "%29")
             .replaceAll("<", "%3C")
             .replaceAll(">", "%3E");
+        // A file or folder name can hold a `|`, which would end a table cell.
+        if (replacement.includes("|") && (inCell ??= inTableCells(document.tree)).has(node))
+          replacement = replacement.replaceAll("|", "\\|");
         if (
           document.dialect === "gitea" &&
           (giteaPyLine(document, start, end) || replacement.includes("_.py")) &&
@@ -479,8 +498,10 @@ export const linkRules: Record<string, Rule> = {
     check({ document, options, workspace }) {
       if (document.dialect !== "obsidian" || !workspace) return [];
       const findings: Finding[] = [];
+      let inCell: Set<Nodes> | undefined;
       walk(document.tree, (node) => {
         const [start, end] = range(node);
+        const pipe = () => ((inCell ??= inTableCells(document.tree)).has(node) ? "\\|" : "|");
         let replacement: string | undefined;
         if (
           options.style === "markdown" &&
@@ -489,7 +510,8 @@ export const linkRules: Record<string, Rule> = {
           node.label !== undefined
         ) {
           if (/[[\]<>\\\r\n]/.test(node.target ?? "") || /[*_`[\]\\]/.test(node.label)) return;
-          replacement = `[${node.label}](<${node.target}>)`;
+          const label = node.label.includes("|") ? node.label.replaceAll("|", pipe()) : node.label;
+          replacement = `[${label}](<${node.target}>)`;
         } else if (
           options.style === "wiki" &&
           node.type === "link" &&
@@ -500,7 +522,7 @@ export const linkRules: Record<string, Rule> = {
           const label = node.children[0].value;
           const target = wikiTarget(node.url);
           if (target === undefined || /[[\]|\r\n]/.test(label)) return;
-          replacement = `[[${target}|${label}]]`;
+          replacement = `[[${target}${pipe()}${label}]]`;
         }
         const url = destination(node);
         if (!replacement || url === undefined) return;

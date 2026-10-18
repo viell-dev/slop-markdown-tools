@@ -8,6 +8,20 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- `links/path` and `links/notation` write a `|` in a table cell as `\|`, because
+  one that is not escaped ends the cell. Before, `links/path` wrote every
+  wikilink it rewrote with a plain `|`, so that it also reported one whose
+  destination already had the configured form, and wrote a `|` from a file or
+  folder name into a new destination; `links/notation` wrote a plain `|` into a
+  new wikilink or Markdown label. The safety check refused those edits, and with
+  them all of the rule's other edits in the document. `links/path` now changes
+  only a wikilink's destination and keeps the rest as written, also outside
+  tables ([#349](https://github.com/viell-dev/slop-markdown-tools/pull/349)).
+
 ## 0.2.2 - 2026-10-18
 
 ### Fixed

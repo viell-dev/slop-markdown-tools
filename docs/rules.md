@@ -245,7 +245,9 @@ label shows its target as text, and a note embed is not the same thing as a
 Markdown image. A new wikilink decodes percent escapes, because Obsidian takes
 its text as the note's name: `[x](My%20Note.md)` becomes `[[My Note.md|x]]`. A
 destination that does not decode, or whose name would hold `|`, `[`, `]`, `#`,
-or `^`, stays as written.
+or `^`, stays as written. In a table cell, a `|` that the rule writes, between a
+new wikilink's target and label or in a new Markdown label, is escaped as `\|`,
+because one that is not escaped ends the cell.
 
 With `"style": "markdown"`, before:
 
@@ -293,11 +295,14 @@ only when the new destination leads to the same file and fragment.
 A relative path also gets `./` when it would otherwise name a different file at
 the vault's root. A destination that already has the configured spelling keeps
 its percent-encoding; a new path encodes `%` and `#`, so that it names the same
-file. Absolute filesystem paths are never written. These are left as written: a
-wikilink without a label, whose target is also its visible text; reference
-definitions, which are checked but not rewritten; autolinks; and links whose
-target is uncertain because a directory could not be read or the workspace root
-is only part of a vault (see [Obsidian
+file, and in a table cell writes a `|` in a name as `\|`, because one that is
+not escaped ends the cell. In a wikilink only the destination changes: the `|`
+or `\|` after it, the label, and an embed's size stay as written. Absolute
+filesystem paths are never written. These are left as written: a wikilink
+without a label, whose target is also its visible text; reference definitions,
+which are checked but not rewritten; autolinks; and links whose target is
+uncertain because a directory could not be read or the workspace root is only
+part of a vault (see [Obsidian
 vaults](obsidian.md#a-workspace-root-inside-a-vault)).
 
 With `{ "style": "relative", "leadingDot": true }` in `README.md`, before:
