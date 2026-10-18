@@ -1168,6 +1168,61 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
     );
   });
 });
+describe("link text in the Obsidian dialect", () => {
+  // Obsidian's Live Preview shows a link whose text spans lines as Markdown
+  // source, so the text of a link stays on one line there, as an image's
+  // description does (issue #306).
+  const workspace = createWorkspace({}, { strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it("moves a link whole to the next line instead of breaking its text", () => {
+    const source =
+      "A paragraph that links to [the target note in this vault](<Target.md>) here.\n\nA paragraph with a reference link [the target note in this vault][t] here.\n\n[t]: <Target.md>\n";
+    expect(verify(source, obsidian(40), workspace).output).toBe(
+      "A paragraph that links to\n[the target note in this vault](<Target.md>)\nhere.\n\nA paragraph with a reference link\n[the target note in this vault][t] here.\n\n[t]: <Target.md>\n",
+    );
+    // Elsewhere, link text wraps like the paragraph's own.
+    expect(verify(source, { ...obsidian(40), dialect: "github" }).output).toBe(
+      "A paragraph that links to [the target\nnote in this vault](<Target.md>) here.\n\nA paragraph with a reference link [the\ntarget note in this vault][t] here.\n\n[t]: <Target.md>\n",
+    );
+  });
+  it.each([
+    ["", ""],
+    ["- ", "  "],
+    ["> ", "> "],
+    ["> [!note]\n> ", "> "],
+  ])("joins link text written across lines (%j)", (prefix, continuation) => {
+    const definitions = "\n\n[shortcut text]: /a\n[ref]: /b\n";
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const link of [
+        "[the text|of a link](https://example.com/guide)",
+        "[a *link* whose|text has emphasis](u 'and a title')",
+        "[a link with `code`|after it](u)",
+        "[a link `with|code` inside](u)",
+        "[a link with ![an|image](i.png) inside](u)",
+        "[full|text][ref]",
+        "[shortcut|text][]",
+        "[shortcut|text]",
+      ]) {
+        const paragraph = (separator: string) =>
+          `${prefix}Some words ${link.replace("|", separator)} and more words after it.`;
+        const source = (paragraph(`\n${continuation}`) + definitions).replaceAll("\n", newline);
+        const joined = (paragraph(" ") + definitions).replaceAll("\n", newline);
+        for (const width of [20, 40, 80]) {
+          const result = verify(source, obsidian(width), workspace);
+          expect(result.output, JSON.stringify([source, width])).toBe(
+            verify(joined, obsidian(width), workspace).output,
+          );
+          // The link's text is on one line.
+          expect(result.output).toContain(link.slice(0, link.indexOf("]")).replace("|", " "));
+        }
+      }
+  });
+  it("keeps a paragraph as written where a line break in link text is inline HTML", () => {
+    const source = "Some words [a link <b>with\nHTML</b> inside](u) and more words after it.\n";
+    expect(verify(source, obsidian(30), workspace).output).toBe(source);
+  });
+});
+
 describe("multiline code spans", () => {
   const config: Config = {
     extends: [],
