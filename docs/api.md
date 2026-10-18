@@ -204,7 +204,9 @@ cannot be used is an error in the CLI's words, such as
   starts after any byte order mark, and `range(node)` gives a node's
   `[start, end]` offsets into it. `textContent(node)` gives a node's text. An
   alias such as `codeberg` reads the document in its dialect, which
-  `document.dialect` holds, and an unknown dialect is an error. In the Obsidian
+  `document.dialect` holds, and an unknown dialect is an error. A document whose
+  front matter would end inside a code block is read without front matter, as
+  the [safety model](design.md#safety-model) describes. In the Obsidian
   dialect, the tree holds `wikiLink`, `obsidianComment`, and `obsidianHighlight`
   nodes, typed as `WikiLink`, `ObsidianComment`, and `ObsidianHighlight` and
   registered with mdast's node types.

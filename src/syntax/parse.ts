@@ -261,7 +261,7 @@ export function range(node: Nodes): [number, number] {
   return [node.position.start.offset, node.position.end.offset];
 }
 /** An alert's or callout's marker, such as `[!NOTE]` or `[!tip]`. */
-export const calloutMarker = /^\[![\w-]+\]/;
+const calloutMarker = /^\[![\w-]+\]/;
 /**
  * Whether a paragraph starts with text that `pattern` matches, by default an
  * alert's or callout's marker: in `written`, its source from its start, or in
