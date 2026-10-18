@@ -8,7 +8,30 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.2.0 - 2026-10-18
+
+The first stable release. It holds everything in the earlier prereleases, and
+the changes since `0.2.0-rc.3` listed here. From this release on, npm's `latest`
+tag names the newest stable release, and prereleases stay under `rc` and `beta`;
+the [versioning
+policy](https://viell-dev.github.io/slop-markdown-tools/versions.html) says what
+a version number promises.
+
+### Upgrading from a prerelease
+
+From `0.2.0-rc.3`:
+
+- In the Obsidian dialect, `format` no longer breaks lines inside the text of a
+  link, and joins link text that is written across lines, also where
+  `0.2.0-rc.3` broke it. Notes that `0.2.0-rc.3` formatted change again: run
+  `format --write` once after upgrading.
+- A document from stdin whose `--stdin-filepath` is ignored is no longer
+  processed: `lint -` reports nothing and `format -` prints it unchanged, with a
+  warning. In `mdrefine/node`, `discoverWorkspace` no longer selects `documents`
+  whose paths are ignored but lists them in `skipped`.
+
+From an earlier prerelease, also read the upgrade notes of
+[0.2.0-rc.3](https://github.com/viell-dev/slop-markdown-tools/releases/tag/0.2.0-rc.3).
 
 ### Added
 

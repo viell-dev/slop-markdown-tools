@@ -7,22 +7,22 @@ results, and says how good they are.
 ## In short
 
 - **Checking a whole workspace takes seconds.** From the command line, 500 pages
-  of documentation (1.4 MB) are linted in about 3.2 s and checked for formatting
-  in about 3.5 s, fast enough for CI or a check before every push.
-- **A single file is mostly start-up.** Every command needs about 0.26 s before
+  of documentation (1.4 MB) are linted in about 2.1 s and checked for formatting
+  in about 2.4 s, fast enough for CI or a check before every push.
+- **A single file is mostly start-up.** Every command needs about 0.17 s before
   it reads a document, nearly all of it Node.js loading the tool's code. Pass
   many files to one command rather than running one command per file.
 - **Formatting is in the same range as Prettier.** Rewriting files takes about
-  1.9 times as long as Prettier, and checking formatted files slightly less,
+  1.8 times as long as Prettier, and checking formatted files slightly less,
   although this tool also checks links and parses every changed document again
   to confirm its meaning.
 - **Cost grows in step with size.** Sixteen times as many files take about
-  fifteen times as long, and a document of a megabyte costs about two fifths
+  sixteen times as long, and a document of a megabyte costs about two thirds
   more per kilobyte than a short one.
 - **Where it is weak.** The tool uses one CPU core and remembers nothing between
   runs, so formatting several thousand files takes tens of seconds every time.
   Memory grows with the workspace, though more slowly than the number of files:
-  linting peaks near 170 MB for 126 pages and near 415 MB for 2,000. While one
+  linting peaks near 170 MB for 126 pages and near 425 MB for 2,000. While one
   document is parsed, it needs about 70 times its size for prose and about 130
   times for a long list of links.
 
@@ -47,7 +47,7 @@ and reading files, and printing.
 
 ## Reference results
 
-- Node.js v24.21.0 on Linux x64; AMD EPYC 7763 64-Core Processor, 4 logical
+- Node.js v24.21.0 on Linux x64; AMD EPYC 9V45 96-Core Processor, 4 logical
   CPUs.
 - Each time is the median of 5 runs after one warm-up run.
 - Prettier 3.9.10 is the comparison formatter.
@@ -63,11 +63,11 @@ magnitude and as ratios between rows, not as a promise for another machine.
 
 | Step                                       | Time   | Fastest to slowest run | Per file | Per second | Compared with parsing |
 | ------------------------------------------ | ------ | ---------------------- | -------- | ---------- | --------------------- |
-| Parse only                                 | 1.06 s | 1.04 s to 1.08 s       | 2.11 ms  | 1.29 MB    | 1.0×                  |
-| Lint                                       | 2.43 s | 2.42 s to 2.47 s       | 4.85 ms  | 0.56 MB    | 2.3×                  |
-| Format, every file needs changes           | 5.64 s | 5.60 s to 5.67 s       | 11.26 ms | 0.24 MB    | 5.3×                  |
-| Format, every file already formatted       | 2.86 s | 2.85 s to 2.88 s       | 5.71 ms  | 0.54 MB    | 2.7×                  |
-| Prettier on the same files, for comparison | 2.99 s | 2.95 s to 3.04 s       | 5.98 ms  | 0.45 MB    | 2.8×                  |
+| Parse only                                 | 595 ms | 583 ms to 622 ms       | 1.19 ms  | 2.28 MB    | 1.0×                  |
+| Lint                                       | 1.44 s | 1.43 s to 1.48 s       | 2.87 ms  | 0.94 MB    | 2.4×                  |
+| Format, every file needs changes           | 3.40 s | 3.31 s to 3.42 s       | 6.79 ms  | 0.40 MB    | 5.7×                  |
+| Format, every file already formatted       | 1.78 s | 1.72 s to 1.83 s       | 3.54 ms  | 0.86 MB    | 3.0×                  |
+| Prettier on the same files, for comparison | 1.90 s | 1.85 s to 1.97 s       | 3.79 ms  | 0.72 MB    | 3.2×                  |
 
 - **Parse only** turns each file into a syntax tree. No rule can run without it,
   so it is the floor for the other rows.
@@ -89,10 +89,10 @@ magnitude and as ratios between rows, not as a promise for another machine.
 
 | Step                                 | Time   | Fastest to slowest run | Per file | Per second | Compared with parsing |
 | ------------------------------------ | ------ | ---------------------- | -------- | ---------- | --------------------- |
-| Parse only                           | 502 ms | 493 ms to 528 ms       | 1.00 ms  | 1.23 MB    | 1.0×                  |
-| Lint                                 | 1.21 s | 1.17 s to 1.25 s       | 2.42 ms  | 0.51 MB    | 2.4×                  |
-| Format, every file needs changes     | 2.89 s | 2.86 s to 2.94 s       | 5.79 ms  | 0.21 MB    | 5.8×                  |
-| Format, every file already formatted | 1.30 s | 1.28 s to 1.35 s       | 2.60 ms  | 0.48 MB    | 2.6×                  |
+| Parse only                           | 278 ms | 266 ms to 281 ms       | 0.56 ms  | 2.22 MB    | 1.0×                  |
+| Lint                                 | 702 ms | 681 ms to 740 ms       | 1.40 ms  | 0.88 MB    | 2.5×                  |
+| Format, every file needs changes     | 1.75 s | 1.71 s to 1.85 s       | 3.50 ms  | 0.35 MB    | 6.3×                  |
+| Format, every file already formatted | 793 ms | 771 ms to 820 ms       | 1.59 ms  | 0.78 MB    | 2.9×                  |
 
 The notes are less than half the size of the documentation pages, so each file
 is cheaper while the cost per megabyte is similar.
@@ -103,12 +103,12 @@ The repository documentation above, as 501 files on disk.
 
 | Command                                        | Time   | Fastest to slowest run | Peak memory |
 | ---------------------------------------------- | ------ | ---------------------- | ----------- |
-| Start Node.js and exit, for comparison         | 25 ms  | 24 ms to 26 ms         | 51.8 MB     |
-| Start the CLI and print its version            | 257 ms | 255 ms to 259 ms       | 84.9 MB     |
-| Lint the workspace                             | 3.21 s | 3.18 s to 3.27 s       | 270.6 MB    |
-| Lint one file of the workspace                 | 367 ms | 364 ms to 370 ms       | 98.9 MB     |
-| Format and write, every file needs changes     | 6.99 s | 6.80 s to 7.07 s       | 374.3 MB    |
-| Check formatting, every file already formatted | 3.51 s | 3.46 s to 3.54 s       | 358.0 MB    |
+| Start Node.js and exit, for comparison         | 22 ms  | 20 ms to 23 ms         | 51.7 MB     |
+| Start the CLI and print its version            | 165 ms | 161 ms to 166 ms       | 84.4 MB     |
+| Lint the workspace                             | 2.11 s | 2.06 s to 2.18 s       | 270.5 MB    |
+| Lint one file of the workspace                 | 238 ms | 234 ms to 240 ms       | 101.6 MB    |
+| Format and write, every file needs changes     | 4.53 s | 4.45 s to 4.68 s       | 377.1 MB    |
+| Check formatting, every file already formatted | 2.43 s | 2.39 s to 2.48 s       | 359.4 MB    |
 
 The difference between the first two rows, loading the tool, is paid by every
 command. Linting one file shows that unselected files cost almost nothing: they
@@ -123,13 +123,13 @@ the median of 3 runs without a warm-up run.
 
 | Files | Size    | Lint   | Lint per file | Format with changes | Format per file | Peak memory of a command-line lint |
 | ----- | ------- | ------ | ------------- | ------------------- | --------------- | ---------------------------------- |
-| 126   | 0.34 MB | 694 ms | 5.51 ms       | 1.47 s              | 11.64 ms        | 170.8 MB                           |
-| 501   | 1.36 MB | 2.43 s | 4.85 ms       | 5.64 s              | 11.26 ms        | 270.6 MB                           |
-| 2,001 | 5.44 MB | 9.66 s | 4.83 ms       | 22.48 s             | 11.23 ms        | 415.4 MB                           |
+| 126   | 0.34 MB | 380 ms | 3.02 ms       | 884 ms              | 7.02 ms         | 172.0 MB                           |
+| 501   | 1.36 MB | 1.44 s | 2.87 ms       | 3.40 s              | 6.79 ms         | 270.5 MB                           |
+| 2,001 | 5.44 MB | 5.94 s | 2.97 ms       | 14.70 s             | 7.35 ms         | 426.8 MB                           |
 
 The per-file columns stay level, so the time for a larger workspace can be
 estimated by multiplying. Memory grows far more slowly: sixteen times as many
-files take about 2.4 times the memory, including about 85 MB that the tool needs
+files take about 2.5 times the memory, including about 85 MB that the tool needs
 before it reads a document. Until a run finishes, the tool keeps every file's
 text and diagnostics, and the anchors of every document that a link points into;
 in the Obsidian dialect also about 70 bytes per file of the workspace,
@@ -140,15 +140,15 @@ Node.js reclaims memory, so it is an upper bound.
 
 | Document size | Format with changes | Per kilobyte |
 | ------------- | ------------------- | ------------ |
-| 17 kB         | 48 ms               | 2.86 ms      |
-| 129 kB        | 388 ms              | 3.01 ms      |
-| 1,024 kB      | 4.07 s              | 3.98 ms      |
+| 17 kB         | 29 ms               | 1.76 ms      |
+| 129 kB        | 315 ms              | 2.44 ms      |
+| 1,024 kB      | 3.04 s              | 2.97 ms      |
 
-The cost per kilobyte rises by about two fifths from a short document to one of
-a megabyte, far larger than documents usually are. In the previous reference
-results it rose by about a quarter, and most of the difference lies between 129
-kB and a megabyte. It is not explained yet; on Windows the cost per kilobyte
-stays level ([issue
+The cost per kilobyte rises by about two thirds from a short document to one of
+a megabyte, far larger than documents usually are. Earlier reference results, on
+another processor, showed a rise of two fifths and of a quarter, so the size of
+the rise depends on the runner. It is not explained yet; on Windows the cost per
+kilobyte stays level ([issue
 #300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
 
 While a document is parsed, the parser holds a list of every token it found,
@@ -172,12 +172,12 @@ sum; Node.js allows a few gigabytes by default.
 
 | Situation                               | Reference result                                                                | Verdict                                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| A hook or an agent lints one file       | 0.37 s, most of it start-up                                                     | Fine, but not instant. Batch files into one command.                                               |
-| CI lints and checks 500 pages           | 3.2 s and 3.5 s                                                                 | Good. Shorter than installing the dependencies.                                                    |
-| Formatting 500 pages for the first time | 7.0 s                                                                           | Good for a one-time job.                                                                           |
-| A workspace of 2,000 pages              | About 9.7 s to lint, 22 s to format everything                                  | Acceptable. Tens of seconds, on one core, every time.                                              |
-| Compared with Prettier                  | 1.9 times its time when rewriting, slightly less than its time when checking    | Comparable, while also validating links and meaning.                                               |
-| Memory                                  | About 270 MB to lint and 375 MB to format 500 pages; about 415 MB to lint 2,000 | Fine at these sizes. At this rate, tens of thousands of files could still need a gigabyte or more. |
+| A hook or an agent lints one file       | 0.24 s, most of it start-up                                                     | Fine, but not instant. Batch files into one command.                                               |
+| CI lints and checks 500 pages           | 2.1 s and 2.4 s                                                                 | Good. Shorter than installing the dependencies.                                                    |
+| Formatting 500 pages for the first time | 4.5 s                                                                           | Good for a one-time job.                                                                           |
+| A workspace of 2,000 pages              | About 6 s to lint, 15 s to format everything                                    | Acceptable. Seconds to tens of seconds, on one core, every time.                                   |
+| Compared with Prettier                  | 1.8 times its time when rewriting, slightly less than its time when checking    | Comparable, while also validating links and meaning.                                               |
+| Memory                                  | About 270 MB to lint and 375 MB to format 500 pages; about 425 MB to lint 2,000 | Fine at these sizes. At this rate, tens of thousands of files could still need a gigabyte or more. |
 
 The design accepts some slowness on purpose: parsing every changed document
 again is what lets the tool refuse an edit that would change a document's
