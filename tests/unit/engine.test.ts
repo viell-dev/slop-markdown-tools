@@ -488,6 +488,112 @@ describe("formatting contracts", () => {
   });
 });
 
+describe("front matter that would end inside a code block", () => {
+  // The front matter extension ends front matter at the next `---` or `+++`
+  // line, also one inside a code block that a line of the front matter opens.
+  // GitHub's comments read the code block there, and GitHub's file view and
+  // site generators read the front matter (issue #295).
+  const fence = "```";
+  const yaml = `---\ntitle: x\n...\n\n${fence}\na\n---\n___\n${fence}\n`;
+  const tildes = "---\n\nIntro.\n\n~~~\n---\n***\n~~~\n";
+  const toml = `+++\n\nIntro.\n\n${fence}\n+++\n***\n${fence}\n\nText *a*.\n`;
+  const preset = (dialect: Dialect): ProcessOptions => ({
+    config: {
+      extends: dialect === "commonmark" ? ["recommended"] : ["recommended", dialect],
+      dialect,
+    },
+    workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
+  });
+  const refusals = (result: { diagnostics: Diagnostic[] }) =>
+    result.diagnostics
+      .filter((item) => item.rule === "engine/unsafe-format")
+      .map((item) => item.message);
+  it.each(dialects)("reads the code block, not front matter, in the %s dialect", (dialect) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const [source, code] of [
+        [yaml, "a\n---\n___"],
+        [tildes, "---\n***"],
+        [toml, "+++\n***"],
+        // A fence indented by up to three spaces opens a code block too.
+        [`---\nkey: |\n  ${fence}js\n---\n___\n  ${fence}\n`, "---\n___"],
+      ] as const) {
+        const { children } = parse(source.replaceAll("\n", newline), dialect).tree;
+        expect(children.map((node) => node.type)).not.toContain("yaml");
+        expect(children.map((node) => node.type)).not.toContain("toml");
+        const block = children.find((node) => node.type === "code");
+        expect(block && "value" in block && block.value.replaceAll(newline, "\n")).toBe(code);
+      }
+  });
+  it.each(dialects)(
+    "keeps the code and the front matter as written with the recommended preset in the %s dialect",
+    (dialect) => {
+      // `style/thematic-break` used to change the code's `___` and `***`, and
+      // `style/code-fence` the closing `~~~`. Joining `title: x` and `...` would
+      // make the front matter that GitHub's file view shows invalid YAML, and a
+      // fence written with backticks would end it there.
+      let result = format(yaml, preset(dialect));
+      expect(result.output).toBe(yaml);
+      expect(refusals(result)).toEqual([
+        "style/wrap would change the parsed meaning at line 1; none of its edits were applied.",
+      ]);
+      result = format(tildes, preset(dialect));
+      expect(result.output).toBe(tildes);
+      expect(refusals(result)).toEqual([
+        "style/code-fence would change the parsed meaning at line 1; none of its edits were applied.",
+      ]);
+      // With front matter, the closing fence opens a code block that holds `*a*`.
+      result = format(toml, preset(dialect));
+      expect(result.output).toBe(toml);
+      expect(refusals(result)).toEqual([
+        "style/emphasis would change the parsed meaning at line 8; none of its edits were applied.",
+      ]);
+    },
+  );
+  it.each(dialects)(
+    "reads an HTML block or display math, not front matter, in the %s dialect",
+    (dialect) => {
+      // A line that opens an HTML block or display math is valid YAML, but
+      // GitHub's comments read the block, and `***` in it is content.
+      const html = "---\n<div>\n---\n***\n</div>\n";
+      const math = "---\n$$\n---\n***\n$$\n";
+      const cases: [string, string, string][] = [[html, "html", "<div>\n---\n***\n</div>"]];
+      if (dialect !== "commonmark") cases.push([math, "math", "---\n***"]);
+      for (const [source, type, value] of cases) {
+        const { children } = parse(source, dialect).tree;
+        expect(children.map((node) => node.type)).toEqual(["thematicBreak", type]);
+        expect("value" in children[1]! && children[1].value).toBe(value);
+        // `style/thematic-break` used to change the `***`, which is now content.
+        const result = format(source, preset(dialect));
+        expect(result.output).toBe(source);
+        expect(refusals(result)).toEqual([]);
+      }
+    },
+  );
+  it.each(dialects)("still reads other front matter in the %s dialect", (dialect) => {
+    for (const [source, output] of [
+      ["---\ntitle: x\n---\n\nText *a*.\n\n***\n", "---\ntitle: x\n---\n\nText _a_.\n\n---\n"],
+      ["+++\ntitle = 'x'\n+++\n\nText *a*.\n", "+++\ntitle = 'x'\n+++\n\nText _a_.\n"],
+      // A line that starts with `<` opens an HTML block that ends at a blank
+      // line, or is a paragraph whose next line underlines it as a heading.
+      ["---\n<x>\n\n---\n\nText *a*.\n", "---\n<x>\n\n---\n\nText _a_.\n"],
+      ["---\n<b>x</b>\n---\n\nText *a*.\n", "---\n<b>x</b>\n---\n\nText _a_.\n"],
+      // A fence indented in a YAML block scalar, and one that a multiline TOML
+      // string opens and closes, are not code in the reading without front matter.
+      [
+        `---\nexample: |\n  ${fence}js\n  ---\n  ${fence}\n---\n\nText *a*.\n`,
+        `---\nexample: |\n  ${fence}js\n  ---\n  ${fence}\n---\n\nText _a_.\n`,
+      ],
+      [
+        `+++\ntext = """\n${fence}js\ncode\n${fence}\n"""\n+++\n\nText *a*.\n`,
+        `+++\ntext = """\n${fence}js\ncode\n${fence}\n"""\n+++\n\nText _a_.\n`,
+      ],
+    ] as const) {
+      expect(["yaml", "toml"]).toContain(parse(source, dialect).tree.children[0]!.type);
+      expect(formatted(source, preset(dialect))).toBe(output);
+    }
+  });
+});
+
 describe("a rule whose edits would change the meaning", () => {
   /** A block rule that puts a list marker before the paragraphs starting with one of `targets`. */
   const listing = (name: string, targets: string[]): Rule => ({

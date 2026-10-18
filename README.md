@@ -3,7 +3,9 @@
 Lint and format Markdown for GitHub, Forgejo, Gitea, Obsidian, or any CommonMark
 renderer, with one configuration for both.
 
-[![npm](https://img.shields.io/npm/v/mdrefine)](https://www.npmjs.com/package/mdrefine) [![CI](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/npm/l/mdrefine)](LICENSE)
+[![npm](https://img.shields.io/npm/v/mdrefine)](https://www.npmjs.com/package/mdrefine)
+[![CI](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/npm/l/mdrefine)](LICENSE)
 
 mdrefine is meant to replace a general-purpose linter and formatter, such as
 markdownlint and Prettier, for Markdown. It does not cover all of their checks

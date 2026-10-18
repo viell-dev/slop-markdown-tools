@@ -24,7 +24,16 @@ and the rules for GitHub Markdown apply to all three. The syntax that only
 Forgejo and Gitea have is protected from formatting rather than parsed; see
 [Forgejo and Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as
 an Obsidian plugin's, is read as text: use a suppression comment or an `ignore`
-pattern for it.
+pattern for it. Site-generator syntax is read as text too, but its lines are
+kept: [`style/wrap`](rules.md#stylewrap) leaves a paragraph as written when one
+of its lines starts with a container such as Docusaurus's `:::note` or a
+template tag such as Liquid's `{% tab %}` or `{{ title }}`, because site
+generators read them by line.
+
+An alert's or callout's marker is read from the text, as GitHub reads it, so
+`> \[!NOTE]` and `> &#91;!NOTE]` are alerts too. Formatting keeps the line of
+such a marker as written in every dialect; whether Forgejo, Gitea, and Obsidian
+render these forms was not observed.
 
 ## The assumed dialect
 

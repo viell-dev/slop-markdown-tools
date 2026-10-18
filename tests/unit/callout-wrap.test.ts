@@ -305,3 +305,116 @@ describe("GitHub, Forgejo, and Gitea alert bodies", () => {
     expect(result.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(true);
   });
 });
+
+describe("markers written with an escape or a character reference", () => {
+  // GitHub reads each of these as the marker of an alert, as it reads
+  // `[!NOTE]`: it reads the marker from the paragraph's text (issue #294).
+  const markers = [
+    "\\[!NOTE]",
+    "&#91;!TIP]",
+    "&lbrack;!WARNING]",
+    "&#x5B;!NOTE]",
+    "[\\!NOTE]",
+    "[!&#78;OTE]",
+  ];
+  const marked = ["github", "forgejo", "gitea", "obsidian"] as const;
+  function check(source: string, dialect: (typeof marked)[number] | "commonmark") {
+    const options = {
+      config: {
+        extends: [],
+        dialect,
+        rules: { "style/wrap": ["warn", { width: 40, reportUnreflowed: true }] },
+      } satisfies Config,
+      workspace,
+    };
+    const result = format(source, options);
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(semanticFingerprint(parse(result.output, dialect))).toBe(
+      semanticFingerprint(parse(source, dialect)),
+    );
+    expect(format(result.output, options).output).toBe(result.output);
+    return result;
+  }
+  it.each(marked)("keeps the marker line and wraps the body in the %s dialect", (dialect) => {
+    for (const newline of ["\n", "\r\n"])
+      for (const marker of markers) {
+        const header = `> ${marker}${newline}`;
+        const { output } = check(`${header}> ${body}${newline}`, dialect);
+        // On Forgejo and Gitea, a line that starts with `\[` can open display
+        // math, so the whole paragraph stays as written.
+        if (dialect !== "github" && dialect !== "obsidian" && marker.startsWith("\\[")) {
+          expect(output).toBe(`${header}> ${body}${newline}`);
+          continue;
+        }
+        expect(output.startsWith(header)).toBe(true);
+        const lines = output.slice(header.length).split(newline).slice(0, -1);
+        expect(lines.length).toBeGreaterThan(1);
+        expect(lines.map((line) => line.slice(2)).join(" ")).toBe(body);
+      }
+  });
+  it.each(markers)(
+    "leaves the paragraph of %s as written in CommonMark, as `[!NOTE]`",
+    (marker) => {
+      const source = `> ${marker}\n> ${body}\n`;
+      const result = check(source, "commonmark");
+      expect(result.output).toBe(source);
+      expect(result.diagnostics.map((item) => item.message)).toEqual([
+        "Paragraph not reflowed: callout header (width 40 columns).",
+      ]);
+    },
+  );
+  it.each(markers)("keeps an Obsidian title after %s on the marker line", (marker) => {
+    const header = `> ${marker.replace("NOTE", "note")} A title with *emphasis*\n`;
+    const source = `${header}> ${body}\n`;
+    const { output } = check(source, "obsidian");
+    expect(output.startsWith(header)).toBe(true);
+    expect(output).not.toBe(source);
+  });
+  it.each(markers)("refuses an edit that moves words onto the line of %s", (marker) => {
+    const source = `> ${marker}\n> Body words.\n`;
+    const output = `> ${marker} Body\n> words.\n`;
+    for (const dialect of marked) {
+      expect(semanticFingerprint(parse(output, dialect))).not.toBe(
+        semanticFingerprint(parse(source, dialect)),
+      );
+      const plugin: Plugin = {
+        name: "unsafe",
+        rules: {
+          boundary: {
+            kind: "style",
+            description: "Move a body word onto the marker line",
+            check: () => [
+              {
+                start: 0,
+                message: "Unsafe edit",
+                edit: { start: 0, end: source.length, text: output },
+              },
+            ],
+          },
+        },
+      };
+      const result = format(source, {
+        config: { extends: [], dialect, rules: { "unsafe/boundary": "warn" } },
+        plugins: [plugin],
+        workspace,
+      });
+      expect(result.output).toBe(source);
+      expect(result.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(true);
+    }
+  });
+  it.each([...marked, "commonmark"] as const)(
+    "leaves the reported alerts as written with the recommended preset in the %s dialect",
+    (dialect) => {
+      for (const marker of markers) {
+        const source = `> ${marker}\n> Body.\n`;
+        const config: Config = {
+          extends: dialect === "commonmark" ? ["recommended"] : ["recommended", dialect],
+          dialect,
+        };
+        const result = format(source, { config, workspace });
+        expect(result.diagnostics).toEqual([]);
+        expect(result.output).toBe(source);
+      }
+    },
+  );
+});

@@ -120,6 +120,12 @@ yet", keep the other tool for that check.
 | `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)                                   |
 | Custom rules                                                                     | [Plugins](plugins.md)                                                                                 |
 
+Prettier keeps line breaks by default (`proseWrap: "preserve"`), while
+`recommended` wraps at 80 columns. `style/wrap` keeps the lines of
+[site-generator syntax](dialects.md#what-each-dialect-reads) such as `:::note`
+and `{% tab %}`; for other syntax that depends on its line breaks, turn the rule
+off or use a suppression comment.
+
 ## Agents and scripts
 
 Read the [JSON report](cli.md#json-report) and the exit code, not the text
