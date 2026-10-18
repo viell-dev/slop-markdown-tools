@@ -31,7 +31,10 @@ it runs, and adds what the commands changed to the commit, configure it in
 ```json
 {
   "lint-staged": {
-    "*.{md,markdown}": ["mdtools format --write", "mdtools lint --max-warnings 0"]
+    "*.{md,markdown}": [
+      "mdtools format --write --no-warn-ignored",
+      "mdtools lint --max-warnings 0 --no-warn-ignored"
+    ]
   }
 }
 ```
@@ -43,9 +46,12 @@ the commit adds or changes:
 ```sh
 #!/bin/sh
 git diff --cached --name-only -z --diff-filter=ACMR -- '*.md' '*.markdown' |
-  xargs -0 -r npx mdtools lint --max-warnings 0 --
+  xargs -0 -r npx mdtools lint --max-warnings 0 --no-warn-ignored --
 ```
 
+In both, `--no-warn-ignored` leaves out the
+[warning](cli.md#which-files-are-processed) for a changed file that the tool
+skips, such as one that the configuration's `ignore` patterns match.
 `--diff-filter=ACMR` leaves out deleted files, which would be an error as paths.
 `xargs -r` skips the command when no file changed. `--` keeps a file name that
 starts with `-` from being read as an option. This hook checks each file as it

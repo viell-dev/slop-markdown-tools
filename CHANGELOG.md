@@ -8,6 +8,35 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Added
+
+- `--no-warn-ignored` leaves out the warning for a file or directory named on
+  the command line that the tool skips as ignored, for hooks and scripts that
+  pass every changed file. The JSON report still lists it in `skipped`
+  ([#311](https://github.com/viell-dev/slop-markdown-tools/pull/311)).
+
+### Fixed
+
+- In the Obsidian dialect, `style/wrap` keeps the text of a link on one line and
+  moves the link whole to the next line where it does not fit, and joins link
+  text written across lines. Obsidian's Live Preview shows a link whose text
+  spans lines as Markdown source. `0.2.0-rc.3` broke lines inside link text in
+  every dialect; elsewhere it still does, as GitHub, Forgejo, and Gitea render
+  such links
+  ([#312](https://github.com/viell-dev/slop-markdown-tools/pull/312)).
+- Lists and block quotes below a first line of `---` or `+++` that no later line
+  closes are read as lists and block quotes, as renderers show them. Before, the
+  parser read them as paragraphs, and `style/wrap` joined them to the line
+  above, which GitHub then showed as text
+  ([#309](https://github.com/viell-dev/slop-markdown-tools/pull/309)).
+- `style/thematic-break` and `style/heading` with `setext` no longer write a
+  line of `---` alone below such a first line of `---`, which made front matter
+  of everything between the two lines. The safety check refused every edit of
+  the rule in such a document
+  ([#309](https://github.com/viell-dev/slop-markdown-tools/pull/309)).
+
 ## 0.2.0-rc.3 - 2026-10-18
 
 ### Upgrading from a prerelease

@@ -825,7 +825,9 @@ because directly below text its line would continue the paragraph. It keeps its
 `#` when its text starts like another block, such as a list item, block quote,
 thematic break, fence, HTML, or link reference definition, when it contains `|`,
 which `---` below it could make a table, or when it ends with a backslash, and
-on Forgejo and Gitea when it contains `{`.
+on Forgejo and Gitea when it contains `{`. Below a first line of `---` that no
+line closes, a level-2 underline has at least four `-`, because `---` would
+close it as front matter.
 
 ## `style/inline-code`
 
@@ -1100,8 +1102,11 @@ means:
   `---` would underline as a heading.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
-- At the start of a document, where a break that is or would become `---` is
-  read as the start of front matter.
+- At the start of a document, with `---`, which would open front matter if a
+  later line of `---` closed it, and a `---` that site generators read as the
+  start of front matter.
+- With `---`, at the start of a line below a first line of `---` that no line
+  closes, which `---` would close as front matter.
 
 ## `style/trailing-space`
 
@@ -1149,7 +1154,9 @@ span, an image, math, a link's destination, a template tag on one line such as
 `{% data x %}` or `{{ title }}`, and a word longer than the line stay whole and
 can overflow; a code span or an image description written across lines is joined
 onto one, without the spaces and tabs that start its next line, as renderers
-read it. List markers, block quote markers, and indentation count toward the
+read it. In Obsidian, the text of a link stays whole and is joined onto one line
+too, because Live Preview shows a link whose text spans lines as its Markdown
+source. List markers, block quote markers, and indentation count toward the
 width, a tab up to the next multiple of four columns.
 
 A word that would start a block at the start of a line, such as a list marker,

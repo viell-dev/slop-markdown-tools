@@ -63,6 +63,11 @@ The comparison is only as good as the parser's reading:
   and `style/block-spacing` leave text whose second line is a table delimiter
   row as written ([issue
   #283](https://github.com/viell-dev/slop-markdown-tools/issues/283)).
+- Front matter needs a closing line. A first line of `---` or `+++` that no
+  later line closes is read as renderers read it, as a thematic break or text,
+  with the lists and block quotes below it; the parser's front matter extension
+  reads them as paragraphs there, so the tool leaves it out for such a document
+  ([issue #278](https://github.com/viell-dev/slop-markdown-tools/issues/278)).
 - Front matter ends at the next `---` or `+++` line, also one inside a code
   block, for the parser, for site generators, and for GitHub's file view when
   the front matter is a YAML mapping. GitHub's comments, and renderers without
