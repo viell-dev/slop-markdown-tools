@@ -1,4 +1,5 @@
 import fc from "fast-check";
+import type { InlineCode, Nodes } from "mdast";
 import { describe, expect, it } from "vitest";
 import {
   applyEdits,
@@ -9,6 +10,7 @@ import {
   lint,
   parse,
   presets,
+  range,
   resolveConfig,
   semanticFingerprint,
   textContent,
@@ -16,6 +18,7 @@ import {
 import type { Config, Dialect, Plugin, RuleSetting } from "../../src/index.js";
 import { builtInRules } from "../../src/core/engine.js";
 import { giteaPyLine, inForgeMath } from "../../src/rules/style.js";
+import { codeSpanText, lazyIndentation } from "../../src/syntax/parse.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
   return { extends: [], dialect, rules };
@@ -30,6 +33,16 @@ function formatted(source: string, config: Config, options: Record<string, unkno
 /** The engine's diagnostics of a formatting result; the refused rules' own findings stay too. */
 const refusals = (result: { diagnostics: { rule: string }[] }) =>
   result.diagnostics.filter((item) => item.rule.startsWith("engine/"));
+/** The code spans of a document, in order. */
+function codeSpans(source: string, dialect: Dialect): InlineCode[] {
+  const spans: InlineCode[] = [];
+  const visit = (node: Nodes) => {
+    if (node.type === "inlineCode") spans.push(node);
+    if ("children" in node) node.children.forEach(visit);
+  };
+  visit(parse(source, dialect).tree);
+  return spans;
+}
 
 describe("style/heading", () => {
   const config = only({ "style/heading": "warn" });
@@ -551,6 +564,113 @@ describe("style/inline-code", () => {
     expect(print("Run `npm run\n   build` now.\n")).not.toBe(
       print("Run `npm run    build` now.\n"),
     );
+    // A lazy line keeps its indentation, as GitHub shows it.
+    expect(print("> Run `npm run\n   build` now.\n")).toBe(
+      print("> Run `npm run    build` now.\n"),
+    );
+    expect(print("> Run `npm run\n   build` now.\n")).not.toBe(
+      print("> Run `npm run build` now.\n"),
+    );
+  });
+  // Issue #290, observed with `gh api markdown -f mode=markdown` on 2026-10-18,
+  // comparing the text of each `<code>` element exactly: each case's code
+  // spans as GitHub shows them, and as commonmark.js 0.31.2 shows them where
+  // it differs. It differs only where a span goes on in a lazy continuation
+  // line, one without its block quote's `>` or its list item's indentation,
+  // that starts with spaces or tabs, which GitHub keeps in the span.
+  const observed: [string, string[], string[]?][] = [
+    ["Text ` \n   foo ` end.", [" foo"]],
+    ["> Run `npm run\n   build` now.", ["npm run    build"], ["npm run build"]],
+    ["Text ` foo \n   ` end.", ["foo "]],
+    ["Text `\n   foo\n   ` end.", ["foo"]],
+    ["> a `b\n>    c` d", ["b c"]],
+    ["> a `b\n  c` d", ["b   c"], ["b c"]],
+    ["> a `b\nc` d", ["b c"]],
+    ["> > a `b\n>   c` d", ["b   c"], ["b c"]],
+    ["> > a `b\n> >   c` d", ["b c"]],
+    ["> > a `b\n   c` d", ["b    c"], ["b c"]],
+    ["- a `b\n c` d", ["b  c"], ["b c"]],
+    ["- a `b\n     c` d", ["b c"]],
+    ["- a `b\n  c` d", ["b c"]],
+    ["1. a `b\n  c` d", ["b   c"], ["b c"]],
+    ["1. a `b\n      c` d", ["b c"]],
+    ["- a\n  - b `c\n   d` e", ["c  d"], ["c d"]],
+    ["- a\n  - b `c\n d` e", ["c  d"], ["c d"]],
+    ["> - a `b\n>  c` d", ["b  c"], ["b c"]],
+    ["> - a `b\n>     c` d", ["b c"]],
+    ["> - a `b\n c` d", ["b  c"], ["b c"]],
+    ["- > a `b\n  c` d", ["b c"]],
+    ["- > a `b\n   c` d", ["b  c"], ["b c"]],
+    ["- > a `b\n  >   c` d", ["b c"]],
+    ["Ref[^a].\n\n[^a]: a `b\n c` d", ["b  c"]],
+    ["Ref[^b].\n\n[^b]: a `b\n     c` d", ["b c"]],
+    ["Ref[^c].\n\n[^c]: a `b\n    c` d", ["b c"]],
+    ["Ref[^d].\n\n[^d]: a ` \n   foo ` d", ["    foo"]],
+    ["Ref[^e].\n\n[^e]: a `\n  foo\n  ` d", ["  foo  "]],
+    ["a `b\n   c`\n===", ["b c"]],
+    ["> a `b\n  c`\n> ===", ["b   c"], ["b c"]],
+    ["> [a `b\n  c`](u)", ["b   c"], ["b c"]],
+    ["> *a `b\n  c`*", ["b   c"], ["b c"]],
+    // Only spaces, which stay.
+    ["a `  ` b", ["  "]],
+    ["a ` \n ` b", ["  "]],
+    ["a ` \n` b", ["  "]],
+    ["a `\n ` b", [" "]],
+    ["> a ` \n  ` b", ["    "], ["  "]],
+    ["> a ` \n>   ` b", ["  "]],
+    // A line break at an edge.
+    ["a `\nfoo` b", [" foo"]],
+    ["a `foo\n` b", ["foo "]],
+    ["a `\nfoo\n` b", ["foo"]],
+    ["a `\n   foo` b", [" foo"]],
+    ["a `foo\n   ` b", ["foo "]],
+    ["> a `\n   foo` b", ["    foo"], [" foo"]],
+    ["> a `foo\n   ` b", ["foo    "], ["foo "]],
+    ["> a `\n   foo\n   ` b", ["   foo   "], ["foo"]],
+    ["> a `\n>   foo\n>   ` b", ["foo"]],
+    ["- a `foo\n   ` b", ["foo "]],
+    ["- a `foo\n ` b", ["foo  "], ["foo "]],
+    ["a `b  \n  c` d", ["b   c"]],
+    ["a ` b \n c ` d", ["b  c"]],
+    ["a `` ` \n   `` b", ["` "]],
+    ["> a `` x\n   ` `` b", ["x    `"], ["x `"]],
+    // Tabs, which are not spaces, and count to the next multiple of four
+    // columns where they indent.
+    ["a `\tfoo\t` b", ["\tfoo\t"]],
+    ["a ` \tfoo\t ` b", ["\tfoo\t"]],
+    ["a `b\n\tc` d", ["b c"]],
+    ["> a `b\n\tc` d", ["b \tc"], ["b c"]],
+    ["> a `b\n>\tc` d", ["b c"]],
+    ["> > a `b\n>\tc` d", ["b   c"], ["b c"]],
+    ["- a `b\n\tc` d", ["b c"]],
+    ["> a `\n\tfoo ` b", ["\tfoo"], ["foo"]],
+    ["a ` \n\tfoo ` b", [" foo"]],
+    ["> Run `npm run\r\n   build` now.", ["npm run    build"], ["npm run build"]],
+    ["Text `\r\n   foo\r\n   ` end.", ["foo"]],
+    ["> a `\r\n   foo\r\n   ` b", ["   foo   "], ["foo"]],
+  ];
+  it.each(observed)("reads the code spans of %j as GitHub shows them", (source, github, other) => {
+    const spans = codeSpans(source, "github");
+    expect(spans.map(codeSpanText)).toEqual(github);
+    // commonmark.js has no footnotes.
+    if (!source.includes("[^"))
+      expect(spans.map(lazyIndentation)).toEqual(
+        github.map((text, i) => (other?.[i] ?? text) !== text),
+      );
+  });
+  it.each(observed)("joins the code spans of %j as GitHub shows them", (source, github) => {
+    for (const dialect of dialects) {
+      // CommonMark has no footnotes.
+      if (dialect === "commonmark" && source.includes("[^")) continue;
+      const output = formatted(source, only(rule, dialect));
+      const spans = codeSpans(output, dialect);
+      expect(spans.map(codeSpanText), dialect).toEqual(github);
+      // Renderers differ on a lazy line's indentation, which only GitHub was
+      // seen to keep.
+      if (dialect === "github")
+        expect(spans.every((span) => !/[\r\n]/.test(output.slice(...range(span))))).toBe(true);
+      else if (codeSpans(source, dialect).some(lazyIndentation)) expect(output).toBe(source);
+    }
   });
   it("still joins code spans beside a single `==` or below a callout's title", () => {
     expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(

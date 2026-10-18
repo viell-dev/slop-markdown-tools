@@ -919,6 +919,28 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
       );
     }
   });
+  // Issue #290: CommonMark drops the indentation and turns line endings into
+  // spaces before it takes a space off each end of a code span, so each of
+  // these reads as GitHub showed it: ` foo`, `foo `, `foo`, `code`, `code`.
+  it.each([
+    ["` \n   foo `", "`  foo `"],
+    ["` foo \n   `", "` foo  `"],
+    ["`\n   foo\n   `", "` foo `"],
+    ["`\n code `", "` code `"],
+    ["` code\n\t`", "` code `"],
+  ])("joins %j, with a space or line break at both edges, as %j", (inline, joined) => {
+    for (const [prefix, continuation] of [
+      ["", ""],
+      ["> ", "> "],
+      ["- ", "  "],
+    ] as const)
+      for (const dialect of dialects) {
+        const span = inline.replace(/\n/g, `\n${continuation}`);
+        const source = `${prefix}Some text with ${span} and more words that run past the width.\n`;
+        const config: Config = { ...wrap({ width: 30 }), dialect };
+        expect(verify(source, config, workspace).output).toContain(joined);
+      }
+  });
   it.each([
     "**bold [link\ntext](u) more bold words**",
     "[**strong\ntext** and more link text](u)",
@@ -962,10 +984,6 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
     ["[full text][long\nref]", "line break in a link destination or title"],
     ["$a\nb$", "line break in math"],
     ["*em <b>html\nb</b> em*", "line break in inline HTML"],
-    // The parser strips a space or line ending from both edges of these spans,
-    // and renderers a space after the indentation is gone.
-    ["`\n code `", "line break with spaces at the edge of a code span"],
-    ["` code\n\t`", "line break with spaces at the edge of a code span"],
     ["![image  \ndescription](i.png)", "hard line break"],
     ["![image\\\ndescription](i.png)", "hard line break"],
     ["*em  \nphrase*", "hard line break"],
@@ -1003,6 +1021,8 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
         "``co`de|\tspan``",
         "` code|  `",
         "`|  code `",
+        "` |code `",
+        "` code |`",
         "![image|alt](i.png)",
         "~~struck|out~~",
         "[**bold|link** text](u)",
