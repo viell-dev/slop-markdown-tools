@@ -234,7 +234,9 @@ export function parse(
     // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
     // that is protected by rules rather than parsed.
     if (read !== "commonmark") {
-      extensions.push(gfm(), math(mathConditions[read]));
+      // Obsidian marks strikethrough with two tildes only; `~a~` is text there
+      // (issue #319).
+      extensions.push(gfm({ singleTilde: read !== "obsidian" }), math(mathConditions[read]));
       mdastExtensions.push(...gfmTree, mathFromMarkdown());
     }
     if (read === "obsidian") {

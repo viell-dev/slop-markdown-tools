@@ -423,6 +423,65 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
         ).toBe("$x$*a* and *$y$* and $z$ *b*\n");
     },
   );
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "leaves emphasis that holds a tilde run of strikethrough alone on %s",
+    (dialect) => {
+      // After `*a*`, the parser pairs `*c~~ d*`, which GitHub and Obsidian show
+      // as text after a strikethrough of `b *c` (issue #320).
+      const rules = only({ "style/emphasis": "warn" }, dialect);
+      expect(formatted("Use *a* and ~~b *c~~ d* here.\n", rules)).toBe(
+        "Use _a_ and ~~b *c~~ d* here.\n",
+      );
+      // One tilde marks strikethrough too, except in Obsidian (issue #319).
+      expect(formatted("Use *a* and ~b *c~ d* here.\n", rules)).toBe(
+        dialect === "obsidian" ? "Use _a_ and ~b _c~ d_ here.\n" : "Use _a_ and ~b *c~ d* here.\n",
+      );
+      // Without another run of tildes no strikethrough forms, and strikethrough
+      // that the parser reads holds no tildes as text.
+      expect(formatted("Some *about ~5 minutes* here.\n", rules)).toBe(
+        "Some _about ~5 minutes_ here.\n",
+      );
+      expect(formatted("A *b ~~c~~ d* e.\n", rules)).toBe("A _b ~~c~~ d_ e.\n");
+    },
+  );
+  it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
+    "leaves a `_` that tildes separate from a word alone on %s",
+    (dialect) => {
+      // GitHub reads such a `_` as inside the word, where it cannot open or
+      // close, while the parser reads emphasis (issue #322).
+      const underscores = only({ "style/emphasis": "warn" }, dialect);
+      expect(formatted("x~~*b b*~~ y and *c*\n", underscores)).toBe("x~~*b b*~~ y and _c_\n");
+      const stars = only({ "style/emphasis": ["warn", { marker: "*" }] }, dialect);
+      expect(formatted("x~_b b_~ y and _c_\n", stars)).toBe("x~_b b_~ y and *c*\n");
+      // Next to a space, a tilde does not join the marker to a word.
+      expect(formatted("a ~*b* c\n", underscores)).toBe("a ~_b_ c\n");
+    },
+  );
+  it.each(dialects)(
+    "leaves markers alone where CommonMark pairs them otherwise than the parser on %s",
+    (dialect) => {
+      // micromark refuses the pair `***` and `*` by the rule of three, counting
+      // what is left of `***`; CommonMark and GitHub count the whole run and
+      // read emphasis around `*a* a` (issue #323).
+      const rules = only({ "style/emphasis": "warn", "style/strong": "warn" }, dialect);
+      expect(formatted("xab***a* a*y and *b*\n", rules)).toBe("xab***a* a*y and *b*\n");
+      expect(formatted("xab***a* a*y\n\nAnd *b*.\n", rules)).toBe("xab***a* a*y\n\nAnd _b_.\n");
+    },
+  );
+  it("reads strikethrough with two tildes only in Obsidian", () => {
+    // Obsidian shows `~a~` as text (issue #319); GitHub, Forgejo, and Gitea
+    // keep the parser's reading of one tilde.
+    const deleted = (source: string, dialect: Dialect) =>
+      parse(source, dialect).tree.children.flatMap((block) =>
+        "children" in block ? block.children.filter((node) => node.type === "delete") : [],
+      ).length;
+    expect(deleted("~a~ and ~~b~~\n", "obsidian")).toBe(1);
+    for (const dialect of ["github", "forgejo", "gitea"] as const)
+      expect(deleted("~a~ and ~~b~~\n", dialect)).toBe(2);
+    expect(
+      formatted("Before ~b *c~ d* after.\n", only({ "style/emphasis": "warn" }, "obsidian")),
+    ).toBe("Before ~b _c~ d_ after.\n");
+  });
   it("keeps `*` next to an emoji, where `_` could neither open nor close", () => {
     // micromark reads each half of the emoji's surrogate pair as a letter.
     expect(formatted("🙂*a*🙂 and *b*\n", only({ "style/emphasis": "warn" }, "github"))).toBe(

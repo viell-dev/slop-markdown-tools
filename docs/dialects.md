@@ -20,7 +20,8 @@ what is text, and so what formatting has to leave alone. Choose it in the
 | Wikilinks, embeds, highlights (`==…==`), comments (`%%…%%`), `^block-ids` | No         | No     | No      | No    | Yes      |
 
 GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian dialects,
-and the rules for GitHub Markdown apply to all three. The syntax that only
+and the rules for GitHub Markdown apply to all three. Obsidian marks
+strikethrough with two tildes only, so `~a~` is text there. The syntax that only
 Forgejo and Gitea have is protected from formatting rather than parsed; see
 [Forgejo and Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as
 an Obsidian plugin's, is read as text: use a suppression comment or an `ignore`
