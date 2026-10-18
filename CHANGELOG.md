@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/wrap` leaves a paragraph as written when a code span in it continues on
+  an indented lazy continuation line, as after `>* ` without a space. Before,
+  the safety check refused all of the rule's edits in such a document
+  ([#340](https://github.com/viell-dev/slop-markdown-tools/pull/340)).
 - `github/alert-marker` no longer capitalizes a marker that GitHub shows as
   text: in a block quote inside another quote or a list, with text after the
   marker on its line, or with nothing below it. Before, the visible text changed
