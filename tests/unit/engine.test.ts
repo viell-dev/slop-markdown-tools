@@ -680,19 +680,22 @@ describe("the block directly below TOML front matter", () => {
     },
     workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
   });
-  it.each(dialects)("compares the reading without the front matter in the %s dialect", (dialect) => {
-    for (const newline of ["\n", "\r\n", "\r"]) {
-      const read = (source: string) =>
-        semanticFingerprint(parse(source.replaceAll("\n", newline), dialect));
-      expect(read(`${matter}* * *\n`)).not.toBe(read(`${matter}---\n`));
-      expect(read(`${matter}candle\n-----\n`)).not.toBe(read(`${matter}## candle\n`));
-      expect(read(`${matter}2) a\n`)).not.toBe(read(`${matter}2. a\n`));
-      // Below a blank line, and with YAML front matter, the renderers read the
-      // block as the parser does.
-      expect(read(`${matter}\n* * *\n`)).toBe(read(`${matter}\n---\n`));
-      expect(read("---\ntitle: 1\n---\n* * *\n")).toBe(read("---\ntitle: 1\n---\n---\n"));
-    }
-  });
+  it.each(dialects)(
+    "compares the reading without the front matter in the %s dialect",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const read = (source: string) =>
+          semanticFingerprint(parse(source.replaceAll("\n", newline), dialect));
+        expect(read(`${matter}* * *\n`)).not.toBe(read(`${matter}---\n`));
+        expect(read(`${matter}candle\n-----\n`)).not.toBe(read(`${matter}## candle\n`));
+        expect(read(`${matter}2) a\n`)).not.toBe(read(`${matter}2. a\n`));
+        // Below a blank line, and with YAML front matter, the renderers read the
+        // block as the parser does.
+        expect(read(`${matter}\n* * *\n`)).toBe(read(`${matter}\n---\n`));
+        expect(read("---\ntitle: 1\n---\n* * *\n")).toBe(read("---\ntitle: 1\n---\n---\n"));
+      }
+    },
+  );
   it.each(dialects)(
     "leaves a block that would join the front matter as written in the %s dialect",
     (dialect) => {

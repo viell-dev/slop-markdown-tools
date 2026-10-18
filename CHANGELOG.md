@@ -8,6 +8,19 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- Formatting no longer changes what GitHub, Forgejo, Gitea, and Obsidian show
+  for the block directly below TOML front matter. They read the front matter's
+  lines as a paragraph, which that block can continue or underline as a heading:
+  `style/thematic-break` wrote `---` there, which made the front matter a
+  heading, and `style/heading` split such a heading in two. The safety check now
+  also compares the reading without TOML front matter, and the rules leave such
+  a block as written
+  ([#338](https://github.com/viell-dev/slop-markdown-tools/pull/338)).
+
 ## 0.2.1 - 2026-10-18
 
 ### Fixed
