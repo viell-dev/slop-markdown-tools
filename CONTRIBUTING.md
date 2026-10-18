@@ -106,7 +106,8 @@ thematic breaks, and blank space in `blocks.test.ts`, problem rules in
 `references.test.ts`, `structure.test.ts`, and `content.test.ts`, wrapping in
 `wrap.test.ts` and `callout-wrap.test.ts`, links in `links.test.ts`, dollar math
 in `math.test.ts` against the renderers' output recorded in `math-renderers.ts`,
-and the engine, configuration, and plugins in `engine.test.ts`.
+the engine, configuration, and plugins in `engine.test.ts`, and the diff that
+`format` prints in `diff.test.ts`.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
