@@ -6,7 +6,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { mathFromMarkdown } from "mdast-util-math";
-import type { InlineCode, Nodes } from "mdast";
+import type { InlineCode, Nodes, Paragraph, Root } from "mdast";
 import type { Dialect, DialectName, Document, Plugin } from "../core/types.js";
 import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
@@ -160,12 +160,40 @@ export function splitByteOrderMark(source: string): [string, string] {
 }
 
 /**
+ * The reading with front matter of a document that `parse` read without it,
+ * by the tree of the reading without it.
+ */
+const frontMatterReadings = new WeakMap<Root, Root>();
+/**
+ * The document read with front matter, where `parse` read it without front
+ * matter because its front matter would end inside a code block, an HTML
+ * block, or display math. Site generators read front matter there, and so does
+ * GitHub's file view when it is a YAML mapping; GitHub's comments and
+ * renderers without front matter read the block. Undefined for other trees.
+ */
+export function frontMatterReading(tree: Root): Root | undefined {
+  return frontMatterReadings.get(tree);
+}
+/**
+ * A line of front matter that could open a block whose content is literal: a
+ * code fence, display math, or an HTML block.
+ */
+const literalOpener = /^ {0,3}(?:`{3,}|~{3,}|\$\$|<)/m;
+/** Blocks in which a `---` or `+++` line is content, not a closing line. */
+const literalBlocks = new Set(["code", "html", "math"]);
+
+/**
  * Parse a document in `dialect`, or the dialect that an alias such as
  * `codeberg` stands for, which the result holds; an unknown dialect is an
  * error. Byte order marks at the start of `source` are not part of the
  * document: the document's source starts after them, as the positions in the
  * tree count. `path` is the document's path relative to the workspace root,
  * and `plugins` add their syntax extensions.
+ *
+ * Front matter whose `---` or `+++` closes it inside a code block, an HTML
+ * block, or display math, opened by a line of the front matter, is read as
+ * Markdown: the document is read without it (issue #295), and
+ * `frontMatterReading` gives the other reading.
  */
 export function parse(
   source: string,
@@ -175,32 +203,59 @@ export function parse(
 ): Document {
   const read = knownDialect(dialect);
   source = splitByteOrderMark(source)[1];
-  const codeSpans = codeSpanRecording();
-  const extensions = [frontmatter(["yaml", "toml"]), codeSpans.syntax];
-  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"]), labelEndTree, codeSpans.tree];
-  // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
-  // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
-  // that is protected by rules rather than parsed.
-  if (read !== "commonmark") {
-    extensions.push(gfm(), math(mathConditions[read]));
-    mdastExtensions.push(...gfmTree, mathFromMarkdown());
-  }
-  if (read === "obsidian") {
-    extensions.push(obsidianSyntax);
-    mdastExtensions.push(obsidianTree);
-  }
-  for (const plugin of plugins) {
-    if (plugin.syntax) {
-      extensions.push(plugin.syntax.micromark);
-      mdastExtensions.push(plugin.syntax.mdast);
+  const tree = (withFrontMatter: boolean): Root => {
+    const codeSpans = codeSpanRecording();
+    const extensions = [codeSpans.syntax];
+    const mdastExtensions = [labelEndTree, codeSpans.tree];
+    if (withFrontMatter) {
+      extensions.unshift(frontmatter(["yaml", "toml"]));
+      mdastExtensions.unshift(frontmatterFromMarkdown(["yaml", "toml"]));
+    }
+    // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
+    // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
+    // that is protected by rules rather than parsed.
+    if (read !== "commonmark") {
+      extensions.push(gfm(), math(mathConditions[read]));
+      mdastExtensions.push(...gfmTree, mathFromMarkdown());
+    }
+    if (read === "obsidian") {
+      extensions.push(obsidianSyntax);
+      mdastExtensions.push(obsidianTree);
+    }
+    for (const plugin of plugins) {
+      if (plugin.syntax) {
+        extensions.push(plugin.syntax.micromark);
+        mdastExtensions.push(plugin.syntax.mdast);
+      }
+    }
+    return fromMarkdown(source, { extensions, mdastExtensions });
+  };
+  let result = tree(true);
+  // The tree's types know YAML front matter only; the parser also reads TOML.
+  const matter = result.children[0] as { type: string; value?: string } | undefined;
+  // Only front matter with a line that could open such a block is read again.
+  // It is given up only when the line that closes it is content of that block
+  // in the other reading, which a multiline TOML string or a YAML block
+  // scalar holding a fence does not decide by itself.
+  if (
+    (matter?.type === "yaml" || matter?.type === "toml") &&
+    literalOpener.test(matter.value ?? "")
+  ) {
+    const closing = result.children[0]!.position!.end.line;
+    const plain = tree(false);
+    if (
+      plain.children.some(
+        (node) =>
+          literalBlocks.has(node.type) &&
+          node.position!.start.line < closing &&
+          node.position!.end.line >= closing,
+      )
+    ) {
+      frontMatterReadings.set(plain, result);
+      result = plain;
     }
   }
-  return {
-    source,
-    dialect: read,
-    path,
-    tree: fromMarkdown(source, { extensions, mdastExtensions }),
-  };
+  return { source, dialect: read, path, tree: result };
 }
 
 /**
@@ -213,6 +268,23 @@ export function range(node: Nodes): [number, number] {
     throw new Error(`Missing source position for ${node.type}`);
   }
   return [node.position.start.offset, node.position.end.offset];
+}
+/** An alert's or callout's marker, such as `[!NOTE]` or `[!tip]`. */
+const calloutMarker = /^\[![\w-]+\]/;
+/**
+ * Whether a paragraph starts with text that `pattern` matches, by default an
+ * alert's or callout's marker: in `written`, its source from its start, or in
+ * its text as renderers read it, where a backslash escape or a character
+ * reference stands for the character it writes. GitHub reads `\[!NOTE]`,
+ * `&#91;!NOTE]`, and `[!&#78;OTE]` as alerts too (issue #294).
+ */
+export function startsWithMarker(
+  written: string,
+  paragraph: Paragraph,
+  pattern: RegExp = calloutMarker,
+): boolean {
+  const first = paragraph.children[0];
+  return pattern.test(written) || (first?.type === "text" && pattern.test(first.value));
 }
 /**
  * A node's text as a reader sees it: the values of its text, code, and other

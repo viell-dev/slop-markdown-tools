@@ -4,7 +4,14 @@ import { deepFreeze } from "./frozen.js";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
-import { codeSpanText, parse, range, splitByteOrderMark } from "../syntax/parse.js";
+import {
+  codeSpanText,
+  frontMatterReading,
+  parse,
+  range,
+  splitByteOrderMark,
+  startsWithMarker,
+} from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
@@ -463,10 +470,10 @@ function semanticTree(
     if (calloutHeader && document.dialect !== "commonmark" && node.type === "paragraph") {
       const [start, end] = range(node);
       const header = document.source.slice(start, end).split(/\r\n|\r|\n/, 1)[0]!;
-      if (/^\[![\w-]+\]/.test(header)) {
+      if (startsWithMarker(header, node)) {
         // CommonMark merges an Obsidian callout's title, or the line of a
         // GitHub alert's marker, and the body into one paragraph. Preserve
-        // their boundary too.
+        // their boundary too, also for a marker written as `\[!NOTE]`.
         const title = header.replace(
           /^\[!([\w-]+)\]/,
           (_, marker: string) => `[!${marker.toLowerCase()}]`,
@@ -503,7 +510,13 @@ function semanticTree(
     origins?.set(result, node);
     return result;
   }
-  return normalize(document.tree);
+  const result = normalize(document.tree) as Record<string, unknown>;
+  // Where front matter would end inside a code block, an HTML block, or
+  // display math, the document is read without it, and an edit has to keep
+  // the meaning of both readings.
+  const reading = frontMatterReading(document.tree);
+  if (reading) result.frontMatterReading = normalize(reading);
+  return result;
 }
 /** A part of a semantic tree that has children. */
 type Branch = Record<string, unknown> & { children: unknown[] };
@@ -519,6 +532,19 @@ function divergence(before: Document, after: Document, workspace?: Workspace): n
   const origins = new Map<unknown, Nodes>();
   let a = semanticTree(before, workspace, origins);
   let b = semanticTree(after, workspace);
+  // Where only the reading with front matter differs, the place is in that reading.
+  const reading = (value: unknown) =>
+    (value as { frontMatterReading?: unknown }).frontMatterReading;
+  if (
+    isBranch(a) &&
+    isBranch(b) &&
+    isBranch(reading(a)) &&
+    isBranch(reading(b)) &&
+    JSON.stringify(a.children) === JSON.stringify(b.children)
+  ) {
+    a = reading(a);
+    b = reading(b);
+  }
   let offset = 0;
   for (;;) {
     const node = origins.get(a);
