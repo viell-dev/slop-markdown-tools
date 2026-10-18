@@ -159,14 +159,24 @@ describe("style/thematic-break", () => {
     ["1. - ***\n"],
     ["> - ***\n"],
     ["[^1]: - ***\n"],
-    // At the start, `---` is tried as front matter, and the parser reads the
-    // rest of the document differently when that fails.
+    // At the start, `---` would open front matter that a later `---` closes.
     ["***\ntitle: x\n---\n"],
     ["***\n\nText\n"],
     ["***\n- Item\n"],
   ])("leaves %j as written", (source) => {
     kept(source, only(rule));
   });
+  it.each(dialects.filter((dialect) => dialect !== "commonmark"))(
+    "leaves a break directly below display math as written in the %s dialect",
+    (dialect) => {
+      // GitHub builds display math from a paragraph, which `---` would
+      // underline as a heading (issue #336).
+      kept("$$\nx = 1\n$$\n* * *\n", only(rule, dialect));
+      expect(formatted("$$\nx = 1\n$$\n\n* * *\n", only(rule, dialect))).toBe(
+        "$$\nx = 1\n$$\n\n---\n",
+      );
+    },
+  );
   it("leaves `* ***` and `- ---` lines alone for the marker that would join them", () => {
     kept("Text\n\n* ---\n", only(stars));
     kept("Text\n\n- ***\n", only(rule));

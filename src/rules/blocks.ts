@@ -312,11 +312,12 @@ const thematicBreak: Rule = {
       if (items.exec(prefix)![0].includes(marker[0]!)) return;
       if (marker === "---") {
         // Directly below a paragraph or a link reference definition, `---`
-        // would underline it as a heading.
+        // would underline it as a heading, and so it would display math,
+        // which GitHub builds from a paragraph (issue #336).
         const above = index && parent ? lastBlock(parent.children[index - 1]!) : undefined;
         if (
           above &&
-          (above.type === "paragraph" || above.type === "definition") &&
+          (above.type === "paragraph" || above.type === "definition" || above.type === "math") &&
           above.position?.end.line === node.position!.start.line - 1
         )
           return;

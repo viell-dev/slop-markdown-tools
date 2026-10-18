@@ -1246,6 +1246,36 @@ describe("dialect markers", () => {
     expect(formatted("> [!Custom-Type]- Title\n", obsidian)).toBe("> [!custom-type]- Title\n");
     expect(formatted("> [!note]\n", obsidian)).toBe("> [!note]\n");
   });
+  it.each(["github", "forgejo", "gitea"] as const)(
+    "changes only markers that GitHub shows as alerts on %s",
+    (dialect) => {
+      // GitHub shows these markers as text, whose letters would change (issue #334).
+      const github = only({ "github/alert-marker": "warn" }, dialect);
+      for (const source of [
+        "> > [!note]\n> > Read.\n",
+        "- > [!note]\n  > Read.\n",
+        "> [!note] Read this.\n",
+        "> [!note]\n",
+        "> [!note]   \n",
+        "Text.\n\n> Quote.\n>\n> > [!note]\n> > Read.\n",
+      ])
+        expect(formatted(source, github)).toBe(source);
+      // A marker alone on its line, with content below it in the quote.
+      for (const [source, output] of [
+        ["> [!note]\n> Read.\n", "> [!NOTE]\n> Read.\n"],
+        ["> [!tip] \t\n> Read.\n", "> [!TIP] \t\n> Read.\n"],
+        ["> [!note]\n>\n> Read.\n", "> [!NOTE]\n>\n> Read.\n"],
+        ["> [!note]\n> - One.\n", "> [!NOTE]\n> - One.\n"],
+      ] as const)
+        expect(formatted(source, github)).toBe(output);
+    },
+  );
+  it("still lowercases Obsidian callouts in nested quotes and with titles", () => {
+    const obsidian = only({ "obsidian/callout-marker": "warn" }, "obsidian");
+    expect(formatted("> > [!NOTE] Title\n> > Body.\n", obsidian)).toBe(
+      "> > [!note] Title\n> > Body.\n",
+    );
+  });
   it("applies GitHub alert casing to Forgejo documents only among GFM dialects", () => {
     const rules: Record<string, RuleSetting> = { "github/alert-marker": "warn" };
     expect(formatted("> [!tip]\n> Text.\n", only(rules, "forgejo"))).toBe("> [!TIP]\n> Text.\n");
