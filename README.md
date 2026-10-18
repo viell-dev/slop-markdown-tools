@@ -59,7 +59,7 @@ mdrefine needs Node.js 22.12 or newer. The package is `mdrefine`, and its
 command is `mdtools`:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.2.0-rc.2
+npm install --save-dev --save-exact mdrefine@0.2.0-rc.3
 npx mdtools lint
 npx mdtools format --diff
 npx mdtools format --write
