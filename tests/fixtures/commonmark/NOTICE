@@ -1,0 +1,9 @@
+spec.json holds the examples of the CommonMark Spec, version 0.31.2, by John
+MacFarlane, as published at https://spec.commonmark.org/0.31.2/spec.json
+(SHA-256 d431b29d97b6f73e69d547109cf5081578fac931e72afe95639ebe766c1b2a20).
+The file is unchanged. The tests in tests/unit/renderers.test.ts read it; the
+package does not include it.
+
+The CommonMark Spec is licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International License:
+https://creativecommons.org/licenses/by-sa/4.0/
