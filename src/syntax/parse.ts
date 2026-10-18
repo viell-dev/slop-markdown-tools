@@ -181,6 +181,22 @@ export function frontMatterReading(tree: Root): Root | undefined {
 const literalOpener = /^ {0,3}(?:`{3,}|~{3,}|\$\$|<)/m;
 /** Blocks in which a `---` or `+++` line is content, not a closing line. */
 const literalBlocks = new Set(["code", "html", "math"]);
+/**
+ * Whether `source` opens front matter that no line closes. The front matter
+ * extension opens it at a first line of `---` or `+++` followed only by spaces
+ * or tabs, and closes it at the next line of the same fence, also followed only
+ * by spaces or tabs. Without a closing line, the document has no front matter,
+ * but the extension then reads the lists and block quotes below as paragraphs
+ * (issue #278, micromark/micromark-extension-frontmatter#5).
+ */
+function unclosedFrontMatter(source: string): boolean {
+  const opening = /^(---|\+\+\+)[ \t]*(?:\r\n|\r|\n)/.exec(source);
+  if (!opening) return false;
+  const fence = opening[1] === "---" ? "---" : "\\+\\+\\+";
+  return !new RegExp(`(?:^|\\r|\\n)${fence}[ \\t]*(?:\\r|\\n|$)`).test(
+    source.slice(opening[0].length),
+  );
+}
 
 /**
  * Parse a document in `dialect`, or the dialect that an alias such as
@@ -193,7 +209,9 @@ const literalBlocks = new Set(["code", "html", "math"]);
  * Front matter whose `---` or `+++` closes it inside a code block, an HTML
  * block, or display math, opened by a line of the front matter, is read as
  * Markdown: the document is read without it (issue #295), and
- * `frontMatterReading` gives the other reading.
+ * `frontMatterReading` gives the other reading. A document whose first line
+ * would open front matter that no line closes is read without the front matter
+ * extension, as renderers read it (issue #278).
  */
 export function parse(
   source: string,
@@ -230,7 +248,7 @@ export function parse(
     }
     return fromMarkdown(source, { extensions, mdastExtensions });
   };
-  let result = tree(true);
+  let result = tree(!unclosedFrontMatter(source));
   // The tree's types know YAML front matter only; the parser also reads TOML.
   const matter = result.children[0] as { type: string; value?: string } | undefined;
   // Only front matter with a line that could open such a block is read again.
