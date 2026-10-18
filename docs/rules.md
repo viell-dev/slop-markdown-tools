@@ -761,6 +761,13 @@ so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
   the dollar decides whether dollar math ends there.
 - Emphasis that begins on the line of an alert's or a callout's marker and ends
   below it.
+- Emphasis whose text holds a run of tildes that could mark strikethrough, one
+  or two tildes or in Obsidian two, while the paragraph holds another: GitHub
+  can read strikethrough there and the markers as text.
+- A `_`, old or new, that only tildes separate from a letter or digit, as in
+  `x~~_b_~~`, which GitHub reads as inside a word.
+- Text whose markers CommonMark pairs otherwise than the parser, as in
+  `xab***a* a*y`: GitHub follows CommonMark, so the parser misread the text.
 
 ## `style/final-newline`
 

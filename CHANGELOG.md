@@ -8,6 +8,22 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- The Obsidian dialect reads strikethrough with two tildes only, as Obsidian
+  shows it; `~a~` is text there. Before, `style/emphasis` left emphasis that the
+  misread strikethrough covered unchanged
+  ([#327](https://github.com/viell-dev/slop-markdown-tools/pull/327)).
+- `style/emphasis` and `style/strong` no longer change markers that GitHub reads
+  otherwise than the parser: after an earlier emphasis, in `~~b *c~~ d*`, where
+  GitHub shows the asterisks as text; next to tildes, in `x~~*b b*~~`, where a
+  `_` would be text on GitHub; and in runs of markers that the parser pairs
+  otherwise than CommonMark, as in `xab***a* a*y`. Each rewrite changed what
+  GitHub showed while the safety check, which uses the parser's reading, saw no
+  change ([#327](https://github.com/viell-dev/slop-markdown-tools/pull/327)).
+
 ## 0.2.0 - 2026-10-18
 
 The first stable release. It holds everything in the earlier prereleases, and
