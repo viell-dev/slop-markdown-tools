@@ -7,6 +7,11 @@ write them for a reader who has not seen the code. Agents maintaining the
 repository also follow [AGENTS.md](AGENTS.md). Everyone follows the [code of
 conduct](CODE_OF_CONDUCT.md).
 
+If an agent wrote your issue or pull request, open it with a short note, such as
+a `> [!NOTE]` callout, that says so, names the model and the tool that ran it,
+and says whether you reviewed it. The maintaining agents mark their own posts
+the same way.
+
 ## Report a defect
 
 Search the open and closed

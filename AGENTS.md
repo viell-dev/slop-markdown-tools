@@ -1,47 +1,11 @@
 # Agent maintenance
 
-The [README](./README.md#status) states how the project is maintained.
-[CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test layout,
-documentation workflow, and pull request rules, and
+This file holds what agents maintaining this repository need beyond its other
+documents. The [README](./README.md#status) states how the project is
+maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test
+layout, documentation workflow, and pull request rules, and
 [RELEASING.md](./RELEASING.md) the release procedure; follow them and do not
 repeat them here. User and API documentation belongs in `docs/`.
-
-## Agent authority
-
-The owner does not read the code, the API, or the CLI and does not run the tool.
-They follow the project through the public documentation, issue and PR
-descriptions, and documents that other agents processed with the tool, and they
-assign agents to tasks. Assume no knowledge of the project's current state: they
-skim some issues and PRs and reread the documentation now and then, to check its
-direction.
-
-- Architectural, design, API, and implementation decisions belong to agents. The
-  assigned agent makes every decision its task needs, including those an issue
-  lists as open questions, and records the choice, its reasoning, and the
-  alternatives rejected in the issue or PR. Ask the owner only for which work to
-  assign, a change of direction, and authorization for actions outside the
-  repository that nothing below already authorizes, such as reporting to another
-  project. Make each request self-contained: what to do, exactly, and why it is
-  needed.
-- Agents maintain the repository's settings like the rest of the repository:
-  rulesets and branch protection, environments, Actions permissions, security
-  features, and the others. Change them as the work needs, never to get a
-  failing change merged, and record each change and its reason in the related
-  issue or PR and under [Git and merging](#git-and-merging).
-- Write issue and PR descriptions so that a reader without knowledge of the code
-  understands the observed problem, the resulting behavior, the scope decision,
-  and the design decisions, without the diff. An issue filed during other work
-  states what a later assignee must decide, as decisions for that agent, not
-  questions for the owner.
-- There is no personal author voice to preserve; keep terminology, structure,
-  and formatting consistent with the existing documents.
-- Deciding how the project is built is not deciding what to work on. The
-  assigned agent judges, and records, whether a request is in scope. Do not
-  extend an assignment to unrelated issues, PRs, or design changes, and do not
-  publish, release, or close work outside the assignment unless it covers them.
-  State the interpretation used when an assignment is ambiguous.
-- No one else catches mistakes before merge. Verification, regression fixtures,
-  CI, and the review of the complete diff are the only review a change receives.
 
 ## Repository boundary
 
@@ -50,49 +14,33 @@ or publish content from outside it. Use synthetic fixtures, never real vault
 documents, in tests, issues, and pull requests, and keep private documents and
 credentials out of diagnostic snapshots and logs.
 
-## Reports to other projects
+## Upstream defects
 
-A defect in a dependency gets a blocked issue here, with everything needed to
-report and verify it without testing again: the inputs, the versions, what
-reference implementations produce, the reproduction, and what unblocks it. It
-also gets a row in the pinned overview, #330, which lists every upstream defect,
-how it is handled here, and what was reported, and logs each report and each
-check for a response. Once nothing here waits on the defect, because a
-workaround keeps renderers showing the same or the limit is documented, close
-its issue as not planned with `Status: Blocked`, and say so in #330. Reopen it
-when upstream releases a fix, when the workaround falls short, or when a
-maintainer's answer changes the plan.
+A defect in a dependency gets an issue here with everything needed to report and
+verify it without testing again: the inputs, the versions, what reference
+implementations produce, the reproduction, and what unblocks it. It also gets a
+row in the pinned overview, #330, which lists every upstream defect, how it is
+handled here, and what was reported, and logs each report and each check for a
+response.
 
-Posting a report to another project needs the owner's decision for that report.
-A report:
+Work around a defect here wherever it could change what a renderer shows, as the
+rules' protections and the check in `parse()` for #278 do. Once nothing here
+waits on it, because a workaround keeps renderers showing the same or the limit
+is documented, close its issue as not planned with `Status: Blocked`, and say so
+in #330. Reopen it when upstream releases a fix, when the workaround falls
+short, or when a maintainer's answer changes the plan.
 
-- follows that project's contributing guide and issue form, after a search of
-  its issues and discussions and a check against its latest release;
-- opens with a `> [!NOTE]` callout that says an AI agent wrote and submitted it,
-  for whom, and that we stop if the project asks us to;
-- links the tracking issue here, which links the report back.
-
-When a project asks for no more reports, record that here, and post nothing
-further there.
-
-Reports wait for a response. The owner decided on 2026-10-18 to post nothing
-more to micromark until its maintainers respond to micromark/micromark#252,
-because a report that is ignored or closed helps no one. Until then, and for
-every upstream defect:
-
-- work around it here wherever it could change what a renderer shows, as rules'
-  protections and the check in `parse()` for #278 do, and keep its blocked issue
-  as the record of the defect and of what would unblock it;
-- check the open reports for responses while working on the project, record what
-  a maintainer says in the tracking issue, and log the check in #330.
+The first report to micromark, micromark/micromark#252, waits for a maintainer's
+response; nothing more goes there until one comes. Check the open reports while
+working on the project, record what a maintainer says in the tracking issue, and
+log the check in #330. A report links its tracking issue here, which links the
+report back. When a project asks for no more reports, record that in #330.
 
 ## Keeping the repository consistent
 
-A change is complete only when everything that describes or depends on what it
-changed agrees with it, in the same PR. Before committing, search the repository
-for other statements of what the change touches: behavior, option names,
-defaults, commands, file locations, versions and Node.js requirements, and
-policy. Known couplings:
+Before committing, search the repository for other statements of what the change
+touches: behavior, option names, defaults, commands, file locations, versions
+and Node.js requirements, and policy. Known couplings:
 
 - Behavior and its descriptions: the `docs/` pages, the README, `examples/` and
   each workspace's `after/` tree, CLI help text, type declarations, and
@@ -111,20 +59,15 @@ policy. Known couplings:
   and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
   also sets the `node-version` of the CI job labeled `22` and the major version
   of `@types/node`, whose major updates `.github/dependabot.yml` ignores.
+- Known renderer differences: the allow lists in `tests/unit/renderers.test.ts`
+  and `scripts/github-rendering.mjs` name an issue for each entry; a fix removes
+  the entries it makes stale.
 
 Drift found along the way is a defect. Correct it in the same PR when it lies in
 what the PR already changes; otherwise file an issue rather than widening the
 assignment.
 
-## Issue triage and project scope
-
-Review requests against the README, the design boundaries, and the extension
-contracts before implementing them. An assignment to review or resolve issues
-gives the maintainer's scope judgment for those issues only, and does not mean
-accepting every proposed feature. Reports from agents get the same scrutiny as
-reports from people. Rejecting, narrowing, splitting, or closing an issue as out
-of scope is a valid outcome. Document corruption and changed rendering take
-priority over new style options.
+## Issues and labels
 
 Take each assigned issue through these steps, and leave it accurate after each;
 the issue, not the session, is the record:
@@ -151,10 +94,6 @@ the issue, not the session, is the record:
    resolves several. After the merge, confirm that the issue closed and remove
    its transient status.
 
-File an issue for every defect or limit found during assigned work in this
-repository instead of only mentioning it; filing is part of the assignment,
-resolving is not. Give it a type label, and a status only once it is validated.
-
 Labels follow [`.github/labels.json`](./.github/labels.json), which holds their
 names, colors, and descriptions; keep GitHub in sync with it. Review labels
 whenever an item is answered, triaged, implemented, closed, or reopened; they do
@@ -169,9 +108,9 @@ not replace explanatory comments or links to PRs.
   scope.
 - `Status: Needs Information` states the evidence needed; `Status: Blocked`
   links the external dependency and the condition that unblocks it, and stays on
-  an upstream defect that is closed while parked (see "Reports to other
-  projects"); `Status: Can't Reproduce` follows a documented attempt with
-  version, input, and result.
+  an upstream defect that is closed while parked (see [Upstream
+  defects](#upstream-defects)); `Status: Can't Reproduce` follows a documented
+  attempt with version, input, and result.
 - A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
   item explains the decision and keeps `Status: Won't Do`, and can be
   reconsidered with new evidence. On reopening, replace the old disposition.
@@ -183,6 +122,13 @@ not replace explanatory comments or links to PRs.
 In an issue or PR's own body, comments, or reviews, call it "this issue" or
 "this PR" rather than linking it, which GitHub shows as a self-reference. Keep
 links to other issues and PRs.
+
+## Project scope
+
+Review requests against the README, the design boundaries, and the extension
+contracts before implementing them. Rejecting, narrowing, splitting, or closing
+an issue as out of scope is a valid outcome. Document corruption and changed
+rendering take priority over new style options.
 
 For each request, separate the observed problem from its proposed solution, and
 choose its home:
@@ -222,7 +168,7 @@ asked to review existing additions without reverting them, report what to keep
 or remove and any real API gaps, keep independent correctness fixes in proposed
 reversals, and do not revert until authorized.
 
-## Implementation and verification
+## Implementation
 
 - Preserve source outside enabled rules. Formatting must not change a document's
   meaning or resolve an ambiguous target by guessing, and unknown constructs
@@ -232,12 +178,11 @@ reversals, and do not revert until authorized.
   applies them.
 - Every defect that changes rendering needs a minimal regression fixture. Test
   idempotence, semantic preservation, rule isolation, and cross-platform paths
-  where they apply.
-- Run `npm run check` and inspect the complete diff before committing; review
-  the packed files before changing packaging. Verify CI after pushing and fix
-  failures before reporting completion.
-- Keep dependencies and generated state inside the repository. Commit the
-  lockfile, not caches.
+  where they apply. Check what a renderer shows with GitHub's Markdown API, the
+  reference parsers in the test suite, or the renderer itself; the safety check
+  only compares the parser's readings.
+- Review the packed files before changing packaging. Keep dependencies and
+  generated state inside the repository; commit the lockfile, not caches.
 - When updating `typescript-eslint`, recheck its TypeScript support and the
   TypeScript 7 ignore in `.github/dependabot.yml`; remove the ignore once the
   upgrade installs and passes without bypassing peer constraints.
@@ -245,25 +190,17 @@ reversals, and do not revert until authorized.
   [versioning policy](./docs/versions.md): before 1.0, a change to the interface
   that is not a defect fix waits for the next minor release. Say so in the PR.
 
-## Git and merging
+## Git, merging, and settings
 
-All changes to `main` go through pull requests, including version bumps,
-dependency updates, documentation, and these instructions. Use focused commits,
-push completed work, and do not rewrite shared history. Some environments ignore
-`AGENTS.md` globally; force-add it when needed.
+Some environments ignore `AGENTS.md` globally; force-add it when needed.
 
 Merge with a merge commit after checking the exact head:
-`gh pr merge --merge --match-head-commit SHA`; squash and rebase merging are
-disabled to keep history and attribution. The ruleset requires branches to be up
-to date, so after each merge the other open PRs need `main` merged in and CI run
-again. Never use administrator bypass or weaken protections to merge a failing
-PR. GitHub deletes a merged PR's branch; fast-forward the local `main` before
-new work.
-
-Delete the source branch of a closed PR, rejected or superseded ones included,
-unless the operator asks to keep it or active work depends on it. Never delete
-`main` or another contributor's fork branch. Prune stale tracking refs and local
-task branches once their work is merged or abandoned.
+`gh pr merge --merge --match-head-commit SHA`. Squash and rebase merging are
+disabled, so that each commit keeps its message and attribution. The ruleset
+requires branches to be up to date, so after each merge the other open PRs need
+`main` merged in and CI run again. GitHub deletes a merged PR's branch;
+fast-forward the local `main` before new work, and prune stale tracking refs and
+local task branches.
 
 `.github/rulesets/` records the policies for `main` and version tags; keep it
 and GitHub's settings in sync. The required checks bind to three
@@ -274,7 +211,7 @@ is not required. Zero required approvals is deliberate for a single-account,
 agent-maintained repository; PRs, passing checks, and resolved review threads
 remain mandatory.
 
-Other repository settings:
+Other repository settings, each recorded here with its reason when it changes:
 
 - GitHub Actions may run only actions that GitHub owns, pinned by full commit
   SHA. A workflow that needs another action, or a tag instead of a SHA, fails to
@@ -287,10 +224,11 @@ Other repository settings:
 - CodeQL's default setup scans JavaScript, TypeScript, and the workflows.
 - Wiki, Projects, and Discussions are off; issues and pull requests are the only
   channels.
+- #330, the overview of upstream defects, is pinned.
 
 Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
 comment, lock a conversation, or close an item that breaks it, and say why where
-it helps. Blocking an account is for the owner.
+it helps.
 
 ## Technical map
 
@@ -359,22 +297,3 @@ rerun publication for an existing version or tag, and never store an npm token
 in GitHub. For each release, check the GitHub publication settings, the
 workflow's result, and the registry provenance; the npm settings are the
 maintainer's to check when they change.
-
-## Attribution
-
-Identify the agent as `<model> via <harness>`, using the most specific
-human-readable model name and version the session exposes, without guessing and
-without an email address. Commit messages end with
-`Assisted-by: <model> via <harness>` after a blank line. Issues, pull requests,
-reviews, comments, release notes, and other published prose end with
-`🤖 Generated with <model> via <harness>`. Never leave placeholders in published
-content.
-
-`Assisted-by:` is the only permitted agent attribution trailer. Never add a
-`Co-Authored-By:` or `Signed-off-by:` trailer identifying an agent, model,
-harness, or AI service, in any capitalization, even next to `Assisted-by:`.
-Replace attribution that a harness or template supplies with `Assisted-by:`, and
-check the complete message, including what tooling adds, before committing.
-
-Do not add attribution footers to repository documents; the README's status
-section covers them.

@@ -7,5 +7,5 @@ Describe validation, including the regression example for any rendering defect.
 Confirm that the documentation, examples, and tests agree with the change, and
 that `CHANGELOG.md` lists it under `Unreleased`.
 
-Agent-authored submissions must end with the actual model and harness
-attribution described in `AGENTS.md`.
+If an agent wrote this pull request, say so at its start, as `CONTRIBUTING.md`
+describes.
