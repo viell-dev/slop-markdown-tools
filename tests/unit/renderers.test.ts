@@ -32,18 +32,18 @@ const inputs: Known[] = [
   {
     case: "an ordered list at the start of a block quote below a paragraph",
     input: "Text\n> 2. a\n> 1) b\n",
-    issue: "candidate, see report",
+    issue: 191,
   },
   {
     case: "an ordered list after an indented code block",
     input: "    code\n\n2. Two\n1) Three\n",
-    issue: "candidate, see report",
+    issue: 191,
   },
   // Renderers without TOML front matter read its lines as a paragraph, which "---" underlines.
   {
     case: "a thematic break below TOML front matter",
     input: "+++\ntitle = 1\n+++\n* * *\n",
-    issue: "candidate, see report",
+    issue: 333,
   },
 ];
 /**
@@ -55,12 +55,12 @@ const inputs: Known[] = [
 const known: Record<string, Known[]> = {
   "commonmark.js": [
     // "+++\n+++\n___\n" becomes "+++\n+++\n---\n", as in the TOML front matter input.
-    { case: "generated 1/14", issue: "candidate, see report" },
+    { case: "generated 1/14", issue: 333 },
     ...inputs,
   ],
   "markdown-it": [
     // The same document as for commonmark.js.
-    { case: "generated 1/14", issue: "candidate, see report" },
+    { case: "generated 1/14", issue: 333 },
     // markdown-it keeps the indentation of a code span's next line, as the parser does, where
     // GitHub and commonmark.js leave it out, and the tool writes code spans as they read them.
     // "`\n `\n" becomes "` `\n".
