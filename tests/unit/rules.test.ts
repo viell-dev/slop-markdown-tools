@@ -665,8 +665,8 @@ describe("style/inline-code", () => {
       const output = formatted(source, only(rule, dialect));
       const spans = codeSpans(output, dialect);
       expect(spans.map(codeSpanText), dialect).toEqual(github);
-      // Renderers differ on a lazy line's indentation, which only GitHub was
-      // seen to keep.
+      // Renderers differ on a lazy line's indentation: GitHub keeps it in the
+      // span, and commonmark.js does not.
       if (dialect === "github")
         expect(spans.every((span) => !/[\r\n]/.test(output.slice(...range(span))))).toBe(true);
       else if (codeSpans(source, dialect).some(lazyIndentation)) expect(output).toBe(source);
