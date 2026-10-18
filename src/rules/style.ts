@@ -328,6 +328,28 @@ function eachInline<T extends "emphasis" | "strong">(
   };
   step(tree, tree);
 }
+/**
+ * Whether the text in `node`, outside code and other literal nodes, holds an
+ * unescaped run of tildes that could mark strikethrough in `dialect`, one or
+ * two tildes or in Obsidian two, while `scope`, where such runs pair, holds
+ * another.
+ */
+function holdsStrikethroughRun(
+  node: Nodes,
+  scope: Nodes,
+  source: string,
+  dialect: Dialect,
+): boolean {
+  const pattern = dialect === "obsidian" ? "(?<![\\\\~])~~(?!~)" : "(?<![\\\\~])~{1,2}(?!~)";
+  const runs = located(scope) ? source.slice(...range(scope)).match(new RegExp(pattern, "g")) : [];
+  if (located(scope) && (runs?.length ?? 0) < 2) return false;
+  const run = new RegExp(pattern);
+  let found = false;
+  walk(node, "text", (text) => {
+    if (!found && located(text) && run.test(source.slice(...range(text)))) found = true;
+  });
+  return found;
+}
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
     description: `Choose ${type} delimiters without reprinting their contents.`,
@@ -413,6 +435,12 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
             reaches(end - size - 1, -1))
         )
           return;
+        // micromark pairs emphasis and strikethrough in separate passes, in the
+        // order that their first delimiters appear in the paragraph, while
+        // GitHub pairs whichever closes first. So emphasis whose text holds a
+        // run of tildes that could mark strikethrough may be strikethrough and
+        // text there, and its markers what GitHub shows (issue #320).
+        if (gfm && holdsStrikethroughRun(node, scope, source, document.dialect)) return;
         const list = candidates.get(scope) ?? [];
         list.push([start, end]);
         candidates.set(scope, list);
