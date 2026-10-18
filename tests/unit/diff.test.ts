@@ -6,7 +6,7 @@ import { unifiedDiff } from "../../src/cli/diff.js";
 /** The diff of the command, between two versions of `note.md`. */
 const diff = (before: string, after: string) =>
   unifiedDiff("a/note.md", "b/note.md", before, after);
-/** The diff that `createTwoFilesPatch` makes of the whole texts, which the command printed before. */
+/** The diff of the whole texts by `createTwoFilesPatch`, which the command printed before. */
 const whole = (before: string, after: string) =>
   createTwoFilesPatch("a/note.md", "b/note.md", before, after);
 /** The headers of the diff. */
@@ -107,7 +107,8 @@ describe("the diff that format prints", () => {
     const context = (from: number, to: number) =>
       Array.from({ length: to - from + 1 }, (_, index) => ` ${from + index}\n`).join("");
     expect(diff(numbered(), numbered(5, 14))).toBe(
-      `${header}@@ -1,18 +1,18 @@\n${context(1, 4)}-5\n+changed 5\n${context(6, 13)}-14\n+changed 14\n${context(15, 18)}`,
+      `${header}@@ -1,18 +1,18 @@\n${context(1, 4)}-5\n+changed 5\n${context(6, 13)}` +
+        `-14\n+changed 14\n${context(15, 18)}`,
     );
     expect(diff(numbered(), numbered(5, 15))).toBe(
       `${header}@@ -1,9 +1,9 @@\n${context(1, 4)}-5\n+changed 5\n${context(6, 9)}` +
