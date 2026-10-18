@@ -4,7 +4,7 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { codeSpanText, labelEnd, parse, range } from "../syntax/parse.js";
+import { codeSpanText, labelEnd, lazyIndentation, parse, range } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
 
@@ -634,14 +634,6 @@ interface InlineAtom {
   from: number;
   to: number;
   joining: Joining;
-  /** A code span's parsed content. */
-  value?: string;
-}
-/** The content of a code span written on one line, as CommonMark reads it. */
-function codeSpanValue(source: string): string {
-  const fence = /^`*/.exec(source)![0].length;
-  const value = source.slice(fence, source.length - fence);
-  return /^ [^]* $/.test(value) && /[^ ]/.test(value) ? value.slice(1, -1) : value;
 }
 /**
  * Inline containers whose text reflow wraps like the paragraph's own: a line
@@ -700,8 +692,7 @@ function inlineAtoms(
           atoms.push({ from: close, to: b, joining: destination });
         }
         visit(child);
-      } else if (child.type === "inlineCode")
-        atoms.push({ from: a, to: b, joining: "code", value: child.value });
+      } else if (child.type === "inlineCode") atoms.push({ from: a, to: b, joining: "code" });
       else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
         const close = labelEnd(child)!;
         atoms.push({ from: a, to: close, joining: "description" });
@@ -957,29 +948,6 @@ const wrap: Rule = {
         ? forgeProtections(source, start, end, forge)
         : { ranges: [] as Range[] };
       for (const [from, to] of protections.ranges) protection.add(from, to);
-      // A code span is joined as `style/inline-code` joins it: each line ending
-      // becomes a space, and the spaces and tabs that start the next line go,
-      // as CommonMark and GitHub read the span. The parser keeps them, also the
-      // indentation below a task item's checkbox. A span with a space or line
-      // ending at both edges loses one at each, and where an edge is a line
-      // ending with spaces, the parser and renderers strip different ones; such
-      // a span is joined only when it reads the same on one line.
-      const codeBreak = { reason: "line break with spaces at the edge of a code span" };
-      for (const atom of inline.atoms) {
-        if (atom.joining !== "code") continue;
-        const lines = source.slice(atom.from, atom.to).split(lineBreak);
-        if (lines.length < 2) continue;
-        const content = lines.map((line, i) =>
-          i
-            ? (continuation && line.startsWith(continuation)
-                ? line.slice(continuation.length)
-                : line
-              ).replace(/^[ \t]+/, "")
-            : line,
-        );
-        if (codeSpanValue(content.join(" ")) !== codeSpanText(atom.value!))
-          atom.joining = codeBreak;
-      }
       const reportUnbreakable = () =>
         findings.push({
           start,
@@ -1089,7 +1057,10 @@ const wrap: Rule = {
           else if (joining === "code" || joining === "description") {
             // In an image description, two spaces or a backslash before the
             // line ending make a hard break, and other spaces collapse; in a
-            // code span, the spaces before it are code.
+            // code span, the spaces before it are code. The spaces and tabs
+            // after it go, as `codeSpanText` reads the span, also the
+            // indentation below a task item's checkbox, which the parser
+            // keeps. A lazy line, which keeps them, is not supported above.
             if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
             const trimmed = line.replace(/^[ \t]+/, "");
             lineAt += line.length - trimmed.length;
@@ -1391,6 +1362,10 @@ export const styleRules: Record<string, Rule> = {
         // text line, and Forgejo also builds the anchor from that line alone.
         // Joining lines would change what that line holds.
         if (start < headingEnd) return;
+        // Joining keeps the spaces and tabs that start a lazy continuation line,
+        // as GitHub shows them; commonmark.js drops them, and the other
+        // dialects' renderers were not observed there.
+        if (document.dialect !== "github" && lazyIndentation(node)) return;
         if (document.dialect === "gitea" && giteaPyLine(document, start, end)) return;
         // Joining lines could put a `\(` and `\)` on one line and turn them into math.
         if (forge) {
@@ -1421,10 +1396,10 @@ export const styleRules: Record<string, Rule> = {
           )
             return;
         }
-        // A line ending becomes a space, and the spaces and tabs that start the
-        // next line go: CommonMark strips them from a paragraph's lines before
-        // it reads a code span, though the parser keeps them in the span.
-        const value = codeSpanText(node.value);
+        // The joined span holds the text that GitHub shows. A space at each end
+        // keeps a backtick there from joining the fence, or spaces there from
+        // being taken off.
+        const value = codeSpanText(node);
         const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
         const marker = "`".repeat(longest + 1);
         // An earlier run of the new backticks that the parser left as text, or

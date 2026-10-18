@@ -477,9 +477,9 @@ function semanticTree(
           );
         result[key] = text;
       } else if (key === "value" && node.type === "inlineCode")
-        // A code span renders a line ending as a space, and leaves out the
-        // spaces and tabs that start the next line, which the parser keeps.
-        result[key] = codeSpanText(node.value);
+        // A code span is compared by the text that GitHub shows, which its
+        // value in the tree does not hold where it spans lines.
+        result[key] = codeSpanText(node);
       // An image's description renders as plain text, and a reference's label
       // matches its definition with whitespace collapsed.
       else if ((key === "alt" || key === "label") && typeof value === "string")

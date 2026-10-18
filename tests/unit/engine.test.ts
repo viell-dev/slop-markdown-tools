@@ -248,6 +248,38 @@ describe("formatting contracts", () => {
       ]);
     },
   );
+  it.each([
+    // Issue #290: joins that `style/inline-code` used to make. GitHub shows
+    // `foo `, `foo`, and `npm run    build` before them, and the text of the
+    // joined span after.
+    ["Text ` foo \n   ` end.\n", "` foo \n   `", "`foo  `"],
+    ["Text `\n   foo\n   ` end.\n", "`\n   foo\n   `", "`    foo  `"],
+    ["> Run `npm run\n   build` now.\n", "`npm run\n   build`", "`npm run build`"],
+  ])("rejects an edit that changes what GitHub shows of a code span: %j", (source, span, text) => {
+    const plugin: Plugin = {
+      name: "join",
+      rules: {
+        span: {
+          kind: "style",
+          phase: "inline",
+          description: "Join a code span",
+          check: ({ document }) => {
+            const start = document.source.indexOf(span);
+            return [{ start, message: "Join", edit: { start, end: start + span.length, text } }];
+          },
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "github", rules: { "join/span": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toMatchObject([
+      { rule: "engine/unsafe-format", severity: "error" },
+      { rule: "join/span" },
+    ]);
+  });
   it.each([false, true])("retains convergence guards (oscillation: %s)", (oscillate) => {
     const plugin: Plugin = {
       name: "unstable",
