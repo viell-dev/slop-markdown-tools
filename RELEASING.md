@@ -90,13 +90,12 @@ ten trusted publishers per package, and each of them can publish.
 
 Merge the release pull request after its checks pass, and review the version,
 the changelog section, and the package manifest once more. Then dispatch
-**Release** on `main` with the exact version, `publish: true`, and the
-publishing agent's identity as `model via harness`. The workflow builds and
-checks the package again, verifies the artifact's checksum, publishes the tested
-tarball with provenance under `publishConfig.tag`, which it checks against the
-version, and creates the GitHub release at the workflow's commit, with the
-tarball and checksum attached and the changelog section as its notes. Tags are
-exact versions without a `v` prefix.
+**Release** on `main` with the exact version and `publish: true`. The workflow
+builds and checks the package again, verifies the artifact's checksum, publishes
+the tested tarball with provenance under `publishConfig.tag`, which it checks
+against the version, and creates the GitHub release at the workflow's commit,
+with the tarball and checksum attached and the changelog section as its notes.
+Tags are exact versions without a `v` prefix.
 
 A last job, with read-only access, then checks the publication: the registry's
 `integrity` and `shasum` must match the tested tarball, and the version's
