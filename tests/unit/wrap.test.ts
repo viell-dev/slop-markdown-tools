@@ -1204,7 +1204,7 @@ describe("link text in the Obsidian dialect", () => {
         "[shortcut|text]",
       ]) {
         const paragraph = (separator: string) =>
-          `${prefix}Some words ${link.replace("|", separator)} and more words after it.`;
+          `${prefix}Some words ${link.replaceAll("|", separator)} and more words after it.`;
         const source = (paragraph(`\n${continuation}`) + definitions).replaceAll("\n", newline);
         const joined = (paragraph(" ") + definitions).replaceAll("\n", newline);
         for (const width of [20, 40, 80]) {
@@ -1213,7 +1213,7 @@ describe("link text in the Obsidian dialect", () => {
             verify(joined, obsidian(width), workspace).output,
           );
           // The link's text is on one line.
-          expect(result.output).toContain(link.slice(0, link.indexOf("]")).replace("|", " "));
+          expect(result.output).toContain(link.slice(0, link.indexOf("]")).replaceAll("|", " "));
         }
       }
   });
