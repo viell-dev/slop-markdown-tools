@@ -15,6 +15,7 @@ interface Report {
   files: { path: string; changed?: boolean; output?: string; diagnostics: Diagnostic[] }[];
 }
 const report = (stdout: string) => JSON.parse(stdout) as Report;
+const hasGit = spawnSync("git", ["--version"]).status === 0;
 
 describe("a repository with an embedded vault", () => {
   const files = {
@@ -294,6 +295,40 @@ describe("reports for scripts and agents", () => {
         "1 file(s) processed; 1 would change.\n",
     );
     expect(run(root, ["format", "--check"]).stdout).toBe("");
+  });
+  it.skipIf(!hasGit)("prints a diff that git apply turns into what a write writes", async () => {
+    // Paragraphs that wrap, between short ones that stay, in more lines than one
+    // run of the line diff compares.
+    const paragraphs = Array.from({ length: 150 }, (_, n) =>
+      n % 3
+        ? `Paragraph ${n} is a sentence long enough that the formatter wraps it at eighty columns.\n`
+        : `Paragraph ${n} stays.\n`,
+    );
+    const files = {
+      "mdtools.config.jsonc": '{ "extends": ["recommended", "github"] }',
+      "long.md": `# Long\n\n${paragraphs.join("\n")}`,
+      "crlf.md":
+        "# Title\r\n\r\nA *small* paragraph that is long enough to need wrapping at the default width of eighty columns.\r\n",
+      "unterminated.md": "# Title\n\nA *note* without a final line break.",
+      "nested/café.md": "# Café\n\n* one\n* two\n",
+    };
+    const previewed = await fixture(files);
+    const preview = run(previewed, ["format", "--diff"]);
+    expect(preview.stderr).toBe("4 file(s) processed; 4 would change.\n");
+    const patched = await fixture(files);
+    for (const args of [["init", "-q", "."], ["apply", "--check"], ["apply"]]) {
+      const done = spawnSync("git", args, {
+        cwd: patched,
+        input: preview.stdout,
+        encoding: "utf8",
+      });
+      expect(done.status, done.stderr).toBe(0);
+    }
+    expect(run(previewed, ["format", "--write"]).status).toBe(0);
+    for (const name of Object.keys(files))
+      expect(await readFile(path.join(patched, name), "utf8"), name).toBe(
+        await readFile(path.join(previewed, name), "utf8"),
+      );
   });
 });
 

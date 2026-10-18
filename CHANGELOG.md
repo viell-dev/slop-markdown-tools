@@ -19,6 +19,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `format --diff`, which `format` also does for files by default, takes about as
+  long as `format --check` when formatting changes lines throughout a long
+  document. Before, building the diff took time in proportion to the document's
+  length times its changed lines: two minutes for a generated document of 8,000
+  wrapped paragraphs that took four seconds to check
+  ([#315](https://github.com/viell-dev/slop-markdown-tools/pull/315)).
 - A document from stdin whose `--stdin-filepath` the configuration, Git, or
   discovery ignores is left out as a named file is: `lint -` reports nothing,
   `format -` prints the document unchanged, and a warning says why. Before, it
