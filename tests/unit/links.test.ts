@@ -1520,6 +1520,24 @@ describe("Forgejo heading anchors", () => {
     expect(lint("[x](Note.md#test-0-1)\n", options("github"))).toHaveLength(1);
   });
 });
+
+describe("heading anchors with a code span across lines", () => {
+  // GitHub's anchors, read from `gh api markdown -f mode=markdown`: the span's
+  // continuation line loses its indentation, except on a lazy line.
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": "a `b\n   c`\n===\n",
+    "Quote.md": "> a `b\n  c`\n> ===\n",
+  });
+  it.each([
+    ["Note.md#a-b-c", true],
+    ["Note.md#a-b----c", false],
+    ["Quote.md#a-b---c", true],
+    ["Quote.md#a-b-c", false],
+  ])("resolves %s as %s", (target, exists) => {
+    expect(workspace.resolve("Doc.md", target, "github").fragmentExists).toBe(exists);
+  });
+});
 describe("Gitea heading anchors", () => {
   const workspace = createWorkspace({
     "Doc.md": "",

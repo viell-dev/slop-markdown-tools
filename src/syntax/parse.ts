@@ -279,12 +279,14 @@ export function startsWithMarker(
 }
 /**
  * A node's text as a reader sees it: the values of its text, code, and other
- * literal nodes, in order. A wikilink gives its label, or else its target, and
- * an Obsidian comment nothing.
+ * literal nodes, in order. A code span gives its text as `codeSpanText` reads
+ * it, on one line, a wikilink its label, or else its target, and an Obsidian
+ * comment nothing.
  */
 export function textContent(node: Nodes): string {
   if (node.type === "wikiLink") return node.label ?? node.target;
   if (node.type === "obsidianComment") return "";
+  if (node.type === "inlineCode") return codeSpanText(node);
   if ("value" in node) return node.value;
   if ("children" in node) return node.children.map(textContent).join("");
   return "";
