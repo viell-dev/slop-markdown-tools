@@ -164,7 +164,8 @@ Dialects: GitHub, Forgejo, Gitea. Options: none.
 Writes the type of a GitHub alert in capitals. The renderers accept any case for
 the five types `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`, and their
 documentation spells them in capitals. Other types are not alerts there and are
-left as written.
+left as written, and so is a marker written with an escape or a character
+reference, such as `\[!note]`.
 
 Before:
 
@@ -437,7 +438,8 @@ Second idea. ^idea
 Options: none.
 
 Writes the type of an Obsidian callout in lowercase, custom types included. The
-title and the body are left as written.
+title and the body are left as written, and so is a marker written with an
+escape or a character reference, such as `\[!TIP]`.
 
 Before:
 
@@ -1151,17 +1153,17 @@ toward the width, a tab up to the next multiple of four columns.
 
 A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
-on the line before it. A word that only starts like one, such as `--config`,
-`#tag`, or `-5`, can start a line. The first line keeps more than one word when
-its first word alone would open a block, such as `***` or `$$`, or, in the body
-below the line of an alert's or callout's marker, would underline that line as a
-heading, such as `==` or `--`. It also keeps a paragraph that starts like a link
-reference definition (`[Note]: see …`) from becoming one. On GitHub and in
-Obsidian, a word that starts with `$` stays on the line before it when a `$`
-comes earlier in the paragraph, and in Obsidian a word that ends in `$`, such as
-a lone `$`, stays on the line after it when a `$` comes later: at the edge of a
-line, a dollar can begin or end math that it cannot begin or end next to a
-space.
+on the line before it, and so does a word that starts with `:::`, `{%`, or `{{`.
+A word that only starts like one, such as `--config`, `#tag`, or `-5`, can start
+a line. The first line keeps more than one word when its first word alone would
+open a block, such as `***` or `$$`, or, in the body below the line of an
+alert's or callout's marker, would underline that line as a heading, such as
+`==` or `--`. It also keeps a paragraph that starts like a link reference
+definition (`[Note]: see …`) from becoming one. On GitHub and in Obsidian, a
+word that starts with `$` stays on the line before it when a `$` comes earlier
+in the paragraph, and in Obsidian a word that ends in `$`, such as a lone `$`,
+stays on the line after it when a `$` comes later: at the edge of a line, a
+dollar can begin or end math that it cannot begin or end next to a space.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -1201,6 +1203,8 @@ what it means, that is, when it:
 - has a table delimiter row such as `| - |` as its second line, in the dialects
   with tables: such a paragraph is usually a table that the parser reads as text
   (see [the safety model](design.md#safety-model));
+- has a line that starts with `:::`, `{%`, or `{{`, which [site
+  generators](dialects.md#what-each-dialect-reads) read by line;
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one.
 

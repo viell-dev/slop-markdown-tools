@@ -63,6 +63,15 @@ The comparison is only as good as the parser's reading:
   and `style/block-spacing` leave text whose second line is a table delimiter
   row as written ([issue
   #283](https://github.com/viell-dev/slop-markdown-tools/issues/283)).
+- Front matter ends at the next `---` or `+++` line, also one inside a code
+  block, for the parser, for site generators, and for GitHub's file view when
+  the front matter is a YAML mapping. GitHub's comments, and renderers without
+  front matter, read the code block. When a line of the front matter opens a
+  code fence and the closing line is code in that other reading, the tool reads
+  the document without front matter, and an edit has to keep the meaning of both
+  readings. In such a document, a rule whose edits would change either, such as
+  joining the lines of the front matter, is refused ([issue
+  #295](https://github.com/viell-dev/slop-markdown-tools/issues/295)).
 
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on
