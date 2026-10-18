@@ -1,11 +1,12 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
+import type { Extension as SyntaxExtension } from "micromark-util-types";
 import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { mathFromMarkdown } from "mdast-util-math";
-import type { Nodes } from "mdast";
+import type { InlineCode, Nodes } from "mdast";
 import type { Dialect, DialectName, Document, Plugin } from "../core/types.js";
 import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
@@ -46,6 +47,92 @@ const labelEndTree: TreeExtension = {
  */
 export function labelEnd(node: Nodes): number | undefined {
   return labelEnds.get(node);
+}
+/**
+ * What the value of a code span in the tree leaves out, by node: the space or
+ * line ending that the parser took off each end, and which lines of the
+ * document are lazy continuation lines.
+ */
+const codeSpanSources = new WeakMap<
+  InlineCode,
+  { padding: string[]; lazy: Record<number, boolean> }
+>();
+/**
+ * The extensions of one parse that record what code spans leave out. The
+ * parser knows which lines are lazy once it has read the document's blocks, and
+ * a construct at a backtick, which never matches, reads that from it before a
+ * code span is read there.
+ */
+function codeSpanRecording(): { syntax: SyntaxExtension; tree: TreeExtension } {
+  let lazy: Record<number, boolean> = {};
+  return {
+    syntax: {
+      text: {
+        [0x60]: {
+          // The text tokenizer asks each construct at a backtick whether the
+          // character before allows it, and tries them all if one does. This
+          // one never does, so the parse is the same as without it.
+          previous() {
+            lazy = this.parser.lazy;
+            return false;
+          },
+          tokenize(_effects, _ok, nok) {
+            lazy = this.parser.lazy;
+            return nok;
+          },
+        },
+      },
+    },
+    tree: {
+      exit: {
+        // The span's value is collected in a fragment on top of the stack, with
+        // the span's node below it.
+        codeTextSequence() {
+          const node = this.stack[this.stack.length - 2];
+          if (node?.type === "inlineCode" && !codeSpanSources.has(node))
+            codeSpanSources.set(node, { padding: [], lazy });
+        },
+        codeTextPadding(token) {
+          const node = this.stack[this.stack.length - 2];
+          if (node?.type === "inlineCode")
+            codeSpanSources.get(node)?.padding.push(this.sliceSerialize(token));
+        },
+      },
+    },
+  };
+}
+/**
+ * The text of a code span as GitHub shows it, read in CommonMark's order: the
+ * spaces and tabs that start each line after the first are dropped, as from
+ * every line of a paragraph, but kept on a lazy continuation line, one that
+ * lacks its block quote's `>` or its list item's indentation; then each line
+ * ending becomes a space; then one space comes off each end when both ends
+ * have one and the span is not only spaces. The parser keeps the spaces and
+ * tabs in the span's value, and takes a space or line ending off each end
+ * before line endings become spaces (issues #276 and #290). A node that
+ * `parse` did not make is read as if its value were all of its content.
+ */
+export function codeSpanText(node: InlineCode): string {
+  const { padding = [], lazy = {} } = codeSpanSources.get(node) ?? {};
+  let line = node.position?.start.line ?? 0;
+  const content = `${padding[0] ?? ""}${node.value}${padding[1] ?? ""}`.replace(
+    /(?:\r\n|\r|\n)([ \t]*)/g,
+    (_, indentation: string) => (lazy[++line] ? ` ${indentation}` : " "),
+  );
+  return /^ [^]* $/.test(content) && /[^ ]/.test(content) ? content.slice(1, -1) : content;
+}
+/**
+ * Whether a code span goes on in a lazy continuation line that starts with
+ * spaces or tabs. GitHub keeps them in the span, as `codeSpanText` does, and
+ * commonmark.js drops them, so renderers show such a span differently.
+ */
+export function lazyIndentation(node: InlineCode): boolean {
+  const { padding = [], lazy = {} } = codeSpanSources.get(node) ?? {};
+  let line = node.position?.start.line ?? 0;
+  const content = `${padding[0] ?? ""}${node.value}${padding[1] ?? ""}`;
+  for (const [, indentation] of content.matchAll(/(?:\r\n|\r|\n)([ \t]*)/g))
+    if (lazy[++line] && indentation) return true;
+  return false;
 }
 
 /**
@@ -88,8 +175,9 @@ export function parse(
 ): Document {
   const read = knownDialect(dialect);
   source = splitByteOrderMark(source)[1];
-  const extensions = [frontmatter(["yaml", "toml"])];
-  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"]), labelEndTree];
+  const codeSpans = codeSpanRecording();
+  const extensions = [frontmatter(["yaml", "toml"]), codeSpans.syntax];
+  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"]), labelEndTree, codeSpans.tree];
   // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
   // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
   // that is protected by rules rather than parsed.
@@ -128,12 +216,14 @@ export function range(node: Nodes): [number, number] {
 }
 /**
  * A node's text as a reader sees it: the values of its text, code, and other
- * literal nodes, in order. A wikilink gives its label, or else its target, and
- * an Obsidian comment nothing.
+ * literal nodes, in order. A code span gives its text as `codeSpanText` reads
+ * it, on one line, a wikilink its label, or else its target, and an Obsidian
+ * comment nothing.
  */
 export function textContent(node: Nodes): string {
   if (node.type === "wikiLink") return node.label ?? node.target;
   if (node.type === "obsidianComment") return "";
+  if (node.type === "inlineCode") return codeSpanText(node);
   if ("value" in node) return node.value;
   if ("children" in node) return node.children.map(textContent).join("");
   return "";

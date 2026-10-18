@@ -81,8 +81,9 @@ From `0.2.0-rc.2`:
   form, turn its rule off or set its option, such as
   `"style/heading": ["warn", { "closing": "keep" }]`.
 - `.gitignore` files decide as in Git: a deeper file can include again what a
-  higher one excludes, and patterns match letter case exactly on Linux. Files
-  that were left out before can be linted now, and the reverse.
+  higher one excludes, and patterns match letter case exactly unless the
+  repository's `core.ignorecase` is on, as Git sets it on Windows and macOS.
+  Files that were left out before can be linted now, and the reverse.
 - Git's other ignore rules apply too: `.gitignore` files above the workspace
   root, `.git/info/exclude`, and the global excludes file, while a file that Git
   tracks is never ignored. With `--root` on a folder of a repository, or with a
@@ -272,12 +273,23 @@ From every prerelease:
 - `style/wrap` wraps the body of a GitHub, Forgejo, or Gitea alert below the
   line with its marker, as it does for Obsidian callouts
   ([#262](https://github.com/viell-dev/slop-markdown-tools/pull/262)).
+- `style/wrap` reflows a paragraph whose code span goes on in a line that starts
+  with spaces or tabs, and joins the span without them, as `style/inline-code`
+  does ([#288](https://github.com/viell-dev/slop-markdown-tools/pull/288)).
 - The plugin example's style rule writes one space after a heading's `#` marks,
   because `style/thematic-break` now does what it did
   ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 
 ### Fixed
 
+- A plugin rule's option schema of `false` refuses options, and an asynchronous
+  schema (``) is refused when the rule set is built instead of crashing Node.js
+  after the run
+  ([#297](https://github.com/viell-dev/slop-markdown-tools/pull/297)).
+- A heading whose code span is written across lines gets the anchor that GitHub
+  gives it, so a correct link to it is no longer reported missing, and the
+  library's `textContent` reads such a code span as renderers show it
+  ([#293](https://github.com/viell-dev/slop-markdown-tools/pull/293)).
 - `--dialect` works with an `.mjs` configuration that exports a frozen object
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - `--stdin-filepath` accepts a document inside a root that is reached through a
@@ -339,6 +351,10 @@ From every prerelease:
   file. Inside a nested repository only its own rules apply, and none applies to
   a file that Git tracks
   ([#273](https://github.com/viell-dev/slop-markdown-tools/pull/273)).
+- Git's ignore rules match letter case as each repository's `core.ignorecase`
+  says, and each repository, also a nested one, uses the global excludes file
+  that its own settings name
+  ([#287](https://github.com/viell-dev/slop-markdown-tools/pull/287)).
 - A file or directory named on the command line that is ignored gets a warning
   that says why, instead of being skipped without a word
   ([#239](https://github.com/viell-dev/slop-markdown-tools/pull/239)).
@@ -384,6 +400,15 @@ From every prerelease:
   `npm run` continued by an indented `build` became `npm run    build`, which
   changed what GitHub shows. The safety check compares code spans the same way
   ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/inline-code` and the safety check read a code span as GitHub shows it
+  where a line break is at its edge, and on a lazy continuation line, one
+  without its block quote's `>` or its list item's indentation, whose spaces and
+  tabs GitHub keeps in the span. Before, the rule could change what GitHub
+  shows, such as `npm run    build` into `npm run build`, and the safety check
+  did not notice. Outside the GitHub dialect, a span on such an indented lazy
+  line stays split, because commonmark.js leaves those spaces out. `style/wrap`
+  now also reflows a paragraph whose code span has a line break at its edge
+  ([#291](https://github.com/viell-dev/slop-markdown-tools/pull/291)).
 - `style/wrap` keeps a dollar from the edge of a line where it could begin or
   end math there: in Obsidian a word that ends in `$` stays with the word after
   it, and on GitHub and in Obsidian a word that starts with `$` stays with the

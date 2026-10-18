@@ -248,6 +248,38 @@ describe("formatting contracts", () => {
       ]);
     },
   );
+  it.each([
+    // Issue #290: joins that `style/inline-code` used to make. GitHub shows
+    // `foo `, `foo`, and `npm run    build` before them, and the text of the
+    // joined span after.
+    ["Text ` foo \n   ` end.\n", "` foo \n   `", "`foo  `"],
+    ["Text `\n   foo\n   ` end.\n", "`\n   foo\n   `", "`    foo  `"],
+    ["> Run `npm run\n   build` now.\n", "`npm run\n   build`", "`npm run build`"],
+  ])("rejects an edit that changes what GitHub shows of a code span: %j", (source, span, text) => {
+    const plugin: Plugin = {
+      name: "join",
+      rules: {
+        span: {
+          kind: "style",
+          phase: "inline",
+          description: "Join a code span",
+          check: ({ document }) => {
+            const start = document.source.indexOf(span);
+            return [{ start, message: "Join", edit: { start, end: start + span.length, text } }];
+          },
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "github", rules: { "join/span": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toMatchObject([
+      { rule: "engine/unsafe-format", severity: "error" },
+      { rule: "join/span" },
+    ]);
+  });
   it.each([false, true])("retains convergence guards (oscillation: %s)", (oscillate) => {
     const plugin: Plugin = {
       name: "unstable",
@@ -324,9 +356,9 @@ describe("formatting contracts", () => {
       ),
     );
     // A space at the start of the code span's next line is kept by the parser
-    // but dropped by GitHub, so that paragraph stays as written.
+    // but dropped by GitHub, and by the joined span.
     const indented = source.replace(`${newline}second`, `${newline} second`);
-    expect(formatted(indented, { config: narrow })).toBe(indented);
+    expect(formatted(indented, { config: narrow })).toBe(formatted(source, { config: narrow }));
   });
   it("does not lint links in multi-backtick code spans", () => {
     const source = "``[link](missing.md)``\n";
@@ -841,6 +873,53 @@ describe("rules that fail", () => {
     expect(() =>
       lint("Text.\n", { plugins, config: { extends: [], rules: { "test/options": "warn" } } }),
     ).toThrow("Invalid rule test/options: its schema cannot be compiled: schema is invalid");
+  });
+  it("enforces an option schema of false, which no options pass", () => {
+    const plugins: Plugin[] = [
+      {
+        name: "test",
+        rules: {
+          none: { kind: "problem", description: "No options", schema: false, check: () => [] },
+        },
+      },
+    ];
+    expect(
+      lint("Text.\n", { plugins, config: { extends: [], rules: { "test/none": "warn" } } }),
+    ).toEqual([]);
+    expect(() =>
+      lint("Text.\n", {
+        plugins,
+        config: { extends: [], rules: { "test/none": ["warn", { n: 1 }] } },
+      }),
+    ).toThrow("Invalid options for test/none");
+  });
+  it("refuses an asynchronous option schema when the rule set is built", async () => {
+    const rejected: unknown[] = [];
+    const record = (reason: unknown) => rejected.push(reason);
+    process.on("unhandledRejection", record);
+    try {
+      const schema = { $async: true, type: "object", properties: { n: { type: "integer" } } };
+      const plugins: Plugin[] = [
+        {
+          name: "test",
+          rules: { slow: { kind: "problem", description: "Async", schema, check: () => [] } },
+        },
+      ];
+      for (const options of [{}, { n: "x" }])
+        expect(() =>
+          lint("Text.\n", {
+            plugins,
+            config: { extends: [], rules: { "test/slow": ["warn", options] } },
+          }),
+        ).toThrow(
+          "Invalid rule test/slow: its schema is asynchronous ($async), and options are checked synchronously",
+        );
+      // Before, the check returned a promise that rejected after the run.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(rejected).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", record);
+    }
   });
   it("compiles each option schema once, however many documents use it", () => {
     const schema = {

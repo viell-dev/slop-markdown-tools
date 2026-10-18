@@ -67,13 +67,16 @@ links.
   a negated pattern includes a file again, but nothing below an excluded
   directory can be included, and nothing in a workspace root that Git ignores is
   processed, except files that Git tracks, which it never ignores. Inside a
-  nested repository only its own rules apply, and outside a repository only the
-  workspace's `.gitignore` files. The tool asks Git which global excludes file
-  it reads and which files it tracks; without Git installed, that file is not
-  read and tracked files are ignored like the others. Letter case is ignored on
-  Windows and macOS, as Git does there by default, and not elsewhere. The
-  configuration's `ignore` and `overrides` patterns match case exactly on every
-  system, so that a shared configuration applies to the same files everywhere.
+  nested repository only its own rules and settings apply, and outside a
+  repository only the workspace's `.gitignore` files. The tool asks Git, in each
+  repository, which global excludes file it reads, whether it ignores letter
+  case (`core.ignorecase`, which Git turns on when it creates a repository on a
+  file system that ignores case, as Windows and macOS do by default), and which
+  files it tracks. Without Git installed, that file is not read, tracked files
+  are ignored like the others, and letter case is ignored on Windows and macOS
+  and not elsewhere. The configuration's `ignore` and `overrides` patterns match
+  case exactly on every system, so that a shared configuration applies to the
+  same files everywhere.
 - A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
   PowerShell, cmd, and npm scripts. It is relative to the current directory,

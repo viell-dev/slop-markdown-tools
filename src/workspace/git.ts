@@ -117,24 +117,81 @@ function runGit(
     );
   });
 }
+/** The settings of Git's configuration that decide how a repository's ignore rules apply. */
+export interface IgnoreSettings {
+  /**
+   * The global excludes file: `core.excludesFile`, else
+   * `$XDG_CONFIG_HOME/git/ignore`, by default `~/.config/git/ignore`.
+   * Undefined where Git is not installed or cannot read its configuration,
+   * since which file Git would read is then unknown.
+   */
+  excludesFile?: string;
+  /**
+   * Whether patterns match without regard to letter case: `core.ignorecase`,
+   * which Git turns on when it creates a repository on a file system that
+   * ignores case, and which is off where it is not set. Undefined where Git is
+   * not installed or cannot read it.
+   */
+  ignoreCase?: boolean;
+}
 /**
- * The global excludes file that Git reads for the repository at `top`:
- * `core.excludesFile` from Git's configuration, else
- * `$XDG_CONFIG_HOME/git/ignore`, by default `~/.config/git/ignore`. Only Git
- * itself can read its configuration, with its included files and system and
- * repository settings, so this runs `git config`. Undefined where Git is not
- * installed or cannot read its configuration, since which file Git would read
- * is then unknown.
+ * A setting's value as Git gives it in the form that `type` names, such as
+ * `--bool`, null where it is not set, or undefined where Git is not installed
+ * or cannot read it.
  */
-export async function globalExcludesFile(top: string): Promise<string | undefined> {
-  const result = await runGit(top, ["config", "-z", "--path", "--get", "core.excludesFile"]);
-  // Git reads a relative path from the repository's top level.
-  const value = result?.status === 0 ? result.stdout.replace(/\0$/, "") : "";
-  if (value) return path.resolve(top, value);
-  // Status 1: the setting is not there, and Git reads its default.
-  if (result?.status !== 1) return undefined;
-  const home = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || homedir(), ".config");
-  return path.join(home, "git", "ignore");
+async function setting(top: string, type: string, name: string) {
+  const result = await runGit(top, ["config", "-z", type, "--get", name]);
+  if (result?.status === 0) return result.stdout.replace(/\0$/, "");
+  // Status 1: the setting is not there, and Git uses its default.
+  return result?.status === 1 ? null : undefined;
+}
+/**
+ * The settings that Git reads for the repository at `top`: the repository's
+ * own over the user's and the system's, so they can differ from one
+ * repository to the next. Only Git itself can read its configuration, with
+ * its included files, so this runs `git config`, in the usual case once for
+ * both settings, since each run of Git takes time, with both read as paths.
+ * Git gives `true` and `false` unchanged as paths, but refuses a setting
+ * written without a value, which means true; where it does, or where a value
+ * takes another form such as `yes`, each setting is read again in its own form.
+ */
+export async function ignoreSettings(top: string): Promise<IgnoreSettings> {
+  const both = await runGit(top, [
+    "config",
+    "-z",
+    "--path",
+    "--get-regexp",
+    "^core\\.(excludesfile|ignorecase)$",
+  ]);
+  if (!both) return {};
+  let excludes: string | null | undefined = null;
+  let ignoreCase: string | null | undefined = null;
+  if (both.status === 0)
+    // Each entry is the setting's name in lower case, a line ending, and the
+    // value, or the name alone for a setting without one; the last one counts.
+    for (const entry of both.stdout.split("\0")) {
+      const end = entry.indexOf("\n");
+      const name = end === -1 ? entry : entry.slice(0, end);
+      const value = end === -1 ? "" : entry.slice(end + 1);
+      if (name === "core.excludesfile") excludes = value;
+      else if (name === "core.ignorecase") ignoreCase = value;
+    }
+  else if (both.status !== 1)
+    [excludes, ignoreCase] = await Promise.all([
+      setting(top, "--path", "core.excludesFile"),
+      setting(top, "--bool", "core.ignorecase"),
+    ]);
+  if (typeof ignoreCase === "string" && ignoreCase !== "true" && ignoreCase !== "false")
+    ignoreCase = await setting(top, "--bool", "core.ignorecase");
+  const settings: IgnoreSettings = {};
+  if (ignoreCase !== undefined) settings.ignoreCase = ignoreCase === "true";
+  // Git reads a relative path from the repository's top level, and an empty one as no file.
+  if (excludes) settings.excludesFile = path.resolve(top, excludes);
+  else if (excludes === null) {
+    const home = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || homedir(), ".config");
+    settings.excludesFile = path.join(home, "git", "ignore");
+  }
+  return settings;
 }
 /**
  * The files that the repository at `top` tracks, relative to its top level,

@@ -85,8 +85,8 @@ loaded plugins. The library exports the same schema as
 A **preset** is a named set of rule settings. The **dialect** is a separate
 setting: it names the renderer whose syntax documents are read in, such as
 GitHub's or Obsidian's, and so decides what counts as a table, a link, or a line
-break. Each preset except `recommended` also sets a dialect. The [rule
-index](rules.md) shows which rules each preset enables.
+break. Each preset except `recommended` also sets a dialect. The
+[rules](rules.md) page shows which presets enable each rule.
 
 Presets are starting points with opinionated defaults, not a fixed style. Every
 rule can be turned off or given another severity, and a rule whose choice
@@ -153,8 +153,8 @@ Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names
 start with a dot, too. Patterns match letter case exactly on every system, so
 that a configuration selects the same files in CI on Linux as on Windows or
-macOS, where `.gitignore` files and patterns on the command line [ignore
-case](cli.md#which-files-are-processed).
+macOS, where patterns on the command line and, in most repositories,
+`.gitignore` files [ignore case](cli.md#which-files-are-processed).
 
 ## Ignored files and link targets
 

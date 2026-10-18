@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
@@ -287,6 +287,78 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     expect(targets).toEqual(names.filter((name) => !ignored.includes(name)));
     expect(targets).toEqual(["a.draft.md", "b.md", "e.md"]);
   });
+  it.skipIf(!hasGit)("match letter case as the repository's core.ignorecase says", async () => {
+    const settings = await fixture({ ignore: "global.md\n" });
+    const names = [
+      "a/NOTES.md",
+      "b/notes.md",
+      "Drafts/x.md",
+      "excluded.md",
+      "Global.md",
+      "kept.md",
+    ];
+    const root = await fixture({
+      ".gitignore": "notes.md\ndrafts/\n",
+      ...Object.fromEntries(names.map((name) => [name, "Text.\n"])),
+    });
+    gitInit(root);
+    await writeFile(path.join(root, ".git/info/exclude"), "EXCLUDED.md\n");
+    await globalExcludes(settings, path.join(settings, "ignore"));
+    // Each value, whatever Git sets when it creates a repository here, also in
+    // the other forms that Git reads: `on`, the name without a value, which
+    // means true, and no setting, which means false.
+    for (const value of ["true", "false", "on", "", undefined]) {
+      if (value) git(root, ["config", "--replace-all", "core.ignorecase", value]);
+      else git(root, ["config", "--unset-all", "core.ignorecase"]);
+      if (value === "") await appendFile(path.join(root, ".git/config"), "[core]\n\tignorecase\n");
+      const ignored = gitIgnored(root, names);
+      const set = await discover(root, [], []);
+      expect(set.selected).toEqual(names.filter((name) => !ignored.includes(name)).sort());
+      // What Git decides here, so that the comparison covers each case.
+      expect(set.selected).toEqual(
+        value === "false" || value === undefined
+          ? ["Drafts/x.md", "Global.md", "a/NOTES.md", "excluded.md", "kept.md"]
+          : ["kept.md"],
+      );
+    }
+  });
+  it.skipIf(!hasGit)(
+    "read a nested repository's own excludes file and letter case inside it",
+    async () => {
+      const settings = await fixture({ outer: "outer.md\n", inner: "inner.md\n" });
+      const names = ["NOTES.md", "inner.md", "kept.md", "outer.md"];
+      const root = await fixture({
+        ".gitignore": "notes.md\n",
+        "inner/.gitignore": "notes.md\n",
+        ...Object.fromEntries(
+          names.flatMap((name) => [
+            [name, "Text.\n"],
+            [`inner/${name}`, "Text.\n"],
+          ]),
+        ),
+      });
+      const inner = path.join(root, "inner");
+      gitInit(root);
+      gitInit(inner);
+      // Git reads a backslash in its settings as an escape.
+      const excludes = (name: string) => path.join(settings, name).split(path.sep).join("/");
+      git(root, ["config", "core.excludesFile", excludes("outer")]);
+      git(inner, ["config", "core.excludesFile", excludes("inner")]);
+      // The two differ, whatever Git sets when it creates a repository here.
+      git(root, ["config", "core.ignorecase", "true"]);
+      git(inner, ["config", "core.ignorecase", "false"]);
+      const set = await discover(root, [], [], { nestedRepositories: true });
+      const outerIgnored = gitIgnored(root, names);
+      expect(set.selected).toEqual(names.filter((name) => !outerIgnored.includes(name)));
+      // Files of a nested repository are only link targets.
+      const innerIgnored = gitIgnored(inner, names);
+      const targets = names.filter((name) => set.files[`inner/${name}`] !== undefined);
+      expect(targets).toEqual(names.filter((name) => !innerIgnored.includes(name)));
+      // What Git decides here, so that the comparison covers each case.
+      expect(set.selected).toEqual(["inner.md", "kept.md"]);
+      expect(targets).toEqual(["NOTES.md", "kept.md", "outer.md"]);
+    },
+  );
   it.skipIf(!hasGit)("leave out everything in a root that Git ignores, and say why", async () => {
     const root = await fixture({
       ".gitignore": "generated/\n",
