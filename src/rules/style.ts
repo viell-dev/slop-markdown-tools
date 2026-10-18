@@ -587,6 +587,20 @@ function misreadTable(text: string): boolean {
 // `:` atom could open one at the start of a reflowed line.
 const forgeLineOpener = /^(?::$|\\\[)/;
 /**
+ * Site-generator syntax at the start of a line: a container such as
+ * Docusaurus's `:::note`, or a template tag such as Liquid's `{% tab %}` or
+ * `{{ title }}`. Site generators read it by line, and no dialect gives it
+ * meaning, so a paragraph with a line that starts with it keeps its lines, and
+ * a word that starts with it stays on the line before it (issue #296).
+ */
+const siteSyntax = /^(?::::|\{%|\{\{)/;
+/** Whether a line of a paragraph, after its container markers, starts with `siteSyntax`. */
+function startsSiteSyntax(text: string): boolean {
+  return text
+    .split(lineBreak)
+    .some((line, index) => siteSyntax.test(index ? line.replace(/^[ \t>]+/, "") : line));
+}
+/**
  * A list, heading, or block quote marker as the whole first word of a
  * paragraph, with more words after it. Directly below text, the parser reads
  * a marker that would open an empty list item there, such as the second `-` of
@@ -924,7 +938,7 @@ const wrap: Rule = {
           belowHeader = true;
         }
       }
-      const openers = [wordOpener, prefixOpener];
+      const openers = [wordOpener, prefixOpener, siteSyntax];
       if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
       if (forge) openers.push(forgeLineOpener);
       const { source } = document;
@@ -1022,15 +1036,18 @@ const wrap: Rule = {
                 ? "leading block marker"
                 : document.dialect !== "commonmark" && misreadTable(original)
                   ? "table delimiter row as its second line"
-                  : lazyStart
-                    ? "lazy first line"
-                    : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                      ? "unsupported container prefix"
-                      : document.dialect === "obsidian" && obsidianMarkers(source, node, start, end)
-                        ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                        : inline.unlocated
-                          ? "inline syntax without a source position"
-                          : undefined;
+                  : startsSiteSyntax(original)
+                    ? "site-generator syntax at the start of a line"
+                    : lazyStart
+                      ? "lazy first line"
+                      : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                        ? "unsupported container prefix"
+                        : document.dialect === "obsidian" &&
+                            obsidianMarkers(source, node, start, end)
+                          ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                          : inline.unlocated
+                            ? "inline syntax without a source position"
+                            : undefined;
       const skipped =
         reason ??
         protections.reason ??

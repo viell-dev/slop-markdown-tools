@@ -615,6 +615,60 @@ describe("a lazy first line", () => {
     expect(verify(source, wrap()).output).toBe(source.replace(" enough", `\n${prefix}enough`));
   });
 });
+describe("site-generator syntax at the start of a line", () => {
+  // Site generators read Docusaurus containers and Liquid or other template
+  // tags by line, though no dialect gives them meaning (issue #296).
+  const emphasis: Config = { ...wrap(), rules: { ...wrap().rules, "style/emphasis": "warn" } };
+  const long = "that is long enough to be wrapped at forty columns";
+  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
+    "keeps the paragraph as written and still formats the rest in the %s dialect",
+    (dialect) => {
+      const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const lines of [
+          [":::note", `An admonition with *text* ${long}.`, ":::"],
+          ["{% tabs %}", '{% tab title="One" %}', `Content of the *first* tab ${long}.`],
+          [`Text with *emphasis* ${long}`, "{{ site.title }} ends it."],
+          [`> Quoted *text* ${long}`, "> {% raw %}"],
+          [`- Item *text* ${long}`, "  {{ variable }}"],
+          [`Indented *text* ${long}`, "   :::"],
+        ]) {
+          const source = [...lines, ""].join(newline);
+          expect(verify(source, { ...emphasis, dialect }, workspace).output).toBe(
+            source.replace(/\*(\w+)\*/, "_$1_"),
+          );
+        }
+    },
+  );
+  it("reports such a paragraph as not reflowed on request", () => {
+    expect(
+      lint(`{% tabs %}\nText ${long}.\n`, { config: wrap({ reportUnreflowed: true }) }),
+    ).toMatchObject([
+      {
+        message:
+          "Paragraph not reflowed: site-generator syntax at the start of a line (width 40 columns).",
+      },
+    ]);
+  });
+  it.each([":::", ":::note", "{%", "{%raw%}", "{{", "{{title}}"])(
+    "keeps %s on the line of the word before it",
+    (atom) => {
+      const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb ${atom} more words follow here.\n`;
+      expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(
+        `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\nbbbb ${atom} more words follow here.\n`,
+      );
+    },
+  );
+  it.each(["::", "{x}", "{ {", "a:::", "x{%", "x{{"])(
+    "still reflows a paragraph with %s",
+    (atom) => {
+      const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\n${atom} more words follow here.\n`;
+      expect(verify(source, { ...wrap({ width: 80 }), dialect: "github" }).output).toBe(
+        source.replace("\n", " "),
+      );
+    },
+  );
+});
 describe("Obsidian markers that joined lines could pair", () => {
   const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
   const obsidian: Config = {
