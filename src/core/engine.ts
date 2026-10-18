@@ -6,6 +6,7 @@ import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
 import {
   codeSpanText,
+  frontMatterReading,
   parse,
   range,
   splitByteOrderMark,
@@ -495,7 +496,12 @@ function semanticTree(
     origins?.set(result, node);
     return result;
   }
-  return normalize(document.tree);
+  const result = normalize(document.tree) as Record<string, unknown>;
+  // Where front matter would end inside a code block, the document is read
+  // without it, and an edit has to keep the meaning of both readings.
+  const reading = frontMatterReading(document.tree);
+  if (reading) result.frontMatterReading = normalize(reading);
+  return result;
 }
 /** A part of a semantic tree that has children. */
 type Branch = Record<string, unknown> & { children: unknown[] };
@@ -511,6 +517,19 @@ function divergence(before: Document, after: Document, workspace?: Workspace): n
   const origins = new Map<unknown, Nodes>();
   let a = semanticTree(before, workspace, origins);
   let b = semanticTree(after, workspace);
+  // Where only the reading with front matter differs, the place is in that reading.
+  const reading = (value: unknown) =>
+    (value as { frontMatterReading?: unknown }).frontMatterReading;
+  if (
+    isBranch(a) &&
+    isBranch(b) &&
+    isBranch(reading(a)) &&
+    isBranch(reading(b)) &&
+    JSON.stringify(a.children) === JSON.stringify(b.children)
+  ) {
+    a = reading(a);
+    b = reading(b);
+  }
   let offset = 0;
   for (;;) {
     const node = origins.get(a);

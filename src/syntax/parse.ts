@@ -6,7 +6,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { mathFromMarkdown } from "mdast-util-math";
-import type { InlineCode, Nodes, Paragraph } from "mdast";
+import type { InlineCode, Nodes, Paragraph, Root } from "mdast";
 import type { Dialect, DialectName, Document, Plugin } from "../core/types.js";
 import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
@@ -160,12 +160,35 @@ export function splitByteOrderMark(source: string): [string, string] {
 }
 
 /**
+ * The reading with front matter of a document that `parse` read without it,
+ * by the tree of the reading without it.
+ */
+const frontMatterReadings = new WeakMap<Root, Root>();
+/**
+ * The document read with front matter, where `parse` read it without front
+ * matter because its front matter would end inside a code block. Site
+ * generators read front matter there, and so does GitHub's file view when it
+ * is a YAML mapping; GitHub's comments and renderers without front matter
+ * read the code block. Undefined for other trees.
+ */
+export function frontMatterReading(tree: Root): Root | undefined {
+  return frontMatterReadings.get(tree);
+}
+/** A line of front matter that starts a code fence. */
+const fenceLine = /^(?:`{3,}|~{3,})/m;
+
+/**
  * Parse a document in `dialect`, or the dialect that an alias such as
  * `codeberg` stands for, which the result holds; an unknown dialect is an
  * error. Byte order marks at the start of `source` are not part of the
  * document: the document's source starts after them, as the positions in the
  * tree count. `path` is the document's path relative to the workspace root,
  * and `plugins` add their syntax extensions.
+ *
+ * Front matter whose `---` or `+++` closes it inside a code block, opened by a
+ * line of the front matter that starts with three backticks or tildes, is not
+ * front matter: the document is read without it (issue #295), and
+ * `frontMatterReading` gives the other reading.
  */
 export function parse(
   source: string,
@@ -175,32 +198,55 @@ export function parse(
 ): Document {
   const read = knownDialect(dialect);
   source = splitByteOrderMark(source)[1];
-  const codeSpans = codeSpanRecording();
-  const extensions = [frontmatter(["yaml", "toml"]), codeSpans.syntax];
-  const mdastExtensions = [frontmatterFromMarkdown(["yaml", "toml"]), labelEndTree, codeSpans.tree];
-  // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
-  // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
-  // that is protected by rules rather than parsed.
-  if (read !== "commonmark") {
-    extensions.push(gfm(), math(mathConditions[read]));
-    mdastExtensions.push(...gfmTree, mathFromMarkdown());
-  }
-  if (read === "obsidian") {
-    extensions.push(obsidianSyntax);
-    mdastExtensions.push(obsidianTree);
-  }
-  for (const plugin of plugins) {
-    if (plugin.syntax) {
-      extensions.push(plugin.syntax.micromark);
-      mdastExtensions.push(plugin.syntax.mdast);
+  const tree = (withFrontMatter: boolean): Root => {
+    const codeSpans = codeSpanRecording();
+    const extensions = [codeSpans.syntax];
+    const mdastExtensions = [labelEndTree, codeSpans.tree];
+    if (withFrontMatter) {
+      extensions.unshift(frontmatter(["yaml", "toml"]));
+      mdastExtensions.unshift(frontmatterFromMarkdown(["yaml", "toml"]));
+    }
+    // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
+    // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
+    // that is protected by rules rather than parsed.
+    if (read !== "commonmark") {
+      extensions.push(gfm(), math(mathConditions[read]));
+      mdastExtensions.push(...gfmTree, mathFromMarkdown());
+    }
+    if (read === "obsidian") {
+      extensions.push(obsidianSyntax);
+      mdastExtensions.push(obsidianTree);
+    }
+    for (const plugin of plugins) {
+      if (plugin.syntax) {
+        extensions.push(plugin.syntax.micromark);
+        mdastExtensions.push(plugin.syntax.mdast);
+      }
+    }
+    return fromMarkdown(source, { extensions, mdastExtensions });
+  };
+  let result = tree(true);
+  // The tree's types know YAML front matter only; the parser also reads TOML.
+  const matter = result.children[0] as { type: string; value?: string } | undefined;
+  // A line that starts with three backticks or tildes is not YAML or TOML,
+  // except inside a multiline TOML string. Front matter that holds one is
+  // given up only when the line that closes it is code in the other reading.
+  if ((matter?.type === "yaml" || matter?.type === "toml") && fenceLine.test(matter.value ?? "")) {
+    const closing = result.children[0]!.position!.end.line;
+    const plain = tree(false);
+    if (
+      plain.children.some(
+        (node) =>
+          node.type === "code" &&
+          node.position!.start.line < closing &&
+          node.position!.end.line >= closing,
+      )
+    ) {
+      frontMatterReadings.set(plain, result);
+      result = plain;
     }
   }
-  return {
-    source,
-    dialect: read,
-    path,
-    tree: fromMarkdown(source, { extensions, mdastExtensions }),
-  };
+  return { source, dialect: read, path, tree: result };
 }
 
 /**
