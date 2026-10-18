@@ -324,9 +324,9 @@ describe("formatting contracts", () => {
       ),
     );
     // A space at the start of the code span's next line is kept by the parser
-    // but dropped by GitHub, so that paragraph stays as written.
+    // but dropped by GitHub, and by the joined span.
     const indented = source.replace(`${newline}second`, `${newline} second`);
-    expect(formatted(indented, { config: narrow })).toBe(indented);
+    expect(formatted(indented, { config: narrow })).toBe(formatted(source, { config: narrow }));
   });
   it("does not lint links in multi-backtick code spans", () => {
     const source = "``[link](missing.md)``\n";

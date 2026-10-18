@@ -867,18 +867,57 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
     const lines = output.trimEnd().split("\n");
     expect(lines.slice(1).every((line) => line.startsWith(continuation))).toBe(true);
   });
-  it("keeps a task item's code span whose next line is indented below the checkbox", () => {
-    // The item's content starts after `- `, so the parser reads the indentation
-    // below the checkbox as part of the code span, and GitHub does not.
-    const source = "- [ ] Item with words and `code\n      span` and more words after it.\n";
-    const config: Config = { ...wrap({ width: 30, reportUnreflowed: true }), dialect: "github" };
-    expect(verify(source, config).diagnostics.map((item) => item.message)).toEqual([
-      "Paragraph not reflowed: line break in a code span followed by a space or tab (width 30 columns).",
-    ]);
+  // Issue #285: the parser keeps the spaces and tabs that start a code span's
+  // next line, which CommonMark and GitHub leave out, so a span is joined
+  // without them, as `style/inline-code` joins it.
+  it.each([
+    ["", ""],
+    ["> ", "> "],
+    ["> > ", "> > "],
+    ["- ", "  "],
+    ["1. ", "   "],
+    ["> - ", ">   "],
+    ["- > ", "  > "],
+    // The indentation that lines up with a task item's text is such a space too.
+    ["- [ ] ", "      "],
+  ])(
+    "joins a code span whose next line is indented as on one line (%j)",
+    (prefix, continuation) => {
+      for (const dialect of dialects)
+        for (const indentation of ["   ", "\t", " \t "])
+          for (const width of [20, 30, 40, 80]) {
+            const config: Config = { ...wrap({ width, reportUnreflowed: true }), dialect };
+            const text = (separator: string) =>
+              `${prefix}Run \`npm run${separator}build\` now, and then more words so that it wraps.\n`;
+            const source = text(`\n${continuation}${indentation}`);
+            const result = verify(source, config, workspace);
+            expect(result.output, JSON.stringify([source, dialect, width])).toBe(
+              verify(text(" "), config, workspace).output,
+            );
+            expect(result.output).toContain("`npm run build`");
+            expect(lint(source, { config, workspace }).map((item) => item.message)).toEqual([
+              `Reflow paragraph to ${width} columns.`,
+            ]);
+          }
+    },
+  );
+  it("lines up a task item's continuation lines with its text", () => {
+    const config: Config = { ...wrap({ width: 30 }), dialect: "github" };
     const linked = "- [ ] Item with words and [a\n      link](u) and more words after it.\n";
     expect(verify(linked, config).output).toBe(
       "- [ ] Item with words and [a\n      link](u) and more words\n      after it.\n",
     );
+  });
+  it("joins a code span whose next line is indented also beside earlier backticks", () => {
+    // Wrapping keeps each span's own backticks, and joining makes no run of
+    // backticks longer, so a span cannot pair differently with an earlier run.
+    for (const before of ["A `` stray run,", "An escaped \\` run,", "A ``code`` span,"]) {
+      const source = `${before} then \`npm run\n   build\` and more words to wrap.\n`;
+      const config: Config = { ...wrap({ width: 30 }), dialect: "github" };
+      expect(verify(source, config).output).toBe(
+        verify(source.replace("\n   ", " "), config).output,
+      );
+    }
   });
   it.each([
     "**bold [link\ntext](u) more bold words**",
@@ -923,8 +962,10 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
     ["[full text][long\nref]", "line break in a link destination or title"],
     ["$a\nb$", "line break in math"],
     ["*em <b>html\nb</b> em*", "line break in inline HTML"],
-    ["`code\n continued`", "line break in a code span followed by a space or tab"],
-    ["`code\n\tcontinued`", "line break in a code span followed by a space or tab"],
+    // The parser strips a space or line ending from both edges of these spans,
+    // and renderers a space after the indentation is gone.
+    ["`\n code `", "line break with spaces at the edge of a code span"],
+    ["` code\n\t`", "line break with spaces at the edge of a code span"],
     ["![image  \ndescription](i.png)", "hard line break"],
     ["![image\\\ndescription](i.png)", "hard line break"],
     ["*em  \nphrase*", "hard line break"],
@@ -958,6 +999,10 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
         "[shortcut|text]",
         "`code|span`",
         "``co`de|span``",
+        "`code|  span`",
+        "``co`de|\tspan``",
+        "` code|  `",
+        "`|  code `",
         "![image|alt](i.png)",
         "~~struck|out~~",
         "[**bold|link** text](u)",

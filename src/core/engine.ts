@@ -4,7 +4,7 @@ import { deepFreeze } from "./frozen.js";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
-import { parse, range, splitByteOrderMark } from "../syntax/parse.js";
+import { codeSpanText, parse, range, splitByteOrderMark } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
@@ -477,10 +477,9 @@ function semanticTree(
           );
         result[key] = text;
       } else if (key === "value" && node.type === "inlineCode")
-        // A code span renders a line ending as a space. The parser keeps the
-        // spaces and tabs that start the next line, which CommonMark strips
-        // from a paragraph's lines, and renderers such as GitHub's with it.
-        result[key] = node.value.replace(/(?:\r\n|\r|\n)[ \t]*/g, " ");
+        // A code span renders a line ending as a space, and leaves out the
+        // spaces and tabs that start the next line, which the parser keeps.
+        result[key] = codeSpanText(node.value);
       // An image's description renders as plain text, and a reference's label
       // matches its definition with whitespace collapsed.
       else if ((key === "alt" || key === "label") && typeof value === "string")
