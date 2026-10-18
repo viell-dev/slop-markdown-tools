@@ -822,7 +822,16 @@ function inlineAtoms(
           atoms.push({ from: close, to: b, joining: destination });
         }
         visit(child);
-      } else if (child.type === "inlineCode") atoms.push({ from: a, to: b, joining: "code" });
+      } else if (child.type === "inlineCode")
+        atoms.push({
+          from: a,
+          to: b,
+          // The spaces that start a lazy continuation line stay in the span,
+          // which joining would drop, as after `>* ` with no space (issue #339).
+          joining: lazyIndentation(child)
+            ? { reason: "code span continuing on an indented lazy line" }
+            : "code",
+        });
       else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
         const close = labelEnd(child)!;
         atoms.push({ from: a, to: close, joining: "description" });

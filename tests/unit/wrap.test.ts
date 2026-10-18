@@ -1252,6 +1252,20 @@ describe("multiline code spans", () => {
     expect(verify(source!, config).output).toBe(expected);
     expect(format(source!, { config: { extends: [] } }).output).toBe(source);
   });
+  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
+    "leaves a code span on an indented lazy line as written, without a refusal, in %s",
+    (dialect) => {
+      // Without a space after `>`, the next line does not reach the list item's
+      // content and is lazy; the parser keeps its spaces in the span, which
+      // joining would drop (issue #339).
+      const workspace = createWorkspace({}, { strictLineBreaks: true });
+      const rules: Config = { extends: [], dialect, rules: { "style/wrap": "warn" } };
+      for (const source of [">* `\n>  `\n", ">3) `\n>   `\n", ">* `a\n>  b`\n"])
+        expect(verify(source, rules, workspace).output).toBe(source);
+      // With the space, the line continues the item, and the span is joined.
+      expect(verify("> * `a\n>   b`\n", rules, workspace).output).toBe("> * `a b`\n");
+    },
+  );
   it.each(["\n", "\r\n", "\r"])(
     "leaves a code span with a backslash at a line end as written (%j)",
     (newline) => {
