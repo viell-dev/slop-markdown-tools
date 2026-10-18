@@ -49,6 +49,8 @@ const found = new WeakMap<Root, MisreadLists>();
  * not count. Renderers read the `===` below such text as text, of the list
  * item or after an empty one, so a paragraph or heading on the next line
  * continues it too, and a block there is nested: a `---` would underline it.
+ * Where such text ends a list item or block quote, renderers continue it
+ * lazily into a paragraph or heading on the next line below the container.
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
@@ -79,15 +81,21 @@ export function misreadLists(document: Document): MisreadLists {
       return node.children[0]?.position?.start.offset ?? start;
     return undefined;
   };
-  const visit = (parent: Parents) => {
+  /** Returns the last line of misread text that ends `parent` and whose `===` renderers read as text. */
+  const visit = (parent: Parents): number | undefined => {
     let reach: number | undefined;
     /** The last line of misread text whose `===` renderers read as text, if the last block is that. */
     let continued: number | undefined;
+    /** Whether that text ends the last block, a container, rather than being it. */
+    let inside = false;
     parent.children.forEach((child, index) => {
       const offset = child.position?.start.offset;
       if (offset === undefined) return;
       const start = textStart(child);
-      const adjacent = continued === child.position!.start.line - 1;
+      // Renderers continue the text lazily on the line below the container
+      // that it ends, but only with text (issue #343).
+      const adjacent =
+        continued === child.position!.start.line - 1 && (!inside || start !== undefined);
       const misread =
         start !== undefined &&
         (listMarker.test(source.slice(start, start + 11)) || adjacent) &&
@@ -108,8 +116,16 @@ export function misreadLists(document: Document): MisreadLists {
         misread && child.type === "heading" && child.depth === 1
           ? child.position!.end.line
           : undefined;
-      if ("children" in child && !leaves.has(child.type)) visit(child);
+      inside = false;
+      if ("children" in child && !leaves.has(child.type)) {
+        const last = visit(child);
+        if (last !== undefined && last === child.position!.end.line) {
+          continued = last;
+          inside = true;
+        }
+      }
     });
+    return continued;
   };
   visit(document.tree);
   const result = { text, nested, next };

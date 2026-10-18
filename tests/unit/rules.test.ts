@@ -127,6 +127,15 @@ describe("style/block-spacing", () => {
     ["Text\n- 1. Step\n", "Text\n\n- 1. Step\n"],
     ["Text\n- - Step\n", "Text\n\n- - Step\n"],
     ["    code\n\n2. Two\n# H\n", "    code\n\n2. Two\n\n# H\n"],
+    // A code fence that is closed, or that ends in a block quote, which a blank
+    // line ends, or in a footnote definition alone, as renderers show them.
+    ["- d\n  ```\n  x\n  ```\n# H\n", "- d\n  ```\n  x\n  ```\n\n# H\n"],
+    ["- d\n  > ```\n# H\n", "- d\n  > ```\n\n# H\n"],
+    ["> ```\n# H\n", "> ```\n\n# H\n"],
+    ["[^1]: d\n    ```\n# H\n", "[^1]: d\n    ```\n\n# H\n"],
+    // Below a list item that ends in misread text, renderers continue only text.
+    ["    code\n\n- 2. q\n  ===\n# H\n", "    code\n\n- 2. q\n  ===\n\n# H\n"],
+    ["    code\n\n- 2. q\n  ===\n===\n# H\n", "    code\n\n- 2. q\n  ===\n===\n\n# H\n"],
   ])("separates %j", (source, output) => {
     expect(spaced(source)).toBe(output);
   });
@@ -170,6 +179,16 @@ describe("style/block-spacing", () => {
     ["    code\n\n2) Two\n   # H\n   Text\n"],
     ["    code\n\n2. Two\n   # H\n1. Three\n"],
     ["Text\n> 1.\n> ===\n> ---\n"],
+    // Renderers continue such text that ends a list item lazily on the next
+    // line, also below the item (issue #343).
+    ["    code\n\n- 2. q\n  ===\n===\n"],
+    ["    code\n\n> - 2. q\n>   ===\n> ===\n"],
+    // Renderers put a blank line below a list item that ends in a code fence
+    // without its closing fence into the code; the parser does not (issue #350).
+    ["- d\n  ```\n# H\n"],
+    ["- a\n  - d\n    ```\n# H\n"],
+    ["> - d\n>   ```\n> # H\n"],
+    ["- d\n  ~~~\n  x\n# H\n"],
     // Below a table that ends in a list or quote, the parser reads the next
     // table as a paragraph or heading text, and a blank line would make it a table.
     ["- | a |\n  | - |\n| b |\n| - |\n"],

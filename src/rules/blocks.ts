@@ -110,6 +110,25 @@ export function takesLines(node: Nodes): boolean {
   return unclosed(node) && (node.type === "obsidianComment" || !quoted);
 }
 /**
+ * Whether a blank line added directly below `node`, at its own level, would be
+ * read by renderers as part of a fenced code block that ends a list item in
+ * `node` and has no closing fence. Such a block runs to the end of the item,
+ * and renderers count the item's last blank lines as its content, while the
+ * parser does not (issue #350). A block quote ends at a blank line, and so
+ * does the code in it.
+ */
+export function endsInOpenFence(source: string, node: Nodes): boolean {
+  let item = false;
+  while (containers.has(node.type) && "children" in node && node.children.length) {
+    if (node.type === "blockquote") return false;
+    if (node.type === "listItem") item = true;
+    node = node.children.at(-1)!;
+  }
+  if (!item || node.type !== "code" || !located(node)) return false;
+  const fence = codeFence(source, node);
+  return fence !== undefined && !fence.close;
+}
+/**
  * Whether a line ending added at the end of the document would change its
  * last block. Besides the blocks of `takesLines`, the parser counts a last
  * line of blank space in a code or math block that has no closing fence only

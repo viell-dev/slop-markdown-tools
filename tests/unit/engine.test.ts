@@ -777,6 +777,15 @@ describe("text that the parser read in place of a list", () => {
       nested: ["---"],
       next: [],
     });
+    // Below the list item or quote that such text ends, renderers continue it
+    // lazily into text on the next line (issue #343), but into no other block.
+    expect(texts("    code\n\n- 2. q\n  ===\n===\n").text).toEqual(["2. q\n  ===", "==="]);
+    expect(texts("Text\n> 2. q\n> ===\n===\n").text).toEqual(["2. q\n> ===", "==="]);
+    expect(texts("    code\n\n- 2. q\n  ===\n# H\n")).toEqual({
+      text: ["2. q\n  ==="],
+      nested: [],
+      next: [],
+    });
   });
 
   /**
