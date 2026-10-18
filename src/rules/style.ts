@@ -15,7 +15,13 @@ import {
   startsWithMarker,
 } from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
-import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
+import {
+  endsInOpenFence,
+  takesFinalLineEnding,
+  takesLines,
+  underlinedHeadings,
+  underlineEdit,
+} from "./blocks.js";
 
 export function optionsSchema(properties: Record<string, unknown>) {
   return { type: "object", properties, additionalProperties: false };
@@ -1386,8 +1392,9 @@ function together(
   const [afterStart, afterEnd] = range(after);
   // Front matter is not part of the document's text.
   if (["yaml", "toml"].includes(before.type)) return true;
-  // An unclosed HTML comment or block at the end of a list would take in the blank line.
-  if (takesLines(before)) return true;
+  // An unclosed HTML comment or block at the end of a list would take in the
+  // blank line, and so would an unclosed code fence there on the renderers.
+  if (takesLines(before) || endsInOpenFence(source, before)) return true;
   // Other tools, too, read a comment as applying to the line below it, and
   // `mdtools-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;

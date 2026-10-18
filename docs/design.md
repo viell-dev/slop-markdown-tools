@@ -52,14 +52,15 @@ The comparison is only as good as the parser's reading:
   there are left out, plugins' too, and so are their findings. The list rules
   also leave a list there, or directly after it, as written, because another
   marker or indentation could join it to that list or move it out of the list,
-  and `style/block-spacing` adds no blank line that would make the list loose.
-  The same holds below a link reference definition, where the parser and GitHub
-  read such a line as text and markdown-it reads a list. Below an empty list
-  item (`-`), the parser takes the `[x]` that begins the next line for a
-  checkbox that belongs to no item, where GitHub shows the text `[x]`, so a
-  blank line between them, as `style/block-spacing` would add, is refused as a
-  change of meaning. The parser also keeps the spaces and tabs that start a code
-  span's next line, where CommonMark and GitHub leave them out, so that a span
+  and `style/block-spacing` adds no blank line that would make the list loose,
+  or that would end text that renderers continue on the line below the list. The
+  same holds below a link reference definition, where the parser and GitHub read
+  such a line as text and markdown-it reads a list. Below an empty list item
+  (`-`), the parser takes the `[x]` that begins the next line for a checkbox
+  that belongs to no item, where GitHub shows the text `[x]`, so a blank line
+  between them, as `style/block-spacing` would add, is refused as a change of
+  meaning. The parser also keeps the spaces and tabs that start a code span's
+  next line, where CommonMark and GitHub leave them out, so that a span
   `npm run` continued by an indented `build` reads `npm run    build`, and it
   takes a space or line ending off each end of a span before its line endings
   become spaces, where CommonMark takes spaces off after. The comparison reads a
@@ -73,7 +74,12 @@ The comparison is only as good as the parser's reading:
   lines of another table as text, where GitHub shows a table, so `style/wrap`
   and `style/block-spacing` leave text whose second line is a table delimiter
   row as written ([issue
-  #283](https://github.com/viell-dev/slop-markdown-tools/issues/283)).
+  #283](https://github.com/viell-dev/slop-markdown-tools/issues/283)). A fenced
+  code block without its closing fence runs to the end of its list item, and
+  CommonMark and GitHub count the blank lines at the end of the item as code,
+  where the parser does not, so `style/block-spacing` adds no blank line below
+  such a list ([issue
+  #350](https://github.com/viell-dev/slop-markdown-tools/issues/350)).
 - Front matter needs a closing line. A first line of `---` or `+++` that no
   later line closes is read as renderers read it, as a thematic break or text,
   with the lists and block quotes below it; the parser's front matter extension

@@ -12,6 +12,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/block-spacing` adds no blank line below a list whose last item ends in
+  a fenced code block without its closing fence. Renderers put that line into
+  the code, while the parser does not, so the safety check did not see the
+  change ([#351](https://github.com/viell-dev/slop-markdown-tools/pull/351)).
+- `style/block-spacing` adds no blank line between text that the parser reads as
+  an underlined heading in place of a list, at the end of a list item or block
+  quote, and text on the line below it. Renderers read that text as more of the
+  list item's text, and the blank line split it off
+  ([#351](https://github.com/viell-dev/slop-markdown-tools/pull/351)).
 - `links/path` and `links/notation` write a `|` in a table cell as `\|`, because
   one that is not escaped ends the cell. Before, `links/path` wrote every
   wikilink it rewrote with a plain `|`, so that it also reported one whose
