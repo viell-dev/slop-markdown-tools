@@ -49,6 +49,17 @@ function skip(entry: Omit<Skipped, "message">, words: (show: PathText) => string
 export function skippedMessage(item: Skipped, show: PathText): string {
   return wording.get(item)?.(show) ?? item.message;
 }
+/** The skipped entries of named inputs that ignore rules leave out. */
+const ignoredInputs = new WeakSet<Skipped>();
+/**
+ * Whether a skipped entry reports a named file or folder that discovery leaves
+ * out as ignored, a warning that the CLI's `--no-warn-ignored` leaves out. An
+ * ignored workspace root is not one: no path named it, and none of its files is
+ * processed.
+ */
+export function isIgnoredInput(item: Skipped): boolean {
+  return ignoredInputs.has(item);
+}
 /** A file of ignore rules as a message shows it: one outside the repository by its full path. */
 function showFile(show: PathText, file: string): string {
   return path.isAbsolute(file) ? file : show(file);
@@ -759,14 +770,14 @@ export async function discover(
   // A named input that ignore rules leave out is not an error, but the user asked for it.
   for (const input of namedInputs.values()) {
     const why = input.reason;
-    if (why)
-      skipped.push(
-        skip(
-          { path: input.path, type: input.directory ? "directory" : "file", code: "IGNORED" },
-          (show) =>
-            `Skipped ignored input: ${show(input.path)} (${why(show)}). ${input.directory ? "Its files are" : "It is"} not processed.`,
-        ),
-      );
+    if (!why) continue;
+    const item = skip(
+      { path: input.path, type: input.directory ? "directory" : "file", code: "IGNORED" },
+      (show) =>
+        `Skipped ignored input: ${show(input.path)} (${why(show)}). ${input.directory ? "Its files are" : "It is"} not processed.`,
+    );
+    ignoredInputs.add(item);
+    skipped.push(item);
   }
   // A root that is no vault itself can be a folder of one.
   if (!vaultFolders.has("")) {

@@ -382,6 +382,10 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     expect(run(generated, ["lint", "--root", "."]).stderr).toContain(
       'mdtools: warning: Skipped ignored workspace root: . (matched by "generated/" in ../.gitignore)',
     );
+    // No path named the root, and none of its files is processed, so --no-warn-ignored keeps it.
+    expect(run(generated, ["lint", "--root", ".", "--no-warn-ignored"]).stderr).toContain(
+      "mdtools: warning: Skipped ignored workspace root: .",
+    );
     // A named input says where the rule matched, from the root.
     const sub = path.join(generated, "sub");
     expect((await discover(sub, [path.join(sub, "b.md")], [])).skipped).toEqual([
@@ -529,6 +533,49 @@ describe("named inputs", () => {
     });
     expect(targets.selected).toEqual([]);
     expect(targets.skipped).toEqual([expect.objectContaining({ code: "IGNORED" })]);
+  });
+  it("say nothing about an ignored one with --no-warn-ignored, which changes nothing else", async () => {
+    // A vault whose settings cannot be used, for a warning that stays.
+    const root = await fixture({
+      ...files,
+      "vault/.obsidian/app.json": "",
+      "vault/note.md": "N.\n",
+    });
+    const named = ["generated/out.md", "skip.md", "drafts/draft.md", "node_modules", "vendor"];
+    const settings =
+      "mdtools: warning: Skipped unusable settings file: vault/.obsidian/app.json (not valid JSON). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.\n";
+    const emphasis = (column: number) =>
+      `notes.txt:3:${column}: warn style/emphasis: Use "_" for emphasis.\n`;
+    const lint = ["lint", "--max-warnings", "0", "notes.txt", ...named];
+    const linted = run(root, [...lint, "--no-warn-ignored"]);
+    expect(linted.stderr).toBe(
+      settings + emphasis(3) + emphasis(8) + "1 file(s) linted; 0 error(s), 2 warning(s).\n",
+    );
+    // The exit code is the one without the option.
+    expect(linted.status).toBe(1);
+    expect(run(root, lint).status).toBe(1);
+    const checked = run(root, ["format", "--check", "--no-warn-ignored", ...named]);
+    expect(checked.status, checked.stderr).toBe(0);
+    expect(checked.stderr).toBe(settings + "0 file(s) processed; 0 would change.\n");
+    // The JSON report still lists them, for a program to filter.
+    const report = run(root, ["lint", "--json", "--no-warn-ignored", ...named]);
+    const skipped = JSON.parse(report.stdout).skipped as { path: string; code: string }[];
+    expect(skipped.map((item) => [item.path, item.code])).toEqual([
+      ["drafts/draft.md", "IGNORED"],
+      ["generated/out.md", "IGNORED"],
+      ["node_modules", "IGNORED"],
+      ["skip.md", "IGNORED"],
+      ["vault/.obsidian/app.json", "INVALID"],
+      ["vendor", "IGNORED"],
+    ]);
+    // A document from stdin is processed under an ignored path without a warning.
+    const piped = run(
+      root,
+      ["lint", "-", "--no-warn-ignored", "--stdin-filepath", "skip.md"],
+      "S.\n",
+    );
+    expect(piped.status, piped.stderr).toBe(0);
+    expect(piped.stderr).toBe(settings);
   });
   it("are reported the same way by mdrefine/node", async () => {
     const root = await fixture(files);
