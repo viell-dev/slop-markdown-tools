@@ -18,7 +18,18 @@ export default defineConfig({
   sitemap: { hostname: "https://viell-dev.github.io/slop-markdown-tools/" },
   // Heading anchors as GitHub generates them, which is how the tool's own link check
   // validates the fragments of these pages: `## \`style/wrap\`` is `#stylewrap`.
-  markdown: { anchor: { slugify: (text) => slug(text) } },
+  markdown: {
+    anchor: { slugify: (text) => slug(text) },
+    // Code spans show `{{` as written, as on GitHub, where Vue would read it
+    // as the start of an interpolation.
+    config(md) {
+      md.core.ruler.push("code_inline_v_pre", (state) => {
+        for (const token of state.tokens)
+          for (const child of token.children ?? [])
+            if (child.type === "code_inline") child.attrSet("v-pre", "");
+      });
+    },
+  },
   themeConfig: {
     nav: [
       { text: "Get started", link: "/quick-start" },
