@@ -47,7 +47,7 @@
   {
     "name": "Status: Blocked",
     "color": "d93f0b",
-    "description": "Accepted work is waiting on an identified external dependency."
+    "description": "Waiting on an external dependency; a parked upstream defect keeps it while closed."
   },
   {
     "name": "Status: Can't Reproduce",
