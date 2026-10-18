@@ -662,10 +662,13 @@ describe("site-generator syntax at the start of a line", () => {
   it.each(["::", "{x}", "{ {", "a:::", "x{%", "x{{"])(
     "still reflows a paragraph with %s",
     (atom) => {
-      const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa\n${atom} more words follow here.\n`;
-      expect(verify(source, { ...wrap({ width: 80 }), dialect: "github" }).output).toBe(
-        source.replace("\n", " "),
-      );
+      const [first, second] = [
+        "aaaa aaaa aaaa aaaa aaaa aaaa aaaa",
+        `${atom} more words follow here.`,
+      ];
+      expect(
+        verify(`${first}\n${second}\n`, { ...wrap({ width: 80 }), dialect: "github" }).output,
+      ).toBe(`${first} ${second}\n`);
     },
   );
   it.each(["\n", "\r\n", "\r"])("keeps a template tag on one line whole (%j)", (newline) => {
