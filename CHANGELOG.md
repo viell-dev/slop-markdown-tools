@@ -147,6 +147,12 @@ From `0.2.0-rc.1` or earlier, also:
 - The `lint` summary counts errors and warnings, and messages about paths,
   configuration files, and plugins are worded differently. Exit codes and the
   JSON report keep their meaning.
+- `style/wrap` no longer joins the lines of a paragraph that has a line starting
+  with `:::`, `{%`, or `{{`, but lines that an earlier version joined stay
+  joined: split them again where a site generator reads them by line.
+- A document whose front matter would end inside a code block can get
+  `engine/unsafe-format` errors, and exit code `2`, from `format`, where the
+  rules used to change it.
 
 From every prerelease:
 
@@ -276,12 +282,28 @@ From every prerelease:
 - `style/wrap` reflows a paragraph whose code span goes on in a line that starts
   with spaces or tabs, and joins the span without them, as `style/inline-code`
   does ([#288](https://github.com/viell-dev/slop-markdown-tools/pull/288)).
+- `style/wrap` leaves a paragraph as written when one of its lines starts with
+  `:::`, `{%`, or `{{`, such as a Docusaurus admonition or a Liquid tag, keeps a
+  word that starts with them from starting a line, and keeps a template tag that
+  one line holds whole. Site generators read these by line
+  ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
 - The plugin example's style rule writes one space after a heading's `#` marks,
   because `style/thematic-break` now does what it did
   ([#267](https://github.com/viell-dev/slop-markdown-tools/pull/267)).
 
 ### Fixed
 
+- `style/wrap`, the other rules that leave the line of an alert's or callout's
+  marker alone, and the safety check recognize a marker written with an escape
+  or a character reference, such as `\[!NOTE]` or `&#91;!TIP]`, which GitHub
+  renders as an alert. Before, `style/wrap` joined the body onto such a marker,
+  and GitHub showed an ordinary quote
+  ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
+- A document whose front matter would end at a `---` or `+++` inside a code
+  block that a line of the front matter opens is read with the code block, and
+  formatting keeps its meaning both with and without the front matter. Before,
+  rules could change the code, such as its `___` into `---`, which GitHub shows
+  ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
 - A plugin rule's option schema of `false` refuses options, and an asynchronous
   schema (``) is refused when the rule set is built instead of crashing Node.js
   after the run

@@ -206,10 +206,10 @@ cannot be used is an error in the CLI's words, such as
   alias such as `codeberg` reads the document in its dialect, which
   `document.dialect` holds, and an unknown dialect is an error. A document whose
   front matter would end inside a code block is read without front matter, as
-  the [safety model](design.md#safety-model) describes. In the Obsidian
-  dialect, the tree holds `wikiLink`, `obsidianComment`, and `obsidianHighlight`
-  nodes, typed as `WikiLink`, `ObsidianComment`, and `ObsidianHighlight` and
-  registered with mdast's node types.
+  the [safety model](design.md#safety-model) describes. In the Obsidian dialect,
+  the tree holds `wikiLink`, `obsidianComment`, and `obsidianHighlight` nodes,
+  typed as `WikiLink`, `ObsidianComment`, and `ObsidianHighlight` and registered
+  with mdast's node types.
 - `resolveConfig`, described above, and `validateConfig(value)`, which throws
   when a value is not a valid configuration. `configSchema` is the
   configuration's [JSON Schema](configuration.md#json-schema), which the package
