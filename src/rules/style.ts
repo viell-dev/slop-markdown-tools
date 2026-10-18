@@ -158,14 +158,17 @@ function markersLoosenRuns(): boolean {
 /**
  * The delimiter runs at `positions`, sorted, with the characters that `at`
  * gives. Whether a run can open or close follows micromark, which also lets a
- * run next to a `~` in GFM do both. Container markers such as `>` count as
- * punctuation here, while micromark sees the line ending before them; the
- * caller compares the result with the parse.
+ * run next to a `~` in GFM do both, and in some versions one next to another
+ * `*` or `_`; with `commonmark`, it follows CommonMark, where those characters
+ * are punctuation. Container markers such as `>` count as punctuation here,
+ * while micromark sees the line ending before them; the caller compares the
+ * result with the parse.
  */
 function delimiterRuns(
   positions: number[],
   at: (index: number) => string | undefined,
   gfm: boolean,
+  commonmark = false,
 ): DelimiterRun[] {
   const runs: DelimiterRun[] = [];
   for (const position of positions) {
@@ -180,9 +183,10 @@ function delimiterRuns(
         close: false,
       });
   }
-  const loosen = markersLoosenRuns();
+  const loosen = !commonmark && markersLoosenRuns();
   const attention = (character: string | undefined) =>
-    (gfm && character === "~") || (loosen && (character === "*" || character === "_"));
+    (!commonmark && gfm && character === "~") ||
+    (loosen && (character === "*" || character === "_"));
   for (const run of runs) {
     const previous = at(run.start - 1);
     const next = at(run.end);
@@ -199,27 +203,30 @@ function delimiterRuns(
  * The emphasis and strong emphasis that micromark makes of `runs`, as
  * `start:end:size` strings: each closing run, in order, pairs with the nearest
  * opening run of its marker before it, except where the rule of three forbids
- * it, and the runs between them become text.
+ * it, and the runs between them become text. micromark applies the rule to the
+ * parts of two runs that are left; with `whole`, it counts the whole runs, as
+ * CommonMark, GitHub, and the reference parsers do (issue #323).
  */
-function pairings(runs: DelimiterRun[]): string[] {
-  const left = runs.map((run) => ({ ...run }));
+function pairings(runs: DelimiterRun[], whole = false): string[] {
+  const left = runs.map((run) => ({ ...run, size: run.end - run.start }));
   const pairs: string[] = [];
   for (let index = 0; index < left.length; index++) {
     const closer = left[index]!;
     while (closer.close && closer.end > closer.start) {
-      const closeSize = closer.end - closer.start;
+      const closeSize = whole ? closer.size : closer.end - closer.start;
       let found = index - 1;
       for (; found >= 0; found--) {
         const opener = left[found]!;
-        const openSize = opener.end - opener.start;
-        if (!opener.open || !openSize || opener.marker !== closer.marker) continue;
+        if (!opener.open || opener.end === opener.start || opener.marker !== closer.marker)
+          continue;
+        const openSize = whole ? opener.size : opener.end - opener.start;
         if ((opener.close || closer.open) && closeSize % 3 && !((openSize + closeSize) % 3))
           continue;
         break;
       }
       if (found < 0) break;
       const opener = left[found]!;
-      const use = opener.end - opener.start > 1 && closeSize > 1 ? 2 : 1;
+      const use = opener.end - opener.start > 1 && closer.end - closer.start > 1 ? 2 : 1;
       opener.end -= use;
       closer.start += use;
       pairs.push(`${opener.end}:${closer.start}:${use}`);
@@ -441,6 +448,20 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         // run of tildes that could mark strikethrough may be strikethrough and
         // text there, and its markers what GitHub shows (issue #320).
         if (gfm && holdsStrikethroughRun(node, scope, source, document.dialect)) return;
+        // GitHub reads a `_` that a run of tildes separates from a letter or
+        // digit as inside a word, where it neither opens nor closes, while the
+        // parser reads emphasis there (issue #322).
+        const tildesToWord = (index: number, step: number) => {
+          if (source[index] !== "~") return false;
+          while (source[index] === "~") index += step;
+          return /[\p{L}\p{N}]/u.test(source[index] ?? "");
+        };
+        if (
+          gfm &&
+          (marker[0] === "_" || original[0] === "_") &&
+          (tildesToWord(start - 1, -1) || tildesToWord(end, 1))
+        )
+          return;
         const list = candidates.get(scope) ?? [];
         list.push([start, end]);
         candidates.set(scope, list);
@@ -463,10 +484,21 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         // share a run of markers, as in `***a***` or `*a****c***`.
         const { positions, emphasis, suspicious } = scopeDelimiters(source, scope);
         const expected = emphasis.join(" ");
-        const pairing = (changed: Set<number>) =>
+        // micromark's pairing, or with `commonmark` CommonMark's.
+        const pairing = (changed: Set<number>, commonmark = false) =>
           pairings(
-            delimiterRuns(positions, (at) => (changed.has(at) ? marker[0] : source[at]), gfm),
+            delimiterRuns(
+              positions,
+              (at) => (changed.has(at) ? marker[0] : source[at]),
+              gfm,
+              commonmark,
+            ),
+            commonmark,
           ).join(" ");
+        // Both micromark's pairing and CommonMark's, which renderers follow,
+        // have to stay the same with the new markers.
+        const kept = (changed: Set<number>) =>
+          pairing(changed) === expected && pairing(changed, true) === expected;
         // micromark pairs `~` in a pass of its own, which can come first, and
         // lets a run next to a `~` pair with one of the new marker, as in `_f~*a*e_`.
         const tilde = gfm && source.slice(...range(scope)).includes("~");
@@ -474,12 +506,15 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         if (!modelled)
           accepted =
             suspicious || (tilde && positions.some((at) => source[at] === marker[0])) ? [] : list;
-        else if (pairing(markers(list)) !== expected) {
+        // Where CommonMark pairs the text as written differently, the parser
+        // misread it, and renderers show other emphasis (issue #323).
+        else if (pairing(new Set(), true) !== expected) accepted = [];
+        else if (!kept(markers(list))) {
           accepted = [];
           let changed = new Set<number>();
           for (const item of list) {
             const trial = new Set([...changed, ...markers([item])]);
-            if (pairing(trial) !== expected) continue;
+            if (!kept(trial)) continue;
             changed = trial;
             accepted.push(item);
           }
