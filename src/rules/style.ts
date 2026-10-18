@@ -594,6 +594,31 @@ const forgeLineOpener = /^(?::$|\\\[)/;
  * a word that starts with it stays on the line before it (issue #296).
  */
 const siteSyntax = /^(?::::|\{%|\{\{)/;
+/**
+ * The template tags in `text`, which starts at offset `base`, that each lie on
+ * one line, such as Liquid's `{% data x %}` or `{{ page.title }}`: wrapping
+ * keeps them whole.
+ */
+function templateTags(text: string, base: number): Range[] {
+  const ranges: Range[] = [];
+  if (!text.includes("{%") && !text.includes("{{")) return ranges;
+  let at = base;
+  for (const line of text.split(/(?<=\n|\r(?!\n))/)) {
+    for (const [open, close] of [
+      ["{%", "%}"],
+      ["{{", "}}"],
+    ] as const)
+      for (let from = 0; ;) {
+        const opener = line.indexOf(open, from);
+        const closer = opener < 0 ? -1 : line.indexOf(close, opener + open.length);
+        if (closer < 0) break;
+        ranges.push([at + opener, at + closer + close.length]);
+        from = closer + close.length;
+      }
+    at += line.length;
+  }
+  return ranges;
+}
 /** Whether a line of a paragraph, after its container markers, starts with `siteSyntax`. */
 function startsSiteSyntax(text: string): boolean {
   return text
@@ -972,6 +997,8 @@ const wrap: Rule = {
         ? forgeProtections(source, start, end, forge)
         : { ranges: [] as Range[] };
       for (const [from, to] of protections.ranges) protection.add(from, to);
+      for (const [from, to] of templateTags(source.slice(start, end), start))
+        protection.add(from, to);
       const reportUnbreakable = () =>
         findings.push({
           start,

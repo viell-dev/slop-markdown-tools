@@ -668,6 +668,22 @@ describe("site-generator syntax at the start of a line", () => {
       );
     },
   );
+  it.each(["\n", "\r\n", "\r"])("keeps a template tag on one line whole (%j)", (newline) => {
+    // Not every site generator reads a tag split across lines, such as the
+    // issue's `{% data … %}` tags. A `{%` or `{{` that its line does not close
+    // is wrapped like any word.
+    const source = `Words before {% data reusables.a.b %} and {{ page.title }} here,${newline}then words {% unclosed and {{ more.${newline}`;
+    const { output } = verify(source, { ...wrap({ width: 20 }), dialect: "github" });
+    expect(output.split(newline)).toEqual([
+      "Words",
+      "before {% data reusables.a.b %}",
+      "and {{ page.title }}",
+      "here, then words {%",
+      "unclosed and {{",
+      "more.",
+      "",
+    ]);
+  });
 });
 describe("Obsidian markers that joined lines could pair", () => {
   const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
