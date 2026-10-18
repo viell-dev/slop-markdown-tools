@@ -1,10 +1,11 @@
 # Releasing
 
-Publishing a version needs the repository owner's explicit authorization for
-that release. Preparing a pull request or a tested package does not supply it,
-and neither do the configured trusted publisher or the `NPM_PUBLISH_ENABLED`
-variable, which only make publication possible. Published versions, tags, and
-release assets are never replaced: a correction gets a new version.
+Agents publish a version when it is ready: its release pull request has merged
+and every check in this guide has passed. The repository owner authorized that
+for every release on 2026-10-18. The configured trusted publisher and the
+`NPM_PUBLISH_ENABLED` variable only make publication possible. Published
+versions, tags, and release assets are never replaced: a correction gets a new
+version.
 
 ## Prepare the release pull request
 
@@ -71,18 +72,19 @@ in on npmjs.com, in the package's **Settings** tab:
 - **Trusted publishing** ([npm's
   guide](https://docs.npmjs.com/trusted-publishers/)) has one entry, for GitHub
   Actions: the user `viell-dev`, the repository `slop-markdown-tools`, the
-  workflow `release.yml`, and the environment `npm-release`, with direct
-  publishing allowed. No npm token is stored in GitHub.
+  workflow `release.yml`, and the environment `npm-release`, with the
+  permissions `npm publish` and `npm stage publish`, and the status "Valid". No
+  npm token is stored in GitHub.
 - **Publishing access** is "Require two-factor authentication and disallow
-  tokens". Trusted publishing still works; publishing with a token does not, and
-  a change made by hand on the account, such as a dist-tag, asks for the second
-  factor.
+  bypass 2fa tokens". Trusted publishing still works; a token cannot publish
+  without the second factor, and a change made by hand on the account, such as a
+  dist-tag, asks for it too.
 
 The maintainer checks these after setting them up or changing them, not for each
-release. Only the maintainer's account can change them, and a successful
-publication already shows that the entry for this workflow exists. It cannot
-show that no other entry exists: npm accepts up to ten trusted publishers per
-package, and each of them can publish.
+release; they were last checked on 2026-10-18. Only the maintainer's account can
+change them, and a successful publication already shows that the entry for this
+workflow exists. It cannot show that no other entry exists: npm accepts up to
+ten trusted publishers per package, and each of them can publish.
 
 ## Publish
 

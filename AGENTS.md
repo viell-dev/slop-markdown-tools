@@ -20,8 +20,9 @@ direction.
   lists as open questions, and records the choice, its reasoning, and the
   alternatives rejected in the issue or PR. Ask the owner only for which work to
   assign, a change of direction, and authorization for actions outside the
-  repository, such as publishing a release or reporting to another project. Make
-  each request self-contained: what to do, exactly, and why it is needed.
+  repository that nothing below already authorizes, such as reporting to another
+  project. Make each request self-contained: what to do, exactly, and why it is
+  needed.
 - Agents maintain the repository's settings like the rest of the repository:
   rulesets and branch protection, environments, Actions permissions, security
   features, and the others. Change them as the work needs, never to get a
@@ -332,11 +333,12 @@ it helps. Blocking an account is for the owner.
 
 ## Releases
 
-Follow [RELEASING.md](./RELEASING.md). Preparing artifacts never authorizes
-publication; never rerun publication for an existing version or tag, and never
-store an npm token in GitHub. For each authorized release, check the GitHub
-publication settings, the workflow's result, and the registry provenance; the
-npm settings are the maintainer's to check when they change.
+Follow [RELEASING.md](./RELEASING.md). Agents publish a release once it is
+ready, without asking: the owner authorized every release on 2026-10-18. Never
+rerun publication for an existing version or tag, and never store an npm token
+in GitHub. For each release, check the GitHub publication settings, the
+workflow's result, and the registry provenance; the npm settings are the
+maintainer's to check when they change.
 
 ## Attribution
 
