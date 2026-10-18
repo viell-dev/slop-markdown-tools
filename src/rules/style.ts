@@ -673,9 +673,10 @@ class Protection {
  * What reflow does with a line ending inside an inline node that it keeps
  * whole: in a code span it becomes the space that it renders as, and so it
  * does in an image description; elsewhere it keeps the paragraph as written,
- * for the reason given.
+ * for the reason given. In the text of a link kept whole, it does what the
+ * atom `within` it there does, and otherwise what it does in a description.
  */
-type Joining = "code" | "description" | { reason: string };
+type Joining = "code" | "description" | { reason: string } | { within: InlineAtom[] };
 interface InlineAtom {
   from: number;
   to: number;
@@ -707,11 +708,14 @@ function holds(node: Nodes, type: string): boolean {
  * The inline nodes of a paragraph, from `start` on, that reflow keeps whole,
  * sorted by position, and the hard line breaks anywhere in it. A container
  * that holds inline HTML is kept whole too, because HTML can make the
- * whitespace inside it significant.
+ * whitespace inside it significant. With `wholeLinks`, the text of a link is
+ * kept whole as an image's description is: Obsidian's Live Preview shows a
+ * link whose text spans lines as Markdown source (issue #306).
  */
 function inlineAtoms(
   paragraph: Paragraph,
   start: number,
+  wholeLinks: boolean,
 ): { atoms: InlineAtom[]; breaks: Range[]; unlocated: boolean } {
   const atoms: InlineAtom[] = [];
   const breaks: Range[] = [];
@@ -728,6 +732,22 @@ function inlineAtoms(
       if (b <= start) continue;
       if (child.type === "break") breaks.push([a, b]);
       else if (
+        wholeLinks &&
+        (child.type === "link" || child.type === "linkReference") &&
+        child.children.length &&
+        labelEnd(child) &&
+        !holds(child, "html")
+      ) {
+        // The code spans, images, and other atoms in the text keep their own
+        // joining; between them, a line ending joins with the space that it
+        // renders as, as in an image's description.
+        const close = labelEnd(child)!;
+        const inner = atoms.length;
+        visit(child);
+        const within = atoms.splice(inner).sort((x, y) => x.from - y.from);
+        atoms.push({ from: a, to: close, joining: { within } });
+        atoms.push({ from: close, to: b, joining: destination });
+      } else if (
         wrappable.has(child.type) &&
         "children" in child &&
         child.children.length &&
@@ -988,7 +1008,7 @@ const wrap: Rule = {
             }
           : {}),
       };
-      const inline = inlineAtoms(node, start);
+      const inline = inlineAtoms(node, start, document.dialect === "obsidian");
       const protection = new Protection(start, end);
       for (const atom of inline.atoms) protection.add(atom.from, atom.to);
       // Forgejo and Gitea protections apply before paragraphs are skipped, so
@@ -1111,9 +1131,11 @@ const wrap: Rule = {
             break;
           }
           const last = words.at(-1);
-          const joining = protection.has(lineEnd)
+          let joining = protection.has(lineEnd)
             ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
             : undefined;
+          if (joining && typeof joining === "object" && "within" in joining)
+            joining = atomAt(joining.within, lineEnd)?.joining ?? "description";
           if (!joining) words.push(" ");
           else if (last === undefined || /^[ \t]+$/.test(last))
             failure = "line break in inline syntax";
@@ -1129,7 +1151,7 @@ const wrap: Rule = {
             lineAt += line.length - trimmed.length;
             line = trimmed;
             words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
-          } else failure = joining.reason;
+          } else failure = "reason" in joining ? joining.reason : "line break in inline syntax";
         }
         words.push(...protection.split(line, lineAt));
         lineEnd = lineAt + line.length;
