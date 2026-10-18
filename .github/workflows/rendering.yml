@@ -1,0 +1,49 @@
+name: Rendering
+# Formats generated documents and compares GitHub's rendering of each before and after, through
+# GitHub's Markdown API (scripts/github-rendering.mjs, issue #303). It needs the network and uses
+# the API's rate limit, so it runs every week and by hand, not for pull requests. A difference
+# fails the run; the documents and their HTML are in the run's rendering artifact, and the
+# summary names the run's new seed, which reproduces it.
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: The new seed (a whole number below 2^32); random when empty
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Compare
+        # An explicit shell enables pipefail, so a difference fails the step.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SEED: ${{ inputs.seed }}
+        run: |
+          arguments=()
+          if [ -n "$SEED" ]; then arguments+=(--seed "$SEED"); fi
+          node scripts/github-rendering.mjs "${arguments[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rendering
+          path: artifacts/github-rendering/
+          if-no-files-found: ignore
