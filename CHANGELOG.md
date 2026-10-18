@@ -392,6 +392,15 @@ From every prerelease:
   `npm run` continued by an indented `build` became `npm run    build`, which
   changed what GitHub shows. The safety check compares code spans the same way
   ([#274](https://github.com/viell-dev/slop-markdown-tools/pull/274)).
+- `style/inline-code` and the safety check read a code span as GitHub shows it
+  where a line break is at its edge, and on a lazy continuation line, one
+  without its block quote's `>` or its list item's indentation, whose spaces and
+  tabs GitHub keeps in the span. Before, the rule could change what GitHub
+  shows, such as `npm run    build` into `npm run build`, and the safety check
+  did not notice. Outside the GitHub dialect, a span on such an indented lazy
+  line stays split, because commonmark.js leaves those spaces out. `style/wrap`
+  now also reflows a paragraph whose code span has a line break at its edge
+  ([#291](https://github.com/viell-dev/slop-markdown-tools/pull/291)).
 - `style/wrap` keeps a dollar from the edge of a line where it could begin or
   end math there: in Obsidian a word that ends in `$` stays with the word after
   it, and on GitHub and in Obsidian a word that starts with `$` stays with the
