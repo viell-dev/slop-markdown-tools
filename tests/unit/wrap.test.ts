@@ -1252,6 +1252,24 @@ describe("multiline code spans", () => {
     expect(verify(source!, config).output).toBe(expected);
     expect(format(source!, { config: { extends: [] } }).output).toBe(source);
   });
+  it.each(["\n", "\r\n", "\r"])(
+    "leaves a code span with a backslash at a line end as written (%j)",
+    (newline) => {
+      // After an unpaired longer run, GitHub does not pair the backticks, and
+      // the backslash is a hard line break there (issue #335).
+      const source = `A \`\` run, \`one\` and \`two\\${newline}three\` end.${newline}`;
+      for (const rules of [
+        config,
+        { extends: [], rules: { "style/wrap": ["warn", { width: 80 }] } } satisfies Config,
+        { extends: [], rules: { "style/inline-code": "warn" } } satisfies Config,
+      ])
+        expect(verify(source, rules).output).toBe(source);
+      // Without the backslash the span is still joined.
+      expect(verify(source.replace("\\", ""), config).output).toBe(
+        `A \`\` run, \`one\` and \`two three\` end.${newline}`,
+      );
+    },
+  );
 });
 
 describe("Obsidian callout overflow", () => {
