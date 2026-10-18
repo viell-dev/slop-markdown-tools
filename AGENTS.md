@@ -11,14 +11,22 @@ repeat them here. User and API documentation belongs in `docs/`.
 The owner does not read the code, the API, or the CLI and does not run the tool.
 They follow the project through the public documentation, issue and PR
 descriptions, and documents that other agents processed with the tool, and they
-assign agents to tasks.
+assign agents to tasks. Assume no knowledge of the project's current state: they
+skim some issues and PRs and reread the documentation now and then, to check its
+direction.
 
 - Architectural, design, API, and implementation decisions belong to agents. The
   assigned agent makes every decision its task needs, including those an issue
   lists as open questions, and records the choice, its reasoning, and the
   alternatives rejected in the issue or PR. Ask the owner only for which work to
-  assign, a change of direction, and authorization for actions with external
-  effect.
+  assign, a change of direction, and authorization for actions outside the
+  repository, such as publishing a release or reporting to another project. Make
+  each request self-contained: what to do, exactly, and why it is needed.
+- Agents maintain the repository's settings like the rest of the repository:
+  rulesets and branch protection, environments, Actions permissions, security
+  features, and the others. Change them as the work needs, never to get a
+  failing change merged, and record each change and its reason in the related
+  issue or PR and under [Git and merging](#git-and-merging).
 - Write issue and PR descriptions so that a reader without knowledge of the code
   understands the observed problem, the resulting behavior, the scope decision,
   and the design decisions, without the diff. An issue filed during other work
@@ -29,9 +37,8 @@ assign agents to tasks.
 - Deciding how the project is built is not deciding what to work on. The
   assigned agent judges, and records, whether a request is in scope. Do not
   extend an assignment to unrelated issues, PRs, or design changes, and do not
-  publish, release, change repository settings, or close work outside the
-  assignment unless it covers them. State the interpretation used when an
-  assignment is ambiguous.
+  publish, release, or close work outside the assignment unless it covers them.
+  State the interpretation used when an assignment is ambiguous.
 - No one else catches mistakes before merge. Verification, regression fixtures,
   CI, and the review of the complete diff are the only review a change receives.
 
@@ -246,11 +253,16 @@ is not required. Zero required approvals is deliberate for a single-account,
 agent-maintained repository; PRs, passing checks, and resolved review threads
 remain mandatory.
 
-Other repository settings, set with the owner's authorization on 2026-10-17:
+Other repository settings:
 
 - GitHub Actions may run only actions that GitHub owns, pinned by full commit
   SHA. A workflow that needs another action, or a tag instead of a SHA, fails to
-  start until the owner changes the setting; ask before adding one.
+  start until the setting allows it. Allow another action only when nothing
+  GitHub owns, and no script in the repository, can do the job; pin it by SHA
+  and give the reason in the PR, because it runs with the workflow's
+  permissions.
+- The publication settings, environments included, are listed in
+  [RELEASING.md](./RELEASING.md#publication-prerequisites).
 - CodeQL's default setup scans JavaScript, TypeScript, and the workflows.
 - Wiki, Projects, and Discussions are off; issues and pull requests are the only
   channels.
@@ -322,8 +334,9 @@ it helps. Blocking an account is for the owner.
 
 Follow [RELEASING.md](./RELEASING.md). Preparing artifacts never authorizes
 publication; never rerun publication for an existing version or tag, and never
-store an npm token in GitHub. Verify the live trusted-publisher settings, the
-workflow's result, and the registry provenance for each authorized release.
+store an npm token in GitHub. For each authorized release, check the GitHub
+publication settings, the workflow's result, and the registry provenance; the
+npm settings are the maintainer's to check when they change.
 
 ## Attribution
 
