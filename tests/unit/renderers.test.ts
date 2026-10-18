@@ -21,25 +21,7 @@ interface Known {
   input?: string;
 }
 /** Small inputs whose rendering formatting changes for both renderers, as for GitHub. */
-const inputs: Known[] = [
-  // The parser reads "2. Step" as text, so style/ordered-list writes "1." for "1)", which
-  // joins two lists.
-  {
-    case: "an ordered list at the start of a list item below a paragraph",
-    input: "Text\n- 2. Step\n  1) Next\n",
-    issue: 191,
-  },
-  {
-    case: "an ordered list at the start of a block quote below a paragraph",
-    input: "Text\n> 2. a\n> 1) b\n",
-    issue: 191,
-  },
-  {
-    case: "an ordered list after an indented code block",
-    input: "    code\n\n2. Two\n1) Three\n",
-    issue: 191,
-  },
-];
+const inputs: Known[] = [];
 /**
  * The cases whose rendering formatting changes, by renderer. Every one has to differ still, so
  * that a fix, here or in a dependency, shows up as an entry to remove. The documents of a seed
@@ -181,6 +163,35 @@ describe.each(targets)("rendering by $renderer", (target) => {
       expect(found, "renders alike now; check the issue and remove the entry").toBeDefined();
     },
   );
+});
+
+describe.each(targets)("rendering by $renderer of lists that the parser misreads", (target) => {
+  // The parser reads these lists as text, and the blocks below them outside the list
+  // (issue #191). Before, formatting joined lists, moved a list out of an item, changed
+  // code, turned a list into a heading, and made lists loose.
+  it.each([
+    "Text\n- 2. Step\n  1) Next\n",
+    "Text\n> 2. a\n> 1) b\n",
+    "    code\n\n2. Two\n1) Three\n",
+    "_\n- 0.     *r*\n",
+    "    code\n\n2. a\n---\n",
+    "Text\n- 2. Step\n     1) Next\n",
+    "    code\n\n2. Two\n   - Sub\n",
+    "    code\n\n-\n* x\n",
+    "Text\n- -\n  * x\n",
+    "    code\n\n- \n  * x\n",
+    "    code\n\n2) b\n   # H\n   Text\n",
+    "Text\n1. 2) b\n   ===\n   *c*\n   1) d\n",
+    "Text\n> 1.\n> ===\n> ---\n",
+    "    code\n\n2. Two\n   # H\n1. Three\n",
+  ])("does not change for %j", (source) => {
+    const config: Config = {
+      ...target.config,
+      rules: { "style/block-spacing": "warn", "style/wrap": ["warn", { width: 20 }] },
+    };
+    expect(difference(source, target.config, target.render)).toBeUndefined();
+    expect(difference(source, config, target.render)).toBeUndefined();
+  });
 });
 
 describe("normalizeHtml", () => {

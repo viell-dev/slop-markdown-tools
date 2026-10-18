@@ -20,6 +20,7 @@ import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
+import { misreadLists } from "../syntax/misread-lists.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
 import type {
@@ -230,6 +231,54 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
   return undefined;
 }
 /**
+ * Whether an edit would change text that the parser read where renderers may
+ * read a list, or a block indented below it, which renderers may read inside
+ * that list (`misreadLists`, issue #191): replace some of their characters, or
+ * insert text between two of them. Renderers may read such text as list items
+ * or code, and the indentation of the blocks below it otherwise, which the
+ * safety check, comparing the parser's readings, cannot see: `_r_` for `*r*`
+ * in `- 0.     *r*` below a paragraph changes code on GitHub. Only the part of
+ * the edit that changes the text counts, so that an edit that copies such
+ * text, such as a list rule's, can still apply.
+ */
+function misreadEdits(document: Document): (edit: Edit) => boolean {
+  const misread = misreadLists(document);
+  // The blocks can hold one another; their union, in order, is searched in O(log n).
+  const blocks: [number, number][] = [];
+  for (const [start, end] of Array.from([...misread.text, ...misread.nested], (node) =>
+    range(node),
+  ).sort((a, b) => a[0] - b[0])) {
+    const last = blocks.at(-1);
+    if (last && start < last[1]) last[1] = Math.max(last[1], end);
+    else blocks.push([start, end]);
+  }
+  if (!blocks.length) return () => false;
+  const { source } = document;
+  const within = (from: number, to: number) => {
+    let low = 0;
+    let high = blocks.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (blocks[middle]![1] <= from) low = middle + 1;
+      else high = middle;
+    }
+    const block = blocks[low];
+    return block !== undefined && from < block[1] && to > block[0];
+  };
+  return (edit) => {
+    if (!within(edit.start, edit.end)) return false;
+    const before = source.slice(edit.start, edit.end);
+    const { text } = edit;
+    if (before === text) return false;
+    const shorter = Math.min(before.length, text.length);
+    let prefix = 0;
+    while (prefix < shorter && before[prefix] === text[prefix]) prefix++;
+    let suffix = 0;
+    while (suffix < shorter - prefix && before.at(-1 - suffix) === text.at(-1 - suffix)) suffix++;
+    return within(edit.start + prefix, edit.end - suffix);
+  };
+}
+/**
  * The workspace of a run as the engine and its rules use it, and the errors
  * that it threw. Such an error is the host's, such as a file that could not be
  * read, and neither a rule's nor a refusal to format: it stops the run.
@@ -278,7 +327,11 @@ function failure(error: unknown): string {
  * throws, or returns something that is not a list of valid findings, is
  * skipped for the document and reported as `engine/rule-error` instead. An
  * error of the workspace itself, such as a file that could not be read, is
- * not the rule's and is thrown on.
+ * not the rule's and is thrown on. Suppressed findings are left out, and so
+ * are findings whose edits would change text that the parser read in place of
+ * a list, or the blocks that renderers read inside that list: the finding
+ * describes what the parser read, and following it by hand would make the
+ * change too.
  */
 function inspect(
   document: Document,
@@ -289,6 +342,7 @@ function inspect(
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
+  const misread = misreadEdits(document);
   const starts = lineStarts(document.source);
   for (const [name, value] of Object.entries(config.rules)) {
     const enabled = setting(value);
@@ -318,7 +372,7 @@ function inspect(
       continue;
     }
     for (const finding of findings)
-      if (!suppressed(name, finding))
+      if (!suppressed(name, finding) && !(finding.edit && misread(finding.edit)))
         result.push(diagnostic(starts, name, enabled.severity, finding));
   }
   return result.sort(sortDiagnostics);

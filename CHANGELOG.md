@@ -12,6 +12,17 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Formatting leaves a list that the parser reads as text as written, with the
+  blocks indented below it and the list after them. The parser reads a list that
+  does not start at 1, or an empty item, as text at the start of a list item or
+  block quote below a paragraph and after an indented code block, where GitHub
+  reads a list. Before, `style/ordered-list` and `style/list-marker` joined the
+  next list to it, `style/list-indent` moved a list out of its items,
+  `style/emphasis` changed what GitHub shows as code, `style/heading` made a
+  heading of it, and `style/block-spacing` made it loose. Every rule's edits in
+  such text are now left out, plugins' too. `style/block-spacing` now separates
+  text from a list such as `- 1. Step`, which the parser reads as GitHub does
+  ([#341](https://github.com/viell-dev/slop-markdown-tools/pull/341)).
 - `style/wrap` leaves a paragraph as written when a code span in it continues on
   an indented lazy continuation line, as after `>* ` without a space. Before,
   the safety check refused all of the rule's edits in such a document

@@ -1,5 +1,6 @@
 import type { Blockquote, FootnoteDefinition, List, ListItem, Nodes, Parents } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
+import { misreadLists } from "../syntax/misread-lists.js";
 import { joinsTomlFrontMatter } from "../syntax/parse.js";
 import { optionsSchema } from "./style.js";
 
@@ -152,6 +153,13 @@ function analyze(document: Document): Analysis {
   /** The innermost container of each line, by line index. */
   const innermost: (Container | undefined)[] = [];
 
+  // Renderers may read a list where the parser read text that starts with a
+  // list marker, the blocks indented below it inside that list's last item,
+  // and the block after those as more of its items (issue #191). Another
+  // marker or indentation could move a list among them into or out of that
+  // item, or join it to that list, so its group of lists stays as written.
+  const misread = misreadLists(document);
+
   const visit = (node: Parents, parent: Container | undefined, unit: Unit | undefined) => {
     const children = node.children as Nodes[];
     let group: Unit | undefined;
@@ -179,6 +187,7 @@ function analyze(document: Document): Analysis {
           }
           target = group;
         }
+        if (misread.nested.has(child) || misread.next.has(child)) target.valid = false;
         const previous = children[index - 1];
         if (!run || previous?.type !== "list" || previous.ordered !== child.ordered) {
           run = [];

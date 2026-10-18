@@ -322,6 +322,36 @@ describe("the list rules together", () => {
       "- a\n  1. b\n  2. c\n\n> - d\n",
     );
   });
+  it.each(dialects)(
+    "keep the lists after text that the parser read in place of a list in the %s dialect",
+    (dialect) => {
+      // The parser reads `2. Two`, `-`, and `2. Step` as text, where renderers read a
+      // list (issue #191). A new marker would join the list after it to that list, and
+      // a new indentation would move the list after it into or out of its last item.
+      for (const source of [
+        "    code\n\n2. Two\n1) Three\n",
+        "    code\n\n2. Two\n\n1) Three\n",
+        "Text\n> 2. a\n> 1) b\n",
+        "Text\n- 2. Step\n  1) Next\n",
+        "Text\n- 2. Step\n     1) Next\n",
+        "Text\n- 2. Step\n     * Next\n",
+        "Text\n-  2. Step\n      * Next\n",
+        "    code\n\n2. Two\n   * Sub\n",
+        "    code\n\n2. Two\n   # Heading\n1) Three\n",
+        "    code\n\n-\n* x\n",
+        "Text\n- -\n  * x\n",
+      ])
+        expect(formatted(source, only(rules, dialect)), JSON.stringify(source)).toBe(source);
+      // The lists before them and below the next block that starts as far left are formatted.
+      expect(
+        formatted("* a\n\n    code\n\n2. Two\n1) Three\n\nText\n\n* b\n", only(rules, dialect)),
+      ).toBe("- a\n\n    code\n\n2. Two\n1) Three\n\nText\n\n- b\n");
+      expect(formatted("Text\n> 2. a\n>\n> Text\n>\n> * b\n", only(rules, dialect))).toBe(
+        "Text\n> 2. a\n>\n> Text\n>\n> - b\n",
+      );
+      expect(formatted("Text\n* 2. Step\n", only(rules, dialect))).toBe("Text\n- 2. Step\n");
+    },
+  );
   it("format nested lists in one run, also with wrapping", () => {
     const config = only({ ...rules, "style/wrap": ["warn", { width: 30 }] });
     expect(

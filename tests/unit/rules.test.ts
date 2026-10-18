@@ -122,6 +122,11 @@ describe("style/block-spacing", () => {
     ["> # H\r\n> Text\r\n", "> # H\r\n>\r\n> Text\r\n"],
     ["# H\rText\r", "# H\r\rText\r"],
     ["Text\n# H", "Text\n\n# H"],
+    // A list that starts with a nested list that the parser reads as renderers do,
+    // and a heading below text that renderers read as a list, which ends there.
+    ["Text\n- 1. Step\n", "Text\n\n- 1. Step\n"],
+    ["Text\n- - Step\n", "Text\n\n- - Step\n"],
+    ["    code\n\n2. Two\n# H\n", "    code\n\n2. Two\n\n# H\n"],
   ])("separates %j", (source, output) => {
     expect(spaced(source)).toBe(output);
   });
@@ -158,6 +163,13 @@ describe("style/block-spacing", () => {
     ["Text\n- > 3. Step\n"],
     ["[a]: https://example.com\n- -\n"],
     ["[a]: https://example.com\n-\n---\n"],
+    // Below text that the parser reads where renderers read a list (issue #191),
+    // the blocks that renderers read in its last item, which a blank line would
+    // make loose, and a list that renderers read as more of its items.
+    ["    code\n\n2. Two\n   - Sub\n"],
+    ["    code\n\n2) Two\n   # H\n   Text\n"],
+    ["    code\n\n2. Two\n   # H\n1. Three\n"],
+    ["Text\n> 1.\n> ===\n> ---\n"],
     // Below a table that ends in a list or quote, the parser reads the next
     // table as a paragraph or heading text, and a blank line would make it a table.
     ["- | a |\n  | - |\n| b |\n| - |\n"],
@@ -174,6 +186,17 @@ describe("style/block-spacing", () => {
     expect(spaced(source)).toBe(source);
     expect(lint(source, { config: only(rule, "github") })).toEqual([]);
   });
+  it.each(dialects)(
+    "keeps the blocks that renderers read in a list that the parser misread in the %s dialect",
+    (dialect) => {
+      for (const source of [
+        "    code\n\n2. Two\n   - Sub\n",
+        "Text\n> 2. a\n>    # H\n",
+        "Text\n- 2. Step\n",
+      ])
+        expect(spaced(source, dialect)).toBe(source);
+    },
+  );
   it.each(dialects)("separates the same blocks in the %s dialect", (dialect) => {
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
       "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",

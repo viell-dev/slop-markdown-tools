@@ -114,10 +114,10 @@ A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
 for at most eight passes. After each phase that changes the document, it parses
 the result again and compares its meaning with the original's; the [safety
-model](design.md#safety-model) describes what happens to edits that overlap or
-would change the meaning. The comparison covers the syntax tree, not every
-application's rendering, and it constrains the text a rule returns, not what its
-code does.
+model](design.md#safety-model) describes what happens to edits that overlap,
+would change the meaning, or fall in text that the parser reads where renderers
+read a list. The comparison covers the syntax tree, not every application's
+rendering, and it constrains the text a rule returns, not what its code does.
 
 ## Resolve links in a rule
 
