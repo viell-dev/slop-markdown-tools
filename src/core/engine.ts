@@ -243,11 +243,28 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  */
 function misreadEdits(document: Document): (edit: Edit) => boolean {
   const misread = misreadLists(document);
-  const blocks = Array.from([...misread.text, ...misread.nested], (node) => range(node));
+  // The blocks can hold one another; their union, in order, is searched in O(log n).
+  const blocks: [number, number][] = [];
+  for (const [start, end] of Array.from([...misread.text, ...misread.nested], (node) =>
+    range(node),
+  ).sort((a, b) => a[0] - b[0])) {
+    const last = blocks.at(-1);
+    if (last && start < last[1]) last[1] = Math.max(last[1], end);
+    else blocks.push([start, end]);
+  }
   if (!blocks.length) return () => false;
   const { source } = document;
-  const within = (from: number, to: number) =>
-    blocks.some(([start, end]) => from < end && to > start);
+  const within = (from: number, to: number) => {
+    let low = 0;
+    let high = blocks.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (blocks[middle]![1] <= from) low = middle + 1;
+      else high = middle;
+    }
+    const block = blocks[low];
+    return block !== undefined && from < block[1] && to > block[0];
+  };
   return (edit) => {
     if (!within(edit.start, edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
@@ -312,8 +329,9 @@ function failure(error: unknown): string {
  * error of the workspace itself, such as a file that could not be read, is
  * not the rule's and is thrown on. Suppressed findings are left out, and so
  * are findings whose edits would change text that the parser read in place of
- * a list: the finding describes what the parser read, and following it by hand
- * would make the change too.
+ * a list, or the blocks that renderers read inside that list: the finding
+ * describes what the parser read, and following it by hand would make the
+ * change too.
  */
 function inspect(
   document: Document,
