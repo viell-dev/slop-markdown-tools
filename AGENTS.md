@@ -67,6 +67,17 @@ A report:
 When a project asks for no more reports, record that here, and post nothing
 further there.
 
+Reports wait for a response. The owner decided on 2026-10-18 to post nothing
+more to micromark until its maintainers respond to micromark/micromark#252,
+because a report that is ignored or closed helps no one. Until then, and for
+every upstream defect:
+
+- work around it here wherever it could change what a renderer shows, as rules'
+  protections and the check in `parse()` for #278 do, and keep its blocked issue
+  as the record of the defect and of what would unblock it;
+- check the open reports for responses while working on the project, and record
+  what a maintainer says in the tracking issue.
+
 ## Keeping the repository consistent
 
 A change is complete only when everything that describes or depends on what it
