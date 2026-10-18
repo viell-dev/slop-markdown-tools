@@ -39,26 +39,33 @@ The comparison is only as good as the parser's reading:
   changes nothing that CommonMark sees. This is why the tool [assumes a
   dialect](dialects.md#the-assumed-dialect) with more syntax, not less, when
   none is named.
-- The parser, micromark, follows CommonMark closely but not everywhere. Directly
-  below a paragraph, a list item that begins with another list marker, as in
-  `- 2. Step` or `- -`, is read as a list item holding text, where CommonMark
-  and GitHub read a nested list ([issue
-  #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)).
-  Formatting cannot change such a document's meaning, because the comparison
-  uses the same reading before and after, but rules see text where GitHub shows
-  a list, and the rules that would change such a place leave it as written.
-  Below an empty list item (`-`), the parser takes the `[x]` that begins the
-  next line for a checkbox that belongs to no item, where GitHub shows the text
-  `[x]`, so a blank line between them, as `style/block-spacing` would add, is
-  refused as a change of meaning. The parser also keeps the spaces and tabs that
-  start a code span's next line, where CommonMark and GitHub leave them out, so
-  that a span `npm run` continued by an indented `build` reads
-  `npm run    build`, and it takes a space or line ending off each end of a span
-  before its line endings become spaces, where CommonMark takes spaces off
-  after. The comparison reads a code span as GitHub shows it, also where
-  renderers differ: GitHub keeps the indentation of a lazy continuation line in
-  the span, and commonmark.js does not. `style/inline-code` and `style/wrap`
-  join a span to that text ([issue
+- The parser, micromark, follows CommonMark closely but not everywhere. A list
+  that does not start at 1, or an empty item, is read as text at the start of a
+  list item, block quote, or footnote definition directly below a paragraph, as
+  in `- 2. Step` or `> -`, and after an indented code block, where CommonMark
+  and GitHub read a list ([issue
+  #191](https://github.com/viell-dev/slop-markdown-tools/issues/191)). The
+  comparison uses that reading before and after, so it cannot see what an edit
+  does to the list that renderers show. A paragraph or underlined heading that
+  starts with a list marker is therefore left as written, as are the blocks
+  indented below it, which renderers read inside that list: every rule's edits
+  there are left out, plugins' too, and so are their findings. The list rules
+  also leave a list there, or directly after it, as written, because another
+  marker or indentation could join it to that list or move it out of the list,
+  and `style/block-spacing` adds no blank line that would make the list loose.
+  The same holds below a link reference definition, where the parser and GitHub
+  read such a line as text and markdown-it reads a list. Below an empty list
+  item (`-`), the parser takes the `[x]` that begins the next line for a
+  checkbox that belongs to no item, where GitHub shows the text `[x]`, so a
+  blank line between them, as `style/block-spacing` would add, is refused as a
+  change of meaning. The parser also keeps the spaces and tabs that start a code
+  span's next line, where CommonMark and GitHub leave them out, so that a span
+  `npm run` continued by an indented `build` reads `npm run    build`, and it
+  takes a space or line ending off each end of a span before its line endings
+  become spaces, where CommonMark takes spaces off after. The comparison reads a
+  code span as GitHub shows it, also where renderers differ: GitHub keeps the
+  indentation of a lazy continuation line in the span, and commonmark.js does
+  not. `style/inline-code` and `style/wrap` join a span to that text ([issue
   #265](https://github.com/viell-dev/slop-markdown-tools/issues/265), [issue
   #285](https://github.com/viell-dev/slop-markdown-tools/issues/285), [issue
   #290](https://github.com/viell-dev/slop-markdown-tools/issues/290)). Directly

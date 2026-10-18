@@ -4,7 +4,8 @@ A rule is either a **style** rule or a **problem** rule. A style rule checks how
 something is written and proposes an edit, which `format` applies and `lint`
 reports. A problem rule reports a defect that has no single correct repair, and
 never edits. `format` applies an edit only when the document still means the
-same afterwards; see [how it works](design.md#safety-model).
+same afterwards, and never in text that the parser reads where renderers read a
+list; see [how it works](design.md#safety-model).
 
 Enable and configure rules under `rules` in the
 [configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
@@ -684,10 +685,13 @@ or what a comment applies to:
 - In the Obsidian dialect, a block identifier on a line of its own (`^id`)
   directly below a heading or list, which Obsidian may attach to the block
   above.
-- Directly below text or a link reference definition: a list or quote whose
-  first line continues with another list marker, as in `- 2. Step` or `- -`, and
-  a heading underlined with `===` or `---`. The parser can read such a line
-  differently there than below a blank line.
+- Directly below text or a link reference definition: a heading underlined with
+  `===` or `---`, which the parser can read differently there than below a blank
+  line.
+- Text that the parser reads where renderers read a list, such as `- 2. Step`
+  directly below text: the list or quote that starts with it, the blocks
+  indented below it, and a list after them, which renderers read as part of that
+  list (see [how it works](design.md#safety-model)).
 - Directly below a table that ends in a list item or block quote: text whose
   second line is a table delimiter row. The parser reads a table there as text,
   where GitHub reads a table, and a blank line would make it a table for the
@@ -946,6 +950,11 @@ These are left as written:
   another block once inside the item.
 - A list with a tab in an item's indentation, such as one that Obsidian indented
   with tabs.
+- A list among the blocks indented below text that the parser reads where
+  renderers read a list, such as `2. Two` after an indented code block, or the
+  list right after them, and the lists next to it (see [how it
+  works](design.md#safety-model)). `style/list-marker` and `style/ordered-list`
+  keep their markers too.
 
 ## `style/list-marker`
 
