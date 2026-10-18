@@ -198,12 +198,9 @@ export function otherReading(tree: Root): Root | undefined {
  */
 export function belowTomlFrontMatter(tree: Root, node: Nodes): boolean {
   const [matter, block] = tree.children;
-  return (
-    matter?.type === ("toml" as string) &&
-    block === node &&
-    block.position !== undefined &&
-    block.position.start.line === matter.position!.end.line + 1
-  );
+  // The tree's types know YAML front matter only; the parser also reads TOML.
+  const end = matter?.type === ("toml" as string) ? matter.position?.end.line : undefined;
+  return end !== undefined && block === node && block.position?.start.line === end + 1;
 }
 /**
  * Whether renderers without TOML front matter read the first line of `node`,
