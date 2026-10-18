@@ -874,6 +874,53 @@ describe("rules that fail", () => {
       lint("Text.\n", { plugins, config: { extends: [], rules: { "test/options": "warn" } } }),
     ).toThrow("Invalid rule test/options: its schema cannot be compiled: schema is invalid");
   });
+  it("enforces an option schema of false, which no options pass", () => {
+    const plugins: Plugin[] = [
+      {
+        name: "test",
+        rules: {
+          none: { kind: "problem", description: "No options", schema: false, check: () => [] },
+        },
+      },
+    ];
+    expect(
+      lint("Text.\n", { plugins, config: { extends: [], rules: { "test/none": "warn" } } }),
+    ).toEqual([]);
+    expect(() =>
+      lint("Text.\n", {
+        plugins,
+        config: { extends: [], rules: { "test/none": ["warn", { n: 1 }] } },
+      }),
+    ).toThrow("Invalid options for test/none");
+  });
+  it("refuses an asynchronous option schema when the rule set is built", async () => {
+    const rejected: unknown[] = [];
+    const record = (reason: unknown) => rejected.push(reason);
+    process.on("unhandledRejection", record);
+    try {
+      const schema = { $async: true, type: "object", properties: { n: { type: "integer" } } };
+      const plugins: Plugin[] = [
+        {
+          name: "test",
+          rules: { slow: { kind: "problem", description: "Async", schema, check: () => [] } },
+        },
+      ];
+      for (const options of [{}, { n: "x" }])
+        expect(() =>
+          lint("Text.\n", {
+            plugins,
+            config: { extends: [], rules: { "test/slow": ["warn", options] } },
+          }),
+        ).toThrow(
+          "Invalid rule test/slow: its schema is asynchronous ($async), and options are checked synchronously",
+        );
+      // Before, the check returned a promise that rejected after the run.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(rejected).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", record);
+    }
+  });
   it("compiles each option schema once, however many documents use it", () => {
     const schema = {
       type: "object",
