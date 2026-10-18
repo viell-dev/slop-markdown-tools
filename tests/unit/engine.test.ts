@@ -514,6 +514,8 @@ describe("front matter that would end inside a code block", () => {
         [yaml, "a\n---\n___"],
         [tildes, "---\n***"],
         [toml, "+++\n***"],
+        // A fence indented by up to three spaces opens a code block too.
+        [`---\nkey: |\n  ${fence}js\n---\n___\n  ${fence}\n`, "---\n___"],
       ] as const) {
         const { children } = parse(source.replaceAll("\n", newline), dialect).tree;
         expect(children.map((node) => node.type)).not.toContain("yaml");
@@ -547,10 +549,34 @@ describe("front matter that would end inside a code block", () => {
       ]);
     },
   );
+  it.each(dialects)(
+    "reads an HTML block or display math, not front matter, in the %s dialect",
+    (dialect) => {
+      // A line that opens an HTML block or display math is valid YAML, but
+      // GitHub's comments read the block, and `***` in it is content.
+      const html = "---\n<div>\n---\n***\n</div>\n";
+      const math = "---\n$$\n---\n***\n$$\n";
+      const cases: [string, string, string][] = [[html, "html", "<div>\n---\n***\n</div>"]];
+      if (dialect !== "commonmark") cases.push([math, "math", "---\n***"]);
+      for (const [source, type, value] of cases) {
+        const { children } = parse(source, dialect).tree;
+        expect(children.map((node) => node.type)).toEqual(["thematicBreak", type]);
+        expect("value" in children[1]! && children[1].value).toBe(value);
+        // `style/thematic-break` used to change the `***`, which is now content.
+        const result = format(source, preset(dialect));
+        expect(result.output).toBe(source);
+        expect(refusals(result)).toEqual([]);
+      }
+    },
+  );
   it.each(dialects)("still reads other front matter in the %s dialect", (dialect) => {
     for (const [source, output] of [
       ["---\ntitle: x\n---\n\nText *a*.\n\n***\n", "---\ntitle: x\n---\n\nText _a_.\n\n---\n"],
       ["+++\ntitle = 'x'\n+++\n\nText *a*.\n", "+++\ntitle = 'x'\n+++\n\nText _a_.\n"],
+      // A line that starts with `<` opens an HTML block that ends at a blank
+      // line, or is a paragraph whose next line underlines it as a heading.
+      ["---\n<x>\n\n---\n\nText *a*.\n", "---\n<x>\n\n---\n\nText _a_.\n"],
+      ["---\n<b>x</b>\n---\n\nText *a*.\n", "---\n<b>x</b>\n---\n\nText _a_.\n"],
       // A fence indented in a YAML block scalar, and one that a multiline TOML
       // string opens and closes, are not code in the reading without front matter.
       [

@@ -121,9 +121,9 @@ From `0.2.0-rc.2`:
 - `style/wrap` no longer joins the lines of a paragraph that has a line starting
   with `:::`, `{%`, or `{{`, but lines that an earlier version joined stay
   joined: split them again where a site generator reads them by line.
-- A document whose front matter would end inside a code block can get
-  `engine/unsafe-format` errors, and exit code `2`, from `format`, where the
-  rules used to change it.
+- A document whose front matter would end inside a code block, an HTML block, or
+  display math can get `engine/unsafe-format` errors, and exit code `2`, from
+  `format`, where the rules used to change it.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -300,13 +300,14 @@ From every prerelease:
   and GitHub showed an ordinary quote
   ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
 - A document whose front matter would end at a `---` or `+++` inside a code
-  block that a line of the front matter opens is read with the code block, and
-  formatting keeps its meaning both with and without the front matter. Before,
-  rules could change the code, such as its `___` into `---`, which GitHub shows
+  block, an HTML block, or display math that a line of the front matter opens is
+  read with that block, and formatting keeps its meaning both with and without
+  the front matter. Before, rules could change the block's content, such as a
+  `___` in code into `---`, which GitHub shows
   ([#298](https://github.com/viell-dev/slop-markdown-tools/pull/298)).
 - A plugin rule's option schema of `false` refuses options, and an asynchronous
-  schema (``) is refused when the rule set is built instead of crashing Node.js
-  after the run
+  schema (`$async`) is refused when the rule set is built instead of crashing
+  Node.js after the run
   ([#297](https://github.com/viell-dev/slop-markdown-tools/pull/297)).
 - A heading whose code span is written across lines gets the anchor that GitHub
   gives it, so a correct link to it is no longer reported missing, and the

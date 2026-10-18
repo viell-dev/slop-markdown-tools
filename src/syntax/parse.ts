@@ -166,16 +166,21 @@ export function splitByteOrderMark(source: string): [string, string] {
 const frontMatterReadings = new WeakMap<Root, Root>();
 /**
  * The document read with front matter, where `parse` read it without front
- * matter because its front matter would end inside a code block. Site
- * generators read front matter there, and so does GitHub's file view when it
- * is a YAML mapping; GitHub's comments and renderers without front matter
- * read the code block. Undefined for other trees.
+ * matter because its front matter would end inside a code block, an HTML
+ * block, or display math. Site generators read front matter there, and so does
+ * GitHub's file view when it is a YAML mapping; GitHub's comments and
+ * renderers without front matter read the block. Undefined for other trees.
  */
 export function frontMatterReading(tree: Root): Root | undefined {
   return frontMatterReadings.get(tree);
 }
-/** A line of front matter that starts a code fence. */
-const fenceLine = /^(?:`{3,}|~{3,})/m;
+/**
+ * A line of front matter that could open a block whose content is literal: a
+ * code fence, display math, or an HTML block.
+ */
+const literalOpener = /^ {0,3}(?:`{3,}|~{3,}|\$\$|<)/m;
+/** Blocks in which a `---` or `+++` line is content, not a closing line. */
+const literalBlocks = new Set(["code", "html", "math"]);
 
 /**
  * Parse a document in `dialect`, or the dialect that an alias such as
@@ -185,9 +190,9 @@ const fenceLine = /^(?:`{3,}|~{3,})/m;
  * tree count. `path` is the document's path relative to the workspace root,
  * and `plugins` add their syntax extensions.
  *
- * Front matter whose `---` or `+++` closes it inside a code block, opened by a
- * line of the front matter that starts with three backticks or tildes, is not
- * front matter: the document is read without it (issue #295), and
+ * Front matter whose `---` or `+++` closes it inside a code block, an HTML
+ * block, or display math, opened by a line of the front matter, is read as
+ * Markdown: the document is read without it (issue #295), and
  * `frontMatterReading` gives the other reading.
  */
 export function parse(
@@ -228,16 +233,20 @@ export function parse(
   let result = tree(true);
   // The tree's types know YAML front matter only; the parser also reads TOML.
   const matter = result.children[0] as { type: string; value?: string } | undefined;
-  // A line that starts with three backticks or tildes is not YAML or TOML,
-  // except inside a multiline TOML string. Front matter that holds one is
-  // given up only when the line that closes it is code in the other reading.
-  if ((matter?.type === "yaml" || matter?.type === "toml") && fenceLine.test(matter.value ?? "")) {
+  // Only front matter with a line that could open such a block is read again.
+  // It is given up only when the line that closes it is content of that block
+  // in the other reading, which a multiline TOML string or a YAML block
+  // scalar holding a fence does not decide by itself.
+  if (
+    (matter?.type === "yaml" || matter?.type === "toml") &&
+    literalOpener.test(matter.value ?? "")
+  ) {
     const closing = result.children[0]!.position!.end.line;
     const plain = tree(false);
     if (
       plain.children.some(
         (node) =>
-          node.type === "code" &&
+          literalBlocks.has(node.type) &&
           node.position!.start.line < closing &&
           node.position!.end.line >= closing,
       )

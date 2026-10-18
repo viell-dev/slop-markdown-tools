@@ -511,8 +511,9 @@ function semanticTree(
     return result;
   }
   const result = normalize(document.tree) as Record<string, unknown>;
-  // Where front matter would end inside a code block, the document is read
-  // without it, and an edit has to keep the meaning of both readings.
+  // Where front matter would end inside a code block, an HTML block, or
+  // display math, the document is read without it, and an edit has to keep
+  // the meaning of both readings.
   const reading = frontMatterReading(document.tree);
   if (reading) result.frontMatterReading = normalize(reading);
   return result;
