@@ -282,6 +282,10 @@ From every prerelease:
 
 ### Fixed
 
+- A heading whose code span is written across lines gets the anchor that GitHub
+  gives it, so a correct link to it is no longer reported missing, and the
+  library's `textContent` reads such a code span as renderers show it
+  ([#292](https://github.com/viell-dev/slop-markdown-tools/issues/292)).
 - `--dialect` works with an `.mjs` configuration that exports a frozen object
   ([#260](https://github.com/viell-dev/slop-markdown-tools/pull/260)).
 - `--stdin-filepath` accepts a document inside a root that is reached through a
