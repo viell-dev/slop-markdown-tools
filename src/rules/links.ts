@@ -424,8 +424,16 @@ export const linkRules: Record<string, Rule> = {
         if (node.type === "wikiLink") {
           if (/[[\]|\r\n]/.test(replacement)) return;
           if (!node.embed && node.label === undefined && replacement !== node.target) return;
-          replacement = `${node.embed ? "!" : ""}[[${replacement}${node.label === undefined ? "" : `|${node.label}`}]]`;
-          if (replacement !== document.source.slice(start, end))
+          // Only the destination changes. The divider stays as written, `|` or
+          // `\|`, which a table cell needs, and so do the label and an embed's size.
+          const raw = document.source.slice(start, end);
+          const open = node.embed ? 3 : 2;
+          const divider = raw.indexOf("|", open);
+          const targetEnd =
+            divider < 0 ? raw.length - 2 : raw[divider - 1] === "\\" ? divider - 1 : divider;
+          if (raw.slice(open, targetEnd) !== node.target) return;
+          replacement = raw.slice(0, open) + replacement + raw.slice(targetEnd);
+          if (replacement !== raw)
             findings.push({
               start,
               end,
@@ -479,8 +487,12 @@ export const linkRules: Record<string, Rule> = {
     check({ document, options, workspace }) {
       if (document.dialect !== "obsidian" || !workspace) return [];
       const findings: Finding[] = [];
+      // In a table cell a `|` that is not escaped ends the cell.
+      const inCell = new Set<Nodes>();
+      walk(document.tree, "tableCell", (cell) => walk(cell, (child) => inCell.add(child)));
       walk(document.tree, (node) => {
         const [start, end] = range(node);
+        const pipe = inCell.has(node) ? "\\|" : "|";
         let replacement: string | undefined;
         if (
           options.style === "markdown" &&
@@ -489,7 +501,7 @@ export const linkRules: Record<string, Rule> = {
           node.label !== undefined
         ) {
           if (/[[\]<>\\\r\n]/.test(node.target ?? "") || /[*_`[\]\\]/.test(node.label)) return;
-          replacement = `[${node.label}](<${node.target}>)`;
+          replacement = `[${node.label.replaceAll("|", pipe)}](<${node.target}>)`;
         } else if (
           options.style === "wiki" &&
           node.type === "link" &&
@@ -500,7 +512,7 @@ export const linkRules: Record<string, Rule> = {
           const label = node.children[0].value;
           const target = wikiTarget(node.url);
           if (target === undefined || /[[\]|\r\n]/.test(label)) return;
-          replacement = `[[${target}|${label}]]`;
+          replacement = `[[${target}${pipe}${label}]]`;
         }
         const url = destination(node);
         if (!replacement || url === undefined) return;

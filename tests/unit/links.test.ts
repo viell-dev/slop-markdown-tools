@@ -482,6 +482,63 @@ describe("Obsidian headings, blocks, and folders", () => {
     expect(wiki("[x](My%20Note.md#Some%23Heading)\n")).toBe("[x](My%20Note.md#Some%23Heading)\n");
   });
 });
+describe("links rewritten in a table cell, where a | must stay escaped (#347)", () => {
+  const notes = createWorkspace(
+    { "Notes/Doc.md": "", "Notes/Target.md": "# Target\n", "Notes/img.png": null },
+    { dialect: "obsidian" },
+  );
+  const table = (cell: string) => `| Link |\n| --- |\n| ${cell} |\n`;
+  const run = (rules: NonNullable<Config["rules"]>, source: string) => {
+    const options = {
+      path: "Notes/Doc.md",
+      workspace: notes,
+      config: { extends: [], dialect: "obsidian", rules } satisfies Config,
+    };
+    const result = format(source, options);
+    expect(
+      result.diagnostics.filter((item) => item.rule.startsWith("engine/")),
+      source,
+    ).toEqual([]);
+    expect(format(result.output, options).output, source).toBe(result.output);
+    return result.output;
+  };
+  const path = (style: string): NonNullable<Config["rules"]> => ({
+    "links/path": ["warn", { style }],
+  });
+  const notation = (style: string): NonNullable<Config["rules"]> => ({
+    "links/notation": ["warn", { style }],
+  });
+  it("changes only a wikilink's destination with links/path", () => {
+    for (const [style, cell, expected] of [
+      ["root", "[[Target\\|alias]]", "[[Notes/Target\\|alias]]"],
+      ["relative", "[[Notes/Target\\|alias]]", "[[Target\\|alias]]"],
+      ["root", "![[img.png\\|100]]", "![[Notes/img.png\\|100]]"],
+      ["root", "[[Target\\|a\\|b]]", "[[Notes/Target\\|a\\|b]]"],
+    ] as const)
+      expect(run(path(style), table(cell)), cell).toBe(table(expected));
+    // Outside a table the divider stays as written too.
+    expect(run(path("root"), "[[Target\\|alias]] and [[Target|alias]]\n")).toBe(
+      "[[Notes/Target\\|alias]] and [[Notes/Target|alias]]\n",
+    );
+  });
+  it("reports no wikilink whose destination already has the configured form", () => {
+    const source = table("[[Notes/Target\\|alias]]");
+    const config: Config = { extends: [], dialect: "obsidian", rules: path("root") };
+    expect(lint(source, { path: "Notes/Doc.md", config, workspace: notes })).toEqual([]);
+  });
+  it("escapes the | that links/notation writes into a table cell", () => {
+    expect(run(notation("wiki"), table("See [alias](Target.md)"))).toBe(
+      table("See [[Target.md\\|alias]]"),
+    );
+    expect(run(notation("wiki"), table("See *[alias](Target.md)*"))).toBe(
+      table("See *[[Target.md\\|alias]]*"),
+    );
+    expect(run(notation("markdown"), table("[[Target\\|a\\|b]]"))).toBe(table("[a\\|b](<Target>)"));
+    // Outside a table it is not escaped.
+    expect(run(notation("wiki"), "See [alias](Target.md)\n")).toBe("See [[Target.md|alias]]\n");
+    expect(run(notation("markdown"), "[[Target|a|b]]\n")).toBe("[a|b](<Target>)\n");
+  });
+});
 describe("Obsidian case-insensitive resolution", () => {
   const files = {
     "Doc.md": "",
