@@ -16,25 +16,13 @@ credentials out of diagnostic snapshots and logs.
 
 ## Upstream defects
 
-A defect in a dependency gets an issue here with everything needed to report and
-verify it without testing again: the inputs, the versions, what reference
-implementations produce, the reproduction, and what unblocks it. It also gets a
-row in the pinned overview, #330, which lists every upstream defect, how it is
-handled here, and what was reported, and logs each report and each check for a
-response.
-
-Work around a defect here wherever it could change what a renderer shows, as the
-rules' protections and the check in `parse()` for #278 do. Once nothing here
-waits on it, because a workaround keeps renderers showing the same or the limit
-is documented, close its issue as not planned with `Status: Blocked`, and say so
-in #330. Reopen it when upstream releases a fix, when the workaround falls
-short, or when a maintainer's answer changes the plan.
-
-The first report to micromark, micromark/micromark#252, waits for a maintainer's
-response; nothing more goes there until one comes. Check the open reports while
-working on the project, record what a maintainer says in the tracking issue, and
-log the check in #330. A report links its tracking issue here, which links the
-report back. When a project asks for no more reports, record that in #330.
+The pinned overview of defects in dependencies is #330: each has a tracking
+issue with `Status: Blocked`, closed as not planned while a workaround or a
+documented limit leaves nothing here waiting on it. Here a workaround is
+whatever keeps renderers showing the same, such as the rules' protections and
+the check in `parse()` for #278. The first report to micromark,
+micromark/micromark#252, waits for a maintainer's response, and nothing more
+goes there until one comes; log each check in #330.
 
 ## Keeping the repository consistent
 
