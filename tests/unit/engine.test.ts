@@ -667,6 +667,103 @@ describe("a first line that opens no front matter", () => {
   });
 });
 
+describe("the block directly below TOML front matter", () => {
+  // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
+  // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,
+  // which the line below can continue or underline as a heading (issue #333).
+  const matter = "+++\ntitle = 1\n+++\n";
+  const preset = (dialect: Dialect, rules: Config["rules"] = {}): ProcessOptions => ({
+    config: {
+      extends: dialect === "commonmark" ? ["recommended"] : ["recommended", dialect],
+      dialect,
+      rules,
+    },
+    workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
+  });
+  it.each(dialects)("compares the reading without the front matter in the %s dialect", (dialect) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const read = (source: string) =>
+        semanticFingerprint(parse(source.replaceAll("\n", newline), dialect));
+      expect(read(`${matter}* * *\n`)).not.toBe(read(`${matter}---\n`));
+      expect(read(`${matter}candle\n-----\n`)).not.toBe(read(`${matter}## candle\n`));
+      expect(read(`${matter}2) a\n`)).not.toBe(read(`${matter}2. a\n`));
+      // Below a blank line, and with YAML front matter, the renderers read the
+      // block as the parser does.
+      expect(read(`${matter}\n* * *\n`)).toBe(read(`${matter}\n---\n`));
+      expect(read("---\ntitle: 1\n---\n* * *\n")).toBe(read("---\ntitle: 1\n---\n---\n"));
+    }
+  });
+  it.each(dialects)(
+    "leaves a block that would join the front matter as written in the %s dialect",
+    (dialect) => {
+      const mark = String.fromCharCode(0xfeff);
+      const setext = preset(dialect, {
+        "style/heading": ["warn", { style: "setext" }],
+        "style/thematic-break": ["warn", { marker: "***" }],
+        "style/list-marker": ["warn", { marker: "+" }],
+        "style/ordered-list": ["warn", { delimiter: ")" }],
+      });
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const before of ["", mark]) {
+          const kept = (block: string, options = preset(dialect)) => {
+            const source = before + (matter + block).replaceAll("\n", newline);
+            expect(formatted(source, options)).toBe(source);
+          };
+          // `style/thematic-break` wrote `---`, which underlines the front
+          // matter's lines, and `style/heading` made them a paragraph above a
+          // heading of its own.
+          kept("* * *\n");
+          kept("candle\n-----\n");
+          kept("candle\n=====\n", setext);
+          kept("---\n", setext);
+          kept("## Head\n", setext);
+          // A list that cannot interrupt a paragraph is text there.
+          kept("2) a\n3) b\n");
+          kept("1.\n2) b\n");
+          kept("*\n* b\n");
+          kept("-\n", setext);
+        }
+    },
+  );
+  it.each(dialects)("still formats what renderers read alike in the %s dialect", (dialect) => {
+    const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
+    const cases: [string, string, ProcessOptions?][] = [
+      ["\n* * *\n", "\n---\n"],
+      ["___\n", "***\n", stars],
+      ["# Head #\n", "# Head\n"],
+      ["Text *a*\n", "Text _a_\n"],
+      ["* a\n+ b\n", "- a\n* b\n"],
+      ["1) a\n1) b\n", "1. a\n1. b\n"],
+      ["~~~\ncode\n~~~\n", "```\ncode\n```\n"],
+    ];
+    for (const [block, output, options = preset(dialect)] of cases)
+      expect(formatted(matter + block, options)).toBe(matter + output);
+  });
+  it("places a refusal where the reading with the front matter first differs", () => {
+    // A change of meaning below the front matter changes both readings.
+    const plugin: Plugin = {
+      name: "probe",
+      rules: {
+        listing: {
+          kind: "style",
+          description: "Turn the paragraph More. into a list item",
+          check: ({ document }) => {
+            const start = document.source.indexOf("More.");
+            return [{ start, message: "List", edit: { start, end: start, text: "- " } }];
+          },
+        },
+      },
+    };
+    const result = format(`${matter}\nText.\n\nMore.\n`, {
+      config: { extends: [], rules: { "probe/listing": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.diagnostics.map((item) => item.message)).toContain(
+      "probe/listing would change the parsed meaning at line 7; none of its edits were applied.",
+    );
+  });
+});
+
 describe("a rule whose edits would change the meaning", () => {
   /** A block rule that puts a list marker before the paragraphs starting with one of `targets`. */
   const listing = (name: string, targets: string[]): Rule => ({

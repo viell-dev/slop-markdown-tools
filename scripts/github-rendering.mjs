@@ -44,17 +44,11 @@ import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
 const known = [
   // "> > [!note]" becomes "> > [!NOTE]"; GitHub shows the marker of a nested quote as text.
   { seed: 1, index: 1, issue: 334 },
-  // "+++\ntitle = 1\n+++\n___\n" becomes "+++\ntitle = 1\n+++\n---\n", which GitHub reads as a
-  // heading.
-  { seed: 1, index: 14, issue: 333 },
   // ">> [!Important]" becomes ">> [!IMPORTANT]", shown as text in a nested quote.
   { seed: 2, index: 10, issue: 334 },
   // "> [!Important] glacier" becomes "> [!IMPORTANT] glacier"; GitHub shows a marker followed by
   // text on its line as text.
   { seed: 3, index: 14, issue: 334 },
-  // "+++\ntitle = 1\n+++\ncandle\n-----\n" becomes "+++\ntitle = 1\n+++\n## candle\n", where
-  // GitHub's heading held the front matter's lines.
-  { seed: 5, index: 16, issue: 333 },
 ];
 
 const usage =

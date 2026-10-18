@@ -6,6 +6,7 @@ import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import {
   codeSpanText,
+  joinsTomlFrontMatter,
   labelEnd,
   lazyIndentation,
   parse,
@@ -1648,6 +1649,9 @@ export const styleRules: Record<string, Rule> = {
           return;
         }
         if (underlined || !first || !last) return;
+        // Renderers without TOML front matter read its lines as part of a
+        // heading underlined directly below it (issue #333).
+        if (joinsTomlFrontMatter(document.tree, node)) return;
         // Below link reference definitions, the heading's position starts at
         // the first definition; its own text starts on a later line. Headings
         // that are indented or inside lists or block quotes are left as written.
