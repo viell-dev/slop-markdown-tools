@@ -199,7 +199,9 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     }
   }
   // Paths on the command line are relative to the working directory, and no
-  // path selects the whole workspace; stdin is the only document then.
+  // path selects the whole workspace; stdin is the only document then. Ignore
+  // rules apply to the path that `--stdin-filepath` names, as to a named file,
+  // and not to the default name.
   const discovery = await discoverFrom(
     {
       root,
@@ -210,6 +212,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       ...(documents ? { documents } : {}),
     },
     process.cwd(),
+    flags.stdinFilepath !== undefined,
   );
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
@@ -335,8 +338,10 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     for (const item of discovery.skipped)
       if (flags.warnIgnored !== false || !isIgnoredInput(item))
         process.stderr.write(`mdtools: warning: ${skippedMessage(item, shown)}\n`);
+    // An ignored document from stdin comes back unchanged, as in Prettier, so
+    // that an editor that replaces its text with the output loses nothing.
     if (stdin && mode === "format" && !flags.check && !flags.diff)
-      process.stdout.write(reports[0]?.output ?? "");
+      process.stdout.write(reports[0]?.output ?? Object.values(documents ?? {})[0] ?? "");
     else if (mode === "format" && !flags.check && !flags.write)
       for (const change of changes)
         process.stdout.write(

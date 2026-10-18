@@ -386,6 +386,21 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     expect(run(generated, ["lint", "--root", ".", "--no-warn-ignored"]).stderr).toContain(
       "mdtools: warning: Skipped ignored workspace root: .",
     );
+    // Stdin selects no file from disk, so the root's warning does not apply to
+    // it (issue #314), and a path that --stdin-filepath gives it there is
+    // ignored, as a named file is (issue #313).
+    const text = "A *b*.\n";
+    const piped = run(generated, ["lint", "-", "--root", "."], text);
+    expect(piped.stderr).toBe(
+      'stdin.md:1:3: warn style/emphasis: Use "_" for emphasis.\nstdin.md:1:5: warn style/emphasis: Use "_" for emphasis.\n',
+    );
+    expect(run(generated, ["lint", "-", "--root", ".", "--stdin-filepath", "a.md"], text)).toEqual(
+      expect.objectContaining({
+        status: 0,
+        stderr:
+          'mdtools: warning: Skipped ignored input: a.md (in the workspace root, which is matched by "generated/" in ../.gitignore). It is not processed.\n',
+      }),
+    );
     // A named input says where the rule matched, from the root.
     const sub = path.join(generated, "sub");
     expect((await discover(sub, [path.join(sub, "b.md")], [])).skipped).toEqual([
@@ -568,7 +583,7 @@ describe("named inputs", () => {
       ["vault/.obsidian/app.json", "INVALID"],
       ["vendor", "IGNORED"],
     ]);
-    // A document from stdin is processed under an ignored path without a warning.
+    // A document from stdin under an ignored path is not processed, and gets no warning.
     const piped = run(
       root,
       ["lint", "-", "--no-warn-ignored", "--stdin-filepath", "skip.md"],
@@ -576,6 +591,58 @@ describe("named inputs", () => {
     );
     expect(piped.status, piped.stderr).toBe(0);
     expect(piped.stderr).toBe(settings);
+  });
+  it("leave out a document from stdin whose path they ignore, as they do a named file", async () => {
+    // Issue #313: such a document used to be linted and formatted.
+    const root = await fixture(files);
+    const text = "A *b*.\n";
+    const message = (name: string, why: string) =>
+      `Skipped ignored input: ${name} (${why}). It is not processed.`;
+    // Each kind of rule, also where no folder of the path exists yet.
+    const cases = [
+      ["dist/new.md", "in dist, which discovery always leaves out"],
+      ["drafts/later/new.md", `matched by the configuration's ignore pattern "drafts/**"`],
+      ["drafts/new.md", `matched by the configuration's ignore pattern "drafts/**"`],
+      ["generated/new.md", 'in generated, which "generated/" in .gitignore matches'],
+      ["node_modules/package/new.md", "in node_modules, which discovery always leaves out"],
+      ["skip.md", 'matched by "skip.md" in .gitignore'],
+    ] as const;
+    const discovery = await discoverWorkspace({
+      root,
+      inputs: [],
+      config: JSON.parse(files["mdtools.config.json"]),
+      documents: Object.fromEntries([...cases.map(([name]) => [name, text]), ["new.md", text]]),
+    });
+    expect(discovery.selected).toEqual(["new.md"]);
+    expect(discovery.skipped.map((item) => [item.path, item.code, item.message])).toEqual(
+      cases.map(([name, why]) => [name, "IGNORED", message(name, why)]),
+    );
+    // The command line leaves such a document out in the same way.
+    const warning = `mdtools: warning: ${message("skip.md", cases[5][1])}\n`;
+    const named = ["--stdin-filepath", "skip.md"];
+    const linted = run(root, ["lint", "-", "--max-warnings", "0", ...named], text);
+    expect([linted.status, linted.stderr]).toEqual([0, warning]);
+    // `format` gives the text back unchanged, as Prettier does, for an editor
+    // that replaces its buffer with the output.
+    const formatted = run(root, ["format", "-", ...named], text);
+    expect([formatted.status, formatted.stdout, formatted.stderr]).toEqual([0, text, warning]);
+    const checked = run(root, ["format", "-", "--check", "--no-warn-ignored", ...named], text);
+    expect([checked.status, checked.stdout, checked.stderr]).toEqual([0, "", ""]);
+    const report = JSON.parse(run(root, ["lint", "-", "--json", ...named], text).stdout);
+    expect([report.files, report.skipped]).toEqual([
+      [],
+      [
+        {
+          path: "skip.md",
+          type: "file",
+          code: "IGNORED",
+          message: message("skip.md", cases[5][1]),
+        },
+      ],
+    ]);
+    // A path that nothing ignores is processed, and so is stdin without a path.
+    for (const args of [["--stdin-filepath", "new.md"], []])
+      expect(run(root, ["format", "-", ...args], text).stdout).toBe("A _b_.\n");
   });
   it("are reported the same way by mdrefine/node", async () => {
     const root = await fixture(files);

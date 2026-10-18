@@ -181,7 +181,9 @@ and writes nothing: pass the configuration as `config`, plugin objects as
 - `exclude` lists files and directories to leave out, as paths, not patterns.
 - `documents` gives text for paths relative to `root`, such as an editor's
   unsaved buffer. Those documents are selected, and the workspace reads that
-  text in place of a file, also where no file exists.
+  text in place of a file, also where no file exists. One whose path ignore
+  rules leave out is not selected and is an entry of `skipped`, as a named file
+  is.
 
 The result has `root`, the root's real path; `selected`, the documents as sorted
 forward-slash paths relative to it; and `skipped`, with the entries of the JSON

@@ -167,6 +167,8 @@ interface NamedInput {
   /** The real path, relative to the root. */
   path: string;
   directory: boolean;
+  /** Whether it is only a supplied document's path, which selects nothing on disk. */
+  document?: boolean;
   /** Why discovery leaves it out, when it does, naming paths through `show`. */
   reason?: (show: PathText) => string;
 }
@@ -459,6 +461,12 @@ function gitRules(root: string, top: string | undefined) {
  * name (`isMarkdownName`), that nothing ignores. A file named on its own is
  * selected whatever its name: naming it is the request. When ignore rules
  * leave out a named file or folder, `skipped` says so and why.
+ *
+ * `documents` are paths from the root of documents whose text a caller
+ * supplies, which need not exist. They are not selected here, but ignore rules
+ * leave them out as named files, as far as their folders exist. With
+ * `selectNone`, the caller selects nothing from disk, and an ignored root is
+ * not reported.
  */
 export async function discover(
   rootPath: string,
@@ -466,6 +474,7 @@ export async function discover(
   excluded: string[],
   resolve: ResolveOptions = {},
   base = process.cwd(),
+  { documents = [], selectNone = false }: { documents?: string[]; selectNone?: boolean } = {},
 ): Promise<FileSet> {
   const root = await realpath(rootPath);
   let top: string | undefined;
@@ -528,6 +537,23 @@ export async function discover(
     const request: NamedInput = { path: relative, directory };
     namedInputs.set(relative, request);
     for (let at = relative; at !== "."; at = path.posix.dirname(at)) {
+      const list = named.get(at);
+      if (list) list.push(request);
+      else named.set(at, [request]);
+    }
+  }
+  /** The supplied documents, which ignore rules leave out as they do named files. */
+  const documentInputs: NamedInput[] = [];
+  for (const name of documents) {
+    const existing = namedInputs.get(name);
+    if (existing) {
+      if (!existing.directory) documentInputs.push(existing);
+      continue;
+    }
+    const request: NamedInput = { path: name, directory: false, document: true };
+    namedInputs.set(name, request);
+    documentInputs.push(request);
+    for (let at = name; at !== "."; at = path.posix.dirname(at)) {
       const list = named.get(at);
       if (list) list.push(request);
       else named.set(at, [request]);
@@ -670,11 +696,14 @@ export async function discover(
           leaveOut(name, name, error);
           continue;
         }
+        // A nested repository is another project, not one that a rule leaves
+        // alone: text supplied for one of its documents is read as its own.
         if (nested)
           leaveNamed(
             name,
             (input) => (show) =>
               input.path === name ? "a nested repository" : `in ${show(name)}, a nested repository`,
+            (input) => !input.document,
           );
         if (nested && resolve.nestedRepositories !== true) continue;
         // Inside a nested repository, only its own rules and settings apply, as in Git.
@@ -706,7 +735,7 @@ export async function discover(
             request.reason ??= () => `matched by the configuration's ignore pattern "${pattern}"`;
           continue;
         }
-        let chosen = request !== undefined;
+        let chosen = request !== undefined && !request.document;
         if (markdown) {
           chosen ||= requests.some(
             (folder) => !folder || name === folder || name.startsWith(`${folder}/`),
@@ -717,8 +746,38 @@ export async function discover(
         if (chosen) selected.push(name);
       }
     }
+    // A supplied document that no file holds yet is left out by the rules of
+    // its folder as a file there would be.
+    for (const request of documentInputs) {
+      if (request.reason || request.path in files) continue;
+      if (path.posix.dirname(request.path) !== (relative || ".")) continue;
+      const entry = path.posix.basename(request.path);
+      if (alwaysSkipped.has(entry)) request.reason = () => `discovery always leaves out ${entry}`;
+      const rule = gitIgnoredAbove ? undefined : gitIgnoreRule(scopes, entry, false);
+      if (rule && untracked(request))
+        request.reason ??= (show) => `matched by "${rule.pattern}" in ${showFile(show, rule.file)}`;
+    }
   }
   await walk("", rootLayers, rootIgnoreCase, false, ignoredRoot !== undefined);
+  // The names that discovery always leaves out, and the configuration's
+  // patterns, apply to a supplied document's path also where no folder of it
+  // exists.
+  for (const request of documentInputs) {
+    if (request.reason) continue;
+    const parts = request.path.split("/");
+    const at = parts.findIndex((part) => alwaysSkipped.has(part));
+    if (at >= 0) {
+      const folder = parts.slice(0, at + 1).join("/");
+      request.reason =
+        folder === request.path
+          ? () => `discovery always leaves out ${parts[at]}`
+          : (show) => `in ${show(folder)}, which discovery always leaves out`;
+      continue;
+    }
+    const pattern = ignorePatterns.find((item) => item.matcher.match(request.path))?.pattern;
+    if (pattern !== undefined)
+      request.reason = () => `matched by the configuration's ignore pattern "${pattern}"`;
+  }
   // Nothing that Git does not track is processed in a root that Git ignores.
   let rootIgnored: ((show: PathText) => string) | undefined;
   if (ignoredRoot) {
@@ -732,7 +791,7 @@ export async function discover(
     for (const input of namedInputs.values())
       if (untracked(input))
         input.reason ??= folder ? why : (show) => `in the workspace root, which is ${why(show)}`;
-    if (!namedInputs.size && !isTracked(lead)) rootIgnored = why;
+    if (!namedInputs.size && !selectNone && !isTracked(lead)) rootIgnored = why;
   }
   // An input in a directory that was left out is an error: the user asked for it.
   for (const { input, path: request } of located) {
