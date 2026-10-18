@@ -1211,6 +1211,11 @@ const wrap: Rule = {
             // indentation below a task item's checkbox, which the parser
             // keeps. A lazy line, which keeps them, is not supported above.
             if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
+            // In a code span, a backslash before the line ending is a hard
+            // break wherever the backticks do not pair, as on GitHub after an
+            // unpaired longer run (issue #335).
+            if (joining === "code" && last.endsWith("\\"))
+              failure = "backslash at a line end in a code span";
             const trimmed = line.replace(/^[ \t]+/, "");
             lineAt += line.length - trimmed.length;
             line = trimmed;
@@ -1524,6 +1529,10 @@ export const styleRules: Record<string, Rule> = {
         // Joining would move text onto the line of a callout's or alert's
         // marker, which holds an Obsidian callout's title.
         if (titles.some(([a, b]) => start >= a && start < b)) return;
+        // Where its backticks do not pair, as on GitHub after an unpaired
+        // longer run, a backslash at the end of a line is a hard line break
+        // (issue #335).
+        if (/\\(?:\r\n|\r|\n)/.test(source.slice(start, end))) return;
         if (document.dialect === "obsidian") {
           // Obsidian reads highlights and wikilinks only within a line. Once
           // the lines are one, an `==` or `[[` left as text could open one that

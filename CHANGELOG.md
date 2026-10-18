@@ -12,6 +12,18 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `github/alert-marker` no longer capitalizes a marker that GitHub shows as
+  text: in a block quote inside another quote or a list, with text after the
+  marker on its line, or with nothing below it. Before, the visible text changed
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
+- `style/wrap` and `style/inline-code` keep a code span written across lines as
+  written when a line inside it ends with a backslash. Where its backticks do
+  not pair, as on GitHub after an unpaired longer run, that backslash is a hard
+  line break, which joining turned into a literal backslash
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
+- `style/thematic-break` no longer writes `---` directly below display math,
+  which GitHub builds from a paragraph and read as a heading
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
 - Formatting no longer changes what GitHub, Forgejo, Gitea, and Obsidian show
   for the block directly below TOML front matter. They read the front matter's
   lines as a paragraph, which that block can continue or underline as a heading:

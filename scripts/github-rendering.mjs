@@ -41,15 +41,7 @@ import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
  * documents of a seed change with the generator and with formatting; check the entries again
  * when either changes. The comment after an entry is a smaller input that shows the difference.
  */
-const known = [
-  // "> > [!note]" becomes "> > [!NOTE]"; GitHub shows the marker of a nested quote as text.
-  { seed: 1, index: 1, issue: 334 },
-  // ">> [!Important]" becomes ">> [!IMPORTANT]", shown as text in a nested quote.
-  { seed: 2, index: 10, issue: 334 },
-  // "> [!Important] glacier" becomes "> [!IMPORTANT] glacier"; GitHub shows a marker followed by
-  // text on its line as text.
-  { seed: 3, index: 14, issue: 334 },
-];
+const known = [];
 
 const usage =
   "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]\n";
