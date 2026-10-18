@@ -109,6 +109,19 @@ in `math.test.ts` against the renderers' output recorded in `math-renderers.ts`,
 the engine, configuration, and plugins in `engine.test.ts`, and the diff that
 `format` prints in `diff.test.ts`.
 
+The safety check compares the parser's readings, so `renderers.test.ts` also
+compares the HTML of two other implementations, commonmark.js and markdown-it,
+before and after formatting. Its inputs are documents that
+`scripts/rendering.mjs` generates from fixed seeds and the CommonMark
+specification's examples in `tests/fixtures/commonmark/`. Each known difference
+is listed with its issue and must still differ, so that a fix shows up as an
+entry to remove; a new one fails the test. The Rendering workflow compares
+GitHub's rendering in the same way every week, through its Markdown API. Run it
+by hand with `gh workflow run rendering.yml`, optionally with `-f seed=N` to
+repeat a run's new seed, or locally after a build with
+`node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
+ten to fifteen minutes; its first lines say what it compares.
+
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
 machine's user and system Git settings, which would change what Git ignores. A

@@ -29,7 +29,11 @@ that were kept changed it.
 The comparison is only as good as the parser's reading:
 
 - It compares syntax trees, and does not run GitHub's, Forgejo's, Gitea's, or
-  Obsidian's renderer.
+  Obsidian's renderer. To find documents that renderers read otherwise than the
+  parser, the tests format generated documents and CommonMark's examples and
+  compare the HTML of commonmark.js and markdown-it before and after, and a
+  weekly workflow does the same with GitHub's renderer. Each difference found is
+  tracked as an issue.
 - It reads the document in its dialect, so it cannot notice that the dialect is
   wrong. In CommonMark a table is an ordinary paragraph, and joining its lines
   changes nothing that CommonMark sees. This is why the tool [assumes a
