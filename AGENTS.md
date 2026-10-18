@@ -322,8 +322,9 @@ it helps. Blocking an account is for the owner.
 
 Follow [RELEASING.md](./RELEASING.md). Preparing artifacts never authorizes
 publication; never rerun publication for an existing version or tag, and never
-store an npm token in GitHub. Verify the live trusted-publisher settings, the
-workflow's result, and the registry provenance for each authorized release.
+store an npm token in GitHub. For each authorized release, check the GitHub
+publication settings, the workflow's result, and the registry provenance; the
+npm settings are the maintainer's to check when they change.
 
 ## Attribution
 

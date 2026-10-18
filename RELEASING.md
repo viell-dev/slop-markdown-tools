@@ -54,22 +54,35 @@ days.
 
 ## Publication prerequisites
 
-Verify these once per release rather than setting them up again:
+Check these GitHub settings with `gh` before each publication:
 
-- npm's [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for
-  `mdrefine` names the user `viell-dev`, the repository `slop-markdown-tools`,
-  the workflow `release.yml`, and the environment `npm-release`, with direct
-  publishing allowed. No npm token is stored in GitHub.
-- The package's publishing access on npm is "Require two-factor authentication
-  and disallow tokens". Trusted publishing still works; publishing with a token
-  does not, and a change made by hand on the account, such as a dist-tag, asks
-  for the second factor.
-- The GitHub environment `npm-release` is restricted to `main`.
+- The environment `npm-release` allows deployments only from the branch `main`,
+  by name. "Protected branches only" is not enough: GitHub documents it for
+  branch protection rules, and `main` is protected by a ruleset.
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
 - GitHub Pages uses GitHub Actions as its source, and the environment
   `github-pages` allows deployments from `main`, where the Pages workflow runs.
 - The ruleset for `main` requires pull requests and the three CI checks that
   `.github/rulesets/main.json` names.
+
+The npm settings are visible only to the package's maintainer, `viell`, signed
+in on npmjs.com, in the package's **Settings** tab:
+
+- **Trusted publishing** ([npm's
+  guide](https://docs.npmjs.com/trusted-publishers/)) has one entry, for GitHub
+  Actions: the user `viell-dev`, the repository `slop-markdown-tools`, the
+  workflow `release.yml`, and the environment `npm-release`, with direct
+  publishing allowed. No npm token is stored in GitHub.
+- **Publishing access** is "Require two-factor authentication and disallow
+  tokens". Trusted publishing still works; publishing with a token does not, and
+  a change made by hand on the account, such as a dist-tag, asks for the second
+  factor.
+
+The maintainer checks these after setting them up or changing them, not for each
+release. Only the maintainer's account can change them, and a successful
+publication already shows that the entry for this workflow exists. It cannot
+show that no other entry exists: npm accepts up to ten trusted publishers per
+package, and each of them can publish.
 
 ## Publish
 
