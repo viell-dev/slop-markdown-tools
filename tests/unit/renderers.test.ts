@@ -150,13 +150,12 @@ function expectKnown(renderer: string, cases: string[], differing: Map<string, s
   const unexpected = [...differing].filter(([name]) => !entries.has(name));
   const stale = cases.filter((name) => entries.has(name) && !differing.has(name));
   expect(
-    unexpected.map(([name, description]) => `${name}\n${description}`),
-    `${renderer} renders these differently after formatting`,
-  ).toEqual([]);
-  expect(
-    stale.map((name) => `${name} (issue: ${entries.get(name)})`),
-    `${renderer} renders these known cases alike now; check the issue and remove the entry`,
-  ).toEqual([]);
+    {
+      unexpected: unexpected.map(([name, description]) => `${name}\n${description}`),
+      stale: stale.map((name) => `${name} (issue: ${entries.get(name)})`),
+    },
+    `${renderer} renders the unexpected cases differently after formatting, and the stale ones alike now: check their issues and remove their entries`,
+  ).toEqual({ unexpected: [], stale: [] });
 }
 
 const seeds = [1, 2, 3];
