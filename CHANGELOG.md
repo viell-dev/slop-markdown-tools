@@ -19,6 +19,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `format --diff`, which `format` also does for files by default, takes about as
+  long as `format --check` when formatting changes lines throughout a long
+  document. Before, building the diff took time in proportion to the document's
+  length times its changed lines: two minutes for a generated document of 8,000
+  wrapped paragraphs that took four seconds to check
+  ([#315](https://github.com/viell-dev/slop-markdown-tools/pull/315)).
 - In the Obsidian dialect, `style/wrap` keeps the text of a link on one line and
   moves the link whole to the next line where it does not fit, and joins link
   text written across lines. Obsidian's Live Preview shows a link whose text
