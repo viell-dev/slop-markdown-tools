@@ -22,23 +22,6 @@ interface Known {
 }
 /** Small inputs whose rendering formatting changes for both renderers, as for GitHub. */
 const inputs: Known[] = [
-  // The parser reads "2. Step" as text, so style/ordered-list writes "1." for "1)", which
-  // joins two lists.
-  {
-    case: "an ordered list at the start of a list item below a paragraph",
-    input: "Text\n- 2. Step\n  1) Next\n",
-    issue: 191,
-  },
-  {
-    case: "an ordered list at the start of a block quote below a paragraph",
-    input: "Text\n> 2. a\n> 1) b\n",
-    issue: 191,
-  },
-  {
-    case: "an ordered list after an indented code block",
-    input: "    code\n\n2. Two\n1) Three\n",
-    issue: 191,
-  },
   // Renderers without TOML front matter read its lines as a paragraph, which "---" underlines.
   {
     case: "a thematic break below TOML front matter",

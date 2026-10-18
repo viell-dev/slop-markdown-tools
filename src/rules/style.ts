@@ -4,6 +4,7 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
+import { misreadLists } from "../syntax/misread-lists.js";
 import {
   codeSpanText,
   labelEnd,
@@ -1339,19 +1340,17 @@ const table: Rule = {
 
 /** A line holding nothing but block quote markers and blank space. */
 const blankLine = /^[ \t>]*$/;
-/**
- * A list item or quote marker followed by another list marker on its line,
- * including the ones that cannot open a list there, such as `* * *`.
- */
-const nestedListStart = /^[ \t]*(?:[-+*]|\d{1,9}[.)]|>)[ \t>]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
+const blockContainers = ["blockquote", "list", "listItem", "footnoteDefinition"];
 /** The innermost last block of a container, where its text ends. */
 function lastBlock(node: RootContent): RootContent {
-  while (
-    ["blockquote", "list", "listItem", "footnoteDefinition"].includes(node.type) &&
-    "children" in node &&
-    node.children.length
-  )
+  while (blockContainers.includes(node.type) && "children" in node && node.children.length)
     node = node.children.at(-1) as RootContent;
+  return node;
+}
+/** The innermost first block of a container, where its text starts. */
+function firstBlock(node: RootContent): RootContent {
+  while (blockContainers.includes(node.type) && "children" in node && node.children.length)
+    node = node.children[0] as RootContent;
   return node;
 }
 /**
@@ -1411,15 +1410,26 @@ function together(
     !last.children.length
   )
     return true;
-  // Directly below text or a link reference definition, the parser does not
-  // start a list that would be empty or not start at 1, though it does below
-  // a blank line: there, `- -` is a list item holding the text `-`, and `-`
-  // underlined with `---` is a heading. Such a list could start on the first
-  // line of a list or quote, and such a line could begin an underlined heading.
-  if (!["paragraph", "definition"].includes(lastBlock(before).type)) return false;
+  // Renderers may read a list where the parser read text that starts with a
+  // list marker, the blocks indented below it inside that list's last item,
+  // and a list after those as more of its items (issue #191). A blank line
+  // above a list or quote that starts with such text, as `- -` or `- 2. Step`
+  // directly below text, would make the parser read the list too, and one
+  // between the blocks of such a list would make it loose.
+  const misread = misreadLists(document);
+  if (
+    misread.nested.has(after) ||
+    (after.type === "list" && misread.next.has(after)) ||
+    misread.text.has(firstBlock(after))
+  )
+    return true;
+  // Directly below text or a link reference definition, `-` underlined with
+  // `---` is a heading, and below a blank line an empty list item and a
+  // thematic break.
+  if (after.type !== "heading" || !["paragraph", "definition"].includes(lastBlock(before).type))
+    return false;
   const firstLine = source.slice(afterStart, lineBounds(source, afterStart, afterStart)[1]);
-  if (after.type === "heading") return !/^[ \t]*#/.test(firstLine);
-  return (after.type === "list" || after.type === "blockquote") && nestedListStart.test(firstLine);
+  return !/^[ \t]*#/.test(firstLine);
 }
 const blockSpacing: Rule = {
   description: "Separate headings and lists from neighboring blocks with a blank line.",
