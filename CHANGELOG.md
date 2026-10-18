@@ -15,15 +15,15 @@ prereleases' notes there are longer than their entries here.
 - `github/alert-marker` no longer capitalizes a marker that GitHub shows as
   text: in a block quote inside another quote or a list, with text after the
   marker on its line, or with nothing below it. Before, the visible text changed
-  ([#PR](https://github.com/viell-dev/slop-markdown-tools/pull/PR)).
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
 - `style/wrap` and `style/inline-code` keep a code span written across lines as
   written when a line inside it ends with a backslash. Where its backticks do
   not pair, as on GitHub after an unpaired longer run, that backslash is a hard
   line break, which joining turned into a literal backslash
-  ([#PR](https://github.com/viell-dev/slop-markdown-tools/pull/PR)).
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
 - `style/thematic-break` no longer writes `---` directly below display math,
   which GitHub builds from a paragraph and read as a heading
-  ([#PR](https://github.com/viell-dev/slop-markdown-tools/pull/PR)).
+  ([#337](https://github.com/viell-dev/slop-markdown-tools/pull/337)).
 
 ## 0.2.1 - 2026-10-18
 
