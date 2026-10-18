@@ -6,7 +6,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { mathFromMarkdown } from "mdast-util-math";
-import type { InlineCode, Nodes } from "mdast";
+import type { InlineCode, Nodes, Paragraph } from "mdast";
 import type { Dialect, DialectName, Document, Plugin } from "../core/types.js";
 import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
@@ -213,6 +213,23 @@ export function range(node: Nodes): [number, number] {
     throw new Error(`Missing source position for ${node.type}`);
   }
   return [node.position.start.offset, node.position.end.offset];
+}
+/** An alert's or callout's marker, such as `[!NOTE]` or `[!tip]`. */
+export const calloutMarker = /^\[![\w-]+\]/;
+/**
+ * Whether a paragraph starts with text that `pattern` matches, by default an
+ * alert's or callout's marker: in `written`, its source from its start, or in
+ * its text as renderers read it, where a backslash escape or a character
+ * reference stands for the character it writes. GitHub reads `\[!NOTE]`,
+ * `&#91;!NOTE]`, and `[!&#78;OTE]` as alerts too (issue #294).
+ */
+export function startsWithMarker(
+  written: string,
+  paragraph: Paragraph,
+  pattern: RegExp = calloutMarker,
+): boolean {
+  const first = paragraph.children[0];
+  return pattern.test(written) || (first?.type === "text" && pattern.test(first.value));
 }
 /**
  * A node's text as a reader sees it: the values of its text, code, and other

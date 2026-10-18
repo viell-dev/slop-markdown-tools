@@ -4,7 +4,13 @@ import { deepFreeze } from "./frozen.js";
 import type { Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
-import { codeSpanText, parse, range, splitByteOrderMark } from "../syntax/parse.js";
+import {
+  codeSpanText,
+  parse,
+  range,
+  splitByteOrderMark,
+  startsWithMarker,
+} from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
@@ -449,10 +455,10 @@ function semanticTree(
     if (calloutHeader && document.dialect !== "commonmark" && node.type === "paragraph") {
       const [start, end] = range(node);
       const header = document.source.slice(start, end).split(/\r\n|\r|\n/, 1)[0]!;
-      if (/^\[![\w-]+\]/.test(header)) {
+      if (startsWithMarker(header, node)) {
         // CommonMark merges an Obsidian callout's title, or the line of a
         // GitHub alert's marker, and the body into one paragraph. Preserve
-        // their boundary too.
+        // their boundary too, also for a marker written as `\[!NOTE]`.
         const title = header.replace(
           /^\[!([\w-]+)\]/,
           (_, marker: string) => `[!${marker.toLowerCase()}]`,

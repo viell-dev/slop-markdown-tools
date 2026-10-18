@@ -150,6 +150,8 @@ describe("style/block-spacing", () => {
     ["<!-- mdtools-disable-next-line style/emphasis -->\n- *A*\n"],
     ["> [!NOTE]\n> - Item\n"],
     ["> [!tip] Title\n> # H\n"],
+    ["> \\[!NOTE]\n> - Item\n"],
+    ["> &#91;!tip] Title\n> # H\n"],
     ["Text\n- 2. Step\n"],
     ["Text\n- -\n"],
     ["> Text\n> - 2) Step\n"],
@@ -436,6 +438,12 @@ describe("style/emphasis and style/strong next to other delimiters", () => {
     // An alert's marker stays alone on its line in GitHub's reading too.
     const alert = "> [!NOTE] _Text\n> more_\n";
     expect(formatted(alert, { ...rules, dialect: "github" })).toBe(alert);
+    // Also a marker written with an escape or a character reference (issue #294).
+    expect(formatted("> &#91;!note] _Title\n> body_ and _b_\n", rules)).toBe(
+      "> &#91;!note] _Title\n> body_ and *b*\n",
+    );
+    const escaped = "> \\[!NOTE] _Text\n> more_\n";
+    expect(formatted(escaped, { ...rules, dialect: "github" })).toBe(escaped);
   });
   it("keeps the meaning of random runs of markers", () => {
     const words = fc.constantFrom(
@@ -537,6 +545,9 @@ describe("style/inline-code", () => {
     for (const source of [
       "> [!note] Title `code\n> span` here.\n",
       "> [!NOTE] `code\n> span` here.\n",
+      // Also a marker written with an escape or a character reference (issue #294).
+      "> &#91;!note] Title `code\n> span` here.\n",
+      "> \\[!NOTE] `code\n> span` here.\n",
     ]) {
       for (const dialect of ["github", "forgejo", "gitea", "obsidian"] as const)
         expect(formatted(source, only(rule, dialect))).toBe(source);

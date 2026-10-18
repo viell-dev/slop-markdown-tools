@@ -4,7 +4,14 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { codeSpanText, labelEnd, lazyIndentation, parse, range } from "../syntax/parse.js";
+import {
+  codeSpanText,
+  labelEnd,
+  lazyIndentation,
+  parse,
+  range,
+  startsWithMarker,
+} from "../syntax/parse.js";
 import { changesForgeHeading, headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { takesFinalLineEnding, takesLines, underlinedHeadings, underlineEdit } from "./blocks.js";
 
@@ -289,7 +296,7 @@ function markerLabels(tree: Root): string[] {
 }
 /**
  * The first lines of the document's Obsidian callouts and GitHub, Forgejo, or
- * Gitea alerts, from the `[!` on, which hold an Obsidian callout's title and
+ * Gitea alerts, from the marker on, which hold an Obsidian callout's title and
  * an alert's marker on its own.
  */
 function calloutTitles(document: Document): Range[] {
@@ -300,7 +307,7 @@ function calloutTitles(document: Document): Range[] {
       if (first?.type !== "paragraph") return;
       const [start] = range(first);
       const end = lineBounds(document.source, start, start)[1];
-      if (/^\[![\w-]+\]/.test(document.source.slice(start, end))) titles.push([start, end]);
+      if (startsWithMarker(document.source.slice(start, end), first)) titles.push([start, end]);
     });
   return titles;
 }
@@ -855,13 +862,17 @@ const wrap: Rule = {
         while (start < end && /[ \t]/.test(document.source[start]!)) start++;
       }
       let original = document.source.slice(start, end);
+      const forge = goldmarkForges[document.dialect];
       // An Obsidian callout or a GitHub, Forgejo, or Gitea alert keeps the line
-      // with its marker, and its title in Obsidian, as written.
+      // with its marker, and its title in Obsidian, as written. On Forgejo and
+      // Gitea, a marker written as `\[!NOTE]` starts like display math, and
+      // its paragraph stays as written.
       let calloutHeader =
         document.dialect !== "commonmark" &&
         parent?.type === "blockquote" &&
         index === 0 &&
-        /^\[![\w-]+\]/.test(original);
+        startsWithMarker(original, node) &&
+        !(forge && original.startsWith("\\["));
       /** Whether the lines to wrap are the body below that line, in the same paragraph. */
       let belowHeader = false;
       let lineStart = start;
@@ -913,7 +924,6 @@ const wrap: Rule = {
           belowHeader = true;
         }
       }
-      const forge = goldmarkForges[document.dialect];
       const openers = [wordOpener, prefixOpener];
       if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
       if (forge) openers.push(forgeLineOpener);
@@ -995,11 +1005,16 @@ const wrap: Rule = {
           });
         if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
       };
+      // Below the line of a marker, the paragraph's text no longer starts the lines to wrap.
+      const markerLike = /^\[![^\]]+\]/;
+      const startsLikeMarker = belowHeader
+        ? markerLike.test(original)
+        : startsWithMarker(original, node, markerLike);
       const reason = inline.breaks.length
         ? "hard line break"
         : children.some((child) => child.type === "html")
           ? "inline HTML"
-          : /^\[![^\]]+\]/.test(original)
+          : startsLikeMarker
             ? "callout header"
             : blockIdentifier(document.source, node)
               ? "block identifier"
@@ -1236,7 +1251,7 @@ function together(
     parent.type === "blockquote" &&
     before.type === "paragraph" &&
     before.position!.start.line === before.position!.end.line &&
-    /^\[![\w-]+\]/.test(source.slice(beforeStart, beforeEnd))
+    startsWithMarker(source.slice(beforeStart, beforeEnd), before)
   )
     return true;
   // Obsidian may attach a block identifier on its own line to the block above.

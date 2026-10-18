@@ -370,6 +370,9 @@ describe("style/trailing-space", () => {
     // The title line of an alert or callout would end with it.
     kept("> [!NOTE]  \n> Text.\n", only(backslash));
     kept("> [!tip] Title  \n> Text.\n", only(backslash, "obsidian"));
+    // Also with a marker written with an escape or a character reference (issue #294).
+    kept("> \\[!NOTE]  \n> Text.\n", only(backslash));
+    kept("> &#91;!tip] Title  \n> Text.\n", only(backslash, "obsidian"));
     expect(formatted("> [!tip] Title\n> One  \n> two\n", only(backslash, "obsidian"))).toBe(
       "> [!tip] Title\n> One\\\n> two\n",
     );

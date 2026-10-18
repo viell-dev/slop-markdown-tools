@@ -1,7 +1,7 @@
 import type { Code, Heading, Nodes } from "mdast";
 import stringWidth from "string-width";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
-import { range } from "../syntax/parse.js";
+import { range, startsWithMarker } from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
 
 /** A JSON Schema for an options object with these properties and no others. */
@@ -424,10 +424,14 @@ const trailingSpace: Rule = {
     const forge = document.dialect === "forgejo" || document.dialect === "gitea";
     /** Source in which blank space at the end of a line is content. */
     const kept: [number, number][] = [];
-    /** Hard line breaks, with the paragraph or heading each one is in. */
-    const breaks: { start: number; end: number; block: [number, number] }[] = [];
+    /**
+     * Hard line breaks, with the paragraph or heading each one is in, and
+     * whether that block starts like an alert's or callout's marker, `[!`.
+     */
+    const breaks: { start: number; end: number; block: [number, number]; marker: boolean }[] = [];
     const links: [number, number][] = [];
     let block: [number, number] = [0, 0];
+    let marker = false;
     walk(document.tree, (node, _, parent) => {
       if (!located(node)) {
         // A plugin's node without a position keeps whatever its parent spans.
@@ -435,9 +439,16 @@ const trailingSpace: Rule = {
         return;
       }
       const [start, end] = range(node);
-      if (node.type === "paragraph" || node.type === "heading") block = [start, end];
+      if (node.type === "paragraph" || node.type === "heading") {
+        block = [start, end];
+        const written = source.slice(start, end);
+        marker =
+          node.type === "paragraph"
+            ? startsWithMarker(written, node, /^\[!/)
+            : written.startsWith("[!");
+      }
       if (node.type === "link") links.push([start, end]);
-      if (node.type === "break") breaks.push({ start, end, block });
+      if (node.type === "break") breaks.push({ start, end, block, marker });
       else if (node.type === "link" || node.type === "linkReference") {
         // The link text is prose; a title or label that spans lines is not.
         let at = start;
@@ -465,17 +476,18 @@ const trailingSpace: Rule = {
      * runs on to the next blank space, so it would take the backslash in. A
      * paragraph that starts like `[label]:` could become a link reference
      * definition with the backslash as its destination, and the title line of
-     * an alert or callout would end with it. On Forgejo and Gitea, a backslash
-     * inside `\(...\)` math would be part of the formula.
+     * an alert or callout, also one written as `\[!NOTE]`, would end with it.
+     * On Forgejo and Gitea, a backslash inside `\(...\)` math would be part of
+     * the formula.
      */
-    const backslashSafe = (start: number, paragraph: [number, number]) => {
+    const backslashSafe = (start: number, paragraph: [number, number], marker: boolean) => {
       if (source[start - 1] === "\\") return false;
       let word = start;
       while (word > paragraph[0] && !/[ \t\r\n]/.test(source[word - 1]!)) word--;
       while (link < links.length && links[link]![1] <= word) link++;
       if (link < links.length && links[link]![0] < start) return false;
       const before = source.slice(paragraph[0], start);
-      if (/^\[[^]*\]:/.test(before) || /^\[![^\r\n]*$/.test(before)) return false;
+      if (/^\[[^]*\]:/.test(before) || (marker && !/[\r\n]/.test(before))) return false;
       return !(forge && source.slice(...paragraph).includes("\\("));
     };
     const findings: Finding[] = [];
@@ -499,7 +511,8 @@ const trailingSpace: Rule = {
         continue;
       }
       const brk = breaks[following]!;
-      if (!backslash || brk.start !== start || !backslashSafe(start, brk.block)) continue;
+      if (!backslash || brk.start !== start || !backslashSafe(start, brk.block, brk.marker))
+        continue;
       findings.push({
         start,
         end,
