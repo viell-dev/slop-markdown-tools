@@ -25,6 +25,16 @@ prereleases' notes there are longer than their entries here.
   length times its changed lines: two minutes for a generated document of 8,000
   wrapped paragraphs that took four seconds to check
   ([#315](https://github.com/viell-dev/slop-markdown-tools/pull/315)).
+- A document from stdin whose `--stdin-filepath` the configuration, Git, or
+  discovery ignores is left out as a named file is: `lint -` reports nothing,
+  `format -` prints the document unchanged, and a warning says why. Before, it
+  was linted and formatted, so an editor's format-on-save rewrote a document
+  that the configuration says to leave alone. In the library, `documents` that
+  ignore rules leave out are no longer selected
+  ([#316](https://github.com/viell-dev/slop-markdown-tools/pull/316)).
+- Stdin in a workspace root that Git ignores no longer warns that the root's
+  files are not processed
+  ([#316](https://github.com/viell-dev/slop-markdown-tools/pull/316)).
 - In the Obsidian dialect, `style/wrap` keeps the text of a link on one line and
   moves the link whole to the next line where it does not fit, and joins link
   text written across lines. Obsidian's Live Preview shows a link whose text

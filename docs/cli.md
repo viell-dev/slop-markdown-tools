@@ -108,12 +108,17 @@ npx mdtools format - --stdin-filepath notes/example.md < input.md > output.md
 
 `--stdin-filepath` gives the document's path, which decides its configuration,
 dialect, and links. It must lie inside the workspace; without it the path is
-`stdin.md` at the workspace root. `format -` prints the formatted document on
-stdout, or the diff with `--diff`, or nothing with `--check`; it cannot be
-combined with `--write`. `lint -` prints its findings. Neither prints a summary
-line. Stdin must be [UTF-8 text](#files-that-cannot-be-read-or-written), with or
-without a byte order mark; anything else stops the command with exit code `2`
-and a message such as
+`stdin.md` at the workspace root. Ignore rules apply to the path that
+`--stdin-filepath` gives as to a [named file](#which-files-are-processed), also
+where no file or folder of it exists yet: for an ignored path, `lint -` reports
+nothing and `format -` prints the document unchanged, both with the
+`Skipped ignored input` warning, which `--no-warn-ignored` leaves out. A nested
+repository is no such rule: a path in one is read as that repository's document.
+`format -` prints the formatted document on stdout, or the diff with `--diff`,
+or nothing with `--check`; it cannot be combined with `--write`. `lint -` prints
+its findings. Neither prints a summary line. Stdin must be [UTF-8
+text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
+anything else stops the command with exit code `2` and a message such as
 `mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
 
 The redirection above, in a POSIX shell or in `cmd`, passes the bytes unchanged.
