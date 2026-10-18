@@ -1265,7 +1265,7 @@ describe("multiline code spans", () => {
       ])
         expect(verify(source, rules).output).toBe(source);
       // Without the backslash the span is still joined.
-      expect(verify(source.replace("\\", ""), config).output).toBe(
+      expect(verify(source.replaceAll("\\", ""), config).output).toBe(
         `A \`\` run, \`one\` and \`two three\` end.${newline}`,
       );
     },
