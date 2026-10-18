@@ -118,6 +118,12 @@ From `0.2.0-rc.2`:
   `1.`, numbers are made consistent, and each item gets one space after its
   marker and no indentation before it. `format --check` fails on lists written
   otherwise until they are formatted or the list rules are turned off.
+- `style/wrap` no longer joins the lines of a paragraph that has a line starting
+  with `:::`, `{%`, or `{{`, but lines that an earlier version joined stay
+  joined: split them again where a site generator reads them by line.
+- A document whose front matter would end inside a code block can get
+  `engine/unsafe-format` errors, and exit code `2`, from `format`, where the
+  rules used to change it.
 
 From `0.2.0-rc.1` or earlier, also:
 
@@ -147,12 +153,6 @@ From `0.2.0-rc.1` or earlier, also:
 - The `lint` summary counts errors and warnings, and messages about paths,
   configuration files, and plugins are worded differently. Exit codes and the
   JSON report keep their meaning.
-- `style/wrap` no longer joins the lines of a paragraph that has a line starting
-  with `:::`, `{%`, or `{{`, but lines that an earlier version joined stay
-  joined: split them again where a site generator reads them by line.
-- A document whose front matter would end inside a code block can get
-  `engine/unsafe-format` errors, and exit code `2`, from `format`, where the
-  rules used to change it.
 
 From every prerelease:
 
