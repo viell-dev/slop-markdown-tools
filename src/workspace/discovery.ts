@@ -4,7 +4,7 @@ import path from "node:path";
 import { resolveConfig } from "../config/resolve.js";
 import type { Config, Dialect, Plugin, ProcessOptions, Workspace } from "../core/types.js";
 import { pathError } from "./access.js";
-import { discover, unlistedLookup, vaultFor } from "./files.js";
+import { discover, isIgnoredInput, unlistedLookup, vaultFor } from "./files.js";
 import type { Skipped } from "./files.js";
 import { createWorkspace } from "./index.js";
 import { excludeSelection } from "./selection.js";
@@ -39,7 +39,8 @@ export interface DiscoverOptions {
   /**
    * Documents whose text the caller supplies, such as an editor's unsaved
    * text, by path relative to the root. They are selected, and the workspace
-   * reads this text instead of a file at that path.
+   * reads this text instead of a file at that path. One whose path ignore rules
+   * leave out is not selected and is reported in `skipped`, as a named file is.
    */
   documents?: Record<string, string>;
 }
@@ -100,14 +101,26 @@ export async function checkRoot(given: string): Promise<void> {
 export function discoverWorkspace(options: DiscoverOptions): Promise<WorkspaceDiscovery> {
   return discoverFrom(options, path.resolve(options.root));
 }
-/** The same, with relative inputs and exclusions resolved from `base`. */
+/**
+ * The same, with relative inputs and exclusions resolved from `base`. Without
+ * `ignoreDocuments`, ignore rules do not leave out the supplied documents, as
+ * for text from stdin without a path of its own.
+ */
 export async function discoverFrom(
   options: DiscoverOptions,
   base: string,
+  ignoreDocuments = true,
 ): Promise<WorkspaceDiscovery> {
   await checkRoot(options.root);
   // Which files to leave out does not depend on a document's dialect.
   const resolved = resolveConfig({ config: options.config, plugins: options.plugins });
+  const documents = new Map<string, string>();
+  for (const [given, text] of Object.entries(options.documents ?? {})) {
+    const name = path.posix.normalize(given.split(path.sep).join("/"));
+    if (name === "." || name === ".." || name.startsWith("../") || path.isAbsolute(given))
+      throw new Error(`Document path is outside the workspace: ${given}`);
+    documents.set(name, text);
+  }
   // Discovery always visits the whole workspace, whose files are link targets;
   // the inputs only choose what is selected.
   const none = options.inputs?.length === 0;
@@ -117,19 +130,24 @@ export async function discoverFrom(
     resolved.ignore,
     resolved.resolve,
     base,
+    { documents: ignoreDocuments ? [...documents.keys()] : [], selectNone: none },
   );
   set.selected = none
     ? []
     : await excludeSelection(set.root, set.selected, options.exclude ?? [], base);
+  // A supplied document that ignore rules leave out is reported as a named
+  // file is, and not selected.
+  const ignored = new Set(
+    set.skipped.flatMap((item) =>
+      item.type === "file" && isIgnoredInput(item) ? [item.path] : [],
+    ),
+  );
   // A supplied document can lie in a folder that discovery did not visit, so
   // its vault is found by a search of its own.
   const supplied = new Map<string, Vault | undefined>();
-  for (const [given, text] of Object.entries(options.documents ?? {})) {
-    const name = path.posix.normalize(given.split(path.sep).join("/"));
-    if (name === "." || name === ".." || name.startsWith("../") || path.isAbsolute(given))
-      throw new Error(`Document path is outside the workspace: ${given}`);
+  for (const [name, text] of documents) {
     set.files[name] = text;
-    supplied.set(name, undefined);
+    if (!ignored.has(name)) supplied.set(name, undefined);
   }
   for (const name of supplied.keys()) supplied.set(name, await vaultFor(set, name));
   const selected = [...new Set([...set.selected, ...supplied.keys()])].sort();
