@@ -12,11 +12,18 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, no rule changes a paragraph line that starts at the
+  first column with `[`, a label, and `]:`, or joins it to the line above or
+  below it. Live Preview styles such a line as a link reference definition and
+  the lines around it as text, where CommonMark reads more of the paragraph.
+  Before, `style/wrap` joined `Text` and `[ref]: https://example.com` below it
+  into one line, which Live Preview shows as text
+  ([#402](https://github.com/viell-dev/slop-markdown-tools/pull/402)).
 - In the Obsidian dialect, `style/final-newline` adds no line break to a note
   that ends in a fenced code block without its closing fence, outside a list
   item or block quote. Obsidian's Reading view shows that line break as one
   more, empty line of the code
-  ([#402](https://github.com/viell-dev/slop-markdown-tools/pull/402)).
+  ([#403](https://github.com/viell-dev/slop-markdown-tools/pull/403)).
 
 ## 0.2.6 - 2026-10-19
 

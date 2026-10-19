@@ -1289,6 +1289,79 @@ describe("lines that Obsidian reads as code below a link reference definition", 
   });
 });
 
+describe("paragraph lines that Live Preview styles as a link reference definition", () => {
+  // Live Preview styles a line that starts at the first column with `[`, a
+  // label, and `]:` as a definition, and the lines above and below it as text,
+  // where the parser reads more of the paragraph, because a definition cannot
+  // interrupt one, or where the line is no definition (issue #391).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  // With strict line breaks, so that `style/wrap` joins lines.
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "a\n[r]: https://x.org\n",
+    'a\n[r]: https://x.org "t"\n',
+    "a\n[r]: <https://x.org>\n",
+    "a\n[r]:\n",
+    "a\n[r]: a b\n",
+    "a\n[r]:x\n",
+    "a\n[]: https://x.org\n",
+    "a\n[a[b]: c\n",
+    "a\n[a\\]b]: c\n",
+    "a\n[r]: https://x.org\n[s]: https://y.org\n",
+    "a\r\n[r]: https://x.org\r\nc\r\n",
+    // Nothing in the line changes, not even its blank space.
+    "a\n[r]: *x*\n",
+    "a\n[r]: x \nc\n",
+    // The parts of a definition on the lines below stay there.
+    "a\n[r]:\nhttps://x.org\n",
+    'a\n[r]: https://x.org\n"t"\n',
+    // A lazy line of a block quote or list item.
+    "> a\n[r]: https://x.org\n",
+    "- a\n[r]: https://x.org\n",
+    "- > a\n[r]: https://x.org\n",
+    // The first line of a paragraph, where the parser reads no definition.
+    "[r]: a b\nc\n",
+    "[r]:\nc\n",
+    "[r]: https://x.org\n[s]: a b\nc\n",
+    // The line is not broken, nor is the line below joined to it.
+    '[r]: https://x.org "a title with words enough to go past the width of eighty columns"\n',
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n[r]: https://x.org\nc\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config, workspace })).toBe(source);
+  });
+  it.each([
+    // The text around it is formatted; only the line stays on a line of its own.
+    ["a *b*\n[r]: https://x.org\n", "a _b_\n[r]: https://x.org\n"],
+    ["a\n[r]: https://x.org\nc *d*\n", "a\n[r]: https://x.org\nc _d_\n"],
+    ["*a*\n[r]: x\n*b*\n", "_a_\n[r]: x\n_b_\n"],
+    ["[r]: a b\nc *d*\n", "[r]: a b\nc _d_\n"],
+    // Blank space, a quote marker, a backslash, or other text before `[` or
+    // between `]` and `:` makes Live Preview read text.
+    ["a\n [r]: https://x.org\n", "a [r]: https://x.org\n"],
+    ["a\n    [r]: https://x.org\n", "a [r]: https://x.org\n"],
+    ["a\n\t[r]: https://x.org\n", "a [r]: https://x.org\n"],
+    ["> a\n> [r]: https://x.org\n", "> a [r]: https://x.org\n"],
+    ["- a\n  [r]: https://x.org\n", "- a [r]: https://x.org\n"],
+    ["a\n\\[r]: https://x.org\n", "a \\[r]: https://x.org\n"],
+    ["a\n[r] : x\n", "a [r] : x\n"],
+    ["a\n[[x]]: y\n", "a [[x]]: y\n"],
+    ["a\n[r][s]: x\n", "a [r][s]: x\n"],
+    ["> [r]: a b\n> c\n", "> [r]: a b c\n"],
+    ["- [r]: a b\n  c\n", "- [r]: a b c\n"],
+    // Below a blank line, it is a definition, and the text below it a paragraph.
+    ["a\n\n[r]: https://x.org\nc *d*\n", "a\n\n[r]: https://x.org\nc _d_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("formats such lines in the other dialects", () => {
+    expect(
+      formatted("a\n[r]: https://x.org\nc *d*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a [r]: https://x.org c _d_\n");
+  });
+});
+
 describe("blocks that Obsidian reads into a fence that a list item leaves open", () => {
   // Reading view continues such a fence with the unindented lines directly
   // below its container, and Live Preview with every block up to a line that
