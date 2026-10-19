@@ -220,7 +220,8 @@ behavior; harassment and disclosure of private data are not acceptable.
   minimal regression example.
 - Update every document, example, and test that describes what you changed, in
   the same pull request, and add the change to the `Unreleased` section of
-  [CHANGELOG.md](CHANGELOG.md).
+  [CHANGELOG.md](CHANGELOG.md). The first change after a release starts that
+  section above the newest version's, because a release renames it.
 - A change to the command line, the configuration, the JSON report, or the
   library that is not a defect fix waits for the next minor release; see the
   [versioning
