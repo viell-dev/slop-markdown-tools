@@ -996,6 +996,82 @@ describe("blocks that Obsidian reads into an HTML block above them", () => {
   });
 });
 
+describe("blocks that Obsidian reads into a paragraph across tab lines", () => {
+  // Reading view reads a line of blank space with a tab at or right of a
+  // paragraph's column as more of the paragraph, and then the block below
+  // such lines too, unless it interrupts a paragraph (issue #398).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "a\n\t\nb *c*\n",
+    "a *** b *c*\n\t\nd *e f*\n",
+    "a\n\t\n| x |\n| - |\n| y |\n",
+    "a\n\t\nb\n===\n",
+    "a\n\t\nb *c*\n---\n",
+    "a\n\t\n2. b *c*\n",
+    "a\n\t\n2. b *c*\n5. d *e*\n",
+    "a\n\t\n2) b *c*\n",
+    "a\n\t\n2.\n",
+    "a\n\t\n[^1]: b *c*\n",
+    "a\n\t\n[^1]: b\n\n    c *d*\n",
+    "a\n\t\n\t\nb *c*\n",
+    "a\n \t \nb *c*\n",
+    "a\r\n\t\r\nb *c*\r\n",
+    // Across the blocks that it reads as more of the text.
+    "a\n\t\nb *c*\n\t\nd *e*\n",
+    "a\n\t\n| x |\n| - |\n\t\nb *c*\n",
+    "a\n\t\n    b\n\t\nc *d*\n",
+    "a\n\t\n2. b\n\t\nc *d*\n",
+    "a\n\t\n[^1]: b\n\t\nc *d*\n",
+    "a\n\t\n<custom>b</custom>\n\t\nc *d*\n",
+    // In a block quote, and from a list item whose content the tab reaches.
+    "> a\n> \t\n> b *c*\n",
+    "> a\n> \t\nb *c*\n",
+    "- a\n  \t\n  b *c*\n",
+    "- a\n  \t\nb *c*\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config, workspace })).toBe(source);
+  });
+  it.each([
+    // These interrupt a paragraph, so they start blocks of their own.
+    ["a\n\t\n# b *c* #\n", "a\n\t\n# b _c_\n"],
+    ["a\n\t\n- b *c*\n", "a\n\t\n- b _c_\n"],
+    ["a\n\t\n1. b *c*\n", "a\n\t\n1. b _c_\n"],
+    ["a\n\t\n1) b *c*\n", "a\n\t\n1. b _c_\n"],
+    ["a\n\t\n2. b\n\n   c\n\t\nd *e*\n\ne *f*\n", "a\n\t\n2. b\n\n   c\n\t\nd *e*\n\ne _f_\n"],
+    ["a\n\t\n> b *c*\n", "a\n\t\n> b _c_\n"],
+    ["a\n\t\n> [!note]\n> b *c*\n", "a\n\t\n> [!note]\n> b _c_\n"],
+    ["a\n\t\n```\nx\n```\n\t\nb *c*\n", "a\n\t\n```\nx\n```\n\t\nb _c_\n"],
+    ["a\n\t\n$$\nx\n$$\n\t\nb *c*\n", "a\n\t\n$$\nx\n$$\n\t\nb _c_\n"],
+    ["a\n\t\n***\n\t\nb *c*\n", "a\n\t\n---\n\t\nb _c_\n"],
+    ["a\n\t\n<div>\nb\n</div>\n\nc *d*\n", "a\n\t\n<div>\nb\n</div>\n\nc _d_\n"],
+    // An empty line, or one of spaces, ends the paragraph.
+    ["a\n\t\nb *c*\n\nd *e*\n", "a\n\t\nb *c*\n\nd _e_\n"],
+    ["a\n\t\n  \nb *c*\n", "a\n\t\n\nb _c_\n"],
+    ["a\n  \n\t\nb *c*\n", "a\n\n\t\nb _c_\n"],
+    // Only paragraph text goes on below a tab line.
+    ["# a\n\t\nb *c*\n", "# a\n\t\nb _c_\n"],
+    ["| x |\n| - |\n\t\nb *c*\n", "| x   |\n| --- |\n\t\nb _c_\n"],
+    ["[r]: https://x.org\n\t\nb *c*\n", "[r]: https://x.org\n\t\nb _c_\n"],
+    // A tab left of the paragraph's column, in a list item or without a
+    // quote's marker, is a blank line.
+    ["- a\n\t\n  b *c*\n", "- a\n\t\n  b _c_\n"],
+    ["- a\n\t\nb *c*\n", "- a\n\t\nb _c_\n"],
+    ["1. a\n\t\n   b *c*\n", "1. a\n\t\n   b _c_\n"],
+    ["> a\n\t\n> b *c*\n", "> a\n\t\n> b _c_\n"],
+    ["> a\n\t\nb *c*\n", "> a\n\t\nb _c_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("formats such blocks in the other dialects", () => {
+    expect(
+      formatted("a\n\t\nb *c*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a\n\nb _c_\n");
+  });
+});
+
 describe("backticks that nothing closes in Obsidian", () => {
   // Live Preview shows the text after such a backtick as code, at least to the
   // end of its line, also from inside a highlight, an inline comment, or a link
@@ -1362,6 +1438,45 @@ describe("paragraph lines that Live Preview styles as a link reference definitio
   });
 });
 
+describe("underlined headings whose text Live Preview styles as a definition", () => {
+  // Live Preview styles a heading's one line of text that starts at the first
+  // column with `[`, a label, and `]:` as a link reference definition, and
+  // reads the underline as text, where Reading view and the parser read a
+  // heading (issue #397).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "[r]: a b\n===\n",
+    "[r]: a b\n---\n",
+    "[r]: a b\n=\n",
+    "[]: a b\n===\n",
+    "[a[b]: c\n===\n",
+    "[r]: a b\r\n===\r\n",
+    // Below a definition, where the heading's text starts on a later line.
+    "[s]: https://y.org\n[r]: a b\n===\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // The text is formatted; only the heading keeps its underline.
+    ["[r]: *a* b\n===\n", "[r]: _a_ b\n===\n"],
+    ["[r]: a b  \n===\n", "[r]: a b\n===\n"],
+    // A backslash, or other text between `]` and `:`, makes Live Preview read
+    // a heading.
+    ["\\[r]: a b\n===\n", "# \\[r]: a b\n"],
+    ["[r] : a b\n===\n", "# [r] : a b\n"],
+    ["[r][s]: a b\n===\n", "# [r][s]: a b\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such headings in the other dialects", () => {
+    expect(
+      formatted("[r]: a b\n===\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("# [r]: a b\n");
+  });
+});
+
 describe("blocks that Obsidian reads into a fence that a list item leaves open", () => {
   // Reading view continues such a fence with the unindented lines directly
   // below its container, and Live Preview with every block up to a line that
@@ -1440,6 +1555,82 @@ describe("tables that Obsidian reads otherwise", () => {
         config: { ...config, extends: ["recommended"], dialect: "github" },
       }),
     ).toBe("a\n| x   | y   |\n| --- | --- |\n");
+  });
+});
+
+describe("HTML blocks that Obsidian keeps inside a list item", () => {
+  // Reading view keeps an HTML block directly below a list inside the list's
+  // last item, where CommonMark ends the list, and so a list below the block
+  // continues it with every item whose marker matches, and the blocks there
+  // that start at the item's content are inside the item (issue #399).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "- a\n<div>\nb\n</div>\n\n* c\n",
+    "* a\n<div>\nb\n</div>\n\n- c\n",
+    "1) a\n<div>\nb\n</div>\n\n1. c\n",
+    "1. a\n<div>\nb\n</div>\n\n1) c\n",
+    "- a\n<!-- x -->\n\n* c\n",
+    "- a\n<!-- x -->\n* c\n",
+    "- a\n<pre>\nx\n</pre>\n\n* c\n",
+    "- a\r\n<div>\r\n</div>\r\n\r\n* c\r\n",
+    "> - a\n> <div>\n> b\n> </div>\n>\n> * c\n",
+    "- a\n  - b\n<div>\n</div>\n\n* c\n",
+    "- a\n  ```\n  x\n  ```\n<div>\n</div>\n\n* c\n",
+    "- # a\n<div>\n</div>\n\n* c\n",
+    "* a\n* b\n<div>\n</div>\n\n- c\n",
+    "- a\n<div>\nb\n</div>\n\n* c\n* d\n",
+    // The markers stay where a block follows that the item's spacing, which
+    // sets the column from which Reading view reads blocks inside it, could
+    // bring inside.
+    "-   a\n<div>\n</div>\n\n   d\n",
+    "*   a\n<div>\n</div>\n\n  * c\n",
+    "-   a\n<div>\n</div>\n\n    d\n\n* c\n",
+    // The blocks that start at the item's content keep their indentation and
+    // markers.
+    "- a\n<div>\n</div>\n\n  * d\n\n* c\n",
+    "- a\n<div>\n</div>\n\n   * d\n* c\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // The text is formatted; only the markers and indentation stay.
+    ["- a\n<div>\nb\n</div>\n\n- c *d*\n", "- a\n<div>\nb\n</div>\n\n- c _d_\n"],
+    ["- *a*\n<div>\n</div>\n\n* c\n", "- _a_\n<div>\n</div>\n\n* c\n"],
+    ["- a\n<div>\nb\n</div>\n\n  d *e*\n\n* c\n", "- a\n<div>\nb\n</div>\n\n  d _e_\n\n* c\n"],
+    // Nothing follows the HTML block, or a block that no spacing of the item
+    // could bring inside it.
+    ["* a\n<div>\n</div>\n", "- a\n<div>\n</div>\n"],
+    ["* a\n<div>\n</div>\n\n1. c\n", "- a\n<div>\n</div>\n\n1. c\n"],
+    ["*   a\n<div>\n</div>\n\n d\n", "- a\n<div>\n</div>\n\n d\n"],
+    // A list of another kind is moved to the first column first, where no
+    // spacing of the item reaches it.
+    ["*   a\n<div>\n</div>\n\n  1. c\n", "- a\n<div>\n</div>\n\n1. c\n"],
+    // An empty line between the list and the HTML block ends the list, and a
+    // paragraph at the first column below the block does too.
+    ["- a\n\n<div>\nb\n</div>\n\n* c\n", "- a\n\n<div>\nb\n</div>\n\n- c\n"],
+    ["* a\n<div>\nb\n</div>\n\nd\n\n- c\n", "- a\n<div>\nb\n</div>\n\nd\n\n- c\n"],
+    // A block quote or footnote definition does not keep the block.
+    ["> a\n<div>\n</div>\n\n* c\n", "> a\n<div>\n</div>\n\n- c\n"],
+    ["[^1]: a\n<div>\n</div>\n\n* c\n\nx[^1]\n", "[^1]: a\n<div>\n</div>\n\n- c\n\nx[^1]\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it.each(["- a\n<div>\n</div>\n\n* c\n", "- a\n<!-- x -->\n* c\n"])(
+    "keeps %j without the blank lines that style/block-spacing adds",
+    (source) => {
+      const spaced: Config = { ...config, rules: { "style/block-spacing": "warn" } };
+      expect(formatted(source, { config: spaced })).toBe(source);
+      expect(formatted("- a\n\n<pre>\nx\n</pre>\n* c\n", { config: spaced })).toBe(
+        "- a\n\n<pre>\nx\n</pre>\n\n- c\n",
+      );
+    },
+  );
+  it("formats such lists in the other dialects", () => {
+    expect(
+      formatted("- a\n<div>\nb\n</div>\n\n* c\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("- a\n<div>\nb\n</div>\n\n- c\n");
   });
 });
 
