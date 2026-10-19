@@ -233,12 +233,12 @@ function livePreview(lines) {
         else if (/\bcm-(?:hmd-barelink|link)\b/.test(classes))
           text = text.replace(/^X(?=\s|$)/, "x");
         // Unstyled text shows the source as written, where Live Preview reads no syntax, such as
-        // after an HTML tag, and so does what it styles as a comment or as code where Reading
-        // view reads neither, such as after `<!--` that nothing closes or a run of three
-        // backticks; Reading view catches a change of real code. Their words count, the syntax
+        // after an HTML tag, and so does what it styles as a comment where Reading view reads
+        // none, such as after `<!--` that nothing closes. Their words count, the syntax
         // characters that rules change do not, nor the case of a task's `x` or the number of a
-        // list item there, which `style/ordered-list` chooses.
-        if (!block.code && (!classes || /\bcm-(?:comment|inline-code)\b/.test(classes))) {
+        // list item there, which `style/ordered-list` chooses. Code counts as shown, also after
+        // a backtick that nothing closes, which no rule changes (#362).
+        if (!block.code && (!classes || /\bcm-comment\b/.test(classes))) {
           text = text
             .replace(/[^\p{L}\p{N}\s]/gu, "")
             .replace(/(^|\s)X(?=\s|$)/g, "$1x")
