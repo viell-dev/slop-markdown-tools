@@ -733,11 +733,12 @@ describe("text that the parser read in place of a list", () => {
       "Term\n\n: 2. Definition\n",
       "    code\n\n\\[ 2. \\]\n",
     ])
-      expect(texts(source, dialect), JSON.stringify(source)).toEqual({
-        text: [],
-        nested: [],
-        next: [],
-      });
+      expect(texts(source, dialect), JSON.stringify(source)).toEqual(
+        // Live Preview starts a list at `2. Two` there (issue #375).
+        dialect === "obsidian" && source === "Text\n2. Two\n"
+          ? { text: ["Text\n2. Two"], nested: [], next: [] }
+          : { text: [], nested: [], next: [] },
+      );
   });
   it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
     "finds such text in a footnote definition but not after a checkbox in the %s dialect",
@@ -1048,6 +1049,44 @@ describe("backticks that nothing closes in Obsidian", () => {
         config: { ...config, extends: ["recommended"], dialect: "github" },
       }),
     ).toBe("a ` b _c_ d\n");
+  });
+});
+
+describe("list items that Obsidian starts below a paragraph line", () => {
+  // Live Preview starts a list at an ordered item numbered other than 1, and
+  // Reading view at an empty item, where CommonMark reads text (issue #375).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "a\n3. b *c*\n",
+    "a\n10) b\n",
+    "a\n   3. b\n",
+    "- a\n  3. b *c*\n",
+    "a\n3. b\nc *d*\n",
+    "a\n3. b\n\n   c *d*\n",
+    "a\n* \n",
+    "a\n+ \n",
+    "a\n1.\n",
+    // The parser reads a heading here, where Obsidian shows text and an empty item.
+    "a\n- \n",
+    "> a\n> * \n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // Neither view starts an ordered list in a block quote.
+    ["> a\n> 3. b *c*\n", "> a\n> 3. b _c_\n"],
+    ["a *x*\n2.\n", "a _x_\n2.\n"],
+    // The block after the next one is no item of the list.
+    ["a\n3. b\n\nc\n\nd *e*\n", "a\n3. b\n\nc\n\nd _e_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such text in the other dialects", () => {
+    expect(
+      formatted("a\n3. b *c*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a 3. b _c_\n");
   });
 });
 

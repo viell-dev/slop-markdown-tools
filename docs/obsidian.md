@@ -69,6 +69,13 @@ note shows there, the tool keeps the text as written:
   to a run of the same length outside an indented code block, a fenced code
   block, or a list item. No rule changes them, nor a table that holds such a
   run.
+- A paragraph with a later line that starts a list item in Obsidian, where
+  CommonMark reads more of the paragraph: Live Preview starts a list at a number
+  other than 1 with text after it, as in `3. Step`, except in a block quote, and
+  Reading view at an empty item, `*`, `+`, `- `, or `1.`, as in `Text` and `- `
+  below it, which the parser reads as a heading. No rule changes such a
+  paragraph, nor the blocks below it that start further right than the marker,
+  which Live Preview reads inside the item, or the block after those.
 
 ## Vaults inside a larger workspace
 

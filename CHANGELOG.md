@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, no rule changes a paragraph with a later line that
+  Obsidian reads as starting a list item where CommonMark reads text: a number
+  other than 1 with text after it, which Live Preview reads as a list item, and
+  an empty item such as `*` or `- `, which Reading view reads as one, nor the
+  blocks indented below it. Before, `style/wrap` joined such a line into the
+  paragraph and `style/heading` wrote `Text` with `- ` below it as `## Text`.
 - In the Obsidian dialect, no rule changes a paragraph, heading, or table cell
   with a backtick that no run of backticks closes, also in a highlight, an
   inline comment, or the text of a link or image. Live Preview shows the text
