@@ -7,8 +7,17 @@ import type { Document } from "../core/types.js";
  * or `)`, and then a space, a tab, or the end of the line.
  */
 export const listMarker = /^(?:[-+*]|\d{1,9}[.)])(?:[ \t\r\n]|$)/;
+/**
+ * A line whose content, after blank space and block quote markers, starts with
+ * `:` and a space or tab. In a paragraph, such a line opens a definition
+ * description on Forgejo and Gitea.
+ */
+export const descriptionLine = /^[ \t>]*:[ \t]/m;
 
-/** Text that the parser read where renderers may read a list, and the blocks after it. */
+/**
+ * Text that the parser read where renderers may read a list, or on Forgejo and
+ * Gitea a definition description, and the blocks after it.
+ */
 export interface MisreadLists {
   /**
    * Paragraphs, and headings underlined with `===` or `---`, whose text starts
@@ -16,17 +25,24 @@ export interface MisreadLists {
    */
   text: ReadonlySet<Nodes>;
   /**
-   * The blocks after such text in its container whose first lines start
-   * further right than the text, up to one that does not. Renderers may read
-   * them inside the list's last item, where their indentation counts from the
-   * item's text: an indented code block can be a paragraph there.
+   * The blocks after such text, or after a description, in its container whose
+   * first lines start further right than the text, up to one that does not.
+   * Renderers may read them inside the list's last item or the description,
+   * where their indentation counts from the item's text: an indented code block
+   * can be a paragraph there.
    */
   nested: ReadonlySet<Nodes>;
   /**
-   * The block after those, which starts no further right than the text.
-   * Renderers may read it as more items of the list.
+   * The block after those below such text, which starts no further right than
+   * the text. Renderers may read it as more items of the list.
    */
   next: ReadonlySet<Nodes>;
+  /**
+   * In the Forgejo and Gitea dialects, paragraphs with a line that opens a
+   * definition description, as `Term` and `: 2. x` do. Those renderers read
+   * the description as blocks, here an ordered list (issue #344).
+   */
+  descriptions: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -51,14 +67,21 @@ const found = new WeakMap<Root, MisreadLists>();
  * continues it too, and a block there is nested: a `---` would underline it.
  * Where such text ends a list item or block quote, renderers continue it
  * lazily into a paragraph or heading on the next line below the container.
+ *
+ * Forgejo and Gitea read a definition list, which the parser reads as text:
+ * `Term` and a line `: 2. x` below it are a term and a description, and the
+ * description holds blocks, here an ordered list, as a list item does. The
+ * blocks indented below it in its container belong to it too (issue #344).
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
   if (known) return known;
   const { source } = document;
+  const forge = document.dialect === "forgejo" || document.dialect === "gitea";
   const text = new Set<Nodes>();
   const nested = new Set<Nodes>();
   const next = new Set<Nodes>();
+  const descriptions = new Set<Nodes>();
   /** The column of the first character from `offset` on, after spaces and tabs. */
   const columnAt = (offset: number) => {
     let start = offset;
@@ -88,10 +111,24 @@ export function misreadLists(document: Document): MisreadLists {
     let continued: number | undefined;
     /** Whether that text ends the last block, a container, rather than being it. */
     let inside = false;
+    /** The column of the last definition description while the blocks after it may belong to it. */
+    let described: number | undefined;
     parent.children.forEach((child, index) => {
       const offset = child.position?.start.offset;
       if (offset === undefined) return;
       const start = textStart(child);
+      if (described !== undefined) {
+        if (columnAt(offset) > described) nested.add(child);
+        else described = undefined;
+      }
+      if (
+        forge &&
+        start !== undefined &&
+        descriptionLine.test(source.slice(offset, child.position!.end.offset))
+      ) {
+        descriptions.add(child);
+        described = Math.min(described ?? columnAt(offset), columnAt(offset));
+      }
       // Renderers continue the text lazily on the line below the container
       // that it ends, but only with text (issue #343).
       const adjacent =
@@ -128,7 +165,7 @@ export function misreadLists(document: Document): MisreadLists {
     return continued;
   };
   visit(document.tree);
-  const result = { text, nested, next };
+  const result = { text, nested, next, descriptions };
   found.set(document.tree, result);
   return result;
 }

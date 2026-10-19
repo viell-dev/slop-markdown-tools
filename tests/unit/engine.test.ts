@@ -892,6 +892,70 @@ describe("text that the parser read in place of a list", () => {
   });
 });
 
+describe("definition descriptions on Forgejo and Gitea", () => {
+  // Forgejo and Gitea read `Term` and a line `: …` below it as a definition
+  // list, whose description holds blocks, and the blocks indented below it are
+  // part of the description. The parser reads text there (issue #344).
+  const forges = ["forgejo", "gitea"] as const;
+  const preset = (dialect: Dialect): ProcessOptions => ({
+    config: { extends: ["recommended", dialect], dialect },
+    workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
+  });
+  const found = (source: string, dialect: Dialect) => {
+    const { descriptions, nested } = misreadLists(parse(source, dialect));
+    const sources = (nodes: ReadonlySet<Nodes>) =>
+      [...nodes].map((node) => source.slice(...range(node)));
+    return { descriptions: sources(descriptions), nested: sources(nested) };
+  };
+  it.each(forges)("finds a description and the blocks below it in the %s dialect", (dialect) => {
+    expect(found("Term\n: 2. x\n", dialect)).toEqual({
+      descriptions: ["Term\n: 2. x"],
+      nested: [],
+    });
+    expect(found("Term\n: *a*\n  * b\n\n- c\n", dialect)).toEqual({
+      descriptions: ["Term\n: *a*"],
+      nested: ["* b"],
+    });
+    expect(found("> Term\n> :\tx\n>   1. y\n", dialect)).toEqual({
+      descriptions: ["Term\n> :\tx"],
+      nested: ["1. y"],
+    });
+    expect(found("Term\n\n: x\n", dialect).descriptions).toEqual([": x"]);
+    expect(found("Term\nx: y\n", dialect).descriptions).toEqual([]);
+  });
+  it("finds none in the other dialects", () => {
+    for (const dialect of dialects.filter((name) => name !== "forgejo" && name !== "gitea"))
+      expect(found("Term\n: *a*\n  * b\n", dialect), dialect).toEqual({
+        descriptions: [],
+        nested: [],
+      });
+  });
+  it.each(forges)(
+    "leaves a description and the blocks below it as written in the %s dialect",
+    (dialect) => {
+      for (const source of [
+        // `style/emphasis` changed code, and the list rules moved lists out
+        // of the description; on Forgejo, a heading's anchor changed.
+        "Term\n: ```js\n  let *a* = 1;\n  ```\n",
+        "Term\n: *a*\n  * b\n",
+        "Term\n: 2. *x*\n   1. *y*\n",
+        "Term\n: # *h*\n",
+        "> Term\n> : *a*\n>   * b\n",
+      ])
+        expect(formatted(source, preset(dialect)), JSON.stringify(source)).toBe(source);
+    },
+  );
+  it.each(forges)("still formats the blocks around it in the %s dialect", (dialect) => {
+    expect(formatted("Term *x*\n\n: *a*\n\n* c *d*\n", preset(dialect))).toBe(
+      "Term _x_\n\n: *a*\n\n- c _d_\n",
+    );
+  });
+  it("formats such text in the other dialects", () => {
+    const config: Config = { extends: [], dialect: "github", rules: { "style/emphasis": "warn" } };
+    expect(formatted("Term\n: *a*\n", { config })).toBe("Term\n: _a_\n");
+  });
+});
+
 describe("the block directly below TOML front matter", () => {
   // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
   // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,

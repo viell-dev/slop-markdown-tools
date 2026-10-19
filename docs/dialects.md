@@ -127,8 +127,11 @@ On GitHub, Forgejo, and Gitea, more fragments are valid:
 Both render GitHub Markdown and more. The tool parses their documents as GitHub
 Markdown and protects the rest:
 
-- A paragraph with a definition description (a line starting with `: `) or a
-  display-math line starting with `\[` is not wrapped.
+- A definition description, a line starting with `: ` below its term, holds
+  blocks on Forgejo and Gitea, as a list item does, and so do the lines indented
+  below it: `: 2. Step` is a list there, and a fence starts code. No rule
+  changes the paragraph with such a line or the blocks indented below it. A
+  paragraph with a display-math line starting with `\[` is not wrapped.
 - `\(…\)` math and `[[…]]` shortlinks on one line are kept whole; a pair split
   across lines keeps its paragraph from being wrapped. Emphasis markers inside
   `\(…\)` are not changed, and code spans are not joined where that would put
