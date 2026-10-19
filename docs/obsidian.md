@@ -111,6 +111,14 @@ note shows there, the tool keeps the text as written:
   Preview everything up to a line that would close the fence, and the fences
   after that otherwise than CommonMark. No rule changes the code block or
   anything below it.
+- A table that Obsidian reads otherwise. Obsidian reads a table directly below a
+  line of paragraph text as more of the text, a one-column table whose header
+  line does not end with a pipe, as in `Name` and `--:` below it, as text, and a
+  line without a pipe as the end of a table, where CommonMark's tables read a
+  row. Reading view reads a line with a pipe above a delimiter row that starts
+  with `- `, as in `Name | Value` and `- | -` below it, as a table, where
+  CommonMark reads a paragraph and a list. No rule changes such a table, those
+  rows, or that line and list.
 
 ## Vaults inside a larger workspace
 
