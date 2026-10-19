@@ -188,39 +188,6 @@ export function misreadLists(document: Document): MisreadLists {
   };
   visit(document.tree);
   const htmlText = new Set<Nodes>();
-  if (document.dialect === "obsidian") {
-    const lines = source.split(/\r\n|\r|\n/);
-    /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
-    const spaced = (number: number) => {
-      const line = lines[number - 1] ?? "";
-      return /^[ \t>]*$/.test(line) && /[^>]/.test(line);
-    };
-    const continued = (parent: Parents) => {
-      /** Whether the last block is an HTML block, or its text, that the next block may continue. */
-      let open = false;
-      parent.children.forEach((child, index) => {
-        const previous = parent.children[index - 1];
-        if (open && previous?.position && child.position) {
-          for (let line = previous.position.end.line + 1; line < child.position.start.line; line++)
-            if (!spaced(line)) open = false;
-          if (open) htmlText.add(child);
-        }
-        // Other HTML blocks end at their own end marker, as a comment does at `-->`.
-        if (
-          !open &&
-          child.type === "html" &&
-          child.position &&
-          !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
-            child.value,
-          )
-        )
-          open = spaced(child.position.end.line + 1);
-        if (!htmlText.has(child) && "children" in child && !leaves.has(child.type))
-          continued(child);
-      });
-    };
-    continued(document.tree);
-  }
   const unclosedCode = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
@@ -236,6 +203,37 @@ export function misreadLists(document: Document): MisreadLists {
         );
     };
     collect(document.tree, false);
+    const lines = source.split(/\r\n|\r|\n/);
+    /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
+    const spaced = (number: number) => {
+      const line = lines[number - 1] ?? "";
+      return /^[ \t>]*$/.test(line) && /[^>]/.test(line);
+    };
+    /**
+     * Whether the last leaf block is an HTML block that ends at a blank line, or
+     * text that Obsidian reads as more of one, which the next block may continue.
+     * Leaf blocks count, not containers, because an empty line inside a list
+     * ends the HTML block there.
+     */
+    let open = false;
+    order.forEach(([leaf], index) => {
+      const previous = order[index - 1]?.[0];
+      if (open && previous?.position && leaf.position) {
+        for (let line = previous.position.end.line + 1; line < leaf.position.start.line; line++)
+          if (!spaced(line)) open = false;
+        if (open) htmlText.add(leaf);
+      }
+      // Other HTML blocks end at their own end marker, as a comment does at `-->`.
+      if (
+        !open &&
+        leaf.type === "html" &&
+        leaf.position &&
+        !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
+          leaf.value.trimStart(),
+        )
+      )
+        open = spaced(leaf.position.end.line + 1);
+    });
     /**
      * The runs of backticks that nothing closes in the text of `node`, outside
      * code, math, and wikilinks. Live Preview starts code at them also inside a

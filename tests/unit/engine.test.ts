@@ -978,6 +978,9 @@ describe("blocks that Obsidian reads into an HTML block above them", () => {
     ["<!-- c -->\n  \n*a* b\n", "<!-- c -->\n  \n_a_ b\n"],
     ["<pre>\nx\n</pre>\n  \n*a* b\n", "<pre>\nx\n</pre>\n  \n_a_ b\n"],
     ["<script>\n</script>\n  \n*a* b\n", "<script>\n</script>\n  \n_a_ b\n"],
+    ["  <!-- c -->\n  \n*a* b\n", "  <!-- c -->\n  \n_a_ b\n"],
+    // An empty line in a list ends the HTML block there.
+    ["</div>\n  \n- *a*\n\n  *b*\n", "</div>\n  \n- *a*\n\n  _b_\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config })).toBe(output);
   });
