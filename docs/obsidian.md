@@ -95,6 +95,22 @@ note shows there, the tool keeps the text as written:
   item's text, as in `- Text` and `more` below it, and the blocks after it in
   the item. Live Preview reads those blocks outside the list, where an indented
   paragraph is code. No rule changes the paragraph or those blocks.
+- A footnote definition directly below a line of paragraph text, also one that
+  ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
+  Reading view reads the definition as more of the paragraph, and its indented
+  lines as code. No rule changes the definition or the end of the line above it.
+  Below a blank line, a heading, or another definition, it is a footnote.
+- A line directly below a link reference definition that starts further right
+  than the definition, as in `[ref]: https://example.com` and `    Text` below
+  it. Reading view reads it as an indented code block from four columns right of
+  the container's content. No rule changes the paragraph or heading that it
+  starts.
+- A fenced code block that a list item or block quote ends before its closing
+  fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
+  as more of the code: Reading view those directly below the list or quote, Live
+  Preview everything up to a line that would close the fence, and the fences
+  after that otherwise than CommonMark. No rule changes the code block or
+  anything below it.
 
 ## Vaults inside a larger workspace
 
