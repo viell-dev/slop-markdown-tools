@@ -859,6 +859,38 @@ describe("style/emphasis and style/strong on Gitea", () => {
   });
 });
 
+describe("style/emphasis and style/strong in Obsidian, next to a * or _ that is text", () => {
+  const rules: Record<string, RuleSetting> = { "style/emphasis": "warn", "style/strong": "warn" };
+  // Obsidian's Reading view pairs a `*` or `_` that CommonMark leaves as text
+  // with a later one: `snake_case and _em_` shows `case and _em` as emphasis,
+  // and `a * b *c*` shows ` b ` (issue #361).
+  it.each([
+    ["snake_case and *em*\n", "snake_case and _em_\n"],
+    ["See file_name.md and *this*.\n", "See file_name.md and _this_.\n"],
+    ["a * b *c*\n", "a * b _c_\n"],
+    ["5 * 3 = 15 and __bold__\n", "5 * 3 = 15 and **bold**\n"],
+    ["a ** b __c__\n", "a ** b **c**\n"],
+    ["- an item with snake_case and *em*\n", "- an item with snake_case and _em_\n"],
+    ["| a_b and *c* |\n| - |\n", "| a_b and _c_ |\n| - |\n"],
+    ["# snake_case and *em*\n", "# snake_case and _em_\n"],
+  ])("leaves %j as written", (source, github) => {
+    expect(formatted(source, only(rules, "obsidian"))).toBe(source);
+    expect(formatted(source, only(rules, "github"))).toBe(github);
+  });
+  it.each([
+    // Escaped, in code, in math, or in a wikilink, a `*` or `_` is not text that pairs.
+    ["a \\_ b *c*\n", "a \\_ b _c_\n"],
+    ["`snake_case` and *em*\n", "`snake_case` and _em_\n"],
+    ["$a_b$ and *em*\n", "$a_b$ and _em_\n"],
+    ["[[snake_case]] and *em*\n", "[[snake_case]] and _em_\n"],
+    // The other paragraphs and table cells are formatted, which Obsidian reads on their own.
+    ["| a_b | *c* |\n| - | - |\n", "| a_b | _c_ |\n| - | - |\n"],
+    ["snake_case\n\n*em* and __b__\n", "snake_case\n\n_em_ and **b**\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, only(rules, "obsidian"))).toBe(output);
+  });
+});
+
 describe("style/emphasis and style/strong on long lines", () => {
   /** The lines that hold a range, searched character by character. */
   function lineOf(source: string, start: number, end: number): [number, number] {

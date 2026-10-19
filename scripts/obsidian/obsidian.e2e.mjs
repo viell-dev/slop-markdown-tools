@@ -108,7 +108,16 @@ async function shown(path, text) {
         }
         if (top + scroller.clientHeight >= scroller.scrollHeight) break;
       }
-      return { reading, lines: [...lines].sort((a, b) => a[0] - b[0]).map(([, line]) => line) };
+      // Reading view itself, for documents short enough that it renders all their sections.
+      await leaf.setViewState({ type: "markdown", state: { file: path, mode: "preview" } });
+      await settle(300);
+      const preview =
+        leaf.view.containerEl.querySelector(".markdown-preview-sizer")?.innerHTML ?? "";
+      return {
+        reading,
+        preview,
+        lines: [...lines].sort((a, b) => a[0] - b[0]).map(([, line]) => line),
+      };
     },
     path,
     text,
@@ -308,11 +317,15 @@ describe("Obsidian before and after formatting", function () {
     for (const [index, source] of probe.entries()) {
       const path = `probes/${index}.md`;
       await obsidianPage.write(path, source);
-      const { reading, lines } = await shown(path, source);
-      const views = { reading: cleanHtml(reading), livePreview: livePreview(lines) };
+      const { reading, preview, lines } = await shown(path, source);
+      const views = {
+        reading: cleanHtml(reading),
+        preview: cleanHtml(preview),
+        livePreview: livePreview(lines),
+      };
       shownProbes.push({ source, ...views });
       console.log(
-        `${JSON.stringify(source)}\n  reading: ${views.reading}\n  live preview: ${JSON.stringify(views.livePreview)}`,
+        `${JSON.stringify(source)}\n  reading: ${views.reading}\n  reading view: ${views.preview}\n  live preview: ${JSON.stringify(views.livePreview)}`,
       );
     }
     writeFileSync("/out/probes.json", `${JSON.stringify(shownProbes, null, 2)}\n`);
