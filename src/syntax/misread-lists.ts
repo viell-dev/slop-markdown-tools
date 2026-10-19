@@ -68,6 +68,23 @@ export interface MisreadLists {
    * first line, with the marker of a list item there.
    */
   htmlText: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the underlined headings whose underline one of the
+   * views reads as text: Reading view one with blank space after it, or before
+   * it beyond the heading's text, and Live Preview a lone `-` (issue #383); and
+   * the paragraphs in a block quote or list item with a lazy line of `=` or
+   * `-`, which Reading view reads as an underline (issue #377). Each counts
+   * from the line break before the underline to the end of its line.
+   */
+  underlines: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the paragraphs of a list item with a lazy line,
+   * one that starts left of the item's content, with the blocks after them in
+   * the item, which Live Preview reads outside the list (issue #376). Each
+   * counts as one stretch, from the start of the paragraph's first line to the
+   * end of the item's last block.
+   */
+  lazyItems: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -228,6 +245,8 @@ export function misreadLists(document: Document): MisreadLists {
   visit(document.tree);
   const htmlText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
+  const underlines = new Set<Nodes>();
+  const lazyItems = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
@@ -349,8 +368,107 @@ export function misreadLists(document: Document): MisreadLists {
       const close = after.findIndex(([, length]) => length === long[1]);
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
     }
+    /** The offsets where the line holding `offset` starts and ends. */
+    const lineAround = (offset: number): [number, number] => {
+      let start = offset;
+      while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r") start--;
+      let end = offset;
+      while (end < source.length && source[end] !== "\n" && source[end] !== "\r") end++;
+      return [start, end];
+    };
+    /** Where each line from `start` to `end` after the first starts and ends. */
+    const laterLines = (start: number, end: number): [number, number][] => {
+      const found: [number, number][] = [];
+      const breaks = /\r\n|\r|\n/g;
+      breaks.lastIndex = start;
+      for (let at = breaks.exec(source); at && at.index < end; at = breaks.exec(source)) {
+        const from = at.index + at[0].length;
+        found.push([from, Math.min(lineAround(from)[1], end)]);
+      }
+      return found;
+    };
+    /** A copy of `node` from the line break before `from` to `to`. */
+    const breakBefore = (node: Nodes, from: number, to: number): Nodes => {
+      const { start, end } = node.position!;
+      return {
+        ...node,
+        position: { start: { ...start, offset: from - 1 }, end: { ...end, offset: to } },
+      } as Nodes;
+    };
+    /** `first` to `last` as one block, from the start of its first line to the end of its last. */
+    const wholeLines = (first: Nodes, last = first): Nodes => {
+      const start = first.position!.start;
+      const end = last.position!.end;
+      return {
+        ...first,
+        position: {
+          start: { ...start, offset: lineAround(start.offset!)[0], column: 1 },
+          end: { ...end, offset: lineAround(end.offset!)[1] },
+        },
+      } as Nodes;
+    };
+    const visitLines = (parent: Parents) =>
+      parent.children.forEach((child, index) => {
+        const start = child.position?.start.offset;
+        const end = child.position?.end.offset;
+        if (start === undefined || end === undefined) return;
+        if (child.type === "heading" && source[start] !== "#") {
+          // The underline: blank space after it, or before it beyond the
+          // heading's text, makes Reading view read text, and a lone `-` makes
+          // Live Preview read text (issue #383). It stays on its own line, as
+          // written.
+          const [from, to] = lineAround(end);
+          const underline = source.slice(from, to);
+          const prefix = /^[ \t>]*/.exec(underline)![0].length;
+          if (
+            from > start &&
+            (/[ \t]$/.test(underline) ||
+              /^[ \t>]*-[ \t]*$/.test(underline) ||
+              columnAt(from + prefix) > columnAt(textStart(child) ?? start))
+          )
+            underlines.add(breakBefore(child, from, to));
+        }
+        if (
+          child.type === "paragraph" &&
+          (parent.type === "blockquote" || parent.type === "listItem")
+        ) {
+          const later = laterLines(start, end);
+          // A lazy line of `=` or `-` underlines the text in Reading view,
+          // where the parser reads more of the text (issue #377). It stays on
+          // its own line, as written.
+          for (const [from, to] of later)
+            if (/^[ \t>]*(?:=+|-+)[ \t]*$/.test(source.slice(from, to)))
+              underlines.add(breakBefore(child, from, to));
+          // A lazy line, left of the item's content, ends the item in Live
+          // Preview for the blocks after it (issue #376).
+          const content = parent.children[0]?.position?.start.offset;
+          if (
+            parent.type === "listItem" &&
+            index < parent.children.length - 1 &&
+            content !== undefined &&
+            later.some(([from, to]) => {
+              let at = from;
+              while (at < to && (source[at] === " " || source[at] === "\t" || source[at] === ">"))
+                at++;
+              return columnAt(at) < columnAt(content);
+            })
+          )
+            lazyItems.add(wholeLines(child, parent.children.at(-1)!));
+        }
+        if ("children" in child && !leaves.has(child.type)) visitLines(child);
+      });
+    visitLines(document.tree);
   }
-  const result = { text, nested, next, descriptions, unclosedCode, htmlText };
+  const result = {
+    text,
+    nested,
+    next,
+    descriptions,
+    unclosedCode,
+    htmlText,
+    underlines,
+    lazyItems,
+  };
   found.set(document.tree, result);
   return result;
 }
