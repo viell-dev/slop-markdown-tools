@@ -1566,13 +1566,18 @@ describe("Obsidian comments that start a line", () => {
     expect(blocks("a\n%%c%% d\n")).toEqual(["paragraph"]);
     expect(blocks("a\n%%\nc\n%%\n")).toEqual(["paragraph"]);
     expect(blocks("%%c%% d\nx\n")).toEqual(["paragraph"]);
-    expect(blocks("- a\n  %%c%% d\n")).toEqual(["list"]);
+    const item = parse("- a\n  %%c%% d\n", "obsidian").tree.children[0];
+    expect(item?.type === "list" && item.children[0]?.children.map((node) => node.type)).toEqual([
+      "paragraph",
+    ]);
     expect(textContent(parse("a\n%%c%% d\n", "obsidian").tree)).toBe("a\n d");
   });
   it("still reads a comment that stands on its own lines as a block", () => {
     expect(blocks("a\n\n%%c%%\n\nb\n")).toEqual(["paragraph", "obsidianComment", "paragraph"]);
     expect(blocks("%%\none\n\ntwo\n%%\n")).toEqual(["obsidianComment"]);
-    expect(blocks("%%c%%  \n")).toEqual(["obsidianComment"]);
+    // Blank space, spaces or tabs, may follow the closing `%%`.
+    for (const source of ["%%c%%  \n", "%%c%%\t\n", "%%c%% \t \n"])
+      expect(blocks(source), JSON.stringify(source)).toEqual(["obsidianComment"]);
   });
   it("keeps the hard break above such a comment", () => {
     const config = only({ "style/trailing-space": "warn" }, "obsidian");
