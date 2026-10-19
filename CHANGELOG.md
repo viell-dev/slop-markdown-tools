@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, `style/wrap` keeps an inline footnote, `^[…]`, on one
+  line, and keeps the lines of a paragraph with one that spans lines. Live
+  Preview shows an inline footnote whose text spans lines as Markdown source,
+  and the rule broke lines inside it.
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
