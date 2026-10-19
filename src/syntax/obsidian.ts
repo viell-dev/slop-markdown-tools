@@ -102,12 +102,16 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
 };
 
 // Standalone comment blocks may cross blank lines. Keep their complete source opaque.
+// Obsidian reads a comment as inline wherever a paragraph is open, so one that
+// would interrupt a paragraph, or that text follows on the line where it
+// closes, is left to the inline construct and continues the paragraph (#357).
 const tokenizeBlockComment: Tokenizer = function (effects, ok, nok) {
+  const interrupt = this.interrupt;
   let opened = 0;
   let previous: number | null = null;
   let closed = false;
   const start: State = (code) => {
-    if (code !== 37) return nok(code);
+    if (code !== 37 || interrupt) return nok(code);
     if (opened === 0) {
       effects.enter("obsidianBlockComment");
       effects.enter("obsidianCommentData");
@@ -130,6 +134,8 @@ const tokenizeBlockComment: Tokenizer = function (effects, ok, nok) {
       previous = null;
       return before;
     }
+    // Only blank space may follow the closing `%%` on its line.
+    if (closed && code !== 32 && code !== -1 && code !== -2) return nok(code);
     effects.consume(code);
     if (code === 37 && previous === 37) closed = true;
     previous = code;
