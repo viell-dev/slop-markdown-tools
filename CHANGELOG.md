@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.2.4 - 2026-10-19
 
 ### Fixed
 
