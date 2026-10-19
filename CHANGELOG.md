@@ -18,6 +18,15 @@ prereleases' notes there are longer than their entries here.
   and also a link to a later heading with the same text, which the renderers
   number from that description's heading on
   ([#389](https://github.com/viell-dev/slop-markdown-tools/pull/389)).
+- In the Obsidian dialect, no rule changes a table that Obsidian reads
+  otherwise: one directly below a line of paragraph text, which Obsidian reads
+  as more of the text, a one-column table whose header line does not end with a
+  pipe, which it reads as text, and the rows from the first one without a pipe,
+  where its table ends. Nor does any rule change a line with a pipe above
+  `- | -`, which Reading view reads as a table header. Before, `style/table`
+  aligned or wrote pipes into such text, and Obsidian then showed a table, or
+  showed a row inside one
+  ([#394](https://github.com/viell-dev/slop-markdown-tools/pull/394)).
 
 ## 0.2.5 - 2026-10-19
 

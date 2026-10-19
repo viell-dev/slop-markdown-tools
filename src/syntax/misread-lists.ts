@@ -68,6 +68,17 @@ export interface MisreadLists {
    * first line, with the marker of a list item there.
    */
   htmlText: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the tables that Obsidian reads otherwise, and the
+   * lines around them (issue #359): a table directly below a line of paragraph
+   * text, which Obsidian reads as more of the text; a one-column table whose
+   * header line does not end with a pipe, which it reads as text; the rows of
+   * a table from the first without a pipe, which ends the table there; and a
+   * line with a pipe above a list item that reads as a delimiter row, as
+   * `x | y` and `- | -` do, which Reading view reads as a table. Each counts
+   * from the line break or line where Obsidian's reading starts to differ.
+   */
+  tableText: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -227,6 +238,7 @@ export function misreadLists(document: Document): MisreadLists {
   };
   visit(document.tree);
   const htmlText = new Set<Nodes>();
+  const tableText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
@@ -349,8 +361,74 @@ export function misreadLists(document: Document): MisreadLists {
       const close = after.findIndex(([, length]) => length === long[1]);
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
     }
+    /** Where the line holding `offset` starts. */
+    const startOfLine = (offset: number) => {
+      let at = offset;
+      while (at > 0 && source[at - 1] !== "\n" && source[at - 1] !== "\r") at--;
+      return at;
+    };
+    /** A copy of `node` from `start` to its end. */
+    const from = (node: Nodes, start: number): Nodes =>
+      ({
+        ...node,
+        position: { ...node.position!, start: { ...node.position!.start, offset: start } },
+      }) as Nodes;
+    /** Whether `line` holds a pipe that no backslash escapes. */
+    const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
+    /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
+    const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
+    order.forEach(([leaf], index) => {
+      const previous = order[index - 1]?.[0];
+      const start = leaf.position?.start.offset;
+      const end = leaf.position?.end.offset;
+      if (start === undefined || end === undefined) return;
+      // Directly below a line of paragraph text, from the end of that line.
+      const below =
+        previous?.type === "paragraph" &&
+        previous.position !== undefined &&
+        previous.position.end.line === leaf.position!.start.line - 1;
+      if (leaf.type === "table") {
+        const rows = source.slice(start, end).split(/\r\n|\r|\n/);
+        if (below) {
+          let at = previous.position!.end.offset!;
+          while (source[at - 1] === " " || source[at - 1] === "\t") at--;
+          tableText.add(from(leaf, at));
+        } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
+          tableText.add(from(leaf, startOfLine(start)));
+        else {
+          // The rows from the first without a pipe, from the line break above it.
+          const parts = source.slice(start, end).split(/(\r\n|\r|\n)/);
+          for (let part = 0, at = start; part < parts.length; part += 2) {
+            if (part >= 4 && !piped(parts[part]!)) {
+              tableText.add(from(leaf, at - parts[part - 1]!.length));
+              break;
+            }
+            at += parts[part]!.length + (parts[part + 1]?.length ?? 0);
+          }
+        }
+      }
+      // `x | y` above `- | -`: Reading view reads a table, the parser a
+      // paragraph and a list item.
+      if (
+        below &&
+        leaf.type === "paragraph" &&
+        previous.position!.start.line === previous.position!.end.line &&
+        piped(source.slice(previous.position!.start.offset, previous.position!.end.offset)) &&
+        listedDelimiter.test(source.slice(startOfLine(start), end).split(/\r\n|\r|\n/)[0]!)
+      )
+        tableText.add({
+          ...leaf,
+          position: {
+            start: {
+              ...previous.position!.start,
+              offset: startOfLine(previous.position!.start.offset!),
+            },
+            end: leaf.position!.end,
+          },
+        } as Nodes);
+    });
   }
-  const result = { text, nested, next, descriptions, unclosedCode, htmlText };
+  const result = { text, nested, next, descriptions, unclosedCode, htmlText, tableText };
   found.set(document.tree, result);
   return result;
 }

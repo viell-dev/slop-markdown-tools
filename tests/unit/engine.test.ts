@@ -1133,6 +1133,49 @@ describe("list items that Obsidian starts below a paragraph line", () => {
   });
 });
 
+describe("tables that Obsidian reads otherwise", () => {
+  // Obsidian reads a table directly below paragraph text as more of the text,
+  // a one-column table whose header line does not end with a pipe as text, and
+  // a line without a pipe as the end of a table; Reading view reads a line
+  // with a pipe above `- | -` as a table (issue #359).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "a\n| x | y |\n| - | - |\n| 1 | 2 |\n",
+    "a  \n| x | y |\n| - | - |\n",
+    "| x |\n| - |\n{% y %}\n",
+    "| x |\n| - |\n| 1 |\ny *z*\n",
+    "| x | w |\n| - | - |\ny *z*\n\nv\n",
+    "| x | w |\r\n| - | - |\r\n| 1 | 2 |\r\ny *z*\r\n",
+    "x | y\n- | :-:\nw | z\n",
+    "x | y\n- | -\n",
+    "x\n--:\n",
+    "x\n:-:\n",
+    "| x\n| --\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config, workspace })).toBe(source);
+  });
+  it.each([
+    // The text above is formatted; only the table stays as written.
+    ["a *b*\n| x |\n| - |\n", "a _b_\n| x |\n| - |\n"],
+    ["a\n\n| x | y |\n| - | - |\n", "a\n\n| x   | y   |\n| --- | --- |\n"],
+    ["# h\n| x | y |\n| - | - |\n", "# h\n| x   | y   |\n| --- | --- |\n"],
+    ["x |\n-- |\n", "| x   |\n| --- |\n"],
+    ["x | y\n-|-\nw | z\n", "| x   | y   |\n| --- | --- |\n| w   | z   |\n"],
+    // The parser reads this as Obsidian does: text of the block quote.
+    ["> a\n| x | y |\n| - | - |\n", "> a | x | y | | - | - |\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("formats such tables in the other dialects", () => {
+    expect(
+      formatted("a\n| x | y |\n| - | - |\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a\n| x   | y   |\n| --- | --- |\n");
+  });
+});
+
 describe("the block directly below TOML front matter", () => {
   // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
   // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,
