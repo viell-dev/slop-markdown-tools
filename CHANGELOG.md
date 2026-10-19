@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.2.4 - 2026-10-19
 
 ### Fixed
 
@@ -16,7 +16,8 @@ prereleases' notes there are longer than their entries here.
   any more, a line starting with `: ` below its term, or the blocks indented
   below it. Forgejo and Gitea read the description as blocks, where the parser
   reads text: `style/emphasis` changed code in a fenced block there and the
-  anchor of a heading, and the list rules moved a list out of the description.
+  anchor of a heading, and the list rules moved a list out of the description
+  ([#354](https://github.com/viell-dev/slop-markdown-tools/pull/354)).
 
 ## 0.2.3 - 2026-10-19
 

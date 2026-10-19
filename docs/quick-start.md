@@ -6,7 +6,7 @@ mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.2.3
+npm install --save-dev --save-exact mdrefine@0.2.4
 npx --no-install mdtools --help
 ```
 
