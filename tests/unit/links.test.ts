@@ -1555,6 +1555,47 @@ describe("files that could not be read", () => {
   });
 });
 
+describe("relative paths to files and folders whose names start with a dot (#356)", () => {
+  const workspace = createWorkspace(
+    {
+      "README.md": "",
+      ".gitignore": "",
+      ".github/workflows/ci.yml": "",
+      "docs/a.md": "",
+      "docs/.hidden.md": "",
+    },
+    { dialect: "github" },
+  );
+  const relative = (path: string, source: string, leadingDot: boolean) => {
+    const config: Config = {
+      extends: [],
+      dialect: "github",
+      rules: { "links/path": ["warn", { style: "relative", leadingDot }] },
+    };
+    const result = format(source, { path, config, workspace });
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(format(result.output, { path, config, workspace }).output).toBe(result.output);
+    return result.output;
+  };
+  it("keeps or adds ./ before such a name with leadingDot", () => {
+    expect(
+      relative(
+        "README.md",
+        "[a](./.gitignore) [b](./.github/workflows/ci.yml) [c](.gitignore)\n",
+        true,
+      ),
+    ).toBe("[a](./.gitignore) [b](./.github/workflows/ci.yml) [c](./.gitignore)\n");
+    expect(relative("docs/a.md", "[d](.hidden.md) [e](../.gitignore)\n", true)).toBe(
+      "[d](./.hidden.md) [e](../.gitignore)\n",
+    );
+  });
+  it("writes such a name without ./ otherwise", () => {
+    expect(relative("README.md", "[a](./.gitignore) [b](.github/workflows/ci.yml)\n", false)).toBe(
+      "[a](.gitignore) [b](.github/workflows/ci.yml)\n",
+    );
+  });
+});
+
 describe("Forgejo heading anchors", () => {
   const workspace = createWorkspace({
     "Doc.md": "",

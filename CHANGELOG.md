@@ -17,6 +17,10 @@ prereleases' notes there are longer than their entries here.
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
   such a character with a later one: after `snake_case and *em*` became
   `snake_case and _em_`, Reading view showed `case and _em` as emphasis.
+- `links/path` with `leadingDot` keeps `./` before a name that starts with a
+  dot, such as `./.gitignore` or `./.github/`, and adds it there. Before, it
+  took such a path for one that already started with `./` and removed the `./`
+  ([#365](https://github.com/viell-dev/slop-markdown-tools/pull/365)).
 
 ## 0.2.4 - 2026-10-19
 
