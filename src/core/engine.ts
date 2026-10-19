@@ -241,8 +241,10 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  * a definition description on Forgejo and Gitea and the blocks below it, which
  * those renderers read as the description's blocks (issue #344), for a block
  * in Obsidian with a backtick that no run closes, where Obsidian shows code
- * that the parser does not (issue #362), and for the blocks that Obsidian reads
- * as more of an HTML block above them (issue #358). Only the part of the edit
+ * that the parser does not (issue #362), for the blocks that Obsidian reads as
+ * more of an HTML block above them (issue #358), and for the underlines and
+ * lazy lines that Obsidian reads otherwise (issues #376, #377, and #383). Only
+ * the part of the edit
  * that changes the text counts, so that an edit that copies such
  * text, such as a list rule's, can still apply.
  */
@@ -257,6 +259,8 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.descriptions,
       ...misread.unclosedCode,
       ...misread.htmlText,
+      ...misread.underlines,
+      ...misread.lazyItems,
     ],
     (node) => range(node),
   ).sort((a, b) => a[0] - b[0])) {
