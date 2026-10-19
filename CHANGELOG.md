@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Forgejo and Gitea dialects, `links/valid` accepts a link to a heading
+  that starts a definition description, as `: # Title` below a term does, which
+  Forgejo and Gitea give an anchor. Before, it reported the fragment as missing,
+  and also a link to a later heading with the same text, which the renderers
+  number from that description's heading on
+  ([#389](https://github.com/viell-dev/slop-markdown-tools/pull/389)).
 - In the Obsidian dialect, no rule changes a footnote definition directly below
   a line of paragraph text, also one that ends a list item or block quote, nor
   the blank space at the end of that line. Obsidian's Reading view reads the
