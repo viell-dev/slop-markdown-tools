@@ -69,6 +69,13 @@ note shows there, the tool keeps the text as written:
   to a run of the same length outside an indented code block, a fenced code
   block, or a list item. No rule changes them, nor a table that holds such a
   run.
+- A line of blank space that holds a tab, which Reading view reads as more of
+  the paragraph above it, and one directly below an HTML block such as
+  `<div>…</div>`, which continues the block. The blocks below such a line are
+  more of the HTML block too, up to an empty line, and Reading view shows them
+  as written. No rule empties the line or changes those blocks. A comment, and
+  the other HTML blocks that end at their own end marker, such as `<pre>`, do
+  not continue.
 
 ## Vaults inside a larger workspace
 
