@@ -62,7 +62,8 @@ export interface MisreadLists {
    * In the Obsidian dialect, the blocks that Reading view reads as more of an
    * HTML block above them. A line of blank space directly below an HTML block
    * that ends at a blank line continues the block, and so do the blocks after
-   * it, up to an empty line (issue #358).
+   * it, up to an empty line (issue #358). Each counts from the start of its
+   * first line, with the marker of a list item there.
    */
   htmlText: ReadonlySet<Nodes>;
 }
@@ -221,7 +222,15 @@ export function misreadLists(document: Document): MisreadLists {
       if (open && previous?.position && leaf.position) {
         for (let line = previous.position.end.line + 1; line < leaf.position.start.line; line++)
           if (!spaced(line)) open = false;
-        if (open) htmlText.add(leaf);
+        if (open) {
+          // From the start of its line: a list item's marker there, `- ` in
+          // `- *a*`, is text of the HTML block too.
+          const offset = leaf.position.start.offset ?? 0;
+          let from = offset;
+          while (from > 0 && source[from - 1] !== "\n" && source[from - 1] !== "\r") from--;
+          const start = { ...leaf.position.start, offset: from, column: 1 };
+          htmlText.add(from === offset ? leaf : { ...leaf, position: { ...leaf.position, start } });
+        }
       }
       // Other HTML blocks end at their own end marker, as a comment does at `-->`.
       if (

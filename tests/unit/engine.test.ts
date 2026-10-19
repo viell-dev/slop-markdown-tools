@@ -968,6 +968,8 @@ describe("blocks that Obsidian reads into an HTML block above them", () => {
     "<div>\n  \n*a* b\n",
     "</div>\n  \n*a* b\n  \n*c* d\n",
     "> </div>\n>  \n> *a* b\n",
+    // Also the marker of a list item there, which is text of the HTML block.
+    "</div>\n  \n* *a* b\n",
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config })).toBe(source);
   });
