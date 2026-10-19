@@ -46,7 +46,11 @@ and Node.js requirements, and policy. Known couplings:
   commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
   and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
   also sets the `node-version` of the CI job labeled `22` and the major version
-  of `@types/node`, whose major updates `.github/dependabot.yml` ignores.
+  of `@types/node`, whose major updates `.github/dependabot.yml` ignores. The
+  development version, in `.nvmrc`, is also the `node-version` of the other
+  workflows, the base image of `scripts/obsidian/Dockerfile`, and CONTRIBUTING's
+  set-up section. The workflows name it themselves, because the Pages workflow
+  builds from a release tag that may predate a change of `.nvmrc`.
 - Known renderer differences: the allow lists in `tests/unit/renderers.test.ts`
   and `scripts/github-rendering.mjs` name an issue for each entry; a fix removes
   the entries it makes stale.
