@@ -1,9 +1,9 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
-// #391, #395, #405, #409, #411), and those that the check has to read with care (#385). Each paragraph is long enough that
-// formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
-// is synthetic.
+// #391, #395, #405, #409, #411), and those that the check has to read with care (#385). Each
+// paragraph is long enough that formatting at 30 or 80 columns reflows it, unless the tool
+// leaves it as written. Every word is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
