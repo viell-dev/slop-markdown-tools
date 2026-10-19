@@ -21,7 +21,9 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
 export interface MisreadLists {
   /**
    * Paragraphs, and headings underlined with `===` or `---`, whose text starts
-   * with a list marker, and the text that renderers read as continuing it.
+   * with a list marker, and the text that renderers read as continuing it. In
+   * the Obsidian dialect also those with a later line that Obsidian reads as
+   * starting a list item where CommonMark reads text (issue #375).
    */
   text: ReadonlySet<Nodes>;
   /**
@@ -95,6 +97,11 @@ const found = new WeakMap<Root, MisreadLists>();
  * `Term` and a line `: 2. x` below it are a term and a description, and the
  * description holds blocks, here an ordered list, as a list item does. The
  * blocks indented below it in its container belong to it too (issue #344).
+ *
+ * Obsidian starts a list below a paragraph line where CommonMark does not:
+ * Live Preview at an ordered marker with a number other than 1 and text after
+ * it, except in a block quote, and Reading view at an empty item, `*`, `+`,
+ * `- `, or `1.`, which Live Preview reads so for `+ ` and `- ` (issue #375).
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
@@ -105,6 +112,7 @@ export function misreadLists(document: Document): MisreadLists {
   const nested = new Set<Nodes>();
   const next = new Set<Nodes>();
   const descriptions = new Set<Nodes>();
+  const obsidian = document.dialect === "obsidian";
   /** The column of the first character from `offset` on, after spaces and tabs. */
   const columnAt = (offset: number) => {
     let start = offset;
@@ -127,8 +135,36 @@ export function misreadLists(document: Document): MisreadLists {
       return node.children[0]?.position?.start.offset ?? start;
     return undefined;
   };
+  /**
+   * In the Obsidian dialect, the offset of the marker on the first line of
+   * `node` after its first that Obsidian reads as starting a list item where
+   * CommonMark reads text; `quoted` says whether `node` is in a block quote.
+   */
+  const obsidianItem = (node: Nodes, quoted: boolean): number | undefined => {
+    const end = node.position!.end.offset!;
+    // A marker four or more columns right of the text is more of the text.
+    const text = columnAt(node.position!.start.offset!);
+    const breaks = /\r\n|\r|\n/g;
+    breaks.lastIndex = node.position!.start.offset!;
+    for (let found = breaks.exec(source); found && found.index < end; found = breaks.exec(source)) {
+      const lineStart = found.index + found[0].length;
+      let lineEnd = lineStart;
+      while (lineEnd < end && source[lineEnd] !== "\n" && source[lineEnd] !== "\r") lineEnd++;
+      const line = source.slice(lineStart, lineEnd);
+      const prefix = /^[ \t>]*/.exec(line)![0].length;
+      const content = line.slice(prefix);
+      const ordered = /^(\d{1,9})[.)][ \t]+\S/.exec(content);
+      if (
+        columnAt(lineStart + prefix) - text <= 3 &&
+        ((ordered && Number(ordered[1]) !== 1 && !quoted) ||
+          /^(?:[*+]|-(?=[ \t])|0*1[.)])[ \t]*$/.test(content))
+      )
+        return lineStart + prefix;
+    }
+    return undefined;
+  };
   /** Returns the last line of misread text that ends `parent` and whose `===` renderers read as text. */
-  const visit = (parent: Parents): number | undefined => {
+  const visit = (parent: Parents, quoted = false): number | undefined => {
     let reach: number | undefined;
     /** The last line of misread text whose `===` renderers read as text, if the last block is that. */
     let continued: number | undefined;
@@ -156,12 +192,14 @@ export function misreadLists(document: Document): MisreadLists {
       // that it ends, but only with text (issue #343).
       const adjacent =
         continued === child.position!.start.line - 1 && (!inside || start !== undefined);
-      const misread =
+      const atStart =
         start !== undefined &&
         (listMarker.test(source.slice(start, start + 11)) || adjacent) &&
         !(index === 0 && parent.type === "listItem" && typeof parent.checked === "boolean");
+      const item = obsidian && start !== undefined ? obsidianItem(child, quoted) : undefined;
+      const misread = atStart || item !== undefined;
       if (misread || adjacent || reach !== undefined) {
-        const column = columnAt(misread ? start! : offset);
+        const column = columnAt(atStart ? start! : (item ?? offset));
         if ((adjacent && !misread) || (reach !== undefined && column > reach)) nested.add(child);
         else if (reach !== undefined) {
           next.add(child);
@@ -178,7 +216,7 @@ export function misreadLists(document: Document): MisreadLists {
           : undefined;
       inside = false;
       if ("children" in child && !leaves.has(child.type)) {
-        const last = visit(child);
+        const last = visit(child, quoted || child.type === "blockquote");
         if (last !== undefined && last === child.position!.end.line) {
           continued = last;
           inside = true;
