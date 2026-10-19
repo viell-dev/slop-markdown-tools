@@ -773,7 +773,6 @@ export function misreadLists(document: Document): MisreadLists {
         if ("children" in child && !leaves.has(child.type)) visitLines(child);
       });
     visitLines(document.tree);
-    /** A copy of a list item from its start to its content, or to its end without content. */
     /** The point where the line holding `node`'s start begins, less one: the line break before it. */
     const breakBeforeLine = (node: Nodes): Point => ({
       ...node.position!.start,
