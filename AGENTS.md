@@ -50,6 +50,12 @@ and Node.js requirements, and policy. Known couplings:
 - Known renderer differences: the allow lists in `tests/unit/renderers.test.ts`
   and `scripts/github-rendering.mjs` name an issue for each entry; a fix removes
   the entries it makes stale.
+- The Obsidian check (`scripts/obsidian-check.mjs`): its own dependencies and
+  lockfile in `scripts/obsidian/`, which Dependabot updates on their own, with
+  WebdriverIO's major version held at the one `wdio-obsidian-service` supports;
+  the documents that `scripts/rendering.mjs` generates for the `obsidian`
+  syntax; and its description in CONTRIBUTING.md. Test in Docker, as this check
+  does, not in a profile of an installed application.
 
 Drift found along the way is a defect. Correct it in the same PR when it lies in
 what the PR already changes; otherwise file an issue rather than widening the
