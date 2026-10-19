@@ -23,7 +23,7 @@ prereleases' notes there are longer than their entries here.
   that ends in a fenced code block without its closing fence, outside a list
   item or block quote. Obsidian's Reading view shows that line break as one
   more, empty line of the code
-  ([#403](https://github.com/viell-dev/slop-markdown-tools/pull/403)).
+  ([#412](https://github.com/viell-dev/slop-markdown-tools/pull/412)).
 
 ## 0.2.6 - 2026-10-19
 
