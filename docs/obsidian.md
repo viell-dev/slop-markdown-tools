@@ -66,8 +66,9 @@ note shows there, the tool keeps the text as written:
   a wikilink does not count.
 - The blocks below a run of three or more backticks that nothing closes. Live
   Preview shows them as code too, across blank lines and out of a list item, up
-  to a block with a run of the same length, a fenced code block, or a list item.
-  No rule changes them, nor a table that holds such a run.
+  to a run of the same length outside an indented code block, a fenced code
+  block, or a list item. No rule changes them, nor a table that holds such a
+  run.
 
 ## Vaults inside a larger workspace
 

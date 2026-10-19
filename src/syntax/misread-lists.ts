@@ -53,23 +53,15 @@ export interface MisreadLists {
    *
    * After a run of three or more, Live Preview shows the blocks below as code
    * too, also out of a list item and across blank lines, up to a block with a
-   * run of the same length, which it closes there, a fenced code block, or a
-   * list item. Those blocks are in the set as well, with a table that holds
-   * such a run.
+   * run of the same length outside an indented code block, which it closes
+   * there, a fenced code block, or a list item. Those blocks are in the set as
+   * well, with a table that holds such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
 const leaves = new Set<Nodes["type"]>(["paragraph", "heading", "table", "code", "html"]);
-/** Blocks whose children are blocks. */
-const containers = new Set<Nodes["type"]>([
-  "root",
-  "blockquote",
-  "list",
-  "listItem",
-  "footnoteDefinition",
-]);
 const found = new WeakMap<Root, MisreadLists>();
 
 /**
@@ -190,13 +182,16 @@ export function misreadLists(document: Document): MisreadLists {
   visit(document.tree);
   const unclosedCode = new Set<Nodes>();
   if (document.dialect === "obsidian") {
-    /** Leaf blocks in document order, and whether each starts a list item. */
+    /**
+     * Leaf blocks in document order, and whether each starts a list item, also
+     * inside a container that does, as in `- > a`.
+     */
     const order: [Nodes, boolean][] = [];
     const collect = (node: Nodes, item: boolean) => {
-      if (!containers.has(node.type) || !("children" in node)) order.push([node, item]);
+      if (leaves.has(node.type) || !("children" in node)) order.push([node, item]);
       else
         node.children.forEach((child, index) =>
-          collect(child, node.type === "listItem" && index === 0),
+          collect(child, index === 0 && (item || node.type === "listItem")),
         );
     };
     collect(document.tree, false);
@@ -226,7 +221,9 @@ export function misreadLists(document: Document): MisreadLists {
     /**
      * The length of a run of three or more backticks whose code Live Preview
      * carries into the blocks below, up to a block with a run of the same
-     * length, a fenced code block, or a list item.
+     * length, a fenced code block, or a list item. A run in a wikilink, in math,
+     * or in an HTML block closes it too, because Live Preview reads none of
+     * those inside the code.
      */
     let carry: number | undefined;
     for (const [leaf, item] of order) {
@@ -234,10 +231,13 @@ export function misreadLists(document: Document): MisreadLists {
       const end = leaf.position?.end.offset;
       if (start === undefined || end === undefined) continue;
       if (carry !== undefined) {
-        if (item || (leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end))))
-          carry = undefined;
+        const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
+        if (item || fenced) carry = undefined;
         else {
           unclosedCode.add(leaf);
+          // Live Preview shows an indented code block there as more of the
+          // code, and its backticks close nothing.
+          if (leaf.type === "code") continue;
           const runs = backtickRuns(source, start, end);
           const close = runs.findIndex(([, length]) => length === carry);
           if (close >= 0) carry = carried(source, runs.slice(close + 1));
@@ -296,12 +296,18 @@ function backtickRuns(source: string, start: number, end: number): Run[] {
  */
 function unclosedRuns(source: string, start: number, end: number): Run[] {
   const runs = backtickRuns(source, start, end);
+  /** The index of the next run of the same length after each run, or -1. */
+  const next: number[] = [];
+  const later = new Map<number, number>();
+  for (let index = runs.length - 1; index >= 0; index--) {
+    const length = runs[index]![1];
+    next[index] = later.get(length) ?? -1;
+    later.set(length, index);
+  }
   const open: Run[] = [];
   for (let index = 0; index < runs.length; index++) {
-    const [, length] = runs[index]!;
-    const close = runs.findIndex((run, later) => later > index && run[1] === length);
-    if (close < 0) open.push(runs[index]!);
-    else index = close;
+    if (next[index]! < 0) open.push(runs[index]!);
+    else index = next[index]!;
   }
   return open;
 }
@@ -309,19 +315,34 @@ function unclosedRuns(source: string, start: number, end: number): Run[] {
 /**
  * The length of the run of three or more backticks whose code Live Preview
  * carries past the last of `runs`, if any. Live Preview closes a run with the
- * next run of the same length, a run of one or two backticks only on its line.
+ * next run of the same length; the code of a run of one or two backticks ends
+ * with its line.
  */
 function carried(source: string, runs: Run[]): number | undefined {
-  for (let index = 0; index < runs.length; index++) {
-    const [at, length] = runs[index]!;
-    const close = runs.findIndex(
-      ([offset, other], later) =>
-        later > index &&
-        other === length &&
-        (length >= 3 || !/[\n\r]/.test(source.slice(at, offset))),
-    );
-    if (close >= 0) index = close;
-    else if (length >= 3) return length;
+  let open: Run | undefined;
+  /** Where the line of the open run ends, and that of the current one. */
+  let openLineEnd = 0;
+  let lineEnd = -1;
+  for (const run of runs) {
+    if (run[0] >= lineEnd) lineEnd = lineBreak(source, run[0]);
+    if (open !== undefined) {
+      const sameLine = run[0] < openLineEnd;
+      if (run[1] === open[1] && (open[1] >= 3 || sameLine)) {
+        open = undefined;
+        continue;
+      }
+      // Other runs are part of the code.
+      if (open[1] >= 3 || sameLine) continue;
+    }
+    open = run;
+    openLineEnd = lineEnd;
   }
-  return undefined;
+  return open !== undefined && open[1] >= 3 ? open[1] : undefined;
+}
+
+/** The offset of the first line break at or after `from`, or the length of `source`. */
+function lineBreak(source: string, from: number): number {
+  for (let at = from; at < source.length; at++)
+    if (source[at] === "\n" || source[at] === "\r") return at;
+  return source.length;
 }

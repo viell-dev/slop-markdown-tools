@@ -991,8 +991,41 @@ describe("backticks that nothing closes in Obsidian", () => {
     ["a ``` b\n\n```js\nx\n```\n\nc *d*\n", "a ``` b\n\n```js\nx\n```\n\nc _d_\n"],
     ["a ``` b\n\n- c *d*\n\ne *f*\n", "a ``` b\n\n- c _d_\n\ne _f_\n"],
     ["| a ``` b |\n| - |\n\nc *d*\n", "| a ``` b |\n| - |\n\nc *d*\n"],
+    // An indented code block shows as more of the code, and its run closes
+    // nothing; in a wikilink, a run closes the code.
+    ["a ``` b\n\n    x ``` y\n\nc *d*\n", "a ``` b\n\n    x ``` y\n\nc *d*\n"],
+    ["a ``` b\n\nc [[x ``` y]] *d*\n\ne *f*\n", "a ``` b\n\nc [[x ``` y]] *d*\n\ne _f_\n"],
+    // A list item ends the code also where its first block is a quote.
+    ["a ``` b\n\n- > c *d*\n\ne *f*\n", "a ``` b\n\n- > c _d_\n\ne _f_\n"],
+    // Blank lines do not end the code, so their number does not matter.
+    ["a ``` b\n\n\n\nc *d*\n", "a ``` b\n\nc *d*\n"],
   ])("leaves the blocks below %j as Live Preview shows them", (source, output) => {
     expect(formatted(source, { config })).toBe(output);
+  });
+  it("looks into the blocks of a container that a syntax plugin adds", () => {
+    const source = "a ``` b\n\nc *d*\n";
+    const document = parse(source, "obsidian");
+    const blocks = document.tree.children;
+    const container = {
+      type: "pluginContainer",
+      children: blocks,
+      position: document.tree.position,
+    };
+    document.tree.children = [container as unknown as (typeof blocks)[number]];
+    const { unclosedCode } = misreadLists(document);
+    expect([...unclosedCode].map((node) => source.slice(...range(node)))).toEqual([
+      "a ``` b",
+      "c *d*",
+    ]);
+  });
+  it("pairs the runs below such a run in time linear in their number", () => {
+    // A line each, so that no run of one closes another, in an HTML block,
+    // which the parser reads without inline syntax (issue #151).
+    const source = `a \`\`\` b\n\n<div>\nc \`\`\` ${"d ` e\n".repeat(20_000)}</div>\n\nf *g*\n`;
+    const started = performance.now();
+    const output = formatted(source, { config });
+    expect(performance.now() - started).toBeLessThan(10_000);
+    expect(output.endsWith("\nf _g_\n")).toBe(true);
   });
   it("keeps the emphasis in such a table cell", () => {
     expect(formatted("| a ` *b* |\n| - |\n", { config })).toBe("| a ` *b* |\n| ------- |\n");
