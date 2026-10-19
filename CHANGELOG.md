@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, no rule changes a paragraph with a later line that
+  Obsidian reads as starting a list item where CommonMark reads text: a number
+  other than 1 with text after it, which Live Preview reads as a list item, and
+  an empty item such as `*` or `- `, which Reading view reads as one, nor the
+  blocks indented below it. Before, `style/wrap` joined such a line into the
+  paragraph and `style/heading` wrote `Text` with `- ` below it as `## Text`.
 - In the Obsidian dialect, `style/blank-lines` and `style/trailing-space` leave
   a line of blank space that holds a tab, or that lies directly below an HTML
   block, as written. Obsidian's Reading view reads such a line as more of the
