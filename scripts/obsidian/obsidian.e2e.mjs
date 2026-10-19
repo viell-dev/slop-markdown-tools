@@ -196,8 +196,10 @@ function livePreview(lines) {
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
-      const last = current.runs.at(-1);
-      const first = line.runs[0];
+      // The runs that show text, not a line's quote markers, which wrapping moves.
+      const shows = ([classes, value]) => value.trim() && !/\bcm-formatting-quote\b/.test(classes);
+      const last = current.runs.findLast(shows);
+      const first = line.runs.find(shows);
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
     } else {
       current = { kind: line.kind, runs: [...line.runs], code };
@@ -244,6 +246,9 @@ function livePreview(lines) {
         // A list's marker shows as written: a bullet character, which the theme draws as a dot,
         // and an item's number, which `style/ordered-list` chooses.
         if (/\blist-bullet\b/.test(classes)) text = "•";
+        // A code block's fence, whose characters and length `style/code-fence` chooses.
+        else if (/\bcm-formatting-code-block\b/.test(classes))
+          text = text.replace(/^(?:`{3,}|~{3,})/, "```");
         else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
         else if (/\bcm-(?:hmd-barelink|link)\b/.test(classes))
           text = text.replace(/^X(?=\s|$)/, "x");
