@@ -448,7 +448,9 @@ Options: none.
 
 Writes the type of an Obsidian callout in lowercase, custom types included. The
 title and the body are left as written, and so is a marker written with an
-escape or a character reference, such as `\[!TIP]`.
+escape or a character reference, such as `\[!TIP]`, and one that Obsidian shows
+as text because more than one space or a tab separates it from the quote's `>`,
+as in `>  [!TIP]`.
 
 Before:
 

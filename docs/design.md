@@ -147,7 +147,9 @@ Files:
 Syntax:
 
 - Obsidian inline comments that span several paragraphs are not fully read;
-  suppress formatting around them or use comment blocks. Heading nesting paths
+  suppress formatting around them or use comment blocks. A comment on lines of
+  its own directly above text is read as a block before a paragraph, where
+  Obsidian reads one paragraph; both show the same text. Heading nesting paths
   in links, property aliases, PDF subpaths, and the syntax of community plugins
   are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
