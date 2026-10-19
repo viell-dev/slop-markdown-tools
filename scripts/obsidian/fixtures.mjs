@@ -1,7 +1,7 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
-// #391, #395), and those that the check has to read with care (#385). Each paragraph is long enough that
+// #391, #395, #405, #409, #411), and those that the check has to read with care (#385). Each paragraph is long enough that
 // formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
@@ -117,5 +117,26 @@ export const fixtures = [
     name: "unclosed code block ending the note",
     source:
       "Some words before the code block, enough of them to be reflowed at a narrow width.\n\n~~~\nconst a = 1;",
+  },
+  {
+    // #411: at 30 columns, the line would break before `[a]:`, and Live Preview would style the
+    // new line as a link reference definition; the word stays on the line before it.
+    name: "label inside a paragraph",
+    source:
+      "Some words before the label [a]: tail words after it, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #409: at 30 columns, the line would break before `#glacier`, which Live Preview reads as
+    // text directly after `>`; the tag stays on the line before it.
+    name: "tag in a quote without a space after the marker",
+    source:
+      ">Some words with a long line x #glacier and more words after it, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #405: Reading view shows the space at the end of the footnote's text before the
+    // backreference, so it stays while the text is reflowed.
+    name: "footnote ending in a space",
+    source:
+      "Some words with a footnote[^1] and enough of them to be reflowed at a narrow width.\n\n[^1]: The footnote's text with enough words to be reflowed at a narrow width. \n",
   },
 ];
