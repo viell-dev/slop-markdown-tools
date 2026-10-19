@@ -1133,6 +1133,200 @@ describe("list items that Obsidian starts below a paragraph line", () => {
   });
 });
 
+describe("underlines that Obsidian reads otherwise", () => {
+  // Reading view reads an underline with blank space after it, or before it
+  // beyond the heading's text, as text, and Live Preview a lone `-` (issue
+  // #383). Reading view also reads a lazy line of `=` or `-` in a block quote or
+  // list item as an underline, where the parser reads text (issue #377).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  // With strict line breaks, so that `style/wrap` joins lines.
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "a\n-\n",
+    "a\n-- \n",
+    "a\n= \n",
+    "a\n=\t\n",
+    "a\n=== \n",
+    "a\n--- \n",
+    "a\n ==\n",
+    "a\n   -\n",
+    "> a\n> = \n",
+    "- a\n  == \n",
+    "> a\n=\n",
+    "> a\n--\n",
+    "> > a\n=\n",
+    "> a\nb\n=\n",
+    "- a\n=\n",
+    "1. a\n=\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config, workspace })).toBe(source);
+  });
+  it.each([
+    ["a *b*\n--\n", "## a _b_\n"],
+    ["a *b*\n=\n", "# a _b_\n"],
+    ["a *b*\n===\n", "# a _b_\n"],
+    ["- a *b*\n  =\n", "- a _b_\n  =\n"],
+    ["> a *b*\n> --\n", "> a _b_\n> --\n"],
+    // The text itself is formatted; only the underline stays on its own line.
+    ["*a*\n-- \n", "_a_\n-- \n"],
+    ["> *a*\n=\n", "> _a_\n=\n"],
+    ["- *a*\n==\n", "- _a_\n==\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("formats such headings in the other dialects", () => {
+    expect(
+      formatted("a\n-- \n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("## a\n");
+  });
+});
+
+describe("list items that Live Preview ends at a lazy line", () => {
+  // Live Preview reads the blocks after a lazy line of an item's paragraph, one
+  // left of the item's content, outside the list, where an indented paragraph
+  // is code and a fence's indentation is part of its code (issue #376).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  // With strict line breaks, so that `style/wrap` joins lines.
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "2. a\nb\n\n    c *d*\n",
+    "- a\nb\n\n  - c *d*\n",
+    "- a\nb\n\n  ```\n  c *d*\n  ```\n",
+    "- a\nb\nc\n\n  d *e*\n",
+    "- a\n  b\nc\n\n  d *e*\n",
+    "> - a\n> b\n>\n>   c *d*\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config, workspace })).toBe(source);
+  });
+  it.each([
+    // Without a lazy line, or without blocks after it in the item.
+    ["2. a\n   b\n\n    c *d*\n", "2. a b\n\n    c _d_\n"],
+    ["- a *x*\nb\n", "- a _x_ b\n"],
+    ["- a\nb\n- c *d*\n", "- a b\n- c _d_\n"],
+    // A lazy line in a block quote changes nothing that Live Preview shows.
+    ["> a\nb\n\n> c *d*\n", "> a b\n\n> c _d_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("formats such items in the other dialects", () => {
+    expect(
+      formatted("2. a\nb\n\n    c *d*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("2. a b\n\n    c _d_\n");
+  });
+});
+
+describe("footnote definitions that Obsidian reads as paragraph text", () => {
+  // Reading view continues a line of paragraph text with a footnote definition
+  // directly below it, also from a list item or block quote, and reads the
+  // definition's indented lines as code (issue #378).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "a\n[^1]: b *c*\n    d *e*\n",
+    "> - a\n[^1]: b\n    c *d*\n",
+    "- a\n[^1]: b *c*\n",
+    "> a\n[^1]: b *c*\n",
+    // A definition below one that is text is text too.
+    "a\n[^1]: b *c*\n[^2]: d *e*\n",
+    // Blank space at the end of the line above is a line break in the paragraph.
+    "a  \n[^1]: b\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // Below a blank line, a heading, or another definition, it is a definition.
+    ["a\n\n[^1]: b *c*\n\nx[^1]\n", "a\n\n[^1]: b _c_\n\nx[^1]\n"],
+    ["# h\n[^1]: b *c*\n\nx[^1]\n", "# h\n[^1]: b _c_\n\nx[^1]\n"],
+    ["[^1]: a *b*\n[^2]: c *d*\n\nx[^1] y[^2]\n", "[^1]: a _b_\n[^2]: c _d_\n\nx[^1] y[^2]\n"],
+    ["[r]: https://x.org\n[^1]: b *c*\n\nx[^1]\n", "[r]: https://x.org\n[^1]: b _c_\n\nx[^1]\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such definitions in the other dialects", () => {
+    expect(
+      formatted("a\n[^1]: b *c*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a\n[^1]: b _c_\n");
+  });
+});
+
+describe("lines that Obsidian reads as code below a link reference definition", () => {
+  // Reading view reads a line below a definition and four columns right of its
+  // container's content as an indented code block, where the parser reads a
+  // paragraph (issue #379).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "[r]: https://x.org\n      c   \n",
+    "[r]: https://x.org\n    c *d*\n",
+    "   [r]: https://x.org\n    c *d*\n",
+    "[r]: https://x.org\n[s]: https://y.org\n    c *d*\n",
+    "[r]:\n  https://x.org\n    c *d*\n",
+    "[r]: https://x.org\n\tc *d*\n",
+    "[r]: https://x.org\n    c *d*\ne *f*\n",
+    "> [r]: https://x.org\n>     c *d*\n",
+    "- [r]: https://x.org\n      c *d*\n",
+    // The parser reads a heading, where Reading view shows code and text.
+    "[r]: https://x.org\n    c\n===\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    ["[r]: https://x.org\nc *d*\n", "[r]: https://x.org\nc _d_\n"],
+    ["[r]: https://x.org\n\n    c *d*\n\ne *f*\n", "[r]: https://x.org\n\n    c *d*\n\ne _f_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such lines in the other dialects", () => {
+    expect(
+      formatted("[r]: https://x.org\n    c *d*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("[r]: https://x.org\n    c _d_\n");
+  });
+});
+
+describe("blocks that Obsidian reads into a fence that a list item leaves open", () => {
+  // Reading view continues such a fence with the unindented lines directly
+  // below its container, and Live Preview with every block up to a line that
+  // would close it, where the parser opens a fence, so that the two pair the
+  // fences after it otherwise (issue #390).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "- ```\nb *c*\n",
+    "- ```\n  a\nb *c*\n",
+    "1. a\n   ```\nb *c*\n",
+    "- ~~~\nb *c*\n",
+    "> ```\nb *c*\n",
+    "- ```\nb *c* and some more words, enough for a line of more than eighty columns\n",
+    // Live Preview reads on across blank lines and list items.
+    "- ```\n  a\n\nb *c*\n",
+    "- a\n  ```\nb *c*\n\n- d *e*\n",
+    // Live Preview closes the fence where the parser opens one, and opens one
+    // where the parser closes it.
+    "- ```\nb *c*\n```\n\nd *e*\n```\n\nf *g*\n",
+    "- ````\nb *c*\n```\n\nd *e*\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    ["- ```\n  a\n  ```\nb *c*\n", "- ```\n  a\n  ```\nb _c_\n"],
+    ["a *b*\n\n- ```\nc\n", "a _b_\n\n- ```\nc\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such blocks in the other dialects", () => {
+    expect(
+      formatted("- ```\nb *c*\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("- ```\nb _c_\n");
+  });
+});
+
 describe("tables that Obsidian reads otherwise", () => {
   // Obsidian reads a table directly below paragraph text as more of the text,
   // a one-column table whose header line does not end with a pipe as text, and

@@ -69,6 +69,48 @@ export interface MisreadLists {
    */
   htmlText: ReadonlySet<Nodes>;
   /**
+   * In the Obsidian dialect, the underlined headings whose underline one of the
+   * views reads as text: Reading view one with blank space after it, or before
+   * it beyond the heading's text, and Live Preview a lone `-` (issue #383); and
+   * the paragraphs in a block quote or list item with a lazy line of `=` or
+   * `-`, which Reading view reads as an underline (issue #377). Each counts
+   * from the line break before the underline to the end of its line.
+   */
+  underlines: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the paragraphs of a list item with a lazy line,
+   * one that starts left of the item's content, with the blocks after them in
+   * the item, which Live Preview reads outside the list (issue #376). Each
+   * counts as one stretch, from the start of the paragraph's first line to the
+   * end of the item's last block.
+   */
+  lazyItems: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, footnote definitions directly below a line of
+   * paragraph text, also one that ends a list item or block quote. Reading view
+   * reads the definition as more of that paragraph, and its indented lines as
+   * code (issue #378). Each counts from the end of the line above it.
+   */
+  footnoteText: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, paragraphs and underlined headings whose text
+   * starts on the line below a link reference definition and further right
+   * than the definition. Reading view reads such a line as an indented code
+   * block from four columns right of its container's content (issue #379).
+   * Each counts from the start of its first line.
+   */
+  definitionCode: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the first fenced code block that a list item or
+   * block quote ends before a closing fence, with the rest of the document.
+   * Obsidian reads the blocks below it as more of the code: Reading view the
+   * lines directly below the fence's container, Live Preview everything up to
+   * a line that would close the fence, where the parser opens one, so that it
+   * pairs the fences after it otherwise (issue #390). It counts as one
+   * stretch, from the start of the fence's first line to the document's end.
+   */
+  openFences: ReadonlySet<Nodes>;
+  /**
    * In the Obsidian dialect, the tables that Obsidian reads otherwise, and the
    * lines around them (issue #359): a table directly below a line of paragraph
    * text, which Obsidian reads as more of the text; a one-column table whose
@@ -113,6 +155,11 @@ const found = new WeakMap<Root, MisreadLists>();
  * Live Preview at an ordered marker with a number other than 1 and text after
  * it, except in a block quote, and Reading view at an empty item, `*`, `+`,
  * `- `, or `1.`, which Live Preview reads so for `+ ` and `- ` (issue #375).
+ * Its Reading view also continues a paragraph with a footnote definition
+ * directly below it (issue #378), reads a line below a link reference
+ * definition as an indented code block (issue #379), and continues a fenced
+ * code block that a list item or block quote leaves open with the lines below
+ * the container, as Live Preview does further (issue #390).
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
@@ -240,20 +287,112 @@ export function misreadLists(document: Document): MisreadLists {
   const htmlText = new Set<Nodes>();
   const tableText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
+  const underlines = new Set<Nodes>();
+  const lazyItems = new Set<Nodes>();
+  const footnoteText = new Set<Nodes>();
+  const definitionCode = new Set<Nodes>();
+  const openFences = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
      * inside a container that does, as in `- > a`.
      */
     const order: [Nodes, boolean][] = [];
-    const collect = (node: Nodes, item: boolean) => {
-      if (leaves.has(node.type) || !("children" in node)) order.push([node, item]);
-      else
+    /** Footnote definitions, each with the number of leaf blocks before it. */
+    const footnotes: [Nodes, number][] = [];
+    /** The footnote definition that each leaf block inside one is in. */
+    const inFootnotes = new Map<Nodes, Nodes>();
+    const collect = (node: Nodes, item: boolean, footnote: Nodes | undefined) => {
+      if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
+      if (leaves.has(node.type) || !("children" in node)) {
+        order.push([node, item]);
+        if (footnote) inFootnotes.set(node, footnote);
+      } else
         node.children.forEach((child, index) =>
-          collect(child, index === 0 && (item || node.type === "listItem")),
+          collect(
+            child,
+            index === 0 && (item || node.type === "listItem"),
+            node.type === "footnoteDefinition" ? node : footnote,
+          ),
         );
     };
-    collect(document.tree, false);
+    collect(document.tree, false, undefined);
+    /** Where the line holding `offset` starts. */
+    const lineStart = (offset: number) => {
+      let at = offset;
+      while (at > 0 && source[at - 1] !== "\n" && source[at - 1] !== "\r") at--;
+      return at;
+    };
+    /** A copy of `node` that starts at `start` and ends at `end`. */
+    const stretch = (node: Nodes, start: Point, end = node.position!.end): Nodes =>
+      start.offset === node.position!.start.offset && end === node.position!.end
+        ? node
+        : ({ ...node, position: { start, end } } as Nodes);
+    /** The start of the line holding `node`'s start. */
+    const lineOf = (node: Nodes): Point => {
+      const start = node.position!.start;
+      const offset = lineStart(start.offset!);
+      return offset === start.offset ? start : { line: start.line, column: 1, offset };
+    };
+    /** Footnote definitions that Reading view reads as paragraph text. */
+    const joined = new Set<Nodes>();
+    for (const [footnote, count] of footnotes) {
+      const previous = order[count - 1]?.[0];
+      // A definition below another that is text, as `[^1]: a` and `[^2]: b`
+      // below `Text` are, is text too.
+      const around = previous && inFootnotes.get(previous);
+      if (
+        previous?.type === "paragraph" &&
+        (around === undefined || joined.has(around)) &&
+        previous.position &&
+        footnote.position &&
+        previous.position.end.line === footnote.position.start.line - 1
+      ) {
+        joined.add(footnote);
+        // From the blank space that ends the line above, a line break there.
+        let offset = previous.position.end.offset!;
+        while (source[offset - 1] === " " || source[offset - 1] === "\t") offset--;
+        footnoteText.add(stretch(footnote, { ...previous.position.end, offset }));
+      }
+    }
+    order.forEach(([leaf], index) => {
+      const next = order[index + 1]?.[0];
+      if (leaf.type !== "definition" || !leaf.position || !next?.position) return;
+      // An underlined heading below the definition starts at it, and its text after it.
+      const start = textStart(next);
+      const line =
+        next.type === "heading" ? next.children[0]?.position?.start.line : next.position.start.line;
+      // Only blank space and quote markers come before the text on its line, so
+      // that it continues the definition's container, unlike the text of a
+      // footnote definition or list item that starts there.
+      if (
+        start !== undefined &&
+        line === leaf.position.end.line + 1 &&
+        /^[ \t>]*$/.test(source.slice(lineStart(start), start)) &&
+        columnAt(start) > columnAt(leaf.position.start.offset!)
+      )
+        definitionCode.add(stretch(next, lineOf(next)));
+    });
+    for (let index = 0; index < order.length - 1; index++) {
+      const [leaf] = order[index]!;
+      if (leaf.type !== "code" || !leaf.position) continue;
+      const text = source.slice(leaf.position.start.offset, leaf.position.end.offset);
+      const fence = /^[ \t]*(`{3,}|~{3,})/.exec(text)?.[1];
+      if (fence === undefined) continue;
+      /** Whether `line` would close the fence, after the markers of its containers. */
+      const closes = (line: string) => {
+        const run = /^[ \t>]*(`{3,}|~{3,})[ \t]*$/.exec(line)?.[1];
+        return run !== undefined && run[0] === fence[0] && run.length >= fence.length;
+      };
+      const lines = text.split(/\r\n|\r|\n/);
+      if (lines.length > 1 && closes(lines.at(-1)!)) continue;
+      // The fence ends before the document does, so its container ended it.
+      // Live Preview reads on to a line that closes it, where the parser opens
+      // a fence, and pairs the fences after that otherwise, so the rest of the
+      // document counts.
+      openFences.add(stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }));
+      break;
+    }
     const lines = source.split(/\r\n|\r|\n/);
     /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
     const spaced = (number: number) => {
@@ -361,14 +500,98 @@ export function misreadLists(document: Document): MisreadLists {
       const close = after.findIndex(([, length]) => length === long[1]);
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
     }
-    /** Where the line holding `offset` starts. */
-    const startOfLine = (offset: number) => {
-      let at = offset;
-      while (at > 0 && source[at - 1] !== "\n" && source[at - 1] !== "\r") at--;
-      return at;
+    /** The offsets where the line holding `offset` starts and ends. */
+    const lineAround = (offset: number): [number, number] => {
+      let start = offset;
+      while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r") start--;
+      let end = offset;
+      while (end < source.length && source[end] !== "\n" && source[end] !== "\r") end++;
+      return [start, end];
     };
+    /** Where each line from `start` to `end` after the first starts and ends. */
+    const laterLines = (start: number, end: number): [number, number][] => {
+      const found: [number, number][] = [];
+      const breaks = /\r\n|\r|\n/g;
+      breaks.lastIndex = start;
+      for (let at = breaks.exec(source); at && at.index < end; at = breaks.exec(source)) {
+        const from = at.index + at[0].length;
+        found.push([from, Math.min(lineAround(from)[1], end)]);
+      }
+      return found;
+    };
+    /** A copy of `node` from the line break before `from` to `to`. */
+    const breakBefore = (node: Nodes, from: number, to: number): Nodes => {
+      const { start, end } = node.position!;
+      return {
+        ...node,
+        position: { start: { ...start, offset: from - 1 }, end: { ...end, offset: to } },
+      } as Nodes;
+    };
+    /** `first` to `last` as one block, from the start of its first line to the end of its last. */
+    const wholeLines = (first: Nodes, last = first): Nodes => {
+      const start = first.position!.start;
+      const end = last.position!.end;
+      return {
+        ...first,
+        position: {
+          start: { ...start, offset: lineAround(start.offset!)[0], column: 1 },
+          end: { ...end, offset: lineAround(end.offset!)[1] },
+        },
+      } as Nodes;
+    };
+    const visitLines = (parent: Parents) =>
+      parent.children.forEach((child, index) => {
+        const start = child.position?.start.offset;
+        const end = child.position?.end.offset;
+        if (start === undefined || end === undefined) return;
+        if (child.type === "heading" && source[start] !== "#") {
+          // The underline: blank space after it, or before it beyond the
+          // heading's text, makes Reading view read text, and a lone `-` makes
+          // Live Preview read text (issue #383). It stays on its own line, as
+          // written.
+          const [from, to] = lineAround(end);
+          const underline = source.slice(from, to);
+          const prefix = /^[ \t>]*/.exec(underline)![0].length;
+          if (
+            from > start &&
+            (/[ \t]$/.test(underline) ||
+              /^[ \t>]*-[ \t]*$/.test(underline) ||
+              columnAt(from + prefix) > columnAt(textStart(child) ?? start))
+          )
+            underlines.add(breakBefore(child, from, to));
+        }
+        if (
+          child.type === "paragraph" &&
+          (parent.type === "blockquote" || parent.type === "listItem")
+        ) {
+          const later = laterLines(start, end);
+          // A lazy line of `=` or `-` underlines the text in Reading view,
+          // where the parser reads more of the text (issue #377). It stays on
+          // its own line, as written.
+          for (const [from, to] of later)
+            if (/^[ \t>]*(?:=+|-+)[ \t]*$/.test(source.slice(from, to)))
+              underlines.add(breakBefore(child, from, to));
+          // A lazy line, left of the item's content, ends the item in Live
+          // Preview for the blocks after it (issue #376).
+          const content = parent.children[0]?.position?.start.offset;
+          if (
+            parent.type === "listItem" &&
+            index < parent.children.length - 1 &&
+            content !== undefined &&
+            later.some(([from, to]) => {
+              let at = from;
+              while (at < to && (source[at] === " " || source[at] === "\t" || source[at] === ">"))
+                at++;
+              return columnAt(at) < columnAt(content);
+            })
+          )
+            lazyItems.add(wholeLines(child, parent.children.at(-1)!));
+        }
+        if ("children" in child && !leaves.has(child.type)) visitLines(child);
+      });
+    visitLines(document.tree);
     /** A copy of `node` from `start` to its end. */
-    const from = (node: Nodes, start: number): Nodes =>
+    const startingAt = (node: Nodes, start: number): Nodes =>
       ({
         ...node,
         position: { ...node.position!, start: { ...node.position!.start, offset: start } },
@@ -392,15 +615,15 @@ export function misreadLists(document: Document): MisreadLists {
         if (below) {
           let at = previous.position!.end.offset!;
           while (source[at - 1] === " " || source[at - 1] === "\t") at--;
-          tableText.add(from(leaf, at));
+          tableText.add(startingAt(leaf, at));
         } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
-          tableText.add(from(leaf, startOfLine(start)));
+          tableText.add(startingAt(leaf, lineStart(start)));
         else {
           // The rows from the first without a pipe, from the line break above it.
           const parts = source.slice(start, end).split(/(\r\n|\r|\n)/);
           for (let part = 0, at = start; part < parts.length; part += 2) {
             if (part >= 4 && !piped(parts[part]!)) {
-              tableText.add(from(leaf, at - parts[part - 1]!.length));
+              tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
               break;
             }
             at += parts[part]!.length + (parts[part + 1]?.length ?? 0);
@@ -414,27 +637,42 @@ export function misreadLists(document: Document): MisreadLists {
         leaf.type === "paragraph" &&
         previous.position!.start.line === previous.position!.end.line &&
         piped(source.slice(previous.position!.start.offset, previous.position!.end.offset)) &&
-        listedDelimiter.test(source.slice(startOfLine(start), end).split(/\r\n|\r|\n/)[0]!)
+        listedDelimiter.test(source.slice(lineStart(start), end).split(/\r\n|\r|\n/)[0]!)
       )
         tableText.add({
           ...leaf,
           position: {
             start: {
               ...previous.position!.start,
-              offset: startOfLine(previous.position!.start.offset!),
+              offset: lineStart(previous.position!.start.offset!),
             },
             end: leaf.position!.end,
           },
         } as Nodes);
     });
   }
-  const result = { text, nested, next, descriptions, unclosedCode, htmlText, tableText };
+  const result = {
+    text,
+    nested,
+    next,
+    descriptions,
+    unclosedCode,
+    htmlText,
+    underlines,
+    lazyItems,
+    footnoteText,
+    definitionCode,
+    openFences,
+    tableText,
+  };
   found.set(document.tree, result);
   return result;
 }
 
 /** A run of backticks: its offset and its length. */
 type Run = [number, number];
+/** A place in the source, as a node's position gives it. */
+type Point = NonNullable<Nodes["position"]>["start"];
 
 /**
  * The runs of backticks from `start` to `end`. A backslash before a run

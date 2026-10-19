@@ -83,6 +83,34 @@ note shows there, the tool keeps the text as written:
   as written. No rule empties the line or changes those blocks. A comment, and
   the other HTML blocks that end at their own end marker, such as `<pre>`, do
   not continue.
+- An underlined heading whose underline one of the views reads as text: Reading
+  view one with blank space after it, as in `Title` and `== ` below it, or
+  before it beyond the heading's text, and Live Preview a lone `-`. No rule
+  writes such a heading with `#` or changes its underline.
+- A paragraph in a block quote or list item with a lazy line of `=` or `-`, as
+  in `> Text` and `=` below it, which Reading view reads as a heading's
+  underline where CommonMark reads more of the text. No rule joins that line to
+  the text or changes it.
+- A paragraph of a list item with a lazy line, one that starts left of the
+  item's text, as in `- Text` and `more` below it, and the blocks after it in
+  the item. Live Preview reads those blocks outside the list, where an indented
+  paragraph is code. No rule changes the paragraph or those blocks.
+- A footnote definition directly below a line of paragraph text, also one that
+  ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
+  Reading view reads the definition as more of the paragraph, and its indented
+  lines as code. No rule changes the definition or the end of the line above it.
+  Below a blank line, a heading, or another definition, it is a footnote.
+- A line directly below a link reference definition that starts further right
+  than the definition, as in `[ref]: https://example.com` and `    Text` below
+  it. Reading view reads it as an indented code block from four columns right of
+  the container's content. No rule changes the paragraph or heading that it
+  starts.
+- A fenced code block that a list item or block quote ends before its closing
+  fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
+  as more of the code: Reading view those directly below the list or quote, Live
+  Preview everything up to a line that would close the fence, and the fences
+  after that otherwise than CommonMark. No rule changes the code block or
+  anything below it.
 - A table that Obsidian reads otherwise. Obsidian reads a table directly below a
   line of paragraph text as more of the text, a one-column table whose header
   line does not end with a pipe, as in `Name` and `--:` below it, as text, and a

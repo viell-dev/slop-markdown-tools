@@ -242,8 +242,12 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  * those renderers read as the description's blocks (issue #344), for a block
  * in Obsidian with a backtick that no run closes, where Obsidian shows code
  * that the parser does not (issue #362), for the blocks that Obsidian reads as
- * more of an HTML block above them (issue #358), and for the tables that it reads
- * otherwise (issue #359). Only the part of the edit
+ * more of an HTML block above them (issue #358), for the underlines and lazy
+ * lines that Obsidian reads otherwise (issues #376, #377, and #383), for the
+ * footnote definitions, lines below link reference definitions, and blocks
+ * below open fences that Obsidian reads as text or code (issues #378, #379, and
+ * #390), and for the tables that it reads otherwise (issue #359). Only the
+ * part of the edit
  * that changes the text counts, so that an edit that copies such
  * text, such as a list rule's, can still apply.
  */
@@ -258,6 +262,11 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.descriptions,
       ...misread.unclosedCode,
       ...misread.htmlText,
+      ...misread.underlines,
+      ...misread.lazyItems,
+      ...misread.footnoteText,
+      ...misread.definitionCode,
+      ...misread.openFences,
       ...misread.tableText,
     ],
     (node) => range(node),
