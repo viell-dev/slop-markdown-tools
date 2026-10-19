@@ -554,6 +554,12 @@ describe("a paragraph's first word that would be a block on its own", () => {
         // A backtick or a `$` on the line keeps a fence or math from opening.
         const source = `${word} ${url} \`c\` and more words here, a$ b.\n`;
         const output = verify(source, { ...wrap(), dialect }, workspace).output;
+        // In Obsidian, a run of backticks that nothing closes keeps the
+        // paragraph as written (issue #362).
+        if (word === "```js" && dialect === "obsidian") {
+          expect(output, dialect).toBe(source);
+          continue;
+        }
         expect(output, dialect).not.toBe(source);
         // CommonMark has no math.
         if (word !== "$$" || dialect !== "commonmark")
