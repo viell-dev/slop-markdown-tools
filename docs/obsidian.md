@@ -110,8 +110,10 @@ note shows there, the tool keeps the text as written:
   colon. Live Preview styles it as a link reference definition, and the lines
   above and below it as text, where CommonMark reads more of the paragraph,
   because a definition cannot interrupt one; it styles `[ref]: a b`, which is no
-  definition, the same way. No rule changes such a line or joins it to the line
-  above or below it. A line indented by a space or after `>` is text in Live
+  definition, the same way, also as the first line of a paragraph, as in
+  `[Note]: see the page for details`. No rule changes such a line or joins it to
+  the line above or below it, so `style/wrap` neither breaks it nor reflows the
+  paragraph around it. A line indented by a space or after `>` is text in Live
   Preview too.
 - A fenced code block that a list item or block quote ends before its closing
   fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
