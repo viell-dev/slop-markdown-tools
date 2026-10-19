@@ -59,9 +59,9 @@ CommonMark, and otherwise than each other. Where formatting would change what a
 note shows there, the tool keeps the text as written:
 
 - A paragraph, heading, or table cell with a backtick that no run of backticks
-  closes, such as ``a ` b``. Live Preview shows the rest of that line as code,
-  and Reading view pairs a run of two or more backticks with a later, shorter
-  run. No rule changes such a block.
+  closes, such as ``a ` b``. Live Preview shows the text after it as code, at
+  least to the end of its line, and Reading view pairs a run of two or more
+  backticks with a later, shorter run. No rule changes such a block.
 
 ## Vaults inside a larger workspace
 

@@ -13,9 +13,10 @@ prereleases' notes there are longer than their entries here.
 ### Fixed
 
 - In the Obsidian dialect, no rule changes a paragraph, heading, or table cell
-  with a backtick that no run of backticks closes. Live Preview shows the rest
-  of that line as code and Reading view pairs a longer run with a later, shorter
-  one, so the rules changed text that Obsidian shows as code.
+  with a backtick that no run of backticks closes. Live Preview shows the text
+  after it as code, at least to the end of its line, and Reading view pairs a
+  longer run with a later, shorter one, so the rules changed text that Obsidian
+  shows as code.
 - `obsidian/callout-marker` leaves a marker that Obsidian shows as text, because
   more than one space or a tab separates it from the quote's `>`, as in
   `>  [!NOTE]`. Before, it lowercased the visible text.

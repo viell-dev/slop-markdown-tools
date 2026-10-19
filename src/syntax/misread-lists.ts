@@ -46,9 +46,9 @@ export interface MisreadLists {
   /**
    * In the Obsidian dialect, paragraphs, headings, and table cells whose text
    * holds a backtick that no run of the same length closes, which the parser
-   * leaves as text. Obsidian's Live Preview shows the rest of its line as code,
-   * and Reading view pairs a run of two or more with a later, shorter one, as
-   * in ``a ``` b `c` d`` (issue #362).
+   * leaves as text. Obsidian's Live Preview shows the text after it as code, at
+   * least to the end of its line, and Reading view pairs a run of two or more
+   * with a later, shorter one, as in ``a ``` b `c` d`` (issue #362).
    */
   unclosedCode: ReadonlySet<Nodes>;
 }
