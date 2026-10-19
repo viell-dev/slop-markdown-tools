@@ -217,8 +217,6 @@ function livePreview(lines) {
     const body = merged
       .map(([classes, value]) => {
         let text = block.code ? value : value.replace(/\s+/g, " ");
-        // A list's marker shows as a bullet whatever the character, and an ordered list's
-        // number as written; the list rules choose the marker, which is not a change.
         // A list's marker shows as written: a bullet character, which the theme draws as a dot,
         // and an item's number, which `style/ordered-list` chooses.
         if (/\blist-bullet\b/.test(classes)) text = "•";
@@ -258,8 +256,9 @@ function documents() {
   return [...fixtures, ...generated];
 }
 
-/** A document's formatting at `width`, and the views in which Obsidian shows it differently. */
+/** How many documents were written to the vault, which names the next ones. */
 let written = 0;
+/** A document's formatting at `width`, and the views in which Obsidian shows it differently. */
 async function compare(source, width, workspace) {
   const config = {
     extends: ["recommended", "obsidian"],
@@ -326,14 +325,14 @@ describe("Obsidian before and after formatting", function () {
     const reduced = [];
     for (const name of reduce)
       for (const width of widths) {
-        const document = all.find((item) => item.name === name);
-        if (!document) continue;
-        const first = await compare(document.source, width, workspace);
+        const named = all.find((item) => item.name === name);
+        if (!named) continue;
+        const first = await compare(named.source, width, workspace);
         if (!first.changed.length) continue;
         const view = first.changed.includes("reading") ? "reading" : first.changed[0];
         const still = async (lines) =>
           (await compare(lines.join("\n") + "\n", width, workspace)).changed.includes(view);
-        let lines = document.source.replace(/\n$/, "").split("\n");
+        let lines = named.source.replace(/\n$/, "").split("\n");
         for (let changed = true; changed;) {
           changed = false;
           // Halves, quarters, and so on, then single lines.
