@@ -17,11 +17,23 @@ prereleases' notes there are longer than their entries here.
   block, as written. Obsidian's Reading view reads such a line as more of the
   paragraph or HTML block above it, so emptying or removing it split a
   paragraph, or made a heading below an HTML block render.
+- In the Obsidian dialect, a `%%` comment at the start of a line below a
+  paragraph, or one that text follows on the line where it closes, is part of
+  the paragraph, as Obsidian reads it. Before, it was read as a block of its
+  own, so `style/trailing-space` removed a hard break above it, `style/wrap`
+  kept it apart, and no rule saw the text after it. An empty comment, `%%%%`, in
+  a paragraph is now a comment too, which Obsidian hides
+  ([#370](https://github.com/viell-dev/slop-markdown-tools/pull/370)).
+- `obsidian/callout-marker` leaves a marker that Obsidian shows as text, because
+  more than one space or a tab separates it from the quote's `>`, as in
+  `>  [!NOTE]`. Before, it lowercased the visible text
+  ([#372](https://github.com/viell-dev/slop-markdown-tools/pull/372)).
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
   such a character with a later one: after `snake_case and *em*` became
-  `snake_case and _em_`, Reading view showed `case and _em` as emphasis.
+  `snake_case and _em_`, Reading view showed `case and _em` as emphasis
+  ([#368](https://github.com/viell-dev/slop-markdown-tools/pull/368)).
 - `links/path` with `leadingDot` keeps `./` before a name that starts with a
   dot, such as `./.gitignore` or `./.github/`, and adds it there. Before, it
   took such a path for one that already started with `./` and removed the `./`
