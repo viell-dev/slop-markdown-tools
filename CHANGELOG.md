@@ -17,18 +17,18 @@ prereleases' notes there are longer than their entries here.
   the blank space at the end of that line. Obsidian's Reading view reads the
   definition as more of the paragraph and its indented lines as code, where the
   rules formatted a footnote: `style/emphasis` changed that code
-  ([#391](https://github.com/viell-dev/slop-markdown-tools/pull/391)).
+  ([#392](https://github.com/viell-dev/slop-markdown-tools/pull/392)).
 - In the Obsidian dialect, no rule changes a paragraph or heading that starts on
   the line below a link reference definition and further right than it. Reading
   view reads such a line as an indented code block, where `style/wrap` and
   `style/emphasis` changed it as text
-  ([#391](https://github.com/viell-dev/slop-markdown-tools/pull/391)).
+  ([#392](https://github.com/viell-dev/slop-markdown-tools/pull/392)).
 - In the Obsidian dialect, no rule changes a fenced code block that a list item
   or block quote ends before its closing fence, nor anything below it. Obsidian
   reads the lines below as more of the code, and Live Preview pairs the fences
   after it otherwise than CommonMark; `style/wrap` reflowed such a line and so
   added a line to the code
-  ([#391](https://github.com/viell-dev/slop-markdown-tools/pull/391)).
+  ([#392](https://github.com/viell-dev/slop-markdown-tools/pull/392)).
 
 ## 0.2.5 - 2026-10-19
 
