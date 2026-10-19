@@ -16,7 +16,8 @@ prereleases' notes there are longer than their entries here.
   paragraph, or one that text follows on the line where it closes, is part of
   the paragraph, as Obsidian reads it. Before, it was read as a block of its
   own, so `style/trailing-space` removed a hard break above it, `style/wrap`
-  kept it apart, and no rule saw the text after it.
+  kept it apart, and no rule saw the text after it. An empty comment, `%%%%`, in
+  a paragraph is now a comment too, which Obsidian hides.
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs

@@ -1579,6 +1579,13 @@ describe("Obsidian comments that start a line", () => {
     for (const source of ["%%c%%  \n", "%%c%%\t\n", "%%c%% \t \n"])
       expect(blocks(source), JSON.stringify(source)).toEqual(["obsidianComment"]);
   });
+  it("reads an empty comment as a comment, as Obsidian hides it", () => {
+    expect(textContent(parse("a %%%% b\n", "obsidian").tree)).toBe("a  b");
+    expect(textContent(parse("a\n%%%%\nb\n", "obsidian").tree)).toBe("a\n\nb");
+    expect(blocks("%%%%\n")).toEqual(["obsidianComment"]);
+    // `====` and `[[]]` stay text.
+    expect(textContent(parse("a ==== b [[]]\n", "obsidian").tree)).toBe("a ==== b [[]]");
+  });
   it("keeps the hard break above such a comment", () => {
     const config = only({ "style/trailing-space": "warn" }, "obsidian");
     for (const source of ["a  \n%%c%% d\n", "- [x] a  \n  %%c%% d\n"])

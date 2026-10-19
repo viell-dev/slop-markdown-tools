@@ -86,7 +86,8 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
     effects.consume(code);
     count++;
     if (code === closing.charCodeAt(1) && previous === closing.charCodeAt(0)) {
-      if (count <= 2) return nok(code);
+      // `====` and `[[]]` are text, while Obsidian hides an empty comment, `%%%%`.
+      if (count <= 2 && opening !== "%%") return nok(code);
       effects.exit("obsidianCommentData");
       effects.exit("obsidianLiteral");
       return ok;
