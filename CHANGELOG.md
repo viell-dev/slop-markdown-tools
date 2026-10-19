@@ -19,6 +19,11 @@ prereleases' notes there are longer than their entries here.
   Before, `style/wrap` joined `Text` and `[ref]: https://example.com` below it
   into one line, which Live Preview shows as text
   ([#402](https://github.com/viell-dev/slop-markdown-tools/pull/402)).
+- In the Obsidian dialect, `style/final-newline` adds no line break to a note
+  that ends in a fenced code block without its closing fence, outside a list
+  item or block quote. Obsidian's Reading view shows that line break as one
+  more, empty line of the code
+  ([#412](https://github.com/viell-dev/slop-markdown-tools/pull/412)).
 
 ## 0.2.6 - 2026-10-19
 

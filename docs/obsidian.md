@@ -121,6 +121,11 @@ note shows there, the tool keeps the text as written:
   Preview everything up to a line that would close the fence, and the fences
   after that otherwise than CommonMark. No rule changes the code block or
   anything below it.
+- A fenced code block without its closing fence that runs to the end of the
+  note, outside a list item or block quote, as in ```` ``` ```` and `code` below
+  it with no line break after it. Reading view shows a line break at the end of
+  the note as one more, empty line of the code, where CommonMark shows the same
+  code either way. `style/final-newline` adds none there.
 - A table that Obsidian reads otherwise. Obsidian reads a table directly below a
   line of paragraph text as more of the text, a one-column table whose header
   line does not end with a pipe, as in `Name` and `--:` below it, as text, and a

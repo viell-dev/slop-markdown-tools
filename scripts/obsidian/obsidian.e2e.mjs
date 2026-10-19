@@ -432,7 +432,8 @@ describe("Obsidian before and after formatting", function () {
         preview: cleanHtml(preview),
         livePreview: livePreview(lines),
       };
-      shownProbes.push({ source, ...views });
+      // The lines as read, for finding out what the comparison makes of them.
+      shownProbes.push({ source, ...views, lines });
       console.log(
         `${JSON.stringify(source)}\n  reading: ${views.reading}\n  reading view: ${views.preview}\n  live preview: ${JSON.stringify(views.livePreview)}`,
       );
@@ -452,8 +453,12 @@ describe("Obsidian before and after formatting", function () {
         const first = await compare(named.source, width, workspace);
         if (!first.changed.length) continue;
         const view = first.changed.includes("reading") ? "reading" : first.changed[0];
+        // The document keeps its end: whether a line break ends it, which `style/final-newline`
+        // adds, can be what makes the difference.
+        const end = named.source.endsWith("\n") ? "\n" : "";
+        const join = (lines) => lines.join("\n") + end;
         const still = async (lines) =>
-          (await compare(lines.join("\n") + "\n", width, workspace)).changed.includes(view);
+          (await compare(join(lines), width, workspace)).changed.includes(view);
         let lines = named.source.replace(/\n$/, "").split("\n");
         for (let changed = true; changed;) {
           changed = false;
@@ -467,12 +472,12 @@ describe("Obsidian before and after formatting", function () {
               } else at += size;
             }
         }
-        const last = await compare(lines.join("\n") + "\n", width, workspace);
+        const last = await compare(join(lines), width, workspace);
         reduced.push({
           name,
           width,
           view,
-          source: lines.join("\n") + "\n",
+          source: join(lines),
           output: last.output,
           views: last.views,
         });

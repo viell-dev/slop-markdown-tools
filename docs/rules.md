@@ -805,7 +805,10 @@ line ending. A file whose last line has no line break is changed; an empty file
 is not. Nothing is added where the line break would become part of the last
 block: an HTML comment or another HTML block without its end marker, an Obsidian
 comment without its closing `%%`, or a code or math block without its closing
-fence whose last line is blank space.
+fence whose last line is blank space. In the Obsidian dialect, nothing is added
+either where the document ends in a fenced code block without its closing fence,
+outside a list item or block quote: Reading view shows the line break as one
+more, empty line of the code.
 
 ## `style/heading`
 

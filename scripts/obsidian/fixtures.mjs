@@ -1,7 +1,7 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
-// the cases where Live Preview showed what the HTML renderers did not (#15, #306, #391), and
-// those that the check has to read with care (#385). Each paragraph is long enough that
+// the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
+// #391, #395), and those that the check has to read with care (#385). Each paragraph is long enough that
 // formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
@@ -110,5 +110,12 @@ export const fixtures = [
     name: "definition line in a paragraph",
     source:
       'Some words with *emphasis* before the line, enough of them to be reflowed at a narrow width.\n[ref]: https://example.com/page "A title with several words"\nSome words after the line, enough of them to be reflowed at a narrow width too.\n',
+  },
+  {
+    // #395: Reading view shows a line break at the end of the note as one more line of a code
+    // block that nothing closes, so `style/final-newline` adds none; only the fence changes.
+    name: "unclosed code block ending the note",
+    source:
+      "Some words before the code block, enough of them to be reflowed at a narrow width.\n\n~~~\nconst a = 1;",
   },
 ];

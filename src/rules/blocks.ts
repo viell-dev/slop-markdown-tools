@@ -133,14 +133,25 @@ export function endsInOpenFence(source: string, node: Nodes): boolean {
  * Whether a line ending added at the end of the document would change its
  * last block. Besides the blocks of `takesLines`, the parser counts a last
  * line of blank space in a code or math block that has no closing fence only
- * when a line ending follows it.
+ * when a line ending follows it. Obsidian's Reading view shows the final line
+ * ending of a fenced code block that runs to the end of the document, outside
+ * any list item or block quote, as one more, empty line of its code; a
+ * container ends such a block before the line ending (issue #395).
  */
 export function takesFinalLineEnding(document: Document): boolean {
   if (takesLines(document.tree)) return true;
-  if (!/(?:^|[\r\n])[ \t]+$/.test(document.source)) return false;
+  const { source } = document;
+  if (document.dialect === "obsidian") {
+    const final = document.tree.children.at(-1);
+    if (final?.type === "code" && located(final)) {
+      const fence = codeFence(source, final);
+      if (fence !== undefined && !fence.close) return true;
+    }
+  }
+  if (!/(?:^|[\r\n])[ \t]+$/.test(source)) return false;
   const last = lastBlock(document.tree);
   if ((last.type !== "code" && last.type !== "math") || !located(last)) return false;
-  const fence = codeFence(document.source, last);
+  const fence = codeFence(source, last);
   return fence !== undefined && !fence.close;
 }
 

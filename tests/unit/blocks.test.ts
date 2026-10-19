@@ -592,6 +592,11 @@ describe("a final line ending inside an unclosed block (#251)", () => {
     ["   ~~~\ncode\n   ", "github"],
     ["- ~~~\n  code\n  ", "github"],
     ["   $$\n\n   ", "github"],
+    // Obsidian's Reading view shows a final line ending as one more line of a fenced code
+    // block that runs to the end of the document (#395).
+    ["~~~\ncode", "obsidian"],
+    ["```js\ncode\n  more", "obsidian"],
+    ["Text.\n\n~~~ info\ncode", "obsidian"],
   ] as const)("adds nothing to %j in the %s dialect", (source, dialect) => {
     kept(source, only(rule, dialect));
   });
@@ -608,6 +613,13 @@ describe("a final line ending inside an unclosed block (#251)", () => {
     ["~~~\ncode", "github"],
     ["~~~\ncode\n~~~\n   ", "github"],
     ["> ~~~\n> code\n>   ", "github"],
+    // A list item or block quote ends an unclosed fence before the line ending, and a closed
+    // fence, a math block, and an indented code block show the same with it in Obsidian (#395).
+    ["- ~~~\n  code", "obsidian"],
+    ["> ~~~\n> code", "obsidian"],
+    ["~~~\ncode\n~~~", "obsidian"],
+    ["$$\nx", "obsidian"],
+    ["    code", "obsidian"],
   ] as const)("adds the line ending to %j in the %s dialect", (source, dialect) => {
     expect(formatted(source, only(rule, dialect))).toBe(`${source}\n`);
   });
