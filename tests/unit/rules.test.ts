@@ -1363,7 +1363,7 @@ describe("dialect markers", () => {
       [">   [!NOTE]\n> body\n", ">   [!NOTE]\n> body\n"],
       [">>  [!Important] signal\n", ">>  [!Important] signal\n"],
       ["> >  [!NOTE] T\n", "> >  [!NOTE] T\n"],
-    ])
+    ] as const)
       expect(formatted(source, obsidian), JSON.stringify(source)).toBe(output);
   });
   it("applies GitHub alert casing to Forgejo documents only among GFM dialects", () => {
