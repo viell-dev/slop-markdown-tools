@@ -614,7 +614,9 @@ lines at the start and at the end of a document. The option `maximum` is an
 integer of at least 1; the default is 1. The line break that ends the last line
 stays; [`style/final-newline`](#stylefinal-newline) adds it where it is missing.
 Inside a block quote, a line of only `>` markers is a blank line, and repeated
-ones are removed the same way.
+ones are removed the same way. In the Obsidian dialect, a line of blank space
+that holds a tab, or that lies directly below an HTML block, is not blank:
+Obsidian's Reading view reads it as more of the paragraph or block above it.
 
 Before, with three blank lines between the blocks and two at the end:
 
@@ -1188,14 +1190,16 @@ Line one\
 line two
 ```
 
-Blank space is left as written where it is content: in code blocks, except on
-their fence lines, and in HTML, math, front matter, Obsidian comments, code
-spans, and link titles and labels that span lines. With `"backslash"`, a break
-stays as spaces where a backslash would change what the line says: after another
-backslash, after a literal autolink such as `www.example.com`, which would take
-the backslash into its address, on the title line of an alert or callout, in a
-paragraph that starts like a link reference definition (`[label]:`), and on
-Forgejo and Gitea inside `\(...\)` math.
+Blank space is left as written where it is content: on a line of blank space
+that holds a tab or lies directly below an HTML block in the Obsidian dialect,
+which Obsidian's Reading view reads as more of the block above it; in code
+blocks, except on their fence lines, and in HTML, math, front matter, Obsidian
+comments, code spans, and link titles and labels that span lines. With
+`"backslash"`, a break stays as spaces where a backslash would change what the
+line says: after another backslash, after a literal autolink such as
+`www.example.com`, which would take the backslash into its address, on the title
+line of an alert or callout, in a paragraph that starts like a link reference
+definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)` math.
 
 ## `style/wrap`
 
