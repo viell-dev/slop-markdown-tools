@@ -43,6 +43,13 @@ export interface MisreadLists {
    * the description as blocks, here an ordered list (issue #344).
    */
   descriptions: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the blocks that Reading view reads as more of an
+   * HTML block above them. A line of blank space directly below an HTML block
+   * that ends at a blank line continues the block, and so do the blocks after
+   * it, up to an empty line (issue #358).
+   */
+  htmlText: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -165,7 +172,41 @@ export function misreadLists(document: Document): MisreadLists {
     return continued;
   };
   visit(document.tree);
-  const result = { text, nested, next, descriptions };
+  const htmlText = new Set<Nodes>();
+  if (document.dialect === "obsidian") {
+    const lines = source.split(/\r\n|\r|\n/);
+    /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
+    const spaced = (number: number) => {
+      const line = lines[number - 1] ?? "";
+      return /^[ \t>]*$/.test(line) && /[^>]/.test(line);
+    };
+    const continued = (parent: Parents) => {
+      /** Whether the last block is an HTML block, or its text, that the next block may continue. */
+      let open = false;
+      parent.children.forEach((child, index) => {
+        const previous = parent.children[index - 1];
+        if (open && previous?.position && child.position) {
+          for (let line = previous.position.end.line + 1; line < child.position.start.line; line++)
+            if (!spaced(line)) open = false;
+          if (open) htmlText.add(child);
+        }
+        // Other HTML blocks end at their own end marker, as a comment does at `-->`.
+        if (
+          !open &&
+          child.type === "html" &&
+          child.position &&
+          !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
+            child.value,
+          )
+        )
+          open = spaced(child.position.end.line + 1);
+        if (!htmlText.has(child) && "children" in child && !leaves.has(child.type))
+          continued(child);
+      });
+    };
+    continued(document.tree);
+  }
+  const result = { text, nested, next, descriptions, htmlText };
   found.set(document.tree, result);
   return result;
 }

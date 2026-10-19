@@ -9,6 +9,7 @@ import {
   startsWithMarker,
   unclosedFrontMatter,
 } from "../syntax/parse.js";
+import { misreadLists } from "../syntax/misread-lists.js";
 import { walk } from "../syntax/walk.js";
 
 /** A JSON Schema for an options object with these properties and no others. */
@@ -366,8 +367,9 @@ const thematicBreak: Rule = {
  * In the Obsidian dialect, the indices of the lines of blank space that
  * Obsidian's Reading view reads as more of the block above them, where
  * CommonMark and the parser read a blank line: one that holds a tab, which
- * continues a paragraph, and one directly below an HTML block, which continues
- * the block (issue #358). Emptying such a line would end the block there.
+ * continues a paragraph, and one directly below an HTML block or the text that
+ * Obsidian reads as more of one, which continues the block (issue #358).
+ * Emptying such a line would end the block there.
  */
 function obsidianShownBlanks(document: Document, lines: Line[]): Set<number> {
   const shown = new Set<number>();
@@ -377,6 +379,9 @@ function obsidianShownBlanks(document: Document, lines: Line[]): Set<number> {
     // An HTML block, not inline HTML: its parent holds blocks.
     if (parent && containers.has(parent.type) && node.position) below.add(node.position.end.line);
   });
+  // And so does the text that Obsidian reads as more of such a block.
+  for (const node of misreadLists(document).htmlText)
+    if (node.position) below.add(node.position.end.line);
   lines.forEach((line, index) => {
     const text = document.source.slice(line.start, line.end);
     if (/^[ \t>]*$/.test(text) && /[^>]/.test(text) && (text.includes("\t") || below.has(index)))

@@ -23,12 +23,16 @@ let loaded = false;
 /** What Obsidian shows a note as, read in its page: Reading view's HTML and Live Preview's lines. */
 async function shown(path, text) {
   // Until the settings are loaded, Obsidian renders with its defaults.
-  if (!loaded)
+  if (!loaded) {
     loaded = await browser.executeObsidian(async ({ app }) => {
       for (let wait = 0; wait < 100 && app.vault.getConfig("strictLineBreaks") !== true; wait++)
         await new Promise((resolve) => setTimeout(resolve, 100));
       return app.vault.getConfig("strictLineBreaks") === true;
     });
+    // The tool wraps only with strict line breaks, so a comparison without
+    // them would check something else.
+    if (!loaded) throw new Error("Obsidian did not load the vault's strict line breaks setting");
+  }
   return browser.executeObsidian(
     async ({ app, obsidian }, path, text) => {
       const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

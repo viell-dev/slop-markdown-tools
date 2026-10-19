@@ -956,6 +956,40 @@ describe("definition descriptions on Forgejo and Gitea", () => {
   });
 });
 
+describe("blocks that Obsidian reads into an HTML block above them", () => {
+  // A line of blank space directly below an HTML block continues it in
+  // Reading view, up to an empty line, so the text there shows as written
+  // (issue #358).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "</div>\n  \n*a* b\n",
+    "</div>\n\t\n### __z__ ##\n",
+    "<div>\n</div>\n  \ndelta\n---\n",
+    "<div>\n  \n*a* b\n",
+    "</div>\n  \n*a* b\n  \n*c* d\n",
+    "> </div>\n>  \n> *a* b\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // An empty line ends the HTML block.
+    ["</div>\n  \n*a* b\n\n*c* d\n", "</div>\n  \n*a* b\n\n_c_ d\n"],
+    // These end at their own end markers.
+    ["<!-- c -->\n  \n*a* b\n", "<!-- c -->\n  \n_a_ b\n"],
+    ["<pre>\nx\n</pre>\n  \n*a* b\n", "<pre>\nx\n</pre>\n  \n_a_ b\n"],
+    ["<script>\n</script>\n  \n*a* b\n", "<script>\n</script>\n  \n_a_ b\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such text in the other dialects", () => {
+    expect(
+      formatted("</div>\n  \n*a* b\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("</div>\n\n_a_ b\n");
+  });
+});
+
 describe("the block directly below TOML front matter", () => {
   // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
   // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,

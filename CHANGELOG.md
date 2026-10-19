@@ -16,7 +16,9 @@ prereleases' notes there are longer than their entries here.
   a line of blank space that holds a tab, or that lies directly below an HTML
   block, as written. Obsidian's Reading view reads such a line as more of the
   paragraph or HTML block above it, so emptying or removing it split a
-  paragraph, or made a heading below an HTML block render.
+  paragraph, or made a heading below an HTML block render. No rule changes the
+  blocks below such a line that Reading view shows as more of the HTML block, up
+  to an empty line.
 - In the Obsidian dialect, `style/wrap` keeps an inline footnote, `^[…]`, on one
   line, and keeps the lines of a paragraph with one that spans lines. Live
   Preview shows an inline footnote whose text spans lines as Markdown source,
