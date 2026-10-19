@@ -1217,9 +1217,10 @@ onto one, without the spaces and tabs that start its next line, as renderers
 read it. On a lazy continuation line, which keeps them, such a code span stays
 as written, and so does its paragraph. In Obsidian, the text of a link stays
 whole and is joined onto one line too, because Live Preview shows a link whose
-text spans lines as its Markdown source. List markers, block quote markers, and
-indentation count toward the width, a tab up to the next multiple of four
-columns.
+text spans lines as its Markdown source. For the same reason, an inline footnote
+(`^[…]`) on one line stays whole there, and a paragraph with one that spans
+lines keeps its lines. List markers, block quote markers, and indentation count
+toward the width, a tab up to the next multiple of four columns.
 
 A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
