@@ -4,7 +4,7 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { definitionLike, misreadLists } from "../syntax/misread-lists.js";
 import {
   codeSpanText,
   joinsTomlFrontMatter,
@@ -776,6 +776,13 @@ function startsSiteSyntax(text: string): boolean {
  * a definition list.
  */
 const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
+/**
+ * A word that Obsidian's Live Preview reads as a tag after blank space or at
+ * the start of a line's content, but not directly after a block quote's `>`
+ * (issue #409): `#` and the characters Obsidian allows in a tag, letters,
+ * digits, `_`, `-`, and `/`, among them one that is not a digit.
+ */
+const obsidianTag = /^#[\p{L}\p{N}_/-]*[\p{L}_/-]/u;
 
 type Range = [number, number];
 /**
@@ -1061,7 +1068,17 @@ const wrap: Rule = {
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
     const newline = lineEnding(document.source);
     walk(document.tree, "paragraph", (node, index, parent) => {
-      const [paragraphStart, end] = range(node);
+      const paragraphStart = range(node)[0];
+      let end = range(node)[1];
+      // Obsidian's Reading view shows the blank space at the end of a footnote
+      // definition's last paragraph before the footnote's backreference (issue
+      // #405). It stays as written, outside the text that is reflowed.
+      if (
+        document.dialect === "obsidian" &&
+        parent?.type === "footnoteDefinition" &&
+        index === parent.children.length - 1
+      )
+        while (end > paragraphStart && /[ \t]/.test(document.source[end - 1]!)) end--;
       let start = paragraphStart;
       let children = node.children;
       // A task item's paragraph range can begin at the checkbox, and its first
@@ -1136,6 +1153,11 @@ const wrap: Rule = {
       const openers = [wordOpener, prefixOpener, siteSyntax];
       if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
       if (forge) openers.push(forgeLineOpener);
+      // Live Preview reads a tag after blank space or at the start of a line's
+      // content, not directly after a quote marker, so where the lines below
+      // the first start with markers written without a space after them, a
+      // tag stays on the line before it (issue #409).
+      if (document.dialect === "obsidian" && continuation.endsWith(">")) openers.push(obsidianTag);
       const { source } = document;
       // GitHub and Obsidian end dollar math at a single dollar after a line
       // ending, but not after a space, so a word that starts with `$` stays on
@@ -1337,15 +1359,19 @@ const wrap: Rule = {
           (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
       )
         atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
+      /** The index of the atom that starts each line of the last `fill`. */
+      let starts: number[] = [];
       /** Fill lines greedily, with the first `first` atoms on the first line. */
       const fill = (first: number): string[] => {
         const lines: string[] = [];
+        starts = [0];
         let line = atoms.slice(0, first).join(" ");
         let linePrefix = prefix;
         for (let i = first; i < atoms.length; i++) {
           const candidate = `${line} ${atoms[i]}`;
           if (lineWidth(linePrefix + candidate, measure) > width) {
             lines.push(line);
+            starts.push(i);
             line = atoms[i]!;
             linePrefix = continuation;
           } else line = candidate;
@@ -1353,15 +1379,36 @@ const wrap: Rule = {
         if (line) lines.push(line);
         return lines;
       };
-      let output = fill(1);
+      let first = 1;
+      let output = fill(first);
       // A paragraph that starts like a link reference definition becomes one
       // when a line ends after the definition's destination or title. Keep
       // words on the first line until the lines read as one paragraph again.
       if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
-        let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
+        first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
         while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
           output = fill(++first);
       }
+      // Live Preview styles a line that starts at the first column with `[`, a
+      // label, and `]:` as a link reference definition, so no reflowed line
+      // starts so: the word that opens the label, which may hold blank space,
+      // stays on the line before it (issue #411). The first line has no line
+      // before it, and a paragraph whose first line would start so, as `[a`
+      // and `b]: c d` below it joined, stays as written.
+      if (document.dialect === "obsidian" && !continuation)
+        for (
+          let index = output.findIndex((line) => definitionLike.test(line));
+          index >= 0;
+          index = output.findIndex((line) => definitionLike.test(line))
+        ) {
+          const at = starts[index]!;
+          if (at === 0) {
+            reportSkipped("first line that Obsidian styles as a link reference definition");
+            return;
+          }
+          atoms.splice(at - 1, 2, `${atoms[at - 1]} ${atoms[at]}`);
+          output = fill(first);
+        }
       const replacement = output.join(newline + continuation);
       if (replacement !== original)
         findings.push({
