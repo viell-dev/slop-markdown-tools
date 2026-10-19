@@ -8,6 +8,14 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- `links/path` with `leadingDot` keeps `./` before a name that starts with a
+  dot, such as `./.gitignore` or `./.github/`, and adds it there. Before, it
+  took such a path for one that already started with `./` and removed the `./`.
+
 ## 0.2.4 - 2026-10-19
 
 ### Fixed

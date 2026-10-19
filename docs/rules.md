@@ -290,7 +290,8 @@ only when the new destination leads to the same file and fragment.
 - `extension`: whether the path to a Markdown file ends in `.md`. `omit` applies
   in the Obsidian dialect only.
 - `leadingDot`: with `relative`, start a path with `./` when it does not start
-  with `.`.
+  with `./` or `../`, also a path to a name that starts with a dot, such as
+  `./.gitignore`.
 
 A relative path also gets `./` when it would otherwise name a different file at
 the vault's root. A destination that already has the configured spelling keeps

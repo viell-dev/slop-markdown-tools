@@ -250,6 +250,14 @@ function undefinedReferences(
   return references;
 }
 
+/**
+ * Whether a relative path already starts at the linking document's directory or above it.
+ * A path such as `.gitignore` starts with a dot and is neither.
+ */
+function explicitlyRelative(path: string): boolean {
+  return /^\.\.?(?:\/|$)/.test(path);
+}
+
 /** Names the first few of the paths that could not be read, and counts the rest. */
 function named(paths: string[]): string {
   return paths.length > 3
@@ -379,7 +387,7 @@ export const linkRules: Record<string, Rule> = {
               target = target.replace(/\.md$/, "");
             else if (options.extension === "include" && !target.endsWith(".md")) target += ".md";
           }
-          if (style === "relative" && options.leadingDot === true && !target.startsWith("."))
+          if (style === "relative" && options.leadingDot === true && !explicitlyRelative(target))
             target = `./${target}`;
         }
         // Encode reserved path characters before reattaching a separately parsed fragment.
@@ -408,7 +416,7 @@ export const linkRules: Record<string, Rule> = {
         if (
           style === "relative" &&
           parts.path &&
-          !replacement.startsWith(".") &&
+          !explicitlyRelative(replacement) &&
           (verified.status !== "resolved" ||
             verified.target !== result.target ||
             verified.unreadable)
