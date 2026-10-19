@@ -63,6 +63,16 @@ async function shown(path, text) {
       const style =
         /^(?:cm-(?:strong|em|strikethrough|inline-code|highlight|link|url|hashtag|hmd-internal-link|link-alias|comment|hmd-barelink|header-\d|formatting[\w-]*|hmd-footnote|footref)|list-bullet|is-unresolved|task-list-item-checkbox)$/;
       /** The text of a line's content, as runs of [classes of what shows it, text]. */
+      const embeds = ".internal-embed, .image-embed";
+      /** What an embed shows: its file, with the description and size written for it. */
+      const embedText = (element) => {
+        const image = element.querySelector("img");
+        const value = (name) => element.getAttribute(name) ?? image?.getAttribute(name);
+        return (
+          ["src", "alt", "width", "height"].map(value).filter(Boolean).join(" ") ||
+          element.textContent
+        );
+      };
       const runs = (node, classes, out) => {
         for (const child of node.childNodes) {
           if (child.nodeType === Node.TEXT_NODE) {
@@ -72,8 +82,7 @@ async function shown(path, text) {
           if (child.nodeType !== Node.ELEMENT_NODE || child.matches(ui)) continue;
           if (child.matches(".math"))
             out.push([`${classes} math`, child.querySelector("[data-latex]")?.dataset.latex ?? ""]);
-          else if (child.matches(".internal-embed, .image-embed"))
-            out.push([`${classes} embed`, child.getAttribute("src") ?? child.textContent]);
+          else if (child.matches(embeds)) out.push([`${classes} embed`, embedText(child)]);
           else if (child.matches("input[type=checkbox]"))
             out.push([`${classes} checkbox`, child.checked ? "x" : " "]);
           else {
@@ -107,8 +116,9 @@ async function shown(path, text) {
           if (lines.has(at)) continue;
           if (element.classList.contains("cm-line"))
             lines.set(at, {
+              // A lazy line of a quote shows as more of the quote.
               kind: [...element.classList]
-                .filter((name) => /^HyperMD-/.test(name) && !/-(?:bg|nobullet)$/.test(name))
+                .filter((name) => /^HyperMD-/.test(name) && !/-(?:bg|nobullet|lazy)$/.test(name))
                 .sort()
                 .join(" "),
               // A list item's next line, which shows as more of its text.
@@ -119,6 +129,14 @@ async function shown(path, text) {
             lines.set(at, {
               widget: [...element.classList].filter((name) => name !== "cm-embed-block").join(" "),
               html: widget(element),
+              // An embed on a line of its own shows as a block, also where a wrapper
+              // holds it.
+              embed: (() => {
+                const target = element.matches(embeds)
+                  ? element
+                  : [...element.children].find((child) => child.matches(embeds));
+                return target && embedText(target);
+              })(),
             });
         }
         if (top + scroller.clientHeight >= scroller.scrollHeight) break;
@@ -174,14 +192,20 @@ const block = "blockquote|div|h[1-6]|hr|li|ol|p|table|td|th|tr|ul";
 function livePreview(lines) {
   const blocks = [];
   let current;
-  for (const line of lines) {
+  for (let line of lines) {
+    // An embed that Live Preview shows as a block where the source gives it a line of its
+    // own, which wrapping can do, shows the same file as an embed in the line.
+    if (line.embed) line = { kind: "", runs: [[" embed", line.embed]] };
     if (line.widget !== undefined) {
       blocks.push(`<${line.widget}> ${cleanHtml(line.html)}`);
       current = undefined;
       continue;
     }
     const text = line.runs.map(([, value]) => value).join("");
-    if (!line.kind && !text.trim()) {
+    // A line that shows only an image is not blank.
+    const embed = line.runs.some(([classes]) => /\bembed\b/.test(classes));
+    // A blank line below a footnote definition takes its class, and shows nothing either.
+    if ((!line.kind || line.kind === "HyperMD-footnote") && !text.trim() && !embed) {
       current = undefined;
       continue;
     }
@@ -196,8 +220,14 @@ function livePreview(lines) {
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
-      const last = current.runs.at(-1);
-      const first = line.runs[0];
+      // The runs on each side of the line break that show text, not a line's quote markers,
+      // which wrapping moves, or a nested quote's `>`, which Live Preview leaves unstyled.
+      const shows = ([classes, value]) =>
+        value.trim() &&
+        !/\bcm-formatting-quote\b/.test(classes) &&
+        !(!classes && /^[\s>]*$/.test(value));
+      const last = current.runs.findLast(shows);
+      const first = line.runs.find(shows);
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
     } else {
       current = { kind: line.kind, runs: [...line.runs], code };
@@ -244,6 +274,9 @@ function livePreview(lines) {
         // A list's marker shows as written: a bullet character, which the theme draws as a dot,
         // and an item's number, which `style/ordered-list` chooses.
         if (/\blist-bullet\b/.test(classes)) text = "•";
+        // A code block's fence, whose characters and length `style/code-fence` chooses.
+        else if (/\bcm-formatting-code-block\b/.test(classes))
+          text = text.replace(/^(?:`{3,}|~{3,})/, "```");
         else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
         else if (/\bcm-(?:hmd-barelink|link)\b/.test(classes))
           text = text.replace(/^X(?=\s|$)/, "x");
@@ -261,8 +294,17 @@ function livePreview(lines) {
             .replace(/\s+/g, " ");
           if (classes) text = text.trim();
         }
-        return classes ? `{${classes}}${text}{/}` : text;
+        return [classes, text];
       })
+      // Unstyled text that shows nothing, such as a nested quote's `>`, separates nothing.
+      .filter(([classes, text]) => classes || text)
+      .reduce((runs, [classes, text]) => {
+        const last = runs.at(-1);
+        if (last && last[0] === classes) last[1] += text;
+        else runs.push([classes, text]);
+        return runs;
+      }, [])
+      .map(([classes, text]) => (classes ? `{${classes}}${text}{/}` : text))
       .join("");
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
   });
