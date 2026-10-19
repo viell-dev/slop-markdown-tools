@@ -18,6 +18,22 @@ prereleases' notes there are longer than their entries here.
   and also a link to a later heading with the same text, which the renderers
   number from that description's heading on
   ([#389](https://github.com/viell-dev/slop-markdown-tools/pull/389)).
+- In the Obsidian dialect, `style/heading` and `style/trailing-space` leave an
+  underlined heading as written where one of Obsidian's views reads its
+  underline as text: Reading view an underline with blank space after it, or
+  before it beyond the heading's text, and Live Preview a lone `-`. Before,
+  `Title` and `-- ` below it became `## Title`, which Reading view had shown as
+  text ([#393](https://github.com/viell-dev/slop-markdown-tools/pull/393)).
+- In the Obsidian dialect, no rule joins a lazy line of `=` or `-` in a block
+  quote or list item to the text above it, or changes it: Reading view reads it
+  as a heading's underline. Before, `style/wrap` joined `> Text` and `=` below
+  it into `> Text =`, and the heading was gone
+  ([#393](https://github.com/viell-dev/slop-markdown-tools/pull/393)).
+- In the Obsidian dialect, no rule changes a list item's paragraph with a lazy
+  line, or the blocks after it in the item, which Live Preview reads outside the
+  list. Before, `style/wrap` joined the lazy line, and `style/emphasis` changed
+  a paragraph that Live Preview showed as code
+  ([#393](https://github.com/viell-dev/slop-markdown-tools/pull/393)).
 - In the Obsidian dialect, no rule changes a footnote definition directly below
   a line of paragraph text, also one that ends a list item or block quote, nor
   the blank space at the end of that line. Obsidian's Reading view reads the

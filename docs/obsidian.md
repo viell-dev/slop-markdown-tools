@@ -83,6 +83,18 @@ note shows there, the tool keeps the text as written:
   as written. No rule empties the line or changes those blocks. A comment, and
   the other HTML blocks that end at their own end marker, such as `<pre>`, do
   not continue.
+- An underlined heading whose underline one of the views reads as text: Reading
+  view one with blank space after it, as in `Title` and `== ` below it, or
+  before it beyond the heading's text, and Live Preview a lone `-`. No rule
+  writes such a heading with `#` or changes its underline.
+- A paragraph in a block quote or list item with a lazy line of `=` or `-`, as
+  in `> Text` and `=` below it, which Reading view reads as a heading's
+  underline where CommonMark reads more of the text. No rule joins that line to
+  the text or changes it.
+- A paragraph of a list item with a lazy line, one that starts left of the
+  item's text, as in `- Text` and `more` below it, and the blocks after it in
+  the item. Live Preview reads those blocks outside the list, where an indented
+  paragraph is code. No rule changes the paragraph or those blocks.
 - A footnote definition directly below a line of paragraph text, also one that
   ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
   Reading view reads the definition as more of the paragraph, and its indented
