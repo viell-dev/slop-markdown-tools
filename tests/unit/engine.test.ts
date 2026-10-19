@@ -990,6 +990,101 @@ describe("blocks that Obsidian reads into an HTML block above them", () => {
   });
 });
 
+describe("backticks that nothing closes in Obsidian", () => {
+  // Live Preview shows the text after such a backtick as code, at least to the
+  // end of its line, also from inside a highlight, an inline comment, or a link
+  // or image description, and Reading view pairs a run of two or more with a
+  // later, shorter one, where the parser reads text (issue #362).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "a ``` b *c* d\n",
+    "a ` b *c* d\n",
+    "a `` b\n`c` *d*\n",
+    "# a ` b *c*\n",
+    "==a ` b== *c* d\n",
+    "==a `b` ``` c== *d*\n",
+    "x %%a ` b%% *c* d\n",
+    "[a ` b](x) *c* d\n",
+    "![a ` b](x) *c* d\n",
+    "![a ` b][r] *c* d\n\n[r]: x\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  // After a run of three or more, Live Preview shows the blocks below as code
+  // up to a run of the same length, a fenced code block, or a list item.
+  it.each([
+    ["a ``` b\n\nc *d* e\n", "a ``` b\n\nc *d* e\n"],
+    ["- a ``` b\n\nc *d*\n", "- a ``` b\n\nc *d*\n"],
+    ["a ``` b\n\n# c *d* #\n\n    x *y*\n", "a ``` b\n\n# c *d* #\n\n    x *y*\n"],
+    ["a ``` b\n\nc *d* ``` e *f*\n\ng *h*\n", "a ``` b\n\nc *d* ``` e *f*\n\ng _h_\n"],
+    [
+      "a ``` b\n\nc `` *d*\n\ne \\``` *f*\n\ng *h*\n",
+      "a ``` b\n\nc `` *d*\n\ne \\``` *f*\n\ng *h*\n",
+    ],
+    ["a ``` b\n\nc ``` d ``` e\n\nf *g*\n", "a ``` b\n\nc ``` d ``` e\n\nf *g*\n"],
+    ["a ``` b\n\n```js\nx\n```\n\nc *d*\n", "a ``` b\n\n```js\nx\n```\n\nc _d_\n"],
+    ["a ``` b\n\n- c *d*\n\ne *f*\n", "a ``` b\n\n- c _d_\n\ne _f_\n"],
+    ["| a ``` b |\n| - |\n\nc *d*\n", "| a ``` b |\n| - |\n\nc *d*\n"],
+    // An indented code block shows as more of the code, and its run closes
+    // nothing; in a wikilink, a run closes the code.
+    ["a ``` b\n\n    x ``` y\n\nc *d*\n", "a ``` b\n\n    x ``` y\n\nc *d*\n"],
+    ["a ``` b\n\nc [[x ``` y]] *d*\n\ne *f*\n", "a ``` b\n\nc [[x ``` y]] *d*\n\ne _f_\n"],
+    // A list item ends the code also where its first block is a quote.
+    ["a ``` b\n\n- > c *d*\n\ne *f*\n", "a ``` b\n\n- > c _d_\n\ne _f_\n"],
+    // Blank lines do not end the code, so their number does not matter.
+    ["a ``` b\n\n\n\nc *d*\n", "a ``` b\n\nc *d*\n"],
+  ])("leaves the blocks below %j as Live Preview shows them", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("looks into the blocks of a container that a syntax plugin adds", () => {
+    const source = "a ``` b\n\nc *d*\n";
+    const document = parse(source, "obsidian");
+    const blocks = document.tree.children;
+    const container = {
+      type: "pluginContainer",
+      children: blocks,
+      position: document.tree.position,
+    };
+    document.tree.children = [container as unknown as (typeof blocks)[number]];
+    const { unclosedCode } = misreadLists(document);
+    expect([...unclosedCode].map((node) => source.slice(...range(node)))).toEqual([
+      "a ``` b",
+      "c *d*",
+    ]);
+  });
+  it("pairs the runs below such a run in time linear in their number", () => {
+    // A line each, so that no run of one closes another, in an HTML block,
+    // which the parser reads without inline syntax (issue #151).
+    const source = `a \`\`\` b\n\n<div>\nc \`\`\` ${"d ` e\n".repeat(20_000)}</div>\n\nf *g*\n`;
+    const started = performance.now();
+    const output = formatted(source, { config });
+    expect(performance.now() - started).toBeLessThan(10_000);
+    expect(output.endsWith("\nf _g_\n")).toBe(true);
+  });
+  it("keeps the emphasis in such a table cell", () => {
+    expect(formatted("| a ` *b* |\n| - |\n", { config })).toBe("| a ` *b* |\n| ------- |\n");
+  });
+  it.each([
+    ["a \\` b *c* d\n", "a \\` b _c_ d\n"],
+    ["a `code` and *c*\n", "a `code` and _c_\n"],
+    ["a ` b\n\n*c* d\n", "a ` b\n\n_c_ d\n"],
+    // Live Preview starts no code inside math or a wikilink.
+    ["$a ` b$ *c*\n", "$a ` b$ _c_\n"],
+    ["[[a ` b]] *c*\n", "[[a ` b]] _c_\n"],
+    ["==a `b` \\` c== *d*\n", "==a `b` \\` c== _d_\n"],
+    ["![a `b` c](x) *d*\n", "![a `b` c](x) _d_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such text in the other dialects", () => {
+    expect(
+      formatted("a ` b *c* d\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a ` b _c_ d\n");
+  });
+});
+
 describe("the block directly below TOML front matter", () => {
   // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
   // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,

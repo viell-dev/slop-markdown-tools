@@ -19,6 +19,14 @@ prereleases' notes there are longer than their entries here.
   paragraph, or made a heading below an HTML block render. No rule changes the
   blocks below such a line that Reading view shows as more of the HTML block, up
   to an empty line.
+- In the Obsidian dialect, no rule changes a paragraph, heading, or table cell
+  with a backtick that no run of backticks closes, also in a highlight, an
+  inline comment, or the text of a link or image. Live Preview shows the text
+  after it as code, at least to the end of its line, and Reading view pairs a
+  longer run with a later, shorter one, so the rules changed text that Obsidian
+  shows as code. After a run of three or more, the blocks that Live Preview
+  shows as code below it stay as written too
+  ([#374](https://github.com/viell-dev/slop-markdown-tools/pull/374)).
 - In the Obsidian dialect, `style/wrap` keeps an inline footnote, `^[…]`, on one
   line, and keeps the lines of a paragraph with one that spans lines. Live
   Preview shows an inline footnote whose text spans lines as Markdown source,
