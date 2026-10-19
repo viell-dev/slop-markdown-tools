@@ -17,7 +17,12 @@ prereleases' notes there are longer than their entries here.
   the paragraph, as Obsidian reads it. Before, it was read as a block of its
   own, so `style/trailing-space` removed a hard break above it, `style/wrap`
   kept it apart, and no rule saw the text after it. An empty comment, `%%%%`, in
-  a paragraph is now a comment too, which Obsidian hides.
+  a paragraph is now a comment too, which Obsidian hides
+  ([#370](https://github.com/viell-dev/slop-markdown-tools/pull/370)).
+- `obsidian/callout-marker` leaves a marker that Obsidian shows as text, because
+  more than one space or a tab separates it from the quote's `>`, as in
+  `>  [!NOTE]`. Before, it lowercased the visible text
+  ([#372](https://github.com/viell-dev/slop-markdown-tools/pull/372)).
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs

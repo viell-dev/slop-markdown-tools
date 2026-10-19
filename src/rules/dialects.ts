@@ -25,6 +25,15 @@ function calloutRule(obsidian: boolean): Rule {
         const [start, end] = range(child);
         const match = /^\[!([\w-]+)\]/.exec(document.source.slice(start));
         if (!match) return;
+        // Obsidian reads a callout only where its marker follows the quote's
+        // `>` and at most one space; after more, or a tab, the marker is text,
+        // whose letters would change (issue #360).
+        if (obsidian) {
+          let gap = start;
+          while (gap > 0 && /[ \t]/.test(document.source[gap - 1]!)) gap--;
+          const space = document.source.slice(gap, start);
+          if (document.source[gap - 1] !== ">" || (space !== "" && space !== " ")) return;
+        }
         // GitHub shows an alert only in a block quote at the top level, with
         // the marker alone on its first line and content below it; elsewhere
         // the marker is text, whose letters would change (issue #334).
