@@ -48,6 +48,16 @@ async function shown(path, text) {
       const style =
         /^(?:cm-(?:strong|em|strikethrough|inline-code|highlight|link|url|hashtag|hmd-internal-link|link-alias|comment|hmd-barelink|header-\d|formatting[\w-]*|hmd-footnote|footref)|list-bullet|is-unresolved|task-list-item-checkbox)$/;
       /** The text of a line's content, as runs of [classes of what shows it, text]. */
+      const embeds = ".internal-embed, .image-embed";
+      /** What an embed shows: its file, with the description and size written for it. */
+      const embedText = (element) => {
+        const image = element.querySelector("img");
+        const value = (name) => element.getAttribute(name) ?? image?.getAttribute(name);
+        return (
+          ["src", "alt", "width", "height"].map(value).filter(Boolean).join(" ") ||
+          element.textContent
+        );
+      };
       const runs = (node, classes, out) => {
         for (const child of node.childNodes) {
           if (child.nodeType === Node.TEXT_NODE) {
@@ -57,13 +67,7 @@ async function shown(path, text) {
           if (child.nodeType !== Node.ELEMENT_NODE || child.matches(ui)) continue;
           if (child.matches(".math"))
             out.push([`${classes} math`, child.querySelector("[data-latex]")?.dataset.latex ?? ""]);
-          else if (child.matches(".internal-embed, .image-embed"))
-            out.push([
-              `${classes} embed`,
-              child.getAttribute("src") ??
-                child.querySelector("img")?.getAttribute("src") ??
-                child.textContent,
-            ]);
+          else if (child.matches(embeds)) out.push([`${classes} embed`, embedText(child)]);
           else if (child.matches("input[type=checkbox]"))
             out.push([`${classes} checkbox`, child.checked ? "x" : " "]);
           else {
@@ -110,10 +114,14 @@ async function shown(path, text) {
             lines.set(at, {
               widget: [...element.classList].filter((name) => name !== "cm-embed-block").join(" "),
               html: widget(element),
-              // An embed on a line of its own shows as a block.
-              embed: element.matches(".internal-embed, .image-embed")
-                ? (element.getAttribute("src") ?? element.querySelector("img")?.getAttribute("src"))
-                : undefined,
+              // An embed on a line of its own shows as a block, also where a wrapper
+              // holds it.
+              embed: (() => {
+                const target = element.matches(embeds)
+                  ? element
+                  : [...element.children].find((child) => child.matches(embeds));
+                return target && embedText(target);
+              })(),
             });
         }
         if (top + scroller.clientHeight >= scroller.scrollHeight) break;
@@ -197,10 +205,12 @@ function livePreview(lines) {
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
-      // The runs that show words, not a line's quote markers, which wrapping moves, or a
-      // nested quote's `>`, which Live Preview leaves unstyled.
+      // The runs on each side of the line break that show text, not a line's quote markers,
+      // which wrapping moves, or a nested quote's `>`, which Live Preview leaves unstyled.
       const shows = ([classes, value]) =>
-        /[\p{L}\p{N}]/u.test(value) && !/\bcm-formatting-quote\b/.test(classes);
+        value.trim() &&
+        !/\bcm-formatting-quote\b/.test(classes) &&
+        !(!classes && /^[\s>]*$/.test(value));
       const last = current.runs.findLast(shows);
       const first = line.runs.find(shows);
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
