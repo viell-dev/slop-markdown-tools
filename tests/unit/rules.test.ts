@@ -1350,6 +1350,22 @@ describe("dialect markers", () => {
       "> > [!note] Title\n> > Body.\n",
     );
   });
+  it("leaves a marker that Obsidian shows as text, after more than one space", () => {
+    // Obsidian reads a callout only where its marker follows the quote's `>`
+    // and at most one space (issue #360).
+    const obsidian = only({ "obsidian/callout-marker": "warn" }, "obsidian");
+    for (const [source, output] of [
+      [">[!NOTE] T\n", ">[!note] T\n"],
+      ["> [!NOTE] T\n", "> [!note] T\n"],
+      [">> [!NOTE] T\n", ">> [!note] T\n"],
+      ["- > [!NOTE] T\n", "- > [!note] T\n"],
+      [">  [!NOTE] T\n", ">  [!NOTE] T\n"],
+      [">   [!NOTE]\n> body\n", ">   [!NOTE]\n> body\n"],
+      [">>  [!Important] signal\n", ">>  [!Important] signal\n"],
+      ["> >  [!NOTE] T\n", "> >  [!NOTE] T\n"],
+    ] as const)
+      expect(formatted(source, obsidian), JSON.stringify(source)).toBe(output);
+  });
   it("applies GitHub alert casing to Forgejo documents only among GFM dialects", () => {
     const rules: Record<string, RuleSetting> = { "github/alert-marker": "warn" };
     expect(formatted("> [!tip]\n> Text.\n", only(rules, "forgejo"))).toBe("> [!TIP]\n> Text.\n");

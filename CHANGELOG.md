@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `obsidian/callout-marker` leaves a marker that Obsidian shows as text, because
+  more than one space or a tab separates it from the quote's `>`, as in
+  `>  [!NOTE]`. Before, it lowercased the visible text.
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
