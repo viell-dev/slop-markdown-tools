@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.2.5 - 2026-10-19
 
 ### Fixed
 
@@ -17,14 +17,16 @@ prereleases' notes there are longer than their entries here.
   other than 1 with text after it, which Live Preview reads as a list item, and
   an empty item such as `*` or `- `, which Reading view reads as one, nor the
   blocks indented below it. Before, `style/wrap` joined such a line into the
-  paragraph and `style/heading` wrote `Text` with `- ` below it as `## Text`.
+  paragraph and `style/heading` wrote `Text` with `- ` below it as `## Text`
+  ([#384](https://github.com/viell-dev/slop-markdown-tools/pull/384)).
 - In the Obsidian dialect, `style/blank-lines` and `style/trailing-space` leave
   a line of blank space that holds a tab, or that lies directly below an HTML
   block, as written. Obsidian's Reading view reads such a line as more of the
   paragraph or HTML block above it, so emptying or removing it split a
   paragraph, or made a heading below an HTML block render. No rule changes the
   blocks below such a line that Reading view shows as more of the HTML block, up
-  to an empty line.
+  to an empty line
+  ([#373](https://github.com/viell-dev/slop-markdown-tools/pull/373)).
 - In the Obsidian dialect, no rule changes a paragraph, heading, or table cell
   with a backtick that no run of backticks closes, also in a highlight, an
   inline comment, or the text of a link or image. Live Preview shows the text
@@ -36,7 +38,8 @@ prereleases' notes there are longer than their entries here.
 - In the Obsidian dialect, `style/wrap` keeps an inline footnote, `^[…]`, on one
   line, and keeps the lines of a paragraph with one that spans lines. Live
   Preview shows an inline footnote whose text spans lines as Markdown source,
-  and the rule broke lines inside it.
+  and the rule broke lines inside it
+  ([#371](https://github.com/viell-dev/slop-markdown-tools/pull/371)).
 - In the Obsidian dialect, a `%%` comment at the start of a line below a
   paragraph, or one that text follows on the line where it closes, is part of
   the paragraph, as Obsidian reads it. Before, it was read as a block of its
