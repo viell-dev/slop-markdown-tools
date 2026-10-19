@@ -717,6 +717,49 @@ function templateTags(text: string, base: number): Range[] {
   }
   return ranges;
 }
+/**
+ * Obsidian's inline footnotes, `^[…]`, in the paragraph from `start` to `end`.
+ * The parser reads them as text, and Live Preview shows one whose text spans
+ * lines as Markdown source (issue #363), so one on a line is kept whole, and a
+ * paragraph that holds one across lines keeps its lines. Brackets inside, as
+ * of a wikilink, are counted to find the footnote's end.
+ */
+function inlineFootnotes(
+  source: string,
+  start: number,
+  end: number,
+  code: Range[],
+): { ranges: Range[]; reason?: string } {
+  const ranges: Range[] = [];
+  /** The end of the code span that holds `at`, or `at` itself. */
+  const pastCode = (at: number) => code.find(([a, b]) => at >= a && at < b)?.[1] ?? at;
+  for (let opener = source.indexOf("^[", start); opener >= 0 && opener < end;) {
+    // `^[` in a code span is code.
+    if (pastCode(opener) !== opener) {
+      opener = source.indexOf("^[", pastCode(opener));
+      continue;
+    }
+    // The scan starts at the `[` of `^[`, which opens the first level.
+    let depth = 0;
+    let at = opener + 1;
+    for (; at < end; at++) {
+      if (pastCode(at) !== at) at = pastCode(at) - 1;
+      else if (source[at] === "\\") at++;
+      else if (source[at] === "[") depth++;
+      else if (source[at] === "]" && --depth === 0) break;
+    }
+    // An opener that nothing closes is text; a later one can still be a footnote.
+    if (at >= end) {
+      opener = source.indexOf("^[", opener + 2);
+      continue;
+    }
+    if (lineBreak.test(source.slice(opener, at)))
+      return { ranges, reason: "Obsidian inline footnote spanning lines" };
+    ranges.push([opener, at + 1]);
+    opener = source.indexOf("^[", at + 1);
+  }
+  return { ranges };
+}
 /** Whether a line of a paragraph, after its container markers, starts with `siteSyntax`. */
 function startsSiteSyntax(text: string): boolean {
   return text
@@ -1122,7 +1165,16 @@ const wrap: Rule = {
       // that diagnostics still count one-line math and shortlinks as atoms.
       const protections = forge
         ? forgeProtections(source, start, end, forge)
-        : { ranges: [] as Range[] };
+        : document.dialect === "obsidian"
+          ? inlineFootnotes(
+              source,
+              start,
+              end,
+              inline.atoms
+                .filter((atom) => atom.joining === "code")
+                .map(({ from, to }) => [from, to]),
+            )
+          : { ranges: [] as Range[] };
       for (const [from, to] of protections.ranges) protection.add(from, to);
       for (const [from, to] of templateTags(source.slice(start, end), start))
         protection.add(from, to);

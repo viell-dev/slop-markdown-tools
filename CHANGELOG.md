@@ -20,6 +20,10 @@ prereleases' notes there are longer than their entries here.
   shows as code. After a run of three or more, the blocks that Live Preview
   shows as code below it stay as written too
   ([#374](https://github.com/viell-dev/slop-markdown-tools/pull/374)).
+- In the Obsidian dialect, `style/wrap` keeps an inline footnote, `^[…]`, on one
+  line, and keeps the lines of a paragraph with one that spans lines. Live
+  Preview shows an inline footnote whose text spans lines as Markdown source,
+  and the rule broke lines inside it.
 - In the Obsidian dialect, a `%%` comment at the start of a line below a
   paragraph, or one that text follows on the line where it closes, is part of
   the paragraph, as Obsidian reads it. Before, it was read as a block of its

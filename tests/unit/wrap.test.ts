@@ -1229,6 +1229,49 @@ describe("link text in the Obsidian dialect", () => {
   });
 });
 
+describe("Obsidian inline footnotes", () => {
+  // Live Preview shows an inline footnote whose text spans lines as Markdown
+  // source, while Reading view shows the footnote either way (issue #363).
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it("keeps an inline footnote's text on one line", () => {
+    const source =
+      "Some words with a footnote^[with several words inside it] and words after it.\n";
+    expect(verify(source, obsidian(30), workspace).output).toBe(
+      "Some words with a\nfootnote^[with several words inside it]\nand words after it.\n",
+    );
+    expect(
+      verify("A note^[see [[Some Note|its alias]] there] ends.\n", obsidian(20), workspace).output,
+    ).toBe("A\nnote^[see [[Some Note|its alias]] there]\nends.\n");
+  });
+  it("finds a footnote after an opener that nothing closes, and none in code", () => {
+    expect(
+      verify("Words ^[open and a note^[with several words] at the end.\n", obsidian(20), workspace)
+        .output,
+    ).toBe("Words ^[open and a\nnote^[with several words]\nat the end.\n");
+    // `^[` in a code span that spans lines is code, so the paragraph is wrapped.
+    expect(
+      verify("Some words and `code ^[x\ny] here` and more words.\n", obsidian(80), workspace)
+        .output,
+    ).toBe("Some words and `code ^[x y] here` and more words.\n");
+  });
+  it("keeps a paragraph with an inline footnote across lines as written", () => {
+    const source =
+      "Some words with a footnote^[with several\nwords inside it] and words after it.\n";
+    expect(verify(source, obsidian(80), workspace).output).toBe(source);
+  });
+  it("wraps an unclosed ^[ and footnotes in other dialects as text", () => {
+    expect(verify("Words ^[and more words here to wrap\n", obsidian(20), workspace).output).toBe(
+      "Words ^[and more\nwords here to wrap\n",
+    );
+    const github = createWorkspace({}, { dialect: "github" });
+    const config: Config = { ...wrap({ width: 20 }), dialect: "github" };
+    expect(verify("Some text^[with several words] and more.\n", config, github).output).toBe(
+      "Some text^[with\nseveral words] and\nmore.\n",
+    );
+  });
+});
+
 describe("multiline code spans", () => {
   const config: Config = {
     extends: [],
