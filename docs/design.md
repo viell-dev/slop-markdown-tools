@@ -154,7 +154,8 @@ Syntax:
   are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
   and shortlinks, is protected rather than read, and shortlinks are not checked
-  as links.
+  as links. Only the anchor of a heading that starts a definition description is
+  read.
 - Legacy `> **Note**` callouts, table-of-contents front matter, emoji
   shortcodes, color previews, and issue or commit references are kept as text.
 - GitHub reads an escaped `\$` as the start of a formula; the tool does not.
