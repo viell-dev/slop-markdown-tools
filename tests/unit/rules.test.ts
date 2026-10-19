@@ -1577,3 +1577,49 @@ describe("Obsidian syntax at the end of a document", () => {
     expect(textContent(parse("---\n", "obsidian").tree)).toBe("");
   });
 });
+
+describe("Obsidian comments that start a line", () => {
+  // Obsidian reads a comment as inline wherever a paragraph is open, also at
+  // the start of a line below it, and when text follows it on its line (#357).
+  const blocks = (source: string) =>
+    parse(source, "obsidian").tree.children.map((node) => node.type);
+  it("reads such a comment as part of the paragraph", () => {
+    expect(blocks("a\n%%c%% d\n")).toEqual(["paragraph"]);
+    expect(blocks("a\n%%\nc\n%%\n")).toEqual(["paragraph"]);
+    expect(blocks("%%c%% d\nx\n")).toEqual(["paragraph"]);
+    const item = parse("- a\n  %%c%% d\n", "obsidian").tree.children[0];
+    expect(item?.type === "list" && item.children[0]?.children.map((node) => node.type)).toEqual([
+      "paragraph",
+    ]);
+    expect(textContent(parse("a\n%%c%% d\n", "obsidian").tree)).toBe("a\n d");
+  });
+  it("still reads a comment that stands on its own lines as a block", () => {
+    expect(blocks("a\n\n%%c%%\n\nb\n")).toEqual(["paragraph", "obsidianComment", "paragraph"]);
+    expect(blocks("%%\none\n\ntwo\n%%\n")).toEqual(["obsidianComment"]);
+    // Blank space, spaces or tabs, may follow the closing `%%`.
+    for (const source of ["%%c%%  \n", "%%c%%\t\n", "%%c%% \t \n"])
+      expect(blocks(source), JSON.stringify(source)).toEqual(["obsidianComment"]);
+  });
+  it("reads an empty comment as a comment, as Obsidian hides it", () => {
+    expect(textContent(parse("a %%%% b\n", "obsidian").tree)).toBe("a  b");
+    expect(textContent(parse("a\n%%%%\nb\n", "obsidian").tree)).toBe("a\n\nb");
+    expect(blocks("%%%%\n")).toEqual(["obsidianComment"]);
+    // `====` and `[[]]` stay text.
+    expect(textContent(parse("a ==== b [[]]\n", "obsidian").tree)).toBe("a ==== b [[]]");
+  });
+  it("keeps the hard break above such a comment", () => {
+    const config = only({ "style/trailing-space": "warn" }, "obsidian");
+    for (const source of ["a  \n%%c%% d\n", "- [x] a  \n  %%c%% d\n"])
+      expect(formatted(source, config), JSON.stringify(source)).toBe(source);
+  });
+  it("wraps such a comment with its paragraph", () => {
+    const config = only({ "style/wrap": ["warn", { width: 80 }] }, "obsidian");
+    const workspace = createWorkspace(
+      { "Doc.md": "" },
+      { dialect: "obsidian", strictLineBreaks: true },
+    );
+    expect(formatted("Some text\n%%c%% and more.\n", config, { path: "Doc.md", workspace })).toBe(
+      "Some text %%c%% and more.\n",
+    );
+  });
+});
