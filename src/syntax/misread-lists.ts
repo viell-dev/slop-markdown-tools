@@ -142,6 +142,8 @@ export function misreadLists(document: Document): MisreadLists {
    */
   const obsidianItem = (node: Nodes, quoted: boolean): number | undefined => {
     const end = node.position!.end.offset!;
+    // A marker four or more columns right of the text is more of the text.
+    const text = columnAt(node.position!.start.offset!);
     const breaks = /\r\n|\r|\n/g;
     breaks.lastIndex = node.position!.start.offset!;
     for (let found = breaks.exec(source); found && found.index < end; found = breaks.exec(source)) {
@@ -153,8 +155,9 @@ export function misreadLists(document: Document): MisreadLists {
       const content = line.slice(prefix);
       const ordered = /^(\d{1,9})[.)][ \t]+\S/.exec(content);
       if (
-        (ordered && Number(ordered[1]) !== 1 && !quoted) ||
-        /^(?:[*+]|-(?=[ \t])|0*1[.)])[ \t]*$/.test(content)
+        columnAt(lineStart + prefix) - text <= 3 &&
+        ((ordered && Number(ordered[1]) !== 1 && !quoted) ||
+          /^(?:[*+]|-(?=[ \t])|0*1[.)])[ \t]*$/.test(content))
       )
         return lineStart + prefix;
     }

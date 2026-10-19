@@ -1100,6 +1100,7 @@ describe("list items that Obsidian starts below a paragraph line", () => {
     "a\n10) b\n",
     "a\n   3. b\n",
     "- a\n  3. b *c*\n",
+    "- a\n    3. b *c*\n",
     "a\n3. b\nc *d*\n",
     "a\n3. b\n\n   c *d*\n",
     "a\n* \n",
@@ -1115,6 +1116,9 @@ describe("list items that Obsidian starts below a paragraph line", () => {
     // Neither view starts an ordered list in a block quote.
     ["> a\n> 3. b *c*\n", "> a\n> 3. b _c_\n"],
     ["a *x*\n2.\n", "a _x_\n2.\n"],
+    // Four columns right of the text, a marker is more of the text.
+    ["a *x*\n    3. b\n", "a _x_\n    3. b\n"],
+    ["- a *x*\n      3. b\n", "- a _x_\n      3. b\n"],
     // The block after the next one is no item of the list.
     ["a\n3. b\n\nc\n\nd *e*\n", "a\n3. b\n\nc\n\nd _e_\n"],
   ])("still formats %j", (source, output) => {
