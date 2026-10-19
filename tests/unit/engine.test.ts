@@ -1586,9 +1586,12 @@ describe("HTML blocks that Obsidian keeps inside a list item", () => {
     "*   a\n<div>\n</div>\n\n  * c\n",
     "-   a\n<div>\n</div>\n\n    d\n\n* c\n",
     // The blocks that start at the item's content keep their indentation and
-    // markers.
+    // markers, and so do the lists nested in the item, which one of them could
+    // continue.
     "- a\n<div>\n</div>\n\n  * d\n\n* c\n",
     "- a\n<div>\n</div>\n\n   * d\n* c\n",
+    "- a\n  * b\n<div>\n</div>\n\n  - d\n",
+    "- a\n  *   b\n<div>\n</div>\n\n    d\n",
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config })).toBe(source);
   });

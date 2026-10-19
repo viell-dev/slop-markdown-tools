@@ -98,12 +98,12 @@ export interface MisreadLists {
    * list (issue #399), each from the end of the list; the indentation of the
    * blocks below such a block that start at or right of the item's content,
    * which Reading view reads inside the item, each from the line break before
-   * it, with the markers of a list there; and the markers of the list's items,
-   * whose spacing sets that column, where such blocks follow, or a block that
-   * a narrower spacing would bring inside, or a list of the same kind, which
-   * continues the list with every item whose marker matches, with that list's
-   * markers, each from the item's start to its content, and from the line
-   * break before that list.
+   * it, with the markers of a list there; and the markers of the list's items
+   * and of the lists nested in its last item, whose spacing sets that column,
+   * where such blocks follow, or a block that a narrower spacing would bring
+   * inside, or a list of the same kind, which continues the list with every
+   * item whose marker matches, with that list's markers, each from the item's
+   * start to its content, and from the line break before that list.
    */
   itemHtml: ReadonlySet<Nodes>;
   /**
@@ -846,7 +846,13 @@ export function misreadLists(document: Document): MisreadLists {
           following?.position?.start.offset !== undefined &&
           columnAt(following.position.start.offset) >= least;
         if (next === index + 1 && !continues && !reaches) return;
-        for (const marker of markersOf(list)) itemHtml.add(marker);
+        // The list and the lists nested in its last item, in turn, are open
+        // there: a list item line below the block continues the innermost one
+        // whose marker matches at its column.
+        for (let open: Nodes | undefined = list; open?.type === "list";) {
+          for (const marker of markersOf(open)) itemHtml.add(marker);
+          open = open.children.at(-1)?.children.at(-1);
+        }
         if (continues)
           for (const marker of markersOf(continues, breakBeforeLine(continues)))
             itemHtml.add(marker);
