@@ -18,7 +18,7 @@ prereleases' notes there are longer than their entries here.
   the lines around it as text, where CommonMark reads more of the paragraph.
   Before, `style/wrap` joined `Text` and `[ref]: https://example.com` below it
   into one line, which Live Preview shows as text
-  ([#398](https://github.com/viell-dev/slop-markdown-tools/pull/398)).
+  ([#402](https://github.com/viell-dev/slop-markdown-tools/pull/402)).
 
 ## 0.2.6 - 2026-10-19
 
