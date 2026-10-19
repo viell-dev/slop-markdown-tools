@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, no rule changes a paragraph line that starts at the
+  first column with `[`, a label, and `]:`, or joins it to the line above or
+  below it. Live Preview styles such a line as a link reference definition and
+  the lines around it as text, where CommonMark reads more of the paragraph.
+  Before, `style/wrap` joined `Text` and `[ref]: https://example.com` below it
+  into one line, which Live Preview shows as text
+  ([#398](https://github.com/viell-dev/slop-markdown-tools/pull/398)).
 - In the Forgejo and Gitea dialects, `links/valid` accepts a link to a heading
   that starts a definition description, as `: # Title` below a term does, which
   Forgejo and Gitea give an anchor. Before, it reported the fragment as missing,

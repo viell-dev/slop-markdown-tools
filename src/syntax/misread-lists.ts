@@ -101,6 +101,17 @@ export interface MisreadLists {
    */
   definitionCode: ReadonlySet<Nodes>;
   /**
+   * In the Obsidian dialect, the lines of a paragraph that Live Preview styles
+   * as a link reference definition: each that starts at the first column of
+   * its line with `[`, a label, and `]:`, whatever follows, where the parser
+   * reads text, because a definition cannot interrupt a paragraph or because
+   * the line is no definition, as `[r]: a b` is not (issue #391). Each counts
+   * from the line break before the line, or from the line's start where the
+   * paragraph starts there, to the line break after it, or to the line's end
+   * where the paragraph ends there.
+   */
+  definitionLines: ReadonlySet<Nodes>;
+  /**
    * In the Obsidian dialect, the first fenced code block that a list item or
    * block quote ends before a closing fence, with the rest of the document.
    * Obsidian reads the blocks below it as more of the code: Reading view the
@@ -159,7 +170,9 @@ const found = new WeakMap<Root, MisreadLists>();
  * directly below it (issue #378), reads a line below a link reference
  * definition as an indented code block (issue #379), and continues a fenced
  * code block that a list item or block quote leaves open with the lines below
- * the container, as Live Preview does further (issue #390).
+ * the container, as Live Preview does further (issue #390). Live Preview
+ * styles a paragraph line that starts at the first column with `[`, a label,
+ * and `]:` as a link reference definition (issue #391).
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
@@ -291,6 +304,7 @@ export function misreadLists(document: Document): MisreadLists {
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
   const definitionCode = new Set<Nodes>();
+  const definitionLines = new Set<Nodes>();
   const openFences = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
@@ -527,6 +541,12 @@ export function misreadLists(document: Document): MisreadLists {
         position: { start: { ...start, offset: from - 1 }, end: { ...end, offset: to } },
       } as Nodes;
     };
+    /**
+     * A line that Live Preview styles as a link reference definition: `[`, a
+     * label, in which `[` and an escaped `]` may stand, and `]:`, whatever
+     * follows. It styles neither `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so.
+     */
+    const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
     /** `first` to `last` as one block, from the start of its first line to the end of its last. */
     const wholeLines = (first: Nodes, last = first): Nodes => {
       const start = first.position!.start;
@@ -559,6 +579,26 @@ export function misreadLists(document: Document): MisreadLists {
               columnAt(from + prefix) > columnAt(textStart(child) ?? start))
           )
             underlines.add(breakBefore(child, from, to));
+        }
+        if (child.type === "paragraph") {
+          // A line that starts at the first column with `[`, a label, and `]:`
+          // has Live Preview's style of a link reference definition, with the
+          // lines above and below it as text, where the parser reads more of
+          // the paragraph, also at its start, where the line is no definition
+          // (issue #391). It stays on a line of its own, as written: the line
+          // break before and after it count, where the paragraph has them.
+          const [lineFrom, lineTo] = lineAround(start);
+          const first: [number, number][] =
+            lineFrom === start ? [[start, Math.min(lineTo, end)]] : [];
+          for (const [from, to] of [...first, ...laterLines(start, end)])
+            if (definitionLike.test(source.slice(from, to)))
+              definitionLines.add({
+                ...child,
+                position: {
+                  start: { ...child.position!.start, offset: from === start ? start : from - 1 },
+                  end: { ...child.position!.end, offset: to < end ? to + 1 : to },
+                },
+              } as Nodes);
         }
         if (
           child.type === "paragraph" &&
@@ -662,6 +702,7 @@ export function misreadLists(document: Document): MisreadLists {
     lazyItems,
     footnoteText,
     definitionCode,
+    definitionLines,
     openFences,
     tableText,
   };
