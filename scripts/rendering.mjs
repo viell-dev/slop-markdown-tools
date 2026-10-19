@@ -22,8 +22,11 @@ function random(seed) {
  * What a document may contain. `commonmark` is CommonMark, with tables and tildes, which it reads
  * as text; `gfm` is what markdown-it's default preset reads as GitHub does: CommonMark, tables,
  * and strikethrough with two tildes; `github` adds the rest of GitHub's syntax: strikethrough
- * with one tilde, task lists, alerts, footnotes, literal autolinks, and dollar math.
- * @typedef {"commonmark" | "gfm" | "github"} Syntax
+ * with one tilde, task lists, alerts, footnotes, literal autolinks, and dollar math. `obsidian`
+ * is `github` with Obsidian's wikilinks, embeds, highlights, comments, tags, and inline
+ * footnotes in place of the runs of emphasis markers, which Obsidian pairs in ways of its own
+ * (scripts/obsidian-check.mjs).
+ * @typedef {"commonmark" | "gfm" | "github" | "obsidian"} Syntax
  */
 
 const words =
@@ -69,7 +72,8 @@ function writer(seed, syntax) {
   const pick = (list) => list[below(list.length)];
   const word = () => pick(words);
   const gfm = syntax !== "commonmark";
-  const github = syntax === "github";
+  const obsidian = syntax === "obsidian";
+  const github = syntax === "github" || obsidian;
   // markdown-it reads runs of three or more tildes as strikethrough, which GitHub does not.
   const tildes = (text) => (syntax === "gfm" ? text.replace(/~{3,}/g, "~~") : text);
 
@@ -115,9 +119,23 @@ function writer(seed, syntax) {
         return `[${word()}](${target})`;
     }
   }
+  /** One of Obsidian's own inline constructs. */
+  function obsidianInline() {
+    return pick([
+      `[[${word()}]]`,
+      `[[${word()}|${word()} ${word()}]]`,
+      `[[${word()}#${word()}]]`,
+      `![[${word()}.png]]`,
+      `==${word()} ${word()}==`,
+      `%%${word()} ${word()}%%`,
+      `#${word()}`,
+      `^[${word()} ${word()}]`,
+    ]);
+  }
   /** One word or construct of a paragraph. */
   function inline() {
     const roll = below(100);
+    if (obsidian && roll >= 31 && roll < 36) return obsidianInline();
     if (roll < 6) return `*${word()} ${word()}*`;
     if (roll < 10) return `_${word()}_`;
     if (roll < 14) return `__${word()}__`;
@@ -216,7 +234,7 @@ function writer(seed, syntax) {
     if (roll < 8) return [`${"#".repeat(1 + below(4))} ${prose(1)[0]}${pick(["", " #", " ##"])}`];
     if (roll < 12) return [...prose(1 + below(2)), pick(["===", "---", "=", "-----"])];
     if (roll < 26) return prose();
-    if (roll < 36) return Array.from({ length: 1 + below(3) }, markerLine);
+    if (roll < 36) return obsidian ? prose() : Array.from({ length: 1 + below(3) }, markerLine);
     if (roll < 48) return list();
     if (roll < 52) return [pick(["***", "___", "- - -", "---", "* * *", "_____"])];
     if (roll < 59) return code();

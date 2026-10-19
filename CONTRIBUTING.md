@@ -127,6 +127,25 @@ repeat a run's new seed, or locally after a build with
 `node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
 ten to fifteen minutes; its first lines say what it compares.
 
+HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
+Reading view read some Markdown otherwise. `npm run check:obsidian` builds the
+repository, runs Obsidian in Docker, formats the documents of
+`scripts/obsidian/fixtures.mjs` and generated documents in the Obsidian dialect,
+and compares what both views show before and after. Docker must be running. The
+image, from `scripts/obsidian/Dockerfile`, holds a virtual display and
+WebdriverIO with `wdio-obsidian-service`, which downloads Obsidian at run time
+into the `mdrefine-obsidian-cache` volume, because Obsidian's terms do not allow
+redistributing it; the check keeps its own dependencies in
+`scripts/obsidian/package.json`. It writes `artifacts/obsidian/report.json`,
+with screenshots of the first differences. `SEED` repeats a run's generated
+documents, `COUNT` sets how many there are (100), and `OBSIDIAN_VERSION` picks
+Obsidian's version (`latest`). `REDUCE`, a comma-separated list of generated
+documents from a report, shortens each to the lines that still show its
+difference, and `PROBE`, a JSON array of documents, only shows each in Obsidian.
+Live Preview is compared by its lines' text and styles, with the characters that
+it shows as written left out where only the source differs, and Reading view by
+its HTML. The check is started by hand and not in CI.
+
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
 machine's user and system Git settings, which would change what Git ignores. A
