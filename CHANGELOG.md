@@ -40,13 +40,13 @@ prereleases' notes there are longer than their entries here.
   across the join, and `style/table` aligned such a table, which it showed as
   text ([#413](https://github.com/viell-dev/slop-markdown-tools/pull/413)).
 - In the Obsidian dialect, no rule changes the markers of a list that an HTML
-  block directly follows, as `- Item` and `<div>…</div>` below it, nor those of
-  a list of the same kind below the block, nor the indentation of the blocks
-  between them that start at the item's text. Obsidian's Reading view keeps the
-  HTML block inside the item and continues the list below it with every item
-  whose marker matches, where CommonMark ends the list at the block. Before,
-  `style/list-marker` gave both lists one marker, and Reading view showed one
-  list in place of two
+  block directly follows, as `- Item` and `<div>…</div>` below it, or of the
+  lists nested in its last item, nor those of a list of the same kind below the
+  block, nor the indentation of the blocks between them that start at the item's
+  text. Obsidian's Reading view keeps the HTML block inside the item and
+  continues the list below it with every item whose marker matches, where
+  CommonMark ends the list at the block. Before, `style/list-marker` gave both
+  lists one marker, and Reading view showed one list in place of two
   ([#413](https://github.com/viell-dev/slop-markdown-tools/pull/413)).
 
 ## 0.2.6 - 2026-10-19

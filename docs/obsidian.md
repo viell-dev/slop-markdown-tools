@@ -144,9 +144,10 @@ note shows there, the tool keeps the text as written:
   footnote definition keeps no block. The list goes on there: the blocks below
   the HTML block that start at or right of the item's text are inside the item,
   and a list of the same kind, bullet or numbered, continues it with every item
-  whose marker matches. No rule puts a blank line between the list and the HTML
-  block, moves those blocks or changes their markers, or, where a block follows
-  the HTML block, changes the markers and spacing of the list's items or the
+  whose marker matches, as does a list nested in the item. No rule puts a blank
+  line between the list and the HTML block, moves those blocks or changes their
+  markers, or, where a block follows the HTML block, changes the markers and
+  spacing of the list's items and of the lists nested in its last item, or the
   markers of that following list.
 - A table that Obsidian reads otherwise. Obsidian reads a table directly below a
   line of paragraph text as more of the text, a one-column table whose header
