@@ -1195,14 +1195,17 @@ line two
 
 Blank space is left as written where it is content: on a line of blank space
 that holds a tab or lies directly below an HTML block in the Obsidian dialect,
-which Obsidian's Reading view reads as more of the block above it; in code
-blocks, except on their fence lines, and in HTML, math, front matter, Obsidian
-comments, code spans, and link titles and labels that span lines. With
-`"backslash"`, a break stays as spaces where a backslash would change what the
-line says: after another backslash, after a literal autolink such as
-`www.example.com`, which would take the backslash into its address, on the title
-line of an alert or callout, in a paragraph that starts like a link reference
-definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)` math.
+which Obsidian's Reading view reads as more of the block above it; at the end of
+a footnote definition's last line in the Obsidian dialect, where a paragraph
+ends the definition, which Reading view shows before the footnote's
+backreference; in code blocks, except on their fence lines, and in HTML, math,
+front matter, Obsidian comments, code spans, and link titles and labels that
+span lines. With `"backslash"`, a break stays as spaces where a backslash would
+change what the line says: after another backslash, after a literal autolink
+such as `www.example.com`, which would take the backslash into its address, on
+the title line of an alert or callout, in a paragraph that starts like a link
+reference definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)`
+math.
 
 ## `style/wrap`
 
@@ -1237,7 +1240,13 @@ definition (`[Note]: see …`) from becoming one. On GitHub and in Obsidian, a
 word that starts with `$` stays on the line before it when a `$` comes earlier
 in the paragraph, and in Obsidian a word that ends in `$`, such as a lone `$`,
 stays on the line after it when a `$` comes later: at the edge of a line, a
-dollar can begin or end math that it cannot begin or end next to a space.
+dollar can begin or end math that it cannot begin or end next to a space. In
+Obsidian, no line at the first column starts with `[`, a label, and `]:`, such
+as `[ref]: …`, which Live Preview styles as a link reference definition: the
+word that opens the label stays on the line before it, also when the label holds
+spaces. In a block quote whose markers are written without a space after them,
+such as `>text`, a tag such as `#tag` stays on the line before it too, because
+Live Preview reads a tag directly after `>` as text.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -1282,7 +1291,10 @@ what it means, that is, when it:
 - has a line that starts with `:::`, `{%`, or `{{`, which [site
   generators](dialects.md#what-each-dialect-reads) read by line;
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
-  wikilinks, because joining lines could create one.
+  wikilinks, because joining lines could create one;
+- would start, in the Obsidian dialect, with `[`, a label, and `]:` on its first
+  line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
+  styles as a link reference definition.
 
 In the Obsidian dialect, the rule wraps only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). [Forgejo and

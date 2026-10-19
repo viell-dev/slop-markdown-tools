@@ -100,6 +100,11 @@ note shows there, the tool keeps the text as written:
   Reading view reads the definition as more of the paragraph, and its indented
   lines as code. No rule changes the definition or the end of the line above it.
   Below a blank line, a heading, or another definition, it is a footnote.
+- The blank space at the end of a footnote definition's last line, where a
+  paragraph ends the definition, as in `[^1]: Note ` with a space after the
+  text. Reading view shows it before the footnote's backreference, `↩︎`, where
+  CommonMark drops it. No rule removes it; `style/wrap` reflows the text before
+  it.
 - A line directly below a link reference definition that starts further right
   than the definition, as in `[ref]: https://example.com` and `    Text` below
   it. Reading view reads it as an indented code block from four columns right of
@@ -113,8 +118,16 @@ note shows there, the tool keeps the text as written:
   definition, the same way, also as the first line of a paragraph, as in
   `[Note]: see the page for details`. No rule changes such a line or joins it to
   the line above or below it, so `style/wrap` neither breaks it nor reflows the
-  paragraph around it. A line indented by a space or after `>` is text in Live
-  Preview too.
+  paragraph around it. Nor does it start a line at the first column with such a
+  word: the word that opens the label, also one with blank space in it, stays on
+  the line before it, and a paragraph whose first line would start so once
+  reflowed stays as written. A line indented by a space or after `>` is text in
+  Live Preview too.
+- A tag directly after a block quote's `>` written without a space, as in `>a`
+  and `>#tag b` below it. Live Preview reads a tag after blank space or at the
+  start of a line's content, and text there, where Reading view reads the tag.
+  `style/wrap` starts no line of such a quote with a tag: it stays on the line
+  before it.
 - A fenced code block that a list item or block quote ends before its closing
   fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
   as more of the code: Reading view those directly below the list or quote, Live
