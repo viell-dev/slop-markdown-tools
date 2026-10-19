@@ -362,6 +362,28 @@ const thematicBreak: Rule = {
   },
 };
 
+/**
+ * In the Obsidian dialect, the indices of the lines of blank space that
+ * Obsidian's Reading view reads as more of the block above them, where
+ * CommonMark and the parser read a blank line: one that holds a tab, which
+ * continues a paragraph, and one directly below an HTML block, which continues
+ * the block (issue #358). Emptying such a line would end the block there.
+ */
+function obsidianShownBlanks(document: Document, lines: Line[]): Set<number> {
+  const shown = new Set<number>();
+  if (document.dialect !== "obsidian") return shown;
+  const below = new Set<number>();
+  walk(document.tree, "html", (node, _, parent) => {
+    // An HTML block, not inline HTML: its parent holds blocks.
+    if (parent && containers.has(parent.type) && node.position) below.add(node.position.end.line);
+  });
+  lines.forEach((line, index) => {
+    const text = document.source.slice(line.start, line.end);
+    if (/^[ \t>]*$/.test(text) && /[^>]/.test(text) && (text.includes("\t") || below.has(index)))
+      shown.add(index);
+  });
+  return shown;
+}
 /** Where blank lines are content, or their number counts, as source ranges. */
 function contentBlocks(document: Document): [number, number][] {
   const blocks: [number, number][] = [];
@@ -392,9 +414,11 @@ const blankLines: Rule = {
     const maximum = typeof options.maximum === "number" ? options.maximum : 1;
     const lines = physicalLines(source);
     const text = (line: Line) => source.slice(line.start, line.end);
-    const empty = (line: Line) => /^[ \t]*$/.test(text(line));
+    // Obsidian reads some lines of blank space as text, which stay as written.
+    const shown = new Set([...obsidianShownBlanks(document, lines)].map((index) => lines[index]));
+    const empty = (line: Line) => !shown.has(line) && /^[ \t]*$/.test(text(line));
     // A line of blank space and block quote markers is blank inside its quotes.
-    const blank = (line: Line) => /^[ \t>]*$/.test(text(line));
+    const blank = (line: Line) => !shown.has(line) && /^[ \t>]*$/.test(text(line));
     const blocks = contentBlocks(document);
     let block = 0;
     /** Whether a line lies inside a block that began above it; asked in document order. */
@@ -543,9 +567,12 @@ const trailingSpace: Rule = {
       return !(forge && source.slice(...paragraph).includes("\\("));
     };
     const findings: Finding[] = [];
-    for (const line of physicalLines(source)) {
+    const lines = physicalLines(source);
+    const shown = obsidianShownBlanks(document, lines);
+    for (const [index, line] of lines.entries()) {
       const space = /[ \t]+$/.exec(source.slice(line.start, line.end));
-      if (!space) continue;
+      // Obsidian reads some lines of blank space as text, which stay as written.
+      if (!space || shown.has(index)) continue;
       const start = line.start + space.index;
       const end = line.end;
       while (next < ranges.length && ranges[next]![1] <= start) next++;

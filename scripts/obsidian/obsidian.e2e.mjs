@@ -18,20 +18,20 @@ const count = Number(process.env.COUNT || 100);
 /** Widths to format at: the preset's, and a narrow one that reflows nearly every paragraph. */
 const widths = [80, 30];
 
+/** Whether Obsidian has loaded the vault's settings, such as its strict line breaks. */
+let loaded = false;
 /** What Obsidian shows a note as, read in its page: Reading view's HTML and Live Preview's lines. */
 async function shown(path, text) {
+  // Until the settings are loaded, Obsidian renders with its defaults.
+  if (!loaded)
+    loaded = await browser.executeObsidian(async ({ app }) => {
+      for (let wait = 0; wait < 100 && app.vault.getConfig("strictLineBreaks") !== true; wait++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      return app.vault.getConfig("strictLineBreaks") === true;
+    });
   return browser.executeObsidian(
     async ({ app, obsidian }, path, text) => {
       const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      // Reading view, through the renderer that it uses.
-      const component = new obsidian.Component();
-      component.load();
-      const container = document.createElement("div");
-      await obsidian.MarkdownRenderer.render(app, text, container, path, component);
-      await settle(50);
-      const reading = container.innerHTML;
-      component.unload();
-
       let file = app.vault.getFileByPath(path);
       for (let wait = 0; !file && wait < 50; wait++) {
         await settle(100);
@@ -42,6 +42,17 @@ async function shown(path, text) {
       const cm = leaf.view.editor.cm;
       cm.contentDOM.blur();
       await settle(150);
+
+      // Reading view, through the renderer that it uses. Before any note was
+      // open, its first rendering differed from Reading view's, as of a line
+      // that holds only a tab, so it runs with the note open.
+      const component = new obsidian.Component();
+      component.load();
+      const container = document.createElement("div");
+      await obsidian.MarkdownRenderer.render(app, text, container, path, component);
+      await settle(50);
+      const reading = container.innerHTML;
+      component.unload();
 
       const ui =
         "img.cm-widgetBuffer, .cm-fold-indicator, .code-block-flair, svg, .embed-actions, .table-col-drag-handle, .table-row-drag-handle, .table-row-btn, .table-col-btn, .callout-icon, .collapse-indicator";

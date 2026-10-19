@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, `style/blank-lines` and `style/trailing-space` leave
+  a line of blank space that holds a tab, or that lies directly below an HTML
+  block, as written. Obsidian's Reading view reads such a line as more of the
+  paragraph or HTML block above it, so emptying or removing it split a
+  paragraph, or made a heading below an HTML block render.
 - In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
   of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
   not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
