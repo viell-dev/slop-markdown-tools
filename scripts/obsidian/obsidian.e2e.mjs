@@ -181,7 +181,8 @@ function livePreview(lines) {
     const text = line.runs.map(([, value]) => value).join("");
     // A line that shows only an image is not blank.
     const embed = line.runs.some(([classes]) => /\bembed\b/.test(classes));
-    if (!line.kind && !text.trim() && !embed) {
+    // A blank line below a footnote definition takes its class, and shows nothing either.
+    if ((!line.kind || line.kind === "HyperMD-footnote") && !text.trim() && !embed) {
       current = undefined;
       continue;
     }
@@ -196,8 +197,10 @@ function livePreview(lines) {
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
-      // The runs that show text, not a line's quote markers, which wrapping moves.
-      const shows = ([classes, value]) => value.trim() && !/\bcm-formatting-quote\b/.test(classes);
+      // The runs that show words, not a line's quote markers, which wrapping moves, or a
+      // nested quote's `>`, which Live Preview leaves unstyled.
+      const shows = ([classes, value]) =>
+        /[\p{L}\p{N}]/u.test(value) && !/\bcm-formatting-quote\b/.test(classes);
       const last = current.runs.findLast(shows);
       const first = line.runs.find(shows);
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
@@ -266,8 +269,17 @@ function livePreview(lines) {
             .replace(/\s+/g, " ");
           if (classes) text = text.trim();
         }
-        return classes ? `{${classes}}${text}{/}` : text;
+        return [classes, text];
       })
+      // Unstyled text that shows nothing, such as a nested quote's `>`, separates nothing.
+      .filter(([classes, text]) => classes || text)
+      .reduce((runs, [classes, text]) => {
+        const last = runs.at(-1);
+        if (last && last[0] === classes) last[1] += text;
+        else runs.push([classes, text]);
+        return runs;
+      }, [])
+      .map(([classes, text]) => (classes ? `{${classes}}${text}{/}` : text))
       .join("");
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
   });
