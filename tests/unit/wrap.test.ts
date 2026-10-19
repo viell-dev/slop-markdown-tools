@@ -1238,6 +1238,17 @@ describe("Obsidian inline footnotes", () => {
       verify("A note^[see [[Some Note|its alias]] there] ends.\n", obsidian(20), workspace).output,
     ).toBe("A\nnote^[see [[Some Note|its alias]] there]\nends.\n");
   });
+  it("finds a footnote after an opener that nothing closes, and none in code", () => {
+    expect(
+      verify("Words ^[open and a note^[with several words] at the end.\n", obsidian(20), workspace)
+        .output,
+    ).toBe("Words ^[open and a\nnote^[with several words]\nat the end.\n");
+    // `^[` in a code span that spans lines is code, so the paragraph is wrapped.
+    expect(
+      verify("Some words and `code ^[x\ny] here` and more words.\n", obsidian(80), workspace)
+        .output,
+    ).toBe("Some words and `code ^[x y] here` and more words.\n");
+  });
   it("keeps a paragraph with an inline footnote across lines as written", () => {
     const source =
       "Some words with a footnote^[with several\nwords inside it] and words after it.\n";
