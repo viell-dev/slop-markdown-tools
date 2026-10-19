@@ -8,6 +8,16 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- In the Obsidian dialect, `style/emphasis` and `style/strong` keep the markers
+  of a paragraph, heading, or table cell whose text holds a `*` or `_` that is
+  not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view pairs
+  such a character with a later one: after `snake_case and *em*` became
+  `snake_case and _em_`, Reading view showed `case and _em` as emphasis.
+
 ## 0.2.4 - 2026-10-19
 
 ### Fixed

@@ -783,6 +783,12 @@ so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
   `x~~_b_~~`, which GitHub reads as inside a word.
 - Text whose markers CommonMark pairs otherwise than the parser, as in
   `xab***a* a*y`: GitHub follows CommonMark, so the parser misread the text.
+- In Obsidian, a paragraph, heading, or table cell whose text holds a `*` or `_`
+  that is not a marker, as in `snake_case` or `5 * 3`. Obsidian's Reading view
+  pairs such a character with a later one, so `snake_case and _em_` shows
+  `case and _em` as emphasis, and `snake_case and *em*` is right only with the
+  `*` kept. Escaped characters and those in code, math, or wikilinks do not
+  count.
 
 ## `style/final-newline`
 

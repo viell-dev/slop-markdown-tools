@@ -365,6 +365,29 @@ function holdsStrikethroughRun(
   });
   return found;
 }
+/**
+ * The paragraphs, headings, and table cells whose text holds a `*` or `_` that
+ * is not a marker of emphasis, as in `snake_case` or `5 * 3`, unescaped and
+ * outside code, math, and links' destinations. Obsidian's Reading view pairs
+ * such a character with a later one, where CommonMark and Live Preview leave it
+ * as text: `snake_case and _em_` shows `case and _em` as emphasis (issue #361).
+ */
+function blocksWithLooseMarkers(document: Document): Range[] {
+  const { source } = document;
+  const blocks: Range[] = [];
+  walk(document.tree, (node) => {
+    if (!inlineBlocks.has(node.type) || !located(node)) return;
+    let found = false;
+    walk(node, "text", (text) => {
+      if (found || !located(text)) return;
+      const [start, end] = range(text);
+      for (let at = start; at < end && !found; at++)
+        found = (source[at] === "*" || source[at] === "_") && !escaped(source, at);
+    });
+    if (found) blocks.push(range(node));
+  });
+  return blocks;
+}
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
     description: `Choose ${type} delimiters without reprinting their contents.`,
@@ -379,12 +402,16 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
       const marker = String(options.marker ?? fallback).repeat(size);
       const labels = markerLabels(document.tree);
       const titles = calloutTitles(document);
+      const loose = document.dialect === "obsidian" ? blocksWithLooseMarkers(document) : [];
       /** The ranges of the emphasis to change, by the scope that holds them. */
       const candidates = new Map<Nodes, Range[]>();
       eachInline(document.tree, type, (node, scope) => {
         const [start, end] = range(node);
         const original = source.slice(start, end);
         if (original.startsWith(marker)) return;
+        // Obsidian's Reading view could pair a new marker with a `*` or `_`
+        // that is text, or an old one that it paired with one, otherwise.
+        if (loose.some(([a, b]) => start >= a && end <= b)) return;
         // Underscores cannot delimit intraword emphasis. Preserve these valid forms.
         if (
           marker.startsWith("_") &&
