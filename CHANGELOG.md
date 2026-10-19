@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## 0.2.6 - 2026-10-19
+## Unreleased
 
 ### Fixed
 
@@ -19,6 +19,11 @@ prereleases' notes there are longer than their entries here.
   Before, `style/wrap` joined `Text` and `[ref]: https://example.com` below it
   into one line, which Live Preview shows as text
   ([#398](https://github.com/viell-dev/slop-markdown-tools/pull/398)).
+
+## 0.2.6 - 2026-10-19
+
+### Fixed
+
 - In the Forgejo and Gitea dialects, `links/valid` accepts a link to a heading
   that starts a definition description, as `: # Title` below a term does, which
   Forgejo and Gitea give an anchor. Before, it reported the fragment as missing,
