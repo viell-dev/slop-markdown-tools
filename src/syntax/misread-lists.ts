@@ -46,7 +46,8 @@ export interface MisreadLists {
   /**
    * In the Obsidian dialect, paragraphs, headings, and table cells whose text
    * holds a backtick that no run of the same length closes, which the parser
-   * leaves as text. Obsidian's Live Preview shows the text after it as code, at
+   * leaves as text, also in a highlight, an inline comment, or an image's
+   * description. Obsidian's Live Preview shows the text after it as code, at
    * least to the end of its line, and Reading view pairs a run of two or more
    * with a later, shorter one, as in ``a ``` b `c` d`` (issue #362).
    */
@@ -183,12 +184,27 @@ export function misreadLists(document: Document): MisreadLists {
       }
       if ("children" in node) for (const child of node.children) visitBlocks(child);
     };
-    /** Whether the text in `node`, outside code, holds an unescaped backtick. */
+    /**
+     * Whether the text in `node`, outside code, math, and wikilinks, holds a
+     * backtick that nothing closes. Live Preview starts code there also inside
+     * a highlight, an inline comment, and an image's description, whose source
+     * the parser does not read as code spans; a backtick in a link's destination
+     * or title starts none, but counts in an image's source.
+     */
     const holdsBacktick = (node: Nodes): boolean => {
+      const start = node.position?.start.offset;
+      const end = node.position?.end.offset;
+      if (
+        node.type === "obsidianHighlight" ||
+        node.type === "obsidianComment" ||
+        node.type === "image" ||
+        node.type === "imageReference"
+      )
+        return start !== undefined && end !== undefined && unclosedRun(source.slice(start, end));
       if (node.type === "text") {
-        const start = node.position?.start.offset;
-        const end = node.position?.end.offset;
         if (start === undefined || end === undefined) return false;
+        // The parser reads every backtick that a run closes as code, so any
+        // other one in text is unclosed.
         for (
           let at = source.indexOf("`", start);
           at >= 0 && at < end;
@@ -207,4 +223,34 @@ export function misreadLists(document: Document): MisreadLists {
   const result = { text, nested, next, descriptions, unclosedCode };
   found.set(document.tree, result);
   return result;
+}
+
+/**
+ * Whether `value` holds a run of backticks, not escaped, that no later run of
+ * the same length closes, as CommonMark pairs them into code spans.
+ */
+function unclosedRun(value: string): boolean {
+  for (let at = 0; at < value.length;) {
+    if (value[at] === "\\") {
+      at += 2;
+      continue;
+    }
+    if (value[at] !== "`") {
+      at++;
+      continue;
+    }
+    let after = at;
+    while (value[after] === "`") after++;
+    const length = after - at;
+    let close = value.indexOf("`", after);
+    for (;;) {
+      if (close < 0) return true;
+      let end = close;
+      while (value[end] === "`") end++;
+      if (end - close === length) break;
+      close = value.indexOf("`", end);
+    }
+    at = close + length;
+  }
+  return false;
 }

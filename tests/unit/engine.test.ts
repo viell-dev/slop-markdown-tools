@@ -957,16 +957,25 @@ describe("definition descriptions on Forgejo and Gitea", () => {
 });
 
 describe("backticks that nothing closes in Obsidian", () => {
-  // Live Preview shows the rest of the line after such a backtick as code, and
-  // Reading view pairs a run of two or more with a later, shorter one, where the
-  // parser reads text (issue #362).
+  // Live Preview shows the text after such a backtick as code, at least to the
+  // end of its line, also from inside a highlight, an inline comment, or a link
+  // or image description, and Reading view pairs a run of two or more with a
+  // later, shorter one, where the parser reads text (issue #362).
   const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
-  it.each(["a ``` b *c* d\n", "a ` b *c* d\n", "a `` b\n`c` *d*\n", "# a ` b *c*\n"])(
-    "leaves %j as written",
-    (source) => {
-      expect(formatted(source, { config })).toBe(source);
-    },
-  );
+  it.each([
+    "a ``` b *c* d\n",
+    "a ` b *c* d\n",
+    "a `` b\n`c` *d*\n",
+    "# a ` b *c*\n",
+    "==a ` b== *c* d\n",
+    "==a `b` ``` c== *d*\n",
+    "%%a ` b%% *c* d\n",
+    "[a ` b](x) *c* d\n",
+    "![a ` b](x) *c* d\n",
+    "![a ` b][r] *c* d\n\n[r]: x\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
   it("keeps the emphasis in such a table cell", () => {
     expect(formatted("| a ` *b* |\n| - |\n", { config })).toBe("| a ` *b* |\n| ------- |\n");
   });
@@ -974,6 +983,11 @@ describe("backticks that nothing closes in Obsidian", () => {
     ["a \\` b *c* d\n", "a \\` b _c_ d\n"],
     ["a `code` and *c*\n", "a `code` and _c_\n"],
     ["a ` b\n\n*c* d\n", "a ` b\n\n_c_ d\n"],
+    // Live Preview starts no code inside math or a wikilink.
+    ["$a ` b$ *c*\n", "$a ` b$ _c_\n"],
+    ["[[a ` b]] *c*\n", "[[a ` b]] _c_\n"],
+    ["==a `b` \\` c== *d*\n", "==a `b` \\` c== _d_\n"],
+    ["![a `b` c](x) *d*\n", "![a `b` c](x) _d_\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config })).toBe(output);
   });

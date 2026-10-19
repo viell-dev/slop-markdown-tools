@@ -805,7 +805,7 @@ describe("style/inline-code", () => {
     ["`a` and `b\nc` here.\n", "`a` and `b c` here.\n"],
   ])("still joins %j", (source, output) => {
     // In Obsidian, a backtick that nothing closes keeps its paragraph as
-    // written, since Live Preview shows the rest of its line as code (#362).
+    // written, since Live Preview shows the text after it as code (#362).
     for (const dialect of dialects)
       expect(formatted(source, only(rule, dialect)), dialect).toBe(
         dialect === "obsidian" && source.includes(" ` ") ? source : output,
