@@ -237,16 +237,19 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  * insert text between two of them. Renderers may read such text as list items
  * or code, and the indentation of the blocks below it otherwise, which the
  * safety check, comparing the parser's readings, cannot see: `_r_` for `*r*`
- * in `- 0.     *r*` below a paragraph changes code on GitHub. Only the part of
- * the edit that changes the text counts, so that an edit that copies such
+ * in `- 0.     *r*` below a paragraph changes code on GitHub. The same goes for
+ * a definition description on Forgejo and Gitea and the blocks below it, which
+ * those renderers read as the description's blocks (issue #344). Only the part
+ * of the edit that changes the text counts, so that an edit that copies such
  * text, such as a list rule's, can still apply.
  */
 function misreadEdits(document: Document): (edit: Edit) => boolean {
   const misread = misreadLists(document);
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
-  for (const [start, end] of Array.from([...misread.text, ...misread.nested], (node) =>
-    range(node),
+  for (const [start, end] of Array.from(
+    [...misread.text, ...misread.nested, ...misread.descriptions],
+    (node) => range(node),
   ).sort((a, b) => a[0] - b[0])) {
     const last = blocks.at(-1);
     if (last && start < last[1]) last[1] = Math.max(last[1], end);
