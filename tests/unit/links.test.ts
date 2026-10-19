@@ -1647,6 +1647,56 @@ describe("Forgejo heading anchors", () => {
   });
 });
 
+describe("headings in definition descriptions on Forgejo and Gitea (#353)", () => {
+  // Read from the file views of Forgejo 16.0.6, Gitea 1.25.5, and Gitea 28.2.0
+  // in throwaway containers, which agree except that Gitea 28 gives repeated
+  // headings one anchor; the Gitea dialect accepts both generations' anchors.
+  const note = (source: string) => createWorkspace({ "Doc.md": "", "Note.md": source });
+  const resolves = (workspace: ReturnType<typeof note>, fragment: string, dialect: Dialect) =>
+    workspace.resolve("Doc.md", `Note.md#${fragment}`, dialect).fragmentExists;
+  it.each([
+    ["Term\n: # H\n\n# H\n", ["h", "h-1"], ["h-2"]],
+    ["# H\n\nTerm\n: # H\n", ["h", "h-1"], ["h-2"]],
+    ["Term\n: # H\n: # H\n", ["h", "h-1"], ["h-2"]],
+    ["Term\n: a\n: # Second\n", ["second"], []],
+    ["Term\n\n: # Loose\n", ["loose"], []],
+    ["Term\n: a\n\n: # Loose second\n", ["loose-second"], []],
+    ["Term\n: > # Quoted\n", ["quoted"], []],
+    ["Term\n: - # Listed\n", ["listed"], []],
+    ["> Term\n> : # In quote\n", ["in-quote"], []],
+    ["- Term\n  : # In item\n", ["in-item"], []],
+    ["Term\n:     # Spaced\n", ["spaced"], []],
+    ["Term\n: ## H *e*\n", ["h-e"], []],
+    ["Term\n: # H {#custom}\n", ["custom"], ["h"]],
+    // Without a term above it, `:` starts no description.
+    [": # Alone\n", [], ["alone"]],
+    ["- x\n\n: # After list\n", [], ["after-list"]],
+    ["# Title\n: # After heading\n", ["title"], ["after-heading"]],
+    // A heading below the description's first line interrupts the paragraph
+    // for the parser too, and is counted once.
+    ["Term\n: a\n  # H\n\n# H\n", ["h", "h-1"], ["h-2"]],
+  ])("reads %j", (source, present, absent) => {
+    const workspace = note(source);
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      for (const fragment of present) expect(resolves(workspace, fragment, dialect)).toBe(true);
+      for (const fragment of absent) expect(resolves(workspace, fragment, dialect)).toBe(false);
+    }
+  });
+  it("accepts a link to a heading in a description", () => {
+    const workspace = createWorkspace({
+      "Doc.md": "See [the term](#h).\n\nTerm\n: # H\n",
+    });
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      const config = { extends: [], dialect, rules: { "links/valid": "error" } } as Config;
+      const source = "See [the term](#h).\n\nTerm\n: # H\n";
+      expect(lint(source, { config, path: "Doc.md", workspace })).toEqual([]);
+      expect(
+        lint("See [x](#g).\n\nTerm\n: # H\n", { config, path: "Doc.md", workspace }),
+      ).toHaveLength(1);
+    }
+  });
+});
+
 describe("heading anchors with a code span across lines", () => {
   // GitHub's anchors, read from `gh api markdown -f mode=markdown`: the span's
   // continuation line loses its indentation, except on a lazy line.

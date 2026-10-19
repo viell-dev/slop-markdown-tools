@@ -6,6 +6,7 @@ import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
 import { fallbackDialect } from "../config/resolve.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
+import { descriptionLine } from "../syntax/misread-lists.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
@@ -419,57 +420,98 @@ function forgeAnchors(document: Document): ForgeAnchors {
     giteaSlugs: new Set(),
     explicit: new Set(),
   };
-  const { source } = document;
   const forgejoSlugger = createForgejoSlugger();
   const giteaSlugger = createGiteaSlugger();
-  const attributes = headingAttributes(document);
   const parts = htmlParts(document);
-  // How many block quotes each heading is in, for the markers of its last line.
-  const quotes = new Map<Heading, number>();
-  const count = (node: Nodes, depth: number) => {
-    if (node.type === "heading") quotes.set(node, depth);
-    if ("children" in node)
-      for (const child of node.children) count(child, depth + (node.type === "blockquote" ? 1 : 0));
-  };
-  count(document.tree, 0);
-  walk(document.tree, (node) => {
-    // Gitea 1.26 and later give HTML headings without an `id` an anchor from
-    // their text, and number nothing. Forgejo gives them none.
-    for (const heading of parts.get(node)?.headings ?? []) {
-      const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
+  /**
+   * Adds the anchors of the headings in `part`, in document order: the
+   * document, or the content of a definition description in it, whose HTML
+   * the document's own parts already hold.
+   */
+  const collect = (part: Document) => {
+    const { source } = part;
+    const attributes = headingAttributes(part);
+    // How many block quotes each heading is in, for the markers of its last line.
+    const quotes = new Map<Heading, number>();
+    const count = (node: Nodes, depth: number) => {
+      if (node.type === "heading") quotes.set(node, depth);
+      if ("children" in node)
+        for (const child of node.children)
+          count(child, depth + (node.type === "blockquote" ? 1 : 0));
+    };
+    count(part.tree, 0);
+    walk(part.tree, (node, index, parent) => {
+      // Gitea 1.26 and later give HTML headings without an `id` an anchor from
+      // their text, and number nothing. Forgejo gives them none.
+      for (const heading of part === document ? (parts.get(node)?.headings ?? []) : []) {
+        const anchor = heading.hasId ? "" : giteaAnchor(heading.text);
+        if (anchor) anchors.giteaSlugs.add(anchor);
+      }
+      // Forgejo and Gitea read a definition description as blocks, where the
+      // parser reads text, and give its headings anchors in their place in the
+      // document (issue #353).
+      if (node.type === "paragraph") {
+        const previous = index === undefined ? undefined : parent?.children[index - 1];
+        for (const content of descriptionContents(source, node, previous))
+          collect(parse(content, part.dialect, part.path));
+        return;
+      }
+      if (node.type !== "heading") return;
+      // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
+      const block = attributes.get(node);
+      if (block?.id !== undefined) {
+        // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
+        const anchor = forgejoSlugger.custom(block.id ?? "");
+        if (anchor) anchors.forgejoSlugs.add(anchor);
+        if (giteaSlugger.custom(block.id ?? "")) anchors.giteaSlugs.add(anchor);
+        return;
+      }
+      // Forgejo, like Gitea before 1.26, builds anchors from the source of
+      // the heading's last line: markup, destinations, and tags are part of it.
+      const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
+      anchors.forgejoSlugs.add(forgejoSlugger.slug(line));
+      anchors.giteaSlugs.add(giteaSlugger.slug(line));
+      // Gitea 1.26 and later number no anchors, build them from the rendered
+      // text, and keep underscores near `_.py` literal.
+      const shown = block?.heading ?? node;
+      const [start, end] = range(shown);
+      const anchor = giteaAnchor(
+        source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
+          ? literalUnderscoreText(shown, source)
+          : renderedText(shown, gitea),
+      );
       if (anchor) anchors.giteaSlugs.add(anchor);
-    }
-    if (node.type !== "heading") return;
-    // Forgejo and Gitea take a trailing `{#id .class}` as attributes, not text.
-    const block = attributes.get(node);
-    if (block?.id !== undefined) {
-      // A non-string id is empty on Gitea 1.26 and later and unrenderable before.
-      const anchor = forgejoSlugger.custom(block.id ?? "");
-      if (anchor) anchors.forgejoSlugs.add(anchor);
-      if (giteaSlugger.custom(block.id ?? "")) anchors.giteaSlugs.add(anchor);
-      return;
-    }
-    // Forgejo, like Gitea before 1.26, builds anchors from the source of
-    // the heading's last line: markup, destinations, and tags are part of it.
-    const line = lastLineSource(source, node, quotes.get(node) ?? 0, block?.start);
-    anchors.forgejoSlugs.add(forgejoSlugger.slug(line));
-    anchors.giteaSlugs.add(giteaSlugger.slug(line));
-    // Gitea 1.26 and later number no anchors, build them from the rendered
-    // text, and keep underscores near `_.py` literal.
-    const shown = block?.heading ?? node;
-    const [start, end] = range(shown);
-    const anchor = giteaAnchor(
-      source.slice(start, block ? Math.min(end, block.start) : end).includes("_.py")
-        ? literalUnderscoreText(shown, source)
-        : renderedText(shown, gitea),
-    );
-    if (anchor) anchors.giteaSlugs.add(anchor);
-  });
+    });
+  };
+  collect(document);
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
   for (const part of parts.values())
     for (const anchor of part.anchors) anchors.explicit.add(anchor);
   detachAll(anchors.forgejoSlugs, anchors.giteaSlugs, anchors.explicit);
   return anchors;
+}
+/**
+ * What follows the `:` and the blank space after it on each line of a
+ * paragraph that Forgejo and Gitea read as opening a definition description,
+ * as `Term` and `: # Heading` below it do: a line below the paragraph's first,
+ * or its first after another paragraph, which ends with a term or a
+ * description. The rest of the description is below that line, where the
+ * parser reads the blocks that interrupt the paragraph as Forgejo and Gitea do.
+ */
+function descriptionContents(
+  source: string,
+  paragraph: Nodes,
+  previous: Nodes | undefined,
+): string[] {
+  const [start, end] = range(paragraph);
+  const text = source.slice(start, end);
+  const contents: string[] = [];
+  if (!descriptionLine.test(text)) return contents;
+  text.split(/\r\n|\r|\n/).forEach((line, index) => {
+    const content = /^[ \t>]*:[ \t]+(.*)$/.exec(line)?.[1];
+    if (content && (index > 0 || previous?.type === "paragraph")) contents.push(content);
+  });
+  return contents;
 }
 /** The options of `createWorkspace`. */
 export interface WorkspaceOptions {

@@ -117,6 +117,9 @@ On GitHub, Forgejo, and Gitea, more fragments are valid:
 - The `id` of any HTML element and the `name` of an `<a>`, such as
   `<a name="install"></a>`, are anchors. HTML inside comments, code, and
   elements whose content is text, such as `<script>` and `<textarea>`, is not.
+- On Forgejo and Gitea, a heading that starts a definition description, as
+  `: # Title` below a term does, gets an anchor, numbered with the other
+  headings, though the tool otherwise reads a definition list as text.
 - A heading written as HTML (`<h2>Title</h2>`) gets an anchor on GitHub,
   numbered together with the Markdown headings, and on Gitea 1.26 and later,
   where it is not numbered and an HTML heading with its own `id` gets none.
