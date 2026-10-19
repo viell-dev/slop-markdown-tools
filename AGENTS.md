@@ -224,7 +224,7 @@ Other repository settings, each recorded here with its reason when it changes:
   findings are claims to check, not approvals: verify each against the code and,
   where it concerns rendering, against the renderer; fix a valid one in the PR
   with a test, and answer every thread with the evidence either way before
-  resolving it, which the ruleset requires.
+  resolving it. The ruleset itself requires only that every thread is resolved.
 
 Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
 comment, lock a conversation, or close an item that breaks it, and say why where
