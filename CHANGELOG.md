@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, `style/blank-lines` and `style/trailing-space` leave
+  a line of blank space that holds a tab, or that lies directly below an HTML
+  block, as written. Obsidian's Reading view reads such a line as more of the
+  paragraph or HTML block above it, so emptying or removing it split a
+  paragraph, or made a heading below an HTML block render. No rule changes the
+  blocks below such a line that Reading view shows as more of the HTML block, up
+  to an empty line.
 - In the Obsidian dialect, no rule changes a paragraph, heading, or table cell
   with a backtick that no run of backticks closes, also in a highlight, an
   inline comment, or the text of a link or image. Live Preview shows the text

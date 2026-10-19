@@ -394,6 +394,37 @@ describe("style/trailing-space", () => {
   });
 });
 
+describe("lines of blank space that Obsidian reads as text (#358)", () => {
+  // Obsidian's Reading view reads a line of blank space that holds a tab as
+  // more of the paragraph above it, and one directly below an HTML block as
+  // more of the block; emptying it would end the paragraph or block there.
+  const rules = { "style/blank-lines": "warn", "style/trailing-space": "warn" } as const;
+  it.each([
+    "a\n\t\nb\n",
+    "a\n \t\nb\n",
+    "a\n\t\n\nb\n",
+    "> a\n>\t\n> b\n",
+    "<div>\nx\n</div>\n  \n# H\n",
+    "<div>\nx\n</div>\n  \n\n# H\n",
+    "<div>\nx\n</div>\n\t\n# H\n",
+  ])("keeps %j as written in Obsidian", (source) => {
+    kept(source, only(rules, "obsidian"));
+  });
+  it.each([
+    ["a\n\t\nb\n", "a\n\nb\n"],
+    ["a\n\t\n\nb\n", "a\n\nb\n"],
+    ["<div>\nx\n</div>\n  \n\n# H\n", "<div>\nx\n</div>\n\n# H\n"],
+  ])("empties %j in the other dialects", (source, output) => {
+    expect(formatted(source, only(rules, "github"))).toBe(output);
+  });
+  it("still empties lines of spaces elsewhere in Obsidian", () => {
+    expect(formatted("a\n  \nb\n\n\n\nc\n", only(rules, "obsidian"))).toBe("a\n\nb\n\nc\n");
+    expect(formatted("<!-- c -->\nx\n\n  \n\ny\n", only(rules, "obsidian"))).toBe(
+      "<!-- c -->\nx\n\ny\n",
+    );
+  });
+});
+
 describe("style/heading closing sequences", () => {
   const rule = { "style/heading": "warn" } as const;
   it.each([
