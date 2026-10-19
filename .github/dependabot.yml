@@ -19,6 +19,30 @@ updates:
     groups:
       development:
         dependency-type: development
+  # The Obsidian check (scripts/obsidian-check.mjs) keeps its own dependencies and image.
+  - package-ecosystem: npm
+    directory: /scripts/obsidian
+    labels: ["Type: Maintenance"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      # wdio-obsidian-service 3.3 needs WebdriverIO 9.
+      - dependency-name: "webdriverio"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@wdio/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      obsidian-check:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /scripts/obsidian
+    labels: ["Type: Maintenance"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     labels: ["Type: Maintenance"]

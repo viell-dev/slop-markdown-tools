@@ -1,0 +1,16 @@
+{
+  "name": "mdrefine-obsidian-check",
+  "private": true,
+  "description": "Compares what Obsidian shows before and after formatting, in Docker",
+  "type": "module",
+  "devDependencies": {
+    "@wdio/cli": "9.32.0",
+    "@wdio/globals": "9.31.3",
+    "@wdio/local-runner": "9.32.0",
+    "@wdio/mocha-framework": "9.32.0",
+    "@wdio/spec-reporter": "9.32.0",
+    "obsidian": "1.14.4",
+    "wdio-obsidian-service": "3.3.0",
+    "webdriverio": "9.32.0"
+  }
+}
