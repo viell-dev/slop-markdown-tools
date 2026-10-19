@@ -2,7 +2,7 @@
 # display, driven by WebdriverIO through wdio-obsidian-service. The image holds
 # no Obsidian build: the service downloads one at run time into a volume,
 # because Obsidian's terms do not allow redistributing it.
-FROM node:24-bookworm-slim
+FROM node:25-bookworm-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
