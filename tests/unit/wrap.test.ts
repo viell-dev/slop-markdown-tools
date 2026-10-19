@@ -519,26 +519,39 @@ describe("a tab in a container prefix", () => {
 });
 describe("a paragraph's first word that would be a block on its own", () => {
   const url = "https://example.com/a/very/long/address/that/does/not/fit/on/a/line";
-  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
+  const sources = [
+    `[Note]: see ${url} for details.\n`,
+    `[A longer note]: see ${url} for details.\n`,
+    `[Note]:\nsee ${url} for details.\n`,
+    `[Note]: see "a quoted title" and ${url} for details.\n`,
+    `[Note]: see 'a quoted title' ${url}\nfor details.\n`,
+  ];
+  const quoted = `> [Note]: see ${url} for details.\n`;
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
     "keeps a link reference definition from forming in the %s dialect",
     (dialect) => {
       const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
       for (const width of [20, 40, 80]) {
         const config: Config = { ...wrap({ width }), dialect };
-        for (const source of [
-          `[Note]: see ${url} for details.\n`,
-          `[A longer note]: see ${url} for details.\n`,
-          `[Note]:\nsee ${url} for details.\n`,
-          `[Note]: see "a quoted title" and ${url} for details.\n`,
-          `[Note]: see 'a quoted title' ${url}\nfor details.\n`,
-          `> [Note]: see ${url} for details.\n`,
-        ]) {
+        for (const source of [...sources, quoted]) {
           const output = verify(source, config, workspace).output;
           expect(output.split("\n").length, JSON.stringify(source)).toBeGreaterThan(2);
         }
       }
     },
   );
+  it("leaves such a paragraph as written in the obsidian dialect", () => {
+    // Live Preview styles a line that starts at the first column with `[`, a
+    // label, and `]:` as a definition, so the line stays whole (issue #391),
+    // and after a quote marker it is text, which wraps.
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    for (const width of [20, 40, 80]) {
+      const config: Config = { ...wrap({ width }), dialect: "obsidian" };
+      for (const source of sources)
+        expect(verify(source, config, workspace).output, JSON.stringify(source)).toBe(source);
+      expect(verify(quoted, config, workspace).output.split("\n").length).toBeGreaterThan(2);
+    }
+  });
   it("keeps the issue's example a paragraph", () => {
     const source =
       "[Note]: see https://example.com/a/very/long/address/that/does/not/fit/on/the/first/line for details.\n";

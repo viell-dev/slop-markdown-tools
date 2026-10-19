@@ -1,8 +1,9 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
-// the cases where Live Preview showed what the HTML renderers did not (#15, #306), and those
-// that the check has to read with care (#385). Each paragraph is long enough that formatting
-// at 30 or 80 columns reflows it. Every word is synthetic.
+// the cases where Live Preview showed what the HTML renderers did not (#15, #306, #391), and
+// those that the check has to read with care (#385). Each paragraph is long enough that
+// formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
+// is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
@@ -102,5 +103,12 @@ export const fixtures = [
     name: "heading and paragraph",
     source:
       "# A heading with *emphasis*\nA paragraph directly below it with enough words to be reflowed.\n",
+  },
+  {
+    // #391: Live Preview styles a paragraph line that starts with `[`, a label, and `]:` as a
+    // link reference definition, so the paragraph stays as written but for its emphasis.
+    name: "definition line in a paragraph",
+    source:
+      'Some words with *emphasis* before the line, enough of them to be reflowed at a narrow width.\n[ref]: https://example.com/page "A title with several words"\nSome words after the line, enough of them to be reflowed at a narrow width too.\n',
   },
 ];
