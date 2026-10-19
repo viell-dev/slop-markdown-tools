@@ -32,12 +32,14 @@ vulnerabilities privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## Set up
 
-Development needs Node.js 22.22.2 or newer, or 24.15.0 or newer (24 is
-preferred), and npm 10 or newer.
+Development needs Node.js 22.22.2 or newer, or 24.15.0 or newer, and npm 10 or
+newer. `.nvmrc` names 24, the version that the checks and releases run on, so
+`nvm use` or `fnm use` selects it.
 
 ```sh
 git clone https://github.com/viell-dev/slop-markdown-tools.git
 cd slop-markdown-tools
+nvm install # or: fnm use --install-if-missing
 npm ci
 npm run build
 node dist/cli/main.js --help
