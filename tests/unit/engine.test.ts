@@ -957,6 +957,45 @@ describe("definition descriptions on Forgejo and Gitea", () => {
   });
 });
 
+describe("blocks that Obsidian reads into an HTML block above them", () => {
+  // A line of blank space directly below an HTML block continues it in
+  // Reading view, up to an empty line, so the text there shows as written
+  // (issue #358).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each([
+    "</div>\n  \n*a* b\n",
+    "</div>\n\t\n### __z__ ##\n",
+    "<div>\n</div>\n  \ndelta\n---\n",
+    "<div>\n  \n*a* b\n",
+    "</div>\n  \n*a* b\n  \n*c* d\n",
+    "> </div>\n>  \n> *a* b\n",
+    // Also the marker of a list item there, which is text of the HTML block.
+    "</div>\n  \n* *a* b\n",
+  ])("leaves %j as written", (source) => {
+    expect(formatted(source, { config })).toBe(source);
+  });
+  it.each([
+    // An empty line ends the HTML block.
+    ["</div>\n  \n*a* b\n\n*c* d\n", "</div>\n  \n*a* b\n\n_c_ d\n"],
+    // These end at their own end markers.
+    ["<!-- c -->\n  \n*a* b\n", "<!-- c -->\n  \n_a_ b\n"],
+    ["<pre>\nx\n</pre>\n  \n*a* b\n", "<pre>\nx\n</pre>\n  \n_a_ b\n"],
+    ["<script>\n</script>\n  \n*a* b\n", "<script>\n</script>\n  \n_a_ b\n"],
+    ["  <!-- c -->\n  \n*a* b\n", "  <!-- c -->\n  \n_a_ b\n"],
+    // An empty line in a list ends the HTML block there.
+    ["</div>\n  \n- *a*\n\n  *b*\n", "</div>\n  \n- *a*\n\n  _b_\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such text in the other dialects", () => {
+    expect(
+      formatted("</div>\n  \n*a* b\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("</div>\n\n_a_ b\n");
+  });
+});
+
 describe("backticks that nothing closes in Obsidian", () => {
   // Live Preview shows the text after such a backtick as code, at least to the
   // end of its line, also from inside a highlight, an inline comment, or a link

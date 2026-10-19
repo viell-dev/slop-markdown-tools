@@ -60,6 +60,14 @@ export interface MisreadLists {
    * well, with a table that holds such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the blocks that Reading view reads as more of an
+   * HTML block above them. A line of blank space directly below an HTML block
+   * that ends at a blank line continues the block, and so do the blocks after
+   * it, up to an empty line (issue #358). Each counts from the start of its
+   * first line, with the marker of a list item there.
+   */
+  htmlText: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -215,6 +223,7 @@ export function misreadLists(document: Document): MisreadLists {
     return continued;
   };
   visit(document.tree);
+  const htmlText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
@@ -230,6 +239,45 @@ export function misreadLists(document: Document): MisreadLists {
         );
     };
     collect(document.tree, false);
+    const lines = source.split(/\r\n|\r|\n/);
+    /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
+    const spaced = (number: number) => {
+      const line = lines[number - 1] ?? "";
+      return /^[ \t>]*$/.test(line) && /[^>]/.test(line);
+    };
+    /**
+     * Whether the last leaf block is an HTML block that ends at a blank line, or
+     * text that Obsidian reads as more of one, which the next block may continue.
+     * Leaf blocks count, not containers, because an empty line inside a list
+     * ends the HTML block there.
+     */
+    let open = false;
+    order.forEach(([leaf], index) => {
+      const previous = order[index - 1]?.[0];
+      if (open && previous?.position && leaf.position) {
+        for (let line = previous.position.end.line + 1; line < leaf.position.start.line; line++)
+          if (!spaced(line)) open = false;
+        if (open) {
+          // From the start of its line: a list item's marker there, `- ` in
+          // `- *a*`, is text of the HTML block too.
+          const offset = leaf.position.start.offset ?? 0;
+          let from = offset;
+          while (from > 0 && source[from - 1] !== "\n" && source[from - 1] !== "\r") from--;
+          const start = { ...leaf.position.start, offset: from, column: 1 };
+          htmlText.add(from === offset ? leaf : { ...leaf, position: { ...leaf.position, start } });
+        }
+      }
+      // Other HTML blocks end at their own end marker, as a comment does at `-->`.
+      if (
+        !open &&
+        leaf.type === "html" &&
+        leaf.position &&
+        !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
+          leaf.value.trimStart(),
+        )
+      )
+        open = spaced(leaf.position.end.line + 1);
+    });
     /**
      * The runs of backticks that nothing closes in the text of `node`, outside
      * code, math, and wikilinks. Live Preview starts code at them also inside a
@@ -299,7 +347,7 @@ export function misreadLists(document: Document): MisreadLists {
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
     }
   }
-  const result = { text, nested, next, descriptions, unclosedCode };
+  const result = { text, nested, next, descriptions, unclosedCode, htmlText };
   found.set(document.tree, result);
   return result;
 }
