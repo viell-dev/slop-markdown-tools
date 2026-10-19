@@ -976,6 +976,24 @@ describe("backticks that nothing closes in Obsidian", () => {
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config })).toBe(source);
   });
+  // After a run of three or more, Live Preview shows the blocks below as code
+  // up to a run of the same length, a fenced code block, or a list item.
+  it.each([
+    ["a ``` b\n\nc *d* e\n", "a ``` b\n\nc *d* e\n"],
+    ["- a ``` b\n\nc *d*\n", "- a ``` b\n\nc *d*\n"],
+    ["a ``` b\n\n# c *d* #\n\n    x *y*\n", "a ``` b\n\n# c *d* #\n\n    x *y*\n"],
+    ["a ``` b\n\nc *d* ``` e *f*\n\ng *h*\n", "a ``` b\n\nc *d* ``` e *f*\n\ng _h_\n"],
+    [
+      "a ``` b\n\nc `` *d*\n\ne \\``` *f*\n\ng *h*\n",
+      "a ``` b\n\nc `` *d*\n\ne \\``` *f*\n\ng *h*\n",
+    ],
+    ["a ``` b\n\nc ``` d ``` e\n\nf *g*\n", "a ``` b\n\nc ``` d ``` e\n\nf *g*\n"],
+    ["a ``` b\n\n```js\nx\n```\n\nc *d*\n", "a ``` b\n\n```js\nx\n```\n\nc _d_\n"],
+    ["a ``` b\n\n- c *d*\n\ne *f*\n", "a ``` b\n\n- c _d_\n\ne _f_\n"],
+    ["| a ``` b |\n| - |\n\nc *d*\n", "| a ``` b |\n| - |\n\nc *d*\n"],
+  ])("leaves the blocks below %j as Live Preview shows them", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
   it("keeps the emphasis in such a table cell", () => {
     expect(formatted("| a ` *b* |\n| - |\n", { config })).toBe("| a ` *b* |\n| ------- |\n");
   });

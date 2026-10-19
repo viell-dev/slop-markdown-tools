@@ -17,7 +17,8 @@ prereleases' notes there are longer than their entries here.
   inline comment, or the text of a link or image. Live Preview shows the text
   after it as code, at least to the end of its line, and Reading view pairs a
   longer run with a later, shorter one, so the rules changed text that Obsidian
-  shows as code.
+  shows as code. After a run of three or more, the blocks that Live Preview
+  shows as code below it stay as written too.
 - `obsidian/callout-marker` leaves a marker that Obsidian shows as text, because
   more than one space or a tab separates it from the quote's `>`, as in
   `>  [!NOTE]`. Before, it lowercased the visible text.

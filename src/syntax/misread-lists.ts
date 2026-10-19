@@ -50,12 +50,26 @@ export interface MisreadLists {
    * description. Obsidian's Live Preview shows the text after it as code, at
    * least to the end of its line, and Reading view pairs a run of two or more
    * with a later, shorter one, as in ``a ``` b `c` d`` (issue #362).
+   *
+   * After a run of three or more, Live Preview shows the blocks below as code
+   * too, also out of a list item and across blank lines, up to a block with a
+   * run of the same length, which it closes there, a fenced code block, or a
+   * list item. Those blocks are in the set as well, with a table that holds
+   * such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
 const leaves = new Set<Nodes["type"]>(["paragraph", "heading", "table", "code", "html"]);
+/** Blocks whose children are blocks. */
+const containers = new Set<Nodes["type"]>([
+  "root",
+  "blockquote",
+  "list",
+  "listItem",
+  "footnoteDefinition",
+]);
 const found = new WeakMap<Root, MisreadLists>();
 
 /**
@@ -176,81 +190,138 @@ export function misreadLists(document: Document): MisreadLists {
   visit(document.tree);
   const unclosedCode = new Set<Nodes>();
   if (document.dialect === "obsidian") {
-    const blocks = new Set<Nodes["type"]>(["paragraph", "heading", "tableCell"]);
-    const visitBlocks = (node: Nodes) => {
-      if (blocks.has(node.type)) {
-        if (holdsBacktick(node)) unclosedCode.add(node);
-        return;
-      }
-      if ("children" in node) for (const child of node.children) visitBlocks(child);
+    /** Leaf blocks in document order, and whether each starts a list item. */
+    const order: [Nodes, boolean][] = [];
+    const collect = (node: Nodes, item: boolean) => {
+      if (!containers.has(node.type) || !("children" in node)) order.push([node, item]);
+      else
+        node.children.forEach((child, index) =>
+          collect(child, node.type === "listItem" && index === 0),
+        );
     };
+    collect(document.tree, false);
     /**
-     * Whether the text in `node`, outside code, math, and wikilinks, holds a
-     * backtick that nothing closes. Live Preview starts code there also inside
-     * a highlight, an inline comment, and an image's description, whose source
-     * the parser does not read as code spans; a backtick in a link's destination
-     * or title starts none, but counts in an image's source.
+     * The runs of backticks that nothing closes in the text of `node`, outside
+     * code, math, and wikilinks. Live Preview starts code at them also inside a
+     * highlight, an inline comment, and an image's description, whose source
+     * the parser does not read as code spans; a backtick in a link's
+     * destination or title starts none, but counts in an image's source.
      */
-    const holdsBacktick = (node: Nodes): boolean => {
+    const openRuns = (node: Nodes): Run[] => {
       const start = node.position?.start.offset;
       const end = node.position?.end.offset;
+      if (start === undefined || end === undefined) return [];
       if (
         node.type === "obsidianHighlight" ||
         node.type === "obsidianComment" ||
         node.type === "image" ||
         node.type === "imageReference"
       )
-        return start !== undefined && end !== undefined && unclosedRun(source.slice(start, end));
-      if (node.type === "text") {
-        if (start === undefined || end === undefined) return false;
-        // The parser reads every backtick that a run closes as code, so any
-        // other one in text is unclosed.
-        for (
-          let at = source.indexOf("`", start);
-          at >= 0 && at < end;
-          at = source.indexOf("`", at + 1)
-        ) {
-          let slashes = 0;
-          while (source[at - 1 - slashes] === "\\") slashes++;
-          if (slashes % 2 === 0) return true;
-        }
-        return false;
-      }
-      return "children" in node && node.children.some(holdsBacktick);
+        return unclosedRuns(source, start, end);
+      // The parser reads every run that another closes as code, so every one
+      // left in text is unclosed.
+      if (node.type === "text") return backtickRuns(source, start, end);
+      return "children" in node ? node.children.flatMap(openRuns) : [];
     };
-    visitBlocks(document.tree);
+    /**
+     * The length of a run of three or more backticks whose code Live Preview
+     * carries into the blocks below, up to a block with a run of the same
+     * length, a fenced code block, or a list item.
+     */
+    let carry: number | undefined;
+    for (const [leaf, item] of order) {
+      const start = leaf.position?.start.offset;
+      const end = leaf.position?.end.offset;
+      if (start === undefined || end === undefined) continue;
+      if (carry !== undefined) {
+        if (item || (leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end))))
+          carry = undefined;
+        else {
+          unclosedCode.add(leaf);
+          const runs = backtickRuns(source, start, end);
+          const close = runs.findIndex(([, length]) => length === carry);
+          if (close >= 0) carry = carried(source, runs.slice(close + 1));
+          continue;
+        }
+      }
+      const parts =
+        leaf.type === "table"
+          ? leaf.children.flatMap((row) => row.children)
+          : leaf.type === "paragraph" || leaf.type === "heading"
+            ? [leaf]
+            : [];
+      const runs = parts.flatMap((part) => {
+        const open = openRuns(part);
+        if (open.length > 0) unclosedCode.add(part);
+        return open;
+      });
+      const long = runs.find(([, length]) => length >= 3);
+      if (long === undefined) continue;
+      // Live Preview shows the rest of a table as code from such a run.
+      if (leaf.type === "table") unclosedCode.add(leaf);
+      const after = backtickRuns(source, long[0] + long[1], end);
+      const close = after.findIndex(([, length]) => length === long[1]);
+      carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
+    }
   }
   const result = { text, nested, next, descriptions, unclosedCode };
   found.set(document.tree, result);
   return result;
 }
 
+/** A run of backticks: its offset and its length. */
+type Run = [number, number];
+
 /**
- * Whether `value` holds a run of backticks, not escaped, that no later run of
- * the same length closes, as CommonMark pairs them into code spans.
+ * The runs of backticks from `start` to `end`. A backslash before a run
+ * escapes its first backtick only.
  */
-function unclosedRun(value: string): boolean {
-  for (let at = 0; at < value.length;) {
-    if (value[at] === "\\") {
-      at += 2;
-      continue;
-    }
-    if (value[at] !== "`") {
-      at++;
-      continue;
-    }
+function backtickRuns(source: string, start: number, end: number): Run[] {
+  const runs: Run[] = [];
+  for (let at = source.indexOf("`", start); at >= 0 && at < end;) {
     let after = at;
-    while (value[after] === "`") after++;
-    const length = after - at;
-    let close = value.indexOf("`", after);
-    for (;;) {
-      if (close < 0) return true;
-      let end = close;
-      while (value[end] === "`") end++;
-      if (end - close === length) break;
-      close = value.indexOf("`", end);
-    }
-    at = close + length;
+    while (after < end && source[after] === "`") after++;
+    let slashes = 0;
+    while (source[at - 1 - slashes] === "\\") slashes++;
+    const from = slashes % 2 === 0 ? at : at + 1;
+    if (after > from) runs.push([from, after - from]);
+    at = source.indexOf("`", after);
   }
-  return false;
+  return runs;
+}
+
+/**
+ * The runs of backticks from `start` to `end` that no later run of the same
+ * length there closes, as CommonMark pairs them into code spans.
+ */
+function unclosedRuns(source: string, start: number, end: number): Run[] {
+  const runs = backtickRuns(source, start, end);
+  const open: Run[] = [];
+  for (let index = 0; index < runs.length; index++) {
+    const [, length] = runs[index]!;
+    const close = runs.findIndex((run, later) => later > index && run[1] === length);
+    if (close < 0) open.push(runs[index]!);
+    else index = close;
+  }
+  return open;
+}
+
+/**
+ * The length of the run of three or more backticks whose code Live Preview
+ * carries past the last of `runs`, if any. Live Preview closes a run with the
+ * next run of the same length, a run of one or two backticks only on its line.
+ */
+function carried(source: string, runs: Run[]): number | undefined {
+  for (let index = 0; index < runs.length; index++) {
+    const [at, length] = runs[index]!;
+    const close = runs.findIndex(
+      ([offset, other], later) =>
+        later > index &&
+        other === length &&
+        (length >= 3 || !/[\n\r]/.test(source.slice(at, offset))),
+    );
+    if (close >= 0) index = close;
+    else if (length >= 3) return length;
+  }
+  return undefined;
 }

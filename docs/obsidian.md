@@ -64,6 +64,10 @@ note shows there, the tool keeps the text as written:
   the end of its line, and Reading view pairs a run of two or more backticks
   with a later, shorter run. No rule changes such a block. A backtick in math or
   a wikilink does not count.
+- The blocks below a run of three or more backticks that nothing closes. Live
+  Preview shows them as code too, across blank lines and out of a list item, up
+  to a block with a run of the same length, a fenced code block, or a list item.
+  No rule changes them, nor a table that holds such a run.
 
 ## Vaults inside a larger workspace
 
