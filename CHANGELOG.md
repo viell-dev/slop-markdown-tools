@@ -24,6 +24,30 @@ prereleases' notes there are longer than their entries here.
   item or block quote. Obsidian's Reading view shows that line break as one
   more, empty line of the code
   ([#412](https://github.com/viell-dev/slop-markdown-tools/pull/412)).
+- In the Obsidian dialect, `style/heading` leaves an underlined heading whose
+  one line of text starts at the first column with `[`, a label, and `]:` as
+  written, as `[ref]: see the page` with `===` below it. Live Preview styles
+  that line as a link reference definition and shows no heading, where Reading
+  view shows one; written as `# [ref]: see the page`, both views showed a
+  heading ([#413](https://github.com/viell-dev/slop-markdown-tools/pull/413)).
+- In the Obsidian dialect, no rule changes the block below a line of blank space
+  that holds a tab, below a line of paragraph text, unless the block interrupts
+  a paragraph. Obsidian's Reading view reads the tab line as more of the
+  paragraph, and then a paragraph, table, underlined heading, indented code
+  block, definition, or numbered list that does not start at 1 there as more of
+  its text, where CommonMark reads blocks of their own. Before, `style/emphasis`
+  changed the markers of such a paragraph, which Reading view paired otherwise
+  across the join, and `style/table` aligned such a table, which it showed as
+  text ([#413](https://github.com/viell-dev/slop-markdown-tools/pull/413)).
+- In the Obsidian dialect, no rule changes the markers of a list that an HTML
+  block directly follows, as `- Item` and `<div>…</div>` below it, nor those of
+  a list of the same kind below the block, nor the indentation of the blocks
+  between them that start at the item's text. Obsidian's Reading view keeps the
+  HTML block inside the item and continues the list below it with every item
+  whose marker matches, where CommonMark ends the list at the block. Before,
+  `style/list-marker` gave both lists one marker, and Reading view showed one
+  list in place of two
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/pull/413)).
 
 ## 0.2.6 - 2026-10-19
 

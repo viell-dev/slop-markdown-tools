@@ -118,4 +118,25 @@ export const fixtures = [
     source:
       "Some words before the code block, enough of them to be reflowed at a narrow width.\n\n~~~\nconst a = 1;",
   },
+  {
+    // #397: Live Preview styles the heading's line as a link reference definition and reads the
+    // underline as text, so `style/heading` leaves the heading underlined.
+    name: "underlined heading with a definition-like line",
+    source:
+      "[ref]: a heading that starts like a link reference definition\n===\nSome words below the heading, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #398: Reading view reads the tab line as more of the paragraph and the table below it as
+    // text, so the table and the paragraph after it stay as written.
+    name: "table and paragraph below a tab line",
+    source:
+      "Some words with *emphasis* above the tab line, enough of them to be reflowed at a narrow width.\n\t\n| Name | Value |\n| - | - |\n| a | b |\n\t\nSome *words* below the table, enough of them to be reflowed at a narrow width too.\n",
+  },
+  {
+    // #399: Reading view keeps the HTML block inside the item and would continue the list with a
+    // matching marker below it, so both lists keep their markers.
+    name: "HTML block inside a list item",
+    source:
+      "* An item with enough words to be reflowed at a narrow width, and more words\n<div>\nSome words inside the block\n</div>\n\n- Another item with enough words to be reflowed at a narrow width\n",
+  },
 ];

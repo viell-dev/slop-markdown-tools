@@ -76,17 +76,29 @@ note shows there, the tool keeps the text as written:
   below it, which the parser reads as a heading. No rule changes such a
   paragraph, nor the blocks below it that start further right than the marker,
   which Live Preview reads inside the item, or the block after those.
-- A line of blank space that holds a tab, which Reading view reads as more of
-  the paragraph above it, and one directly below an HTML block such as
-  `<div>…</div>`, which continues the block. The blocks below such a line are
-  more of the HTML block too, up to an empty line, and Reading view shows them
-  as written. No rule empties the line or changes those blocks. A comment, and
-  the other HTML blocks that end at their own end marker, such as `<pre>`, do
-  not continue.
+- A line of blank space that holds a tab at or right of the column where a
+  paragraph's text starts, which Reading view reads as more of the paragraph,
+  and the block below such lines, up to an empty line. A paragraph, a table, an
+  underlined heading, an indented code block, a link reference or footnote
+  definition, or a numbered list that does not start at 1 there is more of the
+  text, as in `Text`, a tab, and `Name | Value` with `--- | ---` below it, which
+  Reading view shows as text; a `#` heading, a bullet list, a block quote, a
+  fenced code or math block, a thematic break, or an HTML block such as `<div>`
+  starts a block of its own. No rule empties the line or changes those blocks. A
+  tab left of the text's column, as in `- Item` and a tab alone below it, is a
+  blank line.
+- A line of blank space directly below an HTML block such as `<div>…</div>`,
+  which continues the block. The blocks below such a line are more of the HTML
+  block too, up to an empty line, and Reading view shows them as written. No
+  rule empties the line or changes those blocks. A comment, and the other HTML
+  blocks that end at their own end marker, such as `<pre>`, do not continue.
 - An underlined heading whose underline one of the views reads as text: Reading
   view one with blank space after it, as in `Title` and `== ` below it, or
-  before it beyond the heading's text, and Live Preview a lone `-`. No rule
-  writes such a heading with `#` or changes its underline.
+  before it beyond the heading's text, and Live Preview a lone `-`, or the
+  underline of a heading whose one line of text starts at the first column with
+  `[`, a label, and `]:`, as in `[ref]: see the page` and `===` below it, which
+  it styles as a link reference definition. No rule writes such a heading with
+  `#` or changes its underline.
 - A paragraph in a block quote or list item with a lazy line of `=` or `-`, as
   in `> Text` and `=` below it, which Reading view reads as a heading's
   underline where CommonMark reads more of the text. No rule joins that line to
@@ -126,6 +138,16 @@ note shows there, the tool keeps the text as written:
   it with no line break after it. Reading view shows a line break at the end of
   the note as one more, empty line of the code, where CommonMark shows the same
   code either way. `style/final-newline` adds none there.
+- An HTML block directly below a list, as in `- Item` and `<div>…</div>` below
+  it, which Reading view keeps inside the list's last item, where CommonMark
+  ends the list; a comment or a `<pre>` block counts too, and a block quote or
+  footnote definition keeps no block. The list goes on there: the blocks below
+  the HTML block that start at or right of the item's text are inside the item,
+  and a list of the same kind, bullet or numbered, continues it with every item
+  whose marker matches. No rule puts a blank line between the list and the HTML
+  block, moves those blocks or changes their markers, or, where a block follows
+  the HTML block, changes the markers and spacing of the list's items or the
+  markers of that following list.
 - A table that Obsidian reads otherwise. Obsidian reads a table directly below a
   line of paragraph text as more of the text, a one-column table whose header
   line does not end with a pipe, as in `Name` and `--:` below it, as text, and a
