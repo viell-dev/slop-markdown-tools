@@ -58,7 +58,12 @@ async function shown(path, text) {
           if (child.matches(".math"))
             out.push([`${classes} math`, child.querySelector("[data-latex]")?.dataset.latex ?? ""]);
           else if (child.matches(".internal-embed, .image-embed"))
-            out.push([`${classes} embed`, child.getAttribute("src") ?? child.textContent]);
+            out.push([
+              `${classes} embed`,
+              child.getAttribute("src") ??
+                child.querySelector("img")?.getAttribute("src") ??
+                child.textContent,
+            ]);
           else if (child.matches("input[type=checkbox]"))
             out.push([`${classes} checkbox`, child.checked ? "x" : " "]);
           else {
@@ -92,8 +97,9 @@ async function shown(path, text) {
           if (lines.has(at)) continue;
           if (element.classList.contains("cm-line"))
             lines.set(at, {
+              // A lazy line of a quote shows as more of the quote.
               kind: [...element.classList]
-                .filter((name) => /^HyperMD-/.test(name) && !/-(?:bg|nobullet)$/.test(name))
+                .filter((name) => /^HyperMD-/.test(name) && !/-(?:bg|nobullet|lazy)$/.test(name))
                 .sort()
                 .join(" "),
               // A list item's next line, which shows as more of its text.
@@ -104,6 +110,10 @@ async function shown(path, text) {
             lines.set(at, {
               widget: [...element.classList].filter((name) => name !== "cm-embed-block").join(" "),
               html: widget(element),
+              // An embed on a line of its own shows as a block.
+              embed: element.matches(".internal-embed, .image-embed")
+                ? (element.getAttribute("src") ?? element.querySelector("img")?.getAttribute("src"))
+                : undefined,
             });
         }
         if (top + scroller.clientHeight >= scroller.scrollHeight) break;
@@ -159,14 +169,19 @@ const block = "blockquote|div|h[1-6]|hr|li|ol|p|table|td|th|tr|ul";
 function livePreview(lines) {
   const blocks = [];
   let current;
-  for (const line of lines) {
+  for (let line of lines) {
+    // An embed that Live Preview shows as a block where the source gives it a line of its
+    // own, which wrapping can do, shows the same file as an embed in the line.
+    if (line.embed) line = { kind: "", runs: [[" embed", line.embed]] };
     if (line.widget !== undefined) {
       blocks.push(`<${line.widget}> ${cleanHtml(line.html)}`);
       current = undefined;
       continue;
     }
     const text = line.runs.map(([, value]) => value).join("");
-    if (!line.kind && !text.trim()) {
+    // A line that shows only an image is not blank.
+    const embed = line.runs.some(([classes]) => /\bembed\b/.test(classes));
+    if (!line.kind && !text.trim() && !embed) {
       current = undefined;
       continue;
     }
