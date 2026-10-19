@@ -219,6 +219,12 @@ Other repository settings, each recorded here with its reason when it changes:
 - Wiki, Projects, and Discussions are off; issues and pull requests are the only
   channels.
 - #330, the overview of upstream defects, is pinned.
+- Three review apps comment on pull requests: Sourcery and cubic on each push,
+  CodeRabbit when a comment asks for it with `@coderabbitai review`. Their
+  findings are claims to check, not approvals: verify each against the code and,
+  where it concerns rendering, against the renderer; fix a valid one in the PR
+  with a test, and answer every thread with the evidence either way before
+  resolving it, which the ruleset requires.
 
 Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
 comment, lock a conversation, or close an item that breaks it, and say why where
