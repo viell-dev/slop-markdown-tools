@@ -969,7 +969,7 @@ describe("backticks that nothing closes in Obsidian", () => {
     "# a ` b *c*\n",
     "==a ` b== *c* d\n",
     "==a `b` ``` c== *d*\n",
-    "%%a ` b%% *c* d\n",
+    "x %%a ` b%% *c* d\n",
     "[a ` b](x) *c* d\n",
     "![a ` b](x) *c* d\n",
     "![a ` b][r] *c* d\n\n[r]: x\n",
