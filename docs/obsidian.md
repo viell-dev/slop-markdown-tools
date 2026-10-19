@@ -52,6 +52,17 @@ paragraph is left as written in the cases that
 are not consistent, or inline syntax that runs from the title into the body. A
 title that is too long is reported by `reportUnbreakable`.
 
+## Where Obsidian reads Markdown its own way
+
+Obsidian's Reading view and Live Preview read some Markdown otherwise than
+CommonMark, and otherwise than each other. Where formatting would change what a
+note shows there, the tool keeps the text as written:
+
+- A paragraph, heading, or table cell with a backtick that no run of backticks
+  closes, such as ``a ` b``. Live Preview shows the rest of that line as code,
+  and Reading view pairs a run of two or more backticks with a later, shorter
+  run. No rule changes such a block.
+
 ## Vaults inside a larger workspace
 
 A note belongs to the nearest vault at or above its directory, wherever the

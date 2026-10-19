@@ -43,6 +43,14 @@ export interface MisreadLists {
    * the description as blocks, here an ordered list (issue #344).
    */
   descriptions: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, paragraphs, headings, and table cells whose text
+   * holds a backtick that no run of the same length closes, which the parser
+   * leaves as text. Obsidian's Live Preview shows the rest of its line as code,
+   * and Reading view pairs a run of two or more with a later, shorter one, as
+   * in ``a ``` b `c` d`` (issue #362).
+   */
+  unclosedCode: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -165,7 +173,38 @@ export function misreadLists(document: Document): MisreadLists {
     return continued;
   };
   visit(document.tree);
-  const result = { text, nested, next, descriptions };
+  const unclosedCode = new Set<Nodes>();
+  if (document.dialect === "obsidian") {
+    const blocks = new Set<Nodes["type"]>(["paragraph", "heading", "tableCell"]);
+    const visitBlocks = (node: Nodes) => {
+      if (blocks.has(node.type)) {
+        if (holdsBacktick(node)) unclosedCode.add(node);
+        return;
+      }
+      if ("children" in node) for (const child of node.children) visitBlocks(child);
+    };
+    /** Whether the text in `node`, outside code, holds an unescaped backtick. */
+    const holdsBacktick = (node: Nodes): boolean => {
+      if (node.type === "text") {
+        const start = node.position?.start.offset;
+        const end = node.position?.end.offset;
+        if (start === undefined || end === undefined) return false;
+        for (
+          let at = source.indexOf("`", start);
+          at >= 0 && at < end;
+          at = source.indexOf("`", at + 1)
+        ) {
+          let slashes = 0;
+          while (source[at - 1 - slashes] === "\\") slashes++;
+          if (slashes % 2 === 0) return true;
+        }
+        return false;
+      }
+      return "children" in node && node.children.some(holdsBacktick);
+    };
+    visitBlocks(document.tree);
+  }
+  const result = { text, nested, next, descriptions, unclosedCode };
   found.set(document.tree, result);
   return result;
 }

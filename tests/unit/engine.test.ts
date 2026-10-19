@@ -956,6 +956,36 @@ describe("definition descriptions on Forgejo and Gitea", () => {
   });
 });
 
+describe("backticks that nothing closes in Obsidian", () => {
+  // Live Preview shows the rest of the line after such a backtick as code, and
+  // Reading view pairs a run of two or more with a later, shorter one, where the
+  // parser reads text (issue #362).
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  it.each(["a ``` b *c* d\n", "a ` b *c* d\n", "a `` b\n`c` *d*\n", "# a ` b *c*\n"])(
+    "leaves %j as written",
+    (source) => {
+      expect(formatted(source, { config })).toBe(source);
+    },
+  );
+  it("keeps the emphasis in such a table cell", () => {
+    expect(formatted("| a ` *b* |\n| - |\n", { config })).toBe("| a ` *b* |\n| ------- |\n");
+  });
+  it.each([
+    ["a \\` b *c* d\n", "a \\` b _c_ d\n"],
+    ["a `code` and *c*\n", "a `code` and _c_\n"],
+    ["a ` b\n\n*c* d\n", "a ` b\n\n_c_ d\n"],
+  ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config })).toBe(output);
+  });
+  it("formats such text in the other dialects", () => {
+    expect(
+      formatted("a ` b *c* d\n", {
+        config: { ...config, extends: ["recommended"], dialect: "github" },
+      }),
+    ).toBe("a ` b _c_ d\n");
+  });
+});
+
 describe("the block directly below TOML front matter", () => {
   // Site generators read TOML front matter, and GitHub, Forgejo, Gitea,
   // Obsidian, commonmark.js, and markdown-it read its lines as a paragraph,
