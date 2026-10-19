@@ -1,7 +1,8 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
-// and the cases where Live Preview showed what the HTML renderers did not (#15, #306). Each
-// line is long enough that formatting at 30 or 80 columns reflows it. Every word is synthetic.
+// the cases where Live Preview showed what the HTML renderers did not (#15, #306), and those
+// that the check has to read with care (#385). Each paragraph is long enough that formatting
+// at 30 or 80 columns reflows it. Every word is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
@@ -79,6 +80,18 @@ export const fixtures = [
     name: "nested list",
     source:
       "1. An item with enough words to be reflowed at a narrow width\n   - A nested item with enough words to be reflowed too\n2. Another item\n",
+  },
+  {
+    // #385: Live Preview shows the list's indentation on a code block's lines, and the list
+    // rules change it.
+    name: "code block opening a list item",
+    source:
+      "  1. An item with enough words to be reflowed at a narrow width\n     + ```js\n         let a = 1;\n       let b = 2;\n       ```\n",
+  },
+  {
+    name: "code block later in a list item",
+    source:
+      "  - An item with enough words to be reflowed at a narrow width\n\n    ```js\n      let a = 1;\n    let b = 2;\n    ```\n",
   },
   {
     name: "literal URL",

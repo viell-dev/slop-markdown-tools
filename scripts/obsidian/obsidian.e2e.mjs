@@ -192,6 +192,8 @@ const block = "blockquote|div|h[1-6]|hr|li|ol|p|table|td|th|tr|ul";
 function livePreview(lines) {
   const blocks = [];
   let current;
+  // The column where the list item's content starts, for the lines of a code block in it.
+  let content;
   for (let line of lines) {
     // An embed that Live Preview shows as a block where the source gives it a line of its
     // own, which wrapping can do, shows the same file as an embed in the line.
@@ -217,6 +219,17 @@ function livePreview(lines) {
       .find(Boolean);
     if (!line.kind && level) line.kind = `HyperMD-header HyperMD-header-${level}`;
     const code = line.kind.includes("HyperMD-codeblock");
+    // A code block in a list item shows the list's indentation, which the list rules choose, on
+    // each of its lines: the blank space before the item's marker on the line that opens the
+    // block, or before its fence there without one, and the columns up to the item's content
+    // on the lines below. What is left is the code's own indentation.
+    if (code && line.kind.includes("HyperMD-list-line")) {
+      if (line.kind.includes("HyperMD-codeblock-begin")) {
+        const lead = blankStart(line.runs);
+        content = listContent(line.runs) ?? lead;
+        line = { ...line, runs: outdent(line.runs, lead) };
+      } else if (content !== undefined) line = { ...line, runs: outdent(line.runs, content) };
+    } else content = undefined;
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
@@ -307,6 +320,45 @@ function livePreview(lines) {
       .map(([classes, text]) => (classes ? `{${classes}}${text}{/}` : text))
       .join("");
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
+  });
+}
+
+/** A line's runs after its quote markers, which wrapping moves. */
+function afterQuotes(runs) {
+  const start = runs.findIndex(([classes]) => !/\bcm-formatting-quote\b/.test(classes));
+  return start < 0 ? [] : runs.slice(start);
+}
+
+/** How many characters of blank space a line starts with after its quote markers. */
+function blankStart(runs) {
+  let count = 0;
+  for (const [, value] of afterQuotes(runs)) {
+    const blank = /^[ \t]*/.exec(value)[0].length;
+    count += blank;
+    if (blank < value.length) break;
+  }
+  return count;
+}
+
+/** Where a line's list item shows its content, after its quote markers, if it has a marker. */
+function listContent(runs) {
+  let column = 0;
+  let content;
+  for (const [classes, value] of afterQuotes(runs)) {
+    column += value.length;
+    if (/\bcm-formatting-list\b/.test(classes)) content = column;
+  }
+  return content;
+}
+
+/** A line's runs without up to `count` characters of blank space after its quote markers. */
+function outdent(runs, count) {
+  const quotes = runs.length - afterQuotes(runs).length;
+  return runs.flatMap(([classes, value], index) => {
+    if (index < quotes || !count) return [[classes, value]];
+    const cut = Math.min(count, /^[ \t]*/.exec(value)[0].length);
+    count = cut === value.length ? count - cut : 0;
+    return cut === value.length ? [] : [[classes, value.slice(cut)]];
   });
 }
 
