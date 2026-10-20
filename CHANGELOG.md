@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Explicit HTML anchors decode character references in attribute values before
+  matching fragments, including numeric references and escaped ampersands
+  ([#451](https://github.com/viell-dev/slop-markdown-tools/issues/451)).
 - Large paragraphs, tables, code spans, plugin finding lists, configuration
   arrays, and Obsidian target searches no longer exceed the JavaScript engine's
   function-argument limit
