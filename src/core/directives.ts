@@ -23,12 +23,10 @@ export function directive(value: string): Directive | undefined {
 export function suppressions(document: Document): (rule: string, finding: Finding) => boolean {
   // Directives can only appear in HTML comments containing this prefix.
   if (!document.source.includes("mdtools-")) return () => false;
-  const intervals: { start: number; end: number; rules: Set<string> }[] = [];
-  const active = new Map<string, number>();
+  const events: (Directive & { start: number; end: number })[] = [];
   walk(document.tree, "html", (node) => {
     const found = directive(node.value);
     if (!found) return;
-    const { rules } = found;
     const [start, end] = range(node);
     if (found.kind === "disable-next-line") {
       // The line after the directive's own, whichever of CommonMark's line endings ends each.
@@ -39,27 +37,31 @@ export function suppressions(document: Document): (rule: string, finding: Findin
       const next = first.index + first[0].length;
       lineBreak.lastIndex = next;
       const last = lineBreak.exec(document.source);
-      intervals.push({ start: next, end: last ? last.index : document.source.length, rules });
-    } else if (found.kind === "disable") {
-      for (const rule of rules) if (!active.has(rule)) active.set(rule, end);
-    } else {
-      for (const rule of rules.has("*") ? active.keys() : rules) {
-        const from = active.get(rule);
-        if (from !== undefined) intervals.push({ start: from, end: start, rules: new Set([rule]) });
-        active.delete(rule);
-      }
-    }
+      events.push({ ...found, start: next, end: last ? last.index : document.source.length });
+    } else events.push({ ...found, start, end });
   });
-  for (const [rule, start] of active)
-    intervals.push({ start, end: document.source.length, rules: new Set([rule]) });
-  return (rule, finding) =>
-    intervals.some((interval) => {
-      const start = finding.edit?.start ?? finding.start;
-      const end = finding.edit?.end ?? finding.end ?? finding.start;
-      return (
-        (interval.rules.has("*") || interval.rules.has(rule)) &&
-        start <= interval.end &&
-        end >= interval.start
-      );
-    });
+  // Apply all-rule and named transitions to the same state for each rule.
+  // Build its regions only when it reports a finding, and reuse them thereafter.
+  const cache = new Map<string, { start: number; end: number }[]>();
+  return (rule, finding) => {
+    let intervals = cache.get(rule);
+    if (!intervals) {
+      intervals = [];
+      let active: number | undefined;
+      for (const event of events) {
+        if (!event.rules.has("*") && !event.rules.has(rule)) continue;
+        if (event.kind === "disable-next-line") intervals.push(event);
+        else if (event.kind === "disable") active ??= event.end;
+        else if (active !== undefined) {
+          intervals.push({ start: active, end: event.start });
+          active = undefined;
+        }
+      }
+      if (active !== undefined) intervals.push({ start: active, end: document.source.length });
+      cache.set(rule, intervals);
+    }
+    const start = finding.edit?.start ?? finding.start;
+    const end = finding.edit?.end ?? finding.end ?? finding.start;
+    return intervals.some((interval) => start <= interval.end && end >= interval.start);
+  };
 }

@@ -110,6 +110,10 @@ without a `check` function, a `kind` of `"style"` or `"problem"`, and a string
 `description`, or with a `phase` or `schema` of another kind, stops the command
 with an error that names it, even while the rule is off.
 
+A returned Promise is invalid even when it fulfills with findings. The engine
+handles its rejection without waiting for it; unrelated background work that a
+plugin starts remains the plugin's responsibility.
+
 A style rule's `phase` is `"inline"` (the default), `"block"`, or `"document"`.
 `format` runs the phases in that order and repeats them until nothing changes,
 for at most eight passes. After each phase that changes the document, it parses
