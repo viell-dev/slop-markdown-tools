@@ -20,6 +20,9 @@ prereleases' notes there are longer than their entries here.
   markers off new line starts, preventing VitePress build failures and lost text
   ([#445](https://github.com/viell-dev/slop-markdown-tools/issues/445),
   [#446](https://github.com/viell-dev/slop-markdown-tools/issues/446)).
+- The Obsidian check passes large `PROBE` batches through Docker's inherited
+  environment, avoiding the Windows process argument limit
+  ([#442](https://github.com/viell-dev/slop-markdown-tools/issues/442)).
 
 ## 0.3.0 - 2026-10-20
 

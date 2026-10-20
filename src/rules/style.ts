@@ -689,8 +689,8 @@ const forgeLineOpener = /^(?::$|\\\[)/;
 /**
  * Site-generator syntax at the start of a line: a container such as
  * Docusaurus's `:::note`, or a template tag such as Liquid's `{% tab %}` or
- * `{{ title }}`, or a literal `[[toc]]`. Site generators read it by line, and no dialect gives it
- * meaning, so a paragraph with a line that starts with it keeps its lines, and
+ * `{{ title }}`, or a literal `[[toc]]`. Site generators read it by line, and
+ * no dialect gives it meaning, so a paragraph with a line that starts with it keeps its lines, and
  * a word that starts with it stays on the line before it (issue #296).
  */
 const siteSyntax = /^(?::::|\{%|\{\{|\[\[toc\]\](?=[ \t]|$))/i;

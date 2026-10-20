@@ -33,7 +33,9 @@ if (docker("build", "--tag", image, fileURLToPath(new URL("obsidian", import.met
 rmSync(output, { recursive: true, force: true });
 mkdirSync(output, { recursive: true });
 const environment = ["SEED", "COUNT", "OBSIDIAN_VERSION", "REDUCE", "PROBE"].flatMap((name) =>
-  process.env[name] ? ["--env", `${name}=${process.env[name]}`] : [],
+  // Docker reads a named variable from its inherited environment. Large PROBE batches must
+  // not become process arguments, which Windows limits to about 32,000 characters.
+  process.env[name] ? ["--env", name] : [],
 );
 const status = docker(
   "run",
