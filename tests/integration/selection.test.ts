@@ -5,13 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
 import { discover } from "../../src/workspace/files.js";
 import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "./support.js";
+import { parseConfig, parseReport } from "./json.js";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 /** Where letter case is ignored by default, by Git and by the file system. */
 const foldsCase = process.platform === "win32" || process.platform === "darwin";
 /** The paths of a report's files. */
 const paths = (stdout: string) =>
-  (JSON.parse(stdout) as { files: { path: string }[] }).files.map((file) => file.path);
+  (parseReport(stdout) as { files: { path: string }[] }).files.map((file) => file.path);
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -479,7 +480,7 @@ describe("named inputs", () => {
     const root = await fixture(files);
     const checked = run(root, ["lint", "--json"]);
     expect(paths(checked.stdout)).toEqual(["README.markdown", "guide.md"]);
-    const reports = JSON.parse(checked.stdout).files as {
+    const reports = parseReport(checked.stdout).files as {
       path: string;
       diagnostics: { message: string }[];
     }[];
@@ -494,8 +495,8 @@ describe("named inputs", () => {
     const root = await fixture(files);
     const checked = run(root, ["lint", "--json", "notes.txt"]);
     expect(checked.status, checked.stderr).toBe(0);
-    const emphasis = expect.objectContaining({ rule: "style/emphasis" });
-    expect(JSON.parse(checked.stdout).files).toEqual([
+    const emphasis: unknown = expect.objectContaining({ rule: "style/emphasis" });
+    expect(parseReport(checked.stdout).files).toEqual([
       { path: "notes.txt", diagnostics: [emphasis, emphasis] },
     ]);
     expect(run(root, ["format", "--check", "notes.txt"]).status).toBe(1);
@@ -534,7 +535,7 @@ describe("named inputs", () => {
     const reported = run(root, ["lint", "--json", "skip.md", "vendor"]);
     expect(reported.status, reported.stderr).toBe(0);
     expect(reported.stderr).toBe("");
-    expect(JSON.parse(reported.stdout)).toMatchObject({
+    expect(parseReport(reported.stdout)).toMatchObject({
       files: [],
       skipped: [
         { path: "skip.md", type: "file", code: "IGNORED" },
@@ -574,7 +575,7 @@ describe("named inputs", () => {
     expect(checked.stderr).toBe(settings + "0 file(s) processed; 0 would change.\n");
     // The JSON report still lists them, for a program to filter.
     const report = run(root, ["lint", "--json", "--no-warn-ignored", ...named]);
-    const skipped = JSON.parse(report.stdout).skipped as { path: string; code: string }[];
+    const skipped = parseReport(report.stdout).skipped as { path: string; code: string }[];
     expect(skipped.map((item) => [item.path, item.code])).toEqual([
       ["drafts/draft.md", "IGNORED"],
       ["generated/out.md", "IGNORED"],
@@ -610,8 +611,11 @@ describe("named inputs", () => {
     const discovery = await discoverWorkspace({
       root,
       inputs: [],
-      config: JSON.parse(files["mdtools.config.json"]),
-      documents: Object.fromEntries([...cases.map(([name]) => [name, text]), ["new.md", text]]),
+      config: parseConfig(files["mdtools.config.json"]),
+      documents: Object.fromEntries([
+        ...cases.map(([name]) => [name, text] as const),
+        ["new.md", text] as const,
+      ]),
     });
     expect(discovery.selected).toEqual(["new.md"]);
     expect(discovery.skipped.map((item) => [item.path, item.code, item.message])).toEqual(
@@ -628,7 +632,7 @@ describe("named inputs", () => {
     expect([formatted.status, formatted.stdout, formatted.stderr]).toEqual([0, text, warning]);
     const checked = run(root, ["format", "-", "--check", "--no-warn-ignored", ...named], text);
     expect([checked.status, checked.stdout, checked.stderr]).toEqual([0, "", ""]);
-    const report = JSON.parse(run(root, ["lint", "-", "--json", ...named], text).stdout);
+    const report = parseReport(run(root, ["lint", "-", "--json", ...named], text).stdout);
     expect([report.files, report.skipped]).toEqual([
       [],
       [
@@ -654,7 +658,7 @@ describe("named inputs", () => {
     expect(discovery.selected).toEqual(["notes.txt"]);
     expect(discovery.read("notes.txt")).toBe(files["notes.txt"]);
     expect(discovery.skipped).toEqual(
-      JSON.parse(run(root, ["lint", "--json", "notes.txt", "skip.md"]).stdout).skipped,
+      parseReport(run(root, ["lint", "--json", "notes.txt", "skip.md"]).stdout).skipped,
     );
   });
 });
@@ -774,7 +778,7 @@ describe("link targets in folders that discovery does not enter", () => {
     "notes/note.md": "# Note\n",
   };
   const findings = (stdout: string) =>
-    (JSON.parse(stdout) as { files: { path: string; diagnostics: { message: string }[] }[] }).files
+    (parseReport(stdout) as { files: { path: string; diagnostics: { message: string }[] }[] }).files
       .flatMap((file) => file.diagnostics.map((item) => `${file.path}: ${item.message}`))
       .filter((message) => !message.includes("Reflow"));
 

@@ -330,7 +330,7 @@ export function misreadLists(document: Document): MisreadLists {
       const item = obsidian && start !== undefined ? obsidianItem(child, quoted) : undefined;
       const misread = atStart || item !== undefined;
       if (misread || adjacent || reach !== undefined) {
-        const column = columnAt(atStart ? start! : (item ?? offset));
+        const column = columnAt(atStart ? start : (item ?? offset));
         if ((adjacent && !misread) || (reach !== undefined && column > reach)) nested.add(child);
         else if (reach !== undefined) {
           next.add(child);
@@ -423,7 +423,7 @@ export function misreadLists(document: Document): MisreadLists {
     const stretch = (node: Nodes, start: Point, end = node.position!.end): Nodes =>
       start.offset === node.position!.start.offset && end === node.position!.end
         ? node
-        : ({ ...node, position: { start, end } } as Nodes);
+        : { ...node, position: { start, end } };
     /** The start of the line holding `node`'s start. */
     const lineOf = (node: Nodes): Point => {
       const start = node.position!.start;
@@ -602,8 +602,7 @@ export function misreadLists(document: Document): MisreadLists {
       // The parser reads such a line below an indented code block as more of
       // the code; Reading view reads it below the code's last line of text.
       if (below !== undefined && previous!.type === "code")
-        while (below > previous!.position!.start.line && /^[ \t]*$/.test(lines[below - 1]!))
-          below--;
+        while (below > previous.position!.start.line && /^[ \t]*$/.test(lines[below - 1]!)) below--;
       let joins =
         column !== undefined && below !== undefined && leaf.position!.start.line > below + 1;
       for (let line = (below ?? 0) + 1; joins && line < leaf.position!.start.line; line++)
@@ -714,7 +713,7 @@ export function misreadLists(document: Document): MisreadLists {
       return {
         ...node,
         position: { start: { ...start, offset: from - 1 }, end: { ...end, offset: to } },
-      } as Nodes;
+      };
     };
     /** `first` to `last` as one block, from the start of its first line to the end of its last. */
     const wholeLines = (first: Nodes, last = first): Nodes => {
@@ -726,7 +725,7 @@ export function misreadLists(document: Document): MisreadLists {
           start: { ...start, offset: lineAround(start.offset!)[0], column: 1 },
           end: { ...end, offset: lineAround(end.offset!)[1] },
         },
-      } as Nodes;
+      };
     };
     // A container can end the parser's HTML block before Obsidian stops reading
     // its source as HTML (#428). Reading view and Live Preview have different
@@ -772,7 +771,7 @@ export function misreadLists(document: Document): MisreadLists {
       htmlText.add({
         ...leaf,
         position: { ...leaf.position, end: pointAt(until) },
-      } as Nodes);
+      });
     }
     /**
      * Comment openers in text, highlights, and image descriptions, where Live
@@ -901,7 +900,7 @@ export function misreadLists(document: Document): MisreadLists {
                     offset: until < source.length ? until + 1 : until,
                   },
                 },
-              } as Nodes);
+              });
             }
           }
         }
@@ -930,7 +929,7 @@ export function misreadLists(document: Document): MisreadLists {
               return columnAt(at) < columnAt(content);
             })
           )
-            lazyItems.add(wholeLines(child, parent.children.at(-1)!));
+            lazyItems.add(wholeLines(child, parent.children.at(-1)));
         }
         if ("children" in child && !leaves.has(child.type)) visitLines(child);
       });
@@ -1021,11 +1020,10 @@ export function misreadLists(document: Document): MisreadLists {
       });
     visitHtml(document.tree);
     /** A copy of `node` from `start` to its end. */
-    const startingAt = (node: Nodes, start: number): Nodes =>
-      ({
-        ...node,
-        position: { ...node.position!, start: { ...node.position!.start, offset: start } },
-      }) as Nodes;
+    const startingAt = (node: Nodes, start: number): Nodes => ({
+      ...node,
+      position: { ...node.position!, start: { ...node.position!.start, offset: start } },
+    });
     /** Whether `line` holds a pipe that no backslash escapes. */
     const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
@@ -1078,7 +1076,7 @@ export function misreadLists(document: Document): MisreadLists {
             },
             end: leaf.position!.end,
           },
-        } as Nodes);
+        });
     });
   }
   const result = {

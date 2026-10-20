@@ -210,7 +210,7 @@ export async function discoverFrom(
       // Whether a note may be reflowed is a setting of its own vault.
       if (vault?.strictLineBreaks !== undefined) {
         let ofDialect = views.get(dialect);
-        if (!ofDialect) views.set(dialect, (ofDialect = new Map()));
+        if (!ofDialect) views.set(dialect, (ofDialect = new Map<Vault, Workspace>()));
         const shared = workspace;
         workspace = ofDialect.get(vault) ?? { ...shared, strictLineBreaks: vault.strictLineBreaks };
         ofDialect.set(vault, workspace);

@@ -232,7 +232,10 @@ export function setting(value: RuleSetting): {
   options: Readonly<Record<string, unknown>>;
 } {
   return Array.isArray(value)
-    ? { severity: value[0], options: value[1] ?? noOptions }
+    ? {
+        severity: (value as Exclude<RuleSetting, string>)[0],
+        options: (value as Exclude<RuleSetting, string>)[1] ?? noOptions,
+      }
     : { severity: value as Exclude<RuleSetting, readonly unknown[]>, options: noOptions };
 }
 /**

@@ -46,7 +46,7 @@ describe("rules reference", () => {
   const enabling = (rule: string) =>
     Object.entries(presets).flatMap(([name, preset]) => {
       const value = preset.rules?.[rule];
-      const severity = Array.isArray(value) ? value[0] : value;
+      const severity = typeof value === "string" ? value : value?.[0];
       return severity && severity !== "off" ? [{ name, severity }] : [];
     });
   it("has one index row for every built-in rule, in alphabetical order", () => {
@@ -161,9 +161,9 @@ describe("configuration snippets", () => {
       .map((node) => {
         // Parse as the loader does: comments only in JSONC, trailing commas in both.
         const errors: ParseError[] = [];
-        const value = parseJsonc((node as Code).value, errors, {
+        const value = parseJsonc(node.value, errors, {
           allowTrailingComma: true,
-          disallowComments: (node as Code).lang === "json",
+          disallowComments: node.lang === "json",
         }) as unknown;
         return { file, value, errors };
       })
@@ -269,7 +269,7 @@ describe("documentation site", () => {
     const theme = (file: string) =>
       squash(read(`node_modules/vitepress/dist/client/theme-default/${file}`));
     const wrap = presets.recommended?.rules?.["style/wrap"];
-    const width = Array.isArray(wrap) ? Number(wrap[1]?.width) : Number.NaN;
+    const width = typeof wrap === "string" ? Number.NaN : Number(wrap?.[1]?.width);
     expect(width).toBeGreaterThan(0);
 
     // In rem: the text column, less the padding on both sides of a code block, divided by the

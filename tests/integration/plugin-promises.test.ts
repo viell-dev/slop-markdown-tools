@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
+import { stringContaining } from "../assertions.js";
 import { cli, fixture, repository } from "./support.js";
 
 const cases = [
@@ -33,7 +34,7 @@ it.each(cases)("isolates a directly returned %s in the synchronous API (#457)", 
     const before = process.listenerCount("unhandledRejection");
     const options = {
       config: { extends: [], rules: { "local/invalid": "error", "style/emphasis": "warn" } },
-      plugins: [${plugin(check!)}],
+      plugins: [${plugin(check)}],
     };
     for (const source of ["First *word*.\\n", "Second *word*.\\n"]) {
       const findings = lint(source, options);
@@ -64,7 +65,7 @@ it.each(cases)("preserves CLI reports and exit status for a %s (#457)", async (_
   const root = await fixture({
     "a.md": "First *word*.\n",
     "b.md": "Second *word*.\n",
-    "plugin.mjs": `export default ${plugin(check!)};`,
+    "plugin.mjs": `export default ${plugin(check)};`,
     "mdtools.config.mjs":
       'export default { extends: [], plugins: ["./plugin.mjs"], rules: { "local/invalid": "error", "style/emphasis": "warn" } };',
   });
@@ -93,7 +94,7 @@ it.each(cases)("preserves CLI reports and exit status for a %s (#457)", async (_
       expect(file.diagnostics).toContainEqual(
         expect.objectContaining({
           rule: "engine/rule-error",
-          message: expect.stringContaining(
+          message: stringContaining(
             "Rule local/invalid returned an object instead of a list of findings",
           ),
         }),

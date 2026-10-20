@@ -401,7 +401,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
       const { source } = document;
       const gfm = document.dialect !== "commonmark";
       const size = type === "strong" ? 2 : 1;
-      const marker = String(options.marker ?? fallback).repeat(size);
+      const marker = String((options.marker as string | undefined) ?? fallback).repeat(size);
       const labels = markerLabels(document.tree);
       const titles = calloutTitles(document);
       const loose = document.dialect === "obsidian" ? blocksWithLooseMarkers(document) : [];
@@ -426,7 +426,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         const neighbours = [start - 1, end, start + size, end - size - 1].map(
           (index) => document.source[index],
         );
-        if (neighbours.includes(marker[0]!)) return;
+        if (neighbours.includes(marker[0])) return;
         if (goldmarkForges[document.dialect] && inForgeMath(document, start, end)) return;
         // Forgejo, and Gitea before 1.26, build a heading's anchor from its last
         // line as written, keeping `_` and dropping `*`, and both read a trailing
@@ -803,7 +803,7 @@ function keepDefinitionStarts(atoms: string[]): string[] {
       } else if (atom[at] === "]") {
         // Keep the complete label on one line as well: splitting it changes
         // Live Preview's link styling even when its start stays inline (#411).
-        if (atom[at + 1] === ":" && pending.length) joined.fill(1, pending[0]!, index + 1);
+        if (atom[at + 1] === ":" && pending.length) joined.fill(1, pending[0], index + 1);
         pending = [];
       }
     }
@@ -1626,7 +1626,7 @@ function together(
       continuesEmptyItem(before, after) ||
       (after.type === "list" &&
         after.children.length === 1 &&
-        continuesEmptyItem(after, parent.children[index + 1] as RootContent | undefined))
+        continuesEmptyItem(after, parent.children[index + 1]))
     )
       return true;
   }

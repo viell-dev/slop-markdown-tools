@@ -214,12 +214,20 @@ function htmlAnchors(tokens: HtmlToken[]): string[] {
  */
 const characterReference = /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z][A-Za-z\d]*);)/g;
 function decodeReferences(text: string): string {
-  return text.replace(characterReference, (reference, decimal, hex, name) => {
-    if (name) return decodeNamedCharacterReference(name) || reference;
-    const code = Number.parseInt(decimal ?? hex, decimal ? 10 : 16);
-    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
-    return valid ? String.fromCodePoint(code) : "�";
-  });
+  return text.replace(
+    characterReference,
+    (
+      reference: string,
+      decimal: string | undefined,
+      hex: string | undefined,
+      name: string | undefined,
+    ) => {
+      if (name) return decodeNamedCharacterReference(name) || reference;
+      const code = Number.parseInt((decimal ?? hex)!, decimal ? 10 : 16);
+      const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+      return valid ? String.fromCodePoint(code) : "�";
+    },
+  );
 }
 const headingTag = /^h[1-6]$/;
 /**

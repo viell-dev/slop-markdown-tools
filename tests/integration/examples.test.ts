@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { dialects, lint } from "../../src/index.js";
 import type { Diagnostic, Plugin } from "../../src/index.js";
 import { copyOf, fixture, node, repository, run, tree } from "./support.js";
+import { parseExplanation, parseReport } from "./json.js";
 
 interface Report {
   files: { path: string; changed?: boolean; diagnostics: Diagnostic[] }[];
@@ -14,7 +15,7 @@ interface Report {
 const examples = path.join(repository, "examples");
 /** `path:line:column severity rule` for each diagnostic, in report order. */
 function summary(stdout: string): string[] {
-  return (JSON.parse(stdout) as Report).files.flatMap((file) =>
+  return (parseReport(stdout) as Report).files.flatMap((file) =>
     file.diagnostics.map(
       (item) => `${file.path}:${item.line}:${item.column} ${item.severity} ${item.rule}`,
     ),
@@ -49,7 +50,9 @@ describe("starting configurations", () => {
       "note.md",
     ]);
     expect(explained.status, explained.stderr).toBe(0);
-    expect(JSON.parse(explained.stdout).effective.dialect).toBe(path.basename(name, ".jsonc"));
+    expect(parseExplanation(explained.stdout).effective.dialect).toBe(
+      path.basename(name, ".jsonc"),
+    );
     // The Obsidian configuration asks for vault-root paths, the others for ./relative ones.
     const source = name === "obsidian.jsonc" ? "[link](./other.md)" : "[link](other.md)";
     const formatted = run(
@@ -71,7 +74,7 @@ describe.each(workspaces)("workspaces/%s", (name) => {
     const root = await copyOf(before);
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.stderr).toBe("");
-    const report = JSON.parse(applied.stdout) as Report;
+    const report = parseReport(applied.stdout) as Report;
     const changed = report.files.filter((file) => file.changed).map((file) => file.path);
     expect(changed).not.toHaveLength(0);
     expect(report.written).toEqual(changed);
@@ -79,7 +82,7 @@ describe.each(workspaces)("workspaces/%s", (name) => {
   });
   it("keeps after/ unchanged, so formatting it again does nothing", () => {
     const checked = run(path.join(repository, after), ["format", "--check", "--json"]);
-    const report = JSON.parse(checked.stdout) as Report;
+    const report = parseReport(checked.stdout) as Report;
     expect(report.files.filter((file) => file.changed)).toEqual([]);
     // Whatever formatting leaves behind is a problem to fix by hand, never a style finding.
     for (const item of report.files.flatMap((file) => file.diagnostics))
@@ -122,7 +125,9 @@ describe("workspaces/repository-docs", () => {
 describe("workspaces/obsidian-vault", () => {
   const vault = path.join(examples, "workspaces/obsidian-vault");
   it("leaves the ignored template folder alone but resolves links into it", async () => {
-    const report = JSON.parse(run(path.join(vault, "before"), ["lint", "--json"]).stdout) as Report;
+    const report = parseReport(
+      run(path.join(vault, "before"), ["lint", "--json"]).stdout,
+    ) as Report;
     expect(report.files.map((file) => file.path)).toEqual([
       "Garden/Tomatoes.md",
       "Garden/Watering schedule.md",
@@ -145,7 +150,7 @@ describe("workspaces/obsidian-vault", () => {
     const settings = path.join(root, ".obsidian/app.json");
     expect(JSON.parse(await readFile(settings, "utf8"))).toEqual({ strictLineBreaks: true });
     await writeFile(settings, "{}\n");
-    const report = JSON.parse(run(root, ["format", "--write", "--json"]).stdout) as Report;
+    const report = parseReport(run(root, ["format", "--write", "--json"]).stdout) as Report;
     const rules = report.files.flatMap((file) => file.diagnostics.map((item) => item.rule));
     expect(rules).toContain("obsidian/strict-line-breaks");
     const home = await readFile(path.join(root, "Home.md"), "utf8");
@@ -181,7 +186,7 @@ describe("plugin", () => {
       );
       expect(formatted.status, formatted.stderr).toBe(0);
       const file = (
-        JSON.parse(formatted.stdout) as { files: (Report["files"][0] & { output: string })[] }
+        parseReport(formatted.stdout) as { files: (Report["files"][0] & { output: string })[] }
       ).files[0]!;
       return [file.output, ...file.diagnostics.map((item) => `${item.line} ${item.rule}`)];
     };

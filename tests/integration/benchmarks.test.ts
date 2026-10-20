@@ -63,7 +63,7 @@ describe("benchmark suite", () => {
       if (result.group === "cli") expect(result.peakMemoryBytes, result.id).toBeGreaterThan(1e6);
     }
 
-    const { markdown } = await load<{ markdown(report: Report): string }>("report.mjs");
+    const { markdown } = await load<{ markdown: (report: Report) => string }>("report.mjs");
     const rendered = markdown(report);
     expect(rendered).toContain("(quick run, not a measurement)");
     // The page explains the report section by section and row by row; keep the two aligned.
