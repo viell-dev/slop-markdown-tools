@@ -27,7 +27,13 @@ export type WorkspaceSource = string | null | (() => string);
 /** What `WorkspaceOptions.lookup` found at a path. */
 export type LookupResult =
   /** A file, with its path as found from the root and its source as in `files`. */
-  | { type: "file"; path: string; source: WorkspaceSource }
+  | {
+      type: "file";
+      path: string;
+      source: WorkspaceSource;
+      /** Whether another file also matches, so this path is not a unique target. */
+      ambiguous?: boolean;
+    }
   | { type: "directory" }
   /**
    * Something whose real location lies outside the workspace root, reached
@@ -869,6 +875,7 @@ export function createWorkspace(
       if (dialect !== "obsidian" && (targetPath.startsWith("/") || targetPath.includes("?")))
         return { status: "unavailable" };
       const candidates = new Set<string>();
+      let ambiguous = false;
       // Unreadable directories that the link's path leads into.
       const blocking = new Set<string>();
       let directory = false;
@@ -891,7 +898,10 @@ export function createWorkspace(
       const look = (name: string, file = true) => {
         const found = lookup(name, folded);
         if (found?.type === "file") {
-          if (file) candidates.add(found.path);
+          if (file) {
+            candidates.add(found.path);
+            ambiguous ||= found.ambiguous === true;
+          }
         } else if (found?.type === "directory") directory ||= !wiki;
         else if (found?.type === "outside") leaves ??= found.through;
         else if (found?.type === "unreadable") blocking.add(found.at);
@@ -986,7 +996,7 @@ export function createWorkspace(
           unreadable: [...(blocking.size ? blocking : unsearched ? hidden : []), ...unseen],
           ...(vault ? { vault } : {}),
         };
-      if (candidates.size !== 1)
+      if (candidates.size !== 1 || ambiguous)
         return {
           status: candidates.size ? "ambiguous" : "missing",
           ...(vault ? { vault } : {}),
