@@ -10,6 +10,14 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Added
+
+- Existing heading checks accept title levels, preambles, configurable
+  front-matter titles, and duplicate-heading scope; code-language checks accept
+  allowed names and strict info strings. Defaults and problem-only behavior
+  remain unchanged
+  ([#460](https://github.com/viell-dev/slop-markdown-tools/issues/460)).
+
 ### Fixed
 
 - The nested-comment complexity check warms both input sizes and measures fresh

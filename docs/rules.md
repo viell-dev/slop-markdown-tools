@@ -17,7 +17,7 @@ presets, dialects, and options.
 
 | Rule                          | Kind | `recommended` | Dialect preset | Options |
 | ----------------------------- | :--: | :-----------: | :------------: | :-----: |
-| `content/code-language`       | 🔍   | ❌            | ❌             | ❌      |
+| `content/code-language`       | 🔍   | ❌            | ❌             | ✅      |
 | `content/image-alt`           | 🔍   | ✅            | ❌             | ❌      |
 | `content/table-columns`       | 🔍   | ✅            | ❌             | ❌      |
 | `forgejo/heading-id`          | 🔍   | ❌            | ✅ (error)     | ❌      |
@@ -32,10 +32,10 @@ presets, dialects, and options.
 | `obsidian/block-reference`    | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `obsidian/callout-marker`     | 🎨   | ❌            | ✅             | ❌      |
 | `obsidian/strict-line-breaks` | 🔍   | ❌            | ✅             | ❌      |
-| `structure/duplicate-heading` | 🔍   | ❌            | ❌             | ❌      |
+| `structure/duplicate-heading` | 🔍   | ❌            | ❌             | ✅      |
 | `structure/heading-increment` | 🔍   | ✅            | ❌             | ❌      |
-| `structure/initial-heading`   | 🔍   | ❌            | ❌             | ❌      |
-| `structure/single-title`      | 🔍   | ❌            | ❌             | ❌      |
+| `structure/initial-heading`   | 🔍   | ❌            | ❌             | ✅      |
+| `structure/single-title`      | 🔍   | ❌            | ❌             | ✅      |
 | `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
 | `style/block-spacing`         | 🎨   | ✅            | ❌             | ❌      |
 | `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
@@ -58,12 +58,21 @@ that a rule's section does not name, the rule finds nothing.
 
 ## `content/code-language`
 
-**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`allowedLanguages`, `languageOnly`.
 
 Reports a fenced code block that does not name its language after the opening
 fence. GitHub, Forgejo, Gitea, and Obsidian highlight code by the language its
 fence names; name `text` for plain text. Indented code blocks have no place for
 a language and are not reported.
+
+`allowedLanguages` is an array of case-sensitive language names. Its default,
+`[]`, allows any named language; `["js", "ts", "text"]` permits only those
+names. Names are compared after Markdown character references and escapes are
+decoded, without guessing aliases. `languageOnly`, default `false`, requires the
+opening fence's info string to contain only its language name when `true`: no
+leading or trailing whitespace and no additional metadata. Both options only
+report findings; the code and its fence remain as written.
 
 Reported:
 
@@ -484,7 +493,8 @@ vaults](obsidian.md#enable-wrapping).
 
 ## `structure/duplicate-heading`
 
-**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`siblingsOnly`.
 
 Reports a heading with the same text as an earlier heading under the same parent
 heading. Two "Setup" sections side by side make a table of contents ambiguous,
@@ -493,6 +503,11 @@ parents, as in a guide with a section per platform, is not reported. Headings
 are compared by their text as the reader sees it: formatting does not count,
 case does. As for `structure/heading-increment`, the headings of a block quote
 or a footnote are checked among themselves.
+
+`siblingsOnly` defaults to `true`. Set it to `false` to report repeated heading
+text throughout each outline, regardless of parent or level. Quotes and
+footnotes still have independent outlines, and comparison remains
+case-sensitive.
 
 Reported:
 
@@ -553,7 +568,8 @@ Not reported:
 
 ## `structure/initial-heading`
 
-**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: `level`,
+`allowPreamble`, `frontMatterTitle`.
 
 Requires the first block of a document, after optional YAML or TOML front
 matter, to be a level-1 heading. Underlined (`===`) headings count as well as
@@ -561,6 +577,22 @@ matter, to be a level-1 heading. Underlined (`===`) headings count as well as
 empty document is reported. Comments and other content before the title are not
 skipped. Use [overrides](configuration.md#overrides) to exempt generated
 documents.
+
+`level` chooses the required heading level, an integer from 1 to 6, default 1.
+With `allowPreamble: true` (default `false`), prose and comments may precede the
+first top-level Markdown heading, which must have that level. A document with no
+heading still reports a finding unless a recognized front-matter title satisfies
+the check. A heading inside a list or quote does not supply the document's
+initial heading.
+
+`frontMatterTitle` defaults to `false`, preserving the requirement for a body
+heading even when metadata contains a title. Set it to `true` to let a top-level
+YAML or TOML `title` key satisfy the check, or use a JavaScript
+regular-expression string such as `"^page_name\\s*[:=]"` to recognize a
+different field. The pattern matches the front matter's contents, without its
+delimiters, in multiline mode; it does not match the body. An invalid pattern is
+a configuration error. `false` or `""` disables title recognition. The same
+setting is available on `structure/single-title`, with a different default.
 
 Reported:
 
@@ -582,13 +614,22 @@ title: Notes
 
 ## `structure/single-title`
 
-**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: `level`,
+`frontMatterTitle`.
 
 Reports a second level-1 heading in a document. A document has one title, and
 further level-1 headings usually belong one level down. A `title` key in YAML or
 TOML front matter counts as the title; every level-1 heading is then reported.
 As for `structure/heading-increment`, the headings of a block quote or a
 footnote are checked among themselves.
+
+`level` chooses the title heading's level, an integer from 1 to 6, default 1.
+`frontMatterTitle` defaults to `true`: the top-level YAML or TOML `title` key
+counts as the title. Set it to `false` or `""` when metadata does not supply a
+rendered title, or use a regular-expression string to recognize another field,
+with the same matching contract as
+[`structure/initial-heading`](#structureinitial-heading). A metadata title
+belongs only to the document's own outline, not its quotes or footnotes.
 
 Reported:
 
