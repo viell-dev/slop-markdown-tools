@@ -39,11 +39,10 @@ prereleases' notes there are longer than their entries here.
   changed the markers of such a paragraph, which Reading view paired otherwise
   across the join, and `style/table` aligned such a table, which it showed as
   text ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
-- In the Obsidian dialect, no rule changes the markers of a list that an HTML
-  block directly follows, as `- Item` and `<div>…</div>` below it, or of the
-  lists nested in its last item, nor those of a list of the same kind below the
-  block, nor the indentation of the blocks between them that start at the item's
-  text. Obsidian's Reading view keeps the HTML block inside the item and
+- In the Obsidian dialect, when an HTML block directly follows a list, no rule
+  changes the markers or indentation that decide whether the list continues
+  below it, including lists nested in its last item, or adds a blank line above
+  the block. Obsidian's Reading view keeps the HTML block inside the item and
   continues the list below it with every item whose marker matches, where
   CommonMark ends the list at the block. Before, `style/list-marker` gave both
   lists one marker, and Reading view showed one list in place of two
@@ -67,6 +66,29 @@ prereleases' notes there are longer than their entries here.
   closer's line. Before, `style/wrap` moved words onto or off that line,
   changing their styling
   ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, `style/wrap` starts no line at the first column with
+  `[`, a label, and `]:`, which Live Preview styles as a link reference
+  definition: the word that opens the label stays on the line before it. Before,
+  `Some words before the label [a]: tail words after it.` at 30 columns broke
+  the line before `[a]:`, and Live Preview showed the new line as a definition
+  ([#416](https://github.com/viell-dev/slop-markdown-tools/pull/416)).
+- In the Obsidian dialect, `style/wrap` keeps a tag such as `#tag` on the line
+  before it in a block quote whose `>` markers are written without a space after
+  them, where Live Preview reads a tag directly after the marker as text.
+  Before, a reflowed line could start with `>#tag`, and Live Preview no longer
+  showed the tag
+  ([#416](https://github.com/viell-dev/slop-markdown-tools/pull/416)).
+- In the Obsidian dialect, `style/trailing-space` and `style/wrap` leave the
+  blank space at the end of a footnote definition's last line as written where a
+  paragraph ends the definition, because Reading view shows it before the
+  footnote's backreference. Before, `[^1]: Note ` became `[^1]: Note`, and the
+  arrow moved against the text
+  ([#416](https://github.com/viell-dev/slop-markdown-tools/pull/416)).
+- In the Obsidian dialect, `style/wrap` leaves a paragraph as written when a
+  continuation line starts with tag-like text directly after a bare block quote
+  marker. Before, joining `>a` and `>#tag b` into `>a #tag b` created a tag in
+  Live Preview, which had shown plain text
+  ([#416](https://github.com/viell-dev/slop-markdown-tools/pull/416)).
 
 ## 0.2.6 - 2026-10-19
 
