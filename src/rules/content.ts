@@ -59,24 +59,61 @@ export const contentRules: Record<string, Rule> = {
     },
   },
   "content/code-language": {
-    description: "Report fenced code blocks that do not name a language.",
+    description: "Check fenced code block languages and their info strings.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({
+      allowedLanguages: { type: "array", items: { type: "string", minLength: 1 }, default: [] },
+      languageOnly: { type: "boolean", default: false },
+    }),
+    check({ document, options }) {
+      const languages = (options.allowedLanguages as string[] | undefined) ?? [];
+      const allowed = languages.length ? new Set(languages) : undefined;
       const findings: Finding[] = [];
       walk(document.tree, "code", (node) => {
         const [start] = range(node);
         // An indented code block starts with its indentation, and has no place for a language.
         const fence = document.source[start];
-        if (node.lang || (fence !== "`" && fence !== "~")) return;
+        if (
+          (node.lang && (!allowed || allowed.has(node.lang)) && !options.languageOnly) ||
+          (fence !== "`" && fence !== "~")
+        )
+          return;
         let end = start;
         while (document.source[end] === fence) end++;
         const marker = document.source.slice(start, end);
-        findings.push({
-          start,
-          end,
-          message: `Name the code block's language after its opening fence, such as ${marker}sh, or ${marker}text for plain text.`,
-        });
+        if (!node.lang) {
+          findings.push({
+            start,
+            end,
+            message: `Name the code block's language after its opening fence, such as ${marker}sh, or ${marker}text for plain text.`,
+          });
+          return;
+        }
+        let infoEnd = end;
+        while (
+          infoEnd < document.source.length &&
+          document.source[infoEnd] !== "\r" &&
+          document.source[infoEnd] !== "\n"
+        )
+          infoEnd++;
+        const info = document.source.slice(end, infoEnd);
+        if (allowed && !allowed.has(node.lang)) {
+          const name = /\S+/u.exec(info);
+          const at = end + (name?.index ?? 0);
+          findings.push({
+            start: at,
+            end: at + (name?.[0].length ?? info.length),
+            message: `Code language "${node.lang}" is not allowed by allowedLanguages.`,
+          });
+        }
+        if (options.languageOnly && !/^\S+$/u.test(info)) {
+          findings.push({
+            start: end,
+            end: infoEnd,
+            message:
+              "Use only the language name in the code fence's info string, without surrounding whitespace.",
+          });
+        }
       });
       return findings;
     },
