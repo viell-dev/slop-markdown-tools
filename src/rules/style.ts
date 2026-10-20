@@ -1442,7 +1442,7 @@ const wrap: Rule = {
             words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
           } else failure = "reason" in joining ? joining.reason : "line break in inline syntax";
         }
-        words.push(...protection.split(line, lineAt));
+        for (const word of protection.split(line, lineAt)) words.push(word);
         lineEnd = lineAt + line.length;
       }
       if (failure) {
@@ -1546,7 +1546,7 @@ const table: Rule = {
       const count = node.align?.length ?? rows[0]?.length ?? 0;
       if (rows.some((row) => row.length > count)) return;
       const widths = Array.from({ length: count }, (_, i) =>
-        compact ? 3 : Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
+        compact ? 3 : rows.reduce((width, row) => Math.max(width, stringWidth(row[i] ?? "")), 3),
       );
       const pad = (cell: string, i: number) =>
         compact ? cell : cell + " ".repeat(widths[i]! - stringWidth(cell));
@@ -1883,7 +1883,8 @@ export const styleRules: Record<string, Rule> = {
         // keeps a backtick there from joining the fence, or spaces there from
         // being taken off.
         const value = codeSpanText(node);
-        const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
+        let longest = 0;
+        for (const run of value.matchAll(/`+/g)) longest = Math.max(longest, run[0].length);
         const marker = "`".repeat(longest + 1);
         // An earlier run of the new backticks that the parser left as text, or
         // that lies in a link destination, would pair with the new opening one.
