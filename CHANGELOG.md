@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## 0.2.7 - 2026-10-20
+## 0.3.0 - 2026-10-20
 
 ### Changed
 
@@ -16,7 +16,9 @@ prereleases' notes there are longer than their entries here.
   blank lines around headings and lists, and `format` inserts them where safe,
   retaining the rule's existing semantic and renderer protections. To keep
   compact spacing, set `"rules": { "style/block-spacing": "off" }`
-  ([#423](https://github.com/viell-dev/slop-markdown-tools/issues/423)).
+  ([#427](https://github.com/viell-dev/slop-markdown-tools/pull/427)).
+
+## 0.2.7 - 2026-10-20
 
 ### Fixed
 
