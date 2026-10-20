@@ -4,7 +4,7 @@ import type { Blockquote, Nodes, Paragraph, Parents, Root, RootContent } from "m
 import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { definitionLike, misreadLists } from "../syntax/misread-lists.js";
 import {
   codeSpanText,
   joinsTomlFrontMatter,
@@ -776,6 +776,46 @@ function startsSiteSyntax(text: string): boolean {
  * a definition list.
  */
 const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
+/**
+ * A word that Obsidian's Live Preview reads as a tag after blank space or at
+ * the start of a line's content, but not directly after a block quote's `>`
+ * (issue #409): `#` and the characters Obsidian allows in a tag, letters,
+ * digits, `_`, `-`, and `/`, among them one that is not a digit.
+ */
+const obsidianTag = /^#[\p{L}\p{N}_/-]*[\p{L}_/-]/u;
+/**
+ * Keep an atom that opens a definition-like label attached to the preceding
+ * atom. The label may span atoms and contain `[` or escaped `]`, as
+ * `definitionLike` allows. Scan once: retrying the fill for each unsafe line
+ * becomes quadratic when many consecutive atoms are labels.
+ */
+function keepDefinitionStarts(atoms: string[]): string[] {
+  const joined = new Uint8Array(atoms.length);
+  let pending: number[] = [];
+  for (const [index, atom] of atoms.entries()) {
+    if (atom.startsWith("[")) pending.push(index);
+    for (let at = 0; at < atom.length; at++) {
+      if (atom[at] === "\\") {
+        if (atom[at + 1] === "\r" || atom[at + 1] === "\n") pending = [];
+        at++;
+      } else if (atom[at] === "]") {
+        if (atom[at + 1] === ":") for (const index of pending) joined[index] = 1;
+        pending = [];
+      }
+    }
+  }
+  const result: string[] = [];
+  let group: string[] = [];
+  for (const [index, atom] of atoms.entries()) {
+    if (!joined[index] && group.length) {
+      result.push(group.join(" "));
+      group = [];
+    }
+    group.push(atom);
+  }
+  if (group.length) result.push(group.join(" "));
+  return result;
+}
 
 type Range = [number, number];
 /**
@@ -1061,7 +1101,17 @@ const wrap: Rule = {
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
     const newline = lineEnding(document.source);
     walk(document.tree, "paragraph", (node, index, parent) => {
-      const [paragraphStart, end] = range(node);
+      const paragraphStart = range(node)[0];
+      let end = range(node)[1];
+      // Obsidian's Reading view shows the blank space at the end of a footnote
+      // definition's last paragraph before the footnote's backreference (issue
+      // #405). It stays as written, outside the text that is reflowed.
+      if (
+        document.dialect === "obsidian" &&
+        parent?.type === "footnoteDefinition" &&
+        index === parent.children.length - 1
+      )
+        while (end > paragraphStart && /[ \t]/.test(document.source[end - 1]!)) end--;
       let start = paragraphStart;
       let children = node.children;
       // A task item's paragraph range can begin at the checkbox, and its first
@@ -1136,6 +1186,11 @@ const wrap: Rule = {
       const openers = [wordOpener, prefixOpener, siteSyntax];
       if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
       if (forge) openers.push(forgeLineOpener);
+      // Live Preview reads a tag after blank space or at the start of a line's
+      // content, not directly after a quote marker, so where the lines below
+      // the first start with markers written without a space after them, a
+      // tag stays on the line before it (issue #409).
+      if (document.dialect === "obsidian" && continuation.endsWith(">")) openers.push(obsidianTag);
       const { source } = document;
       // GitHub and Obsidian end dollar math at a single dollar after a line
       // ending, but not after a space, so a word that starts with `$` stays on
@@ -1289,6 +1344,18 @@ const wrap: Rule = {
             failure = "unsupported continuation";
             break;
           }
+          // Directly after a bare quote marker, Live Preview reads a tag as
+          // text. Joining that line would put it after a space and create a
+          // tag (issue #414). Inline atoms keep their own reading of `#`.
+          if (
+            document.dialect === "obsidian" &&
+            source[lineAt - 1] === ">" &&
+            obsidianTag.test(line) &&
+            !protection.has(lineAt)
+          ) {
+            failure = "tag-like text directly after a block quote marker";
+            break;
+          }
           const last = words.at(-1);
           let joining = protection.has(lineEnd)
             ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
@@ -1324,7 +1391,9 @@ const wrap: Rule = {
         reportSkipped(failure);
         return;
       }
-      const atoms = wrappingAtoms(words, openers, dollars);
+      const definitions = document.dialect === "obsidian" && !continuation;
+      const wrapped = wrappingAtoms(words, openers, dollars);
+      const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
       if (!atoms.length) return;
       // The first line keeps the words after a first word that would open a
       // block alone on the line, until the line can no longer open one, and
@@ -1361,6 +1430,16 @@ const wrap: Rule = {
         let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
         while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
           output = fill(++first);
+      }
+      // Live Preview styles a line that starts at the first column with `[`, a
+      // label, and `]:` as a link reference definition, so no reflowed line
+      // starts so: the word that opens the label, which may hold blank space,
+      // stays on the line before it (issue #411). The first line has no line
+      // before it, and a paragraph whose first line would start so, as `[a`
+      // and `b]: c d` below it joined, stays as written.
+      if (definitions && definitionLike.test(output[0]!)) {
+        reportSkipped("first line that Obsidian styles as a link reference definition");
+        return;
       }
       const replacement = output.join(newline + continuation);
       if (replacement !== original)

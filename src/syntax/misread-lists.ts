@@ -13,6 +13,14 @@ export const listMarker = /^(?:[-+*]|\d{1,9}[.)])(?:[ \t\r\n]|$)/;
  * description on Forgejo and Gitea.
  */
 export const descriptionLine = /^[ \t>]*:[ \t]/m;
+/**
+ * A line that Obsidian's Live Preview styles as a link reference definition
+ * where it starts at the first column (issue #391): `[`, a label, in which `[`
+ * and an escaped `]` may stand, and `]:`, whatever follows. It styles neither
+ * `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so, nor a line after `>` or blank
+ * space.
+ */
+export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
 
 /**
  * Text that the parser read where renderers may read a list, or on Forgejo and
@@ -541,12 +549,6 @@ export function misreadLists(document: Document): MisreadLists {
         position: { start: { ...start, offset: from - 1 }, end: { ...end, offset: to } },
       } as Nodes;
     };
-    /**
-     * A line that Live Preview styles as a link reference definition: `[`, a
-     * label, in which `[` and an escaped `]` may stand, and `]:`, whatever
-     * follows. It styles neither `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so.
-     */
-    const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
     /** `first` to `last` as one block, from the start of its first line to the end of its last. */
     const wholeLines = (first: Nodes, last = first): Nodes => {
       const start = first.position!.start;

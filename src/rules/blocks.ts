@@ -555,6 +555,17 @@ const trailingSpace: Rule = {
         // A fence line ends in syntax, unless an info string's text runs to its end.
         const from = fence && !node.meta ? lineEnd(source, start) : start;
         kept.push([from, fence?.close ? lineStart(source, fence.close[0]) : end]);
+      } else if (node.type === "footnoteDefinition" && document.dialect === "obsidian") {
+        // Obsidian's Reading view appends the footnote's backreference to the
+        // paragraph that ends the definition, after the text as written, blank
+        // space at the end of its last line included (issue #405).
+        const last = node.children.at(-1);
+        if (last?.type === "paragraph" && located(last)) {
+          const to = lineEnd(source, range(last)[1]);
+          let from = to;
+          while (from > start && (source[from - 1] === " " || source[from - 1] === "\t")) from--;
+          if (from < to) kept.push([from, to]);
+        }
       } else if (!prose.has(node.type)) kept.push([start, end]);
     });
     const ranges = merged(kept);
