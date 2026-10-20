@@ -1,6 +1,7 @@
 import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
+import { tableContainerBoundary } from "../syntax/site-generator.js";
 import { optionsSchema } from "./style.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
@@ -36,7 +37,8 @@ export const contentRules: Record<string, Rule> = {
     check({ document }) {
       const findings: Finding[] = [];
       walk(document.tree, "table", (node) => {
-        const [header, ...rows] = node.children;
+        const boundary = tableContainerBoundary(document.source, node);
+        const [header, ...rows] = boundary < 0 ? node.children : node.children.slice(0, boundary);
         const columns = header?.children.length ?? 0;
         for (const row of rows) {
           const cells = row.children.length;

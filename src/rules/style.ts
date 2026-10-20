@@ -5,6 +5,7 @@ import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike, misreadLists } from "../syntax/misread-lists.js";
+import { tableContainerBoundary } from "../syntax/site-generator.js";
 import {
   codeSpanText,
   joinsTomlFrontMatter,
@@ -688,11 +689,11 @@ const forgeLineOpener = /^(?::$|\\\[)/;
 /**
  * Site-generator syntax at the start of a line: a container such as
  * Docusaurus's `:::note`, or a template tag such as Liquid's `{% tab %}` or
- * `{{ title }}`. Site generators read it by line, and no dialect gives it
+ * `{{ title }}`, or a literal `[[toc]]`. Site generators read it by line, and no dialect gives it
  * meaning, so a paragraph with a line that starts with it keeps its lines, and
  * a word that starts with it stays on the line before it (issue #296).
  */
-const siteSyntax = /^(?::::|\{%|\{\{)/;
+const siteSyntax = /^(?::::|\{%|\{\{|\[\[toc\]\](?=[ \t]|$))/i;
 /**
  * The template tags in `text`, which starts at offset `base`, that each lie on
  * one line, such as Liquid's `{% data x %}` or `{{ page.title }}`: wrapping
@@ -1340,18 +1341,20 @@ const wrap: Rule = {
                 ? "leading block marker"
                 : document.dialect !== "commonmark" && misreadTable(original)
                   ? "table delimiter row as its second line"
-                  : startsSiteSyntax(original)
-                    ? "site-generator syntax at the start of a line"
-                    : lazyStart
-                      ? "lazy first line"
-                      : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                        ? "unsupported container prefix"
-                        : document.dialect === "obsidian" &&
-                            obsidianMarkers(source, node, start, end)
-                          ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                          : inline.unlocated
-                            ? "inline syntax without a source position"
-                            : undefined;
+                  : original.startsWith("<<<")
+                    ? "site-generator snippet import"
+                    : startsSiteSyntax(original)
+                      ? "site-generator syntax at the start of a line"
+                      : lazyStart
+                        ? "lazy first line"
+                        : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                          ? "unsupported container prefix"
+                          : document.dialect === "obsidian" &&
+                              obsidianMarkers(source, node, start, end)
+                            ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                            : inline.unlocated
+                              ? "inline syntax without a source position"
+                              : undefined;
       const skipped =
         reason ??
         protections.reason ??
@@ -1530,6 +1533,8 @@ const table: Rule = {
       const [start, end] = range(node);
       // Nested tables retain container prefixes until a dedicated container printer handles them.
       if (node.position!.start.column !== 1) return;
+      // Site generators close or open a container here, where GFM still reads table rows.
+      if (tableContainerBoundary(document.source, node) >= 0) return;
       const rows = node.children.map((row) =>
         row.children.map((cell) => {
           if (!cell.children.length) return "";

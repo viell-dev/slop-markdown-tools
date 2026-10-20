@@ -8,6 +8,19 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- Table formatting keeps colon-container boundaries as written, and
+  `content/table-columns` stops checking rows at them, preserving site-generator
+  containers
+  ([#444](https://github.com/viell-dev/slop-markdown-tools/issues/444)).
+- Wrapping preserves snippet-import paragraphs and keeps literal `[[toc]]`
+  markers off new line starts, preventing VitePress build failures and lost text
+  ([#445](https://github.com/viell-dev/slop-markdown-tools/issues/445),
+  [#446](https://github.com/viell-dev/slop-markdown-tools/issues/446)).
+
 ## 0.3.0 - 2026-10-20
 
 ### Changed
