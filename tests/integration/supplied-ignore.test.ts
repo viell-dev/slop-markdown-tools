@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { expect, it } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
@@ -113,7 +113,9 @@ it("honors repository-top rules, info/exclude, and the configured global exclude
     ".git/global-ignore": "workspace/**/global.txt\n",
   });
   git(root, ["init", "-q"]);
-  git(root, ["config", "core.excludesFile", path.join(root, ".git/global-ignore")]);
+  // Windows CI may give TEMP through an 8.3 alias. Discovery uses canonical
+  // repository paths, so configure this file by the same spelling.
+  git(root, ["config", "core.excludesFile", await realpath(path.join(root, ".git/global-ignore"))]);
   const before = await snapshot(root);
   const result = await discoverWorkspace({
     root: path.join(root, "workspace"),
