@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian links match every path component without regard to case inside
+  skipped folders, and report duplicate case variants as ambiguous
+  ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).
 - Supplied documents and stdin paths obey inherited Git ignore rules even when
   their parent directories do not exist, with repository boundaries and
   negations preserved

@@ -1,7 +1,7 @@
 import { access, lstat, readdir, readFile, realpath, open, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
-import { constants, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { constants, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import type { Dirent, Stats } from "node:fs";
 import type { ResolveOptions } from "../core/types.js";
 import type { LookupResult, WorkspaceSource } from "./index.js";
@@ -263,18 +263,83 @@ export function unlistedLookup(
 ): (name: string, folded: boolean) => LookupResult | undefined {
   const exact = new Set(set.unlisted);
   // Obsidian matches paths without regard to case.
-  const folded = new Map(set.unlisted.map((name) => [name.toLowerCase(), name]));
+  const folded = new Map<string, string[]>();
+  for (const name of set.unlisted) {
+    const key = name.toLowerCase();
+    const names = folded.get(key);
+    if (names) names.push(name);
+    else folded.set(key, [name]);
+  }
+  const folders = new Map<string, Map<string, string[]>>();
+  /** The case-insensitive matches within a directory whose containment was checked. */
+  function namesIn(folder: string, wanted: string): string[] {
+    let names = folders.get(folder);
+    if (!names) {
+      names = new Map();
+      for (const name of readdirSync(path.join(set.root, folder))) {
+        const key = name.toLowerCase();
+        const matches = names.get(key);
+        if (matches) matches.push(name);
+        else names.set(key, [name]);
+      }
+      folders.set(folder, names);
+    }
+    return names.get(wanted.toLowerCase()) ?? [];
+  }
+  /** Follow only matching components, checking links before listing any directory. */
+  function foldedPath(entries: string[], rest: string[]): LookupResult | undefined {
+    let candidates = entries;
+    for (const part of rest) {
+      const next: string[] = [];
+      for (const folder of candidates) {
+        const found = onDisk(set.root, folder);
+        if (found?.type === "outside" || found?.type === "unreadable") return found;
+        if (found?.type !== "directory") continue;
+        try {
+          for (const name of namesIn(folder, part)) next.push(`${folder}/${name}`);
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") continue;
+          if (refusal(error)) return { type: "unreadable", at: folder };
+          throw error;
+        }
+      }
+      candidates = next;
+      if (!candidates.length) return undefined;
+    }
+    let file: Extract<LookupResult, { type: "file" }> | undefined;
+    let directory = false;
+    let ambiguous = false;
+    for (const name of candidates) {
+      const found = onDisk(set.root, name);
+      if (found?.type === "outside" || found?.type === "unreadable") return found;
+      if (found?.type === "file") {
+        if (file && file.path !== found.path) ambiguous = true;
+        file ??= found;
+      } else if (found?.type === "directory") directory = true;
+    }
+    return file
+      ? ambiguous
+        ? { ...file, ambiguous: true }
+        : file
+      : directory
+        ? { type: "directory" }
+        : undefined;
+  }
   return (name, fold) => {
     if (!set.unlisted.length) return undefined;
     const parts = name.split("/");
     for (let count = 1; count <= parts.length; count++) {
       const prefix = parts.slice(0, count).join("/");
-      const entry = fold
+      const entries = fold
         ? folded.get(prefix.toLowerCase())
         : exact.has(prefix)
-          ? prefix
+          ? [prefix]
           : undefined;
-      if (entry !== undefined) return onDisk(set.root, [entry, ...parts.slice(count)].join("/"));
+      if (entries !== undefined)
+        return fold
+          ? foldedPath(entries, parts.slice(count))
+          : onDisk(set.root, [entries[0]!, ...parts.slice(count)].join("/"));
     }
     return undefined;
   };
