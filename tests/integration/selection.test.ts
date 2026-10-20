@@ -823,9 +823,7 @@ describe("link targets in folders that discovery does not enter", () => {
     });
     await linkDirectory(path.join(root, "notes"), path.join(root, "linked"));
     const checked = run(root, ["lint", "--json", "--dialect", "obsidian"]);
-    expect(findings(checked.stdout)).toEqual(
-      foldsCase ? [] : ["index.md: Missing local target: DIST/Guide.md."],
-    );
+    expect(findings(checked.stdout)).toEqual([]);
   });
   it("stay missing in a folder that Git ignores, unless ignored files are link targets", async () => {
     const root = await fixture({ ...files, ".gitignore": "dist/\n" });

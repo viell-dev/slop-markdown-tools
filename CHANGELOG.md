@@ -15,6 +15,19 @@ prereleases' notes there are longer than their entries here.
 - Named suppression enables work after an all-rule disable, without enabling
   other rules or changing configuration
   ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
+- Obsidian links match every path component without regard to case inside
+  skipped folders, and report duplicate case variants as ambiguous
+  ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).
+- Supplied documents and stdin paths obey inherited Git ignore rules even when
+  their parent directories do not exist, with repository boundaries and
+  negations preserved
+  ([#453](https://github.com/viell-dev/slop-markdown-tools/issues/453)).
+- The nested-comment complexity check warms both input sizes and measures fresh
+  batches, preserving its scaling bound while reducing timing noise
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
+- The links memory-regression check waits for asynchronous full collection,
+  keeping its existing retained-text allowance
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
 - Invalid asynchronous plugin rules report an engine error without leaking a
   rejected return value into the host process; the CLI keeps exit code `2`
   ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
