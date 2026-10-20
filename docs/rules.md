@@ -691,6 +691,9 @@ or what a comment applies to:
 - Blocks inside a list item or a footnote definition. A blank line between the
   blocks of a list item makes the list loose, which changes how it renders.
 - Front matter and the block below it.
+- A boundary inside a paragraph or underlined heading in the reading without
+  TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
+  fence. A blank line there would make a list from text.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
