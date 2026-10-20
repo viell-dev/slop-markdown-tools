@@ -404,6 +404,9 @@ function inspect(
         options: enabled.options,
         ...(workspace ? { workspace } : {}),
       });
+      // A directly returned Promise is invalid, but its later rejection must
+      // not escape the synchronous rule failure. Do not await eventual findings.
+      if (!Array.isArray(returned)) void Promise.resolve(returned).catch(() => undefined);
       problem = findingsProblem(returned, document.source.length);
       if (!problem) findings = returned as Finding[];
     } catch (error) {

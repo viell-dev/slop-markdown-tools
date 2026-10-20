@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Invalid asynchronous plugin rules report an engine error without leaking a
+  rejected return value into the host process; the CLI keeps exit code `2`
+  ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
 - Discovery applies explicit exclusions to supplied editor buffers, including
   files that do not exist yet, while retaining their text for link checks
   ([#452](https://github.com/viell-dev/slop-markdown-tools/issues/452)).
