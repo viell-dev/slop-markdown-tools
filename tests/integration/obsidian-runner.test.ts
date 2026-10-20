@@ -40,7 +40,7 @@ process.stdout.write(JSON.stringify(values));`,
       ],
       { encoding: "utf8" },
     );
-    expect(result.error?.code).toBeUndefined();
+    expect(result.error?.message).toBeUndefined();
     received = result.stdout;
     return result;
   });
