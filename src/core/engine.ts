@@ -109,8 +109,19 @@ export function ruleRegistry(plugins: readonly Plugin[] = []): Record<string, Re
   }
   return rules;
 }
+/** Option schemas can check JavaScript pattern syntax without running the pattern. */
+function optionsCompiler() {
+  return new Ajv({ allErrors: true }).addFormat("regex", (pattern: string) => {
+    try {
+      new RegExp(pattern);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
 /** Checks the options of built-in rules, whose schemas have no `$id` that could collide. */
-const ruleValidator = new Ajv({ allErrors: true });
+const ruleValidator = optionsCompiler();
 const builtInSchemas = new Set(Object.values(builtInRules).map((rule) => rule.schema));
 /**
  * Each option schema compiled once, however many documents use it. A plugin
@@ -124,9 +135,9 @@ function optionsValidator(name: string, schema: JsonSchema): ValidateFunction {
   let validate = compiledSchemas.get(schema);
   if (!validate) {
     try {
-      validate = (
-        builtInSchemas.has(schema) ? ruleValidator : new Ajv({ allErrors: true })
-      ).compile(schema as AnySchema);
+      validate = (builtInSchemas.has(schema) ? ruleValidator : optionsCompiler()).compile(
+        schema as AnySchema,
+      );
     } catch (error) {
       throw new Error(
         `Invalid rule ${name}: its schema cannot be compiled: ${error instanceof Error ? error.message : String(error)}`,

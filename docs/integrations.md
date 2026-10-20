@@ -114,7 +114,7 @@ yet", keep the other tool for that check.
 | MD042 (no empty links)                                                           | [`links/empty`](rules.md#linksempty)                                                                  |
 | MD001 (heading levels go up by one)                                              | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart |
 | MD025 (one top-level heading)                                                    | [`structure/single-title`](rules.md#structuresingle-title)                                            |
-| MD024 (repeated headings) with `siblings_only`                                   | [`structure/duplicate-heading`](rules.md#structureduplicate-heading)                                  |
+| MD024 (repeated headings)                                                        | [`structure/duplicate-heading`](rules.md#structureduplicate-heading)                                  |
 | MD045 (image alternative text)                                                   | [`content/image-alt`](rules.md#contentimage-alt)                                                      |
 | MD056 (table column count)                                                       | [`content/table-columns`](rules.md#contenttable-columns)                                              |
 | MD040 (code block language)                                                      | [`content/code-language`](rules.md#contentcode-language)                                              |
@@ -132,6 +132,17 @@ Prettier keeps line breaks by default (`proseWrap: "preserve"`), while
 [site-generator syntax](dialects.md#what-each-dialect-reads) such as `:::note`
 and `{% tab %}`; for other syntax that depends on its line breaks, turn the rule
 off or use a suppression comment.
+
+For the heading checks, markdownlint's `level`, `allow_preamble`, and
+`front_matter_title` choices correspond to mdrefine's `level`, `allowPreamble`,
+and `frontMatterTitle`. For duplicate headings, use `siblingsOnly`; its default
+is `true`, so set it to `false` for whole-outline checking. For fenced-code
+languages, use `allowedLanguages` and `languageOnly`, corresponding to
+`allowed_languages` and `language_only`. These are option mappings, not a
+promise of identical defaults or behavior: initial-heading's metadata-title
+recognition is off by default, and the heading checks use Markdown headings with
+independent quote and footnote outlines. See each rule's reference for its exact
+contract.
 
 ## Agents and scripts
 

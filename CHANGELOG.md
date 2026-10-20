@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Existing heading checks accept title levels, preambles, configurable
+  front-matter titles, and duplicate-heading scope; code-language checks accept
+  allowed names and strict info strings. Defaults and problem-only behavior
+  remain unchanged
+  ([#460](https://github.com/viell-dev/slop-markdown-tools/issues/460)).
 - The main `mdrefine` entry exports `unifiedDiff`, the same scalable unified
   patch generator that `format --diff` uses, for scripts extending a formatting
   preview ([#321](https://github.com/viell-dev/slop-markdown-tools/issues/321)).

@@ -85,7 +85,8 @@ A rule is an object with a `description`, a `kind`, an optional `schema` and
   gives are checked against it, and a rule without a schema accepts any options;
   `false` means that the rule takes none. Each schema is compiled once, for all
   documents. Options are checked synchronously, so an asynchronous schema
-  (`$async`) is refused.
+  (`$async`) is refused. String options can use `format: "regex"` to validate
+  JavaScript regular-expression syntax.
 - `check({ document, options, workspace })` receives the parsed `document`
   (`source`, `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) tree with source positions), the
