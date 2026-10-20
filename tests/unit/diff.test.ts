@@ -1,7 +1,7 @@
 import { createTwoFilesPatch } from "diff";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { unifiedDiff } from "../../src/cli/diff.js";
+import { unifiedDiff } from "../../src/index.js";
 
 /** The diff of the command, between two versions of `note.md`. */
 const diff = (before: string, after: string) =>

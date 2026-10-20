@@ -203,6 +203,23 @@ cannot be used is an error in the CLI's words, such as
 
 ## Other exports
 
+- `unifiedDiff(oldFileName, newFileName, before, after): string` returns the
+  unified patch that `format --diff` prints, with four context lines around
+  changes. Use it when a wrapper adds its own edits to a formatting preview:
+
+  ```js
+  import { format, unifiedDiff } from "mdrefine";
+
+  const before = "A *small* note.\n";
+  const after = format(before).output;
+  const patch = unifiedDiff("a/note.md", "b/note.md", before, after);
+  ```
+
+  It compares changed regions to keep large rewrites fast. Its hunks can differ
+  from a diff that compares the whole texts, while applying either patch gives
+  the same result. The function reads no files; the first two arguments label
+  the patch's old and new files. Identical texts produce headers without hunks;
+  skip calling it when an unchanged document should produce no preview.
 - `parse(source, dialect, path, plugins)` returns a `Document`: `source`,
   `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) syntax tree. `document.source`
