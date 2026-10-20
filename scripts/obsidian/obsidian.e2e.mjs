@@ -268,6 +268,25 @@ function livePreview(lines) {
       !code && !quoted && line.kind.includes("HyperMD-list-line")
         ? /\bcm-formatting-list-(ol|ul)\b/.exec(leading?.[0] ?? "")?.[1]
         : undefined;
+    // A marker-only line loses its styled trailing space when soft lines join,
+    // while a marker beside text keeps it. The separator has the same role in
+    // both forms (#443); keep the numeric marker's classes and space separately.
+    const ordered =
+      listFamily === "ol" &&
+      !/\bcm-inline-code\b/.test(leading[0]) &&
+      /^(\d+[.)])([ \t]+)$/.exec(leading[1]);
+    if (ordered)
+      line = {
+        ...line,
+        runs: line.runs.flatMap((run) =>
+          run === leading
+            ? [
+                [run[0], ordered[1]],
+                ["", ordered[2]],
+              ]
+            : [run],
+        ),
+      };
     const differentList =
       current?.kind === line.kind &&
       current.listFamily &&

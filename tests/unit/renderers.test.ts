@@ -341,6 +341,87 @@ describe("Obsidian Live Preview normalizer", () => {
     });
   });
 
+  describe("ordered marker separators across soft lines (#443)", () => {
+    type PreviewLine = { kind: string; continuation?: boolean; runs: string[][] };
+    const classes = "cm-formatting cm-formatting-list cm-formatting-list-ol";
+    const marker = (text: string, depth = 1): PreviewLine => ({
+      kind: `HyperMD-list-line HyperMD-list-line-${depth}`,
+      runs: [[classes, text]],
+    });
+    const prose = (): PreviewLine => ({
+      kind: "",
+      runs: [
+        ["", "Some "],
+        ["cm-em", "words"],
+        ["", " after the marker."],
+      ],
+    });
+    const joined = (text: string, depth = 1): PreviewLine => ({
+      ...marker(text, depth),
+      runs: [...marker(text).runs, ...prose().runs],
+    });
+    const normalized = (lines: PreviewLine[]) => livePreview(structuredClone(lines));
+    it.each(["1. ", "1234567890. ", "42)\t"])("keeps the same separator role for %j", (text) => {
+      for (const depth of [1, 2]) {
+        const before = [marker(text, depth), prose()];
+        const after = [joined(text, depth)];
+        expect(normalized(before)).toEqual(normalized(after));
+        expect(normalized(after)[0]).toContain(`{${classes}}#.{/} Some`);
+      }
+    });
+    it("keeps text, emphasis, marker family, and depth changes detectable", () => {
+      const original = normalized([marker("1234567890. "), prose()]);
+      const changedText = joined("1234567890. ");
+      changedText.runs[1]![1] = "Changed ";
+      const changedStyle = joined("1234567890. ");
+      changedStyle.runs[2]![0] = "cm-strong";
+      const changedFamily = joined("1234567890. ");
+      changedFamily.runs[0] = [
+        "cm-formatting cm-formatting-list cm-formatting-list-ul list-bullet",
+        "-",
+      ];
+      for (const changed of [changedText, changedStyle, changedFamily, joined("1234567890. ", 2)])
+        expect(normalized([changed])).not.toEqual(original);
+    });
+    it("keeps genuine blanks and the loss of an actual styled marker detectable", () => {
+      const original = normalized([marker("1234567890. "), prose()]);
+      expect(normalized([marker("1234567890. "), { kind: "", runs: [] }, prose()])).not.toEqual(
+        original,
+      );
+      expect(normalized([{ kind: "", runs: [["", "1234567890."]] }, prose()])).not.toEqual(
+        original,
+      );
+      expect(
+        normalized([{ kind: "", runs: [["", "1234567890.Some words after the marker."]] }]),
+      ).not.toEqual(original);
+    });
+    it.each(["quote", "code", "inline-code", "nonleading", "incomplete"])(
+      "keeps separator styles outside the genuine leading marker (%s)",
+      (control) => {
+        const styled = joined("1. ");
+        const split = joined("1.");
+        split.runs.splice(1, 0, ["", " "]);
+        if (control === "quote") {
+          styled.kind += " HyperMD-quote HyperMD-quote-1";
+          split.kind = styled.kind;
+        } else if (control === "code") {
+          styled.kind += " HyperMD-codeblock";
+          split.kind = styled.kind;
+        } else if (control === "inline-code") {
+          styled.runs[0]![0] += " cm-inline-code";
+          split.runs[0]![0] += " cm-inline-code";
+        } else if (control === "nonleading") {
+          styled.runs.unshift(["", "visible "]);
+          split.runs.unshift(["", "visible "]);
+        } else {
+          styled.runs[0]![1] = "1. text ";
+          split.runs[0]![1] = "1. text";
+        }
+        expect(normalized([styled])).not.toEqual(normalized([split]));
+      },
+    );
+  });
+
   it("preserves inline-code padding across soft-line joins while keeping code changes detectable (#421)", () => {
     const singlePaddedSource = [
       {
