@@ -425,6 +425,41 @@ describe("lines of blank space that Obsidian reads as text (#358)", () => {
   });
 });
 
+describe("blank space at the end of a footnote definition's text (#405)", () => {
+  // Obsidian's Reading view appends the footnote's backreference to the
+  // paragraph that ends the definition, after its text as written, so blank
+  // space at the end of its last line shows before the arrow.
+  const rule = { "style/trailing-space": "warn" } as const;
+  it.each([
+    "Text[^1]\n\n[^1]: Note \n",
+    "Text[^1]\n\n[^1]: Note  \n",
+    "Text[^1]\n\n[^1]: Note\t\n",
+    "Text[^1]\n\n[^1]: Note\n    more \n",
+    "Text[^1]\n\n[^1]: Note\n\n    Second \n",
+    "Text[^1][^2]\n\n[^1]: Note \n[^2]: Other \n",
+    "Text[^1]\n\n[^1]: Note \n\nAfter\n",
+    "Text[^1]\n\n[^1]: Note \r\n",
+    "Text[^1]\n\n[^1]: Note ",
+  ])("keeps %j as written in Obsidian", (source) => {
+    kept(source, only(rule, "obsidian"));
+  });
+  it.each([
+    // On an earlier line or in an earlier paragraph, it shows as nothing.
+    ["Text[^1]\n\n[^1]: Note \n    more\n", "Text[^1]\n\n[^1]: Note\n    more\n"],
+    ["Text[^1]\n\n[^1]: Note \n\n    Second\n", "Text[^1]\n\n[^1]: Note\n\n    Second\n"],
+    // After a list, the backreference follows the list.
+    ["Text[^1]\n\n[^1]: Note\n\n    - item \n", "Text[^1]\n\n[^1]: Note\n\n    - item\n"],
+    ["Text[^1] \n\n[^1]: Note\n", "Text[^1]\n\n[^1]: Note\n"],
+  ])("still removes the blank space of %j in Obsidian", (source, output) => {
+    expect(formatted(source, only(rule, "obsidian"))).toBe(output);
+  });
+  it("removes it in the other dialects", () => {
+    expect(formatted("Text[^1]\n\n[^1]: Note \n", only(rule, "github"))).toBe(
+      "Text[^1]\n\n[^1]: Note\n",
+    );
+  });
+});
+
 describe("style/heading closing sequences", () => {
   const rule = { "style/heading": "warn" } as const;
   it.each([

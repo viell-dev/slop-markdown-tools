@@ -1490,3 +1490,249 @@ describe("a run of `=` or `-` below the line of an alert's or callout's marker",
     );
   });
 });
+
+describe("a reflowed line that Live Preview would style as a link reference definition", () => {
+  // Live Preview styles a line that starts at the first column with `[`, a
+  // label, and `]:` as a definition (issue #391), so no reflowed line starts
+  // so in the Obsidian dialect: the word that opens the label stays on the
+  // line before it (issue #411).
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it.each([
+    [
+      "Some words before the label [a]: tail words after it.\n",
+      "Some words before the\nlabel [a]: tail words after\nit.\n",
+    ],
+    [
+      "Some words before the label [a]:x tail words after it.\n",
+      "Some words before the\nlabel [a]:x tail words after\nit.\n",
+    ],
+    // A label with blank space in it, or with `[` inside, counts too.
+    [
+      "Some words before the label x [a b]: tail words after it.\n",
+      "Some words before the label\nx [a b]: tail words after it.\n",
+    ],
+    [
+      "Some words before the label x [a [b]: tail words after it.\n",
+      "Some words before the label\nx [a [b]: tail words after it.\n",
+    ],
+    // A label written across two lines, which reflowing would join at a
+    // line's start.
+    [
+      "Some words before the label x\n[a\nb]: tail words after it.\n",
+      "Some words before the label\nx [a b]: tail words after it.\n",
+    ],
+    [
+      "Some words before the label x\n[a b\n]: tail words after it.\n",
+      "Some words before the label\nx [a b ]: tail words after it.\n",
+    ],
+  ])("keeps the word that opens the label on the line before it in %j", (source, output) => {
+    expect(verify(source, obsidian(30), workspace).output).toBe(output);
+    expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
+  });
+  it("leaves a paragraph as written whose first line would start so", () => {
+    const source = "[a\nb]: c d and more words after it.\n";
+    const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect: "obsidian" };
+    const result = verify(source, config, workspace);
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: first line that Obsidian styles as a link reference definition (width 20 columns).",
+    ]);
+  });
+  it.each([
+    String.raw`[a\]b]:x`,
+    String.raw`[a\\]:x`,
+    String.raw`[a\\\]b]:x`,
+    String.raw`[a\\\\]:x`,
+    String.raw`[a\ b]:x`,
+    "[a [b]:x",
+  ])("keeps escaped and nested label %s off a new line", (label) => {
+    const source = `Some words before the label x ${label} tail words after it.\n`;
+    const output = verify(source, obsidian(30), workspace).output;
+    expect(output).toContain(`\nx ${label}`);
+    expect(output).not.toMatch(/^\[/m);
+  });
+  it("allows a word whose first unescaped closing bracket is not followed by a colon", () => {
+    const source = "Some words before the label [a]b]:x tail words after it.\n";
+    expect(verify(source, obsidian(30), workspace).output).toBe(
+      "Some words before the label\n[a]b]:x tail words after it.\n",
+    );
+  });
+  it("groups consecutive definition-like labels in linear time (#415)", () => {
+    const rule = builtInRules["style/wrap"]!;
+    const fastest = (count: number) => {
+      const document = parse(`Intro ${"[a]:x ".repeat(count)}end.\n`, "obsidian");
+      let best = Infinity;
+      for (let run = 0; run < 3; run++) {
+        const started = performance.now();
+        const findings = rule.check({ document, workspace, options: { width: 20 } });
+        best = Math.min(best, performance.now() - started);
+        expect(findings[0]?.edit?.text).toBe(`Intro ${"[a]:x ".repeat(count).trimEnd()}\nend.`);
+      }
+      return best;
+    };
+    // Four times the input must cost less than the roughly sixteenfold growth
+    // of the former refill loop. Use the best of three to reduce runner noise.
+    expect(fastest(4000) / fastest(1000)).toBeLessThan(10);
+  }, 60_000);
+  it.each([
+    // After a quote marker or indentation, Live Preview reads text.
+    [
+      "> Some words before the label [a]: tail words after it.\n",
+      "> Some words before the label\n> [a]: tail words after it.\n",
+    ],
+    [
+      "- Some words before the label [a]: tail words after it.\n",
+      "- Some words before the label\n  [a]: tail words after it.\n",
+    ],
+    [
+      "  Some words before the label [a]: tail words after it.\n",
+      "  Some words before the label\n  [a]: tail words after it.\n",
+    ],
+  ])("still starts a line with the label in %j", (source, output) => {
+    expect(verify(source, obsidian(30), workspace).output).toBe(output);
+  });
+  it("starts a line with the label in the other dialects", () => {
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const) {
+      const config: Config = { ...wrap({ width: 30 }), dialect };
+      expect(
+        verify("Some words before the label [a]: tail words after it.\n", config).output,
+        dialect,
+      ).toBe("Some words before the label\n[a]: tail words after it.\n");
+      expect(
+        verify("Some words before the label x\n[a\nb]: tail words after it.\n", config).output,
+        dialect,
+      ).toBe("Some words before the label x\n[a b]: tail words after it.\n");
+    }
+  });
+});
+
+describe("a tag directly after a block quote marker written without a space", () => {
+  // Live Preview reads a tag after blank space or at the start of a line's
+  // content, and text directly after `>`, so in such a quote the tag stays on
+  // the line before it (issue #409).
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it.each([
+    [
+      ">Some words with a long line x #glacier and more words after it.\n",
+      30,
+      ">Some words with a long line\n>x #glacier and more words\n>after it.\n",
+    ],
+    [
+      ">>Some words with a long line x #glacier and more words after it.\n",
+      31,
+      ">>Some words with a long line\n>>x #glacier and more words\n>>after it.\n",
+    ],
+    [
+      "- >Some words with a long line x #glacier and more words after it.\n",
+      32,
+      "- >Some words with a long line\n  >x #glacier and more words\n  >after it.\n",
+    ],
+    // After `> `, the tag can start a line.
+    [
+      "> Some words with a long line x #glacier and more words after it.\n",
+      31,
+      "> Some words with a long line x\n> #glacier and more words after\n> it.\n",
+    ],
+    // A word of digits alone is no tag.
+    [
+      ">Some words with a long line x #1984 and more words after it.\n",
+      30,
+      ">Some words with a long line x\n>#1984 and more words after\n>it.\n",
+    ],
+  ])("wraps %j at %i as %j", (source, width, output) => {
+    expect(verify(source, obsidian(width), workspace).output).toBe(output);
+    expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
+  });
+  it.each(["#tag/nested", "#tag-name", "#tag_1", "#é", "#tag,"])(
+    "keeps %s on the line before it",
+    (tag) => {
+      const source = `>Some words with a long line x ${tag} and more words after it.\n`;
+      const output = verify(source, obsidian(30), workspace).output;
+      expect(output.startsWith(`>Some words with a long line\n>x ${tag} `)).toBe(true);
+    },
+  );
+  it("starts a line with the tag in the other dialects", () => {
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const)
+      expect(
+        verify(">Some words with a long line x #glacier and more words after it.\n", {
+          ...wrap({ width: 30 }),
+          dialect,
+        }).output,
+        dialect,
+      ).toBe(">Some words with a long line x\n>#glacier and more words after\n>it.\n");
+  });
+});
+
+describe("tag-like text on a continuation line directly after a bare quote marker (#414)", () => {
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it.each([
+    ">a\n>#b c\n",
+    ">>a\n>>#b c\n",
+    "- >a\n  >#b c\n",
+    ">[!note] Title\n>a\n>#b c\n",
+    ">a\n>#tag/nested c\n",
+    ">a\n>#tag-name c\n",
+    ">a\n>#é c\n",
+    ">a\n>#tag, c\n",
+    ">a\r\n>#b c\r\n",
+    ">a\r>#b c\r",
+    ">a\n>#b c",
+    ">Some longer words before the next line that could otherwise reflow.\n>#b c\n>More words.\n",
+  ])("keeps %j as written in Obsidian", (source) => {
+    expect(verify(source, obsidian(30), workspace).output).toBe(source);
+    expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
+  });
+  it.each([
+    [">#b c\n>more words\n", ">#b c more words\n"],
+    [">a\n> #b c\n", ">a #b c\n"],
+    [">a\n>#1984 c\n", ">a #1984 c\n"],
+    [">a\n>\\#b c\n", ">a \\#b c\n"],
+    [">a `code\n>#b` c\n", ">a `code #b` c\n"],
+    [">a [link\n>#b](page) c\n", ">a [link #b](page) c\n"],
+  ])("still reflows %j in Obsidian", (source, output) => {
+    expect(verify(source, obsidian(80), workspace).output).toBe(output);
+  });
+  it("reports the reason when requested", () => {
+    const source = ">Some longer words before the next line that could otherwise reflow.\n>#b c\n";
+    const config: Config = {
+      ...wrap({ width: 30, reportUnreflowed: true }),
+      dialect: "obsidian",
+    };
+    expect(verify(source, config, workspace).diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: tag-like text directly after a block quote marker (width 30 columns).",
+    ]);
+  });
+  it("joins the line in the other dialects", () => {
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const)
+      expect(verify(">a\n>#b c\n", { ...wrap({ width: 80 }), dialect }).output, dialect).toBe(
+        ">a #b c\n",
+      );
+  });
+});
+
+describe("blank space at the end of a footnote definition's text", () => {
+  // Obsidian's Reading view shows it before the footnote's backreference
+  // (issue #405), so it stays outside the reflowed text.
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const source =
+    "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough of them to be reflowed. \n";
+  it("keeps it in the Obsidian dialect", () => {
+    expect(verify(source, { ...wrap(), dialect: "obsidian" }, workspace).output).toBe(
+      "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough\n    of them to be reflowed. \n",
+    );
+    expect(
+      verify(source.replaceAll(". \n", ".\t\n"), { ...wrap(), dialect: "obsidian" }, workspace)
+        .output,
+    ).toBe(
+      "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough\n    of them to be reflowed.\t\n",
+    );
+  });
+  it("removes it in the other dialects", () => {
+    expect(verify(source, { ...wrap(), dialect: "github" }).output).toBe(
+      "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough\n    of them to be reflowed.\n",
+    );
+  });
+});
