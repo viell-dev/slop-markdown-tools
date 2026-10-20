@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Named suppression enables work after an all-rule disable, without enabling
+  other rules or changing configuration
+  ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
 - Discovery applies explicit exclusions to supplied editor buffers, including
   files that do not exist yet, while retaining their text for link checks
   ([#452](https://github.com/viell-dev/slop-markdown-tools/issues/452)).
