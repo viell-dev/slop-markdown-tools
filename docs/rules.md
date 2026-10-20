@@ -811,7 +811,9 @@ comment without its closing `%%`, or a code or math block without its closing
 fence whose last line is blank space. In the Obsidian dialect, nothing is added
 either where the document ends in a fenced code block without its closing fence,
 outside a list item or block quote: Reading view shows the line break as one
-more, empty line of the code.
+more, empty line of the code. An HTML block opened in a list or quote can also
+lead Live Preview into code that the parser does not recognize. Its original end
+stays where that code's closing boundary is uncertain.
 
 ## `style/heading`
 

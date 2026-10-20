@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, unfinished code entered after a contained HTML block
+  keeps its literal source and original document end. Before, the parser still
+  read HTML where Live Preview had entered code, and formatting could change
+  literal emphasis markers below it
+  ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
 - In the Obsidian dialect, `style/wrap` introduces no reference-like start after
   indentation or quote markers, and preserves existing starts and pending
   destinations. Live Preview hides the destination there, even without a

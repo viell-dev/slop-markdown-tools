@@ -69,6 +69,8 @@ export interface MisreadLists {
    * well, with a table that holds such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
+  /** Live Preview can keep code through EOF after an HTML/code transition (#433). */
+  htmlCodeToEnd: boolean;
   /**
    * In the Obsidian dialect, the blocks that Reading view reads as more of an
    * HTML block above them. A line of blank space directly below an HTML block
@@ -356,6 +358,7 @@ export function misreadLists(document: Document): MisreadLists {
   const htmlText = new Set<Nodes>();
   const tableText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
+  let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
@@ -729,20 +732,11 @@ export function misreadLists(document: Document): MisreadLists {
     // Each scan consumes every opener through that union's end, so a contained
     // leaf already inside it cannot extend the region without being visited.
     let htmlUntil = 0;
-    let htmlCode: Map<number, number> | undefined;
-    const htmlCodeEnd = (at: number): number | undefined => {
-      if (!htmlCode) {
-        htmlCode = new Map();
-        const runs = backtickRuns(source, 0, source.length);
-        const next = new Map<number, number>();
-        for (let index = runs.length - 1; index >= 0; index--) {
-          const [from, length] = runs[index]!;
-          const close = next.get(length);
-          if (close !== undefined) htmlCode.set(from, close + length);
-          next.set(length, from);
-        }
-      }
-      return htmlCode.get(at);
+    let htmlCode: Map<number, HtmlCode> | undefined;
+    const htmlCodeEnd = (at: number): HtmlCode | undefined => {
+      const code = (htmlCode ??= htmlCodeSpans(source)).get(at);
+      if (code?.toEnd) htmlCodeToEnd = true;
+      return code;
     };
     for (const [leaf] of order) {
       if (!containerHtml.has(leaf) || !leaf.position) continue;
@@ -1065,6 +1059,7 @@ export function misreadLists(document: Document): MisreadLists {
     next,
     descriptions,
     unclosedCode,
+    htmlCodeToEnd,
     htmlText,
     underlines,
     lazyItems,
@@ -1112,7 +1107,7 @@ const voidHtml = new Set([
 function obsidianHtmlEnd(
   source: string,
   start: number,
-  codeEnd: (at: number) => number | undefined,
+  codeEnd: (at: number) => HtmlCode | undefined,
 ): number {
   const first = source.slice(start, lineBreak(source, start));
   const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
@@ -1170,8 +1165,12 @@ function obsidianHtmlEnd(
       while (cursor < until) {
         if (source[cursor] === "\\") cursor += 2;
         else if (source[cursor] === "`") {
-          const end = codeEnd(cursor);
-          cursor = end !== undefined && end <= until ? end : cursor + 1;
+          const code = codeEnd(cursor);
+          // A multiline run can reach a fence opener the parser still reads
+          // inside this HTML block (#433). Preserve its uncertain end.
+          if (code?.toEnd) return source.length;
+          cursor = code?.end ?? cursor + 1;
+          if (cursor > until) until = lineBreak(source, cursor);
         } else if (source[cursor] === "<") break;
         else cursor++;
       }
@@ -1205,6 +1204,12 @@ function obsidianHtmlEnd(
     }
     let end = from + 1;
     while (end < source.length && /[a-z0-9-]/i.test(source[end]!)) end++;
+    // Between roots this is Markdown: a scheme colon or an email's `@` cannot
+    // be an HTML name delimiter. Hyphenated custom tag names remain possible.
+    if (!stack.length && end < source.length && !/[\s/>]/.test(source[end]!)) {
+      cursor = end;
+      continue;
+    }
     const name = source.slice(from, end).toLowerCase();
     let quote = "";
     let multiline = false;
@@ -1235,6 +1240,53 @@ function obsidianHtmlEnd(
     if (!stack.length && cursor > until) until = lineBreak(source, cursor);
   }
   return stack.length ? source.length : until;
+}
+
+/** A code run's known end, or conservative protection through EOF. */
+type HtmlCode = { end: number; toEnd: boolean };
+
+/** Code runs between HTML roots, indexed once; escaped ticks can still close code. */
+function htmlCodeSpans(source: string): Map<number, HtmlCode> {
+  type HtmlRun = { from: number; length: number; lineEnd: number; fence: boolean };
+  const runs: HtmlRun[] = [];
+  let lineEnd = -1;
+  for (let from = source.indexOf("`"); from >= 0;) {
+    const first = from >= lineEnd;
+    let fence = false;
+    if (first) {
+      lineEnd = lineBreak(source, from);
+      let start = from;
+      while (start > 0 && source[start - 1] !== "\r" && source[start - 1] !== "\n") start--;
+      fence = /^(?:[ \t>]|(?:[-+*]|\d{1,9}[.)])[ \t])*$/.test(source.slice(start, from));
+    }
+    let after = from + 1;
+    while (source[after] === "`") after++;
+    runs.push({ from, length: after - from, lineEnd, fence });
+    from = source.indexOf("`", after);
+  }
+  const result = new Map<number, HtmlCode>();
+  const nearby = new Map<number, HtmlRun>();
+  const later = new Map<number, HtmlRun>();
+  lineEnd = -1;
+  for (let index = runs.length - 1; index >= 0; index--) {
+    const run = runs[index]!;
+    if (run.lineEnd !== lineEnd) nearby.clear();
+    lineEnd = run.lineEnd;
+    const record = (from: number, length: number) => {
+      const close = (length <= 2 ? nearby : later).get(length);
+      result.set(from, {
+        end: close ? close.from + length : length <= 2 ? run.lineEnd : source.length,
+        toEnd: length >= 3 && (!close || (close.lineEnd !== run.lineEnd && close.fence)),
+      });
+    };
+    record(run.from, run.length);
+    // Outside code a backslash escapes only a run's first tick. Inside code
+    // every full raw run can close it, regardless of a preceding backslash.
+    if (run.length > 1) record(run.from + 1, run.length - 1);
+    nearby.set(run.length, run);
+    later.set(run.length, run);
+  }
+  return result;
 }
 
 /** A run of backticks: its offset and its length. */

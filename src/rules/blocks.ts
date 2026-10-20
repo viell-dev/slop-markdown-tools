@@ -142,6 +142,9 @@ export function takesFinalLineEnding(document: Document): boolean {
   if (takesLines(document.tree)) return true;
   const { source } = document;
   if (document.dialect === "obsidian") {
+    // The parser can still read HTML where Live Preview entered unfinished
+    // code. Its end must keep the final line ending too (#433).
+    if (misreadLists(document).htmlCodeToEnd) return true;
     const final = document.tree.children.at(-1);
     if (final?.type === "code" && located(final)) {
       const fence = codeFence(source, final);

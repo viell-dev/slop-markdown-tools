@@ -125,6 +125,13 @@ early. Properly terminated regions leave independent blocks below them
 formatable ([issue
 #428](https://github.com/viell-dev/slop-markdown-tools/issues/428)).
 
+Live Preview can resume Markdown between those HTML roots. One- and two-backtick
+code ends with its physical line, while longer runs can carry into a fence that
+the parser still reads as HTML. An unfinished code transition keeps the source
+through EOF, including its original final line ending. Confirmed inline-code
+ends still leave independent paragraphs formatable ([issue
+#433](https://github.com/viell-dev/slop-markdown-tools/issues/433)).
+
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on
 every run, and 22 cases that a person looked at in both of Obsidian's views. The

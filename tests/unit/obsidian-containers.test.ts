@@ -203,6 +203,32 @@ describe("Obsidian HTML continued outside a container (#428)", () => {
       `- ${html}\n\n*b*\n</div>\n\nAfter _c_.\n`,
     );
   });
+  it.each(["`", "``"])("ends an inactive %s code run with its physical line", (tick) => {
+    variants(
+      `- <hr> ${tick}\n  <div>\n  ${tick}\n\n*b*\n</div>\n\nAfter *c*.\n`,
+      `- <hr> ${tick}\n  <div>\n  ${tick}\n\n*b*\n</div>\n\nAfter _c_.\n`,
+    );
+    variants(
+      `- <hr> ${tick}<div>\n\n*b*\n</div>\n\nAfter *c*.\n`,
+      `- <hr> ${tick}<div>\n\n_b_\n</div>\n\nAfter _c_.\n`,
+    );
+  });
+  it("lets a backslash-preceded backtick close an inactive code span", () => {
+    variants(
+      "- <hr> `a\\` <div> `\n\n*b*\n</div>\n\nAfter *c*.\n",
+      "- <hr> `a\\` <div> `\n\n*b*\n</div>\n\nAfter _c_.\n",
+    );
+  });
+  it.each(["<https://example.com>", "<a@example.org>"])(
+    "keeps the autolink control %s from opening HTML mode",
+    (link) => variants(`- <hr> ${link}\n\nAfter *c*.\n`, `- <hr> ${link}\n\nAfter _c_.\n`),
+  );
+  it("still recognizes a custom HTML root after a void root", () => {
+    variants(
+      "- <hr> <x-probe>\n\n*b*\n</x-probe>\n\nAfter *c*.\n",
+      "- <hr> <x-probe>\n\n*b*\n</x-probe>\n\nAfter _c_.\n",
+    );
+  });
   it.each(["<!-- </div> -->", "<?probe </div> ?>", "<![CDATA[</div>]]>"])(
     "keeps a closing tag inside %s from ending the HTML region",
     (token) =>
@@ -221,6 +247,49 @@ describe("Obsidian HTML continued outside a container (#428)", () => {
     "still formats an inline or escaped control %s",
     (tag) => {
       expect(checked(`- ${tag} a\n*b*\n\nAfter *c*.\n`)).toContain("_b_");
+    },
+  );
+});
+
+describe("Obsidian code mode after a contained HTML root (#433)", () => {
+  const source = "- <hr> ```\n  <div>\n  ```\n\n*b*\n</div>\n\nAfter *c*.\n";
+  it("keeps the unfinished code region", () => variants(source));
+  it("keeps its EOF under the recommended preset", () => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)]) {
+        const input = bom + source.trimEnd().replaceAll("\n", newline);
+        expect(checked(input, { extends: ["recommended", "obsidian"], dialect: "obsidian" })).toBe(
+          input,
+        );
+      }
+  });
+  it("isolates final-newline protection to the unfinished transition", () => {
+    const settings: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/final-newline": "warn" },
+    };
+    expect(checked(source.trimEnd(), settings)).toBe(source.trimEnd());
+    const control = "- <hr> `<div>`\n\nAfter *c*.";
+    expect(checked(control, settings)).toBe(control + "\n");
+  });
+  it("protects a long inline run without a later closer", () => {
+    variants("- <hr> ```<div>\n\n*b*\n</div>\n\nAfter *c*.\n");
+  });
+  it.each([
+    "- <hr> ```<div>```\n\n*b*\n\nAfter *c*.\n",
+    "- <hr> ```\n  <div>\n  words ```\n\n*b*\n</div>\n\nAfter *c*.\n",
+  ])("still formats below the confirmed code end in %j", (input) => {
+    variants(input, input.replaceAll("*b*", "_b_").replaceAll("*c*", "_c_"));
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "keeps ordinary emphasis formatting in the %s dialect",
+    (dialect) => {
+      const result = format(source, {
+        config: { extends: [], dialect, rules: { "style/emphasis": "warn" } },
+      });
+      expect(result.output).toContain("_b_");
+      expect(result.output).toContain("After _c_.");
     },
   );
 });
