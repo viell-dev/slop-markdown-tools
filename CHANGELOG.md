@@ -8,6 +8,14 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- The Obsidian check passes large `PROBE` batches through Docker's inherited
+  environment, avoiding the Windows process argument limit
+  ([#442](https://github.com/viell-dev/slop-markdown-tools/issues/442)).
+
 ## 0.3.0 - 2026-10-20
 
 ### Changed
