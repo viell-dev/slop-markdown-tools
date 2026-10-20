@@ -1,6 +1,7 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { decodeNamedCharacterReference } from "decode-named-character-reference";
+import { decodeHTMLAttribute } from "entities/decode";
 import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
@@ -177,8 +178,9 @@ function htmlTokens(html: string): HtmlToken[] {
 }
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
- * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
- * elements they allow and add their `user-content-` prefix to them unless it is
+ * `name` of an `<a>`, with character references decoded once as HTML attribute
+ * values. GitHub, Forgejo, and Gitea keep both on allowed elements and add their
+ * `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
  * prefix is recorded without it. Every value of a repeated attribute counts:
  * Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
@@ -190,7 +192,10 @@ function htmlAnchors(tokens: HtmlToken[]): string[] {
     for (const match of token.attributes.matchAll(attribute)) {
       const attributeName = match[1]!.toLowerCase();
       if (attributeName !== "id" && !(token.name === "a" && attributeName === "name")) continue;
-      const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
+      const value = decodeHTMLAttribute(match[2] ?? match[3] ?? match[4] ?? "").replace(
+        /^user-content-/,
+        "",
+      );
       if (value) anchors.push(value);
     }
   }
