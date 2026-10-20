@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Discovery applies explicit exclusions to supplied editor buffers, including
+  files that do not exist yet, while retaining their text for link checks
+  ([#452](https://github.com/viell-dev/slop-markdown-tools/issues/452)).
 - Table formatting keeps colon-container boundaries as written, and
   `content/table-columns` stops checking rows at them, preserving site-generator
   containers

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { format, lint } from "../../src/index.js";
 import type { Config, Diagnostic } from "../../src/index.js";
 import { discoverWorkspace } from "../../src/node.js";
-import { fixture, run } from "./support.js";
+import { fixture, run, tree } from "./support.js";
 
 const config: Config = { extends: ["recommended", "github"], ignore: ["drafts/**"] };
 const note = `${"A long line of prose in a vault. ".repeat(4).trim()}\nAnd *more*.\n`;
@@ -104,6 +104,38 @@ describe("filesystem discovery for library hosts (mdrefine/node)", () => {
       "# Draft\n\nSee [[#Draft]] and _this_.\n",
     );
   });
+  it.each([
+    [false, false, false],
+    [true, false, false],
+    [false, true, false],
+    [true, true, false],
+    [false, false, true],
+    [true, false, true],
+    [false, true, true],
+    [true, true, true],
+  ])(
+    "excludes supplied documents while keeping their buffer as a link target (existing %s, folder %s, absolute %s)",
+    async (existing, folder, absolute) => {
+      const target = "hidden/note.md";
+      const root = await fixture(existing ? { [target]: "# Disk\n" } : {});
+      const before = await tree(root);
+      const excluded = folder ? "hidden" : target;
+      const source = "See [the hidden heading](hidden/note.md#buffer).\n";
+      const discovery = await discoverWorkspace({
+        root,
+        inputs: [],
+        exclude: [absolute ? path.join(root, excluded) : excluded],
+        config: { extends: [], dialect: "github", rules: { "links/valid": "error" } },
+        documents: { "visible.md": source, [target]: "# Buffer\n" },
+      });
+      expect(discovery.selected).toEqual(["visible.md"]);
+      expect(discovery.skipped).toEqual([]);
+      expect(lint(discovery.read("visible.md"), discovery.options("visible.md"))).toEqual([]);
+      expect(() => discovery.read(target)).toThrow(`Not a selected document: ${target}`);
+      expect(() => discovery.options(target)).toThrow(`Not a selected document: ${target}`);
+      expect(await tree(root)).toEqual(before);
+    },
+  );
   it("refuses a document that is not UTF-8 text with a code, and checks no link into it", async () => {
     const root = await fixture({
       ...files,
