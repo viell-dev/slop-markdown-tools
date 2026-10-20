@@ -18,8 +18,8 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
  * A line that Obsidian's Live Preview styles as a link reference definition
  * where it starts at the first column (issue #391): `[`, a label, in which `[`
  * and an escaped `]` may stand, and `]:`, whatever follows. It styles neither
- * `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so, nor a line after `>` or blank
- * space.
+ * `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so. After indentation or quote
+ * markers it hides the destination too, without that line class (issue #411).
  */
 export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
 
@@ -75,6 +75,9 @@ export interface MisreadLists {
    * that ends at a blank line continues the block, and so do the blocks after
    * it, up to an empty line (issue #358). Each counts from the start of its
    * first line, with the marker of a list item there.
+   * Also the HTML source opened in a container and continued beyond its end:
+   * each range spans both views' raw regions, through their later terminator
+   * or EOF, starting at the HTML opener (issue #428).
    */
   htmlText: ReadonlySet<Nodes>;
   /**
@@ -147,14 +150,16 @@ export interface MisreadLists {
    */
   definitionCode: ReadonlySet<Nodes>;
   /**
-   * In the Obsidian dialect, the lines of a paragraph that Live Preview styles
-   * as a link reference definition: each that starts at the first column of
-   * its line with `[`, a label, and `]:`, whatever follows, where the parser
-   * reads text, because a definition cannot interrupt a paragraph or because
+   * In the Obsidian dialect, the lines of a paragraph whose content Live Preview
+   * reads as a link reference definition: `[`, a label, and `]:`, whatever
+   * follows, where the parser reads text because a definition cannot interrupt
+   * a paragraph or because
    * the line is no definition, as `[r]: a b` is not (issue #391). Each counts
    * from the line break before the line, or from the line's start where the
    * paragraph starts there, to the line break after it, or to the line's end
-   * where the paragraph ends there.
+   * where the paragraph ends there. Indented or quoted starts hide destinations
+   * as well (#411), except the content on a list's marker line. An empty colon line protects the
+   * next nonblank source line, which supplies the hidden destination.
    */
   definitionLines: ReadonlySet<Nodes>;
   /**
@@ -361,6 +366,7 @@ export function misreadLists(document: Document): MisreadLists {
   const itemHtml = new Set<Nodes>();
   const commentText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
+    const containerHtml = new Set<Nodes>();
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
      * inside a container that does, as in `- > a`.
@@ -380,12 +386,14 @@ export function misreadLists(document: Document): MisreadLists {
       item: boolean,
       footnote: Nodes | undefined,
       opener: Parents | undefined,
+      contained: boolean,
     ) => {
       if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
       if (leaves.has(node.type) || !("children" in node)) {
         order.push([node, item]);
         if (footnote) inFootnotes.set(node, footnote);
         if (opener) openers.set(node, opener);
+        if (contained && node.type === "html") containerHtml.add(node);
       } else
         node.children.forEach((child, index) =>
           collect(
@@ -395,10 +403,11 @@ export function misreadLists(document: Document): MisreadLists {
             index === 0 || node.type === "list"
               ? (opener ?? (node.type === "root" ? undefined : node))
               : undefined,
+            contained || node.type === "listItem" || node.type === "blockquote",
           ),
         );
     };
-    collect(document.tree, false, undefined, undefined);
+    collect(document.tree, false, undefined, undefined, false);
     /** Where the line holding `offset` starts. */
     const lineStart = (offset: number) => {
       let at = offset;
@@ -714,6 +723,22 @@ export function misreadLists(document: Document): MisreadLists {
         },
       } as Nodes;
     };
+    // A container can end the parser's HTML block before Obsidian stops reading
+    // its source as HTML (#428). Reading view and Live Preview have different
+    // ends; preserve their union, including a closer inside another leaf block.
+    let htmlUntil = 0;
+    for (const [leaf] of order) {
+      if (!containerHtml.has(leaf) || !leaf.position) continue;
+      const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
+      if (start < htmlUntil) continue;
+      const until = obsidianHtmlEnd(source, start);
+      if (until <= end) continue;
+      htmlUntil = until;
+      htmlText.add({
+        ...leaf,
+        position: { ...leaf.position, end: { ...leaf.position.end, offset: until } },
+      } as Nodes);
+    }
     /**
      * Comment openers in text, highlights, and image descriptions, where Live
      * Preview starts HTML comments too, excluding code spans and math.
@@ -795,24 +820,51 @@ export function misreadLists(document: Document): MisreadLists {
             underlines.add(breakBefore(child, from, to));
         }
         if (child.type === "paragraph") {
-          // A line that starts at the first column with `[`, a label, and `]:`
-          // has Live Preview's style of a link reference definition, with the
+          // A line whose content starts with `[`, a label, and `]:` hides its
+          // destination, including after indentation and quote markers, with the
           // lines above and below it as text, where the parser reads more of
           // the paragraph, also at its start, where the line is no definition
           // (issue #391). It stays on a line of its own, as written: the line
           // break before and after it count, where the paragraph has them.
           const [lineFrom, lineTo] = lineAround(start);
-          const first: [number, number][] =
-            lineFrom === start ? [[start, Math.min(lineTo, end)]] : [];
-          for (const [from, to] of [...first, ...laterLines(start, end)])
-            if (definitionLike.test(source.slice(from, to)))
+          const prefix = source.slice(lineFrom, start);
+          // The first content on a list's marker line is text, not a definition.
+          const marker = /(?:^|[ \t>])(?:[-+*]|\d{1,9}[.)])[ \t]/.test(prefix);
+          const first: [number, number][] = marker ? [] : [[start, Math.min(lineTo, end)]];
+          for (const [from, to] of [...first, ...laterLines(start, end)]) {
+            const content = source.slice(from, to).replace(/^[ \t>]+/, "");
+            const label = definitionLike.exec(content);
+            if (label) {
+              let until = to;
+              // An empty colon line keeps its pending destination across blank
+              // lines; the first following word can be hidden in another block.
+              if (!content.slice(label[0].length).trim()) {
+                let next = to;
+                while (next < source.length) {
+                  next += source.startsWith("\r\n", next) ? 2 : 1;
+                  until = lineAround(next)[1];
+                  if (
+                    source
+                      .slice(next, until)
+                      .replace(/^[ \t>]+/, "")
+                      .trim()
+                  )
+                    break;
+                  next = until;
+                }
+              }
               definitionLines.add({
                 ...child,
                 position: {
                   start: { ...child.position!.start, offset: from === start ? start : from - 1 },
-                  end: { ...child.position!.end, offset: to < end ? to + 1 : to },
+                  end: {
+                    ...child.position!.end,
+                    offset: until < source.length ? until + 1 : until,
+                  },
                 },
               } as Nodes);
+            }
+          }
         }
         if (
           child.type === "paragraph" &&
@@ -1021,6 +1073,91 @@ export function misreadLists(document: Document): MisreadLists {
  */
 const interruptingHtml =
   /^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$)|\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[\s>]|\/>|$))/i;
+
+const voidHtml = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+/** The last source line that either Obsidian view reads as HTML after a container opener. */
+function obsidianHtmlEnd(source: string, start: number): number {
+  const first = source.slice(start, lineBreak(source, start));
+  const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
+    ? /<\/(?:script|pre|style|textarea)[ \t]*>/gi
+    : first.startsWith("<!--")
+      ? /-->/g
+      : first.startsWith("<?")
+        ? /\?>/g
+        : first.startsWith("<![CDATA[")
+          ? /\]\]>/g
+          : /^<![A-Za-z]/.test(first)
+            ? />/g
+            : undefined;
+  let reading = lineBreak(source, start);
+  if (explicit) {
+    explicit.lastIndex =
+      start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
+    const close = explicit.exec(source);
+    reading = close ? lineBreak(source, close.index + close[0].length) : source.length;
+    // Comments, instructions, declarations, and CDATA have no nested tag stack.
+    if (/^<[!?]/.test(first)) {
+      // Live Preview does not reuse the opener's characters as the closer in
+      // `<!-->`, `<!--->`, or `<?>`, although Reading view ends the block there.
+      const marker = first.startsWith("<!--") ? "-->" : first.startsWith("<?") ? "?>" : undefined;
+      if (!marker) return reading;
+      const at = source.indexOf(marker, start + (marker === "-->" ? 4 : 2));
+      return at < 0 ? source.length : Math.max(reading, lineBreak(source, at + marker.length));
+    }
+  } else {
+    let cursor = reading;
+    while (cursor < source.length) {
+      cursor += source.startsWith("\r\n", cursor) ? 2 : 1;
+      const end = lineBreak(source, cursor);
+      const line = source.slice(cursor, end);
+      // Obsidian keeps whitespace-only lines as HTML source (#358), but a
+      // physically empty line or bare quote markers end Reading view's block.
+      if (/^[ \t>]*$/.test(line) && !/[ \t]/.test(line)) break;
+      reading = end;
+      cursor = end;
+    }
+  }
+  // Live Preview's HTML mode survives blank lines until its tag stack closes.
+  // Quoted attribute values and comments cannot supply closing tags; void and
+  // self-closing tags need no closer. A mismatched closer ends its open stack.
+  const tags =
+    /<!--(?:[^]*?-->|[^]*$)|<\?(?:[^]*?\?>|[^]*$)|<!\[CDATA\[(?:[^]*?\]\]>|[^]*$)|<![A-Za-z](?:[^>]*>|[^]*$)|<\/?([a-z][a-z0-9-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
+  tags.lastIndex = start;
+  const stack: string[] = [];
+  for (let tag = tags.exec(source); tag; tag = tags.exec(source)) {
+    const name = tag[1]?.toLowerCase();
+    if (!name) continue;
+    // Container markers can stand inside a multiline tag's source. Without
+    // reconstructing that HTML token stream, retain the remaining source.
+    if (/[\r\n]/.test(tag[0])) return source.length;
+    if (tag.index !== start && !stack.length) break;
+    const closing = tag[0].startsWith("</");
+    const raw = stack.at(-1);
+    if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
+    if (closing) {
+      const matched = stack.lastIndexOf(name);
+      stack.length = matched < 0 ? 0 : matched;
+    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*>$/.test(tag[0])) stack.push(name);
+    if (!stack.length) return Math.max(reading, lineBreak(source, tags.lastIndex));
+  }
+  return source.length;
+}
 
 /** A run of backticks: its offset and its length. */
 type Run = [number, number];

@@ -800,7 +800,9 @@ function keepDefinitionStarts(atoms: string[]): string[] {
         if (atom[at + 1] === "\r" || atom[at + 1] === "\n") pending = [];
         at++;
       } else if (atom[at] === "]") {
-        if (atom[at + 1] === ":") for (const index of pending) joined[index] = 1;
+        // Keep the complete label on one line as well: splitting it changes
+        // Live Preview's link styling even when its start stays inline (#411).
+        if (atom[at + 1] === ":" && pending.length) joined.fill(1, pending[0]!, index + 1);
         pending = [];
       }
     }
@@ -816,6 +818,42 @@ function keepDefinitionStarts(atoms: string[]): string[] {
   }
   if (group.length) result.push(group.join(" "));
   return result;
+}
+
+/** Why a definition-like label's source must keep its Live Preview link styling. */
+function definitionWrapReason(
+  source: string,
+  start: number,
+  end: number,
+  code: Range[],
+): string | undefined {
+  let label = false;
+  let multiline = false;
+  let nested = false;
+  let span = 0;
+  for (let at = start; at < end; at++) {
+    while (span < code.length && code[span]![1] <= at) span++;
+    if (span < code.length && code[span]![0] <= at) {
+      at = code[span]![1] - 1;
+      label = false;
+    } else if (source[at] === "\\") {
+      if (source[at + 1] === "\r" || source[at + 1] === "\n") label = false;
+      at++;
+    } else if (source[at] === "[") {
+      if (!label) multiline = nested = false;
+      else nested = true;
+      label = true;
+    } else if (source[at] === "]") {
+      if (label && source[at + 1] === ":") {
+        if (multiline) return "definition-like label spanning lines";
+        if (nested) return "definition-like label with a nested opening bracket";
+        for (let after = at + 2; source[after] === " " || source[after] === "\t"; after++)
+          if (source[after] === "\t") return "tab after a definition-like label";
+      }
+      label = false;
+    } else if (source[at] === "\r" || source[at] === "\n") multiline = true;
+  }
+  return undefined;
 }
 
 type Range = [number, number];
@@ -1317,6 +1355,22 @@ const wrap: Rule = {
       const skipped =
         reason ??
         protections.reason ??
+        (document.dialect === "obsidian" &&
+        parent?.type === "blockquote" &&
+        node.position?.start.line === parent.position?.start.line &&
+        prefix !== continuation
+          ? "block quote on a list marker line"
+          : undefined) ??
+        (document.dialect === "obsidian"
+          ? definitionWrapReason(
+              source,
+              start,
+              end,
+              inline.atoms
+                .filter((atom) => atom.joining === "code")
+                .map(({ from, to }) => [from, to]),
+            )
+          : undefined) ??
         (document.dialect === "gitea" && giteaPyParagraph(source, node, start, end)
           ? "Gitea `_.py` emphasis exception"
           : undefined);
@@ -1392,7 +1446,7 @@ const wrap: Rule = {
         reportSkipped(failure);
         return;
       }
-      const definitions = document.dialect === "obsidian" && !continuation;
+      const definitions = document.dialect === "obsidian";
       const wrapped = wrappingAtoms(words, openers, dollars);
       const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
       if (!atoms.length) return;
@@ -1432,13 +1486,15 @@ const wrap: Rule = {
         while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
           output = fill(++first);
       }
-      // Live Preview styles a line that starts at the first column with `[`, a
-      // label, and `]:` as a link reference definition, so no reflowed line
+      // Live Preview hides the destination after `[`, a label, and `]:` at a
+      // line's content start, including container continuations, so no reflowed line
       // starts so: the word that opens the label, which may hold blank space,
       // stays on the line before it (issue #411). The first line has no line
       // before it, and a paragraph whose first line would start so, as `[a`
       // and `b]: c d` below it joined, stays as written.
-      if (definitions && definitionLike.test(output[0]!)) {
+      // A list's marker line shows its destination as text; ordinary wrapping
+      // there keeps the label on that first line and remains possible (#411).
+      if (definitions && prefix === continuation && definitionLike.test(output[0]!)) {
         reportSkipped("first line that Obsidian styles as a link reference definition");
         return;
       }
