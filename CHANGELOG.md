@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The Prettier coexistence recipe excludes both `.md` and `.markdown` files,
+  matching the file types that both tools process
+  ([#458](https://github.com/viell-dev/slop-markdown-tools/issues/458)).
 - Named suppression enables work after an all-rule disable, without enabling
   other rules or changing configuration
   ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).

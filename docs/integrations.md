@@ -75,10 +75,11 @@ Schemas completes and checks the configuration file with the package's
 ## Next to Prettier or markdownlint
 
 Prettier formats Markdown too, and two formatters undo each other's changes.
-Leave Markdown to mdrefine by adding this line to `.prettierignore`:
+Leave Markdown to mdrefine by adding both file extensions to `.prettierignore`:
 
 ```text
 **/*.md
+**/*.markdown
 ```
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
