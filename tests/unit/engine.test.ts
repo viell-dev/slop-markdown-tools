@@ -793,6 +793,111 @@ describe("HTML comments that Live Preview continues across blocks", () => {
       }),
     ).toBe("a <!-- b\n\nc _d_\n");
   });
+  describe("comments opened by headings and tables", () => {
+    const openers = [
+      "# Head *a* <!-- open #\n",
+      "Head *a* <!-- open\n===\n",
+      "| A | B |\n| - | - |\n| x <!-- open | y |\n",
+      "| <!-- open | A |\n| - | - |\n| x | y |\n",
+    ];
+    const closers = [
+      "\n> alpha --> beta *gamma* delta epsilon zeta eta theta iota\n> more words\n",
+      "\n* alpha --> beta *gamma* delta epsilon zeta eta theta iota\n  more words\n",
+      "\n> alpha *beta* gamma delta epsilon zeta eta theta iota\n",
+    ];
+    it.each(openers)("keeps all of the opening and closing blocks after %j", (opener) => {
+      for (const closer of closers)
+        for (const newline of ["\n", "\r\n", "\r"])
+          for (const mark of ["", String.fromCharCode(0xfeff)]) {
+            const source = mark + (opener + closer).replaceAll("\n", newline);
+            const output = formatted(source, { config, workspace });
+            expect(output).toBe(source);
+            expect(semanticFingerprint(parse(output, "obsidian"))).toBe(
+              semanticFingerprint(parse(source, "obsidian")),
+            );
+            expect(formatted(source, { config: { extends: [], dialect: "obsidian" } })).toBe(
+              source,
+            );
+          }
+    });
+    it.each([
+      "> # Head <!-- open\n>\n> * alpha --> beta *gamma* delta epsilon zeta eta\n>   more words\n",
+      "* Head <!-- open\n  ===\n\n  > alpha --> beta *gamma* delta epsilon zeta eta\n  > more words\n",
+      "> | A | B |\n> | - | - |\n> | x <!-- open | y |\n>\n> * alpha --> beta *gamma* delta epsilon zeta eta\n>   more words\n",
+      "* | A | B |\n  | - | - |\n  | x <!-- open | y |\n\n  > alpha --> beta *gamma* delta epsilon zeta eta\n  > more words\n",
+    ])("keeps container markers around %j", (source) => {
+      expect(formatted(source, { config, workspace })).toBe(source);
+    });
+    it.each(openers)("still formats an independent block after the comment in %j", (opener) => {
+      const kept = `${opener}\n> alpha --> beta *gamma*\n`;
+      expect(formatted(`${kept}\nIndependent *text*.\n`, { config, workspace })).toBe(
+        `${kept}\nIndependent _text_.\n`,
+      );
+    });
+    it.each([
+      ["# Head <!-- open #\n\nText *a*\n", "# Head <!-- open\n\nText _a_\n"],
+      ["Head <!-- open\n===\n\nText *a*\n", "# Head <!-- open\n\nText _a_\n"],
+      ["| x <!-- open |\n| - |\n\nText *a*\n", "| x <!-- open |\n| ----------- |\n\nText _a_\n"],
+    ])("does not extend Obsidian's protection to other dialects in %j", (source, output) => {
+      expect(
+        formatted(source, {
+          config: { extends: ["recommended", "github"], dialect: "github" },
+        }),
+      ).toBe(output);
+    });
+    it.each([
+      ["# Head <!-- closed --> *a* #\n", "# Head <!-- closed --> _a_\n"],
+      ["Head <!-- closed --> *a*\n===\n", "# Head <!-- closed --> _a_\n"],
+      ["# Head \\<!-- open *a* #\n", "# Head \\<!-- open _a_\n"],
+      ["Head \\<!-- open *a*\n===\n", "# Head \\<!-- open _a_\n"],
+      ["# Head `<!--` *a* #\n", "# Head `<!--` _a_\n"],
+      ["Head `<!--` *a*\n===\n", "# Head `<!--` _a_\n"],
+    ])("still formats closed, escaped, and code openers in %j", (source, output) => {
+      expect(formatted(`${source}\nText *b*\n`, { config, workspace })).toBe(
+        `${output}\nText _b_\n`,
+      );
+    });
+    it.each(["<!-- closed -->", "\\<!-- open", "`<!--`"])(
+      "still aligns a table containing %j and formats the block below it",
+      (content) => {
+        const source = `| ${content} | x |\n| - | - |\n| y | z |\n\nText *a*\n`;
+        const obsidian = formatted(source, { config, workspace });
+        const github = formatted(source, {
+          config: { extends: ["recommended", "github"], dialect: "github" },
+        });
+        expect(obsidian).toBe(github);
+        expect(obsidian).not.toBe(source);
+        expect(obsidian.endsWith("\nText _a_\n")).toBe(true);
+      },
+    );
+    it("detects a later opener after a same-table closer in a different cell", () => {
+      const source = "| <!-- first | --> <!-- second |\n| - | - |\n| x | y |\n\nText *a*\n";
+      expect(formatted(source, { config, workspace })).toBe(source);
+    });
+    it("applies only the enabled rule outside the protected heading", () => {
+      const kept = "Head *a* <!-- open\n===\n\nText --> *b*\n\n";
+      const headingOnly: Config = {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": "warn" },
+      };
+      expect(formatted(`${kept}Other *c*\n===\n`, { config: headingOnly })).toBe(
+        `${kept}# Other *c*\n`,
+      );
+    });
+    it.each([
+      "# Head *a* <!-- open\n\nText *b*",
+      "Head *a* <!-- open\n===\n\nText *b*",
+      "| A | B |\n| - | - |\n| x <!-- open | y |\n\nText *b*",
+    ])("keeps final block text without a closer in %j", (source) => {
+      // Isolate the block protection from the existing EOF-newline policy.
+      const withoutNewline: Config = {
+        ...config,
+        rules: { ...config.rules, "style/final-newline": "off" },
+      };
+      expect(formatted(source, { config: withoutNewline, workspace })).toBe(source);
+    });
+  });
   it("skips nested comment openers in time proportional to their number", () => {
     // #418: every nested opener searched the same suffix for the same closer.
     // Time only range discovery, on distinct trees so the cache cannot hide it.

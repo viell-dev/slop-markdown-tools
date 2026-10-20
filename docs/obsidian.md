@@ -63,14 +63,15 @@ note shows there, the tool keeps the text as written:
   closes the front matter at a malformed `--- text` line. No rule changes such a
   note, including its opening fence or its final line break. A `+++` fence does
   not have this protection, and `---` alone is still a thematic break.
-- An inline HTML comment that starts in a paragraph but ends in another block,
-  as in `Text <!-- comment`, a blank line, and `> More --> text` below it. Live
-  Preview carries comment styling across the blocks and restores quote or list
-  styling only after the closer's line, where Reading view reads the blocks as
-  Markdown. No rule changes the paragraph or the blocks through the closing
-  block, or through the note's end without a closer. Later blocks still format.
-  An opener in emphasis, a highlight, or a link or image's text counts too; an
-  escaped opener or one inside a code span does not.
+- An inline HTML comment that starts in a paragraph, heading, or table cell but
+  ends in another block, as in `# Title <!-- comment`, a blank line, and
+  `> More --> text` below it. Live Preview carries comment styling across the
+  blocks and restores quote or list styling only after the closer's line, where
+  Reading view reads the blocks as Markdown. No rule changes the whole opening
+  block or the blocks through the closing block, or through the note's end
+  without a closer. A heading's underline and the whole table stay too. Later
+  blocks still format. An opener in emphasis, a highlight, or a link or image's
+  text counts too; an escaped opener or one inside a code span does not.
 - A paragraph, heading, or table cell with a backtick that no run of backticks
   closes, such as ``a ` b``, also in a highlight, an inline comment, or the text
   of a link or image. Live Preview shows the text after it as code, at least to

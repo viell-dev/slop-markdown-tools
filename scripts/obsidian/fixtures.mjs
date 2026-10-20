@@ -193,6 +193,24 @@ export const fixtures = [
       "Some words <!-- an open comment\n\n> - Words --> followed by enough more words to be reflowed at a narrow width.\n>   More words on the next line.\n\nIndependent *text* below the comment.\n",
   },
   {
+    // #408: a setext heading's underline is comment-styled too, and must not be removed.
+    name: "inline HTML comment opened in an underlined heading",
+    source:
+      "Heading <!-- an open comment\n================\n\n> Words --> followed by enough more words to be reflowed at a narrow width.\n> More words on the next line.\n",
+  },
+  {
+    // #408: an ATX heading carries the same comment state out into the following blocks.
+    name: "inline HTML comment opened in an ATX heading",
+    source:
+      "# Heading <!-- an open comment\n\n- Words --> followed by enough more words to be reflowed at a narrow width.\n  More words on the next line.\n",
+  },
+  {
+    // #408: the table widget does not stop the editor's comment state at the table boundary.
+    name: "inline HTML comment opened in a table cell",
+    source:
+      "| A | B |\n| - | - |\n| Words <!-- an open comment | value |\n\n> Words --> followed by enough more words to be reflowed at a narrow width.\n> More words on the next line.\n",
+  },
+  {
     // #411: at 30 columns, the line would break before `[a]:`, and Live Preview would style the
     // new line as a link reference definition; the word stays on the line before it.
     name: "label inside a paragraph",
