@@ -404,6 +404,9 @@ function inspect(
         options: enabled.options,
         ...(workspace ? { workspace } : {}),
       });
+      // A directly returned Promise is invalid, but its later rejection must
+      // not escape the synchronous rule failure. Do not await eventual findings.
+      if (!Array.isArray(returned)) void Promise.resolve(returned).catch(() => undefined);
       problem = findingsProblem(returned, document.source.length);
       if (!problem) findings = returned as Finding[];
     } catch (error) {
@@ -781,7 +784,7 @@ function formatText(
           hosted,
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
-        findings.push(...diagnostics);
+        for (const diagnostic of diagnostics) findings.push(diagnostic);
         // With ranges, an edit that reaches outside them is not applied. One
         // that changes nothing need not be tried, and must not hold others back.
         const proposals: Proposal[] = [];

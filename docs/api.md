@@ -113,7 +113,9 @@ which matches without regard to case, and returns
 `{ type: "file", path, source }`, `{ type: "directory" }`,
 `{ type: "outside", through }` for a path that leads out of the workspace root
 through the link `through`, `{ type: "unreadable", at }`, or `undefined` when
-nothing is there. An Obsidian search by note name does not call it.
+nothing is there. An Obsidian search by note name does not call it. A file
+result may set `ambiguous: true` when another file matches too; the workspace
+then reports an ambiguous target without reading either file's text.
 
 The CLI passes the directories it skipped as `unreadable`, the vaults it found
 as `vaults`, and `rootInVault` when it finds the vault above the root; [Obsidian
@@ -178,7 +180,8 @@ and writes nothing: pass the configuration as `config`, plugin objects as
   them](cli.md#which-files-are-processed): a file is selected whatever its name,
   and an ignored file or directory is an entry of `skipped` with the code
   `IGNORED`. Omitted, every document is selected; an empty list selects none.
-- `exclude` lists files and directories to leave out, as paths, not patterns.
+- `exclude` lists files and directories to leave out, as paths, not patterns. It
+  applies to supplied documents too; their text stays available for links.
 - `documents` gives text for paths relative to `root`, such as an editor's
   unsaved buffer. Those documents are selected, and the workspace reads that
   text in place of a file, also where no file exists. One whose path ignore

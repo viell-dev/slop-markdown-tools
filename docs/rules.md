@@ -116,6 +116,10 @@ trace and fill a shorter row with empty cells, so the table does not show what
 its source says. A `|` separates cells inside code and wikilinks too, unless it
 is escaped as `\|`.
 
+A standalone colon-container boundary, such as `:::`, ends the rows checked.
+Site generators read it as a container boundary, although GFM reads it and the
+following text as more rows. A cell written as `| ::: |` is checked normally.
+
 Reported, because the last row has three cells:
 
 ```markdown
@@ -1133,6 +1137,11 @@ space on each side of a cell's text and delimiters of three characters, such as
 of cells in each row. A table inside a list or block quote, and one with a row
 that has more cells than its header, are left as written.
 
+A table containing a standalone colon-container boundary such as `:::` or
+`:::tip` stays as written too: site generators use it to open or close a
+container, where GFM reads another row. Cells written with table borders, such
+as `| ::: |`, are formatted normally.
+
 Before:
 
 ```markdown
@@ -1260,26 +1269,27 @@ toward the width, a tab up to the next multiple of four columns.
 
 A word that would start a block at the start of a line, such as a list marker,
 `#`, `>`, a run of `-` or `=`, or a table delimiter row such as `|---|`, stays
-on the line before it, and so does a word that starts with `:::`, `{%`, or `{{`.
-A word that only starts like one, such as `--config`, `#tag`, or `-5`, can start
-a line. The first line keeps more than one word when its first word alone would
-open a block, such as `***` or `$$`, or, in the body below the line of an
-alert's or callout's marker, would underline that line as a heading, such as
-`==` or `--`. It also keeps a paragraph that starts like a link reference
-definition (`[Note]: see …`) from becoming one. On GitHub and in Obsidian, a
-word that starts with `$` stays on the line before it when a `$` comes earlier
-in the paragraph, and in Obsidian a word that ends in `$`, such as a lone `$`,
-stays on the line after it when a `$` comes later: at the edge of a line, a
-dollar can begin or end math that it cannot begin or end next to a space. In
-Obsidian, no new line's content starts with `[`, a label, and `]:`, such as
-`[ref]: …`: Live Preview hides its destination, including after indentation or
-quote markers. The complete label stays on the preceding word's line, also when
-it holds spaces. Existing reference-like lines stay on their own lines; an empty
-colon line also preserves the following destination line, even across blank
-lines. A list's marker line still wraps normally, because it shows the label and
-destination as text. In a block quote whose markers are written without a space
-after them, such as `>text`, a tag such as `#tag` stays on the line before it
-too, because Live Preview reads a tag directly after `>` as text.
+on the line before it, and so does a word that starts with `:::`, `{%`, or `{{`,
+or a literal `[[toc]]` marker (in any letter case). A word that only starts like
+one, such as `--config`, `#tag`, or `-5`, can start a line. The first line keeps
+more than one word when its first word alone would open a block, such as `***`
+or `$$`, or, in the body below the line of an alert's or callout's marker, would
+underline that line as a heading, such as `==` or `--`. It also keeps a
+paragraph that starts like a link reference definition (`[Note]: see …`) from
+becoming one. On GitHub and in Obsidian, a word that starts with `$` stays on
+the line before it when a `$` comes earlier in the paragraph, and in Obsidian a
+word that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
+comes later: at the edge of a line, a dollar can begin or end math that it
+cannot begin or end next to a space. In Obsidian, no new line's content starts
+with `[`, a label, and `]:`, such as `[ref]: …`: Live Preview hides its
+destination, including after indentation or quote markers. The complete label
+stays on the preceding word's line, also when it holds spaces. Existing
+reference-like lines stay on their own lines; an empty colon line also preserves
+the following destination line, even across blank lines. A list's marker line
+still wraps normally, because it shows the label and destination as text. In a
+block quote whose markers are written without a space after them, such as
+`>text`, a tag such as `#tag` stays on the line before it too, because Live
+Preview reads a tag directly after `>` as text.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -1321,7 +1331,8 @@ what it means, that is, when it:
 - has a table delimiter row such as `| - |` as its second line, in the dialects
   with tables: such a paragraph is usually a table that the parser reads as text
   (see [the safety model](design.md#safety-model));
-- has a line that starts with `:::`, `{%`, or `{{`, which [site
+- starts with a snippet import (`<<<`), or has a line that starts with `:::`,
+  `{%`, `{{`, or a literal `[[toc]]` marker, which [site
   generators](dialects.md#what-each-dialect-reads) read by line;
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one;

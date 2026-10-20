@@ -5,6 +5,7 @@ import { directive } from "../core/directives.js";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike, misreadLists } from "../syntax/misread-lists.js";
+import { tableContainerBoundary } from "../syntax/site-generator.js";
 import {
   codeSpanText,
   joinsTomlFrontMatter,
@@ -688,11 +689,11 @@ const forgeLineOpener = /^(?::$|\\\[)/;
 /**
  * Site-generator syntax at the start of a line: a container such as
  * Docusaurus's `:::note`, or a template tag such as Liquid's `{% tab %}` or
- * `{{ title }}`. Site generators read it by line, and no dialect gives it
- * meaning, so a paragraph with a line that starts with it keeps its lines, and
+ * `{{ title }}`, or a literal `[[toc]]`. Site generators read it by line, and
+ * no dialect gives it meaning, so a paragraph with a line that starts with it keeps its lines, and
  * a word that starts with it stays on the line before it (issue #296).
  */
-const siteSyntax = /^(?::::|\{%|\{\{)/;
+const siteSyntax = /^(?::::|\{%|\{\{|\[\[toc\]\](?=[ \t]|$))/i;
 /**
  * The template tags in `text`, which starts at offset `base`, that each lie on
  * one line, such as Liquid's `{% data x %}` or `{{ page.title }}`: wrapping
@@ -1340,18 +1341,20 @@ const wrap: Rule = {
                 ? "leading block marker"
                 : document.dialect !== "commonmark" && misreadTable(original)
                   ? "table delimiter row as its second line"
-                  : startsSiteSyntax(original)
-                    ? "site-generator syntax at the start of a line"
-                    : lazyStart
-                      ? "lazy first line"
-                      : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                        ? "unsupported container prefix"
-                        : document.dialect === "obsidian" &&
-                            obsidianMarkers(source, node, start, end)
-                          ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                          : inline.unlocated
-                            ? "inline syntax without a source position"
-                            : undefined;
+                  : original.startsWith("<<<")
+                    ? "site-generator snippet import"
+                    : startsSiteSyntax(original)
+                      ? "site-generator syntax at the start of a line"
+                      : lazyStart
+                        ? "lazy first line"
+                        : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                          ? "unsupported container prefix"
+                          : document.dialect === "obsidian" &&
+                              obsidianMarkers(source, node, start, end)
+                            ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                            : inline.unlocated
+                              ? "inline syntax without a source position"
+                              : undefined;
       const skipped =
         reason ??
         protections.reason ??
@@ -1439,7 +1442,7 @@ const wrap: Rule = {
             words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
           } else failure = "reason" in joining ? joining.reason : "line break in inline syntax";
         }
-        words.push(...protection.split(line, lineAt));
+        for (const word of protection.split(line, lineAt)) words.push(word);
         lineEnd = lineAt + line.length;
       }
       if (failure) {
@@ -1530,6 +1533,8 @@ const table: Rule = {
       const [start, end] = range(node);
       // Nested tables retain container prefixes until a dedicated container printer handles them.
       if (node.position!.start.column !== 1) return;
+      // Site generators close or open a container here, where GFM still reads table rows.
+      if (tableContainerBoundary(document.source, node) >= 0) return;
       const rows = node.children.map((row) =>
         row.children.map((cell) => {
           if (!cell.children.length) return "";
@@ -1541,7 +1546,7 @@ const table: Rule = {
       const count = node.align?.length ?? rows[0]?.length ?? 0;
       if (rows.some((row) => row.length > count)) return;
       const widths = Array.from({ length: count }, (_, i) =>
-        compact ? 3 : Math.max(3, ...rows.map((row) => stringWidth(row[i] ?? ""))),
+        compact ? 3 : rows.reduce((width, row) => Math.max(width, stringWidth(row[i] ?? "")), 3),
       );
       const pad = (cell: string, i: number) =>
         compact ? cell : cell + " ".repeat(widths[i]! - stringWidth(cell));
@@ -1878,7 +1883,8 @@ export const styleRules: Record<string, Rule> = {
         // keeps a backtick there from joining the fence, or spaces there from
         // being taken off.
         const value = codeSpanText(node);
-        const longest = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
+        let longest = 0;
+        for (const run of value.matchAll(/`+/g)) longest = Math.max(longest, run[0].length);
         const marker = "`".repeat(longest + 1);
         // An earlier run of the new backticks that the parser left as text, or
         // that lies in a link destination, would pair with the new opening one.

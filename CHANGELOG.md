@@ -16,8 +16,50 @@ prereleases' notes there are longer than their entries here.
   patch generator that `format --diff` uses, for scripts extending a formatting
   preview ([#321](https://github.com/viell-dev/slop-markdown-tools/issues/321)).
 
+## 0.3.1 - 2026-10-21
+
 ### Fixed
 
+- The Prettier coexistence recipe excludes both `.md` and `.markdown` files,
+  matching the file types that both tools process
+  ([#458](https://github.com/viell-dev/slop-markdown-tools/issues/458)).
+- Named suppression enables work after an all-rule disable, without enabling
+  other rules or changing configuration
+  ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
+- Obsidian links match every path component without regard to case inside
+  skipped folders, and report duplicate case variants as ambiguous
+  ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).
+- Supplied documents and stdin paths obey inherited Git ignore rules even when
+  their parent directories do not exist, with repository boundaries and
+  negations preserved
+  ([#453](https://github.com/viell-dev/slop-markdown-tools/issues/453)).
+- The nested-comment complexity check warms both input sizes and measures fresh
+  batches, preserving its scaling bound while reducing timing noise
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
+- The links memory-regression check waits for asynchronous full collection,
+  keeping its existing retained-text allowance
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
+- Invalid asynchronous plugin rules report an engine error without leaking a
+  rejected return value into the host process; the CLI keeps exit code `2`
+  ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
+- Explicit HTML anchors decode character references in attribute values before
+  matching fragments, including numeric references and escaped ampersands
+  ([#451](https://github.com/viell-dev/slop-markdown-tools/issues/451)).
+- Large paragraphs, tables, code spans, plugin finding lists, configuration
+  arrays, and Obsidian target searches no longer exceed the JavaScript engine's
+  function-argument limit
+  ([#454](https://github.com/viell-dev/slop-markdown-tools/issues/454)).
+- Discovery applies explicit exclusions to supplied editor buffers, including
+  files that do not exist yet, while retaining their text for link checks
+  ([#452](https://github.com/viell-dev/slop-markdown-tools/issues/452)).
+- Table formatting keeps colon-container boundaries as written, and
+  `content/table-columns` stops checking rows at them, preserving site-generator
+  containers
+  ([#444](https://github.com/viell-dev/slop-markdown-tools/issues/444)).
+- Wrapping preserves snippet-import paragraphs and keeps literal `[[toc]]`
+  markers off new line starts, preventing VitePress build failures and lost text
+  ([#445](https://github.com/viell-dev/slop-markdown-tools/issues/445),
+  [#446](https://github.com/viell-dev/slop-markdown-tools/issues/446)).
 - The Obsidian check passes large `PROBE` batches through Docker's inherited
   environment, avoiding the Windows process argument limit
   ([#442](https://github.com/viell-dev/slop-markdown-tools/issues/442)).
