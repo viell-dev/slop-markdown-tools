@@ -12,6 +12,27 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, unfinished code entered after a contained HTML block
+  keeps its literal source and original document end. Before, the parser still
+  read HTML where Live Preview had entered code, and formatting could change
+  literal emphasis markers below it
+  ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
+- In the Obsidian dialect, `style/wrap` introduces no reference-like start after
+  indentation or quote markers, and preserves existing starts and pending
+  destinations. Live Preview hides the destination there, even without a
+  definition line class. Complete labels stay on one line, and a label already
+  split across lines stays as written, preserving its link styling
+  ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
+- In the Obsidian dialect, HTML opened in a list item or quote protects the lazy
+  lines outside its parsed container through both views' raw regions, including
+  later openers after a void or closed element. Before, rules changed literal
+  `*words*` to `_words_`, and an unclosed tag could leave Live Preview reading
+  raw source below a blank line
+  ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
+- In the Obsidian dialect, `style/wrap` leaves the first paragraph of a quote
+  opened on a list item's marker line as written. Before, reflow moved words
+  from that line's literal `>` list text into styled quote continuation lines
+  ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
 - `style/block-spacing` proposes no blank line inside a paragraph or underlined
   heading in the reading without TOML front matter. Before, separating `1.` and
   `2) b` directly below its closing fence would turn paragraph text into a list;

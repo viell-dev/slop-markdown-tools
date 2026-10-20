@@ -811,7 +811,9 @@ comment without its closing `%%`, or a code or math block without its closing
 fence whose last line is blank space. In the Obsidian dialect, nothing is added
 either where the document ends in a fenced code block without its closing fence,
 outside a list item or block quote: Reading view shows the line break as one
-more, empty line of the code.
+more, empty line of the code. An HTML block opened in a list or quote can also
+lead Live Preview into code that the parser does not recognize. Its original end
+stays where that code's closing boundary is uncertain.
 
 ## `style/heading`
 
@@ -1244,12 +1246,15 @@ word that starts with `$` stays on the line before it when a `$` comes earlier
 in the paragraph, and in Obsidian a word that ends in `$`, such as a lone `$`,
 stays on the line after it when a `$` comes later: at the edge of a line, a
 dollar can begin or end math that it cannot begin or end next to a space. In
-Obsidian, no line at the first column starts with `[`, a label, and `]:`, such
-as `[ref]: …`, which Live Preview styles as a link reference definition: the
-word that opens the label stays on the line before it, also when the label holds
-spaces. In a block quote whose markers are written without a space after them,
-such as `>text`, a tag such as `#tag` stays on the line before it too, because
-Live Preview reads a tag directly after `>` as text.
+Obsidian, no new line's content starts with `[`, a label, and `]:`, such as
+`[ref]: …`: Live Preview hides its destination, including after indentation or
+quote markers. The complete label stays on the preceding word's line, also when
+it holds spaces. Existing reference-like lines stay on their own lines; an empty
+colon line also preserves the following destination line, even across blank
+lines. A list's marker line still wraps normally, because it shows the label and
+destination as text. In a block quote whose markers are written without a space
+after them, such as `>text`, a tag such as `#tag` stays on the line before it
+too, because Live Preview reads a tag directly after `>` as text.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
@@ -1298,6 +1303,13 @@ what it means, that is, when it:
 - has, in the Obsidian dialect, a continuation line with tag-like text directly
   after a bare block quote marker, such as `>#tag text`: joining the line would
   create a tag in Live Preview;
+- has, in the Obsidian dialect, a definition-like label that already spans
+  lines, contains a nested opening bracket, or has a tab after its colon: reflow
+  changes Live Preview's link styling;
+- opens a block quote on a list item's marker line in the Obsidian dialect, such
+  as `- > words`: Live Preview shows the first line as list text with a literal
+  `>` and only continuation lines as a quote. Its first paragraph stays as
+  written, while ordinary quotes below the marker line still wrap;
 - would start, in the Obsidian dialect, with `[`, a label, and `]:` on its first
   line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
   styles as a link reference definition.
