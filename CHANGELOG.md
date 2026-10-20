@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The nested-comment complexity check warms both input sizes and measures fresh
+  batches, preserving its scaling bound while reducing timing noise
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
 - Invalid asynchronous plugin rules report an engine error without leaking a
   rejected return value into the host process; the CLI keeps exit code `2`
   ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
