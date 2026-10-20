@@ -1,6 +1,7 @@
 import path from "node:path";
 import GithubSlugger from "github-slugger";
 import { decodeNamedCharacterReference } from "decode-named-character-reference";
+import { decodeHTMLAttribute } from "entities/decode";
 import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Dialect, Document, LinkResolution, Workspace } from "../core/types.js";
@@ -177,8 +178,9 @@ function htmlTokens(html: string): HtmlToken[] {
 }
 /**
  * The anchors that HTML in a document adds: the `id` of any element and the
- * `name` of an `<a>`, as written. GitHub, Forgejo, and Gitea keep both on the
- * elements they allow and add their `user-content-` prefix to them unless it is
+ * `name` of an `<a>`, with character references decoded once as HTML attribute
+ * values. GitHub, Forgejo, and Gitea keep both on allowed elements and add their
+ * `user-content-` prefix to them unless it is
  * already there, as they do to a link's fragment, so an `id` written with the
  * prefix is recorded without it. Every value of a repeated attribute counts:
  * Forgejo 16 and Gitea 1.26 keep the first, Gitea 1.25 the last.
@@ -190,7 +192,10 @@ function htmlAnchors(tokens: HtmlToken[]): string[] {
     for (const match of token.attributes.matchAll(attribute)) {
       const attributeName = match[1]!.toLowerCase();
       if (attributeName !== "id" && !(token.name === "a" && attributeName === "name")) continue;
-      const value = (match[2] ?? match[3] ?? match[4] ?? "").replace(/^user-content-/, "");
+      const value = decodeHTMLAttribute(match[2] ?? match[3] ?? match[4] ?? "").replace(
+        /^user-content-/,
+        "",
+      );
       if (value) anchors.push(value);
     }
   }
@@ -805,8 +810,9 @@ export function createWorkspace(
       const tail = rootFolded.slice(-count);
       if (!tail.every((part, index) => parts[index]!.toLowerCase() === part)) continue;
       const rest = parts.slice(count).join("/");
-      found.push(...namesMatching(rest));
-      if (!path.posix.extname(rest)) found.push(...namesMatching(`${rest}.md`));
+      for (const name of namesMatching(rest)) found.push(name);
+      if (!path.posix.extname(rest))
+        for (const name of namesMatching(`${rest}.md`)) found.push(name);
     }
     return found;
   }
@@ -837,8 +843,9 @@ export function createWorkspace(
     for (const extension of ["", ".md"]) {
       const sharing = filesNamed(wanted.slice(slash + 1) + extension);
       // A bare file name is decided by the table alone.
-      if (slash < 0) found.push(...sharing);
-      else {
+      if (slash < 0) {
+        for (const name of sharing) found.push(name);
+      } else {
         const ending = `/${wanted}${extension}`;
         for (const actual of sharing) {
           const path = actual.toLowerCase();
