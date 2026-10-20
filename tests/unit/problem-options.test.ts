@@ -117,6 +117,16 @@ describe("configurable title headings", () => {
       { line: 11, message: "Use one level-2 heading per document; the title is on line 9." },
     ]);
   });
+  it("keeps the default literal title forms and allows other forms through a pattern", () => {
+    const front = "---\n  title: Page\n---\n";
+    expect(check(front, "structure/initial-heading", { frontMatterTitle: true })).toHaveLength(1);
+    expect(check(`${front}\n# Page\n`, "structure/single-title", {})).toEqual([]);
+    const frontMatterTitle = "^[ \\t]*title:";
+    expect(check(front, "structure/initial-heading", { frontMatterTitle })).toEqual([]);
+    expect(
+      check(`${front}\n# Page\n`, "structure/single-title", { frontMatterTitle }),
+    ).toHaveLength(1);
+  });
   it.each(["structure/initial-heading", "structure/single-title"])(
     "rejects invalid %s options before execution",
     (rule) => {

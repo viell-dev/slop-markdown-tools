@@ -594,6 +594,11 @@ delimiters, in multiline mode; it does not match the body. An invalid pattern is
 a configuration error. `false` or `""` disables title recognition. The same
 setting is available on `structure/single-title`, with a different default.
 
+The default detector matches a literal `title` key, optionally quoted: in column
+1 for YAML, or before the first table header in TOML, where indentation is
+allowed. It matches text rather than parsing the metadata. Use a custom pattern
+for other textual forms.
+
 Reported:
 
 ```markdown

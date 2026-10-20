@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { format, lint } from "../../src/index.js";
+import { format, lint, unifiedDiff } from "../../src/index.js";
 import type { Config, Diagnostic } from "../../src/index.js";
 import { discoverWorkspace } from "../../src/node.js";
 import { fixture, run, tree } from "./support.js";
@@ -22,6 +22,19 @@ const files = {
   "broken/.obsidian/app.json": "not json",
   "broken/Other.md": "Text.\n",
 };
+
+it("exports the same unified diff that the CLI prints for a changed document", async () => {
+  const source = "A *small* note.\n";
+  const root = await fixture({
+    "mdtools.config.json": JSON.stringify(config),
+    "note.md": source,
+  });
+  const printed = run(root, ["format", "--diff", "note.md"]);
+  expect(printed.status, printed.stderr).toBe(0);
+  expect(printed.stdout).toBe(
+    unifiedDiff("a/note.md", "b/note.md", source, format(source, { config }).output),
+  );
+});
 
 describe("filesystem discovery for library hosts (mdrefine/node)", () => {
   it("selects and prepares every document as the CLI does", async () => {

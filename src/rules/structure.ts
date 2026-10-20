@@ -32,11 +32,11 @@ function outlines(tree: Root): Heading[][] {
 const levelSchema = { type: "integer", minimum: 1, maximum: 6, default: 1 };
 const titleSchema = {
   description:
-    "True uses the top-level title key; a string matches front matter in multiline mode; false or an empty string disables it.",
+    "True uses the default literal title field; a string matches front matter in multiline mode; false or an empty string disables it.",
   anyOf: [{ type: "boolean" }, { type: "string", format: "regex" }],
 };
 type TitleSetting = boolean | string;
-/** Whether front matter sets a title, by its top-level key or a configured pattern. */
+/** Whether front matter contains a recognized title field or matches a configured pattern. */
 function frontMatterTitle(tree: Root, setting: TitleSetting = true): boolean {
   if (setting === false || setting === "") return false;
   const pattern = typeof setting === "string" ? new RegExp(setting, "m") : undefined;
