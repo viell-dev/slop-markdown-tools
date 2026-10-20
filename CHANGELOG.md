@@ -15,6 +15,12 @@ prereleases' notes there are longer than their entries here.
 - Named suppression enables work after an all-rule disable, without enabling
   other rules or changing configuration
   ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
+- Invalid asynchronous plugin rules report an engine error without leaking a
+  rejected return value into the host process; the CLI keeps exit code `2`
+  ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
+- Explicit HTML anchors decode character references in attribute values before
+  matching fragments, including numeric references and escaped ampersands
+  ([#451](https://github.com/viell-dev/slop-markdown-tools/issues/451)).
 - Large paragraphs, tables, code spans, plugin finding lists, configuration
   arrays, and Obsidian target searches no longer exceed the JavaScript engine's
   function-argument limit
