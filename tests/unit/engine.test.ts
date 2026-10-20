@@ -1989,14 +1989,13 @@ describe("the block directly below TOML front matter", () => {
           kept("## Head\n", setext);
           // A list that cannot interrupt a paragraph is text there.
           kept("2) a\n3) b\n");
-          // The other dialects' spacing proposal has a separate regression below (#426).
-          if (dialect === "obsidian") kept("1.\n2) b\n");
+          kept("1.\n2) b\n");
           kept("*\n* b\n");
           kept("-\n", setext);
         }
     },
   );
-  it.fails.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+  it.each(dialects)(
     "keeps a paragraph-ending empty marker above a misread list in the %s dialect (#426)",
     (dialect) => {
       for (const newline of ["\n", "\r\n", "\r"])
