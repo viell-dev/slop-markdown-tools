@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian links match every path component without regard to case inside
+  skipped folders, and report duplicate case variants as ambiguous
+  ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).
 - Explicit HTML anchors decode character references in attribute values before
   matching fragments, including numeric references and escaped ampersands
   ([#451](https://github.com/viell-dev/slop-markdown-tools/issues/451)).
