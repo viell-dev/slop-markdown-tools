@@ -37,7 +37,7 @@ presets, dialects, and options.
 | `structure/initial-heading`   | 🔍   | ❌            | ❌             | ❌      |
 | `structure/single-title`      | 🔍   | ❌            | ❌             | ❌      |
 | `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
-| `style/block-spacing`         | 🎨   | ❌            | ❌             | ❌      |
+| `style/block-spacing`         | 🎨   | ✅            | ❌             | ❌      |
 | `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
 | `style/emphasis`              | 🎨   | ✅            | ❌             | ✅      |
 | `style/final-newline`         | 🎨   | ✅            | ❌             | ❌      |
@@ -654,12 +654,17 @@ number changes what the document means:
 
 ## `style/block-spacing`
 
-**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: none.
 
 Separates every heading and every list from the blocks before and after it with
 a blank line, in the document and in block quotes at any depth. It adds one
 blank line where there is none and keeps the blank lines that are already there.
 Inside a block quote, the new line holds the quote's `>` markers.
+
+Enabled at `warn` in `recommended`: `lint` reports missing separators and
+`format` adds them where safe. To keep compact spacing, set
+`"rules": { "style/block-spacing": "off" }`.
 
 Before:
 
@@ -689,6 +694,19 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
+- In the Obsidian dialect, after an underlined heading that a view reads as
+  paragraph text, such as a multiline level-1 heading, one beginning with a
+  reference-like line, or one whose underline has trailing space, extra
+  indentation, or a lone `-`.
+- In the Obsidian dialect, inside a block quote, whose heading and list markers
+  Live Preview reads as literal inline text; between a list and the adjacent
+  unindented quote that Reading view keeps in its last item; or between an empty
+  list marker and the text directly below it, which Reading view takes into the
+  item.
+- In the Obsidian dialect, inside continued HTML source: Live Preview can carry
+  an inline opener's raw state through later blocks until its closer or the
+  document's end, and Reading view continues HTML across a whitespace-only line
+  into the blocks below it until an empty line.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
@@ -1183,6 +1201,13 @@ Removes spaces and tabs at the end of lines. A hard line break written as two or
 more spaces keeps them. The option `hardBreak` is `"keep"` (the default) or
 `"backslash"`, which writes such a break as a backslash, so that it is visible
 in the source.
+
+In the Obsidian dialect, a list marker alone on its line keeps one space after
+it. Live Preview needs that separator to style the line as a list item, even
+when the item's text starts on the next line. Extra spaces and tabs are reduced
+to that one space where safe. Quoted markers and further markers on the same
+physical line keep ordinary trailing-space cleanup, because Live Preview reads
+them as text.
 
 With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
 

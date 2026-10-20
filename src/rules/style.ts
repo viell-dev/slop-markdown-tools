@@ -1605,6 +1605,26 @@ function together(
   const { source } = document;
   const [beforeStart, beforeEnd] = range(before);
   const [afterStart, afterEnd] = range(after);
+  if (document.dialect === "obsidian") {
+    // Reading view keeps an adjacent, unindented quote in the last item,
+    // although the parser ends the list before it (#437).
+    if (before.type === "list" && after.type === "blockquote") return true;
+    // Reading view takes text directly below an empty marker into its item
+    // (#438). Keep both boundaries of a lone marker, including after a table
+    // that Live Preview reads as paragraph text.
+    const continuesEmptyItem = (list: RootContent, next: RootContent | undefined) =>
+      list.type === "list" &&
+      list.children.at(-1)?.children.length === 0 &&
+      next?.type === "paragraph" &&
+      next.position?.start.line === list.position!.end.line + 1;
+    if (
+      continuesEmptyItem(before, after) ||
+      (after.type === "list" &&
+        after.children.length === 1 &&
+        continuesEmptyItem(after, parent.children[index + 1] as RootContent | undefined))
+    )
+      return true;
+  }
   // Front matter is not part of the document's text.
   if (["yaml", "toml"].includes(before.type)) return true;
   // An unclosed HTML comment or block at the end of a list would take in the
@@ -1677,6 +1697,32 @@ const blockSpacing: Rule = {
     const { source } = document;
     const findings: Finding[] = [];
     const newline = lineEnding(source);
+    // These parsed headings continue as paragraph text in an Obsidian view
+    // (#383, #397). Keep the boundary after their underline too (#434).
+    const paragraphHeadingEnds = new Set(
+      [...misreadLists(document).underlines]
+        .filter((node) => node.type === "heading")
+        .map((node) => range(node)[1]),
+    );
+    // HTML can continue across parsed block boundaries in either Obsidian
+    // view (#435, #439). Test the next
+    // physical line's start, including a continuation leaf's first newline.
+    const continued: Range[] = [];
+    if (document.dialect === "obsidian") {
+      for (const node of misreadLists(document).htmlText) continued.push(range(node));
+    }
+    continued.sort((a, b) => a[0] - b[0]);
+    const joined: Range[] = [];
+    for (const [start, end] of continued) {
+      const previous = joined.at(-1);
+      if (previous && start <= previous[1]) previous[1] = Math.max(previous[1], end);
+      else joined.push([start, end]);
+    }
+    const ends = joined.map(([, end]) => end);
+    const continuesAt = (point: number) => {
+      const next = joined[countBelow(ends, point + 1)];
+      return next !== undefined && next[0] <= point;
+    };
     // Without TOML front matter, one paragraph can continue through several
     // blocks of the front-matter reading, such as empty and numbered lists
     // (#426). A separator inside that paragraph would create a new block.
@@ -1714,6 +1760,9 @@ const blockSpacing: Rule = {
     // blank line between the blocks of a list item makes its list loose.
     walk(document.tree, (parent) => {
       if (parent.type !== "root" && parent.type !== "blockquote") return;
+      // Live Preview reads headings/list markers inside ordinary quotes as
+      // literal inline text, so their paragraph boundaries stay (#436).
+      if (document.dialect === "obsidian" && parent.type === "blockquote") return;
       for (let index = 1; index < parent.children.length; index++) {
         const before = parent.children[index - 1]!;
         const after = parent.children[index]!;
@@ -1731,6 +1780,8 @@ const blockSpacing: Rule = {
         const lineStart = lineBounds(source, start, start)[0];
         const breakStart = lineStart - (source.startsWith("\r\n", lineStart - 2) ? 2 : 1);
         if (breakStart < end) continue;
+        if (before.type === "heading" && paragraphHeadingEnds.has(breakStart)) continue;
+        if (continuesAt(lineStart)) continue;
         if (splitsPlainText(breakStart, lineStart)) continue;
         // A blank line, or one with only quote markers, already separates them.
         const previous = source.slice(lineBounds(source, breakStart, breakStart)[0], breakStart);

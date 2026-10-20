@@ -59,7 +59,7 @@ mdrefine needs Node.js 22.12 or newer. The package is `mdrefine`, and its
 command is `mdtools`:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.2.7
+npm install --save-dev --save-exact mdrefine@0.3.0
 npx mdtools lint
 npx mdtools format --diff
 npx mdtools format --write
@@ -82,7 +82,8 @@ and with `--check` fails when a document would change.
 `recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
 text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
 code fences with backticks, and thematic breaks as `---`; aligns tables; removes
-trailing spaces and repeated blank lines; ends files with a line break; and
+trailing spaces and repeated blank lines; separates headings and lists from
+adjacent blocks with a blank line where safe; ends files with a line break; and
 checks links. It also warns about references without a definition, unused
 definitions, empty links, skipped heading levels, images without alternative
 text, and table rows with the wrong number of cells. Use `forgejo`, `codeberg`,

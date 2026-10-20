@@ -80,15 +80,17 @@ export interface MisreadLists {
    * Also the HTML source opened in a container and continued beyond its end:
    * each range spans both views' raw regions, through their later terminator
    * or EOF, starting at the HTML opener (issue #428).
+   * An inline HTML opener can carry Live Preview's raw state across blocks
+   * too, through its closer or EOF (issue #435).
    */
   htmlText: ReadonlySet<Nodes>;
   /**
    * In the Obsidian dialect, the underlined headings whose underline one of the
    * views reads as text: Reading view one with blank space after it, or before
-   * it beyond the heading's text, and Live Preview a lone `-` (issue #383) and
-   * the underline of a heading whose one line of text starts at the first
-   * column with `[`, a label, and `]:`, which it styles as a link reference
-   * definition (issue #397); and the paragraphs in a block quote or list item
+   * it beyond the heading's text, and Live Preview a lone `-` (issue #383);
+   * level-1 headings with more than one text line, or headings beginning with
+   * a reference-like line, also after indentation or quote markers (#397,
+   * #434); and paragraphs in a block quote or list item
    * with a lazy line of `=` or `-`, which Reading view reads as an underline
    * (issue #377). Each counts from the line break before the underline to the
    * end of its line.
@@ -738,16 +740,38 @@ export function misreadLists(document: Document): MisreadLists {
       if (code?.toEnd) htmlCodeToEnd = true;
       return code;
     };
+    const htmlRoots: [Nodes, boolean][] = [];
+    const inlineHtml = (node: Nodes) => {
+      if (node.type === "html" && /^<[a-z][a-z0-9-]*(?=[\s/>])/i.test(node.value))
+        htmlRoots.push([node, false]);
+      else if ("children" in node) node.children.forEach(inlineHtml);
+    };
     for (const [leaf] of order) {
-      if (!containerHtml.has(leaf) || !leaf.position) continue;
+      if (containerHtml.has(leaf)) htmlRoots.push([leaf, true]);
+      else if ("children" in leaf) leaf.children.forEach(inlineHtml);
+    }
+    // Source positions for the extended raw regions. Build once, not once per
+    // opener; the union scan below visits each token at most once (#435).
+    const starts = [0];
+    if (htmlRoots.length)
+      for (const found of source.matchAll(/\r\n|\r|\n/g))
+        starts.push(found.index + found[0].length);
+    let line = 0;
+    const pointAt = (offset: number): Point => {
+      // HTML roots and their union ends advance monotonically in source order.
+      while (line + 1 < starts.length && starts[line + 1]! <= offset) line++;
+      return { offset, line: line + 1, column: offset - starts[line]! + 1 };
+    };
+    for (const [leaf, block] of htmlRoots) {
+      if (!leaf.position) continue;
       const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
       if (start < htmlUntil) continue;
-      const until = obsidianHtmlEnd(source, start, htmlCodeEnd);
-      if (until <= end) continue;
+      const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block);
       htmlUntil = until;
+      if (block && until <= end) continue;
       htmlText.add({
         ...leaf,
-        position: { ...leaf.position, end: { ...leaf.position.end, offset: until } },
+        position: { ...leaf.position, end: pointAt(until) },
       } as Nodes);
     }
     /**
@@ -813,19 +837,23 @@ export function misreadLists(document: Document): MisreadLists {
           const underline = source.slice(from, to);
           const prefix = /^[ \t>]*/.exec(underline)![0].length;
           const text = textStart(child) ?? start;
-          // Live Preview styles a heading's one line of text that starts at
-          // the first column with `[`, a label, and `]:` as a link reference
-          // definition, and reads the underline as text (issue #397).
+          // The heading's own start can overlap preceding definitions.
+          const textLine = child.children[0]?.position?.start.line ?? child.position!.start.line;
+          // A reference-like first line can make Live Preview read a one-line
+          // heading's underline as text, also after indentation/quote markers.
+          // Reading view reads multiline level-1 headings as paragraph text,
+          // including their underline (#434), regardless of reference labels.
+          // Both need their underline and following boundary.
           const [textFrom, textTo] = lineAround(text);
           const definitionText =
-            textFrom === text &&
-            /^(?:\r\n|\r|\n)$/.test(source.slice(textTo, from)) &&
+            /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
           if (
             from > start &&
             (/[ \t]$/.test(underline) ||
               /^[ \t>]*-[ \t]*$/.test(underline) ||
               columnAt(from + prefix) > columnAt(text) ||
+              (child.depth === 1 && child.position!.end.line > textLine + 1) ||
               definitionText)
           )
             underlines.add(breakBefore(child, from, to));
@@ -1103,13 +1131,16 @@ const voidHtml = new Set([
   "wbr",
 ]);
 
-/** The last source line that either Obsidian view reads as HTML after a container opener. */
+/** The union's last line for block HTML, or the exact Live Preview inline HTML end. */
 function obsidianHtmlEnd(
   source: string,
   start: number,
   codeEnd: (at: number) => HtmlCode | undefined,
+  block = true,
 ): number {
-  const first = source.slice(start, lineBreak(source, start));
+  // Only the opening token's prefix is needed here. Inline roots on one long
+  // line must not repeatedly search or copy the remaining physical-line suffix.
+  const first = source.slice(start, start + 16);
   const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
     ? /<\/(?:script|pre|style|textarea)[ \t]*>/gi
     : first.startsWith("<!--")
@@ -1121,8 +1152,8 @@ function obsidianHtmlEnd(
           : /^<![A-Za-z]/.test(first)
             ? ">"
             : undefined;
-  let reading = lineBreak(source, start);
-  if (explicit) {
+  let reading = block ? lineBreak(source, start) : start + 1;
+  if (block && explicit) {
     const from = start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
     let end: number;
     if (typeof explicit === "string") {
@@ -1134,7 +1165,7 @@ function obsidianHtmlEnd(
       end = close ? close.index + close[0].length : source.length;
     }
     reading = lineBreak(source, end);
-  } else {
+  } else if (block) {
     let cursor = reading;
     while (cursor < source.length) {
       cursor += source.startsWith("\r\n", cursor) ? 2 : 1;
@@ -1237,6 +1268,10 @@ function obsidianHtmlEnd(
       stack.length = matched < 0 ? 0 : matched;
     } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
       stack.push(name);
+    // Inline HTML resumes Markdown on the same line. Later parsed inline
+    // roots are visited independently, preserving the Markdown between them
+    // (#435). Block HTML still needs the union of both views' source lines.
+    if (!block && !stack.length) return cursor;
     if (!stack.length && cursor > until) until = lineBreak(source, cursor);
   }
   return stack.length ? source.length : until;

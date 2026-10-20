@@ -8,6 +8,40 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## 0.3.0 - 2026-10-20
+
+### Changed
+
+- `recommended` enables `style/block-spacing` at `warn`. `lint` reports missing
+  blank lines around headings and lists, and `format` inserts them where safe,
+  retaining the rule's existing semantic and renderer protections. To keep
+  compact spacing, set `"rules": { "style/block-spacing": "off" }`
+  ([#427](https://github.com/viell-dev/slop-markdown-tools/pull/427)).
+
+### Fixed
+
+- In the Obsidian dialect, `style/trailing-space` preserves a separator after a
+  list marker alone on its line. Before, removing the final separator made Live
+  Preview display it as plain text instead of a list item
+  ([#441](https://github.com/viell-dev/slop-markdown-tools/issues/441)).
+- In the Obsidian dialect, formatting preserves raw source continued after an
+  inline HTML opener, and `style/block-spacing` keeps paragraph boundaries
+  inside it or an HTML region continued across a whitespace-only line
+  ([#435](https://github.com/viell-dev/slop-markdown-tools/issues/435),
+  [#439](https://github.com/viell-dev/slop-markdown-tools/issues/439)).
+- In the Obsidian dialect, `style/block-spacing` keeps boundaries inside quotes
+  that Live Preview reads as inline text, and between a list and an adjacent
+  quote or an empty marker and its following text, which Reading view keeps
+  inside the item
+  ([#436](https://github.com/viell-dev/slop-markdown-tools/issues/436),
+  [#437](https://github.com/viell-dev/slop-markdown-tools/issues/437),
+  [#438](https://github.com/viell-dev/slop-markdown-tools/issues/438)).
+- In the Obsidian dialect, `style/block-spacing` preserves the boundary after an
+  underlined heading that a view reads as paragraph text. Before, a new blank
+  line split that paragraph after a multiline level-1 or reference-like heading,
+  or an underline with trailing space, extra indentation, or a lone `-`
+  ([#434](https://github.com/viell-dev/slop-markdown-tools/issues/434)).
+
 ## 0.2.7 - 2026-10-20
 
 ### Fixed

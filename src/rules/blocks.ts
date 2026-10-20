@@ -610,17 +610,32 @@ const trailingSpace: Rule = {
       // Breaks are in document order, as lines are.
       while (following < breaks.length && breaks[following]!.end <= start) following++;
       const hard = breaks[following]?.start !== undefined && breaks[following]!.start < end;
+      // Even a marker the parser keeps in a paragraph receives list styling
+      // in Live Preview. Keep its last separator (#441). Quotes and further
+      // markers on the same physical line stay ordinary text there.
+      const emptyMarker =
+        document.dialect === "obsidian" &&
+        /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+$/.test(source.slice(line.start, end));
       if (!hard) {
+        const text = emptyMarker ? " " : "";
+        if (source.slice(start, end) === text) continue;
         findings.push({
           start,
           end,
-          message: "Remove the spaces and tabs at the end of the line.",
-          edit: { start, end, text: "" },
+          message: text
+            ? "Keep one space after the empty list marker."
+            : "Remove the spaces and tabs at the end of the line.",
+          edit: { start, end, text },
         });
         continue;
       }
       const brk = breaks[following]!;
-      if (!backslash || brk.start !== start || !backslashSafe(start, brk.block, brk.marker))
+      if (
+        emptyMarker ||
+        !backslash ||
+        brk.start !== start ||
+        !backslashSafe(start, brk.block, brk.marker)
+      )
         continue;
       findings.push({
         start,
