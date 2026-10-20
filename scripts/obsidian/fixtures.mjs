@@ -1,13 +1,117 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
-// #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414), and those that the
+// #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414, #428, #429, #433), and those that the
 // check has to read with care (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
+  {
+    // #411: definition-like container continuations hide any destination token.
+    name: "reference-like start introduced in a list",
+    source: "1. words before [a]: <https://example.com/x> **after**\n",
+  },
+  {
+    name: "reference-like start introduced in a quote",
+    source: "> words before [a]: https://example.com/x **after**\n",
+  },
+  {
+    name: "existing reference-like container line",
+    source: "> words before\n> [a]: relative.md\n> words after\n",
+  },
+  {
+    name: "reference destination after a blank quote line",
+    source: "> before\n> [a]:\n>\n> ordinary *after*\n",
+  },
+  {
+    name: "split reference-like label in a quote",
+    source: "> before\n> [a\n> b]: https://example.com/x ordinary after\n",
+  },
+  {
+    name: "tab after an inline reference-like label",
+    source: "> before [a]:\thttps://example.com/x ordinary after\n",
+  },
+  {
+    name: "nested opening bracket in a reference-like label",
+    source: "> before [a[b]: https://example.com/x ordinary after\n",
+  },
+  {
+    // #428: Reading view and Live Preview continue HTML past a lazy container end.
+    name: "HTML continued outside a list",
+    source: "* <div> a\n*b*\n</div>\n*c*\n\nAfter *d*.\n",
+  },
+  {
+    name: "unclosed HTML continued outside a quote",
+    source: "> <div> a\n*b*\n\nAfter *c*.\n",
+  },
+  {
+    name: "raw HTML terminated outside a list",
+    source: "- <pre>\n*b*\n</pre>\n*c*\n\nAfter *d*.\n",
+  },
+  {
+    name: "void HTML followed by literal list text",
+    source: "- <hr>\n*b*\n\nAfter *c*.\n",
+  },
+  {
+    name: "contained HTML opener inside an earlier HTML reading",
+    source: "- <hr>\n> <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "consecutive HTML roots in a list",
+    source: "- <hr><div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "closed HTML roots before an independent paragraph",
+    source: "- <hr><div></div>\n\n*b*\n\nAfter *c*.\n",
+  },
+  {
+    name: "generic HTML root after an explicit comment closer",
+    source: "- <!-- c --> <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "code after a void HTML root before an independent paragraph",
+    source: "- <hr> `<div>`\n\n*b*\n\nAfter *c*.\n",
+  },
+  {
+    name: "short code runs on separate lines between HTML roots",
+    source: "- <hr> `\n  <div>\n  `\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "escaped backtick closing code between HTML roots",
+    source: "- <hr> `a\\` <div> `\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "URL autolink after a void HTML root",
+    source: "- <hr> <https://example.com>\n\nAfter *c*.\n",
+  },
+  {
+    name: "email autolink after a void HTML root",
+    source: "- <hr> <a@example.org>\n\nAfter *c*.\n",
+  },
+  {
+    // #433: Live Preview starts an unfinished fence inside the parser's HTML block.
+    name: "unfinished code after contained HTML",
+    source: "- <hr> ```\n  <div>\n  ```\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "confirmed inline code end after contained HTML",
+    source: "- <hr> ```\n  <div>\n  words ```\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    // #429: only continuation lines receive the quote styling in Live Preview.
+    name: "quote opened on an ordered list marker line",
+    source: "1. > words inside a block quote on a list marker line\n",
+  },
+  {
+    name: "quote opened on an unordered list marker line",
+    source: "- > first words\n  > other words on a quote continuation\n",
+  },
+  {
+    name: "quote nested on a quoted list marker line",
+    source: "> - > words inside a nested quote on the list marker line\n",
+  },
   {
     // #306: Live Preview shows a link whose text spans lines as its Markdown source.
     name: "link text",

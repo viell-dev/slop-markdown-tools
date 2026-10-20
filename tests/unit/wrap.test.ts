@@ -543,13 +543,13 @@ describe("a paragraph's first word that would be a block on its own", () => {
   it("leaves such a paragraph as written in the obsidian dialect", () => {
     // Live Preview styles a line that starts at the first column with `[`, a
     // label, and `]:` as a definition, so the line stays whole (issue #391),
-    // and after a quote marker it is text, which wraps.
+    // and after a quote marker its destination is hidden too (#411).
     const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
     for (const width of [20, 40, 80]) {
       const config: Config = { ...wrap({ width }), dialect: "obsidian" };
       for (const source of sources)
         expect(verify(source, config, workspace).output, JSON.stringify(source)).toBe(source);
-      expect(verify(quoted, config, workspace).output.split("\n").length).toBeGreaterThan(2);
+      expect(verify(quoted, config, workspace).output).toBe(quoted);
     }
   });
   it("keeps the issue's example a paragraph", () => {
@@ -1016,6 +1016,12 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
               `${prefix}Run \`npm run${separator}build\` now, and then more words so that it wraps.\n`;
             const source = text(`\n${continuation}${indentation}`);
             const result = verify(source, config, workspace);
+            if (dialect === "obsidian" && prefix === "- > ") {
+              // #429: moving text across the list's marker line changes quote styling.
+              expect(result.output).toBe(source);
+              expect(lint(source, { config, workspace }).every((item) => !item.edit)).toBe(true);
+              continue;
+            }
             expect(result.output, JSON.stringify([source, dialect, width])).toBe(
               verify(text(" "), config, workspace).output,
             );
@@ -1514,19 +1520,18 @@ describe("a reflowed line that Live Preview would style as a link reference defi
     ],
     [
       "Some words before the label x [a [b]: tail words after it.\n",
-      "Some words before the label\nx [a [b]: tail words after it.\n",
+      "Some words before the label x [a [b]: tail words after it.\n",
     ],
-    // A label written across two lines, which reflowing would join at a
-    // line's start.
+    // A label already written across lines keeps its link styling as written.
     [
       "Some words before the label x\n[a\nb]: tail words after it.\n",
-      "Some words before the label\nx [a b]: tail words after it.\n",
+      "Some words before the label x\n[a\nb]: tail words after it.\n",
     ],
     [
       "Some words before the label x\n[a b\n]: tail words after it.\n",
-      "Some words before the label\nx [a b ]: tail words after it.\n",
+      "Some words before the label x\n[a b\n]: tail words after it.\n",
     ],
-  ])("keeps the word that opens the label on the line before it in %j", (source, output) => {
+  ])("keeps definition-like label styling in %j", (source, output) => {
     expect(verify(source, obsidian(30), workspace).output).toBe(output);
     expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
   });
@@ -1536,7 +1541,7 @@ describe("a reflowed line that Live Preview would style as a link reference defi
     const result = verify(source, config, workspace);
     expect(result.output).toBe(source);
     expect(result.diagnostics.map((item) => item.message)).toEqual([
-      "Paragraph not reflowed: first line that Obsidian styles as a link reference definition (width 20 columns).",
+      "Paragraph not reflowed: definition-like label spanning lines (width 20 columns).",
     ]);
   });
   it.each([
@@ -1549,7 +1554,8 @@ describe("a reflowed line that Live Preview would style as a link reference defi
   ])("keeps escaped and nested label %s off a new line", (label) => {
     const source = `Some words before the label x ${label} tail words after it.\n`;
     const output = verify(source, obsidian(30), workspace).output;
-    expect(output).toContain(`\nx ${label}`);
+    if (label === "[a [b]:x") expect(output).toBe(source);
+    else expect(output).toContain(`\nx ${label}`);
     expect(output).not.toMatch(/^\[/m);
   });
   it("allows a word whose first unescaped closing bracket is not followed by a colon", () => {
@@ -1592,20 +1598,20 @@ describe("a reflowed line that Live Preview would style as a link reference defi
     expect(fastest[1]! / fastest[0]!).toBeLessThan(10);
   }, 60_000);
   it.each([
-    // After a quote marker or indentation, Live Preview reads text.
+    // Container continuations hide the destination too, without a definition line class.
     [
       "> Some words before the label [a]: tail words after it.\n",
-      "> Some words before the label\n> [a]: tail words after it.\n",
+      "> Some words before the\n> label [a]: tail words after\n> it.\n",
     ],
     [
       "- Some words before the label [a]: tail words after it.\n",
-      "- Some words before the label\n  [a]: tail words after it.\n",
+      "- Some words before the\n  label [a]: tail words after\n  it.\n",
     ],
     [
       "  Some words before the label [a]: tail words after it.\n",
-      "  Some words before the label\n  [a]: tail words after it.\n",
+      "  Some words before the\n  label [a]: tail words after\n  it.\n",
     ],
-  ])("still starts a line with the label in %j", (source, output) => {
+  ])("keeps the label off a new container line in %j", (source, output) => {
     expect(verify(source, obsidian(30), workspace).output).toBe(output);
   });
   it("starts a line with the label in the other dialects", () => {
@@ -1643,7 +1649,7 @@ describe("a tag directly after a block quote marker written without a space", ()
     [
       "- >Some words with a long line x #glacier and more words after it.\n",
       32,
-      "- >Some words with a long line\n  >x #glacier and more words\n  >after it.\n",
+      "- >Some words with a long line x #glacier and more words after it.\n",
     ],
     // After `> `, the tag can start a line.
     [

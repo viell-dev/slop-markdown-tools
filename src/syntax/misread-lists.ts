@@ -18,8 +18,8 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
  * A line that Obsidian's Live Preview styles as a link reference definition
  * where it starts at the first column (issue #391): `[`, a label, in which `[`
  * and an escaped `]` may stand, and `]:`, whatever follows. It styles neither
- * `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so, nor a line after `>` or blank
- * space.
+ * `[[x]]: y` nor `[r][s]: x` nor `[r] : x` so. After indentation or quote
+ * markers it hides the destination too, without that line class (issue #411).
  */
 export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
 
@@ -69,12 +69,17 @@ export interface MisreadLists {
    * well, with a table that holds such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
+  /** Live Preview can keep code through EOF after an HTML/code transition (#433). */
+  htmlCodeToEnd: boolean;
   /**
    * In the Obsidian dialect, the blocks that Reading view reads as more of an
    * HTML block above them. A line of blank space directly below an HTML block
    * that ends at a blank line continues the block, and so do the blocks after
    * it, up to an empty line (issue #358). Each counts from the start of its
    * first line, with the marker of a list item there.
+   * Also the HTML source opened in a container and continued beyond its end:
+   * each range spans both views' raw regions, through their later terminator
+   * or EOF, starting at the HTML opener (issue #428).
    */
   htmlText: ReadonlySet<Nodes>;
   /**
@@ -147,14 +152,16 @@ export interface MisreadLists {
    */
   definitionCode: ReadonlySet<Nodes>;
   /**
-   * In the Obsidian dialect, the lines of a paragraph that Live Preview styles
-   * as a link reference definition: each that starts at the first column of
-   * its line with `[`, a label, and `]:`, whatever follows, where the parser
-   * reads text, because a definition cannot interrupt a paragraph or because
-   * the line is no definition, as `[r]: a b` is not (issue #391). Each counts
+   * In the Obsidian dialect, the lines of a paragraph whose content Live Preview
+   * reads as a link reference definition: `[`, a label, and `]:`, whatever
+   * follows, where the parser reads text because a definition cannot interrupt
+   * a paragraph or because the line is no definition, as `[r]: a b` is not
+   * (issue #391). Each counts
    * from the line break before the line, or from the line's start where the
    * paragraph starts there, to the line break after it, or to the line's end
-   * where the paragraph ends there.
+   * where the paragraph ends there. Indented or quoted starts hide destinations
+   * as well (#411), except the content on a list's marker line. An empty colon
+   * line protects the next nonblank source line, which supplies the hidden destination.
    */
   definitionLines: ReadonlySet<Nodes>;
   /**
@@ -351,6 +358,7 @@ export function misreadLists(document: Document): MisreadLists {
   const htmlText = new Set<Nodes>();
   const tableText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
+  let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
@@ -361,6 +369,7 @@ export function misreadLists(document: Document): MisreadLists {
   const itemHtml = new Set<Nodes>();
   const commentText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
+    const containerHtml = new Set<Nodes>();
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
      * inside a container that does, as in `- > a`.
@@ -380,12 +389,14 @@ export function misreadLists(document: Document): MisreadLists {
       item: boolean,
       footnote: Nodes | undefined,
       opener: Parents | undefined,
+      contained: boolean,
     ) => {
       if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
       if (leaves.has(node.type) || !("children" in node)) {
         order.push([node, item]);
         if (footnote) inFootnotes.set(node, footnote);
         if (opener) openers.set(node, opener);
+        if (contained && node.type === "html") containerHtml.add(node);
       } else
         node.children.forEach((child, index) =>
           collect(
@@ -395,10 +406,11 @@ export function misreadLists(document: Document): MisreadLists {
             index === 0 || node.type === "list"
               ? (opener ?? (node.type === "root" ? undefined : node))
               : undefined,
+            contained || node.type === "listItem" || node.type === "blockquote",
           ),
         );
     };
-    collect(document.tree, false, undefined, undefined);
+    collect(document.tree, false, undefined, undefined, false);
     /** Where the line holding `offset` starts. */
     const lineStart = (offset: number) => {
       let at = offset;
@@ -714,6 +726,30 @@ export function misreadLists(document: Document): MisreadLists {
         },
       } as Nodes;
     };
+    // A container can end the parser's HTML block before Obsidian stops reading
+    // its source as HTML (#428). Reading view and Live Preview have different
+    // ends; preserve their union, including a closer inside another leaf block.
+    // Each scan consumes every opener through that union's end, so a contained
+    // leaf already inside it cannot extend the region without being visited.
+    let htmlUntil = 0;
+    let htmlCode: Map<number, HtmlCode> | undefined;
+    const htmlCodeEnd = (at: number): HtmlCode | undefined => {
+      const code = (htmlCode ??= htmlCodeSpans(source)).get(at);
+      if (code?.toEnd) htmlCodeToEnd = true;
+      return code;
+    };
+    for (const [leaf] of order) {
+      if (!containerHtml.has(leaf) || !leaf.position) continue;
+      const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
+      if (start < htmlUntil) continue;
+      const until = obsidianHtmlEnd(source, start, htmlCodeEnd);
+      if (until <= end) continue;
+      htmlUntil = until;
+      htmlText.add({
+        ...leaf,
+        position: { ...leaf.position, end: { ...leaf.position.end, offset: until } },
+      } as Nodes);
+    }
     /**
      * Comment openers in text, highlights, and image descriptions, where Live
      * Preview starts HTML comments too, excluding code spans and math.
@@ -795,24 +831,51 @@ export function misreadLists(document: Document): MisreadLists {
             underlines.add(breakBefore(child, from, to));
         }
         if (child.type === "paragraph") {
-          // A line that starts at the first column with `[`, a label, and `]:`
-          // has Live Preview's style of a link reference definition, with the
+          // A line whose content starts with `[`, a label, and `]:` hides its
+          // destination, including after indentation and quote markers, with the
           // lines above and below it as text, where the parser reads more of
           // the paragraph, also at its start, where the line is no definition
           // (issue #391). It stays on a line of its own, as written: the line
           // break before and after it count, where the paragraph has them.
           const [lineFrom, lineTo] = lineAround(start);
-          const first: [number, number][] =
-            lineFrom === start ? [[start, Math.min(lineTo, end)]] : [];
-          for (const [from, to] of [...first, ...laterLines(start, end)])
-            if (definitionLike.test(source.slice(from, to)))
+          const prefix = source.slice(lineFrom, start);
+          // The first content on a list's marker line is text, not a definition.
+          const marker = /(?:^|[ \t>])(?:[-+*]|\d{1,9}[.)])[ \t]/.test(prefix);
+          const first: [number, number][] = marker ? [] : [[start, Math.min(lineTo, end)]];
+          for (const [from, to] of [...first, ...laterLines(start, end)]) {
+            const content = source.slice(from, to).replace(/^[ \t>]+/, "");
+            const label = definitionLike.exec(content);
+            if (label) {
+              let until = to;
+              // An empty colon line keeps its pending destination across blank
+              // lines; the first following word can be hidden in another block.
+              if (!content.slice(label[0].length).trim()) {
+                let next = to;
+                while (next < source.length) {
+                  next += source.startsWith("\r\n", next) ? 2 : 1;
+                  until = lineAround(next)[1];
+                  if (
+                    source
+                      .slice(next, until)
+                      .replace(/^[ \t>]+/, "")
+                      .trim()
+                  )
+                    break;
+                  next = until;
+                }
+              }
               definitionLines.add({
                 ...child,
                 position: {
                   start: { ...child.position!.start, offset: from === start ? start : from - 1 },
-                  end: { ...child.position!.end, offset: to < end ? to + 1 : to },
+                  end: {
+                    ...child.position!.end,
+                    offset: until < source.length ? until + 1 : until,
+                  },
                 },
               } as Nodes);
+            }
+          }
         }
         if (
           child.type === "paragraph" &&
@@ -996,6 +1059,7 @@ export function misreadLists(document: Document): MisreadLists {
     next,
     descriptions,
     unclosedCode,
+    htmlCodeToEnd,
     htmlText,
     underlines,
     lazyItems,
@@ -1021,6 +1085,209 @@ export function misreadLists(document: Document): MisreadLists {
  */
 const interruptingHtml =
   /^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$)|\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[\s>]|\/>|$))/i;
+
+const voidHtml = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+/** The last source line that either Obsidian view reads as HTML after a container opener. */
+function obsidianHtmlEnd(
+  source: string,
+  start: number,
+  codeEnd: (at: number) => HtmlCode | undefined,
+): number {
+  const first = source.slice(start, lineBreak(source, start));
+  const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
+    ? /<\/(?:script|pre|style|textarea)[ \t]*>/gi
+    : first.startsWith("<!--")
+      ? "-->"
+      : first.startsWith("<?")
+        ? "?>"
+        : first.startsWith("<![CDATA[")
+          ? "]]>"
+          : /^<![A-Za-z]/.test(first)
+            ? ">"
+            : undefined;
+  let reading = lineBreak(source, start);
+  if (explicit) {
+    const from = start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
+    let end: number;
+    if (typeof explicit === "string") {
+      const at = source.indexOf(explicit, from);
+      end = at < 0 ? source.length : at + explicit.length;
+    } else {
+      explicit.lastIndex = from;
+      const close = explicit.exec(source);
+      end = close ? close.index + close[0].length : source.length;
+    }
+    reading = lineBreak(source, end);
+  } else {
+    let cursor = reading;
+    while (cursor < source.length) {
+      cursor += source.startsWith("\r\n", cursor) ? 2 : 1;
+      const end = lineBreak(source, cursor);
+      const line = source.slice(cursor, end);
+      // Obsidian keeps whitespace-only lines as HTML source (#358), but a
+      // physically empty line or bare quote markers end Reading view's block.
+      if (/^[ \t>]*$/.test(line) && !/[ \t]/.test(line)) break;
+      reading = end;
+      cursor = end;
+    }
+  }
+  // Live Preview's HTML mode survives blank lines until its tag stack closes.
+  // A later opener before Reading view's end, or on that closing source line,
+  // can open another such region, including inside a separate parsed HTML leaf.
+  // Quoted attribute values and comments cannot supply closing tags; void and
+  // self-closing tags need no closer. A mismatched closer ends its open stack.
+  const stack: string[] = [];
+  // Cache the physical line end: consecutive roots on that line must not
+  // rescan its remaining suffix for every closing tag or explicit token.
+  let until = reading;
+  for (let cursor = start; cursor < source.length;) {
+    let at: number;
+    if (!stack.length) {
+      // Between HTML roots Live Preview resumes Markdown, even while Reading
+      // view still reads raw HTML. Escapes and matched code spans supply no
+      // new opener. Their run-pair index is built once for the whole document.
+      while (cursor < until) {
+        if (source[cursor] === "\\") cursor += 2;
+        else if (source[cursor] === "`") {
+          const code = codeEnd(cursor);
+          // A multiline run can reach a fence opener the parser still reads
+          // inside this HTML block (#433). Preserve its uncertain end.
+          if (code?.toEnd) return source.length;
+          cursor = code?.end ?? cursor + 1;
+          if (cursor > until) until = lineBreak(source, cursor);
+        } else if (source[cursor] === "<") break;
+        else cursor++;
+      }
+      at = cursor;
+    } else at = source.indexOf("<", cursor);
+    if (at < 0) break;
+    if (!stack.length && at >= until) break;
+    // Consume each special token once, ignoring tags inside its body. Live
+    // Preview needs `-->` even when Reading view closes at `--!>`.
+    const marker = source.startsWith("<!--", at)
+      ? "-->"
+      : source.startsWith("<?", at)
+        ? "?>"
+        : source.slice(at, at + 9).toUpperCase() === "<![CDATA["
+          ? "]]>"
+          : /^<![A-Za-z]/.test(source.slice(at, at + 3))
+            ? ">"
+            : undefined;
+    if (marker) {
+      const end = source.indexOf(marker, at + (marker === "-->" ? 4 : marker === "]]>" ? 9 : 2));
+      if (end < 0) return source.length;
+      cursor = end + marker.length;
+      if (!stack.length && cursor > until) until = lineBreak(source, cursor);
+      continue;
+    }
+    const closing = source[at + 1] === "/";
+    const from = at + (closing ? 2 : 1);
+    if (!/[a-z]/i.test(source[from] ?? "")) {
+      cursor = from;
+      continue;
+    }
+    let end = from + 1;
+    while (end < source.length && /[a-z0-9-]/i.test(source[end]!)) end++;
+    // Between roots this is Markdown: a scheme colon or an email's `@` cannot
+    // be an HTML name delimiter. Hyphenated custom tag names remain possible.
+    if (!stack.length && end < source.length && !/[\s/>]/.test(source[end]!)) {
+      cursor = end;
+      continue;
+    }
+    const name = source.slice(from, end).toLowerCase();
+    let quote = "";
+    let multiline = false;
+    for (; end < source.length; end++) {
+      const char = source[end]!;
+      if (char === "\r" || char === "\n") multiline = true;
+      if (quote) {
+        if (char === quote) quote = "";
+      } else if (char === '"' || char === "'") quote = char;
+      else if (char === "<" || char === ">") break;
+    }
+    if (end === source.length) return source.length;
+    cursor = end;
+    // A new opener ends this incomplete token; resume there without rescanning
+    // its prefix. Quoted values above are each traversed only once as well.
+    if (source[end] === "<") continue;
+    cursor++;
+    // Container markers can stand inside a multiline tag's source. Without
+    // reconstructing that HTML token stream, retain the remaining source.
+    if (multiline) return source.length;
+    const raw = stack.at(-1);
+    if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
+    if (closing) {
+      const matched = stack.lastIndexOf(name);
+      stack.length = matched < 0 ? 0 : matched;
+    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
+      stack.push(name);
+    if (!stack.length && cursor > until) until = lineBreak(source, cursor);
+  }
+  return stack.length ? source.length : until;
+}
+
+/** A code run's known end, or conservative protection through EOF. */
+type HtmlCode = { end: number; toEnd: boolean };
+
+/** Code runs between HTML roots, indexed once; escaped ticks can still close code. */
+function htmlCodeSpans(source: string): Map<number, HtmlCode> {
+  type HtmlRun = { from: number; length: number; lineEnd: number; fence: boolean };
+  const runs: HtmlRun[] = [];
+  let lineEnd = -1;
+  for (let from = source.indexOf("`"); from >= 0;) {
+    const first = from >= lineEnd;
+    let fence = false;
+    if (first) {
+      lineEnd = lineBreak(source, from);
+      let start = from;
+      while (start > 0 && source[start - 1] !== "\r" && source[start - 1] !== "\n") start--;
+      fence = /^(?:[ \t>]|(?:[-+*]|\d{1,9}[.)])[ \t])*$/.test(source.slice(start, from));
+    }
+    let after = from + 1;
+    while (source[after] === "`") after++;
+    runs.push({ from, length: after - from, lineEnd, fence });
+    from = source.indexOf("`", after);
+  }
+  const result = new Map<number, HtmlCode>();
+  const nearby = new Map<number, HtmlRun>();
+  const later = new Map<number, HtmlRun>();
+  lineEnd = -1;
+  for (let index = runs.length - 1; index >= 0; index--) {
+    const run = runs[index]!;
+    if (run.lineEnd !== lineEnd) nearby.clear();
+    lineEnd = run.lineEnd;
+    const record = (from: number, length: number) => {
+      const close = (length <= 2 ? nearby : later).get(length);
+      result.set(from, {
+        end: close ? close.from + length : length <= 2 ? run.lineEnd : source.length,
+        toEnd: length >= 3 && (!close || (close.lineEnd !== run.lineEnd && close.fence)),
+      });
+    };
+    record(run.from, run.length);
+    // Outside code a backslash escapes only a run's first tick. Inside code
+    // every full raw run can close it, regardless of a preceding backslash.
+    if (run.length > 1) record(run.from + 1, run.length - 1);
+    nearby.set(run.length, run);
+    later.set(run.length, run);
+  }
+  return result;
+}
 
 /** A run of backticks: its offset and its length. */
 type Run = [number, number];

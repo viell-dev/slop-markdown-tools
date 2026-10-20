@@ -1641,6 +1641,12 @@ describe("paragraph lines that Live Preview styles as a link reference definitio
     // Nothing in the line changes, not even its blank space.
     "a\n[r]: *x*\n",
     "a\n[r]: x \nc\n",
+    "a\n [r]: https://x.org\n",
+    "a\n    [r]: https://x.org\n",
+    "a\n\t[r]: https://x.org\n",
+    "> a\n> [r]: https://x.org\n",
+    "- a\n  [r]: https://x.org\n",
+    "> [r]: a b\n> c\n",
     // The parts of a definition on the lines below stay there.
     "a\n[r]:\nhttps://x.org\n",
     'a\n[r]: https://x.org\n"t"\n',
@@ -1664,18 +1670,11 @@ describe("paragraph lines that Live Preview styles as a link reference definitio
     ["a\n[r]: https://x.org\nc *d*\n", "a\n[r]: https://x.org\nc _d_\n"],
     ["*a*\n[r]: x\n*b*\n", "_a_\n[r]: x\n_b_\n"],
     ["[r]: a b\nc *d*\n", "[r]: a b\nc _d_\n"],
-    // Blank space, a quote marker, a backslash, or other text before `[` or
-    // between `]` and `:` makes Live Preview read text.
-    ["a\n [r]: https://x.org\n", "a [r]: https://x.org\n"],
-    ["a\n    [r]: https://x.org\n", "a [r]: https://x.org\n"],
-    ["a\n\t[r]: https://x.org\n", "a [r]: https://x.org\n"],
-    ["> a\n> [r]: https://x.org\n", "> a [r]: https://x.org\n"],
-    ["- a\n  [r]: https://x.org\n", "- a [r]: https://x.org\n"],
+    // A backslash or other text before `[` or between `]` and `:` is text.
     ["a\n\\[r]: https://x.org\n", "a \\[r]: https://x.org\n"],
     ["a\n[r] : x\n", "a [r] : x\n"],
     ["a\n[[x]]: y\n", "a [[x]]: y\n"],
     ["a\n[r][s]: x\n", "a [r][s]: x\n"],
-    ["> [r]: a b\n> c\n", "> [r]: a b c\n"],
     ["- [r]: a b\n  c\n", "- [r]: a b c\n"],
     // Below a blank line, it is a definition, and the text below it a paragraph.
     ["a\n\n[r]: https://x.org\nc *d*\n", "a\n\n[r]: https://x.org\nc _d_\n"],
