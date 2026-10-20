@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The benchmark guide identifies the parser's repeated list/table transition
+  performance limit and links its standalone reproduction
+  ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
+- Dependency documentation distinguishes exact direct pins from a consumer's
+  resolved indirect dependencies, and explains consumer lockfiles
+  ([#472](https://github.com/viell-dev/slop-markdown-tools/issues/472)).
 - The Prettier coexistence recipe excludes both `.md` and `.markdown` files,
   matching the file types that both tools process
   ([#458](https://github.com/viell-dev/slop-markdown-tools/issues/458)).
