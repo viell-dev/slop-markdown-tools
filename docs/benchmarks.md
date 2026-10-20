@@ -147,9 +147,20 @@ Node.js reclaims memory, so it is an upper bound.
 The cost per kilobyte rises by about two thirds from a short document to one of
 a megabyte, far larger than documents usually are. Earlier reference results, on
 another processor, showed a rise of two fifths and of a quarter, so the size of
-the rise depends on the runner. It is not explained yet; on Windows the cost per
-kilobyte stays level ([issue
+the rise depends on the runner. The investigation also found a dependency
+regression: micromark 4.0.3 repeatedly copies its accumulated document events at
+list/table transitions. With many repetitions in one file, doubling the input
+approaches four times the parsing work. A standalone parser reproduction gives
+the same HTML as 4.0.2 while showing that growth; the issue records the version
+matrix, profiling, and reproduction ([issue
 #300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
+
+Both linting and formatting parse the whole document, so either can be affected
+by this limit. No general source-level workaround is applied: the parser still
+needs the complete document for its references and container structure. Where
+the content permits it, keeping independent sections in separate documents
+limits the size of each parse. This limit is tracked pending an upstream fix;
+the existing output-preservation checks remain in place.
 
 While a document is parsed, the parser holds a list of every token it found,
 many times larger than the text. These are the smallest heap limits
