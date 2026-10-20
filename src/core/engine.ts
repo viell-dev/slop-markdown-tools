@@ -781,7 +781,7 @@ function formatText(
           hosted,
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
         );
-        findings.push(...diagnostics);
+        for (const diagnostic of diagnostics) findings.push(diagnostic);
         // With ranges, an edit that reaches outside them is not applied. One
         // that changes nothing need not be tried, and must not hold others back.
         const proposals: Proposal[] = [];

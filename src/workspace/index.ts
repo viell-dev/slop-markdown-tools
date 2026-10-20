@@ -805,8 +805,9 @@ export function createWorkspace(
       const tail = rootFolded.slice(-count);
       if (!tail.every((part, index) => parts[index]!.toLowerCase() === part)) continue;
       const rest = parts.slice(count).join("/");
-      found.push(...namesMatching(rest));
-      if (!path.posix.extname(rest)) found.push(...namesMatching(`${rest}.md`));
+      for (const name of namesMatching(rest)) found.push(name);
+      if (!path.posix.extname(rest))
+        for (const name of namesMatching(`${rest}.md`)) found.push(name);
     }
     return found;
   }
@@ -837,8 +838,9 @@ export function createWorkspace(
     for (const extension of ["", ".md"]) {
       const sharing = filesNamed(wanted.slice(slash + 1) + extension);
       // A bare file name is decided by the table alone.
-      if (slash < 0) found.push(...sharing);
-      else {
+      if (slash < 0) {
+        for (const name of sharing) found.push(name);
+      } else {
         const ending = `/${wanted}${extension}`;
         for (const actual of sharing) {
           const path = actual.toLowerCase();
