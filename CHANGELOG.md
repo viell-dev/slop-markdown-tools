@@ -18,8 +18,23 @@ prereleases' notes there are longer than their entries here.
   remain unchanged
   ([#460](https://github.com/viell-dev/slop-markdown-tools/issues/460)).
 
+## 0.3.1 - 2026-10-21
+
 ### Fixed
 
+- The Prettier coexistence recipe excludes both `.md` and `.markdown` files,
+  matching the file types that both tools process
+  ([#458](https://github.com/viell-dev/slop-markdown-tools/issues/458)).
+- Named suppression enables work after an all-rule disable, without enabling
+  other rules or changing configuration
+  ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
+- Obsidian links match every path component without regard to case inside
+  skipped folders, and report duplicate case variants as ambiguous
+  ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).
+- Supplied documents and stdin paths obey inherited Git ignore rules even when
+  their parent directories do not exist, with repository boundaries and
+  negations preserved
+  ([#453](https://github.com/viell-dev/slop-markdown-tools/issues/453)).
 - The nested-comment complexity check warms both input sizes and measures fresh
   batches, preserving its scaling bound while reducing timing noise
   ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
