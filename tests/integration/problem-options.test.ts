@@ -4,6 +4,7 @@ import { expect, it } from "vitest";
 import { lint } from "../../src/index.js";
 import type { Config } from "../../src/index.js";
 import { fixture, run } from "./support.js";
+import { parseReport } from "./json.js";
 
 it("uses configured problem rules identically in the API, CLI and path overrides", async () => {
   const config: Config = {
@@ -30,7 +31,7 @@ it("uses configured problem rules identically in the API, CLI and path overrides
       const result = run(root, [mode, name, "--json", ...(mode === "format" ? ["--check"] : [])]);
       expect(result.status, result.stderr).toBe(1);
       expect(result.stderr).toBe("");
-      expect(JSON.parse(result.stdout).files).toEqual([
+      expect(parseReport(result.stdout).files).toEqual([
         { path: name, ...(mode === "format" ? { changed: false } : {}), diagnostics: expected },
       ]);
     }
@@ -54,7 +55,7 @@ it("lets custom front-matter titles satisfy initial-heading and single-title tog
     source,
   );
   expect(result.status, result.stderr).toBe(0);
-  expect(JSON.parse(result.stdout).files).toEqual([
+  expect(parseReport(result.stdout).files).toEqual([
     { path: "new.md", changed: false, diagnostics: [] },
   ]);
 });
