@@ -10,6 +10,12 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Added
+
+- The main `mdrefine` entry exports `unifiedDiff`, the same scalable unified
+  patch generator that `format --diff` uses, for scripts extending a formatting
+  preview ([#321](https://github.com/viell-dev/slop-markdown-tools/issues/321)).
+
 ### Changed
 
 - Contributor checks use TypeScript types during source and test linting, and
