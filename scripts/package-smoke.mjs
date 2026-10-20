@@ -27,7 +27,7 @@ function runNode(args, cwd, input) {
 }
 /** A TypeScript consumer of the published types, as an ES module. */
 const consumerModule = `import {
-  builtInRules, configSchema, format, lint, parse, presets, resolveConfig,
+  builtInRules, configSchema, format, lint, parse, presets, resolveConfig, unifiedDiff,
   type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink,
 } from ${named()};
 import { discoverWorkspace, type DiscoverOptions, type Skipped, type WorkspaceDiscovery } from ${named("/node")};
@@ -44,6 +44,7 @@ const config = {
 } as const satisfies Config;
 const options: ProcessOptions = { config, plugins: [plugin], defaultDialect: "obsidian" };
 const output: string = format("Text", options).output;
+const patch: string = unifiedDiff("a/note.md", "b/note.md", "Text", output); void patch;
 const assumed: Dialect = resolveConfig({ ...options, defaultDialect: "codeberg" }).dialect; void assumed;
 void lint(output, { config: presets.github });
 // @ts-expect-error The tables that every caller shares are read-only.
@@ -60,14 +61,32 @@ for (const node of parse(output, "obsidian").tree.children) {
 }
 `;
 /** The same package from a CommonJS module, whose imports become require() calls. */
-const consumerCommonJs = `import { format, type Config } from ${named()};
+const consumerCommonJs = `import { format, unifiedDiff, type Config } from ${named()};
 import { discoverWorkspace } from ${named("/node")};
 const config: Config = { extends: ["recommended"] };
 const output: string = format("Text", { config }).output;
-void output; void discoverWorkspace;
+const patch: string = unifiedDiff("a/note.md", "b/note.md", "Text", output);
+void output; void discoverWorkspace; void patch;
 `;
 /** What every installation of the package must do, whatever its layout. */
 async function checkInstalled(project) {
+  for (const mode of ["module", "commonjs"]) {
+    const load =
+      mode === "module"
+        ? `import { unifiedDiff } from ${named()};`
+        : `const { unifiedDiff } = require(${named()});`;
+    assert.equal(
+      runNode(
+        [
+          `--input-type=${mode}`,
+          "-e",
+          `${load} process.stdout.write(unifiedDiff("a/note.md", "b/note.md", "before\\n", "after\\n"));`,
+        ],
+        project,
+      ),
+      `${"=".repeat(67)}\n--- a/note.md\n+++ b/note.md\n@@ -1,1 +1,1 @@\n-before\n+after\n`,
+    );
+  }
   assert.equal(
     runNode(
       [
