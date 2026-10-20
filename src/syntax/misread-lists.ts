@@ -116,11 +116,11 @@ export interface MisreadLists {
    */
   itemHtml: ReadonlySet<Nodes>;
   /**
-   * In the Obsidian dialect, a paragraph with an inline HTML comment that no
-   * closer ends in that paragraph, and the blocks through the one holding the
-   * next closer, or through the document's end without one. Live Preview
-   * carries comment styling across the blocks and restores container styling
-   * only after the closer's line (issue #408). Whole source lines count.
+   * In the Obsidian dialect, a paragraph, heading, or table with an inline HTML
+   * comment that no closer ends in that block, and the blocks through the one
+   * holding the next closer, or through the document's end without one. Live
+   * Preview carries comment styling across the blocks and restores container
+   * styling only after the closer's line (issue #408). Whole source lines count.
    */
   commentText: ReadonlySet<Nodes>;
   /**
@@ -737,11 +737,17 @@ export function misreadLists(document: Document): MisreadLists {
     let commentedUntil = 0;
     for (let index = 0; index < order.length; index++) {
       const [leaf] = order[index]!;
-      if (leaf.type !== "paragraph" || !leaf.position) continue;
+      // These leaf blocks hold inline syntax, including a table's cells.
+      // Live Preview carries comment state out of any of them (issue #408).
+      if (
+        (leaf.type !== "paragraph" && leaf.type !== "heading" && leaf.type !== "table") ||
+        !leaf.position
+      )
+        continue;
       for (const opener of commentOpeners(leaf)) {
         if (opener < commentedUntil) continue;
         const closer = source.indexOf("-->", opener + 4);
-        // Comments do not nest, even inside one paragraph. Searching for the
+        // Comments do not nest, even inside one block. Searching for the
         // same closer at every nested opener was quadratic (issue #418).
         commentedUntil = closer < 0 ? source.length : closer + 3;
         if (closer >= 0 && closer < leaf.position.end.offset!) continue;

@@ -1,9 +1,10 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
-// #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414), and those that the check
-// has to read with care (#385). Each paragraph is long enough that formatting at 30 or 80 columns
-// reflows it, unless the tool leaves it as written. Every word is synthetic.
+// #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414), and those that the
+// check has to read with care (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
+// that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
+// is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
@@ -119,6 +120,41 @@ export const fixtures = [
       "Some words before the code block, enough of them to be reflowed at a narrow width.\n\n~~~\nconst a = 1;",
   },
   {
+    // #400: a line of spaces below a list item is a list line to Live Preview, and the text
+    // below it is not part of the item; `style/trailing-space` empties the line.
+    name: "blank list line of spaces",
+    source:
+      "- An item with enough words to be reflowed at a narrow width, and more\n  \nA paragraph below the line, with enough words to be reflowed at a narrow width.\n",
+  },
+  {
+    // #401: with the cursor on a table's first line, Live Preview shows an empty row line next
+    // to the table's widget, whose class names the leading pipe that `style/table` adds.
+    name: "table at the start of the note",
+    source:
+      "Name | Value\n--- | ---\nA cell | Another cell\n\nA paragraph below the table, with enough words to be reflowed at a narrow width.\n",
+  },
+  {
+    // #403: after an HTML tag that nothing closes, Live Preview shows the source as written,
+    // a callout's type included, which the callout rule writes in lowercase.
+    name: "callout after an open HTML tag",
+    source:
+      "Some words <b> before a callout, enough of them to be reflowed at a narrow width.\n\n> [!TIP] A title\n> A body line with enough words to be reflowed at a narrow width, and more.\n",
+  },
+  {
+    // #406: blank space at the end of a heading's line in a list item is inside the heading's
+    // styled run, and `style/trailing-space` removes it.
+    name: "heading in an item with trailing space",
+    source:
+      "- ## A heading in an item ~~~ \n  A line below it in the item, with enough words to be reflowed at a narrow width.\n",
+  },
+  {
+    // #410: the first line of a block quote in a list item carries the item's classes and the
+    // lines after it only the quote's; wrapping makes more lines of it.
+    name: "quote in a nested item",
+    source:
+      "+ An item\n  1) A nested item\n  > A quote inside the nested item with enough words to be reflowed at a narrow width\n",
+  },
+  {
     // #397: Live Preview styles the heading's line as a link reference definition and reads the
     // underline as text, so `style/heading` leaves the heading underlined.
     name: "underlined heading with a definition-like line",
@@ -157,6 +193,24 @@ export const fixtures = [
       "Some words <!-- an open comment\n\n> - Words --> followed by enough more words to be reflowed at a narrow width.\n>   More words on the next line.\n\nIndependent *text* below the comment.\n",
   },
   {
+    // #408: a setext heading's underline is comment-styled too, and must not be removed.
+    name: "inline HTML comment opened in an underlined heading",
+    source:
+      "Heading <!-- an open comment\n================\n\n> Words --> followed by enough more words to be reflowed at a narrow width.\n> More words on the next line.\n",
+  },
+  {
+    // #408: an ATX heading carries the same comment state out into the following blocks.
+    name: "inline HTML comment opened in an ATX heading",
+    source:
+      "# Heading <!-- an open comment\n\n- Words --> followed by enough more words to be reflowed at a narrow width.\n  More words on the next line.\n",
+  },
+  {
+    // #408: the table widget does not stop the editor's comment state at the table boundary.
+    name: "inline HTML comment opened in a table cell",
+    source:
+      "| A | B |\n| - | - |\n| Words <!-- an open comment | value |\n\n> Words --> followed by enough more words to be reflowed at a narrow width.\n> More words on the next line.\n",
+  },
+  {
     // #411: at 30 columns, the line would break before `[a]:`, and Live Preview would style the
     // new line as a link reference definition; the word stays on the line before it.
     name: "label inside a paragraph",
@@ -182,5 +236,31 @@ export const fixtures = [
     name: "footnote ending in a space",
     source:
       "Some words with a footnote[^1] and enough of them to be reflowed at a narrow width.\n\n[^1]: The footnote's text with enough words to be reflowed at a narrow width. \n",
+  },
+  {
+    // #421: an inline-code span at the end of a soft line keeps its trailing spaces when
+    // wrapping moves the next word onto the line.
+    name: "padded inline code at a soft line break",
+    source:
+      "Words before `code  `\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: control without trailing spaces inside the inline-code span at a soft line break.
+    name: "unpadded inline code at a soft line break",
+    source:
+      "Words before `code`\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: a double-backtick inline-code span with a literal backtick and trailing spaces at
+    // the end of a soft line keeps its padding when wrapping moves the next word onto the line.
+    name: "padded double-backtick inline code at a soft line break",
+    source:
+      "Words `` code `   ``\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: control double-backtick inline-code span whose single surrounding spaces strip.
+    name: "unpadded double-backtick inline code at a soft line break",
+    source:
+      "Words `` code ` ``\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
   },
 ];
