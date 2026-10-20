@@ -152,6 +152,57 @@ describe("Obsidian HTML continued outside a container (#428)", () => {
       '- <div title="</div>"> a\n*b*\n</div>\n*c*\n\nAfter _d_\n',
     );
   });
+  it.each([
+    "- <hr>\n> <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+    "- <div></div>\n> <section>\n\n*b*\n</section>\n\nAfter *c*.\n",
+    "- <hr>\n- <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+    "- <hr><div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+    "- <hr>\n  <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+    "- <div></div><section>\n\n*b*\n</section>\n\nAfter *c*.\n",
+    "> - <hr>\n>   <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+    "- - <hr><div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  ])("keeps a later opener inside an earlier HTML region in %j", (source) => {
+    variants(source, source.replaceAll("After *c*.", "After _c_."));
+  });
+  it("keeps the end of an unfinished later opener", () => {
+    variants("- <hr><div>\n\n*b*");
+  });
+  it("still formats below consecutive closed HTML roots", () => {
+    variants(
+      "- <hr><div></div>\n\n*b*\n\nAfter *c*.\n",
+      "- <hr><div></div>\n\n_b_\n\nAfter _c_.\n",
+    );
+  });
+  it.each(["<!-- c -->", "<?probe ?>", "<!DOCTYPE probe>", "<![CDATA[c]]>"])(
+    "keeps a later HTML root after the explicit token %s",
+    (token) =>
+      variants(
+        `- ${token} <div>\n\n*b*\n</div>\n\nAfter *c*.\n`,
+        `- ${token} <div>\n\n*b*\n</div>\n\nAfter _c_.\n`,
+      ),
+  );
+  it("continues through later openers on a closing source line", () => {
+    variants(
+      "- <div>\n*b*\n</div><section>\n\n*c*\n</section>\n\nAfter *d*.\n",
+      "- <div>\n*b*\n</div><section>\n\n*c*\n</section>\n\nAfter _d_.\n",
+    );
+  });
+  it.each(["`<div>`", "\\<div>"])(
+    "still formats below the Markdown control %s after a void root",
+    (text) => {
+      for (const between of [" ", "\n  "])
+        variants(
+          `- <hr>${between}${text}\n\n*b*\n\nAfter *c*.\n`,
+          `- <hr>${between}${text}\n\n_b_\n\nAfter _c_.\n`,
+        );
+    },
+  );
+  it("scans consecutive void roots before an unclosed HTML root", () => {
+    const html = "<hr>".repeat(4000) + "<div>";
+    expect(checked(`- ${html}\n\n*b*\n</div>\n\nAfter *c*.\n`)).toBe(
+      `- ${html}\n\n*b*\n</div>\n\nAfter _c_.\n`,
+    );
+  });
   it.each(["<!-- </div> -->", "<?probe </div> ?>", "<![CDATA[</div>]]>"])(
     "keeps a closing tag inside %s from ending the HTML region",
     (token) =>

@@ -726,12 +726,29 @@ export function misreadLists(document: Document): MisreadLists {
     // A container can end the parser's HTML block before Obsidian stops reading
     // its source as HTML (#428). Reading view and Live Preview have different
     // ends; preserve their union, including a closer inside another leaf block.
+    // Each scan consumes every opener through that union's end, so a contained
+    // leaf already inside it cannot extend the region without being visited.
     let htmlUntil = 0;
+    let htmlCode: Map<number, number> | undefined;
+    const htmlCodeEnd = (at: number): number | undefined => {
+      if (!htmlCode) {
+        htmlCode = new Map();
+        const runs = backtickRuns(source, 0, source.length);
+        const next = new Map<number, number>();
+        for (let index = runs.length - 1; index >= 0; index--) {
+          const [from, length] = runs[index]!;
+          const close = next.get(length);
+          if (close !== undefined) htmlCode.set(from, close + length);
+          next.set(length, from);
+        }
+      }
+      return htmlCode.get(at);
+    };
     for (const [leaf] of order) {
       if (!containerHtml.has(leaf) || !leaf.position) continue;
       const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
       if (start < htmlUntil) continue;
-      const until = obsidianHtmlEnd(source, start);
+      const until = obsidianHtmlEnd(source, start, htmlCodeEnd);
       if (until <= end) continue;
       htmlUntil = until;
       htmlText.add({
@@ -1092,7 +1109,11 @@ const voidHtml = new Set([
 ]);
 
 /** The last source line that either Obsidian view reads as HTML after a container opener. */
-function obsidianHtmlEnd(source: string, start: number): number {
+function obsidianHtmlEnd(
+  source: string,
+  start: number,
+  codeEnd: (at: number) => number | undefined,
+): number {
   const first = source.slice(start, lineBreak(source, start));
   const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
     ? /<\/(?:script|pre|style|textarea)[ \t]*>/gi
@@ -1118,15 +1139,6 @@ function obsidianHtmlEnd(source: string, start: number): number {
       end = close ? close.index + close[0].length : source.length;
     }
     reading = lineBreak(source, end);
-    // Comments, instructions, declarations, and CDATA have no nested tag stack.
-    if (/^<[!?]/.test(first)) {
-      // Live Preview does not reuse the opener's characters as the closer in
-      // `<!-->`, `<!--->`, or `<?>`, although Reading view ends the block there.
-      const marker = first.startsWith("<!--") ? "-->" : first.startsWith("<?") ? "?>" : undefined;
-      if (!marker) return reading;
-      const at = source.indexOf(marker, start + (marker === "-->" ? 4 : 2));
-      return at < 0 ? source.length : Math.max(reading, lineBreak(source, at + marker.length));
-    }
   } else {
     let cursor = reading;
     while (cursor < source.length) {
@@ -1141,12 +1153,32 @@ function obsidianHtmlEnd(source: string, start: number): number {
     }
   }
   // Live Preview's HTML mode survives blank lines until its tag stack closes.
+  // A later opener before Reading view's end, or on that closing source line,
+  // can open another such region, including inside a separate parsed HTML leaf.
   // Quoted attribute values and comments cannot supply closing tags; void and
   // self-closing tags need no closer. A mismatched closer ends its open stack.
   const stack: string[] = [];
+  // Cache the physical line end: consecutive roots on that line must not
+  // rescan its remaining suffix for every closing tag or explicit token.
+  let until = reading;
   for (let cursor = start; cursor < source.length;) {
-    const at = source.indexOf("<", cursor);
+    let at: number;
+    if (!stack.length) {
+      // Between HTML roots Live Preview resumes Markdown, even while Reading
+      // view still reads raw HTML. Escapes and matched code spans supply no
+      // new opener. Their run-pair index is built once for the whole document.
+      while (cursor < until) {
+        if (source[cursor] === "\\") cursor += 2;
+        else if (source[cursor] === "`") {
+          const end = codeEnd(cursor);
+          cursor = end !== undefined && end <= until ? end : cursor + 1;
+        } else if (source[cursor] === "<") break;
+        else cursor++;
+      }
+      at = cursor;
+    } else at = source.indexOf("<", cursor);
     if (at < 0) break;
+    if (!stack.length && at >= until) break;
     // Consume each special token once, ignoring tags inside its body. Live
     // Preview needs `-->` even when Reading view closes at `--!>`.
     const marker = source.startsWith("<!--", at)
@@ -1162,6 +1194,7 @@ function obsidianHtmlEnd(source: string, start: number): number {
       const end = source.indexOf(marker, at + (marker === "-->" ? 4 : marker === "]]>" ? 9 : 2));
       if (end < 0) return source.length;
       cursor = end + marker.length;
+      if (!stack.length && cursor > until) until = lineBreak(source, cursor);
       continue;
     }
     const closing = source[at + 1] === "/";
@@ -1192,7 +1225,6 @@ function obsidianHtmlEnd(source: string, start: number): number {
     // Container markers can stand inside a multiline tag's source. Without
     // reconstructing that HTML token stream, retain the remaining source.
     if (multiline) return source.length;
-    if (at !== start && !stack.length) break;
     const raw = stack.at(-1);
     if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
     if (closing) {
@@ -1200,9 +1232,9 @@ function obsidianHtmlEnd(source: string, start: number): number {
       stack.length = matched < 0 ? 0 : matched;
     } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
       stack.push(name);
-    if (!stack.length) return Math.max(reading, lineBreak(source, cursor));
+    if (!stack.length && cursor > until) until = lineBreak(source, cursor);
   }
-  return source.length;
+  return stack.length ? source.length : until;
 }
 
 /** A run of backticks: its offset and its length. */

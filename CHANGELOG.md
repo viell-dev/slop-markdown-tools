@@ -19,9 +19,10 @@ prereleases' notes there are longer than their entries here.
   split across lines stays as written, preserving its link styling
   ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
 - In the Obsidian dialect, HTML opened in a list item or quote protects the lazy
-  lines outside its parsed container through both views' raw regions. Before,
-  rules changed literal `*words*` to `_words_`, and an unclosed tag could leave
-  Live Preview reading raw source below a blank line
+  lines outside its parsed container through both views' raw regions, including
+  later openers after a void or closed element. Before, rules changed literal
+  `*words*` to `_words_`, and an unclosed tag could leave Live Preview reading
+  raw source below a blank line
   ([#432](https://github.com/viell-dev/slop-markdown-tools/pull/432)).
 - In the Obsidian dialect, `style/wrap` leaves the first paragraph of a quote
   opened on a list item's marker line as written. Before, reflow moved words

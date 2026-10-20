@@ -55,6 +55,26 @@ export const fixtures = [
     source: "- <hr>\n*b*\n\nAfter *c*.\n",
   },
   {
+    name: "contained HTML opener inside an earlier HTML reading",
+    source: "- <hr>\n> <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "consecutive HTML roots in a list",
+    source: "- <hr><div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "closed HTML roots before an independent paragraph",
+    source: "- <hr><div></div>\n\n*b*\n\nAfter *c*.\n",
+  },
+  {
+    name: "generic HTML root after an explicit comment closer",
+    source: "- <!-- c --> <div>\n\n*b*\n</div>\n\nAfter *c*.\n",
+  },
+  {
+    name: "code after a void HTML root before an independent paragraph",
+    source: "- <hr> `<div>`\n\n*b*\n\nAfter *c*.\n",
+  },
+  {
     // #429: only continuation lines receive the quote styling in Live Preview.
     name: "quote opened on an ordered list marker line",
     source: "1. > words inside a block quote on a list marker line\n",
