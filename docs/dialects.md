@@ -115,8 +115,10 @@ On GitHub, Forgejo, and Gitea, more fragments are valid:
 - A fragment may carry the `user-content-` prefix that the renderers add to
   every anchor.
 - The `id` of any HTML element and the `name` of an `<a>`, such as
-  `<a name="install"></a>`, are anchors. HTML inside comments, code, and
-  elements whose content is text, such as `<script>` and `<textarea>`, is not.
+  `<a name="install"></a>`, are anchors. Their character references are decoded
+  once as HTML attributes, so `<a id="a&#x2d;b"></a>` is reached by `#a-b`. HTML
+  inside comments, code, and elements whose content is text, such as `<script>`
+  and `<textarea>`, is not.
 - On Forgejo and Gitea, a heading that starts a definition description, as
   `: # Title` below a term does, gets an anchor, numbered with the other
   headings, though the tool otherwise reads a definition list as text.

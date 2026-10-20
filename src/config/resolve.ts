@@ -312,8 +312,8 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     if (part.dialect) result.dialect = canonicalDialect(part.dialect);
     addRules(result.rules, part.rules);
     Object.assign(result.resolve, part.resolve);
-    result.ignore.push(...(part.ignore ?? []));
-    overrides.push(...(part.overrides ?? []));
+    for (const pattern of part.ignore ?? []) result.ignore.push(pattern);
+    for (const override of part.overrides ?? []) overrides.push(override);
   }
   if (config.extends === undefined) merge(presets.recommended!, []);
   merge(config, []);
