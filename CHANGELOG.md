@@ -18,6 +18,14 @@ prereleases' notes there are longer than their entries here.
   compact spacing, set `"rules": { "style/block-spacing": "off" }`
   ([#427](https://github.com/viell-dev/slop-markdown-tools/pull/427)).
 
+### Fixed
+
+- In the Obsidian dialect, `style/block-spacing` preserves the boundary after an
+  underlined heading that a view reads as paragraph text. Before, a new blank
+  line split that paragraph after a multiline level-1 or reference-like heading,
+  or an underline with trailing space, extra indentation, or a lone `-`
+  ([#434](https://github.com/viell-dev/slop-markdown-tools/issues/434)).
+
 ## 0.2.7 - 2026-10-20
 
 ### Fixed

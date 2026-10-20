@@ -316,6 +316,72 @@ describe("style/block-spacing", () => {
       expect(spaced(source, dialect)).toBe("+++\ntitle = 1\n+++\n1.\n\n2) b\n\n# Heading\n");
     },
   );
+  it.each([
+    "[r]: a b\n===\nText.\n",
+    "[r]: a b\n---\nText.\n",
+    "[r]: a b\n=\nText.\n",
+    "[a[b]: c\n===\nText.\n",
+    "[s]: https://example.org\n[r]: a b\n===\nText.\n",
+    " [r]: a b\n===\nText.\n",
+    "> [r]: a b\n> ===\n> Text.\n",
+    "[r]: a b\nmore words\n===\nText.\n",
+    "Heading\n[r]: a b\n===\nText.\n",
+    "> Heading\n> [r]: a b\n> ===\n> Text.\n",
+    "Heading\nMore [r]: a b\n===\nText.\n",
+    "Heading\nMore words\n===\nText.\n",
+    "> Heading\n> More words\n> ===\n> Text.\n",
+    "Heading\nMore \\[r]: a b\n===\nText.\n",
+    "Heading\nMore [r] : a b\n===\nText.\n",
+    "Heading\n=== \nText.\n",
+    "Heading\n  ===\nText.\n",
+    "Heading\n-\nText.\n",
+    "> Heading\n> === \n> Text.\n",
+  ])("keeps the alternate Obsidian paragraph boundary in %j (#434)", (body) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        for (const config of [
+          only(rule, "obsidian"),
+          { extends: ["recommended", "obsidian"], dialect: "obsidian" } satisfies Config,
+        ]) {
+          const source = bom + body.replaceAll("\n", newline);
+          const output = formatted(source, config);
+          expect(output).toBe(source);
+          expect(
+            lint(source, { config }).filter(({ rule }) => rule === "style/block-spacing"),
+          ).toEqual([]);
+          expect(semanticFingerprint(parse(source, "obsidian"))).toBe(
+            semanticFingerprint(parse(output, "obsidian")),
+          );
+        }
+  });
+  it("still separates ordinary headings and later independent blocks in Obsidian (#434)", () => {
+    for (const heading of ["Heading", "\\[r]: a b", "[r] : a b", "[r][s]: a b", "More [r]: a b"])
+      expect(spaced(`${heading}\n===\nText.\n`, "obsidian")).toBe(`${heading}\n===\n\nText.\n`);
+    expect(spaced("Heading\nMore words\n---\nText.\n", "obsidian")).toBe(
+      "Heading\nMore words\n---\n\nText.\n",
+    );
+    expect(spaced("[s]: https://example.org\nHeading\n===\nText.\n", "obsidian")).toBe(
+      "[s]: https://example.org\nHeading\n===\n\nText.\n",
+    );
+    expect(spaced("[r]: a b\n===\nText.\n\n# Later\nMore.\n", "obsidian")).toBe(
+      "[r]: a b\n===\nText.\n\n# Later\n\nMore.\n",
+    );
+  });
+  it("keeps independent inline formatting and opt-out behavior in Obsidian (#434)", () => {
+    const source = "[r]: *a* b\n===\nText.\n";
+    expect(formatted(source, { extends: ["recommended", "obsidian"], dialect: "obsidian" })).toBe(
+      "[r]: _a_ b\n===\nText.\n",
+    );
+    const compact = "[r]: a b\n===\nText.\n";
+    expect(formatted(compact, only({ "style/block-spacing": "off" }, "obsidian"))).toBe(compact);
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "retains ordinary spacing after the definition-like heading in %s (#434)",
+    (dialect) => {
+      for (const heading of ["[r]: a b", "Heading\nMore words"])
+        expect(spaced(`${heading}\n===\nText.\n`, dialect)).toBe(`${heading}\n===\n\nText.\n`);
+    },
+  );
   it("honours suppression comments", () => {
     const config = only({ "style/block-spacing": "warn", "style/emphasis": "warn" }, "github");
     const region =

@@ -85,10 +85,10 @@ export interface MisreadLists {
   /**
    * In the Obsidian dialect, the underlined headings whose underline one of the
    * views reads as text: Reading view one with blank space after it, or before
-   * it beyond the heading's text, and Live Preview a lone `-` (issue #383) and
-   * the underline of a heading whose one line of text starts at the first
-   * column with `[`, a label, and `]:`, which it styles as a link reference
-   * definition (issue #397); and the paragraphs in a block quote or list item
+   * it beyond the heading's text, and Live Preview a lone `-` (issue #383);
+   * level-1 headings with more than one text line, or headings beginning with
+   * a reference-like line, also after indentation or quote markers (#397,
+   * #434); and paragraphs in a block quote or list item
    * with a lazy line of `=` or `-`, which Reading view reads as an underline
    * (issue #377). Each counts from the line break before the underline to the
    * end of its line.
@@ -813,19 +813,23 @@ export function misreadLists(document: Document): MisreadLists {
           const underline = source.slice(from, to);
           const prefix = /^[ \t>]*/.exec(underline)![0].length;
           const text = textStart(child) ?? start;
-          // Live Preview styles a heading's one line of text that starts at
-          // the first column with `[`, a label, and `]:` as a link reference
-          // definition, and reads the underline as text (issue #397).
+          // The heading's own start can overlap preceding definitions.
+          const textLine = child.children[0]?.position?.start.line ?? child.position!.start.line;
+          // A reference-like first line can make Live Preview read a one-line
+          // heading's underline as text, also after indentation/quote markers.
+          // Reading view reads multiline level-1 headings as paragraph text,
+          // including their underline (#434), regardless of reference labels.
+          // Both need their underline and following boundary.
           const [textFrom, textTo] = lineAround(text);
           const definitionText =
-            textFrom === text &&
-            /^(?:\r\n|\r|\n)$/.test(source.slice(textTo, from)) &&
+            /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
           if (
             from > start &&
             (/[ \t]$/.test(underline) ||
               /^[ \t>]*-[ \t]*$/.test(underline) ||
               columnAt(from + prefix) > columnAt(text) ||
+              (child.depth === 1 && child.position!.end.line > textLine + 1) ||
               definitionText)
           )
             underlines.add(breakBefore(child, from, to));

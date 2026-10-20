@@ -1677,6 +1677,13 @@ const blockSpacing: Rule = {
     const { source } = document;
     const findings: Finding[] = [];
     const newline = lineEnding(source);
+    // These parsed headings continue as paragraph text in an Obsidian view
+    // (#383, #397). Keep the boundary after their underline too (#434).
+    const paragraphHeadingEnds = new Set(
+      [...misreadLists(document).underlines]
+        .filter((node) => node.type === "heading")
+        .map((node) => range(node)[1]),
+    );
     // Without TOML front matter, one paragraph can continue through several
     // blocks of the front-matter reading, such as empty and numbered lists
     // (#426). A separator inside that paragraph would create a new block.
@@ -1731,6 +1738,7 @@ const blockSpacing: Rule = {
         const lineStart = lineBounds(source, start, start)[0];
         const breakStart = lineStart - (source.startsWith("\r\n", lineStart - 2) ? 2 : 1);
         if (breakStart < end) continue;
+        if (before.type === "heading" && paragraphHeadingEnds.has(breakStart)) continue;
         if (splitsPlainText(breakStart, lineStart)) continue;
         // A blank line, or one with only quote markers, already separates them.
         const previous = source.slice(lineBounds(source, breakStart, breakStart)[0], breakStart);

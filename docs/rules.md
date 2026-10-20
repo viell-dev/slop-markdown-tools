@@ -694,6 +694,10 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
+- In the Obsidian dialect, after an underlined heading that a view reads as
+  paragraph text, such as a multiline level-1 heading, one beginning with a
+  reference-like line, or one whose underline has trailing space, extra
+  indentation, or a lone `-`.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
