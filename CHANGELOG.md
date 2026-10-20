@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The nested-comment complexity check warms both input sizes and measures fresh
+  batches, preserving its scaling bound while reducing timing noise
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
 - The links memory-regression check waits for asynchronous full collection,
   keeping its existing retained-text allowance
   ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).

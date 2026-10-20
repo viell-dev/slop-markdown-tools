@@ -26,6 +26,7 @@ import type {
   Config,
   Diagnostic,
   Dialect,
+  Document,
   Finding,
   Plugin,
   ProcessOptions,
@@ -901,25 +902,34 @@ describe("HTML comments that Live Preview continues across blocks", () => {
   it("skips nested comment openers in time proportional to their number", () => {
     // #418: every nested opener searched the same suffix for the same closer.
     // Time only range discovery, on distinct trees so the cache cannot hide it.
-    const documents = [4000, 16000].map((count) =>
-      Array.from({ length: 3 }, () => parse(`==${"a <!-- ".repeat(count)}b -->==\n`, "obsidian")),
-    );
-    misreadLists(parse("==a <!-- b -->==\n", "obsidian"));
-    const fastest = documents.map((group) =>
-      Math.min(
-        ...group.map((document) => {
-          const start = performance.now();
-          const result = misreadLists(document);
-          const elapsed = performance.now() - start;
-          expect(result.commentText.size).toBe(0);
-          return elapsed;
-        }),
-      ),
-    );
+    const sizes = [4000, 16000];
+    const prepare = (count: number) => parse(`==${"a <!-- ".repeat(count)}b -->==\n`, "obsidian");
+    // Warm both workloads on other documents, so the first large sample is
+    // not also a cold compilation sample. Every timed call still has a fresh tree.
+    for (let round = 0; round < 5; round++)
+      for (const size of sizes) expect(misreadLists(prepare(size)).commentText.size).toBe(0);
+    const elapsed = (documents: Document[]) => {
+      const results = [];
+      const started = performance.now();
+      for (const document of documents) results.push(misreadLists(document));
+      const duration = performance.now() - started;
+      for (const result of results) expect(result.commentText.size).toBe(0);
+      return duration;
+    };
+    const calibration = Math.min(...Array.from({ length: 3 }, () => elapsed([prepare(sizes[0]!)])));
+    // Use the same bounded batch size for both inputs. Parsing is outside the
+    // timed section; the cap bounds the cost of constructing distinct trees.
+    const calls = Math.max(1, Math.min(32, Math.ceil(25 / calibration)));
+    const fastest = [Infinity, Infinity];
+    for (let round = 0; round < 4; round++) {
+      const documents = sizes.map((size) => Array.from({ length: calls }, () => prepare(size)));
+      for (const index of round % 2 ? [1, 0] : [0, 1])
+        fastest[index] = Math.min(fastest[index]!, elapsed(documents[index]!));
+    }
     // Four times the input should take about four times the work, not sixteen.
-    // A millisecond floor and best-of-three samples tolerate timer noise and CI load.
-    expect(fastest[1]! / Math.max(1, fastest[0]!)).toBeLessThan(10);
-  });
+    // Paired batches alternate their order and keep the existing scaling bound.
+    expect(fastest[1]! / fastest[0]!).toBeLessThan(10);
+  }, 120_000);
 });
 
 describe("text that the parser read in place of a list", () => {
