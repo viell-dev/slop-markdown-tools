@@ -153,13 +153,13 @@ export interface MisreadLists {
    * In the Obsidian dialect, the lines of a paragraph whose content Live Preview
    * reads as a link reference definition: `[`, a label, and `]:`, whatever
    * follows, where the parser reads text because a definition cannot interrupt
-   * a paragraph or because
-   * the line is no definition, as `[r]: a b` is not (issue #391). Each counts
+   * a paragraph or because the line is no definition, as `[r]: a b` is not
+   * (issue #391). Each counts
    * from the line break before the line, or from the line's start where the
    * paragraph starts there, to the line break after it, or to the line's end
    * where the paragraph ends there. Indented or quoted starts hide destinations
-   * as well (#411), except the content on a list's marker line. An empty colon line protects the
-   * next nonblank source line, which supplies the hidden destination.
+   * as well (#411), except the content on a list's marker line. An empty colon
+   * line protects the next nonblank source line, which supplies the hidden destination.
    */
   definitionLines: ReadonlySet<Nodes>;
   /**
@@ -1097,20 +1097,27 @@ function obsidianHtmlEnd(source: string, start: number): number {
   const explicit = /^<(?:script|pre|style|textarea)(?:[\s>]|$)/i.test(first)
     ? /<\/(?:script|pre|style|textarea)[ \t]*>/gi
     : first.startsWith("<!--")
-      ? /-->/g
+      ? "-->"
       : first.startsWith("<?")
-        ? /\?>/g
+        ? "?>"
         : first.startsWith("<![CDATA[")
-          ? /\]\]>/g
+          ? "]]>"
           : /^<![A-Za-z]/.test(first)
-            ? />/g
+            ? ">"
             : undefined;
   let reading = lineBreak(source, start);
   if (explicit) {
-    explicit.lastIndex =
-      start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
-    const close = explicit.exec(source);
-    reading = close ? lineBreak(source, close.index + close[0].length) : source.length;
+    const from = start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
+    let end: number;
+    if (typeof explicit === "string") {
+      const at = source.indexOf(explicit, from);
+      end = at < 0 ? source.length : at + explicit.length;
+    } else {
+      explicit.lastIndex = from;
+      const close = explicit.exec(source);
+      end = close ? close.index + close[0].length : source.length;
+    }
+    reading = lineBreak(source, end);
     // Comments, instructions, declarations, and CDATA have no nested tag stack.
     if (/^<[!?]/.test(first)) {
       // Live Preview does not reuse the opener's characters as the closer in
@@ -1136,25 +1143,64 @@ function obsidianHtmlEnd(source: string, start: number): number {
   // Live Preview's HTML mode survives blank lines until its tag stack closes.
   // Quoted attribute values and comments cannot supply closing tags; void and
   // self-closing tags need no closer. A mismatched closer ends its open stack.
-  const tags =
-    /<!--(?:[^]*?-->|[^]*$)|<\?(?:[^]*?\?>|[^]*$)|<!\[CDATA\[(?:[^]*?\]\]>|[^]*$)|<![A-Za-z](?:[^>]*>|[^]*$)|<\/?([a-z][a-z0-9-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
-  tags.lastIndex = start;
   const stack: string[] = [];
-  for (let tag = tags.exec(source); tag; tag = tags.exec(source)) {
-    const name = tag[1]?.toLowerCase();
-    if (!name) continue;
+  for (let cursor = start; cursor < source.length;) {
+    const at = source.indexOf("<", cursor);
+    if (at < 0) break;
+    // Consume each special token once, ignoring tags inside its body. Live
+    // Preview needs `-->` even when Reading view closes at `--!>`.
+    const marker = source.startsWith("<!--", at)
+      ? "-->"
+      : source.startsWith("<?", at)
+        ? "?>"
+        : source.slice(at, at + 9).toUpperCase() === "<![CDATA["
+          ? "]]>"
+          : /^<![A-Za-z]/.test(source.slice(at, at + 3))
+            ? ">"
+            : undefined;
+    if (marker) {
+      const end = source.indexOf(marker, at + (marker === "-->" ? 4 : marker === "]]>" ? 9 : 2));
+      if (end < 0) return source.length;
+      cursor = end + marker.length;
+      continue;
+    }
+    const closing = source[at + 1] === "/";
+    const from = at + (closing ? 2 : 1);
+    if (!/[a-z]/i.test(source[from] ?? "")) {
+      cursor = from;
+      continue;
+    }
+    let end = from + 1;
+    while (end < source.length && /[a-z0-9-]/i.test(source[end]!)) end++;
+    const name = source.slice(from, end).toLowerCase();
+    let quote = "";
+    let multiline = false;
+    for (; end < source.length; end++) {
+      const char = source[end]!;
+      if (char === "\r" || char === "\n") multiline = true;
+      if (quote) {
+        if (char === quote) quote = "";
+      } else if (char === '"' || char === "'") quote = char;
+      else if (char === "<" || char === ">") break;
+    }
+    if (end === source.length) return source.length;
+    cursor = end;
+    // A new opener ends this incomplete token; resume there without rescanning
+    // its prefix. Quoted values above are each traversed only once as well.
+    if (source[end] === "<") continue;
+    cursor++;
     // Container markers can stand inside a multiline tag's source. Without
     // reconstructing that HTML token stream, retain the remaining source.
-    if (/[\r\n]/.test(tag[0])) return source.length;
-    if (tag.index !== start && !stack.length) break;
-    const closing = tag[0].startsWith("</");
+    if (multiline) return source.length;
+    if (at !== start && !stack.length) break;
     const raw = stack.at(-1);
     if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
     if (closing) {
       const matched = stack.lastIndexOf(name);
       stack.length = matched < 0 ? 0 : matched;
-    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*>$/.test(tag[0])) stack.push(name);
-    if (!stack.length) return Math.max(reading, lineBreak(source, tags.lastIndex));
+    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
+      stack.push(name);
+    if (!stack.length) return Math.max(reading, lineBreak(source, cursor));
   }
   return source.length;
 }

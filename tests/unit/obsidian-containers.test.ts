@@ -114,6 +114,7 @@ describe("Obsidian HTML continued outside a container (#428)", () => {
     "- <div> a\n*b*\n\nAfter *c*.\n",
     "- <!-->\n*b*\n\nAfter *c*.\n",
     "- <!--->\n*b*\n\nAfter *c*.\n",
+    "- <!-- a --!>\n*b*\n\nAfter *c*.\n",
     "- <?>\n*b*\n\nAfter *c*.\n",
   ])("keeps the literal region in %j", (source) => variants(source));
   it.each([
@@ -149,6 +150,20 @@ describe("Obsidian HTML continued outside a container (#428)", () => {
     variants(
       '- <div title="</div>"> a\n*b*\n</div>\n*c*\n\nAfter *d*\n',
       '- <div title="</div>"> a\n*b*\n</div>\n*c*\n\nAfter _d_\n',
+    );
+  });
+  it.each(["<!-- </div> -->", "<?probe </div> ?>", "<![CDATA[</div>]]>"])(
+    "keeps a closing tag inside %s from ending the HTML region",
+    (token) =>
+      variants(
+        `- <div>\n${token}\n\n*b*\n</div>\n\nAfter *c*.\n`,
+        `- <div>\n${token}\n\n*b*\n</div>\n\nAfter _c_.\n`,
+      ),
+  );
+  it("scans many tags and comments before the container's HTML closer", () => {
+    const html = "<x-probe/> <!-- </div> --> ".repeat(2000);
+    expect(checked(`- <div>\n${html}\n\n*b*\n</div>\n\nAfter *c*.\n`)).toBe(
+      `- <div>\n${html}\n\n*b*\n</div>\n\nAfter _c_.\n`,
     );
   });
   it.each(["\\<div>", "`<div>`", "<span>text</span>"])(
