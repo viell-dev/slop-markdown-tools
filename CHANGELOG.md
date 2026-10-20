@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The links memory-regression check waits for asynchronous full collection,
+  keeping its existing retained-text allowance
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
 - Invalid asynchronous plugin rules report an engine error without leaking a
   rejected return value into the host process; the CLI keeps exit code `2`
   ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
