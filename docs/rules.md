@@ -37,7 +37,7 @@ presets, dialects, and options.
 | `structure/initial-heading`   | 🔍   | ❌            | ❌             | ❌      |
 | `structure/single-title`      | 🔍   | ❌            | ❌             | ❌      |
 | `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
-| `style/block-spacing`         | 🎨   | ❌            | ❌             | ❌      |
+| `style/block-spacing`         | 🎨   | ✅            | ❌             | ❌      |
 | `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
 | `style/emphasis`              | 🎨   | ✅            | ❌             | ✅      |
 | `style/final-newline`         | 🎨   | ✅            | ❌             | ❌      |
@@ -654,12 +654,17 @@ number changes what the document means:
 
 ## `style/block-spacing`
 
-**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: none.
 
 Separates every heading and every list from the blocks before and after it with
 a blank line, in the document and in block quotes at any depth. It adds one
 blank line where there is none and keeps the blank lines that are already there.
 Inside a block quote, the new line holds the quote's `>` markers.
+
+Enabled at `warn` in `recommended`: `lint` reports missing separators and
+`format` adds them where safe. To keep compact spacing, set
+`"rules": { "style/block-spacing": "off" }`.
 
 Before:
 

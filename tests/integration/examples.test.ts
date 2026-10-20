@@ -189,9 +189,10 @@ describe("plugin", () => {
       "# One\n\n## Two\n\n> #### Three\n\n### Four\n\n#\n",
     ]);
     // An underlined heading has no marks, also below a link reference definition,
-    // where its position starts at the definition.
+    // where its position starts at the definition. The built-in recommended rules
+    // convert it to ATX and separate it from the definition.
     expect(format("[a]: https://example.com\nText\n----\n\n[a]\n")).toEqual([
-      "[a]: https://example.com\n## Text\n\n[a]\n",
+      "[a]: https://example.com\n\n## Text\n\n[a]\n",
     ]);
   });
   it("validates options against the schema the rule declares", async () => {

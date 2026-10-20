@@ -10,6 +10,14 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Changed
+
+- `recommended` enables `style/block-spacing` at `warn`. `lint` reports missing
+  blank lines around headings and lists, and `format` inserts them where safe,
+  retaining the rule's existing semantic and renderer protections. To keep
+  compact spacing, set `"rules": { "style/block-spacing": "off" }`
+  ([#423](https://github.com/viell-dev/slop-markdown-tools/issues/423)).
+
 ### Fixed
 
 - In the Obsidian dialect, the protection for an inline HTML comment that spans

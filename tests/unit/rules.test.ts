@@ -281,12 +281,16 @@ describe("style/block-spacing", () => {
       },
     ]);
   });
-  it("is enabled by no preset and formats nothing when off", () => {
+  it("is enabled only by recommended and formats nothing when off", () => {
     const source = "# Setup\nInstall the package.\n- Run the command.\n";
-    expect(format(source, { config: { extends: ["recommended", "github"] } }).output).toBe(source);
+    expect(format(source, { config: { extends: ["recommended", "github"] } }).output).toBe(
+      "# Setup\n\nInstall the package.\n\n- Run the command.\n",
+    );
     expect(format(source, { config: only({ "style/block-spacing": "off" }) }).output).toBe(source);
-    for (const preset of Object.values(presets))
-      expect(Object.keys(preset.rules ?? {})).not.toContain("style/block-spacing");
+    for (const [name, preset] of Object.entries(presets))
+      expect(preset.rules?.["style/block-spacing"], name).toBe(
+        name === "recommended" ? "warn" : undefined,
+      );
   });
   it("honours suppression comments", () => {
     const config = only({ "style/block-spacing": "warn", "style/emphasis": "warn" }, "github");

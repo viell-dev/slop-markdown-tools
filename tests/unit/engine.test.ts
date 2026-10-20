@@ -322,7 +322,7 @@ describe("formatting contracts", () => {
   });
   it("preserves genuine lists following prose", () => {
     const source = "Some items follow\n- First item\n- Second item\n";
-    expect(formatted(source)).toBe(source);
+    expect(formatted(source)).toBe("Some items follow\n\n- First item\n- Second item\n");
   });
   it("reflows prose while protecting inline code and link destinations", () => {
     const source =
@@ -644,10 +644,10 @@ describe("a first line that opens no front matter", () => {
     "keeps the lists and block quotes below it with the recommended preset in the %s dialect",
     (dialect) => {
       for (const [source, output] of [
-        ["+++\n- a\n\n+++ b\n", "+++\n- a\n\n+++ b\n"],
-        ["---\nText\n- One\n", "---\nText\n- One\n"],
+        ["+++\n- a\n\n+++ b\n", "+++\n\n- a\n\n+++ b\n"],
+        ["---\nText\n- One\n", "---\nText\n\n- One\n"],
         ["---\nText\n> *quote*\n", "---\nText\n> _quote_\n"],
-        ["---\ntitle: a\n1) One\n", "---\ntitle: a\n1. One\n"],
+        ["---\ntitle: a\n1) One\n", "---\ntitle: a\n\n1. One\n"],
       ] as const)
         expect(formatted(source, preset(dialect))).toBe(
           dialect === "obsidian" && source.startsWith("---") ? source : output,
@@ -1568,7 +1568,7 @@ describe("footnote definitions that Obsidian reads as paragraph text", () => {
   it.each([
     // Below a blank line, a heading, or another definition, it is a definition.
     ["a\n\n[^1]: b *c*\n\nx[^1]\n", "a\n\n[^1]: b _c_\n\nx[^1]\n"],
-    ["# h\n[^1]: b *c*\n\nx[^1]\n", "# h\n[^1]: b _c_\n\nx[^1]\n"],
+    ["# h\n[^1]: b *c*\n\nx[^1]\n", "# h\n\n[^1]: b _c_\n\nx[^1]\n"],
     ["[^1]: a *b*\n[^2]: c *d*\n\nx[^1] y[^2]\n", "[^1]: a _b_\n[^2]: c _d_\n\nx[^1] y[^2]\n"],
     ["[r]: https://x.org\n[^1]: b *c*\n\nx[^1]\n", "[r]: https://x.org\n[^1]: b _c_\n\nx[^1]\n"],
   ])("still formats %j", (source, output) => {
@@ -1754,7 +1754,7 @@ describe("blocks that Obsidian reads into a fence that a list item leaves open",
     expect(formatted(source, { config })).toBe(source);
   });
   it.each([
-    ["- ```\n  a\n  ```\nb *c*\n", "- ```\n  a\n  ```\nb _c_\n"],
+    ["- ```\n  a\n  ```\nb *c*\n", "- ```\n  a\n  ```\n\nb _c_\n"],
     ["a *b*\n\n- ```\nc\n", "a _b_\n\n- ```\nc\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config })).toBe(output);
@@ -1794,7 +1794,7 @@ describe("tables that Obsidian reads otherwise", () => {
     // The text above is formatted; only the table stays as written.
     ["a *b*\n| x |\n| - |\n", "a _b_\n| x |\n| - |\n"],
     ["a\n\n| x | y |\n| - | - |\n", "a\n\n| x   | y   |\n| --- | --- |\n"],
-    ["# h\n| x | y |\n| - | - |\n", "# h\n| x   | y   |\n| --- | --- |\n"],
+    ["# h\n| x | y |\n| - | - |\n", "# h\n\n| x   | y   |\n| --- | --- |\n"],
     ["x |\n-- |\n", "| x   |\n| --- |\n"],
     ["x | y\n-|-\nw | z\n", "| x   | y   |\n| --- | --- |\n| w   | z   |\n"],
     // The parser reads this as Obsidian does: text of the block quote.
@@ -1886,7 +1886,7 @@ describe("HTML blocks that Obsidian keeps inside a list item", () => {
       formatted("- a\n<div>\nb\n</div>\n\n* c\n", {
         config: { ...config, extends: ["recommended"], dialect: "github" },
       }),
-    ).toBe("- a\n<div>\nb\n</div>\n\n- c\n");
+    ).toBe("- a\n\n<div>\nb\n</div>\n\n- c\n");
   });
 });
 
@@ -1989,9 +1989,25 @@ describe("the block directly below TOML front matter", () => {
           kept("## Head\n", setext);
           // A list that cannot interrupt a paragraph is text there.
           kept("2) a\n3) b\n");
-          kept("1.\n2) b\n");
+          // The other dialects' spacing proposal has a separate regression below (#426).
+          if (dialect === "obsidian") kept("1.\n2) b\n");
           kept("*\n* b\n");
           kept("-\n", setext);
+        }
+    },
+  );
+  it.fails.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "keeps a paragraph-ending empty marker above a misread list in the %s dialect (#426)",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const before of ["", String.fromCharCode(0xfeff)]) {
+          const source = before + (matter + "1.\n2) b\n").replaceAll("\n", newline);
+          expect(formatted(source, preset(dialect))).toBe(source);
+          expect(
+            formatted(source, {
+              config: { extends: [], dialect, rules: { "style/block-spacing": "warn" } },
+            }),
+          ).toBe(source);
         }
     },
   );
@@ -2002,7 +2018,7 @@ describe("the block directly below TOML front matter", () => {
       ["___\n", "***\n", stars],
       ["# Head #\n", "# Head\n"],
       ["Text *a*\n", "Text _a_\n"],
-      ["* a\n+ b\n", "- a\n* b\n"],
+      ["* a\n+ b\n", "- a\n\n* b\n"],
       ["1) a\n1) b\n", "1. a\n1. b\n"],
       ["~~~\ncode\n~~~\n", "```\ncode\n```\n"],
     ];
@@ -2747,6 +2763,42 @@ describe("processing selected ranges", () => {
 });
 
 describe("configuration and plugins", () => {
+  describe("recommended block spacing (#423)", () => {
+    const source = "# Setup\nInstall the package.\n- Run the command.\n";
+    const output = "# Setup\n\nInstall the package.\n\n- Run the command.\n";
+    it.each<Config | undefined>([
+      undefined,
+      {},
+      { extends: "recommended" },
+      { extends: ["recommended"] },
+    ])("warns and formats missing separators with configuration %j", (config) => {
+      expect(resolveConfig({ config }).rules["style/block-spacing"]).toBe("warn");
+      expect(lint(source, { config })).toMatchObject([
+        { rule: "style/block-spacing", severity: "warn" },
+        { rule: "style/block-spacing", severity: "warn" },
+      ]);
+      expect(formatted(source, { config })).toBe(output);
+      expect(semanticFingerprint(parse(output, "github"))).toBe(
+        semanticFingerprint(parse(source, "github")),
+      );
+    });
+    it("allows opting out while retaining the other recommended rules", () => {
+      const config: Config = { rules: { "style/block-spacing": "off" } };
+      expect(lint(source, { config })).toEqual([]);
+      expect(formatted(source, { config })).toBe(source);
+      expect(formatted(source.replace("Install", "*Install*"), { config })).toBe(
+        source.replace("Install", "_Install_"),
+      );
+    });
+    it.each<Config>([{ extends: [] }, { extends: "github" }])(
+      "does not enable spacing outside recommended with configuration %j",
+      (config) => {
+        expect(resolveConfig({ config }).rules["style/block-spacing"]).toBeUndefined();
+        expect(lint(source, { config })).toEqual([]);
+        expect(formatted(source, { config })).toBe(source);
+      },
+    );
+  });
   it("supports region and next-line suppressions without interpreting code examples", () => {
     const source =
       "<!-- mdtools-disable style/emphasis -->\n\n*keep*\n\n<!-- mdtools-enable style/emphasis -->\n\n*change*\n\n<!-- mdtools-disable-next-line style/emphasis -->\n*also keep*\n";

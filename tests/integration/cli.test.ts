@@ -36,6 +36,41 @@ import {
 } from "./support.js";
 
 describe("CLI", () => {
+  it.each([undefined, { extends: ["recommended"] }])(
+    "warns about missing block spacing, explains it, and formats it with configuration %j (#423)",
+    async (config) => {
+      const source = "# Setup\nInstall the package.\n- Run the command.\n";
+      const root = await fixture({
+        "note.md": source,
+        ...(config ? { "mdtools.config.json": JSON.stringify(config) } : {}),
+      });
+      const explained = run(root, ["config", "explain", "note.md"]);
+      expect(explained.status, explained.stderr).toBe(0);
+      expect(JSON.parse(explained.stdout).effective.rules["style/block-spacing"]).toBe("warn");
+      const checked = run(root, ["lint", "--json", "."]);
+      expect(checked.status, checked.stderr).toBe(0);
+      expect(JSON.parse(checked.stdout).files[0].diagnostics).toMatchObject([
+        { rule: "style/block-spacing", severity: "warn" },
+        { rule: "style/block-spacing", severity: "warn" },
+      ]);
+      expect(run(root, ["lint", "--max-warnings", "0", "."]).status).toBe(1);
+      expect(run(root, ["format", "--check", "."]).status).toBe(1);
+      const applied = run(root, ["format", "--write", "."]);
+      expect(applied.status, applied.stderr).toBe(0);
+      expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(
+        "# Setup\n\nInstall the package.\n\n- Run the command.\n",
+      );
+      expect(run(root, ["format", "--check", "."]).status).toBe(0);
+      await writeFile(path.join(root, "note.md"), source);
+      await writeFile(
+        path.join(root, "mdtools.config.json"),
+        JSON.stringify({ ...config, rules: { "style/block-spacing": "off" } }),
+      );
+      expect(run(root, ["lint", "--max-warnings", "0", "."]).status).toBe(0);
+      expect(run(root, ["format", "--check", "."]).status).toBe(0);
+      expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    },
+  );
   it("previews, writes, then verifies formatting without changing unrelated syntax", async () => {
     const root = await fixture({ "note.md": "A *small* note.\n" });
     const preview = run(root, ["format", "."]);

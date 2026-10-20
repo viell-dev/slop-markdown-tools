@@ -64,6 +64,7 @@ export const presets: Readonly<Record<string, Readonly<Config>>> = {
       "style/code-fence": "warn",
       "style/thematic-break": "warn",
       "style/blank-lines": "warn",
+      "style/block-spacing": "warn",
       "style/trailing-space": "warn",
       "style/final-newline": "warn",
       "style/list-marker": ["warn", { marker: "-" }],

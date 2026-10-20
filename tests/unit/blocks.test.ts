@@ -744,6 +744,7 @@ describe("the block and whitespace rules together", () => {
     const recommended = presets.recommended!.rules!;
     for (const name of [
       "style/blank-lines",
+      "style/block-spacing",
       "style/code-fence",
       "style/heading",
       "style/table",

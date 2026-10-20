@@ -112,6 +112,11 @@ setting for a rule replaces an earlier one as a whole, options included. A
 plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
 
+`recommended` enables [`style/block-spacing`](rules.md#styleblock-spacing) at
+`warn`, adding a blank line between headings or lists and adjacent blocks where
+safe. `lint` reports missing separators, and `format` adds them. To keep compact
+spacing, set `"rules": { "style/block-spacing": "off" }`.
+
 ## Rules and severity
 
 A rule's setting is its severity, `"off"`, `"warn"`, or `"error"`, or a list of
