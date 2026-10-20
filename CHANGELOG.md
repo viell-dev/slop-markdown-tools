@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Large paragraphs, tables, code spans, plugin finding lists, configuration
+  arrays, and Obsidian target searches no longer exceed the JavaScript engine's
+  function-argument limit
+  ([#454](https://github.com/viell-dev/slop-markdown-tools/issues/454)).
 - Table formatting keeps colon-container boundaries as written, and
   `content/table-columns` stops checking rows at them, preserving site-generator
   containers
