@@ -18,7 +18,7 @@ prereleases' notes there are longer than their entries here.
   without one. Before, heading conversion, table alignment, and wrapping below
   them could change Live Preview's comment and container styling even though
   Reading view stayed the same
-  ([#408](https://github.com/viell-dev/slop-markdown-tools/issues/408)).
+  ([#422](https://github.com/viell-dev/slop-markdown-tools/pull/422)).
 - In the Obsidian dialect, no rule changes a paragraph line that starts at the
   first column with `[`, a label, and `]:`, or joins it to the line above or
   below it. Live Preview styles such a line as a link reference definition and
