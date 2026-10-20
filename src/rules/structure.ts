@@ -29,11 +29,21 @@ function outlines(tree: Root): Heading[][] {
   visit(tree, document);
   return result;
 }
-/** Whether front matter sets a title, as a top-level `title` key in YAML or TOML. */
-function frontMatterTitle(tree: Root): boolean {
+const levelSchema = { type: "integer", minimum: 1, maximum: 6, default: 1 };
+const titleSchema = {
+  description:
+    "True uses the default literal title field; a string matches front matter in multiline mode; false or an empty string disables it.",
+  anyOf: [{ type: "boolean" }, { type: "string", format: "regex" }],
+};
+type TitleSetting = boolean | string;
+/** Whether front matter contains a recognized title field or matches a configured pattern. */
+function frontMatterTitle(tree: Root, setting: TitleSetting = true): boolean {
+  if (setting === false || setting === "") return false;
+  const pattern = typeof setting === "string" ? new RegExp(setting, "m") : undefined;
   return tree.children.some((node) => {
     // The tree's types know YAML front matter only; the parser also reads TOML.
     const { type, value } = node as { type: string; value?: string };
+    if (pattern) return (type === "yaml" || type === "toml") && pattern.test(value ?? "");
     if (type === "yaml") return /^["']?title["']?[ \t]*:/m.test(value ?? "");
     if (type !== "toml") return false;
     // TOML keys after a table header belong to that table.
@@ -48,17 +58,29 @@ function headingText(node: Heading): string {
 
 export const structureRules: Record<string, Rule> = {
   "structure/initial-heading": {
-    description: "Require the first content block to be a level-1 heading.",
+    description: "Require an initial heading at the configured level.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
-      const first = content(document.tree.children)[0];
-      return first?.type === "heading" && first.depth === 1
+    schema: optionsSchema({
+      level: levelSchema,
+      allowPreamble: { type: "boolean", default: false },
+      frontMatterTitle: { ...titleSchema, default: false },
+    }),
+    check({ document, options }) {
+      if (frontMatterTitle(document.tree, (options.frontMatterTitle ?? false) as TitleSetting))
+        return [];
+      const level = (options.level as number | undefined) ?? 1;
+      const blocks = content(document.tree.children);
+      const first = options.allowPreamble
+        ? blocks.find((node) => node.type === "heading")
+        : blocks[0];
+      return first?.type === "heading" && first.depth === level
         ? []
         : [
             {
-              start: first ? range(first)[0] : 0,
-              message: "Start the document with a level-1 heading after optional front matter.",
+              start: first ? range(first)[0] : blocks[0] ? range(blocks[0])[0] : 0,
+              message: options.allowPreamble
+                ? `Use a level-${level} heading as the first heading after any preamble or front matter.`
+                : `Start the document with a level-${level} heading after optional front matter.`,
             },
           ];
     },
@@ -83,26 +105,32 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/single-title": {
-    description: "Report a second level-1 heading, or one after a front matter title.",
+    description:
+      "Report repeated title headings at the configured level, including front matter titles.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({
+      level: levelSchema,
+      frontMatterTitle: { ...titleSchema, default: true },
+    }),
+    check({ document, options }) {
+      const level = (options.level as number | undefined) ?? 1;
       const findings: Finding[] = [];
       outlines(document.tree).forEach((outline, index) => {
         // Only the document's own outline has front matter.
         let title =
-          index === 0 && frontMatterTitle(document.tree)
+          index === 0 &&
+          frontMatterTitle(document.tree, options.frontMatterTitle as TitleSetting | undefined)
             ? "the front matter sets the title"
             : undefined;
         for (const heading of outline) {
-          if (heading.depth !== 1) continue;
+          if (heading.depth !== level) continue;
           if (title === undefined) {
             title = `the title is on line ${heading.position!.start.line}`;
             continue;
           }
           findings.push({
             start: range(heading)[0],
-            message: `Use one level-1 heading per document; ${title}.`,
+            message: `Use one level-${level} heading per document; ${title}.`,
           });
         }
       });
@@ -110,10 +138,10 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/duplicate-heading": {
-    description: "Report headings with the same text under the same parent heading.",
+    description: "Report repeated heading text among siblings or across an outline.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({ siblingsOnly: { type: "boolean", default: true } }),
+    check({ document, options }) {
       const findings: Finding[] = [];
       for (const outline of outlines(document.tree)) {
         // The headings that a following heading can be under, from the outermost.
@@ -122,7 +150,7 @@ export const structureRules: Record<string, Rule> = {
         const seen = new Map<Heading | undefined, Map<string, Heading>>();
         for (const heading of outline) {
           while (parents.length && parents.at(-1)!.depth >= heading.depth) parents.pop();
-          const parent = parents.at(-1);
+          const parent = options.siblingsOnly === false ? undefined : parents.at(-1);
           parents.push(heading);
           const text = headingText(heading);
           if (!text) continue;
@@ -132,7 +160,7 @@ export const structureRules: Record<string, Rule> = {
           if (earlier)
             findings.push({
               start: range(heading)[0],
-              message: `Heading "${text}" repeats the heading on line ${earlier.position!.start.line} under the same parent; give it a distinct name.`,
+              message: `Heading "${text}" repeats the heading on line ${earlier.position!.start.line} ${options.siblingsOnly === false ? "in this outline" : "under the same parent"}; give it a distinct name.`,
             });
           else siblings.set(text, heading);
         }
