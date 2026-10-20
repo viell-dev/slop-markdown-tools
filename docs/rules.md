@@ -1292,6 +1292,9 @@ what it means, that is, when it:
   generators](dialects.md#what-each-dialect-reads) read by line;
 - holds, in the Obsidian dialect, `==`, `[[`, or `]]` outside its highlights and
   wikilinks, because joining lines could create one;
+- has, in the Obsidian dialect, a continuation line with tag-like text directly
+  after a bare block quote marker, such as `>#tag text`: joining the line would
+  create a tag in Live Preview;
 - would start, in the Obsidian dialect, with `[`, a label, and `]:` on its first
   line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
   styles as a link reference definition.

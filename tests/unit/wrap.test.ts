@@ -1540,6 +1540,42 @@ describe("a reflowed line that Live Preview would style as a link reference defi
     ]);
   });
   it.each([
+    String.raw`[a\]b]:x`,
+    String.raw`[a\\]:x`,
+    String.raw`[a\\\]b]:x`,
+    String.raw`[a\\\\]:x`,
+    String.raw`[a\ b]:x`,
+    "[a [b]:x",
+  ])("keeps escaped and nested label %s off a new line", (label) => {
+    const source = `Some words before the label x ${label} tail words after it.\n`;
+    const output = verify(source, obsidian(30), workspace).output;
+    expect(output).toContain(`\nx ${label}`);
+    expect(output).not.toMatch(/^\[/m);
+  });
+  it("allows a word whose first unescaped closing bracket is not followed by a colon", () => {
+    const source = "Some words before the label [a]b]:x tail words after it.\n";
+    expect(verify(source, obsidian(30), workspace).output).toBe(
+      "Some words before the label\n[a]b]:x tail words after it.\n",
+    );
+  });
+  it("groups consecutive definition-like labels in linear time (#415)", () => {
+    const rule = builtInRules["style/wrap"]!;
+    const fastest = (count: number) => {
+      const document = parse(`Intro ${"[a]:x ".repeat(count)}end.\n`, "obsidian");
+      let best = Infinity;
+      for (let run = 0; run < 3; run++) {
+        const started = performance.now();
+        const findings = rule.check({ document, workspace, options: { width: 20 } });
+        best = Math.min(best, performance.now() - started);
+        expect(findings[0]?.edit?.text).toBe(`Intro ${"[a]:x ".repeat(count).trimEnd()}\nend.`);
+      }
+      return best;
+    };
+    // Four times the input must cost less than the roughly sixteenfold growth
+    // of the former refill loop. Use the best of three to reduce runner noise.
+    expect(fastest(4000) / fastest(1000)).toBeLessThan(10);
+  }, 60_000);
+  it.each([
     // After a quote marker or indentation, Live Preview reads text.
     [
       "> Some words before the label [a]: tail words after it.\n",
@@ -1626,6 +1662,54 @@ describe("a tag directly after a block quote marker written without a space", ()
         }).output,
         dialect,
       ).toBe(">Some words with a long line x\n>#glacier and more words after\n>it.\n");
+  });
+});
+
+describe("tag-like text on a continuation line directly after a bare quote marker (#414)", () => {
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });
+  it.each([
+    ">a\n>#b c\n",
+    ">>a\n>>#b c\n",
+    "- >a\n  >#b c\n",
+    ">[!note] Title\n>a\n>#b c\n",
+    ">a\n>#tag/nested c\n",
+    ">a\n>#tag-name c\n",
+    ">a\n>#é c\n",
+    ">a\n>#tag, c\n",
+    ">a\r\n>#b c\r\n",
+    ">a\r>#b c\r",
+    ">a\n>#b c",
+    ">Some longer words before the next line that could otherwise reflow.\n>#b c\n>More words.\n",
+  ])("keeps %j as written in Obsidian", (source) => {
+    expect(verify(source, obsidian(30), workspace).output).toBe(source);
+    expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
+  });
+  it.each([
+    [">#b c\n>more words\n", ">#b c more words\n"],
+    [">a\n> #b c\n", ">a #b c\n"],
+    [">a\n>#1984 c\n", ">a #1984 c\n"],
+    [">a\n>\\#b c\n", ">a \\#b c\n"],
+    [">a `code\n>#b` c\n", ">a `code #b` c\n"],
+    [">a [link\n>#b](page) c\n", ">a [link #b](page) c\n"],
+  ])("still reflows %j in Obsidian", (source, output) => {
+    expect(verify(source, obsidian(80), workspace).output).toBe(output);
+  });
+  it("reports the reason when requested", () => {
+    const source = ">Some longer words before the next line that could otherwise reflow.\n>#b c\n";
+    const config: Config = {
+      ...wrap({ width: 30, reportUnreflowed: true }),
+      dialect: "obsidian",
+    };
+    expect(verify(source, config, workspace).diagnostics.map((item) => item.message)).toEqual([
+      "Paragraph not reflowed: tag-like text directly after a block quote marker (width 30 columns).",
+    ]);
+  });
+  it("joins the line in the other dialects", () => {
+    for (const dialect of ["commonmark", "github", "forgejo", "gitea"] as const)
+      expect(verify(">a\n>#b c\n", { ...wrap({ width: 80 }), dialect }).output, dialect).toBe(
+        ">a #b c\n",
+      );
   });
 });
 

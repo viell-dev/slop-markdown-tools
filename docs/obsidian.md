@@ -127,7 +127,10 @@ note shows there, the tool keeps the text as written:
   and `>#tag b` below it. Live Preview reads a tag after blank space or at the
   start of a line's content, and text there, where Reading view reads the tag.
   `style/wrap` starts no line of such a quote with a tag: it stays on the line
-  before it.
+  before it. When an existing continuation line starts with tag-like text
+  directly after `>`, its paragraph stays as written: joining it to the line
+  above would create a tag in Live Preview. A tag-like word on the paragraph's
+  first line stays after the same marker, so that paragraph can reflow.
 - A fenced code block that a list item or block quote ends before its closing
   fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
   as more of the code: Reading view those directly below the list or quote, Live

@@ -29,19 +29,24 @@ prereleases' notes there are longer than their entries here.
   definition: the word that opens the label stays on the line before it. Before,
   `Some words before the label [a]: tail words after it.` at 30 columns broke
   the line before `[a]:`, and Live Preview showed the new line as a definition
-  ([#415](https://github.com/viell-dev/slop-markdown-tools/pull/415)).
+  ([#411](https://github.com/viell-dev/slop-markdown-tools/issues/411)).
 - In the Obsidian dialect, `style/wrap` keeps a tag such as `#tag` on the line
   before it in a block quote whose `>` markers are written without a space after
   them, where Live Preview reads a tag directly after the marker as text.
   Before, a reflowed line could start with `>#tag`, and Live Preview no longer
   showed the tag
-  ([#415](https://github.com/viell-dev/slop-markdown-tools/pull/415)).
+  ([#409](https://github.com/viell-dev/slop-markdown-tools/issues/409)).
 - In the Obsidian dialect, `style/trailing-space` and `style/wrap` leave the
   blank space at the end of a footnote definition's last line as written where a
   paragraph ends the definition, because Reading view shows it before the
   footnote's backreference. Before, `[^1]: Note ` became `[^1]: Note`, and the
   arrow moved against the text
-  ([#415](https://github.com/viell-dev/slop-markdown-tools/pull/415)).
+  ([#405](https://github.com/viell-dev/slop-markdown-tools/issues/405)).
+- In the Obsidian dialect, `style/wrap` leaves a paragraph as written when a
+  continuation line starts with tag-like text directly after a bare block quote
+  marker. Before, joining `>a` and `>#tag b` into `>a #tag b` created a tag in
+  Live Preview, which had shown plain text
+  ([#414](https://github.com/viell-dev/slop-markdown-tools/issues/414)).
 
 ## 0.2.6 - 2026-10-19
 

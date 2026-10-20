@@ -783,6 +783,39 @@ const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
  * digits, `_`, `-`, and `/`, among them one that is not a digit.
  */
 const obsidianTag = /^#[\p{L}\p{N}_/-]*[\p{L}_/-]/u;
+/**
+ * Keep an atom that opens a definition-like label attached to the preceding
+ * atom. The label may span atoms and contain `[` or escaped `]`, as
+ * `definitionLike` allows. Scan once: retrying the fill for each unsafe line
+ * becomes quadratic when many consecutive atoms are labels.
+ */
+function keepDefinitionStarts(atoms: string[]): string[] {
+  const joined = new Uint8Array(atoms.length);
+  let pending: number[] = [];
+  for (const [index, atom] of atoms.entries()) {
+    if (atom.startsWith("[")) pending.push(index);
+    for (let at = 0; at < atom.length; at++) {
+      if (atom[at] === "\\") {
+        if (atom[at + 1] === "\r" || atom[at + 1] === "\n") pending = [];
+        at++;
+      } else if (atom[at] === "]") {
+        if (atom[at + 1] === ":") for (const index of pending) joined[index] = 1;
+        pending = [];
+      }
+    }
+  }
+  const result: string[] = [];
+  let group: string[] = [];
+  for (const [index, atom] of atoms.entries()) {
+    if (!joined[index] && group.length) {
+      result.push(group.join(" "));
+      group = [];
+    }
+    group.push(atom);
+  }
+  if (group.length) result.push(group.join(" "));
+  return result;
+}
 
 type Range = [number, number];
 /**
@@ -1311,6 +1344,18 @@ const wrap: Rule = {
             failure = "unsupported continuation";
             break;
           }
+          // Directly after a bare quote marker, Live Preview reads a tag as
+          // text. Joining that line would put it after a space and create a
+          // tag (issue #414). Inline atoms keep their own reading of `#`.
+          if (
+            document.dialect === "obsidian" &&
+            source[lineAt - 1] === ">" &&
+            obsidianTag.test(line) &&
+            !protection.has(lineAt)
+          ) {
+            failure = "tag-like text directly after a block quote marker";
+            break;
+          }
           const last = words.at(-1);
           let joining = protection.has(lineEnd)
             ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
@@ -1346,7 +1391,9 @@ const wrap: Rule = {
         reportSkipped(failure);
         return;
       }
-      const atoms = wrappingAtoms(words, openers, dollars);
+      const definitions = document.dialect === "obsidian" && !continuation;
+      const wrapped = wrappingAtoms(words, openers, dollars);
+      const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
       if (!atoms.length) return;
       // The first line keeps the words after a first word that would open a
       // block alone on the line, until the line can no longer open one, and
@@ -1359,19 +1406,15 @@ const wrap: Rule = {
           (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
       )
         atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
-      /** The index of the atom that starts each line of the last `fill`. */
-      let starts: number[] = [];
       /** Fill lines greedily, with the first `first` atoms on the first line. */
       const fill = (first: number): string[] => {
         const lines: string[] = [];
-        starts = [0];
         let line = atoms.slice(0, first).join(" ");
         let linePrefix = prefix;
         for (let i = first; i < atoms.length; i++) {
           const candidate = `${line} ${atoms[i]}`;
           if (lineWidth(linePrefix + candidate, measure) > width) {
             lines.push(line);
-            starts.push(i);
             line = atoms[i]!;
             linePrefix = continuation;
           } else line = candidate;
@@ -1379,13 +1422,12 @@ const wrap: Rule = {
         if (line) lines.push(line);
         return lines;
       };
-      let first = 1;
-      let output = fill(first);
+      let output = fill(1);
       // A paragraph that starts like a link reference definition becomes one
       // when a line ends after the definition's destination or title. Keep
       // words on the first line until the lines read as one paragraph again.
       if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
-        first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
+        let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
         while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
           output = fill(++first);
       }
@@ -1395,20 +1437,10 @@ const wrap: Rule = {
       // stays on the line before it (issue #411). The first line has no line
       // before it, and a paragraph whose first line would start so, as `[a`
       // and `b]: c d` below it joined, stays as written.
-      if (document.dialect === "obsidian" && !continuation)
-        for (
-          let index = output.findIndex((line) => definitionLike.test(line));
-          index >= 0;
-          index = output.findIndex((line) => definitionLike.test(line))
-        ) {
-          const at = starts[index]!;
-          if (at === 0) {
-            reportSkipped("first line that Obsidian styles as a link reference definition");
-            return;
-          }
-          atoms.splice(at - 1, 2, `${atoms[at - 1]} ${atoms[at]}`);
-          output = fill(first);
-        }
+      if (definitions && definitionLike.test(output[0]!)) {
+        reportSkipped("first line that Obsidian styles as a link reference definition");
+        return;
+      }
       const replacement = output.join(newline + continuation);
       if (replacement !== original)
         findings.push({
