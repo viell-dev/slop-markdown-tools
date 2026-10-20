@@ -12,6 +12,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Table formatting keeps colon-container boundaries as written, and
+  `content/table-columns` stops checking rows at them, preserving site-generator
+  containers
+  ([#444](https://github.com/viell-dev/slop-markdown-tools/issues/444)).
+- Wrapping preserves snippet-import paragraphs and keeps literal `[[toc]]`
+  markers off new line starts, preventing VitePress build failures and lost text
+  ([#445](https://github.com/viell-dev/slop-markdown-tools/issues/445),
+  [#446](https://github.com/viell-dev/slop-markdown-tools/issues/446)).
 - The Obsidian check passes large `PROBE` batches through Docker's inherited
   environment, avoiding the Windows process argument limit
   ([#442](https://github.com/viell-dev/slop-markdown-tools/issues/442)).
