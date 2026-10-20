@@ -739,8 +739,10 @@ export function misreadLists(document: Document): MisreadLists {
       for (const opener of commentOpeners(leaf)) {
         if (opener < commentedUntil) continue;
         const closer = source.indexOf("-->", opener + 4);
-        if (closer >= 0 && closer < leaf.position.end.offset!) continue;
+        // Comments do not nest, even inside one paragraph. Searching for the
+        // same closer at every nested opener was quadratic (issue #418).
         commentedUntil = closer < 0 ? source.length : closer + 3;
+        if (closer >= 0 && closer < leaf.position.end.offset!) continue;
         let last = index;
         while (
           last + 1 < order.length &&

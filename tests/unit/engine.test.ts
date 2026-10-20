@@ -764,6 +764,7 @@ describe("HTML comments that Live Preview continues across blocks", () => {
     "a ![b <!-- c](image.png)\n\nd *e*\n\nf --> g *h*\n",
     "a <!-- b\n\n```\nc --> d\n```\n",
     "a <!-- b\n\nc --> d <!-- e\n\nf *g*\n",
+    "a ==b <!-- nested <!-- c --> d <!-- e==\n\nf *g*\n",
   ])("keeps the comment and its closing block in %j", (input) => {
     for (const newline of ["\n", "\r\n", "\r"]) {
       const source = input.replaceAll("\n", newline);
@@ -791,6 +792,28 @@ describe("HTML comments that Live Preview continues across blocks", () => {
         config: { extends: ["recommended", "github"], dialect: "github" },
       }),
     ).toBe("a <!-- b\n\nc _d_\n");
+  });
+  it("skips nested comment openers in time proportional to their number", () => {
+    // #418: every nested opener searched the same suffix for the same closer.
+    // Time only range discovery, on distinct trees so the cache cannot hide it.
+    const documents = [4000, 16000].map((count) =>
+      Array.from({ length: 3 }, () => parse(`==${"a <!-- ".repeat(count)}b -->==\n`, "obsidian")),
+    );
+    misreadLists(parse("==a <!-- b -->==\n", "obsidian"));
+    const fastest = documents.map((group) =>
+      Math.min(
+        ...group.map((document) => {
+          const start = performance.now();
+          const result = misreadLists(document);
+          const elapsed = performance.now() - start;
+          expect(result.commentText.size).toBe(0);
+          return elapsed;
+        }),
+      ),
+    );
+    // Four times the input should take about four times the work, not sixteen.
+    // A millisecond floor and best-of-three samples tolerate timer noise and CI load.
+    expect(fastest[1]! / Math.max(1, fastest[0]!)).toBeLessThan(10);
   });
 });
 
