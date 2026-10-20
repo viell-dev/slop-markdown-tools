@@ -2,7 +2,7 @@
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
 // #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414), and those that the
-// check has to read with care (#385, #400, #401, #403, #406, #410). Each paragraph is long enough
+// check has to read with care (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
@@ -218,5 +218,31 @@ export const fixtures = [
     name: "footnote ending in a space",
     source:
       "Some words with a footnote[^1] and enough of them to be reflowed at a narrow width.\n\n[^1]: The footnote's text with enough words to be reflowed at a narrow width. \n",
+  },
+  {
+    // #421: an inline-code span at the end of a soft line keeps its trailing spaces when
+    // wrapping moves the next word onto the line.
+    name: "padded inline code at a soft line break",
+    source:
+      "Words before `code  `\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: control without trailing spaces inside the inline-code span at a soft line break.
+    name: "unpadded inline code at a soft line break",
+    source:
+      "Words before `code`\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: a double-backtick inline-code span with a literal backtick and trailing spaces at
+    // the end of a soft line keeps its padding when wrapping moves the next word onto the line.
+    name: "padded double-backtick inline code at a soft line break",
+    source:
+      "Words `` code `   ``\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
+  },
+  {
+    // #421: control double-backtick inline-code span whose single surrounding spaces strip.
+    name: "unpadded double-backtick inline code at a soft line break",
+    source:
+      "Words `` code ` ``\nneighbor words after the code span, enough text to wrap at thirty columns.\n",
   },
 ];

@@ -271,9 +271,11 @@ function livePreview(lines) {
         !(!classes && /^[\s>]*$/.test(value));
       const last = current.runs.findLast(shows);
       const first = line.runs.find(shows);
-      // Blank space at the end of the line shows as nothing, whatever styles it (#406).
+      // Blank space at the end of the line outside inline code shows as nothing, whatever
+      // styles it (#406, #421).
       while (current.runs.length) {
         const [classes, value] = current.runs.at(-1);
+        if (/\bcm-inline-code\b/.test(classes)) break;
         if (value.trimEnd()) {
           current.runs[current.runs.length - 1] = [classes, value.trimEnd()];
           break;
