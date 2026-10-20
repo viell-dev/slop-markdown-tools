@@ -20,6 +20,18 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, formatting preserves raw source continued after an
+  inline HTML opener, and `style/block-spacing` keeps paragraph boundaries
+  inside it or an HTML region continued across a whitespace-only line
+  ([#435](https://github.com/viell-dev/slop-markdown-tools/issues/435),
+  [#439](https://github.com/viell-dev/slop-markdown-tools/issues/439)).
+- In the Obsidian dialect, `style/block-spacing` keeps boundaries inside quotes
+  that Live Preview reads as inline text, and between a list and an adjacent
+  quote or an empty marker and its following text, which Reading view keeps
+  inside the item
+  ([#436](https://github.com/viell-dev/slop-markdown-tools/issues/436),
+  [#437](https://github.com/viell-dev/slop-markdown-tools/issues/437),
+  [#438](https://github.com/viell-dev/slop-markdown-tools/issues/438)).
 - In the Obsidian dialect, `style/block-spacing` preserves the boundary after an
   underlined heading that a view reads as paragraph text. Before, a new blank
   line split that paragraph after a multiline level-1 or reference-like heading,

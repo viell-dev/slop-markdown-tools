@@ -698,6 +698,15 @@ or what a comment applies to:
   paragraph text, such as a multiline level-1 heading, one beginning with a
   reference-like line, or one whose underline has trailing space, extra
   indentation, or a lone `-`.
+- In the Obsidian dialect, inside a block quote, whose heading and list markers
+  Live Preview reads as literal inline text; between a list and the adjacent
+  unindented quote that Reading view keeps in its last item; or between an empty
+  list marker and the text directly below it, which Reading view takes into the
+  item.
+- In the Obsidian dialect, inside continued HTML source: Live Preview can carry
+  an inline opener's raw state through later blocks until its closer or the
+  document's end, and Reading view continues HTML across a whitespace-only line
+  into the blocks below it until an empty line.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put

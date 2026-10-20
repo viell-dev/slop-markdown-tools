@@ -2,7 +2,7 @@
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
 // #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414,
-// #428, #429, #433, #434), and those that the check has to read with care
+// #428, #429, #433, #434, #435, #436, #437, #438, #439), and those that the check has to read with care
 // (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
@@ -316,6 +316,55 @@ export const fixtures = [
     name: "underlined heading with a lone dash underline",
     source:
       "Heading\n-\nSome *words* below the heading, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #435: Live Preview keeps raw HTML state beyond an inline opener and original blank.
+    name: "inline HTML continued into a later list",
+    source: "Words <b> *literal words*\n\nMore *literal words*\n1. Still *literal words*\n",
+  },
+  {
+    // #435: closing the tag restores ordinary Markdown below its source line.
+    name: "closed inline HTML before ordinary blocks",
+    source:
+      "Words <b> *literal words*\n</b>\n# Later heading\nSome *words* below the heading, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #436: headings and lists inside ordinary quotes remain literal inline source in LP.
+    name: "quoted heading directly above paragraph text",
+    source:
+      "> # Heading\n> Some *words* below it, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    name: "quoted paragraph directly above a literal list marker",
+    source:
+      "> Some paragraph words\n> - Some *words* below them, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #437: without a blank, Reading view keeps the quote in the last list item.
+    name: "unindented quote directly below a list",
+    source:
+      "- An item\n> Some *quoted words* below it, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #438: Reading view takes the unindented text as the empty marker's content.
+    name: "empty list marker directly above text",
+    source: "-\nSome *words* below the marker, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    name: "empty list marker after a table-like paragraph",
+    source:
+      "Words\n--:\nMore words\n-\nSome *words* below the marker, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #439: the tab continues Reading view's raw HTML through the list and heading.
+    name: "HTML tab continuation across a list and heading",
+    source: "<div>\nLiteral HTML\n</div>\n\t\n1. *Literal list*\n# *Literal heading*\n",
+  },
+  {
+    // #440: both actual marker families remain separate lists even without a blank.
+    name: "adjacent ordered and unordered lists",
+    source:
+      "1. Some *words* in the ordered item, enough of them to be reflowed at a narrow width.\n- Some *words* in the unordered item, enough of them to be reflowed at a narrow width.\n",
   },
   {
     // #398: Reading view reads the tab line as more of the paragraph and the table below it as

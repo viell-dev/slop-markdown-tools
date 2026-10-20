@@ -217,8 +217,12 @@ describe("style/block-spacing", () => {
     },
   );
   it.each(dialects)("separates the same blocks in the %s dialect", (dialect) => {
+    // Live Preview reads the heading/list markers inside a quote as literal
+    // inline text, so Obsidian keeps those internal boundaries (#436).
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
-      "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
+      dialect === "obsidian"
+        ? "> # H\n> Text\n> - A\n\n- B\n\n## I\n"
+        : "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
   });
   it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
@@ -380,6 +384,96 @@ describe("style/block-spacing", () => {
     (dialect) => {
       for (const heading of ["[r]: a b", "Heading\nMore words"])
         expect(spaced(`${heading}\n===\nText.\n`, dialect)).toBe(`${heading}\n===\n\nText.\n`);
+    },
+  );
+  it.each([
+    "a <b> *b*\n\nc *d*\n1. *e*\n",
+    "a <div> *b*\n\nc\n# *d*\n",
+    "1. a <b> *b*\n```js\nc\n```\n",
+    "> ## a\n> b\n",
+    "> a\n> - b\n",
+    "> a\n> [!TIP] b\n> - [ ] c\n",
+    ">\n> ## a\n> b\n",
+    ">\n> - a\n> # b\n",
+    "> > # a\n> > b\n",
+    "- a\n> b\n",
+    "1. a\n> b\n",
+    "- a\n  - b\n> c\n",
+    "-\ncedar\n",
+    "a\n--:\nb\n-\nc\n",
+    "<div>\na\n</div>\n\t\n1. b\n# c\n",
+    "<div>\na\n</div>\n\t\n- b\n# c\n",
+  ])("preserves the alternate Obsidian boundary in %j (#435–#439)", (body) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        for (const config of [
+          only(rule, "obsidian"),
+          { extends: ["recommended", "obsidian"], dialect: "obsidian" } satisfies Config,
+        ]) {
+          const source = bom + body.replaceAll("\n", newline);
+          expect(formatted(source, config)).toBe(source);
+          expect(
+            lint(source, { config }).filter(({ rule }) => rule === "style/block-spacing"),
+          ).toEqual([]);
+        }
+  });
+  it.each([
+    ["a <b>b</b>\n\nc\n1. d\n", "a <b>b</b>\n\nc\n\n1. d\n"],
+    ["- a ``` b\n# c\n", "- a ``` b\n\n# c\n"],
+    ["<div>\na\n</div>\n\n1. b\n# c\n", "<div>\na\n</div>\n\n1. b\n\n# c\n"],
+    ["- a\n\n> b\n", "- a\n\n> b\n"],
+    ["-\n\ncedar\n", "-\n\ncedar\n"],
+    ["> a\n>\n> - b\n", "> a\n>\n> - b\n"],
+    ["# Heading\n> quote\n", "# Heading\n\n> quote\n"],
+  ])("keeps ordinary spacing available in %j (#435–#439)", (source, output) => {
+    expect(spaced(source, "obsidian")).toBe(output);
+  });
+  it("resumes formatting after the confirmed inline HTML closer (#435)", () => {
+    const source = "a <b> *literal*\n</b>\n# Later\nText *formats*.\n";
+    expect(formatted(source, { extends: ["recommended", "obsidian"], dialect: "obsidian" })).toBe(
+      "a <b> *literal*\n</b>\n\n# Later\n\nText _formats_.\n",
+    );
+    for (const [source, output] of [
+      [
+        "Words <span>text</span> *styled*\n\nLater *words*.\n",
+        "Words <span>text</span> _styled_\n\nLater _words_.\n",
+      ],
+      ["a <b>*inside*</b> *after*\n", "a <b>*inside*</b> _after_\n"],
+      [
+        "a <b>*inside*</b> *between* <span>*literal*</span> *after*\n",
+        "a <b>*inside*</b> _between_ <span>*literal*</span> _after_\n",
+      ],
+    ])
+      expect(
+        formatted(source!, { extends: ["recommended", "obsidian"], dialect: "obsidian" }),
+      ).toBe(output);
+  });
+  it.each([
+    "a <b> *literal*\n\nc\n1. d",
+    "> # a\n> b",
+    "- a\n> b",
+    "-\ncedar",
+    "<div>\na\n</div>\n\t\n1. b\n# c",
+  ])("preserves the Obsidian boundary through EOF in %j (#435–#439)", (source) => {
+    expect(formatted(source, only(rule, "obsidian"))).toBe(source);
+  });
+  it("formats between many closed inline HTML roots on one physical line (#435)", () => {
+    const source = "a <b>literal</b> *styled* ".repeat(1_000) + "\n";
+    expect(formatted(source, only({ "style/emphasis": "warn" }, "obsidian"))).toBe(
+      "a <b>literal</b> _styled_ ".repeat(1_000) + "\n",
+    );
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "retains normal separator proposals in the %s dialect (#435–#439)",
+    (dialect) => {
+      for (const [source, output] of [
+        ["a <b> b\n\nc\n1. d\n", "a <b> b\n\nc\n\n1. d\n"],
+        ["> # a\n> b\n", "> # a\n>\n> b\n"],
+        ["- a\n> b\n", "- a\n\n> b\n"],
+        ["-\ncedar\n", "-\n\ncedar\n"],
+        ["<div>\na\n</div>\n\t\n1. b\n# c\n", "<div>\na\n</div>\n\t\n1. b\n\n# c\n"],
+      ])
+        expect(spaced(source!, dialect)).toBe(output);
     },
   );
   it("honours suppression comments", () => {
