@@ -39,8 +39,9 @@ export interface DiscoverOptions {
   /**
    * Documents whose text the caller supplies, such as an editor's unsaved
    * text, by path relative to the root. They are selected, and the workspace
-   * reads this text instead of a file at that path. One whose path ignore rules
-   * leave out is not selected and is reported in `skipped`, as a named file is.
+   * reads this text instead of a file at that path. Exclusions leave them out
+   * of the selection too. One whose path ignore rules leave out is not selected
+   * and is reported in `skipped`, as a named file is.
    */
   documents?: Record<string, string>;
 }
@@ -132,9 +133,7 @@ export async function discoverFrom(
     base,
     { documents: ignoreDocuments ? [...documents.keys()] : [], selectNone: none },
   );
-  set.selected = none
-    ? []
-    : await excludeSelection(set.root, set.selected, options.exclude ?? [], base);
+  if (none) set.selected = [];
   // A supplied document that ignore rules leave out is reported as a named
   // file is, and not selected.
   const ignored = new Set(
@@ -150,7 +149,12 @@ export async function discoverFrom(
     if (!ignored.has(name)) supplied.set(name, undefined);
   }
   for (const name of supplied.keys()) supplied.set(name, await vaultFor(set, name));
-  const selected = [...new Set([...set.selected, ...supplied.keys()])].sort();
+  const selected = await excludeSelection(
+    set.root,
+    [...new Set([...set.selected, ...supplied.keys()])].sort(),
+    options.exclude ?? [],
+    base,
+  );
   const chosen = new Set(selected);
   const known = (name: string) => {
     if (!chosen.has(name)) throw new Error(`Not a selected document: ${name}`);
