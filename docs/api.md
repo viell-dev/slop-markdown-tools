@@ -178,7 +178,8 @@ and writes nothing: pass the configuration as `config`, plugin objects as
   them](cli.md#which-files-are-processed): a file is selected whatever its name,
   and an ignored file or directory is an entry of `skipped` with the code
   `IGNORED`. Omitted, every document is selected; an empty list selects none.
-- `exclude` lists files and directories to leave out, as paths, not patterns.
+- `exclude` lists files and directories to leave out, as paths, not patterns. It
+  applies to supplied documents too; their text stays available for links.
 - `documents` gives text for paths relative to `root`, such as an editor's
   unsaved buffer. Those documents are selected, and the workspace reads that
   text in place of a file, also where no file exists. One whose path ignore
