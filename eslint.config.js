@@ -1,7 +1,8 @@
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       "**/dist/**",
@@ -16,6 +17,13 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+    extends: [tseslint.configs.recommendedTypeCheckedOnly],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+  },
   {
     // Examples read like consumer scripts, which use Node's globals without importing them.
     files: ["examples/**/*.mjs"],

@@ -245,11 +245,11 @@ describe("wrapping controls", () => {
     ],
     ["A long line with <b>inline HTML</b> and many more words.\n", "inline HTML"],
   ])("optionally reports protected over-width paragraphs", (source, reason) => {
-    const result = verify(source!, wrap({ reportUnreflowed: true }));
+    const result = verify(source, wrap({ reportUnreflowed: true }));
     expect(result.output).toBe(source);
     expect(result.diagnostics[0]?.message).toContain(reason);
     expect(result.diagnostics[0]?.edit).toBeUndefined();
-    expect(lint(source!, { config: wrap() })).toEqual([]);
+    expect(lint(source, { config: wrap() })).toEqual([]);
   });
   it("reflows a paragraph that ends in what an Obsidian block identifier cannot be", () => {
     // Obsidian allows letters, digits, and hyphens in a block identifier.
@@ -1317,8 +1317,8 @@ describe("multiline code spans", () => {
     ["A ` \n ` here.\n", "A `  ` here.\n"],
     ["A `one\r\ntwo` here.\r\n", "A `one two` here.\r\n"],
   ])("joins parsed code without deleting content or container syntax", (source, expected) => {
-    expect(verify(source!, config).output).toBe(expected);
-    expect(format(source!, { config: { extends: [] } }).output).toBe(source);
+    expect(verify(source, config).output).toBe(expected);
+    expect(format(source, { config: { extends: [] } }).output).toBe(source);
   });
   it.each(["commonmark", "github", "forgejo", "gitea", "obsidian"] as const)(
     "leaves a code span on an indented lazy line as written, without a refusal, in %s",

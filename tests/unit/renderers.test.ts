@@ -224,11 +224,16 @@ describe("Obsidian Live Preview normalizer", () => {
     source.indexOf("function cleanHtml("),
     source.indexOf("/** The documents to format:"),
   );
-  const { livePreview } = new Function("normalizeHtml", `${body}; return { livePreview };`)(
-    normalizeHtml,
-  ) as {
+  type NormalizerFactory = (normalize: typeof normalizeHtml) => {
     livePreview: (lines: { kind: string; continuation?: boolean; runs: string[][] }[]) => string[];
   };
+  // The probe executes the repository's browser helper with its dependency injected.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Verbatim helper probe.
+  const normalizerFactory = new Function(
+    "normalizeHtml",
+    `${body}; return { livePreview };`,
+  ) as NormalizerFactory;
+  const { livePreview } = normalizerFactory(normalizeHtml);
 
   describe("styled list-family boundaries (#440)", () => {
     type PreviewLine = { kind: string; continuation?: boolean; runs: string[][] };

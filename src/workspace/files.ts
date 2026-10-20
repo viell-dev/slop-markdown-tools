@@ -617,7 +617,7 @@ export async function discover(
     for (let index = 0; index < parts.length; index++) {
       const parent = parts.slice(0, index).join("/");
       let children = documentChildren.get(parent);
-      if (!children) documentChildren.set(parent, (children = new Map()));
+      if (!children) documentChildren.set(parent, (children = new Map<string, boolean>()));
       const child = parts[index]!;
       children.set(child, children.get(child) === true || index < parts.length - 1);
     }

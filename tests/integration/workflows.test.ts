@@ -6,6 +6,7 @@ import { importConditions } from "../../src/config/load.js";
 import { parse, semanticFingerprint } from "../../src/index.js";
 import type { Diagnostic } from "../../src/index.js";
 import { cli, fixture, manifest, run, tree } from "./support.js";
+import { parseExplanation, parseReport } from "./json.js";
 
 interface Report {
   version: string;
@@ -14,7 +15,7 @@ interface Report {
   written: string[];
   files: { path: string; changed?: boolean; output?: string; diagnostics: Diagnostic[] }[];
 }
-const report = (stdout: string) => JSON.parse(stdout) as Report;
+const report = (stdout: string) => parseReport(stdout) as Report;
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 
 describe("a repository with an embedded vault", () => {
@@ -147,7 +148,7 @@ describe("line endings and file names", () => {
     await writeFile(path.join(root, "other.jsonc"), `${mark}// Comment\n{ "dialect": "gitea" }\n`);
     const explained = run(root, ["config", "--config", "other.jsonc", "explain", "note.md"]);
     expect(explained.status, explained.stderr).toBe(0);
-    expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
+    expect(parseExplanation(explained.stdout).effective.dialect).toBe("gitea");
     // The mark does not hide other errors, and their columns count after it.
     await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
     expect(run(root, ["lint"]).stderr).toBe(

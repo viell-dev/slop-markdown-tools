@@ -2,6 +2,7 @@ import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
 import type { Nodes } from "mdast";
 import { describe, expect, it, vi } from "vitest";
+import { stringContaining } from "../assertions.js";
 import {
   createWorkspace,
   format,
@@ -83,7 +84,7 @@ describe("local target resolution", () => {
     ["Local", "Sub/Local.md"],
     ["Unique", "Elsewhere/Unique.md"],
   ])("resolves %s by explicit, root, relative, then suffix precedence", (url, target) => {
-    expect(workspace.resolve("Sub/Doc.md", url!, "obsidian")).toMatchObject({
+    expect(workspace.resolve("Sub/Doc.md", url, "obsidian")).toMatchObject({
       status: "resolved",
       target,
     });
@@ -967,9 +968,7 @@ describe("directories that could not be read", () => {
         config: valid("github", "warn"),
         workspace,
       }),
-    ).toMatchObject([
-      { severity: "warn", message: expect.stringContaining("could not be checked") },
-    ]);
+    ).toMatchObject([{ severity: "warn", message: stringContaining("could not be checked") }]);
     expect(
       lint("[[Diary]] and ![[locked/image.png]]\n", {
         path: "Doc.md",

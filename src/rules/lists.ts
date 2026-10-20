@@ -757,7 +757,7 @@ const listMarker: Rule = {
   check({ document, options }) {
     const analysis = analyze(document);
     const { source, lines } = analysis;
-    const base = bulletMarkers(analysis, String(options.marker ?? "-"));
+    const base = bulletMarkers(analysis, String((options.marker as string | undefined) ?? "-"));
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;
@@ -839,7 +839,7 @@ const orderedList: Rule = {
   check({ document, options }) {
     const analysis = analyze(document);
     const { source } = analysis;
-    let preferred = String(options.delimiter ?? ".");
+    let preferred = String((options.delimiter as string | undefined) ?? ".");
     if (preferred === "consistent") {
       // The delimiter of the document's first ordered list.
       const first = analysis.units
@@ -848,7 +848,7 @@ const orderedList: Rule = {
       preferred = source[(first?.items[0]?.markerEnd ?? 0) - 1] === ")" ? ")" : ".";
     }
     const other = preferred === "." ? ")" : ".";
-    const numbering = String(options.numbering ?? "auto");
+    const numbering = String((options.numbering as string | undefined) ?? "auto");
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;

@@ -64,6 +64,12 @@ the library through `import` and `require()`, a shipped example, and TypeScript
 consumers of the published types. npm fetches the pinned pnpm into the
 repository's cache, and both installations can need access to the npm registry.
 
+ESLint uses the project's TypeScript types when checking source and tests. It
+also checks the JavaScript scripts and examples with their existing environment
+settings. Integration tests validate CLI JSON before using it; the shared
+readers in `tests/integration/json.ts` keep the original payload, so assertions
+still catch unexpected keys.
+
 The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
 `npm run schema` writes it to `config.schema.json`, which the package ships and
 the site serves; a test fails when the two differ.

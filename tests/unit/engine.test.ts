@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { stringContaining } from "../assertions.js";
 import { Ajv } from "ajv";
 import * as syntax from "../../src/syntax/parse.js";
 import { misreadLists } from "../../src/syntax/misread-lists.js";
@@ -2277,10 +2278,11 @@ describe("rules that fail", () => {
       const ranged = lint("Text.\n\n" + source, { ...options, ranges: [{ start: 7, end: 7 }] });
       expect(ruleErrors(ranged)).toEqual([expected]);
       const thrown = failing(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- Test isolation of a non-Error throw.
         throw "text";
       }, kind);
       expect(ruleErrors(lint(source, thrown))).toMatchObject([
-        { message: expect.stringContaining("Rule test/fragile failed (text);") },
+        { message: stringContaining("Rule test/fragile failed (text);") },
       ]);
     },
   );
@@ -2370,10 +2372,10 @@ describe("rules that fail", () => {
       throw new Error("Own");
     });
     expect(ruleErrors(lint(source, { ...replaced, workspace }))).toMatchObject([
-      { message: expect.stringContaining("failed (Error: Own)") },
+      { message: stringContaining("failed (Error: Own)") },
     ]);
     expect(ruleErrors(format(source, { ...replaced, workspace }).diagnostics)).toMatchObject([
-      { message: expect.stringContaining("failed (Error: Own)") },
+      { message: stringContaining("failed (Error: Own)") },
     ]);
   });
   it("rejects a plugin named engine, whose findings would pass for the engine's own", () => {
@@ -2392,7 +2394,7 @@ describe("rules that fail", () => {
     const at = (start: number) => failing(() => [{ start, message: "End" }]);
     expect(lint(`${mark}A.\n`, at(3))).toMatchObject([{ rule: "test/fragile", start: 4 }]);
     expect(lint(`${mark}A.\n`, at(4))).toMatchObject([
-      { message: expect.stringContaining("start is 4, not an offset from 0 to 3") },
+      { message: stringContaining("start is 4, not an offset from 0 to 3") },
     ]);
   });
   it.each([
@@ -2565,7 +2567,7 @@ describe("processing selected ranges", () => {
     expect(format(source, emphasis)).toEqual({
       output: "A _b_.\n\nC _d_.\n",
       changed: true,
-      diagnostics: expect.any(Array),
+      diagnostics: [],
     });
     expect(format(source, { ...emphasis, ranges: [] })).toEqual({
       output: source,
@@ -2980,8 +2982,8 @@ describe("configuration and plugins", () => {
       builtInRules["style/wrap"]!.check = () => [];
     }).toThrow(TypeError);
     expect(() => {
-      // @ts-expect-error The dialects are read-only.
-      dialects.push("markdown");
+      // @ts-expect-error Bypass the read-only type to test runtime freezing.
+      dialects.push("markdown"); // eslint-disable-line @typescript-eslint/no-unsafe-call
     }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error The aliases are read-only.

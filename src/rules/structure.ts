@@ -127,7 +127,7 @@ export const structureRules: Record<string, Rule> = {
           const text = headingText(heading);
           if (!text) continue;
           let siblings = seen.get(parent);
-          if (!siblings) seen.set(parent, (siblings = new Map()));
+          if (!siblings) seen.set(parent, (siblings = new Map<string, Heading>()));
           const earlier = siblings.get(text);
           if (earlier)
             findings.push({

@@ -10,6 +10,12 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Changed
+
+- Contributor checks use TypeScript types during source and test linting, and
+  integration tests validate CLI JSON before inspecting it
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
+
 ### Fixed
 
 - The benchmark guide identifies the parser's repeated list/table transition

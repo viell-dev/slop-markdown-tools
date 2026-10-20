@@ -34,6 +34,7 @@ import {
   tree,
   windowsTool,
 } from "./support.js";
+import { parseExplanation, parseReport, parseRules } from "./json.js";
 
 describe("CLI", () => {
   it.each([undefined, { extends: ["recommended"] }])(
@@ -46,10 +47,12 @@ describe("CLI", () => {
       });
       const explained = run(root, ["config", "explain", "note.md"]);
       expect(explained.status, explained.stderr).toBe(0);
-      expect(JSON.parse(explained.stdout).effective.rules["style/block-spacing"]).toBe("warn");
+      expect(parseExplanation(explained.stdout).effective.rules["style/block-spacing"]).toBe(
+        "warn",
+      );
       const checked = run(root, ["lint", "--json", "."]);
       expect(checked.status, checked.stderr).toBe(0);
-      expect(JSON.parse(checked.stdout).files[0].diagnostics).toMatchObject([
+      expect(parseReport(checked.stdout).files[0]!.diagnostics).toMatchObject([
         { rule: "style/block-spacing", severity: "warn" },
         { rule: "style/block-spacing", severity: "warn" },
       ]);
@@ -87,7 +90,7 @@ describe("CLI", () => {
     const root = await fixture({ "note.md": "[bad](missing.md)\n" });
     const checked = run(root, ["lint", "--json", "."]);
     expect(checked.status).toBe(1);
-    expect(JSON.parse(checked.stdout).files[0].diagnostics[0].rule).toBe("links/valid");
+    expect(parseReport(checked.stdout).files[0]!.diagnostics[0]!.rule).toBe("links/valid");
     expect(checked.stderr).toBe("");
     expect(run(root, ["lint", "--dialect", "typo", "."]).status).toBe(2);
   });
@@ -101,7 +104,7 @@ describe("CLI", () => {
     expect(run(root, ["format", "--check", "."]).status).toBe(0);
     expect(run(root, ["lint", "--dialect", "github", "."]).status).toBe(1);
     const explained = run(root, ["config", "explain", "note.md"]);
-    expect(JSON.parse(explained.stdout).effective.dialect).toBe("forgejo");
+    expect(parseExplanation(explained.stdout).effective.dialect).toBe("forgejo");
     const aliased = run(root, ["lint", "--dialect", "codeberg", "--json", "."]);
     expect(aliased.status, aliased.stderr).toBe(0);
   });
@@ -115,7 +118,7 @@ describe("CLI", () => {
     expect(run(root, ["format", "--check", "."]).status).toBe(0);
     expect(run(root, ["lint", "--dialect", "forgejo", "."]).status).toBe(1);
     const explained = run(root, ["config", "explain", "note.md"]);
-    expect(JSON.parse(explained.stdout).effective.dialect).toBe("gitea");
+    expect(parseExplanation(explained.stdout).effective.dialect).toBe("gitea");
   });
   it("loads JSONC, applies path overrides, and explains configuration", async () => {
     const root = await fixture({
@@ -126,7 +129,7 @@ describe("CLI", () => {
     expect(run(root, ["format", "--check", "vault"]).status).toBe(0);
     const explained = run(root, ["config", "explain", "vault/a.md"]);
     expect(explained.status, explained.stderr).toBe(0);
-    expect(JSON.parse(explained.stdout).effective.dialect).toBe("obsidian");
+    expect(parseExplanation(explained.stdout).effective.dialect).toBe("obsidian");
   });
   it("loads a custom JavaScript rule and preset", async () => {
     const root = await fixture({
@@ -159,7 +162,7 @@ describe("CLI", () => {
     });
     const result = run(root, ["lint", "--json", "."]);
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(result.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "note.md",
     ]);
   });
@@ -177,7 +180,7 @@ describe("CLI", () => {
       "other/d.md": "A *note*.\n",
     });
     const result = run(root, ["lint", "--json"]);
-    const report = JSON.parse(result.stdout) as {
+    const report = parseReport(result.stdout) as {
       files: { path: string; diagnostics: { rule: string }[] }[];
     };
     expect(report.files.map((file) => file.path)).toEqual([
@@ -207,12 +210,12 @@ describe("CLI", () => {
     });
     const checked = run(root, ["lint", "--json", "Doc.md"]);
     expect(checked.status, checked.stderr).toBe(0);
-    expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "Doc.md",
     ]);
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.status, applied.stderr).toBe(0);
-    expect(JSON.parse(applied.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(applied.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "Doc.md",
     ]);
     expect(await readFile(path.join(root, "Ignored/Note.md"), "utf8")).toContain("*untouched*");
@@ -265,10 +268,10 @@ describe("CLI", () => {
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(
       `${header}> A body line that is long enough to be reflowed by the\n> wrapper, so it should wrap.\n`,
     );
-    const findings = JSON.parse(applied.stdout).files[0].diagnostics;
+    const findings = parseReport(applied.stdout).files[0]!.diagnostics;
     expect(findings).toHaveLength(1);
-    expect(findings[0].line).toBe(1);
-    expect(findings[0].message).toContain("unbreakable atom");
+    expect(findings[0]!.line).toBe(1);
+    expect(findings[0]!.message).toContain("unbreakable atom");
     expect(run(root, ["format", "--check", "note.md"]).status).toBe(0);
   });
   it("writes the other documents, and the checked result of one, when a rule's edits are refused", async () => {
@@ -322,7 +325,7 @@ describe("CLI", () => {
     expect(linted.stderr).toContain("2 file(s) linted; 1 error(s), 5 warning(s).\n");
     const written = run(root, ["format", "--write", "--json", "."]);
     expect(written.status).toBe(2);
-    const report = JSON.parse(written.stdout) as {
+    const report = parseReport(written.stdout) as {
       written: string[];
       files: { path: string; changed: boolean; diagnostics: { rule: string }[] }[];
     };
@@ -363,7 +366,7 @@ describe("CLI", () => {
       "not-created/note.md",
     ]);
     expect(selected.status, selected.stderr).toBe(0);
-    expect(JSON.parse(selected.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(selected.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "folder-extra.md",
       "note.md",
     ]);
@@ -531,7 +534,7 @@ describe("the command line", () => {
       "deep/new.md:1:1: error links/valid: Missing local target: absent.md.\n",
     );
     // The JSON report names files from the root, which it gives as an absolute path.
-    const report = JSON.parse(run(docs, ["lint", "--json", "deep"]).stdout);
+    const report = parseReport(run(docs, ["lint", "--json", "deep"]).stdout);
     expect(report.files.map((file: { path: string }) => file.path)).toEqual(["docs/deep/page.md"]);
     expect(await realpath(report.root)).toBe(await realpath(root));
   });
@@ -559,7 +562,7 @@ describe("the command line", () => {
         "1 file(s) linted; 0 error(s), 0 warning(s).\n",
     );
     // The JSON report, like the library, names them from the root.
-    const report = JSON.parse(run(path.join(root, "docs"), ["lint", "--json", ...inputs]).stdout);
+    const report = parseReport(run(path.join(root, "docs"), ["lint", "--json", ...inputs]).stdout);
     expect(report.skipped).toEqual([
       {
         path: "docs/drafts/a.md",
@@ -609,8 +612,8 @@ describe("the command line", () => {
           unreadable("open", " for open/.gitignore") +
           "1 file(s) linted; 0 error(s), 0 warning(s).\n",
       );
-      const report = JSON.parse(run(path.join(root, "docs"), ["lint", "--json"]).stdout);
-      expect(report.skipped.map((item: { message: string }) => item.message)).toEqual([
+      const report = parseReport(run(path.join(root, "docs"), ["lint", "--json"]).stdout);
+      expect(report.skipped!.map((item: { message: string }) => item.message)).toEqual([
         unreadable("docs/closed").slice(18, -1),
         unreadable("docs/open", " for docs/open/.gitignore").slice(18, -1),
       ]);
@@ -667,8 +670,8 @@ describe("the command line", () => {
       "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
         "1 file(s) linted; 1 error(s), 0 warning(s).\n",
     );
-    const report = JSON.parse(run(root, ["lint", "--quiet", "--json"]).stdout);
-    expect(report.files[0].diagnostics.map((item: { rule: string }) => item.rule)).toEqual([
+    const report = parseReport(run(root, ["lint", "--quiet", "--json"]).stdout);
+    expect(report.files[0]!.diagnostics.map((item: { rule: string }) => item.rule)).toEqual([
       "links/valid",
     ]);
     // Warnings that are not reported are not counted either, as in ESLint.
@@ -692,7 +695,7 @@ describe("the command line", () => {
     expect(linted.stderr).toBe("1 file(s) linted; 0 error(s), 0 warning(s).\n");
     const explained = run(root, ["config", "explain", "note.md", "--dialect", "codeberg"]);
     expect(explained.status, explained.stderr).toBe(0);
-    expect(JSON.parse(explained.stdout).effective).toMatchObject({
+    expect(parseExplanation(explained.stdout).effective).toMatchObject({
       dialect: "forgejo",
       rules: { "style/emphasis": "off" },
     });
@@ -706,7 +709,7 @@ describe("the command line", () => {
     const explain = (cwd: string, ...args: string[]) => run(cwd, ["config", "explain", ...args]);
     const explained = explain(root, "notes/a.md");
     expect(explained.status, explained.stderr).toBe(0);
-    const result = JSON.parse(explained.stdout);
+    const result = parseExplanation(explained.stdout);
     expect(Object.keys(result)).toEqual(["root", "config", "path", "effective"]);
     expect(result).toMatchObject({
       config: path.join(result.root, "mdtools.config.jsonc"),
@@ -715,15 +718,15 @@ describe("the command line", () => {
     });
     // From a folder, of a document that does not exist yet, with the options on either side.
     const inner = explain(path.join(root, "notes"), "new/b.md", "--dialect", "github");
-    expect(JSON.parse(inner.stdout)).toMatchObject({ path: "notes/new/b.md" });
+    expect(parseExplanation(inner.stdout)).toMatchObject({ path: "notes/new/b.md" });
     const before = run(path.join(root, "notes"), ["config", "--root", "..", "explain", "a.md"]);
-    expect(JSON.parse(before.stdout)).toMatchObject({ path: "notes/a.md" });
+    expect(parseExplanation(before.stdout)).toMatchObject({ path: "notes/a.md" });
     // A root reached through a link holds the document named by its real path.
     const elsewhere = await fixture({});
     await linkDirectory(root, path.join(elsewhere, "alias"));
     const linked = explain(root, "notes/a.md", "--root", path.join(elsewhere, "alias"));
     expect(linked.status, linked.stderr).toBe(0);
-    expect(JSON.parse(linked.stdout)).toMatchObject({ path: "notes/a.md" });
+    expect(parseExplanation(linked.stdout)).toMatchObject({ path: "notes/a.md" });
     // `lint` refuses a document outside the workspace, and so does `config explain`.
     for (const args of [["../outside.md"], ["notes/a.md", "--root", "other"]]) {
       const outside = explain(root, ...args);
@@ -748,7 +751,7 @@ describe("the command line", () => {
       "style/wrap\tstyle\tReflow paragraphs using configurable width and protected inline atoms.",
     );
     expect(lines.at(-1)).toBe("local/report\tproblem\tReports everything.");
-    const rules = (JSON.parse(run(root, ["rules", "--json"]).stdout) as { rules: unknown[] }).rules;
+    const rules = (parseRules(run(root, ["rules", "--json"]).stdout) as { rules: unknown[] }).rules;
     expect(rules.length).toBe(lines.length);
     expect(rules.at(-1)).toEqual({
       id: "local/report",
@@ -756,7 +759,7 @@ describe("the command line", () => {
       description: "Reports\n\teverything.",
     });
     const plain = run(root, ["rules", "--json", "--config", "other/settings.json"]);
-    expect(JSON.parse(plain.stdout).rules.length).toBe(lines.length - 1);
+    expect(parseRules(plain.stdout).rules.length).toBe(lines.length - 1);
   });
 });
 describe("without a named dialect", () => {
@@ -789,13 +792,14 @@ describe("without a named dialect", () => {
   const dialect = (root: string, file: string, ...flags: string[]) => {
     const explained = run(root, ["config", ...flags, "explain", file]);
     expect(explained.status, explained.stderr).toBe(0);
-    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+    return (parseExplanation(explained.stdout) as { effective: { dialect: string } }).effective
+      .dialect;
   };
   it("assumes GitHub Markdown and says so", async () => {
     const root = await fixture(files);
     expect(dialect(root, "outer-pipes.md")).toBe("github");
     // Only the dialect is assumed: the rules are those of the recommended preset.
-    const explained = JSON.parse(run(root, ["config", "explain", "outer-pipes.md"]).stdout);
+    const explained = parseExplanation(run(root, ["config", "explain", "outer-pipes.md"]).stdout);
     expect(explained.config).toBeNull();
     expect(Object.keys(explained.effective.rules)).not.toContain("github/task-marker");
     // A configuration that names no dialect is read the same way.
@@ -865,7 +869,7 @@ describe("without a named dialect", () => {
     expect(dialect(root, "plain/table.md")).toBe("commonmark");
     const previewed = run(root, ["format", "--json"]);
     expect(previewed.status, previewed.stderr).toBe(0);
-    const changed = (JSON.parse(previewed.stdout) as { files: { path: string }[] }).files;
+    const changed = (parseReport(previewed.stdout) as { files: { path: string }[] }).files;
     expect(changed).toMatchObject([
       // The forgejo preset aligns the table; CommonMark reflows its lines as prose.
       { path: "docs/table.md", changed: true },
@@ -895,7 +899,8 @@ describe("in an Obsidian vault, without a named dialect", () => {
   const dialect = (root: string, file: string, ...flags: string[]) => {
     const explained = run(root, ["config", ...flags, "explain", file]);
     expect(explained.status, explained.stderr).toBe(0);
-    return (JSON.parse(explained.stdout) as { effective: { dialect: string } }).effective.dialect;
+    return (parseExplanation(explained.stdout) as { effective: { dialect: string } }).effective
+      .dialect;
   };
   /** A vault: Obsidian creates `.obsidian/` at its root, with or without settings in `app.json`. */
   async function vault(settings: string | undefined, extra: Record<string, string> = {}) {
@@ -953,7 +958,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
   it("assumes the dialect only, so the rules of the obsidian preset still need the preset", async () => {
     const source = "> [!TIP] Title\n> Text.\n";
     const root = await vault(undefined, { "Callout.md": source });
-    const explained = JSON.parse(run(root, ["config", "explain", "Callout.md"]).stdout);
+    const explained = parseExplanation(run(root, ["config", "explain", "Callout.md"]).stdout);
     expect(explained.config).toBeNull();
     expect(explained.effective.dialect).toBe("obsidian");
     expect(Object.keys(explained.effective.rules)).not.toContain("obsidian/callout-marker");
@@ -1078,7 +1083,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
       "vault/Folder/mdtools.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
     });
     const inside = path.join(configured, "vault/Folder");
-    expect(JSON.parse(run(inside, ["config", "explain", "Note.md"]).stdout)).toMatchObject({
+    expect(parseExplanation(run(inside, ["config", "explain", "Note.md"]).stdout)).toMatchObject({
       root: inside,
       effective: { dialect: "obsidian" },
     });
@@ -1180,7 +1185,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(dialect(root, "note.md")).toBe("github");
     const linted = run(root, ["lint", "--json"]);
     expect(linted.status, linted.stderr).toBe(0);
-    expect(JSON.parse(linted.stdout).skipped).toBeUndefined();
+    expect(parseReport(linted.stdout).skipped).toBeUndefined();
     const applied = run(root, ["format", "--write"]);
     expect(applied.status, applied.stderr).toBe(0);
     expect(applied.stderr).toBe("1 file(s) processed; 1 written.\n");
@@ -1208,7 +1213,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
         "1 file(s) processed; 0 written.\n",
     );
     expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(paragraph);
-    expect(JSON.parse(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
+    expect(parseReport(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
       { path: ".obsidian/app.json", type: "file", code: "INVALID", message },
     ]);
   });
@@ -1223,7 +1228,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
       `Skipped unusable settings file: ${file} (not a file). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.`;
     const below = run(root, ["lint", "--json"]);
     expect(below.status, below.stderr).toBe(0);
-    expect(JSON.parse(below.stdout).skipped).toEqual([
+    expect(parseReport(below.stdout).skipped).toEqual([
       {
         path: "docs/vault/.obsidian/app.json",
         type: "file",
@@ -1238,7 +1243,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
       `mdtools: warning: ${text("docs/vault/.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
     const report = run(root, ["lint", "--root", "docs/vault/Folder", "--json"]);
-    expect(JSON.parse(report.stdout).skipped).toMatchObject([
+    expect(parseReport(report.stdout).skipped).toMatchObject([
       { path: "../.obsidian/app.json", message: text("../.obsidian/app.json") },
     ]);
     const inside = run(path.join(root, "docs/vault/Folder"), ["lint"]);
@@ -1431,9 +1436,9 @@ describe("filesystem safeguards", () => {
           "3 file(s) processed; 2 written; 1 could not be written.\n",
       );
       expect(await tree(root)).toEqual({ ...notes, "a.md": "A _b_.\n", "z.md": "Z _b_.\n" });
-      const report = JSON.parse(run(root, ["format", "--write", "--json"]).stdout);
+      const report = parseReport(run(root, ["format", "--write", "--json"]).stdout);
       expect(report.written).toEqual([]);
-      expect(report.files[1].diagnostics[0]).toEqual({
+      expect(report.files[1]!.diagnostics[0]).toEqual({
         start: 0,
         message: `The file may not be written (${reason}); the file is unchanged.`,
         rule: "engine/unwritable-file",
@@ -1475,7 +1480,7 @@ describe("filesystem safeguards", () => {
       denyWrite(path.join(root, "held.md"));
       let applied = run(root, ["format", "--write", "--json"]);
       expect(applied.status).toBe(2);
-      const report = JSON.parse(applied.stdout);
+      const report = parseReport(applied.stdout);
       expect(report.written).toEqual(["a.md", "z.md"]);
       expect(report.files[1]).toEqual({
         path: "held.md",
@@ -1563,7 +1568,7 @@ describe("filesystem safeguards", () => {
     expect((await discover(root, [], [])).selected).toEqual(["folder/target.md"]);
     // A path through the link names the file that the link leads to.
     const through = run(root, ["lint", "--json", path.join("linked", "target.md")]);
-    expect(JSON.parse(through.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(through.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "folder/target.md",
     ]);
   });
@@ -1581,7 +1586,7 @@ describe("filesystem safeguards", () => {
       path.join(alias, "not-created/note.md"),
     ]);
     expect(checked.status, checked.stderr).toBe(0);
-    expect(JSON.parse(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
+    expect(parseReport(checked.stdout).files.map((file: { path: string }) => file.path)).toEqual([
       "other.md",
     ]);
   });
@@ -1812,7 +1817,7 @@ describe("paths and configuration files that cannot be used", () => {
     // The summary is not part of a JSON report.
     const report = run(root, ["lint", "--json"]);
     expect(report.stderr).toBe("");
-    expect(Object.keys(JSON.parse(report.stdout))).toEqual([
+    expect(Object.keys(parseReport(report.stdout))).toEqual([
       "version",
       "mode",
       "root",
@@ -1865,7 +1870,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const linted = run(root, ["lint", "--json"]);
     expect(linted.status).toBe(0);
     expect(linted.stderr).toBe("");
-    expect(Object.keys(JSON.parse(linted.stdout))).toEqual([
+    expect(Object.keys(parseReport(linted.stdout))).toEqual([
       "version",
       "mode",
       "root",
@@ -1873,20 +1878,20 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       "written",
       "skipped",
     ]);
-    expect(JSON.parse(linted.stdout)).toMatchObject({
+    expect(parseReport(linted.stdout)).toMatchObject({
       files: [{ path: "note.md" }],
       written: [],
       skipped,
     });
     const piped = run(root, ["format", "-", "--json"], "B *note*.\n");
     expect(piped.status, piped.stderr).toBe(0);
-    expect(JSON.parse(piped.stdout)).toMatchObject({
+    expect(parseReport(piped.stdout)).toMatchObject({
       files: [{ path: "stdin.md", output: "B _note_.\n" }],
       skipped,
     });
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.status, applied.stderr).toBe(0);
-    expect(JSON.parse(applied.stdout)).toMatchObject({
+    expect(parseReport(applied.stdout)).toMatchObject({
       files: [{ path: "note.md", changed: true }],
       written: ["note.md"],
       skipped,
@@ -1911,7 +1916,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     await writeFile(config, '{"extends":[],"rules":{"links/valid":"warn"}}');
     const warned = run(root, ["lint", "--json"]);
     expect(warned.status, warned.stderr).toBe(0);
-    expect(JSON.parse(warned.stdout).files[0].diagnostics).toMatchObject([
+    expect(parseReport(warned.stdout).files[0]!.diagnostics).toMatchObject([
       { rule: "links/valid", severity: "warn", column: 1 },
       { rule: "links/valid", severity: "warn", message: "Missing local target: gone.md." },
     ]);
@@ -1928,7 +1933,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const linted = run(root, ["lint", "--json"]);
     expect(linted.status).toBe(1);
     expect(
-      JSON.parse(linted.stdout).files[0].diagnostics.map(
+      parseReport(linted.stdout).files[0]!.diagnostics.map(
         (item: { message: string }) => item.message,
       ),
     ).toEqual([
@@ -2165,7 +2170,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
         "1 file(s) processed; 0 written.\n",
     );
     expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(paragraph);
-    expect(JSON.parse(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
+    expect(parseReport(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
       { path: ".obsidian/app.json", type: "file", code: "EACCES", message },
     ]);
     // The same when the settings directory cannot be entered.
@@ -2219,7 +2224,7 @@ describe("documents that are not UTF-8 text", () => {
         reported("unmarked.md", "linted") +
         "2 file(s) linted; 5 error(s), 2 warning(s); 4 could not be read.\n",
     );
-    const report = JSON.parse(run(root, ["format", "--check", "--json"]).stdout);
+    const report = parseReport(run(root, ["format", "--check", "--json"]).stdout);
     expect(report.files[1]).toEqual({
       path: "latin.md",
       changed: false,
@@ -2392,7 +2397,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     const linted = run(root, ["lint", "--json"]);
     expect(linted.status).toBe(2);
     expect(linted.stderr).toBe("");
-    const report = JSON.parse(linted.stdout);
+    const report = parseReport(linted.stdout);
     expect(Object.keys(report)).toEqual(["version", "mode", "root", "files", "written"]);
     expect(report.files.map((file: { path: string }) => file.path)).toEqual([
       "linking.md",
@@ -2412,7 +2417,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
         },
       ],
     });
-    expect(report.files[0].diagnostics).toMatchObject([
+    expect(report.files[0]!.diagnostics).toMatchObject([
       { rule: "links/valid", severity: "error", line: 1, column: 5 },
     ]);
   });
@@ -2421,7 +2426,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
     await restrict(path.join(root, "secret.md"));
     const applied = run(root, ["format", "--write", "--json"]);
     expect(applied.status).toBe(2);
-    const report = JSON.parse(applied.stdout);
+    const report = parseReport(applied.stdout);
     expect(report.written).toEqual(["note.md"]);
     expect(report.files).toMatchObject([
       { path: "linking.md", changed: false },
@@ -2469,7 +2474,7 @@ describe.skipIf(process.platform !== "win32")("paths that may not be read on Win
         `secret.md:1:1: error engine/unreadable-file: The file could not be read (${refused}) and was not linted.\n` +
         "2 file(s) linted; 3 error(s), 2 warning(s); 1 could not be read.\n",
     );
-    expect(JSON.parse(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
+    expect(parseReport(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
       { path: "locked", type: "directory", code: "EPERM", message: skipped.slice(18, -1) },
     ]);
     // The other documents are written while a selected document cannot be read.
