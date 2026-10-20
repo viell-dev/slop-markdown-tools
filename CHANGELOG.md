@@ -12,6 +12,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Named suppression enables work after an all-rule disable, without enabling
+  other rules or changing configuration
+  ([#456](https://github.com/viell-dev/slop-markdown-tools/issues/456)).
 - Obsidian links match every path component without regard to case inside
   skipped folders, and report duplicate case variants as ambiguous
   ([#459](https://github.com/viell-dev/slop-markdown-tools/issues/459)).

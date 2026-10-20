@@ -226,8 +226,10 @@ Keep *this* delimiter.
 ```
 
 `mdtools-disable` turns rules off from the comment on, and `mdtools-enable`
-turns them on again; without rule names, they apply to every rule.
-`mdtools-disable-next-line` applies to the next line only, even when it is
+turns them on again; without rule names, they apply to every rule. A named
+enable also removes that rule's suppression after an all-rule disable, leaving
+other rules suppressed. It does not enable a rule that the configuration turns
+off. `mdtools-disable-next-line` applies to the next line only, even when it is
 blank, so place it directly above the line. A suppressed rule reports nothing
 there and changes nothing that touches the region, so a paragraph that crosses
 into it is left as written. A directive inside code is code, not a directive.
