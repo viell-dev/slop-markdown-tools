@@ -18,6 +18,11 @@ prereleases' notes there are longer than their entries here.
 - Dependency documentation distinguishes exact direct pins from a consumer's
   resolved indirect dependencies, and explains consumer lockfiles
   ([#472](https://github.com/viell-dev/slop-markdown-tools/issues/472)).
+
+## 0.3.1 - 2026-10-21
+
+### Fixed
+
 - The Prettier coexistence recipe excludes both `.md` and `.markdown` files,
   matching the file types that both tools process
   ([#458](https://github.com/viell-dev/slop-markdown-tools/issues/458)).

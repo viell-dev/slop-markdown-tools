@@ -1,6 +1,6 @@
 {
   "name": "mdrefine",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian",
   "keywords": [
     "markdown",
