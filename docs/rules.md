@@ -1202,6 +1202,13 @@ more spaces keeps them. The option `hardBreak` is `"keep"` (the default) or
 `"backslash"`, which writes such a break as a backslash, so that it is visible
 in the source.
 
+In the Obsidian dialect, a list marker alone on its line keeps one space after
+it. Live Preview needs that separator to style the line as a list item, even
+when the item's text starts on the next line. Extra spaces and tabs are reduced
+to that one space where safe. Quoted markers and further markers on the same
+physical line keep ordinary trailing-space cleanup, because Live Preview reads
+them as text.
+
 With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
 
 ```markdown

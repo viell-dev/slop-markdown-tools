@@ -20,6 +20,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In the Obsidian dialect, `style/trailing-space` preserves a separator after a
+  list marker alone on its line. Before, removing the final separator made Live
+  Preview display it as plain text instead of a list item
+  ([#441](https://github.com/viell-dev/slop-markdown-tools/issues/441)).
 - In the Obsidian dialect, formatting preserves raw source continued after an
   inline HTML opener, and `style/block-spacing` keeps paragraph boundaries
   inside it or an HTML region continued across a whitespace-only line

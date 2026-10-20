@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
+import { builtInRules } from "../../src/core/engine.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "github"): Config {
   return { extends: [], dialect, rules };
@@ -392,6 +393,98 @@ describe("style/trailing-space", () => {
       "# Title\n\nText\n> Quote\n",
     );
   });
+});
+
+describe("empty list marker separators in Obsidian (#441)", () => {
+  const rule = { "style/trailing-space": "warn" } as const;
+  it.each(["-", "*", "+", "1.", "1)", "42."])("keeps the list styling of %s", (marker) => {
+    for (const separator of [" ", "  ", "\t", " \t", "\t\t"])
+      for (const tail of ["\ncedar\n", "\n  cedar\n", "\n\ncedar\n", ""]) {
+        const source = `${marker}${separator}${tail}`;
+        expect(formatted(source, only(rule, "obsidian"))).toBe(`${marker} ${tail}`);
+      }
+  });
+  it.each(["\n", "\r\n", "\r"])("keeps offsets, BOMs, and %j line endings", (eol) => {
+    for (const bom of ["", String.fromCharCode(0xfeff)]) {
+      const source = `${bom}   - \t${eol}cedar${eol}`;
+      const output = `${bom}   - ${eol}cedar${eol}`;
+      expect(formatted(source, only(rule, "obsidian"))).toBe(output);
+      expect(lint(source, { config: only(rule, "obsidian") })).toMatchObject([
+        {
+          rule: "style/trailing-space",
+          start: bom.length + 4,
+          end: bom.length + 6,
+          line: 1,
+          column: 5,
+          edit: { start: bom.length + 4, end: bom.length + 6, text: " " },
+        },
+      ]);
+    }
+  });
+  it("keeps nested marker lines and later item content", () => {
+    expect(formatted("- parent\n\n  +\t\n  cedar\n", only(rule, "obsidian"))).toBe(
+      "- parent\n\n  + \n  cedar\n",
+    );
+    expect(formatted("1. parent\n\n   1.\t\n   cedar\n", only(rule, "obsidian"))).toBe(
+      "1. parent\n\n   1. \n   cedar\n",
+    );
+    // Existing alternate-list protection keeps paragraphs that Live Preview reads as lists.
+    kept("- parent\n  +\t\n  cedar\n", only(rule, "obsidian"));
+    kept("- \n  cedar\n", only(rule, "obsidian"));
+    kept(`${String.fromCharCode(0xfeff)}- \ncedar\n`, only(rule, "obsidian"));
+  });
+  it("keeps long ordered markers and their existing hard breaks", () => {
+    kept("1234567890. \ncedar\n", only(rule, "obsidian"));
+    kept("1234567890.  \ncedar\n", only(rule, "obsidian"));
+    expect(formatted("1234567890.\t\ncedar\n", only(rule, "obsidian"))).toBe(
+      "1234567890. \ncedar\n",
+    );
+  });
+  it("retains one space with recommended defaults and the hard-break option", () => {
+    const config: Config = { dialect: "obsidian" };
+    expect(formatted("- \t\ncedar\n", config)).toBe("- \ncedar\n");
+    expect(lint("- \ncedar\n", { config })).toEqual([]);
+    expect(
+      formatted(
+        "-  \ncedar\n",
+        only({ "style/trailing-space": ["warn", { hardBreak: "backslash" }] }, "obsidian"),
+      ),
+    ).toBe("- \ncedar\n");
+    kept("- \t\ncedar\n", only({ "style/trailing-space": "off" }, "obsidian"));
+    kept(
+      "- parent\n  +  \n  cedar\n",
+      only({ "style/trailing-space": ["warn", { hardBreak: "backslash" }] }, "obsidian"),
+    );
+  });
+  it.each([
+    ["> - \n> cedar\n", "> -\n> cedar\n"],
+    ["- > - \n  > cedar\n", "- > -\n  > cedar\n"],
+    ["- - \n  cedar\n", "- -\n  cedar\n"],
+    ["- cedar \n", "- cedar\n"],
+    ["\\- \ncedar\n", "\\-\ncedar\n"],
+    ["Text \n", "Text\n"],
+    ["*** \n", "***\n"],
+  ])("still cleans ordinary trailing whitespace in %j", (source, output) => {
+    expect(formatted(source, only(rule, "obsidian"))).toBe(output);
+  });
+  it("keeps code and HTML controls", () => {
+    kept("    - \n    cedar\n", only(rule, "obsidian"));
+    kept("```\n- \n```\n", only(rule, "obsidian"));
+    kept("<div>\n- \n</div>\n", only(rule, "obsidian"));
+  });
+  it("retains a plugin node's unpositioned source", () => {
+    const document = parse("- \t\ncedar\n", "obsidian");
+    const list = document.tree.children[0]!;
+    if (list.type !== "list") throw new Error("Expected a list");
+    delete list.children[0]!.position;
+    expect(builtInRules["style/trailing-space"]!.check({ document, options: {} })).toEqual([]);
+  });
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "still removes all marker whitespace in %s",
+    (dialect) => {
+      expect(formatted("-  \ncedar\n", only(rule, dialect))).toBe("-\ncedar\n");
+    },
+  );
 });
 
 describe("lines of blank space that Obsidian reads as text (#358)", () => {

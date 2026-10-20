@@ -2,13 +2,37 @@
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
 // #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414,
-// #428, #429, #433, #434, #435, #436, #437, #438, #439), and those that the check has to read with care
+// #428, #429, #433, #434, #435, #436, #437, #438, #439, #441), and those that the check has to read with care
 // (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
+  {
+    // #441: the empty marker needs a separator to retain Live Preview's list styling.
+    name: "empty bullet marker before lazy text",
+    source: "- \nSome *words* after the marker, enough for the text to wrap at thirty columns.\n",
+  },
+  {
+    name: "empty ordered marker before indented text",
+    source:
+      "1.  \n   Some *words* inside the item, enough for the text to wrap at thirty columns.\n",
+  },
+  {
+    name: "nested empty bullet marker with a tab",
+    source:
+      "- Parent\n\n  +\t\n  Some *words* after the marker, enough for the text to wrap at thirty columns.\n",
+  },
+  {
+    name: "long empty ordered marker",
+    source:
+      "1234567890. \nSome *words* after the marker, enough for the text to wrap at thirty columns.\n",
+  },
+  {
+    name: "empty bullet marker at the document end",
+    source: "- \t",
+  },
   {
     // #411: definition-like container continuations hide any destination token.
     name: "reference-like start introduced in a list",
