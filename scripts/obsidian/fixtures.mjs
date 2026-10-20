@@ -1,9 +1,10 @@
 // Documents for the Obsidian check (scripts/obsidian-check.mjs), besides the generated ones:
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
-// #391, #395, #405, #409, #411, #414), and those that the check has to read with care (#385,
-// #400, #401, #403, #406, #410). Each paragraph is long enough that formatting at 30 or 80
-// columns reflows it, unless the tool leaves it as written. Every word is synthetic.
+// #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414), and those that the
+// check has to read with care (#385, #400, #401, #403, #406, #410). Each paragraph is long enough
+// that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
+// is synthetic.
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [
@@ -152,6 +153,44 @@ export const fixtures = [
     name: "quote in a nested item",
     source:
       "+ An item\n  1) A nested item\n  > A quote inside the nested item with enough words to be reflowed at a narrow width\n",
+  },
+  {
+    // #397: Live Preview styles the heading's line as a link reference definition and reads the
+    // underline as text, so `style/heading` leaves the heading underlined.
+    name: "underlined heading with a definition-like line",
+    source:
+      "[ref]: a heading that starts like a link reference definition\n===\nSome words below the heading, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #398: Reading view reads the tab line as more of the paragraph and the table below it as
+    // text, so the table and the paragraph after it stay as written.
+    name: "table and paragraph below a tab line",
+    source:
+      "Some words with *emphasis* above the tab line, enough of them to be reflowed at a narrow width.\n\t\n| Name | Value |\n| - | - |\n| a | b |\n\t\nSome *words* below the table, enough of them to be reflowed at a narrow width too.\n",
+  },
+  {
+    // #399: Reading view keeps the HTML block inside the item and would continue the list with a
+    // matching marker below it, so both lists keep their markers.
+    name: "HTML block inside a list item",
+    source:
+      "* An item with enough words to be reflowed at a narrow width, and more words\n<div>\nSome words inside the block\n</div>\n\n- Another item with enough words to be reflowed at a narrow width\n",
+  },
+  {
+    // #404: Live Preview reads an unclosed opening YAML fence as source through the note's end.
+    name: "unclosed YAML front matter",
+    source:
+      "---\n# Heading\n\nSome *words* and a #tag with enough words after it to be reflowed at a narrow width.\n",
+  },
+  {
+    // #407: Obsidian reads TOML as paragraph text, continued by the table below its closing fence.
+    name: "table directly below TOML front matter",
+    source: "+++\ntitle = 1\n+++\n| a | b |\n| --: | - |\n| c | d |\n",
+  },
+  {
+    // #408: Live Preview restores quote/list styling only after the comment closer's line.
+    name: "inline HTML comment across a quoted list",
+    source:
+      "Some words <!-- an open comment\n\n> - Words --> followed by enough more words to be reflowed at a narrow width.\n>   More words on the next line.\n\nIndependent *text* below the comment.\n",
   },
   {
     // #411: at 30 columns, the line would break before `[a]:`, and Live Preview would style the

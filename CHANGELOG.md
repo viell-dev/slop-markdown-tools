@@ -24,6 +24,48 @@ prereleases' notes there are longer than their entries here.
   item or block quote. Obsidian's Reading view shows that line break as one
   more, empty line of the code
   ([#412](https://github.com/viell-dev/slop-markdown-tools/pull/412)).
+- In the Obsidian dialect, `style/heading` leaves an underlined heading whose
+  one line of text starts at the first column with `[`, a label, and `]:` as
+  written, as `[ref]: see the page` with `===` below it. Live Preview styles
+  that line as a link reference definition and shows no heading, where Reading
+  view shows one; written as `# [ref]: see the page`, both views showed a
+  heading ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, no rule changes the block below a line of blank space
+  that holds a tab, below a line of paragraph text, unless the block interrupts
+  a paragraph. Obsidian's Reading view reads the tab line as more of the
+  paragraph, and then a paragraph, table, underlined heading, indented code
+  block, definition, or numbered list that does not start at 1 there as more of
+  its text, where CommonMark reads blocks of their own. Before, `style/emphasis`
+  changed the markers of such a paragraph, which Reading view paired otherwise
+  across the join, and `style/table` aligned such a table, which it showed as
+  text ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, when an HTML block directly follows a list, no rule
+  changes the markers or indentation that decide whether the list continues
+  below it, including lists nested in its last item, or adds a blank line above
+  the block. Obsidian's Reading view keeps the HTML block inside the item and
+  continues the list below it with every item whose marker matches, where
+  CommonMark ends the list at the block. Before, `style/list-marker` gave both
+  lists one marker, and Reading view showed one list in place of two
+  ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, no rule changes a note whose opening YAML fence has
+  no ordinary closing fence. Live Preview shows the entire note as YAML source,
+  including below a malformed `--- text` closer that Reading view accepts.
+  Before, the rules formatted it as Markdown, changing that source and moving
+  words into or out of YAML comments
+  ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, the protections for blocks that Obsidian reads
+  otherwise also apply below TOML front matter, whose `+++` lines it reads as
+  paragraph text. Before, `style/table` aligned a table directly below the
+  closing fence and `style/emphasis` changed a footnote definition there, both
+  of which Obsidian reads as more of that paragraph
+  ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
+- In the Obsidian dialect, no rule changes a paragraph with an inline HTML
+  comment that ends in another block or has no closer, nor the blocks through
+  its closing block or the note's end. Live Preview carries comment styling
+  across those blocks and restores quote and list styling only after the
+  closer's line. Before, `style/wrap` moved words onto or off that line,
+  changing their styling
+  ([#417](https://github.com/viell-dev/slop-markdown-tools/pull/417)).
 - In the Obsidian dialect, `style/wrap` starts no line at the first column with
   `[`, a label, and `]:`, which Live Preview styles as a link reference
   definition: the word that opens the label stays on the line before it. Before,
