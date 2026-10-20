@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/block-spacing` proposes no blank line inside a paragraph or underlined
+  heading in the reading without TOML front matter. Before, separating `1.` and
+  `2) b` directly below its closing fence would turn paragraph text into a
+  list; the engine refused the unsafe proposal and reported an error
+  ([#426](https://github.com/viell-dev/slop-markdown-tools/issues/426)).
 - In the Obsidian dialect, the protection for an inline HTML comment that spans
   blocks also starts in headings and table cells. No rule changes the opening
   heading or table through the block holding the closer, or the rest of the note

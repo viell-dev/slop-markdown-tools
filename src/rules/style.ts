@@ -10,6 +10,7 @@ import {
   joinsTomlFrontMatter,
   labelEnd,
   lazyIndentation,
+  otherReading,
   parse,
   range,
   startsWithMarker,
@@ -1620,6 +1621,33 @@ const blockSpacing: Rule = {
     const { source } = document;
     const findings: Finding[] = [];
     const newline = lineEnding(source);
+    // Without TOML front matter, one paragraph can continue through several
+    // blocks of the front-matter reading, such as empty and numbered lists
+    // (#426). A separator inside that paragraph would create a new block.
+    const plainText: Range[] = [];
+    if (document.tree.children[0]?.type === ("toml" as string)) {
+      const plain = otherReading(document.tree);
+      if (plain)
+        walk(plain, (node) => {
+          if (
+            (node.type === "paragraph" || node.type === "heading") &&
+            node.position?.start.offset !== undefined &&
+            node.position.end.offset !== undefined
+          )
+            plainText.push(range(node));
+        });
+    }
+    const splitsPlainText = (from: number, to: number) => {
+      let low = 0;
+      let high = plainText.length;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (plainText[middle]![1] <= from) low = middle + 1;
+        else high = middle;
+      }
+      const block = plainText[low];
+      return block !== undefined && block[0] <= from && to < block[1];
+    };
     const directiveLines = new Set<number>();
     if (source.includes("mdtools-"))
       walk(document.tree, "html", (node) => {
@@ -1647,6 +1675,7 @@ const blockSpacing: Rule = {
         const lineStart = lineBounds(source, start, start)[0];
         const breakStart = lineStart - (source.startsWith("\r\n", lineStart - 2) ? 2 : 1);
         if (breakStart < end) continue;
+        if (splitsPlainText(breakStart, lineStart)) continue;
         // A blank line, or one with only quote markers, already separates them.
         const previous = source.slice(lineBounds(source, breakStart, breakStart)[0], breakStart);
         if (blankLine.test(previous)) continue;
