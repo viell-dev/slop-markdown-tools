@@ -16,6 +16,9 @@ prereleases' notes there are longer than their entries here.
   their parent directories do not exist, with repository boundaries and
   negations preserved
   ([#453](https://github.com/viell-dev/slop-markdown-tools/issues/453)).
+- Invalid asynchronous plugin rules report an engine error without leaking a
+  rejected return value into the host process; the CLI keeps exit code `2`
+  ([#457](https://github.com/viell-dev/slop-markdown-tools/issues/457)).
 - Explicit HTML anchors decode character references in attribute values before
   matching fragments, including numeric references and escaped ampersands
   ([#451](https://github.com/viell-dev/slop-markdown-tools/issues/451)).
