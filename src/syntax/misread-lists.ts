@@ -1,5 +1,6 @@
-import type { Nodes, Parents, Root } from "mdast";
+import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
+import { labelEnd } from "./parse.js";
 
 /**
  * A list marker as CommonMark reads one at the start of a line's content: a
@@ -79,12 +80,49 @@ export interface MisreadLists {
   /**
    * In the Obsidian dialect, the underlined headings whose underline one of the
    * views reads as text: Reading view one with blank space after it, or before
-   * it beyond the heading's text, and Live Preview a lone `-` (issue #383); and
-   * the paragraphs in a block quote or list item with a lazy line of `=` or
-   * `-`, which Reading view reads as an underline (issue #377). Each counts
-   * from the line break before the underline to the end of its line.
+   * it beyond the heading's text, and Live Preview a lone `-` (issue #383) and
+   * the underline of a heading whose one line of text starts at the first
+   * column with `[`, a label, and `]:`, which it styles as a link reference
+   * definition (issue #397); and the paragraphs in a block quote or list item
+   * with a lazy line of `=` or `-`, which Reading view reads as an underline
+   * (issue #377). Each counts from the line break before the underline to the
+   * end of its line.
    */
   underlines: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the blocks that Reading view reads as more of a
+   * paragraph above them, across lines of blank space that hold a tab at or
+   * right of the paragraph's column, which it reads as more of the paragraph
+   * where the parser reads a blank line (issue #398): a paragraph, a table, an
+   * underlined heading, an indented code block, a definition, a footnote
+   * definition, a numbered list that does not start at 1, or an HTML block
+   * that cannot interrupt a paragraph, each up to an empty line or a block that
+   * can. Each counts from the start of its first line, with the marker of a
+   * list item there.
+   */
+  tabText: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, the HTML blocks directly below a list, which
+   * Reading view keeps inside the list's last item, where CommonMark ends the
+   * list (issue #399), each from the end of the list; the indentation of the
+   * blocks below such a block that start at or right of the item's content,
+   * which Reading view reads inside the item, each from the line break before
+   * it, with the markers of a list there; and the markers of the list's items
+   * and of the lists nested in its last item, whose spacing sets that column,
+   * where such blocks follow, or a block that a narrower spacing would bring
+   * inside, or a list of the same kind, which continues the list with every
+   * item whose marker matches, with that list's markers, each from the item's
+   * start to its content, and from the line break before that list.
+   */
+  itemHtml: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, a paragraph with an inline HTML comment that no
+   * closer ends in that paragraph, and the blocks through the one holding the
+   * next closer, or through the document's end without one. Live Preview
+   * carries comment styling across the blocks and restores container styling
+   * only after the closer's line (issue #408). Whole source lines count.
+   */
+  commentText: ReadonlySet<Nodes>;
   /**
    * In the Obsidian dialect, the paragraphs of a list item with a lazy line,
    * one that starts left of the item's content, with the blocks after them in
@@ -180,7 +218,12 @@ const found = new WeakMap<Root, MisreadLists>();
  * code block that a list item or block quote leaves open with the lines below
  * the container, as Live Preview does further (issue #390). Live Preview
  * styles a paragraph line that starts at the first column with `[`, a label,
- * and `]:` as a link reference definition (issue #391).
+ * and `]:` as a link reference definition (issue #391), also the one line of
+ * text of an underlined heading, whose underline it reads as text (issue
+ * #397). Reading view continues a paragraph across lines of blank space that
+ * hold a tab, with the block below them unless it interrupts a paragraph
+ * (issue #398), and keeps an HTML block directly below a list inside its last
+ * item, so that a list below the block can continue it (issue #399).
  */
 export function misreadLists(document: Document): MisreadLists {
   const known = found.get(document.tree);
@@ -314,6 +357,9 @@ export function misreadLists(document: Document): MisreadLists {
   const definitionCode = new Set<Nodes>();
   const definitionLines = new Set<Nodes>();
   const openFences = new Set<Nodes>();
+  const tabText = new Set<Nodes>();
+  const itemHtml = new Set<Nodes>();
+  const commentText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
@@ -324,21 +370,35 @@ export function misreadLists(document: Document): MisreadLists {
     const footnotes: [Nodes, number][] = [];
     /** The footnote definition that each leaf block inside one is in. */
     const inFootnotes = new Map<Nodes, Nodes>();
-    const collect = (node: Nodes, item: boolean, footnote: Nodes | undefined) => {
+    /**
+     * The outermost list, block quote, or footnote definition that each leaf
+     * block starts, also as the first block of a later list item.
+     */
+    const openers = new Map<Nodes, Parents>();
+    const collect = (
+      node: Nodes,
+      item: boolean,
+      footnote: Nodes | undefined,
+      opener: Parents | undefined,
+    ) => {
       if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
       if (leaves.has(node.type) || !("children" in node)) {
         order.push([node, item]);
         if (footnote) inFootnotes.set(node, footnote);
+        if (opener) openers.set(node, opener);
       } else
         node.children.forEach((child, index) =>
           collect(
             child,
             index === 0 && (item || node.type === "listItem"),
             node.type === "footnoteDefinition" ? node : footnote,
+            index === 0 || node.type === "list"
+              ? (opener ?? (node.type === "root" ? undefined : node))
+              : undefined,
           ),
         );
     };
-    collect(document.tree, false, undefined);
+    collect(document.tree, false, undefined, undefined);
     /** Where the line holding `offset` starts. */
     const lineStart = (offset: number) => {
       let at = offset;
@@ -455,6 +515,99 @@ export function misreadLists(document: Document): MisreadLists {
         open = spaced(leaf.position.end.line + 1);
     });
     /**
+     * Whether line `number`, counted from 1, holds blank space and block quote
+     * markers with a tab that starts at or right of `column`. Reading view
+     * reads such a line as more of a paragraph at that column, so `- a` goes
+     * on below `  ` and a tab, and ends below a tab alone.
+     */
+    const tabbedAt = (number: number, column: number) => {
+      const line = lines[number - 1] ?? "";
+      if (!/^[ \t>]*$/.test(line)) return false;
+      let at = 0;
+      for (const character of line) {
+        if (character !== "\t") at++;
+        else if (at >= column) return true;
+        else at += 4 - (at % 4);
+      }
+      return false;
+    };
+    /**
+     * Whether `leaf` starts a block that interrupts a paragraph in Reading
+     * view: a block quote, a bullet list, a numbered list that starts at 1, a
+     * `#` heading, a thematic break, a fenced code or math block, or an HTML
+     * block of CommonMark's kinds 1 to 6; a footnote definition, a numbered
+     * list that starts elsewhere, and the other blocks are more of the text.
+     */
+    const interrupts = (leaf: Nodes): boolean => {
+      const opener = openers.get(leaf);
+      if (opener?.type === "blockquote") return true;
+      if (opener?.type === "list") return !opener.ordered || (opener.start ?? 1) === 1;
+      if (opener !== undefined) return false;
+      const start = leaf.position!.start.offset!;
+      switch (leaf.type) {
+        case "heading":
+          return source[start] === "#";
+        case "thematicBreak":
+        case "math":
+          return true;
+        case "code":
+          return /^ {0,3}(?:```|~~~)/.test(source.slice(start, start + 6));
+        case "html":
+          return interruptingHtml.test(leaf.value.trimStart());
+        default:
+          return false;
+      }
+    };
+    /**
+     * The column of the paragraph that Reading view may continue across the
+     * lines below the last leaf block: a paragraph's own, or that of the one
+     * that it reads the block as more of (issue #398).
+     */
+    let column: number | undefined;
+    /** The end of a list or footnote definition that Reading view read as text, while inside it. */
+    let joinedEnd = 0;
+    order.forEach(([leaf], index) => {
+      const previous = order[index - 1]?.[0];
+      const start = leaf.position?.start.offset;
+      if (start === undefined) {
+        column = undefined;
+        return;
+      }
+      if (start < joinedEnd) return;
+      // A table directly below paragraph text is more of that text in
+      // Obsidian (#394), so a tab below it still continues that paragraph.
+      // The table's own range is protected below, with the other tables.
+      if (
+        column !== undefined &&
+        previous?.type === "paragraph" &&
+        leaf.type === "table" &&
+        previous.position!.end.line === leaf.position!.start.line - 1
+      )
+        return;
+      let below = previous?.position?.end.line;
+      // The parser reads such a line below an indented code block as more of
+      // the code; Reading view reads it below the code's last line of text.
+      if (below !== undefined && previous!.type === "code")
+        while (below > previous!.position!.start.line && /^[ \t]*$/.test(lines[below - 1]!))
+          below--;
+      let joins =
+        column !== undefined && below !== undefined && leaf.position!.start.line > below + 1;
+      for (let line = (below ?? 0) + 1; joins && line < leaf.position!.start.line; line++)
+        if (!tabbedAt(line, column!)) joins = false;
+      if (joins && !interrupts(leaf)) {
+        // From the start of its line, with a list item's marker there, and the
+        // whole of a list or footnote definition that it starts: Reading view
+        // reads none of their later lines as a list or footnote either.
+        const opener = openers.get(leaf);
+        const block =
+          opener?.type === "list" || opener?.type === "footnoteDefinition" ? opener : leaf;
+        tabText.add(stretch(block, lineOf(leaf), block.position!.end));
+        joinedEnd = block.position!.end.offset!;
+        return;
+      }
+      column = leaf.type === "paragraph" ? columnAt(start) : undefined;
+    });
+    /**
      * The runs of backticks that nothing closes in the text of `node`, outside
      * code, math, and wikilinks. Live Preview starts code at them also inside a
      * highlight, an inline comment, and an image's description, whose source
@@ -561,6 +714,49 @@ export function misreadLists(document: Document): MisreadLists {
         },
       } as Nodes;
     };
+    /**
+     * Comment openers in text, highlights, and image descriptions, where Live
+     * Preview starts HTML comments too, excluding code spans and math.
+     */
+    const commentOpeners = (node: Nodes): number[] => {
+      const start = node.position?.start.offset;
+      const image = node.type === "image" || node.type === "imageReference";
+      const end = image ? (labelEnd(node) ?? node.position?.end.offset) : node.position?.end.offset;
+      if (start === undefined || end === undefined) return [];
+      if (node.type !== "text" && node.type !== "obsidianHighlight" && !image)
+        return "children" in node ? node.children.flatMap(commentOpeners) : [];
+      const offsets: number[] = [];
+      for (const match of source.slice(start, end).matchAll(/<!--/g)) {
+        const at = start + match.index;
+        let slashes = 0;
+        while (source[at - slashes - 1] === "\\") slashes++;
+        if (slashes % 2 === 0) offsets.push(at);
+      }
+      return offsets;
+    };
+    let commentedUntil = 0;
+    for (let index = 0; index < order.length; index++) {
+      const [leaf] = order[index]!;
+      if (leaf.type !== "paragraph" || !leaf.position) continue;
+      for (const opener of commentOpeners(leaf)) {
+        if (opener < commentedUntil) continue;
+        const closer = source.indexOf("-->", opener + 4);
+        // Comments do not nest, even inside one paragraph. Searching for the
+        // same closer at every nested opener was quadratic (issue #418).
+        commentedUntil = closer < 0 ? source.length : closer + 3;
+        if (closer >= 0 && closer < leaf.position.end.offset!) continue;
+        let last = index;
+        while (
+          last + 1 < order.length &&
+          (closer < 0 || (order[last]![0].position?.end.offset ?? 0) < closer + 3)
+        )
+          last++;
+        commentText.add(wholeLines(leaf, order[last]![0]));
+        // The complete closing block stays: reflow on either side of the
+        // closer could move words onto its line. Later blocks still format.
+        break;
+      }
+    }
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
@@ -574,11 +770,21 @@ export function misreadLists(document: Document): MisreadLists {
           const [from, to] = lineAround(end);
           const underline = source.slice(from, to);
           const prefix = /^[ \t>]*/.exec(underline)![0].length;
+          const text = textStart(child) ?? start;
+          // Live Preview styles a heading's one line of text that starts at
+          // the first column with `[`, a label, and `]:` as a link reference
+          // definition, and reads the underline as text (issue #397).
+          const [textFrom, textTo] = lineAround(text);
+          const definitionText =
+            textFrom === text &&
+            /^(?:\r\n|\r|\n)$/.test(source.slice(textTo, from)) &&
+            definitionLike.test(source.slice(text, textTo));
           if (
             from > start &&
             (/[ \t]$/.test(underline) ||
               /^[ \t>]*-[ \t]*$/.test(underline) ||
-              columnAt(from + prefix) > columnAt(textStart(child) ?? start))
+              columnAt(from + prefix) > columnAt(text) ||
+              definitionText)
           )
             underlines.add(breakBefore(child, from, to));
         }
@@ -632,6 +838,91 @@ export function misreadLists(document: Document): MisreadLists {
         if ("children" in child && !leaves.has(child.type)) visitLines(child);
       });
     visitLines(document.tree);
+    /** The point where the line holding `node`'s start begins, less one: the line break before it. */
+    const breakBeforeLine = (node: Nodes): Point => ({
+      ...node.position!.start,
+      offset: lineAround(node.position!.start.offset!)[0] - 1,
+    });
+    /**
+     * The markers of `list`'s items as stretches: each from the item's start,
+     * or from `from` for the first, to the item's content, or to its end
+     * without content.
+     */
+    const markersOf = (list: List, from?: Point): Nodes[] =>
+      list.children.map((item, position) =>
+        stretch(item, position === 0 && from ? from : item.position!.start, {
+          ...item.position!.end,
+          offset: item.children[0]?.position?.start.offset ?? item.position!.end.offset!,
+        }),
+      );
+    const visitHtml = (parent: Parents) =>
+      parent.children.forEach((child, index) => {
+        if ("children" in child && !leaves.has(child.type)) visitHtml(child);
+        const list = parent.children[index - 1];
+        // Reading view keeps an HTML block directly below a list inside the
+        // list's last item, where the parser ends the list (issue #399), and
+        // so the list goes on there.
+        if (
+          child.type !== "html" ||
+          list?.type !== "list" ||
+          !list.position ||
+          !child.position ||
+          child.position.start.line !== list.position.end.line + 1
+        )
+          return;
+        const item = list.children.at(-1)!;
+        const itemStart = item.position!.start.offset!;
+        // The item's content column, from which the blocks below are its, and
+        // the lowest one that its spacing could give it, one space after the
+        // marker.
+        const content = item.children[0]?.position?.start.offset;
+        const least =
+          columnAt(itemStart) +
+          /^(?:[-+*]|\d{1,9}[.)])?/.exec(source.slice(itemStart, itemStart + 11))![0].length +
+          1;
+        const column = content !== undefined ? columnAt(content) : least;
+        // From the end of the list: a blank line there would end it.
+        let at = list.position.end.offset!;
+        while (source[at - 1] === " " || source[at - 1] === "\t") at--;
+        itemHtml.add(stretch(child, { ...list.position.end, offset: at }));
+        let next = index + 1;
+        for (; next < parent.children.length; next++) {
+          const block = parent.children[next]!;
+          const start = block.position?.start.offset;
+          if (start === undefined || columnAt(start) < column) break;
+          // Its indentation, and a list's markers, from the line break before
+          // it: Reading view reads the block the same way, inside the item.
+          const from = breakBeforeLine(block);
+          if (block.type === "list")
+            for (const marker of markersOf(block, from)) itemHtml.add(marker);
+          else itemHtml.add(stretch(block, from, block.position!.start));
+        }
+        // A list of the same kind continues the list with every item whose
+        // marker matches, and the item's spacing sets the column from which
+        // Reading view reads blocks inside it, which a block at or right of
+        // the lowest one could come to reach, so the markers on both sides
+        // stay.
+        const following = parent.children[next];
+        const continues =
+          following?.type === "list" && following.ordered === list.ordered && following.position
+            ? following
+            : undefined;
+        const reaches =
+          following?.position?.start.offset !== undefined &&
+          columnAt(following.position.start.offset) >= least;
+        if (next === index + 1 && !continues && !reaches) return;
+        // The list and the lists nested in its last item, in turn, are open
+        // there: a list item line below the block continues the innermost one
+        // whose marker matches at its column.
+        for (let open: Nodes | undefined = list; open?.type === "list";) {
+          for (const marker of markersOf(open)) itemHtml.add(marker);
+          open = open.children.at(-1)?.children.at(-1);
+        }
+        if (continues)
+          for (const marker of markersOf(continues, breakBeforeLine(continues)))
+            itemHtml.add(marker);
+      });
+    visitHtml(document.tree);
     /** A copy of `node` from `start` to its end. */
     const startingAt = (node: Nodes, start: number): Nodes =>
       ({
@@ -707,10 +998,23 @@ export function misreadLists(document: Document): MisreadLists {
     definitionLines,
     openFences,
     tableText,
+    tabText,
+    itemHtml,
+    commentText,
   };
   found.set(document.tree, result);
   return result;
 }
+
+/**
+ * The start of an HTML block of CommonMark's kinds 1 to 6, which can interrupt
+ * a paragraph: raw text elements, a comment, a processing instruction, a
+ * declaration, CDATA, or a tag of one of the block-level names that the
+ * specification lists. A block of kind 7, any other complete tag on a line of
+ * its own, cannot.
+ */
+const interruptingHtml =
+  /^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$)|\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[\s>]|\/>|$))/i;
 
 /** A run of backticks: its offset and its length. */
 type Run = [number, number];

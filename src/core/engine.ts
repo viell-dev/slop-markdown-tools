@@ -11,6 +11,7 @@ import {
   range,
   splitByteOrderMark,
   startsWithMarker,
+  unclosedFrontMatter,
 } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
@@ -242,21 +243,39 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  * those renderers read as the description's blocks (issue #344), for a block
  * in Obsidian with a backtick that no run closes, where Obsidian shows code
  * that the parser does not (issue #362), for the blocks that Obsidian reads as
- * more of an HTML block above them (issue #358), for the underlines, lazy
+ * more of an HTML block above them (issue #358) or of a paragraph above lines
+ * of blank space that hold a tab (issue #398), for the underlines, lazy
  * lines, and definition-like lines that Obsidian reads otherwise (issues #376,
- * #377, #383, and #391), for the footnote definitions, lines below link
+ * #377, #383, #391, and #397), for the footnote definitions, lines below link
  * reference definitions, and blocks below open fences that Obsidian reads as
- * text or code (issues #378, #379, and #390), and for the tables that it reads
- * otherwise (issue #359). Only the part of the edit that changes the text
- * counts, so that an edit that copies such text, such as a list rule's, can
- * still apply.
+ * text or code (issues #378, #379, and #390), for the tables that it reads
+ * otherwise (issue #359), and for the HTML blocks that it keeps inside a list
+ * item, with the blocks and list markers that then stay as written (issue
+ * #399). Only the part of the edit that changes the text counts, so that an
+ * edit that copies such text, such as a list rule's, can still apply.
  */
 function misreadEdits(document: Document): (edit: Edit) => boolean {
-  const misread = misreadLists(document);
+  // Live Preview reads all of an unclosed YAML document as source, including
+  // below a malformed closer that Reading view accepts (issue #404).
+  if (
+    document.dialect === "obsidian" &&
+    unclosedFrontMatter(document.source) === "---" &&
+    !/^---(?:\r\n|\r|\n)?$/.test(document.source)
+  )
+    return () => true;
+  const readings = [misreadLists(document)];
+  // Obsidian reads TOML front matter as paragraph text. Run the same range
+  // protections on that reading too, so blocks below it see the paragraph
+  // above them (issue #407). Range discovery does not request other readings.
+  const plain =
+    document.dialect === "obsidian" && document.tree.children[0]?.type === ("toml" as string)
+      ? otherReading(document.tree)
+      : undefined;
+  if (plain) readings.push(misreadLists({ ...document, tree: plain }));
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
   for (const [start, end] of Array.from(
-    [
+    readings.flatMap((misread) => [
       ...misread.text,
       ...misread.nested,
       ...misread.descriptions,
@@ -269,7 +288,10 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.definitionLines,
       ...misread.openFences,
       ...misread.tableText,
-    ],
+      ...misread.tabText,
+      ...misread.itemHtml,
+      ...misread.commentText,
+    ]),
     (node) => range(node),
   ).sort((a, b) => a[0] - b[0])) {
     const last = blocks.at(-1);

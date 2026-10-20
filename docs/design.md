@@ -86,6 +86,9 @@ The comparison is only as good as the parser's reading:
   with the lists and block quotes below it; the parser's front matter extension
   reads them as paragraphs there, so the tool leaves it out for such a document
   ([issue #278](https://github.com/viell-dev/slop-markdown-tools/issues/278)).
+  In Obsidian, Live Preview instead reads an unclosed YAML document as source,
+  so no rule changes that document; `+++` does not open YAML there ([issue
+  #404](https://github.com/viell-dev/slop-markdown-tools/issues/404)).
 - Front matter ends at the next `---` or `+++` line, also one inside a code
   block, for the parser, for site generators, and for GitHub's file view when
   the front matter is a YAML mapping. GitHub's comments, and renderers without
@@ -105,7 +108,11 @@ The comparison is only as good as the parser's reading:
   that is or would become `---`, an underlined heading, and a list that cannot
   interrupt a paragraph, such as a numbered list that does not start at 1
   ([issue #333](https://github.com/viell-dev/slop-markdown-tools/issues/333)).
-  YAML front matter, outside the case above, is read as front matter only, as
+  Obsidian's protections for blocks it reads otherwise apply to both readings,
+  so a table or footnote definition directly below TOML front matter stays as
+  paragraph text too ([issue
+  #407](https://github.com/viell-dev/slop-markdown-tools/issues/407)). YAML
+  front matter, outside the case above, is read as front matter only, as
   GitHub's file view, Forgejo, Gitea, and Obsidian read it.
 
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
