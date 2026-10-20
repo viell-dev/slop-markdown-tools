@@ -41,12 +41,19 @@ vi.mock("../../src/syntax/parse.js", async (importOriginal) => {
   };
   return { ...actual, parse };
 });
-/** Collect garbage now. Node.js offers that only behind a flag, which can be set while running. */
+type AsyncGc = (options: { type: "major"; execution: "async" }) => Promise<void>;
+let gc: AsyncGc | undefined;
+/** Collect after the JavaScript stack unwinds, without conservative stack roots. */
 async function collectGarbage(): Promise<void> {
   // A WeakRef keeps its target alive until the task that created it has ended.
   await new Promise((resolve) => setImmediate(resolve));
-  setFlagsFromString("--expose-gc");
-  (runInNewContext("gc") as () => void)();
+  if (!gc) {
+    setFlagsFromString("--expose-gc");
+    gc = runInNewContext("gc") as AsyncGc;
+  }
+  // A synchronous collection may retain stale stack pointers. V8's async
+  // collector runs as a separate task with no JavaScript heap pointers there.
+  await gc({ type: "major", execution: "async" });
 }
 
 const config: Config = {
