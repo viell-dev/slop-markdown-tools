@@ -8,6 +8,17 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- The benchmark guide identifies the parser's repeated list/table transition
+  performance limit and links its standalone reproduction
+  ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
+- Dependency documentation distinguishes exact direct pins from a consumer's
+  resolved indirect dependencies, and explains consumer lockfiles
+  ([#472](https://github.com/viell-dev/slop-markdown-tools/issues/472)).
+
 ## 0.3.1 - 2026-10-21
 
 ### Fixed

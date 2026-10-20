@@ -79,14 +79,24 @@ target.
 
 ## Dependencies
 
-Every dependency is pinned to an exact version, and the lockfile is committed.
-For the runtime dependencies this is deliberate: a formatter's output should
-depend only on its own version, and an update of the parser can change it, so a
-dependency update reaches users only in a release of mdrefine whose tests passed
-with it. `@types/node` stays on the major version of the lowest supported
-Node.js version, 22, so that the type check rejects interfaces that Node.js 22
-does not have; the CI job on 22.12.0 catches those that later 22.x releases
-added.
+Direct dependencies are pinned to exact versions, and the repository lockfile is
+committed. Direct updates therefore get an explicit review and release; release
+preparation also refreshes and tests eligible indirect dependencies, as
+described in the [release
+procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
+A parser update can affect output or performance, so those checks cover the
+complete resolved dependency graph.
+
+Indirect dependencies can declare version ranges. The repository's development
+lockfile is not shipped or imposed on consumers, so a fresh installation of the
+same mdrefine version can resolve newer indirect dependencies than its release
+checks used. Consumers that need a repeatable dependency graph should keep their
+own lockfile and use its frozen-install command, such as `npm ci` or
+`pnpm install --frozen-lockfile`.
+
+`@types/node` stays on the major version of the lowest supported Node.js
+version, 22, so that the type check rejects interfaces that Node.js 22 does not
+have; the CI job on 22.12.0 catches those that later 22.x releases added.
 
 Dependabot proposes updates weekly, the development dependencies as one group,
 and only versions published at least seven days earlier, which leaves time for a
