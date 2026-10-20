@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
@@ -211,5 +212,196 @@ describe("normalizeHtml", () => {
     expect(normalizeHtml("<p>a b</p>")).not.toBe(normalizeHtml("<p>ab</p>"));
     expect(normalizeHtml("<p>a</p><p>b</p>")).not.toBe(normalizeHtml("<p>a b</p>"));
     expect(normalizeHtml("<p>a<br />\nb</p>")).not.toBe(normalizeHtml("<p>a\nb</p>"));
+  });
+});
+
+describe("Obsidian Live Preview normalizer", () => {
+  const source = readFileSync(
+    new URL("../../scripts/obsidian/obsidian.e2e.mjs", import.meta.url),
+    "utf8",
+  );
+  const body = source.slice(
+    source.indexOf("function cleanHtml("),
+    source.indexOf("/** The documents to format:"),
+  );
+  const { livePreview } = new Function("normalizeHtml", `${body}; return { livePreview };`)(
+    normalizeHtml,
+  ) as {
+    livePreview: (lines: { kind: string; continuation?: boolean; runs: string[][] }[]) => string[];
+  };
+
+  it("preserves inline-code padding across soft-line joins while keeping code changes detectable (#421)", () => {
+    const singlePaddedSource = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words before "],
+          ["cm-inline-code", "code  "],
+        ],
+      },
+      {
+        continuation: false,
+        kind: "",
+        runs: [["", "neighbor words after the code span, enough text to wrap at thirty columns."]],
+      },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const singlePaddedFormatted = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words before "],
+          ["cm-inline-code", "code  "],
+          ["", " neighbor"],
+        ],
+      },
+      { continuation: false, kind: "", runs: [["", "words after the code span,"]] },
+      { continuation: false, kind: "", runs: [["", "enough text to wrap at thirty"]] },
+      { continuation: false, kind: "", runs: [["", "columns."]] },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const singleUnpaddedSource = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words before "],
+          ["cm-inline-code", "code"],
+        ],
+      },
+      {
+        continuation: false,
+        kind: "",
+        runs: [["", "neighbor words after the code span, enough text to wrap at thirty columns."]],
+      },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const singleUnpaddedFormatted = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words before "],
+          ["cm-inline-code", "code"],
+          ["", " neighbor"],
+        ],
+      },
+      { continuation: false, kind: "", runs: [["", "words after the code span,"]] },
+      { continuation: false, kind: "", runs: [["", "enough text to wrap at thirty"]] },
+      { continuation: false, kind: "", runs: [["", "columns."]] },
+      { continuation: false, kind: "", runs: [] },
+    ];
+
+    const doublePaddedSource = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words "],
+          ["cm-inline-code", " code `   "],
+        ],
+      },
+      {
+        continuation: false,
+        kind: "",
+        runs: [["", "neighbor words after the code span, enough text to wrap at thirty columns."]],
+      },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const doublePaddedFormatted = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words "],
+          ["cm-inline-code", " code `   "],
+          ["", " neighbor"],
+        ],
+      },
+      { continuation: false, kind: "", runs: [["", "words after the code span,"]] },
+      { continuation: false, kind: "", runs: [["", "enough text to wrap at thirty"]] },
+      { continuation: false, kind: "", runs: [["", "columns."]] },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const doubleUnpaddedSource = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words "],
+          ["cm-inline-code", " code ` "],
+        ],
+      },
+      {
+        continuation: false,
+        kind: "",
+        runs: [["", "neighbor words after the code span, enough text to wrap at thirty columns."]],
+      },
+      { continuation: false, kind: "", runs: [] },
+    ];
+    const doubleUnpaddedFormatted = [
+      {
+        continuation: false,
+        kind: "",
+        runs: [
+          ["", "Words "],
+          ["cm-inline-code", " code ` "],
+          ["", " neighbor"],
+        ],
+      },
+      { continuation: false, kind: "", runs: [["", "words after the code span,"]] },
+      { continuation: false, kind: "", runs: [["", "enough text to wrap at thirty"]] },
+      { continuation: false, kind: "", runs: [["", "columns."]] },
+      { continuation: false, kind: "", runs: [] },
+    ];
+
+    expect(livePreview(singlePaddedSource)).toEqual(livePreview(singlePaddedFormatted));
+    expect(livePreview(singleUnpaddedSource)).toEqual(livePreview(singleUnpaddedFormatted));
+    expect(livePreview(doublePaddedSource)).toEqual(livePreview(doublePaddedFormatted));
+    expect(livePreview(doubleUnpaddedSource)).toEqual(livePreview(doubleUnpaddedFormatted));
+
+    // Actual inline-code content differences remain detectable.
+    expect(livePreview(singlePaddedSource)).not.toEqual(livePreview(singleUnpaddedSource));
+    expect(livePreview(singlePaddedFormatted)).not.toEqual(livePreview(singleUnpaddedFormatted));
+    const doubleChanged = structuredClone(doublePaddedSource);
+    doubleChanged[0]!.runs[1]![1] = " code `x  ";
+    expect(livePreview(doublePaddedSource)).not.toEqual(livePreview(doubleChanged));
+
+    // Trailing blank space in regular or styled non-code runs at a line end is still ignored (#406).
+    const styledTrailingSpace = [
+      {
+        continuation: false,
+        kind: "HyperMD-list-line HyperMD-list-line-1",
+        runs: [
+          ["cm-formatting cm-formatting-list cm-formatting-list-ul list-bullet", "•"],
+          ["cm-formatting cm-formatting-list cm-formatting-list-ul", " "],
+          ["cm-header cm-header-2", "A heading in an item ~~~ "],
+        ],
+      },
+      {
+        continuation: true,
+        kind: "HyperMD-list-line HyperMD-list-line-1",
+        runs: [["", "  A line below it in the item."]],
+      },
+    ];
+    const styledTrimmed = [
+      {
+        continuation: false,
+        kind: "HyperMD-list-line HyperMD-list-line-1",
+        runs: [
+          ["cm-formatting cm-formatting-list cm-formatting-list-ul list-bullet", "•"],
+          ["cm-formatting cm-formatting-list cm-formatting-list-ul", " "],
+          ["cm-header cm-header-2", "A heading in an item ~~~"],
+        ],
+      },
+      {
+        continuation: true,
+        kind: "HyperMD-list-line HyperMD-list-line-1",
+        runs: [["", "  A line below it in the item."]],
+      },
+    ];
+    expect(livePreview(styledTrailingSpace)).toEqual(livePreview(styledTrimmed));
   });
 });

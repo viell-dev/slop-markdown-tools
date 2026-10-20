@@ -113,9 +113,13 @@ async function shown(path, text) {
           } catch {
             continue;
           }
-          if (lines.has(at)) continue;
+          // A line and a widget can share a position: with the cursor on a table's line,
+          // as on a note's first line when it opens, Live Preview keeps an empty line of
+          // the table next to the table's widget (#401). Lines sort before widgets there.
+          const key = element.classList.contains("cm-line") ? at * 2 : at * 2 + 1;
+          if (lines.has(key)) continue;
           if (element.classList.contains("cm-line"))
-            lines.set(at, {
+            lines.set(key, {
               // A lazy line of a quote shows as more of the quote.
               kind: [...element.classList]
                 .filter((name) => /^HyperMD-/.test(name) && !/-(?:bg|nobullet|lazy)$/.test(name))
@@ -126,7 +130,7 @@ async function shown(path, text) {
               runs: runs(element, "", []),
             });
           else
-            lines.set(at, {
+            lines.set(key, {
               widget: [...element.classList].filter((name) => name !== "cm-embed-block").join(" "),
               html: widget(element),
               // An embed on a line of its own shows as a block, also where a wrapper
@@ -203,11 +207,37 @@ function livePreview(lines) {
       current = undefined;
       continue;
     }
+    // A table's `HyperMD-table-1` or `-2` says whether its rows begin with a pipe, which
+    // `style/table` chooses (#401), and the first line of a block quote in a list item carries
+    // the item's classes, which the quote's other lines do not (#410); neither shows.
+    const quoted = /\bHyperMD-quote\b/.test(line.kind);
+    const kind = line.kind
+      .split(" ")
+      .filter(
+        (name) => !/^HyperMD-table-\d+$/.test(name) && !(quoted && /^HyperMD-list-line/.test(name)),
+      )
+      .join(" ");
+    if (kind !== line.kind) line = { ...line, kind, continuation: line.continuation && !quoted };
     const text = line.runs.map(([, value]) => value).join("");
     // A line that shows only an image is not blank.
     const embed = line.runs.some(([classes]) => /\bembed\b/.test(classes));
     // A blank line below a footnote definition takes its class, and shows nothing either.
     if ((!line.kind || line.kind === "HyperMD-footnote") && !text.trim() && !embed) {
+      current = undefined;
+      continue;
+    }
+    // A line of a list item or block quote that shows only blank space after its markers,
+    // such as a line of spaces in an item or `>` alone, is a blank line too, and ends the
+    // block (#400). An empty list item shows its marker, and is not one.
+    const shownText = afterQuotes(line.runs)
+      .map(([, value]) => value)
+      .join("");
+    if (
+      !line.kind.includes("HyperMD-codeblock") &&
+      (line.continuation || quoted) &&
+      !shownText.trim() &&
+      !embed
+    ) {
       current = undefined;
       continue;
     }
@@ -241,6 +271,17 @@ function livePreview(lines) {
         !(!classes && /^[\s>]*$/.test(value));
       const last = current.runs.findLast(shows);
       const first = line.runs.find(shows);
+      // Blank space at the end of the line outside inline code shows as nothing, whatever
+      // styles it (#406, #421).
+      while (current.runs.length) {
+        const [classes, value] = current.runs.at(-1);
+        if (/\bcm-inline-code\b/.test(classes)) break;
+        if (value.trimEnd()) {
+          current.runs[current.runs.length - 1] = [classes, value.trimEnd()];
+          break;
+        }
+        current.runs.pop();
+      }
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
     } else {
       current = { kind: line.kind, runs: [...line.runs], code };
@@ -296,11 +337,13 @@ function livePreview(lines) {
         // Unstyled text shows the source as written, where Live Preview reads no syntax, such as
         // after an HTML tag, and so does what it styles as a comment where Reading view reads
         // none, such as after `<!--` that nothing closes. Their words count, the syntax
-        // characters that rules change do not, nor the case of a task's `x` or the number of a
-        // list item there, which `style/ordered-list` chooses. Code counts as shown, also after
-        // a backtick that nothing closes, which no rule changes (#362).
+        // characters that rules change do not, nor the case of a task's `x`, the number of a
+        // list item, or the case of a callout's type there, which `style/ordered-list` and the
+        // callout rule choose (#403). Code counts as shown, also after a backtick that nothing
+        // closes, which no rule changes (#362).
         if (!block.code && (!classes || /\bcm-comment\b/.test(classes))) {
           text = text
+            .replace(/\[!([^\]\s]+)\]/g, (_, type) => `[!${type.toLowerCase()}]`)
             .replace(/[^\p{L}\p{N}\s]/gu, "")
             .replace(/(^|\s)X(?=\s|$)/g, "$1x")
             .replace(/(^|\s)\d{1,9}(?=\s|$)/g, "$1#")
