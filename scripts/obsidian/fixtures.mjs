@@ -139,4 +139,21 @@ export const fixtures = [
     source:
       "* An item with enough words to be reflowed at a narrow width, and more words\n<div>\nSome words inside the block\n</div>\n\n- Another item with enough words to be reflowed at a narrow width\n",
   },
+  {
+    // #404: Live Preview reads an unclosed opening YAML fence as source through the note's end.
+    name: "unclosed YAML front matter",
+    source:
+      "---\n# Heading\n\nSome *words* and a #tag with enough words after it to be reflowed at a narrow width.\n",
+  },
+  {
+    // #407: Obsidian reads TOML as paragraph text, continued by the table below its closing fence.
+    name: "table directly below TOML front matter",
+    source: "+++\ntitle = 1\n+++\n| a | b |\n| --: | - |\n| c | d |\n",
+  },
+  {
+    // #408: Live Preview restores quote/list styling only after the comment closer's line.
+    name: "inline HTML comment across a quoted list",
+    source:
+      "Some words <!-- an open comment\n\n> - Words --> followed by enough more words to be reflowed at a narrow width.\n>   More words on the next line.\n\nIndependent *text* below the comment.\n",
+  },
 ];

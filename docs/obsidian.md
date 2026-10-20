@@ -58,6 +58,19 @@ Obsidian's Reading view and Live Preview read some Markdown otherwise than
 CommonMark, and otherwise than each other. Where formatting would change what a
 note shows there, the tool keeps the text as written:
 
+- A note whose first `---` has no closing line of `---` alone. Live Preview
+  reads the entire note as YAML source, where Reading view reads Markdown or
+  closes the front matter at a malformed `--- text` line. No rule changes such a
+  note, including its opening fence or its final line break. A `+++` fence does
+  not have this protection, and `---` alone is still a thematic break.
+- An inline HTML comment that starts in a paragraph but ends in another block,
+  as in `Text <!-- comment`, a blank line, and `> More --> text` below it. Live
+  Preview carries comment styling across the blocks and restores quote or list
+  styling only after the closer's line, where Reading view reads the blocks as
+  Markdown. No rule changes the paragraph or the blocks through the closing
+  block, or through the note's end without a closer. Later blocks still format.
+  An opener in emphasis, a highlight, or a link or image's text counts too; an
+  escaped opener or one inside a code span does not.
 - A paragraph, heading, or table cell with a backtick that no run of backticks
   closes, such as ``a ` b``, also in a highlight, an inline comment, or the text
   of a link or image. Live Preview shows the text after it as code, at least to
@@ -157,6 +170,11 @@ note shows there, the tool keeps the text as written:
   with `- `, as in `Name | Value` and `- | -` below it, as a table, where
   CommonMark reads a paragraph and a list. No rule changes such a table, those
   rows, or that line and list.
+
+These protections also apply to the reading of TOML front matter (`+++`) as
+paragraph text: a table or footnote definition directly below its closing fence
+is more of that text in Obsidian, so it stays as written. A separating blank
+line or a block that interrupts a paragraph still starts a block of its own.
 
 ## Vaults inside a larger workspace
 

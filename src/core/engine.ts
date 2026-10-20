@@ -11,6 +11,7 @@ import {
   range,
   splitByteOrderMark,
   startsWithMarker,
+  unclosedFrontMatter,
 } from "../syntax/parse.js";
 import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
@@ -254,11 +255,27 @@ function findingsProblem(findings: unknown, length: number): string | undefined 
  * edit that copies such text, such as a list rule's, can still apply.
  */
 function misreadEdits(document: Document): (edit: Edit) => boolean {
-  const misread = misreadLists(document);
+  // Live Preview reads all of an unclosed YAML document as source, including
+  // below a malformed closer that Reading view accepts (issue #404).
+  if (
+    document.dialect === "obsidian" &&
+    unclosedFrontMatter(document.source) === "---" &&
+    !/^---(?:\r\n|\r|\n)?$/.test(document.source)
+  )
+    return () => true;
+  const readings = [misreadLists(document)];
+  // Obsidian reads TOML front matter as paragraph text. Run the same range
+  // protections on that reading too, so blocks below it see the paragraph
+  // above them (issue #407). Range discovery does not request other readings.
+  const plain =
+    document.dialect === "obsidian" && document.tree.children[0]?.type === ("toml" as string)
+      ? otherReading(document.tree)
+      : undefined;
+  if (plain) readings.push(misreadLists({ ...document, tree: plain }));
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
   for (const [start, end] of Array.from(
-    [
+    readings.flatMap((misread) => [
       ...misread.text,
       ...misread.nested,
       ...misread.descriptions,
@@ -273,7 +290,8 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.tableText,
       ...misread.tabText,
       ...misread.itemHtml,
-    ],
+      ...misread.commentText,
+    ]),
     (node) => range(node),
   ).sort((a, b) => a[0] - b[0])) {
     const last = blocks.at(-1);

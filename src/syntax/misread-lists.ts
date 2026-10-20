@@ -1,5 +1,6 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
+import { labelEnd } from "./parse.js";
 
 /**
  * A list marker as CommonMark reads one at the start of a line's content: a
@@ -106,6 +107,14 @@ export interface MisreadLists {
    * start to its content, and from the line break before that list.
    */
   itemHtml: ReadonlySet<Nodes>;
+  /**
+   * In the Obsidian dialect, a paragraph with an inline HTML comment that no
+   * closer ends in that paragraph, and the blocks through the one holding the
+   * next closer, or through the document's end without one. Live Preview
+   * carries comment styling across the blocks and restores container styling
+   * only after the closer's line (issue #408). Whole source lines count.
+   */
+  commentText: ReadonlySet<Nodes>;
   /**
    * In the Obsidian dialect, the paragraphs of a list item with a lazy line,
    * one that starts left of the item's content, with the blocks after them in
@@ -342,6 +351,7 @@ export function misreadLists(document: Document): MisreadLists {
   const openFences = new Set<Nodes>();
   const tabText = new Set<Nodes>();
   const itemHtml = new Set<Nodes>();
+  const commentText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
@@ -556,6 +566,16 @@ export function misreadLists(document: Document): MisreadLists {
         return;
       }
       if (start < joinedEnd) return;
+      // A table directly below paragraph text is more of that text in
+      // Obsidian (#394), so a tab below it still continues that paragraph.
+      // The table's own range is protected below, with the other tables.
+      if (
+        column !== undefined &&
+        previous?.type === "paragraph" &&
+        leaf.type === "table" &&
+        previous.position!.end.line === leaf.position!.start.line - 1
+      )
+        return;
       let below = previous?.position?.end.line;
       // The parser reads such a line below an indented code block as more of
       // the code; Reading view reads it below the code's last line of text.
@@ -692,6 +712,47 @@ export function misreadLists(document: Document): MisreadLists {
         },
       } as Nodes;
     };
+    /**
+     * Comment openers in text, highlights, and image descriptions, where Live
+     * Preview starts HTML comments too, excluding code spans and math.
+     */
+    const commentOpeners = (node: Nodes): number[] => {
+      const start = node.position?.start.offset;
+      const image = node.type === "image" || node.type === "imageReference";
+      const end = image ? (labelEnd(node) ?? node.position?.end.offset) : node.position?.end.offset;
+      if (start === undefined || end === undefined) return [];
+      if (node.type !== "text" && node.type !== "obsidianHighlight" && !image)
+        return "children" in node ? node.children.flatMap(commentOpeners) : [];
+      const offsets: number[] = [];
+      for (const match of source.slice(start, end).matchAll(/<!--/g)) {
+        const at = start + match.index;
+        let slashes = 0;
+        while (source[at - slashes - 1] === "\\") slashes++;
+        if (slashes % 2 === 0) offsets.push(at);
+      }
+      return offsets;
+    };
+    let commentedUntil = 0;
+    for (let index = 0; index < order.length; index++) {
+      const [leaf] = order[index]!;
+      if (leaf.type !== "paragraph" || !leaf.position) continue;
+      for (const opener of commentOpeners(leaf)) {
+        if (opener < commentedUntil) continue;
+        const closer = source.indexOf("-->", opener + 4);
+        if (closer >= 0 && closer < leaf.position.end.offset!) continue;
+        commentedUntil = closer < 0 ? source.length : closer + 3;
+        let last = index;
+        while (
+          last + 1 < order.length &&
+          (closer < 0 || (order[last]![0].position?.end.offset ?? 0) < closer + 3)
+        )
+          last++;
+        commentText.add(wholeLines(leaf, order[last]![0]));
+        // The complete closing block stays: reflow on either side of the
+        // closer could move words onto its line. Later blocks still format.
+        break;
+      }
+    }
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
@@ -935,6 +996,7 @@ export function misreadLists(document: Document): MisreadLists {
     tableText,
     tabText,
     itemHtml,
+    commentText,
   };
   found.set(document.tree, result);
   return result;

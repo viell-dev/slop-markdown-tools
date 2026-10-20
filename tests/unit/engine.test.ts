@@ -649,10 +649,18 @@ describe("a first line that opens no front matter", () => {
         ["---\nText\n> *quote*\n", "---\nText\n> _quote_\n"],
         ["---\ntitle: a\n1) One\n", "---\ntitle: a\n1. One\n"],
       ] as const)
-        expect(formatted(source, preset(dialect))).toBe(output);
+        expect(formatted(source, preset(dialect))).toBe(
+          dialect === "obsidian" && source.startsWith("---") ? source : output,
+        );
     },
   );
   it.each(dialects)("writes no line of --- alone below it in the %s dialect", (dialect) => {
+    // Live Preview shows all of an unclosed YAML document as source (#404).
+    if (dialect === "obsidian") {
+      const source = "---\n\nText *a*.\n\n***\n\n___\n";
+      expect(formatted(source, preset(dialect))).toBe(source);
+      return;
+    }
     // Such a line would close the front matter, and the safety check refused
     // every edit of the rule that wrote it.
     expect(formatted("---\n\nText *a*.\n\n***\n\n___\n", preset(dialect))).toBe(
@@ -667,6 +675,122 @@ describe("a first line that opens no front matter", () => {
     // The first line itself takes the configured marker.
     const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
     expect(formatted("---\n\nText.\n", stars)).toBe("***\n\nText.\n");
+  });
+});
+
+describe("unclosed YAML front matter in Obsidian", () => {
+  const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "---\n# a\n\n- b *c*\n\nd #e with enough words to wrap across several lines\n",
+    "---\n\na *b*\n\n--- c\nd *e*\n",
+    "---\n\nText *a*",
+    "---  \n\nText *a*\n",
+    "---\t\n\nText *a*\n",
+  ])("preserves the entire unsupported document %j", (input) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const mark of ["", String.fromCharCode(0xfeff)]) {
+        const source = mark + input.replaceAll("\n", newline);
+        const options = {
+          config: {
+            ...config,
+            rules: {
+              "style/wrap": ["warn", { width: 20 }],
+              "style/thematic-break": ["warn", { marker: "***" }],
+            },
+          } satisfies Config,
+          workspace,
+        };
+        expect(formatted(source, options)).toBe(source);
+        expect(semanticFingerprint(parse(source, "obsidian"))).toBe(
+          semanticFingerprint(parse(format(source, options).output, "obsidian")),
+        );
+      }
+  });
+  it("still formats below a proper closer and below an unclosed TOML fence", () => {
+    expect(formatted("---\ntitle: a\n---\n\nText *a*\n", { config, workspace })).toBe(
+      "---\ntitle: a\n---\n\nText _a_\n",
+    );
+    expect(formatted("+++\n\nText *a*\n", { config, workspace })).toBe("+++\n\nText _a_\n");
+  });
+  it("formats a standalone thematic break without treating it as YAML source", () => {
+    const stars: Config = {
+      ...config,
+      rules: { "style/thematic-break": ["warn", { marker: "***" }] },
+    };
+    expect(formatted("---", { config: stars })).toBe("***\n");
+    expect(formatted("---\n", { config: stars })).toBe("***\n");
+  });
+  it("also prevents plugin insertions at either end of the document", () => {
+    const plugin: Plugin = {
+      name: "boundary",
+      rules: {
+        newline: {
+          kind: "style",
+          description: "Insert a blank line at either boundary",
+          check: ({ document }) =>
+            [0, document.source.length].map((start) => ({
+              start,
+              message: "Blank line",
+              edit: { start, end: start, text: "\n" },
+            })),
+        },
+      },
+    };
+    const source = "---\nText";
+    expect(
+      formatted(source, {
+        config: { extends: [], dialect: "obsidian", rules: { "boundary/newline": "warn" } },
+        plugins: [plugin],
+      }),
+    ).toBe(source);
+  });
+});
+
+describe("HTML comments that Live Preview continues across blocks", () => {
+  const config: Config = {
+    extends: ["recommended", "obsidian"],
+    dialect: "obsidian",
+    rules: { "style/wrap": ["warn", { width: 20 }] },
+  };
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each([
+    "a <!-- b\n\n> - c --> d e f g h i j k l m n o p q r s\n>   t u\n",
+    "a <!-- b\n\n> - c\n>   --> d e f g h i j k l m n o p q r s\n",
+    "a <!-- b\n\n> - c *d* e f g h i j k l m n o p q r s\n",
+    "a *b <!-- c*\n\n# d *e*\n\nf --> g *h*\n",
+    "a ==b <!-- c==\n\nd *e*\n\nf --> g *h*\n",
+    "a [b <!-- c](https://example.org)\n\nd *e*\n\nf --> g *h*\n",
+    "a ![b <!-- c](image.png)\n\nd *e*\n\nf --> g *h*\n",
+    "a <!-- b\n\n```\nc --> d\n```\n",
+    "a <!-- b\n\nc --> d <!-- e\n\nf *g*\n",
+  ])("keeps the comment and its closing block in %j", (input) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const source = input.replaceAll("\n", newline);
+      const output = formatted(source, { config, workspace });
+      expect(output).toBe(source);
+      expect(semanticFingerprint(parse(output, "obsidian"))).toBe(
+        semanticFingerprint(parse(source, "obsidian")),
+      );
+      expect(formatted(source, { config: { extends: [], dialect: "obsidian" } })).toBe(source);
+    }
+  });
+  it.each([
+    ["a <!-- b --> *c*\n", "a <!-- b --> _c_\n"],
+    ["a \\<!-- b *c*\n", "a \\<!-- b _c_\n"],
+    ["a `<!--` b *c*\n", "a `<!--` b _c_\n"],
+    ["```\na <!-- b\n```\n\nc *d*\n", "```\na <!-- b\n```\n\nc _d_\n"],
+    ["a <!-- b\n\nc --> d\n\ne *f*\n", "a <!-- b\n\nc --> d\n\ne _f_\n"],
+    ["a <!-- b\n\nc --> d\n\ne <!-- f\n\ng *h*\n", "a <!-- b\n\nc --> d\n\ne <!-- f\n\ng *h*\n"],
+  ])("still formats independent text in %j", (source, output) => {
+    expect(formatted(source, { config, workspace })).toBe(output);
+  });
+  it("leaves other dialects unchanged", () => {
+    expect(
+      formatted("a <!-- b\n\nc *d*\n", {
+        config: { extends: ["recommended", "github"], dialect: "github" },
+      }),
+    ).toBe("a <!-- b\n\nc _d_\n");
   });
 });
 
@@ -1020,6 +1144,7 @@ describe("blocks that Obsidian reads into a paragraph across tab lines", () => {
     // Across the blocks that it reads as more of the text.
     "a\n\t\nb *c*\n\t\nd *e*\n",
     "a\n\t\n| x |\n| - |\n\t\nb *c*\n",
+    "a\n| x |\n| - |\n\t\nb *c*\n",
     "a\n\t\n    b\n\t\nc *d*\n",
     "a\n\t\n2. b\n\t\nc *d*\n",
     "a\n\t\n[^1]: b\n\t\nc *d*\n",
@@ -1634,6 +1759,50 @@ describe("HTML blocks that Obsidian keeps inside a list item", () => {
         config: { ...config, extends: ["recommended"], dialect: "github" },
       }),
     ).toBe("- a\n<div>\nb\n</div>\n\n- c\n");
+  });
+});
+
+describe("Obsidian's preservation of the reading without TOML front matter", () => {
+  const config: Config = {
+    extends: ["recommended", "obsidian"],
+    dialect: "obsidian",
+    rules: { "style/wrap": ["warn", { width: 20 }] },
+  };
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const matter = "+++\ntitle = 1\n+++\n";
+  it.each([
+    "| a | b |\n| --: | - |\n| c | d |\n",
+    "[^1]: *words*\n\nx[^1]\n",
+    "[^1]: first\n[^2]: *second*\n\nx[^1] y[^2]\n",
+    "[r]: a *b* c\n",
+    "\t\n| a | b |\n| - | - |\n| c | d |\n",
+    "| a | b |\n| - | - |\n\t\nmore *words* below the table\n",
+  ])("preserves the blocks that follow the paragraph reading in %j", (block) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const source = (matter + block).replaceAll("\n", newline);
+      const output = formatted(source, { config, workspace });
+      expect(output).toBe(source);
+      expect(semanticFingerprint(parse(output, "obsidian"))).toBe(
+        semanticFingerprint(parse(source, "obsidian")),
+      );
+      expect(formatted(source, { config: { extends: [], dialect: "obsidian" } })).toBe(source);
+    }
+  });
+  it("still formats below a blank line and blocks that interrupt the paragraph", () => {
+    expect(formatted(`${matter}\n| x |\n| - |\n| y |\n`, { config, workspace })).toBe(
+      `${matter}\n| x   |\n| --- |\n| y   |\n`,
+    );
+    expect(formatted(`${matter}# Head *a* #\n`, { config, workspace })).toBe(
+      `${matter}# Head _a_\n`,
+    );
+    expect(formatted(`${matter}- Item *a*\n`, { config, workspace })).toBe(`${matter}- Item _a_\n`);
+  });
+  it("does not apply Obsidian's table protection to other dialects", () => {
+    expect(
+      formatted(`${matter}| x |\n| - |\n| y |\n`, {
+        config: { extends: ["recommended", "github"], dialect: "github" },
+      }),
+    ).toBe(`${matter}| x   |\n| --- |\n| y   |\n`);
   });
 });
 
