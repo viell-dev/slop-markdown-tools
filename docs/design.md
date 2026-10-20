@@ -115,6 +115,23 @@ The comparison is only as good as the parser's reading:
   front matter, outside the case above, is read as front matter only, as
   GitHub's file view, Forgejo, Gitea, and Obsidian read it.
 
+In Obsidian, an HTML block opened inside a list or quote can continue across
+lines that lack its container markers. Reading view and Live Preview can stop
+reading raw HTML at different places, so the source stays as written through
+both regions' ends, or EOF without a closer. This includes blank lines where
+Live Preview remains in HTML mode. Later openers in the same raw region count
+too: a void or closed element before an unclosed element does not end protection
+early. Properly terminated regions leave independent blocks below them
+formatable ([issue
+#428](https://github.com/viell-dev/slop-markdown-tools/issues/428)).
+
+Live Preview can resume Markdown between those HTML roots. One- and two-backtick
+code ends with its physical line, while longer runs can carry into a fence that
+the parser still reads as HTML. An unfinished code transition keeps the source
+through EOF, including its original final line ending. Confirmed inline-code
+ends still leave independent paragraphs formatable ([issue
+#433](https://github.com/viell-dev/slop-markdown-tools/issues/433)).
+
 Which `$…$` is math was observed on the renderers themselves: about 125 cases
 rendered by GitHub, Forgejo, and Gitea, which the tests compare with the tool on
 every run, and 22 cases that a person looked at in both of Obsidian's views. The
