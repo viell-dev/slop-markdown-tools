@@ -1724,7 +1724,8 @@ describe("blank space at the end of a footnote definition's text", () => {
       "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough\n    of them to be reflowed. \n",
     );
     expect(
-      verify(source.replaceAll(". \n", ".\t\n"), { ...wrap(), dialect: "obsidian" }, workspace).output,
+      verify(source.replaceAll(". \n", ".\t\n"), { ...wrap(), dialect: "obsidian" }, workspace)
+        .output,
     ).toBe(
       "Text[^1]\n\n[^1]: Note\n\n    Some words of the footnote, enough\n    of them to be reflowed.\t\n",
     );
