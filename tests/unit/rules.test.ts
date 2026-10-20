@@ -288,6 +288,30 @@ describe("style/block-spacing", () => {
     for (const preset of Object.values(presets))
       expect(Object.keys(preset.rules ?? {})).not.toContain("style/block-spacing");
   });
+  it.each(dialects)(
+    "keeps a separator inside the reading without TOML front matter in the %s dialect (#426)",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)])
+          for (const config of [
+            only(rule, dialect),
+            { extends: ["recommended"], dialect, rules: rule },
+          ]) {
+            for (const body of ["1.\n2) b\n", "1)\n2. b\n", "*\n2) b\n", "+\n2. b\n"]) {
+              const source = bom + ("+++\ntitle = 1\n+++\n" + body).replaceAll("\n", newline);
+              expect(formatted(source, config)).toBe(source);
+              expect(lint(source, { config })).toEqual([]);
+            }
+          }
+    },
+  );
+  it.each(dialects)(
+    "still separates real blocks after TOML front matter in the %s dialect (#426)",
+    (dialect) => {
+      const source = "+++\ntitle = 1\n+++\n1.\n\n2) b\n# Heading\n";
+      expect(spaced(source, dialect)).toBe("+++\ntitle = 1\n+++\n1.\n\n2) b\n\n# Heading\n");
+    },
+  );
   it("honours suppression comments", () => {
     const config = only({ "style/block-spacing": "warn", "style/emphasis": "warn" }, "github");
     const region =
