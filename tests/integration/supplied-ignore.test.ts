@@ -72,7 +72,9 @@ it("compares virtual paths with the repository's case setting", async () => {
   const name = "new/sub/note.md";
   for (const folded of [true, false]) {
     git(root, ["config", "core.ignoreCase", String(folded)]);
-    const reference = spawnSync("git", ["check-ignore", "--no-index", "-q", "--", name], { cwd: root });
+    const reference = spawnSync("git", ["check-ignore", "--no-index", "-q", "--", name], {
+      cwd: root,
+    });
     expect(reference.status).toBe(folded ? 0 : 1);
     const before = await snapshot(root);
     const result = await discoverWorkspace({ root, inputs: [], documents: { [name]: source } });
