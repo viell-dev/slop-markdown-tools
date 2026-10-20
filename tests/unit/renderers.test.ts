@@ -230,6 +230,117 @@ describe("Obsidian Live Preview normalizer", () => {
     livePreview: (lines: { kind: string; continuation?: boolean; runs: string[][] }[]) => string[];
   };
 
+  describe("styled list-family boundaries (#440)", () => {
+    type PreviewLine = { kind: string; continuation?: boolean; runs: string[][] };
+    const plain = (text: string): PreviewLine => ({ kind: "", runs: [["", text]] });
+    const blank = (): PreviewLine => ({ kind: "", runs: [] });
+    const list = (family: "ol" | "ul", text: string, depth = 1): PreviewLine => ({
+      kind: `HyperMD-list-line HyperMD-list-line-${depth}`,
+      runs:
+        family === "ol"
+          ? [
+              ["cm-formatting cm-formatting-list cm-formatting-list-ol", "1. "],
+              ["", text],
+            ]
+          : [
+              ["cm-formatting cm-formatting-list cm-formatting-list-ul list-bullet", "*"],
+              ["cm-formatting cm-formatting-list cm-formatting-list-ul", " "],
+              ["", text],
+            ],
+    });
+    const continuation = (text: string): PreviewLine => ({
+      kind: "HyperMD-list-line HyperMD-list-line-1",
+      continuation: true,
+      runs: [["", `   ${text}`]],
+    });
+    const quote = (runs: string[][]): PreviewLine => ({
+      kind: "HyperMD-quote HyperMD-quote-1",
+      runs: [
+        ["cm-formatting cm-formatting-quote cm-formatting-quote-1", ">"],
+        ["cm-formatting cm-formatting-quote cm-formatting-quote-1", " "],
+        ...runs,
+      ],
+    });
+    const normalized = (lines: PreviewLine[]) => livePreview(structuredClone(lines));
+
+    it.each([
+      ["ol", "ul"],
+      ["ul", "ol"],
+    ] as const)("recognizes an actual %s to %s transition without a blank", (first, second) => {
+      for (const depth of [1, 2]) {
+        const before = [list(first, "a", depth), list(second, "b", depth)];
+        const after = [list(first, "a", depth), blank(), list(second, "b", depth)];
+        expect(normalized(before)).toEqual(normalized(after));
+        expect(normalized(before)).toHaveLength(2);
+      }
+    });
+
+    it("keeps a list's family across soft continuations and consecutive items", () => {
+      const first = [list("ol", "a"), continuation("continued"), list("ol", "b")];
+      const second = [list("ul", "c"), continuation("more")];
+      expect(normalized(first)).toHaveLength(1);
+      expect(normalized([...first, ...second])).toEqual(normalized([...first, blank(), ...second]));
+      expect(normalized([...first, ...second])).toHaveLength(2);
+      expect(normalized(first)).not.toEqual(
+        normalized([list("ol", "a"), blank(), continuation("continued"), list("ol", "b")]),
+      );
+    });
+
+    it("still detects changed item text, marker family, and nesting depth", () => {
+      const original = [list("ol", "a"), list("ul", "b")];
+      expect(normalized(original)).not.toEqual(
+        normalized([list("ol", "a"), list("ul", "changed")]),
+      );
+      expect(normalized(original)).not.toEqual(normalized([list("ol", "a"), list("ol", "b")]));
+      expect(normalized(original)).not.toEqual(normalized([list("ol", "a"), list("ul", "b", 2)]));
+    });
+
+    it("still detects genuine paragraph and raw-HTML paragraph splits", () => {
+      expect(normalized([plain("a"), plain("b")])).not.toEqual(
+        normalized([plain("a"), blank(), plain("b")]),
+      );
+      const html = [list("ol", "a <b> b"), plain("c")];
+      expect(normalized([...html, plain("1. d")])).not.toEqual(
+        normalized([...html, blank(), plain("1. d")]),
+      );
+    });
+
+    it.each([
+      [quote([["", "a"]]), quote([["", "- b"]])],
+      [
+        quote([
+          ["", "## "],
+          ["cm-em", "a"],
+        ]),
+        quote([["cm-em", "b"]]),
+      ],
+    ])("keeps a real blank-line split in unstyled quoted syntax", (first, second) => {
+      // Raw Obsidian probes: these markers have neither heading nor list classes.
+      expect(normalized([first, second])).not.toEqual(normalized([first, quote([]), second]));
+    });
+
+    it("keeps blank quote lines meaningful and ignores redundant first-line list classes (#400, #410)", () => {
+      const first = quote([["", "a"]]);
+      const second = quote([["", "b"]]);
+      const redundant = { ...first, kind: `HyperMD-list-line HyperMD-list-line-1 ${first.kind}` };
+      expect(normalized([redundant, second])).toEqual(normalized([first, second]));
+      expect(normalized([first, second])).not.toEqual(normalized([first, quote([]), second]));
+      expect(normalized([first, second])).not.toEqual(
+        normalized([first, { ...second, kind: "HyperMD-quote HyperMD-quote-2" }]),
+      );
+    });
+
+    it("does not infer a family from a marker-like run after visible content", () => {
+      const trailing = {
+        ...list("ul", "b"),
+        runs: [["", "visible content "], ...list("ul", "b").runs],
+      };
+      expect(normalized([list("ol", "a"), trailing])).not.toEqual(
+        normalized([list("ol", "a"), blank(), trailing]),
+      );
+    });
+  });
+
   it("preserves inline-code padding across soft-line joins while keeping code changes detectable (#421)", () => {
     const singlePaddedSource = [
       {

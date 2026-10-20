@@ -260,9 +260,28 @@ function livePreview(lines) {
         line = { ...line, runs: outdent(line.runs, lead) };
       } else if (content !== undefined) line = { ...line, runs: outdent(line.runs, content) };
     } else content = undefined;
+    // Adjacent ordered and unordered lists are distinct blocks even without a
+    // blank line (#440). Only an actual styled leading marker supplies that
+    // distinction: unstyled `-` or `1.` in quotes or HTML remains paragraph text.
+    const leading = line.runs.find(([, value]) => value.trim());
+    const listFamily =
+      !code && !quoted && line.kind.includes("HyperMD-list-line")
+        ? /\bcm-formatting-list-(ol|ul)\b/.exec(leading?.[0] ?? "")?.[1]
+        : undefined;
+    const differentList =
+      current?.kind === line.kind &&
+      current.listFamily &&
+      listFamily &&
+      current.listFamily !== listFamily;
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
-    if (current && !code && (current.kind === line.kind || line.continuation || lazy)) {
+    if (
+      current &&
+      !code &&
+      !differentList &&
+      (current.kind === line.kind || line.continuation || lazy)
+    ) {
+      if (listFamily) current.listFamily = listFamily;
       // The runs on each side of the line break that show text, not a line's quote markers,
       // which wrapping moves, or a nested quote's `>`, which Live Preview leaves unstyled.
       const shows = ([classes, value]) =>
@@ -284,7 +303,7 @@ function livePreview(lines) {
       }
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
     } else {
-      current = { kind: line.kind, runs: [...line.runs], code };
+      current = { kind: line.kind, runs: [...line.runs], code, listFamily };
       blocks.push(current);
     }
   }
