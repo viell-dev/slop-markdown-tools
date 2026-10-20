@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Supplied documents and stdin paths obey inherited Git ignore rules even when
+  their parent directories do not exist, with repository boundaries and
+  negations preserved
+  ([#453](https://github.com/viell-dev/slop-markdown-tools/issues/453)).
 - Large paragraphs, tables, code spans, plugin finding lists, configuration
   arrays, and Obsidian target searches no longer exceed the JavaScript engine's
   function-argument limit

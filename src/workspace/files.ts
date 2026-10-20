@@ -464,7 +464,7 @@ function gitRules(root: string, top: string | undefined) {
  *
  * `documents` are paths from the root of documents whose text a caller
  * supplies, which need not exist. They are not selected here, but ignore rules
- * leave them out as named files, as far as their folders exist. With
+ * leave them out as named files, including in missing folders. With
  * `selectNone`, the caller selects nothing from disk, and an ignored root is
  * not reported.
  */
@@ -544,7 +544,18 @@ export async function discover(
   }
   /** The supplied documents, which ignore rules leave out as they do named files. */
   const documentInputs: NamedInput[] = [];
+  // Overlay only the paths implied by supplied buffers. Missing directories
+  // need the same inherited ignore decisions without any filesystem writes.
+  const documentChildren = new Map<string, Map<string, boolean>>();
   for (const name of documents) {
+    const parts = name.split("/");
+    for (let index = 0; index < parts.length; index++) {
+      const parent = parts.slice(0, index).join("/");
+      let children = documentChildren.get(parent);
+      if (!children) documentChildren.set(parent, (children = new Map()));
+      const child = parts[index]!;
+      children.set(child, children.get(child) === true || index < parts.length - 1);
+    }
     const existing = namedInputs.get(name);
     if (existing) {
       if (!existing.directory) documentInputs.push(existing);
@@ -624,24 +635,35 @@ export async function discover(
     relative: string,
     inherited: IgnoreLayer[],
     ignoreCase: boolean,
-    targetOnly = false,
-    gitIgnoredAbove = false,
+    {
+      targetOnly = false,
+      gitIgnoredAbove = false,
+      virtual = false,
+      suppliedOnly = false,
+    }: {
+      targetOnly?: boolean;
+      gitIgnoredAbove?: boolean;
+      virtual?: boolean;
+      suppliedOnly?: boolean;
+    } = {},
   ) {
     const directory = path.join(root, relative);
     const layers = [...inherited];
     const rules = path.join(directory, ".gitignore");
-    let entries: Dirent[];
+    let entries: (Pick<Dirent, "name" | "isDirectory" | "isFile" | "isSymbolicLink"> & {
+      virtual?: boolean;
+    })[] = [];
     // What is being read: the directory itself, or its `.gitignore`. Without the
     // ignore rules nothing tells which of the directory's files may be touched.
     let reading = relative;
     try {
-      if (!gitIgnoredAbove && (await exists(rules))) {
+      if (!virtual && !gitIgnoredAbove && (await exists(rules))) {
         reading = relative ? `${relative}/.gitignore` : ".gitignore";
         const text = await readFile(rules, "utf8");
         layers.push(ignoreLayer(fromTop(relative), reading, text, ignoreCase));
         reading = relative;
       }
-      entries = await readdir(directory, { withFileTypes: true });
+      if (!virtual) entries = await readdir(directory, { withFileTypes: true });
     } catch (error) {
       leaveOut(relative, reading, error);
       return;
@@ -650,6 +672,21 @@ export async function discover(
     const settings = entries.find((entry) => entry.name === ".obsidian");
     if (settings?.isDirectory() || (settings?.isSymbolicLink() && (await isVault(directory))))
       vaultFolders.set(relative, directory);
+    const children = documentChildren.get(relative);
+    if (suppliedOnly) entries = entries.filter((entry) => children?.has(entry.name));
+    if (children) {
+      const present = new Set(entries.map((entry) => entry.name));
+      for (const [name, folder] of children) {
+        if (present.has(name)) continue;
+        entries.push({
+          name,
+          virtual: true,
+          isDirectory: () => folder,
+          isFile: () => !folder,
+          isSymbolicLink: () => false,
+        });
+      }
+    }
     const scopes = gitIgnoredAbove ? [] : ignoreScopes(fromTop(relative), layers);
     for (const entry of entries) {
       const name = relative ? `${relative}/${entry.name}` : entry.name;
@@ -687,10 +724,10 @@ export async function discover(
       if (gitIgnored && resolve.gitIgnored !== true) continue;
       const full = path.join(root, name);
       if (entry.isDirectory()) {
-        directories.push(name);
+        if (!entry.virtual) directories.push(name);
         let nested: boolean;
         try {
-          nested = await exists(path.join(full, ".git"));
+          nested = !entry.virtual && (await exists(path.join(full, ".git")));
         } catch (error) {
           // A directory that cannot be entered: nothing in it can be read.
           leaveOut(name, name, error);
@@ -705,7 +742,8 @@ export async function discover(
               input.path === name ? "a nested repository" : `in ${show(name)}, a nested repository`,
             (input) => !input.document,
           );
-        if (nested && resolve.nestedRepositories !== true) continue;
+        const onlySupplied = suppliedOnly || (nested && resolve.nestedRepositories !== true);
+        if (onlySupplied && !documentChildren.has(name)) continue;
         // Inside a nested repository, only its own rules and settings apply, as in Git.
         let inner = { layers, ignoreCase };
         if (nested && !gitIgnored)
@@ -715,14 +753,13 @@ export async function discover(
             leaveOut(name, failed(error, path.join(full, ".git")), error);
             continue;
           }
-        await walk(
-          name,
-          inner.layers,
-          inner.ignoreCase,
-          targetOnly || gitIgnored || nested,
-          nested && !gitIgnored ? false : gitExcluded,
-        );
-      } else if (entry.isFile()) {
+        await walk(name, inner.layers, inner.ignoreCase, {
+          targetOnly: targetOnly || gitIgnored || nested,
+          gitIgnoredAbove: nested && !gitIgnored ? false : gitExcluded,
+          virtual: entry.virtual === true,
+          suppliedOnly: onlySupplied,
+        });
+      } else if (entry.isFile() && !entry.virtual) {
         const request = named.get(name)?.find((input) => input.path === name && !input.directory);
         const markdown = isMarkdownName(name);
         let cached: string | undefined;
@@ -746,19 +783,8 @@ export async function discover(
         if (chosen) selected.push(name);
       }
     }
-    // A supplied document that no file holds yet is left out by the rules of
-    // its folder as a file there would be.
-    for (const request of documentInputs) {
-      if (request.reason || request.path in files) continue;
-      if (path.posix.dirname(request.path) !== (relative || ".")) continue;
-      const entry = path.posix.basename(request.path);
-      if (alwaysSkipped.has(entry)) request.reason = () => `discovery always leaves out ${entry}`;
-      const rule = gitIgnoredAbove ? undefined : gitIgnoreRule(scopes, entry, false);
-      if (rule && untracked(request))
-        request.reason ??= (show) => `matched by "${rule.pattern}" in ${showFile(show, rule.file)}`;
-    }
   }
-  await walk("", rootLayers, rootIgnoreCase, false, ignoredRoot !== undefined);
+  await walk("", rootLayers, rootIgnoreCase, { gitIgnoredAbove: ignoredRoot !== undefined });
   // The names that discovery always leaves out, and the configuration's
   // patterns, apply to a supplied document's path also where no folder of it
   // exists.
