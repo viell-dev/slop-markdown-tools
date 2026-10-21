@@ -33,6 +33,9 @@ prereleases' notes there are longer than their entries here.
   coverage, and CLI tests are grouped by responsibility with bounded integration
   concurrency
   ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
+- Large-input regression checks compare warmed scaling measurements instead of
+  requiring fixed execution times, preserving their output assertions
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
 
 ### Fixed
 

@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { parse, range } from "../../src/index.js";
 import type { Dialect } from "../../src/index.js";
 import type { Nodes } from "mdast";
+import { scaling } from "./scaling.js";
 
 /** The source text of every formula the tool reads in a document, in order. */
 function formulas(source: string, dialect: Dialect): string[] {
@@ -15,13 +16,23 @@ function formulas(source: string, dialect: Dialect): string[] {
   visit(parse(source, dialect).tree);
   return found;
 }
-it("reads a paragraph of many prices once, not once for each price", () => {
+const prices = (count: number) => `${"pay $5 and $6 now ".repeat(count)}\n`;
+it("does not read prices as math and still finds a later formula", () => {
   // In Obsidian a dollar that cannot close is read past, so every price opens a
   // search to the end of the paragraph unless the first failed search is remembered.
-  const source = `${"pay $5 and $6 now ".repeat(6000)}\n`;
-  const started = performance.now();
+  const source = prices(6000);
   expect(formulas(source, "obsidian")).toEqual([]);
-  expect(performance.now() - started).toBeLessThan(10000);
   // A formula after the prices is still found, by the search that the first price began.
   expect(formulas(`${"pay $5 and $6 now ".repeat(50)}and $x$ too.\n`, "obsidian")).toHaveLength(1);
+});
+
+it("reads repeated prices with linear scaling", () => {
+  expect(
+    scaling(
+      [1000, 4000],
+      prices,
+      (source) => formulas(source, "obsidian"),
+      (found) => expect(found).toEqual([]),
+    ),
+  ).toBeLessThan(10);
 });

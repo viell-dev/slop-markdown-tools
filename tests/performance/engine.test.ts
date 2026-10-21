@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { applyEdits, format, lint, parse, resolveConfig } from "../../src/index.js";
 import type { Config, Document, Plugin, ProcessOptions } from "../../src/index.js";
 import { misreadLists } from "../../src/syntax/misread-lists.js";
+import { scaling } from "./scaling.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
 function formatted(source: string, options: ProcessOptions = {}) {
@@ -10,35 +11,39 @@ function formatted(source: string, options: ProcessOptions = {}) {
   expect(format(result.output, options).output).toBe(result.output);
   return result.output;
 }
-it("locates many findings without rescanning the source for each one", () => {
-  const source = Array.from({ length: 30000 }, (_, i) => `Paragraph ${i}.`).join("\n\n") + "\n";
-  const plugin: Plugin = {
-    name: "probe",
-    rules: {
-      lines: {
-        kind: "problem",
-        description: "Report every line start and the final offset",
-        check: ({ document }) => {
-          const findings = [{ start: 0, message: "line" }];
-          for (
-            let at = document.source.indexOf("\n");
-            at >= 0;
-            at = document.source.indexOf("\n", at + 1)
-          )
-            findings.push({ start: at + 1, message: "line" });
-          findings.push({ start: document.source.length, message: "end" });
-          return findings;
-        },
+function findingWorkload(count: number) {
+  return {
+    count,
+    source: Array.from({ length: count }, (_, i) => `Paragraph ${i}.`).join("\n\n") + "\n",
+  };
+}
+const linePlugin: Plugin = {
+  name: "probe",
+  rules: {
+    lines: {
+      kind: "problem",
+      description: "Report every line start and the final offset",
+      check: ({ document }) => {
+        const findings = [{ start: 0, message: "line" }];
+        for (
+          let at = document.source.indexOf("\n");
+          at >= 0;
+          at = document.source.indexOf("\n", at + 1)
+        )
+          findings.push({ start: at + 1, message: "line" });
+        findings.push({ start: document.source.length, message: "end" });
+        return findings;
       },
     },
-  };
-  const started = performance.now();
-  const diagnostics = lint(source, {
-    config: { extends: [], rules: { "probe/lines": "warn" } },
-    plugins: [plugin],
-  });
-  // Generous for slow CI runners; the previous prefix-scanning code needed minutes here.
-  expect(performance.now() - started).toBeLessThan(12000);
+  },
+};
+const lineOptions: ProcessOptions = {
+  config: { extends: [], rules: { "probe/lines": "warn" } },
+  plugins: [linePlugin],
+};
+it("locates many findings at their source positions", () => {
+  const { source } = findingWorkload(30000);
+  const diagnostics = lint(source, lineOptions);
   expect(diagnostics).toHaveLength(60001);
   for (const item of diagnostics.filter((_, index) => index % 997 === 0 || index > 59998)) {
     const prefix = source.slice(0, item.start);
@@ -47,6 +52,24 @@ it("locates many findings without rescanning the source for each one", () => {
       item.start - prefix.lastIndexOf("\n"),
     ]);
   }
+});
+
+it("locates findings with linear scaling", () => {
+  expect(
+    scaling(
+      [3000, 12000],
+      findingWorkload,
+      ({ source }) => lint(source, lineOptions),
+      (diagnostics, { source, count }) => {
+        expect(diagnostics).toHaveLength(2 * count + 1);
+        expect(diagnostics.at(-1)).toMatchObject({
+          start: source.length,
+          line: 2 * count,
+          column: 1,
+        });
+      },
+    ),
+  ).toBeLessThan(10);
 });
 
 it("skips nested comment openers in time proportional to their number", () => {
@@ -81,14 +104,29 @@ it("skips nested comment openers in time proportional to their number", () => {
   expect(fastest[1]! / fastest[0]!).toBeLessThan(10);
 }, 120_000);
 
-it("pairs the runs below such a run in time linear in their number", () => {
+function carriedRuns(count: number): string {
+  return "a ``` b\n\n<div>\nc ``` " + "d ` e\n".repeat(count) + "</div>\n\nf *g*\n";
+}
+it("pairs carried backtick runs without changing the following emphasis", () => {
   // A line each, so that no run of one closes another, in an HTML block,
   // which the parser reads without inline syntax (issue #151).
-  const source = `a \`\`\` b\n\n<div>\nc \`\`\` ${"d ` e\n".repeat(20_000)}</div>\n\nf *g*\n`;
-  const started = performance.now();
+  const source = carriedRuns(20_000);
   const output = formatted(source, { config });
-  expect(performance.now() - started).toBeLessThan(10_000);
   expect(output.endsWith("\nf _g_\n")).toBe(true);
+});
+
+it("pairs carried backtick runs with linear scaling", () => {
+  expect(
+    scaling(
+      [2000, 8000],
+      carriedRuns,
+      (source) => format(source, { config }),
+      (result) => {
+        expect(result.output.endsWith("\nf _g_\n")).toBe(true);
+        expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+      },
+    ),
+  ).toBeLessThan(10);
 });
 
 it("matches override patterns without compiling them for every document", () => {
@@ -113,8 +151,8 @@ it("matches override patterns without compiling them for every document", () => 
   expect(fastest(overridden) / fastest({})).toBeLessThan(6);
 });
 
-it("applies many edits in linear time", () => {
-  const source = Array.from({ length: 20000 }, (_, i) => `Paragraph ${i} with *emphasis*.`).join(
+function editWorkload(count: number) {
+  const source = Array.from({ length: count }, (_, i) => `Paragraph ${i} with *emphasis*.`).join(
     "\n\n",
   );
   const edits = [];
@@ -126,9 +164,22 @@ it("applies many edits in linear time", () => {
   );
   // The reference is linear on purpose: sequential splicing is the behaviour under test.
   const expected = `# Title\n\n${source.replaceAll("*", "_")}\n`;
-  const started = performance.now();
+  return { source, edits, expected };
+}
+it("applies many edits with insertions at both ends", () => {
+  const { source, edits, expected } = editWorkload(20000);
   const output = applyEdits(source, edits);
-  expect(performance.now() - started).toBeLessThan(5000);
   expect(output).toBe(expected);
   expect(applyEdits(source, [])).toBe(source);
+});
+
+it("applies edits with linear scaling", () => {
+  expect(
+    scaling(
+      [2000, 8000],
+      editWorkload,
+      ({ source, edits }) => applyEdits(source, edits),
+      (output, { expected }) => expect(output).toBe(expected),
+    ),
+  ).toBeLessThan(10);
 });

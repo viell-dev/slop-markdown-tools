@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { createWorkspace } from "../../src/index.js";
 import { createForgejoSlugger, createGiteaSlugger } from "../../src/workspace/slug.js";
+import { scaling } from "./scaling.js";
 const sluggers = [
   ["forgejo", createForgejoSlugger],
   ["gitea", createGiteaSlugger],
@@ -25,39 +26,69 @@ it.each(sluggers)("number many repeats on %s in linear time", (_, create) => {
   expect(fastest(repeated) / fastest(distinct)).toBeLessThan(10);
 });
 
-it("scans unusual HTML in linear time", () => {
-  const hostile = createWorkspace({
+function unusualHtml(count: number) {
+  return createWorkspace({
     "Doc.md": "",
     "Note.md": [
-      `<a ${"x ".repeat(100000)}`,
-      "<a ".repeat(50000),
-      `<a id="${"x".repeat(200000)}`,
-      `<a ${'id="a" '.repeat(20000)}${"'".repeat(20000)}`,
+      `<a ${"x ".repeat(count * 10)}`,
+      "<a ".repeat(count * 5),
+      `<a id="${"x".repeat(count * 20)}`,
+      `<a ${'id="a" '.repeat(count * 2)}${"'".repeat(count * 2)}`,
       // Real HTML blocks: many tags, a raw-text element that never closes,
       // and, last because it swallows the rest, a comment opener on every line.
-      '<div>\n<span id="s"></span>\n'.repeat(20000),
-      `<div>\n<textarea>${"<a id='t'></a>\n".repeat(20000)}`,
-      "<!--\n".repeat(50000),
+      '<div>\n<span id="s"></span>\n'.repeat(count * 2),
+      `<div>\n<textarea>${"<a id='t'></a>\n".repeat(count * 2)}`,
+      "<!--\n".repeat(count * 5),
     ].join("\n\n"),
   });
-  const start = performance.now();
+}
+it("finds only real anchors in large malformed HTML", () => {
+  const hostile = unusualHtml(10000);
   expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
   expect(hostile.resolve("Doc.md", "Note.md#t", "forgejo").fragmentExists).toBe(false);
   expect(hostile.resolve("Doc.md", "Note.md#s", "forgejo").fragmentExists).toBe(true);
-  // The bound tells linear from quadratic growth, which would take minutes here. It leaves
-  // room for a slow CI runner and for GFM parsing, which the workspace now uses when no
-  // dialect is named and which takes about half as long again as CommonMark on this input.
-  // The scan takes 2 to 4 seconds, but a Windows runner once needed 14 (issue #185).
-  expect(performance.now() - start).toBeLessThan(30000);
 }, 40_000);
 
-it("reads many unclosed headings in linear time", () => {
-  const hostile = createWorkspace({
-    "Doc.md": "",
-    "Note.md": `${"<h2>x\n".repeat(50000)}\n\n<div>\n${'<div title="<h2>">\n'.repeat(20000)}`,
-  });
-  const start = performance.now();
+it("scans malformed HTML with linear scaling", () => {
+  expect(
+    scaling(
+      [1000, 4000],
+      unusualHtml,
+      (workspace) =>
+        ["a", "t", "s"].map(
+          (fragment) =>
+            workspace.resolve("Doc.md", `Note.md#${fragment}`, "forgejo").fragmentExists,
+        ),
+      (found) => expect(found).toEqual([false, false, true]),
+    ),
+  ).toBeLessThan(10);
+});
+
+function unclosedHeadings(count: number) {
+  return {
+    count,
+    workspace: createWorkspace({
+      "Doc.md": "",
+      "Note.md": `${"<h2>x\n".repeat(count)}\n\n<div>\n${'<div title="<h2>">\n'.repeat(count * 0.4)}`,
+    }),
+  };
+}
+it("reads closed HTML headings and omits the last unclosed one", () => {
+  const { workspace: hostile } = unclosedHeadings(50000);
   expect(hostile.resolve("Doc.md", "Note.md#x", "github").fragmentExists).toBe(true);
   expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github").fragmentExists).toBe(false);
-  expect(performance.now() - start).toBeLessThan(4000);
+});
+
+it("reads unclosed headings with linear scaling", () => {
+  expect(
+    scaling(
+      [2500, 10000],
+      unclosedHeadings,
+      ({ workspace, count }) => [
+        workspace.resolve("Doc.md", "Note.md#x", "github").fragmentExists,
+        workspace.resolve("Doc.md", `Note.md#x-${count - 1}`, "github").fragmentExists,
+      ],
+      (found) => expect(found).toEqual([true, false]),
+    ),
+  ).toBeLessThan(10);
 });
