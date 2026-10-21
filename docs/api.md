@@ -52,7 +52,8 @@ Without `config`, the `recommended` preset applies. Positions count UTF-16 code
 units in the text as given. A byte order mark at its start (U+FEFF, which some
 editors write) is not part of what rules see, but it counts in the offsets that
 `lint` and `format` report, so that their edits apply to the text as given, and
-`format` keeps it in the output.
+`format` keeps it in the output. Columns count visible text, excluding initial
+byte order marks.
 
 ## The dialect
 

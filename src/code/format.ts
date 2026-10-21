@@ -176,6 +176,8 @@ export async function formatWithCode(
   const starts = lineStarts(output);
   reported = reported.map((item) => {
     const located = diagnostic(starts, item.rule, item.severity, item);
+    // Offsets include encoding marks; columns follow the core's visible text.
+    if (located.line === 1) located.column -= mark.length;
     if (located.rule === "engine/unsafe-format")
       located.message = located.message.replace(
         / at line \d+; none of its edits were applied\.$/,

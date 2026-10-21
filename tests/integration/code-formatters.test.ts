@@ -249,3 +249,21 @@ it("does not replace an invalid Unicode input on its way to a tool", async () =>
   expect(result.diagnostics).toEqual([expect.objectContaining({ rule: "engine/code-formatter" })]);
   await expect(readFile(record)).rejects.toMatchObject({ code: "ENOENT" });
 });
+
+it("counts encoding marks in error offsets while reporting visible columns", async () => {
+  const { root, config } = await setup("fail");
+  for (const count of [1, 2]) {
+    const mark = String.fromCharCode(0xfeff).repeat(count);
+    const source = mark + block();
+    const result = await formatWithCode(source, { cwd: root, config: config() });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        rule: "engine/code-formatter",
+        start: mark.length,
+        line: 1,
+        column: 1,
+      }),
+    ]);
+  }
+});

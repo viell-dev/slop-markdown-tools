@@ -212,14 +212,14 @@ the JSON report and the exit code.
 A diagnostic has the `rule`, the `severity` (`warn` or `error`), the `message`,
 and its position: `start` and optional `end` as offsets into the text, and
 `line` and `column`, both counted from 1. Offsets and columns count UTF-16 code
-units, as JavaScript strings do. A style rule's diagnostic can carry the `edit`
-it proposes, with `start`, `end`, and the replacement `text`. In a `format`
-report, positions refer to the formatted text. Besides the rules, the engine
-reports `engine/unsafe-format` for edits that it could not apply safely (see the
-[safety model](design.md#safety-model)), `engine/rule-error` for a rule that
-failed on a document (see [rules](plugins.md#rules)), `engine/code-formatter`
-for a failed or unsafe code tool, `engine/unreadable-file`, and
-`engine/unwritable-file`.
+units, as JavaScript strings do. Initial byte order marks count in offsets but
+not visible columns. A style rule's diagnostic can carry the `edit` it proposes,
+with `start`, `end`, and the replacement `text`. In a `format` report, positions
+refer to the formatted text. Besides the rules, the engine reports
+`engine/unsafe-format` for edits that it could not apply safely (see the [safety
+model](design.md#safety-model)), `engine/rule-error` for a rule that failed on a
+document (see [rules](plugins.md#rules)), `engine/code-formatter` for a failed
+or unsafe code tool, `engine/unreadable-file`, and `engine/unwritable-file`.
 
 ## Exit codes
 
