@@ -1,0 +1,96 @@
+name: Obsidian
+# Formats the documents of scripts/obsidian/fixtures.mjs and generated documents in the Obsidian
+# dialect and compares what Obsidian's Live Preview and Reading view show before and after, with
+# Obsidian running in Docker (scripts/obsidian-check.mjs). It runs for pull requests that change
+# how documents are read or formatted, by hand, from the Release workflow for the commit that it
+# releases, and every week with the fixtures alone, so that a new Obsidian release is tested
+# within a week. A difference fails the run; report.json and the screenshots of the first
+# differences are in the run's obsidian artifact. The paths below are the Rendering workflow's,
+# with the check's own files; keep the two lists alike.
+on:
+  schedule:
+    - cron: "47 5 * * 1"
+  pull_request:
+    paths:
+      - src/config/**
+      - src/core/**
+      - src/rules/**
+      - src/syntax/**
+      - src/index.ts
+      - package.json
+      - package-lock.json
+      - scripts/rendering.mjs
+      - scripts/obsidian-check.mjs
+      - scripts/obsidian/**
+      - .github/workflows/obsidian.yml
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: The seed of the generated documents (a whole number); random when empty
+        required: false
+      count:
+        description: How many documents to generate (100 when empty)
+        required: false
+      obsidian-version:
+        description: The Obsidian version to test (latest when empty)
+        required: false
+  workflow_call:
+    inputs:
+      seed:
+        type: string
+        required: false
+      count:
+        type: string
+        required: false
+      obsidian-version:
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: obsidian-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Compare
+        env:
+          SEED: ${{ inputs.seed }}
+          COUNT: ${{ github.event_name == 'schedule' && '0' || inputs.count }}
+          OBSIDIAN_VERSION: ${{ inputs.obsidian-version }}
+        run: npm run check:obsidian
+      # Fails too when the check compared nothing, so that a run that skipped its work cannot
+      # pass for one that found no difference.
+      - if: ${{ !cancelled() }}
+        name: Summarize
+        run: |
+          node --input-type=module <<'JS' >> "$GITHUB_STEP_SUMMARY"
+          import { existsSync, readFileSync } from 'node:fs';
+          const file = 'artifacts/obsidian/report.json';
+          if (!existsSync(file)) {
+            console.log('The check wrote no report.');
+            process.exit(1);
+          }
+          const report = JSON.parse(readFileSync(file, 'utf8'));
+          console.log(`## Obsidian ${report.obsidian}, before and after formatting\n`);
+          console.log(`Seed **${report.seed}**, ${report.count} generated documents and the fixtures, at widths ${report.widths.join(' and ')}: ${report.compared} compared, ${report.differences.length} shown differently.`);
+          console.log(`\nRepeat with \`SEED=${report.seed} COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} npm run check:obsidian\`.`);
+          if (!(report.compared > 0)) process.exit(1);
+          JS
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: obsidian
+          path: artifacts/obsidian/
+          if-no-files-found: warn
+          retention-days: 14

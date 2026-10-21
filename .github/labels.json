@@ -12,12 +12,12 @@
   {
     "name": "Type: Feature Request",
     "color": "0e8a16",
-    "description": "Add a new independently useful capability or rule."
+    "description": "Add a new independently useful capability."
   },
   {
     "name": "Type: Maintenance",
     "color": "6a737d",
-    "description": "Dependencies, CI, releases, refactoring, or repository upkeep."
+    "description": "Dependencies, CI, tests, releases, refactoring, or repository upkeep."
   },
   {
     "name": "Type: Documentation",
@@ -47,7 +47,7 @@
   {
     "name": "Status: Blocked",
     "color": "d93f0b",
-    "description": "Waiting on an external dependency; a parked upstream defect keeps it while closed."
+    "description": "Waiting on a stated condition; parked dependency issues retain it while closed."
   },
   {
     "name": "Status: Can't Reproduce",
@@ -63,6 +63,16 @@
     "name": "Status: Won't Do",
     "color": "666666",
     "description": "Declined as out of scope or unsuitable in its proposed form."
+  },
+  {
+    "name": "Needs: Human",
+    "color": "fbca04",
+    "description": "Needs human observation or action that a suitable person can provide."
+  },
+  {
+    "name": "Needs: Owner",
+    "color": "c5def5",
+    "description": "Needs the owner's decision, identity, access, or personal observation."
   },
   {
     "name": "Good First Issue",

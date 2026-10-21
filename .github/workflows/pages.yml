@@ -1,9 +1,13 @@
 name: Pages
 # The site documents the newest stable release. After a Release run that published a stable
-# version, this workflow builds the site from that version's tag and deploys it; dispatched by
-# hand with a version tag, it deploys that tag's site. Either way the workflow runs on main,
-# which the github-pages environment requires, and only the checkout uses the tag. CI builds
-# the site for every pull request.
+# version, this workflow builds the site from that version's tag and deploys it. Dispatched by
+# hand with the newest stable release's tag, it deploys that tag's site, or, with `ref`, the
+# documentation corrections on a branch cut from the tag, such as site-0.4.0: that commit must
+# descend from the tag and change nothing outside docs/, so the site can be corrected without a
+# new version and without describing unreleased changes. Either way the workflow runs on main,
+# which the github-pages environment requires, and only the checkout uses the tag or the branch.
+# The site's version.json names the version, the tag's commit, and the commit it was built from.
+# CI builds the site for every pull request.
 on:
   workflow_run:
     workflows: [Release]
@@ -11,8 +15,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Version tag to build the site from (an exact version, without a v prefix)
+        description: The newest stable release's tag (an exact version, without a v prefix)
         required: true
+      ref:
+        description:
+          A branch or commit of documentation corrections cut from the tag; the tag when empty
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -30,16 +38,20 @@ jobs:
       contents: read
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      tag-commit: ${{ steps.tag.outputs.tag-commit }}
+      commit: ${{ steps.tag.outputs.commit }}
     steps:
-      - name: Choose the tag
+      - name: Choose the tag and the commit
         id: tag
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
+          REF: ${{ inputs.ref }}
           JOBS_URL: ${{ github.event.workflow_run.jobs_url }}
           RELEASED_COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: |
           skip() { echo "$1" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; }
+          fail() { echo "::error::$1"; exit 1; }
           if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
             # The Release workflow publishes only in its publish job, from a commit whose
             # package.json names the version, and tags that commit with the version.
@@ -51,20 +63,39 @@ jobs:
               *-*) skip "$TAG is a prerelease; the site keeps documenting the newest stable release." ;;
             esac
           fi
-          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::'$TAG' is not a version tag"
-            exit 1
+          [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "'$TAG' is not a stable version tag"
+          tag_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$TAG" --jq .sha) ||
+            fail "The tag $TAG does not exist"
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ "$tag_commit" != "$RELEASED_COMMIT" ]; then
+            fail "The tag $TAG names $tag_commit, not the released commit $RELEASED_COMMIT"
           fi
-          if ! commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$TAG" --jq .sha); then
-            echo "::error::The tag $TAG does not exist"
-            exit 1
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          [ "$latest" = "$TAG" ] || fail "$TAG is not the newest stable release, $latest"
+          commit=$tag_commit
+          if [ -n "$REF" ]; then
+            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" --jq .sha) ||
+              fail "$REF names no commit"
+            # The corrections must build on the release and touch only its documentation.
+            gh api "repos/$GITHUB_REPOSITORY/compare/$tag_commit...$commit" > compare.json
+            status=$(jq -r .status compare.json)
+            case "$status" in
+              ahead | identical) ;;
+              *) fail "$REF ($commit) does not descend from $TAG ($tag_commit): $status" ;;
+            esac
+            [ "$(jq '.files | length' compare.json)" -lt 300 ] ||
+              fail "$REF changes too many files to check"
+            outside=$(jq -r '.files[].filename | select(startswith("docs/") | not)' compare.json)
+            [ -z "$outside" ] || fail "$REF changes files outside docs/: $(echo $outside)"
+            echo "$REF ($commit) is $(jq .ahead_by compare.json) commits of documentation corrections on $TAG." |
+              tee -a "$GITHUB_STEP_SUMMARY"
           fi
-          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ "$commit" != "$RELEASED_COMMIT" ]; then
-            echo "::error::The tag $TAG names $commit, not the released commit $RELEASED_COMMIT"
-            exit 1
-          fi
-          echo "Building the site of $TAG, commit $commit." | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building the site of $TAG, tag commit $tag_commit, from commit $commit." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo "tag=$TAG"
+            echo "tag-commit=$tag_commit"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
   build:
     needs: resolve
     if: needs.resolve.outputs.tag != ''
@@ -76,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+          ref: ${{ needs.resolve.outputs.commit }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -84,7 +115,23 @@ jobs:
           cache: npm
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: npm ci
+      # The tool's lint and format check of the Markdown, which also checks the links' fragments.
+      - run: npm run format:docs:check
       - run: npm run docs:build
+      - name: Record what the site was built from
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          TAG_COMMIT: ${{ needs.resolve.outputs.tag-commit }}
+          COMMIT: ${{ needs.resolve.outputs.commit }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          const { TAG, TAG_COMMIT, COMMIT, RUN } = process.env;
+          const record = { version: TAG, tag: { name: TAG, commit: TAG_COMMIT }, commit: COMMIT, run: RUN };
+          writeFileSync('docs/.vitepress/dist/version.json', `${JSON.stringify(record, null, 2)}\n`);
+          JS
+          cat docs/.vitepress/dist/version.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/.vitepress/dist

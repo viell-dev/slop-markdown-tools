@@ -1,12 +1,13 @@
 // Compare GitHub's rendering of generated documents before and after formatting (issue #303).
 //
-//   node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]
+//   node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]
 //
 // Each run seed stands for --documents documents, generated as scripts/rendering.mjs describes
 // with all of GitHub's syntax. The fixed seeds are followed by one new seed, random unless
-// --seed names it; the report names it, so that a finding can be reproduced. Each document is
-// formatted with the presets recommended and github, and a document that formatting changes is
-// rendered before and after by GitHub's Markdown API in two modes:
+// --seed names it, or none with `--seed none`, as the Release workflow runs it so that its result
+// depends only on the commit; the report names the seed, so that a finding can be reproduced.
+// Each document is formatted with the presets recommended and github, and a document that
+// formatting changes is rendered before and after by GitHub's Markdown API in two modes:
 //
 // - `markdown` renders a file and keeps soft line breaks, but leaves out GitHub's task lists,
 //   alerts, and math, whose markers it shows as text. For this mode the document is formatted
@@ -17,7 +18,8 @@
 // The HTML is compared after normalizeHtml, without the random ID that GitHub writes into each
 // response. A document that renders differently and that KNOWN does not list fails the run, and
 // so does a listed document of the fixed seeds that renders alike, because what its entry
-// tracks may be fixed. Each document that renders differently is written to DIR (default
+// tracks may be fixed, and so does a run in which formatting changed no document, which compared
+// nothing. Each document that renders differently is written to DIR (default
 // artifacts/github-rendering) as before.md, after-MODE.md, and the HTML of both. The report, in
 // Markdown, goes to standard output.
 //
@@ -44,7 +46,7 @@ import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
 const known = [];
 
 const usage =
-  "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]\n";
+  "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]\n";
 /** The run's settings from its arguments. */
 function settings(argv) {
   const result = {
@@ -61,7 +63,7 @@ function settings(argv) {
     const [name, value] = [argv[index], argv[index + 1]];
     if (value === undefined) throw new Error(usage);
     if (name === "--seeds") result.seeds = value === "" ? [] : value.split(",").map(number);
-    else if (name === "--seed") result.seed = number(value);
+    else if (name === "--seed") result.seed = value === "none" ? undefined : number(value);
     else if (name === "--documents") result.documents = number(value);
     else if (name === "--out" && value !== "") result.out = value;
     else throw new Error(usage);
@@ -141,7 +143,7 @@ try {
   process.stderr.write(error.message);
   process.exit(2);
 }
-const runSeeds = [...options.seeds, options.seed];
+const runSeeds = options.seed === undefined ? options.seeds : [...options.seeds, options.seed];
 const results = [];
 for (const seed of runSeeds)
   for (let index = 0; index < options.documents; index++) {
@@ -175,15 +177,16 @@ const changed = results.filter((result) => result.modes.length > 0).length;
 const lines = [
   "## GitHub's rendering before and after formatting",
   "",
-  `Seeds ${options.seeds.join(", ") || "(none)"} and the new seed **${options.seed}**, ${options.documents} documents each: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently, ${differing.length - unexpected.length} of them known.`,
+  `Seeds ${options.seeds.join(", ") || "(none)"} and ${options.seed === undefined ? "no new seed" : `the new seed **${options.seed}**`}, ${options.documents} documents each: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently, ${differing.length - unexpected.length} of them known.`,
   "",
   "Reproduce with:",
   "",
   "```sh",
-  `node scripts/github-rendering.mjs --seeds "${options.seeds.join(",")}" --seed ${options.seed} --documents ${options.documents}`,
+  `node scripts/github-rendering.mjs --seeds "${options.seeds.join(",")}" --seed ${options.seed ?? "none"} --documents ${options.documents}`,
   "```",
 ];
-if (unexpected.length || stale.length) lines.push("");
+if (unexpected.length || stale.length || !changed) lines.push("");
+if (!changed) lines.push("- Formatting changed no document, so nothing was compared.");
 for (const result of unexpected) {
   const modeNames = result.modes.filter((mode) => mode.differs).map((mode) => mode.mode);
   lines.push(`- Document ${name(result)} renders differently in mode ${modeNames.join(" and ")}.`);
@@ -193,4 +196,4 @@ for (const entry of stale)
     `- Document ${name(entry)} renders alike now; check issue ${entry.issue} and remove its entry.`,
   );
 process.stdout.write(lines.join("\n") + "\n");
-process.exit(unexpected.length || stale.length ? 1 : 0);
+process.exit(unexpected.length || stale.length || !changed ? 1 : 0);
