@@ -28,12 +28,28 @@ goes there until one comes; log each check in #330.
 
 Before committing, search the repository for other statements of what the change
 touches: behavior, option names, defaults, commands, file locations, versions
-and Node.js requirements, and policy. Known couplings:
+and Node.js requirements, and policy.
+
+Adding or changing a feature includes maintaining every affected public
+description, usage example, and discovery field. Complete this routine work with
+the feature; do not wait for the owner to identify omissions. Check both tracked
+files and live repository metadata. The couplings below are a starting point,
+not an exhaustive list. At publication, verify that hosted descriptions reflect
+the capabilities users can install; editing source files does not update them.
+
+Known couplings:
 
 - Behavior and its descriptions: the `docs/` pages, the README, `examples/` and
   each workspace's `after/` tree, CLI help text, type declarations, and
   `CHANGELOG.md`. The integration tests compare some of these with the code, not
   all.
+- Public descriptions and discovery: the README's opening description, feature
+  and configuration lists; GitHub's About description, topics, and homepage;
+  `package.json`'s description and keywords; and the documentation site's
+  description and navigation. Update the affected fields whenever capabilities
+  change, including support for another renderer. The About description follows
+  the README's opening description and retains the agent-maintained disclosure;
+  topics include the supported renderers.
 - Rules: `docs/rules.md` has one index row and one section per rule, in
   alphabetical order of rule ID; a new rule adds both.
 - The maintenance statement: the README's status section, which other documents

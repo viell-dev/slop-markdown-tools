@@ -8,6 +8,15 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- The README's opening description and repository About/topics include
+  VitePress, matching the released dialect support. Maintenance instructions
+  require public descriptions and discovery metadata to be updated with feature
+  changes ([#483](https://github.com/viell-dev/slop-markdown-tools/issues/483)).
+
 ## 0.4.0 - 2026-10-21
 
 ### Added

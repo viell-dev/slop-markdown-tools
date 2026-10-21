@@ -1,7 +1,7 @@
 # mdrefine
 
-Lint and format Markdown for GitHub, Forgejo, Gitea, Obsidian, or any CommonMark
-renderer, with one configuration for both.
+Lint and format Markdown for GitHub, Forgejo, Gitea, Obsidian, VitePress, or any
+CommonMark renderer, with one configuration for both.
 
 [![npm](https://img.shields.io/npm/v/mdrefine)](https://www.npmjs.com/package/mdrefine)
 [![CI](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml)
