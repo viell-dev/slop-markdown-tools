@@ -125,8 +125,9 @@ commit. It waits up to five minutes for the registry to know the version. If
 only this job failed, re-run it with `gh run rerun RUN --failed`; it does not
 publish again. When the Release run succeeds for a stable version, the **Pages**
 workflow builds the documentation site from the new tag and deploys it; a
-prerelease leaves the site on the newest stable release. To deploy a release's
-site by hand, dispatch **Pages** on `main` with the version as its `tag`.
+prerelease leaves the site on the newest stable release. To deploy the site by
+hand, dispatch **Pages** on `main` with the newest stable release's version as
+its `tag`; the workflow refuses any other tag.
 
 The workflow refuses a version or tag that already exists. Never run publication
 again for an existing version. If npm succeeded but the GitHub release failed,
@@ -135,8 +136,10 @@ download the run's artifact with
 with
 `node scripts/verify-publication.mjs VERSION ./artifacts/mdrefine-VERSION.tgz COMMIT`,
 where `COMMIT` is the run's commit, and finish only the GitHub step at that
-commit. Then deploy the site by hand for a stable version. Attach every asset
-before a release is published, because published releases are immutable.
+commit. Then deploy the site by hand for a stable version, once the GitHub
+release exists, because the Pages workflow deploys only the newest stable
+release, which it reads from GitHub. Attach every asset before a release is
+published, because published releases are immutable.
 
 ## Verify
 

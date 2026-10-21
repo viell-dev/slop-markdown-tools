@@ -186,7 +186,12 @@ describe("labels", () => {
   });
   it("include every label that the maintenance documents name", () => {
     const pattern = /`((?:Type|Status|Needs): [^`]+|Good First Issue|Help Wanted)`/g;
-    for (const file of ["AGENTS.md", "CONTRIBUTING.md", "RELEASING.md"])
+    for (const file of [
+      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "RELEASING.md",
+      ".github/pull_request_template.md",
+    ])
       for (const [, name] of read(file).matchAll(pattern)) expect(defined, file).toContain(name);
   });
 });

@@ -298,9 +298,15 @@ The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
 of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
 request. Run the checks by hand on a branch whose change could alter what a
 renderer shows from another path. A difference fails the check; investigate it
-and record it in an issue rather than running the check again until it passes. A
-fixed document that shows a difference blocks releases until it is fixed or, in
-the Rendering check, listed with its issue.
+and record it in an issue rather than running the check again until it passes.
+While confirmed differences are open, runs with random documents can fail on
+them again: reduce the run's documents, with `REDUCE` for the Obsidian check,
+and compare them with the open issues before filing another. The fix of such a
+difference adds its reduced document to `scripts/obsidian/fixtures.mjs` or a
+unit test, so the fixed documents that releases compare grow from what the
+random ones find. A fixed document that shows a difference blocks releases until
+it is fixed or, in the Rendering check, listed with its issue; the Obsidian
+fixtures have no such list, because each records a defect that was fixed.
 
 ## Benchmarks
 

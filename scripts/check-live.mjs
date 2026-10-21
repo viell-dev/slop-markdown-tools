@@ -117,10 +117,15 @@ await section("rulesets", () => {
     }
     const actual = gh(`repos/${repository}/rulesets/${summary.id}`);
     const fields = ["target", "enforcement", "bypass_actors", "conditions", "rules"];
-    const pick = (ruleset) => Object.fromEntries(fields.map((field) => [field, ruleset[field]]));
     check(
       `ruleset ${expected.name} (${name})`,
-      canonical(pick(actual)) === canonical(pick(expected)) ? undefined : "differs from the file",
+      fields
+        .filter((field) => canonical(actual[field]) !== canonical(expected[field]))
+        .map(
+          (field) =>
+            `${field} is ${canonical(actual[field])}, expected ${canonical(expected[field])}`,
+        )
+        .join("; ") || undefined,
     );
   }
   for (const ruleset of live)

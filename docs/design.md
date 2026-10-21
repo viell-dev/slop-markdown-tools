@@ -39,10 +39,11 @@ The comparison is only as good as the parser's reading:
 - It compares syntax trees, and does not run GitHub's, Forgejo's, Gitea's, or
   Obsidian's renderer. To find documents that renderers read otherwise than the
   parser, the tests format generated documents and CommonMark's examples and
-  compare the HTML of commonmark.js and markdown-it before and after, a weekly
-  workflow does the same with GitHub's renderer, and a check started by hand
-  compares Obsidian's Live Preview and Reading view, with Obsidian running in
-  Docker. Each difference found is tracked as an issue.
+  compare the HTML of commonmark.js and markdown-it before and after. A workflow
+  does the same with GitHub's renderer, and another compares Obsidian's Live
+  Preview and Reading view, with Obsidian running in Docker, for every change to
+  parsing or formatting, every week, and before each release. Each difference
+  found is tracked as an issue.
 - The VitePress dialect also compares a synchronous markdown-it reading,
   including container boundaries, attributes, and Vue-sensitive whitespace.
   Actual VitePress rendering and Vue SSR are test references. The portable guard

@@ -84,7 +84,9 @@ jobs:
             esac
             [ "$(jq '.files | length' compare.json)" -lt 300 ] ||
               fail "$REF changes too many files to check"
-            outside=$(jq -r '.files[].filename | select(startswith("docs/") | not)' compare.json)
+            # A file renamed into docs/ also removes its old path.
+            outside=$(jq -r '.files[] | .filename, (.previous_filename // empty) |
+              select(startswith("docs/") | not)' compare.json)
             [ -z "$outside" ] || fail "$REF changes files outside docs/: $(echo $outside)"
             echo "$REF ($commit) is $(jq .ahead_by compare.json) commits of documentation corrections on $TAG." |
               tee -a "$GITHUB_STEP_SUMMARY"
@@ -109,10 +111,11 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.commit }}
           persist-credentials: false
+      # No dependency cache: this job runs on main's behalf with code from a tag or a correction
+      # branch, and a cache it saved would be restored by main's other workflows.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: npm ci
       # The tool's lint and format check of the Markdown, which also checks the links' fragments.

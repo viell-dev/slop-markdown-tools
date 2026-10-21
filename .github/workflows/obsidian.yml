@@ -48,7 +48,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: obsidian-${{ github.ref }}
+  # In a run that the Release workflow calls, github.workflow is "Release", so a release never
+  # waits for, or is replaced by, a weekly or manual run.
+  group: obsidian-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compare:

@@ -36,22 +36,27 @@ import { URL, fileURLToPath } from "node:url";
 export function requiredChecks(ruleset) {
   const rule = ruleset.rules.find((entry) => entry.type === "required_status_checks");
   /** @type {Check[]} */
-  const checks = rule.parameters.required_status_checks.map((check) => ({
+  const checks = (rule?.parameters?.required_status_checks ?? []).map((check) => ({
     name: check.context,
     app: check.integration_id,
   }));
+  if (!checks.length) throw new Error("The ruleset for main requires no status checks");
   return [...checks, { name: "Unit coverage", app: checks[0].app }];
 }
 
 /**
  * The state of the required checks among a commit's check runs: "success" when each has a
  * successful run, "failure" when one has finished otherwise, and "pending" while one is missing,
- * queued, or running. With several runs of a check, as after a re-run, the newest one counts.
+ * queued, or running. With several runs of a check, as after a re-run, the newest one counts;
+ * a run that has not started yet is the newest.
  * @param {CheckRun[]} checkRuns
  * @param {Check[]} required
  * @returns {{ state: "success" | "pending" | "failure", lines: string[] }}
  */
 export function evaluate(checkRuns, required) {
+  /** When a run started; one that has not started yet sorts as the newest. */
+  const started = (/** @type {CheckRun} */ run) =>
+    run.started_at ? Date.parse(run.started_at) : Number.POSITIVE_INFINITY;
   /** @type {string[]} */
   const lines = [];
   /** @type {"success" | "pending" | "failure"} */
@@ -59,7 +64,7 @@ export function evaluate(checkRuns, required) {
   for (const check of required) {
     const runs = checkRuns
       .filter((run) => run.name === check.name && run.app?.id === check.app)
-      .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id);
+      .sort((a, b) => started(b) - started(a) || b.id - a.id);
     const run = runs[0];
     if (!run) {
       lines.push(`${check.name}: not started`);

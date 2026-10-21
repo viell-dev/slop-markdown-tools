@@ -60,6 +60,20 @@ describe("release evidence", () => {
     const failedAgain = [...passing(), run(name, "completed", "failure", "2026-10-22")];
     expect(evaluate(failedAgain, required).state).toBe("failure");
   });
+  it("waits for a run that was queued again after a failure", () => {
+    const name = required[0]!.name;
+    const queued = { ...run(name, "queued", null), started_at: null };
+    const runs = [...passing().slice(1), run(name, "completed", "failure"), queued];
+    expect(evaluate(runs, required).state).toBe("pending");
+  });
+  it("refuses a ruleset that requires no checks rather than passing", () => {
+    expect(() => requiredChecks({ rules: [{ type: "deletion" }] })).toThrow(/no status checks/);
+    expect(() =>
+      requiredChecks({
+        rules: [{ type: "required_status_checks", parameters: { required_status_checks: [] } }],
+      }),
+    ).toThrow(/no status checks/);
+  });
   it("ignores a check of the same name from another app", () => {
     const runs = passing().slice(1);
     runs.push({ ...run(required[0]!.name, "completed", "success"), app: { id: 1 } });

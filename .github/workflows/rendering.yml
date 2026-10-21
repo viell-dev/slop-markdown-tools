@@ -3,8 +3,8 @@ name: Rendering
 # GitHub's Markdown API (scripts/github-rendering.mjs, issue #303). It runs every week, so that a
 # change of GitHub's renderer shows up, for pull requests that change how documents are read or
 # formatted, by hand, and from the Release workflow for the commit that it releases. A run makes
-# up to 600 requests, and a workflow's token may make 1,000 an hour in this repository, so runs
-# that overlap can fail on the limit; run again after the hour. A difference fails the run; the
+# up to 600 requests, and a workflow's token may make 1,000 an hour in this repository, so when
+# runs overlap, the script waits for the limit to reset. A difference fails the run; the
 # report, the documents, and their HTML are in the run's rendering artifact, and the summary
 # names the run's new seed, which reproduces it. The paths below are the Obsidian workflow's,
 # with this check's own files; keep the two lists alike.
@@ -36,12 +36,14 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rendering-${{ github.ref }}
+  # In a run that the Release workflow calls, github.workflow is "Release", so a release never
+  # waits for, or is replaced by, a weekly or manual run.
+  group: rendering-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compare:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

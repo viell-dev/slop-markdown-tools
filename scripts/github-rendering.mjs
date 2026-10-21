@@ -29,7 +29,7 @@
 // to 600 requests and take ten to fifteen minutes. The Rendering workflow runs this every
 // week, and by hand with `gh workflow run rendering.yml`.
 import { Buffer } from "node:buffer";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomInt } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -92,13 +92,37 @@ function gh(body) {
 }
 const pause = 1000;
 let lastRequest = 0;
-/** GitHub's HTML for `text` in `mode`. A failed request is tried again, after longer waits. */
+/** When the token's request limit resets, in milliseconds since the epoch, or in a minute. */
+function rateLimitReset() {
+  const { stdout } = spawnSync("gh", ["api", "rate_limit", "--jq", ".resources.core.reset"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const seconds = Number(stdout?.trim());
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Date.now() + 60000;
+}
+let limitWaits = 0;
+/**
+ * GitHub's HTML for `text` in `mode`. A failed request is tried again, after longer waits. When
+ * the token's request limit is spent, as when runs overlap, the request waits for the limit to
+ * reset, at least a minute and at most an hour, twice at most in a run.
+ */
 async function render(text, mode) {
   for (let attempt = 1; ; attempt++) {
     await delay(Math.max(0, lastRequest + pause - Date.now()));
     lastRequest = Date.now();
     const { status, stdout, stderr } = await gh({ text, mode });
     if (status === 0) return stdout;
+    if (/rate limit/i.test(stderr) && limitWaits < 2) {
+      limitWaits++;
+      const wait = Math.min(Math.max(rateLimitReset() - Date.now() + 5000, 60000), 3600000);
+      process.stderr.write(
+        `${stderr}\nWaiting ${Math.ceil(wait / 60000)} minutes for the request limit to reset.\n`,
+      );
+      await delay(wait);
+      attempt--;
+      continue;
+    }
     if (attempt === 5) throw new Error(`gh api markdown failed: ${stderr}`);
     process.stderr.write(
       `gh api markdown failed: ${stderr}\nTrying again in ${attempt} minutes.\n`,
