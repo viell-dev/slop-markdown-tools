@@ -103,7 +103,7 @@ export async function formatWithCode(
     const node = nodes[index]!;
     const language = node.lang;
     const fence = codeFence(document.source, node);
-    if (!fence || !language || /\s/.test(language)) continue;
+    if (!fence || fence.marker === "$" || !language || /\s/.test(language)) continue;
     const selected = route(language);
     if (!selected || selected.excluded) continue;
     const [start, end] = range(node);
@@ -133,7 +133,18 @@ export async function formatWithCode(
       fail(error instanceof Error ? error.message : String(error));
       continue;
     }
-    const candidate = codeEdits(document, node, formatted, normalizeFence);
+    const candidate = codeEdits(
+      document,
+      node,
+      formatted,
+      normalizeFence &&
+        !suppressed("style/code-fence", {
+          start,
+          end,
+          edit: { start, end, text: "" },
+          message: "",
+        }),
+    );
     if (!candidate || candidate.value === node.value) continue;
     const expected = semanticFingerprintWithCode(
       document,

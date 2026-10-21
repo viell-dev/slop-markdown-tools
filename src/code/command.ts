@@ -58,7 +58,7 @@ export function runFormatter(
             ),
           );
         } catch {
-          reject(new Error("returned output that is not UTF-8 text"));
+          reject(new Error("returned output that could not be decoded as UTF-8 text"));
         }
       }
     };

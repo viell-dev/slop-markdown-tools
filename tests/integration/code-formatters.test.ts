@@ -230,6 +230,17 @@ it("preserves separately chosen fence lengths when fence styling is disabled", a
   expect(result.output).toBe(source.replace("old", "formatted"));
 });
 
+it("keeps fence runs whose style rule is suppressed while formatting their code", async () => {
+  const { root, config } = await setup();
+  const source = `<!-- mdtools-disable style/code-fence -->\n\n${fence}\`\`\`js\nold\n${fence}\`\`\`\`\`\n`;
+  const result = await formatWithCode(source, {
+    cwd: root,
+    config: { ...config(), extends: ["recommended"] },
+  });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.output).toBe(source.replace("old", "formatted"));
+});
+
 it("does not replace an invalid Unicode input on its way to a tool", async () => {
   const { root, record, config } = await setup("echo");
   const source = block(String.fromCharCode(0xd800));
