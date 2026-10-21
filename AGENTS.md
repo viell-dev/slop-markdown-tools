@@ -16,13 +16,37 @@ credentials out of diagnostic snapshots and logs.
 
 ## Upstream defects
 
-The pinned overview of defects in dependencies is #330: each has a tracking
-issue with `Status: Blocked`, closed as not planned while a workaround or a
-documented limit leaves nothing here waiting on it. Here a workaround is
-whatever keeps renderers showing the same, such as the rules' protections and
-the check in `parse()` for #278. The first report to micromark,
-micromark/micromark#252, waits for a maintainer's response, and nothing more
-goes there until one comes; log each check in #330.
+The pinned overview of defects in dependencies is #330. It lists each defect
+with the dependency and affected versions, its effect here, the evidence, how it
+is handled, and what would unblock or reopen it, in one of four states:
+
+1. **Blocked upstream:** nothing here can remedy it; the overview names the
+   limit that users see and any effect on releases.
+2. **Worked around:** a verified workaround here keeps renderers showing the
+   same, such as the rules' protections and the check in `parse()` for #278; the
+   overview names its limits and when it can be removed.
+3. **Resolved upstream:** a verified fix exists upstream; adopting it, testing
+   it, and removing the workaround remain work here, and the state alone does
+   not mean the problem is fixed here.
+4. **Upstream route unavailable:** the project does not answer, declines, or
+   forbids the contribution; the overview records the dated evidence and the
+   remedy chosen here.
+
+A defect with its own issue keeps `Status: Blocked` on it, and the issue is
+closed as not planned while nothing here waits on it; the overview says how it
+would be reopened. Keep an issue with actionable work here open.
+
+Reports and bounded fixes to dependencies are part of the maintainers' work,
+within each project's contribution rules: read its contributing guide, code of
+conduct, templates, and any policy on agent contributions first, and record what
+applies in the overview. Where it is not known whether a project accepts reports
+written by agents, send one report that invites the maintainers to say if they
+want no more, and send nothing further until a maintainer's answer shows they
+accept them. The first report to micromark, micromark/micromark#252, waits for
+such an answer, so nothing more goes to micromark until one comes. Check it and
+micromark/micromark#253 at the start of each maintenance session, check the
+other entries' upstream state before a release they affect, and log each check
+in #330.
 
 ## Keeping the repository consistent
 
@@ -56,8 +80,12 @@ Known couplings:
   link to rather than repeat.
 - Labels: `.github/labels.json`, GitHub, the issue templates,
   `.github/dependabot.yml`, and the policy below.
-- Branch and tag policy: `.github/rulesets/`, GitHub's settings, and the job
-  names in `ci.yml`.
+- Branch and tag policy: `.github/rulesets/`, GitHub's settings, the job names
+  in `ci.yml`, and `scripts/release-evidence.mjs`, which reads the required
+  checks from the ruleset for `main`.
+- Renderer-sensitive paths: the `pull_request` paths of `rendering.yml` and
+  `obsidian.yml`, which are alike apart from each check's own files, and the map
+  of what the checks prove in CONTRIBUTING.md.
 - Versions and requirements: `package.json`, the lockfile, the installation
   commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
   and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
@@ -76,6 +104,15 @@ Known couplings:
   the documents that `scripts/rendering.mjs` generates for the `obsidian`
   syntax; and its description in CONTRIBUTING.md. Test in Docker, as this check
   does, not in a profile of an installed application.
+
+`docs.test.ts` and `metadata.test.ts` compare the mechanically comparable
+couplings offline in CI. `npm run check:live` compares the live ones without
+changing anything: GitHub's labels, rulesets, About description, topics,
+homepage, and the settings listed here and in RELEASING.md, the newest release
+with npm's `latest` and its assets, and the commit the deployed site was built
+from. It needs an administrator's `gh` login; run it at the start of
+maintenance, after changing a setting, and after each release. Prose still needs
+reading for its meaning.
 
 Drift found along the way is a defect. Correct it in the same PR when it lies in
 what the PR already changes; otherwise file an issue rather than widening the
@@ -115,16 +152,22 @@ not replace explanatory comments or links to PRs.
 
 - Every item has one `Type:` label and at most one `Status:` label, for its
   current disposition or next action. A feature's implementation PR uses
-  `Type: Feature Request`. There are no priority labels, and assignees,
-  milestones, and projects are not used.
+  `Type: Feature Request`. There are no priority labels; milestones and projects
+  are not used, and only a request for the owner has an assignee.
 - New items carry only a type until an assigned agent reviews them.
   `Status: Confirmed` means a reproduced defect or an accepted request within
   scope.
 - `Status: Needs Information` states the evidence needed; `Status: Blocked`
-  links the external dependency and the condition that unblocks it, and stays on
-  an upstream defect that is closed while parked (see [Upstream
-  defects](#upstream-defects)); `Status: Can't Reproduce` follows a documented
-  attempt with version, input, and result.
+  links the dependency, decision, or other condition that the item waits for and
+  what unblocks it, and stays on an upstream defect that is closed while parked
+  (see [Upstream defects](#upstream-defects)); `Status: Can't Reproduce` follows
+  a documented attempt with version, input, and result.
+- `Needs: Owner` marks a request that only the repository owner can answer: a
+  change of direction or scope, or a step that needs their identity, sign-in, or
+  second factor, such as npm account settings. `Needs: Human` marks an
+  observation or action that any suitable person could provide and no check can.
+  Use only the more specific of the two; either can stand with
+  `Status: Blocked`. See [Requests for people](#requests-for-people).
 - A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
   item explains the decision and keeps `Status: Won't Do`, and can be
   reconsidered with new evidence. On reopening, replace the old disposition.
@@ -136,6 +179,58 @@ not replace explanatory comments or links to PRs.
 In an issue or PR's own body, comments, or reviews, call it "this issue" or
 "this PR" rather than linking it, which GitHub shows as a self-reference. Keep
 links to other issues and PRs.
+
+## Requests for people
+
+The maintaining agents own verification as well as the code. The repository
+owner is not a routine tester, reviewer, or release engineer, and nothing waits
+for them to try a change. Ask a person only for what no check can provide: the
+owner's decision on direction or scope, a step that needs their identity or
+access, or an observation that no test, container, or API can make.
+
+Make such a request an issue, or reuse the issue that already owns the question,
+so that it can be answered on GitHub without a checkout or a conversation. State
+what is needed, why an agent cannot provide it, the recommendation or the
+choices, what result to expect, and which work waits for it. A request for an
+observation names the build, supplies synthetic inputs, gives numbered steps and
+the expected outcome, and lists what to report. Label it `Needs: Owner` or
+`Needs: Human`, assign an owner-only request to the owner, and give the work it
+blocks `Status: Blocked` with a link; optional feedback blocks nothing. Keep
+private details out of the issue. Record an answer given elsewhere in the issue,
+act on it, and update its labels and the items it unblocks. A request that comes
+back is a gap in the checks: improve them rather than asking again.
+
+## Review and verification
+
+Every change gets its tests and CI, then the author's review of the complete
+diff after the checks pass, trying inputs that the tests do not cover. Beyond
+that, the maintainer decides whether a separate agent with fresh context reviews
+it, by its sensitivity, complexity, effect, and uncertainty, and records the
+choice:
+
+- Changes to the semantic guard, the edit engine, parsing, file writes,
+  packaging, the release or Pages workflows, or repository settings usually
+  warrant an independent review; a small diff can too. Ordinary, well-understood
+  changes can rest on the author's review.
+- A release PR normally gets an in-depth independent review by a model with
+  stronger reasoning suited to the work, of the changes since the previous
+  release, unresolved defects, the evidence, compatibility, packaging,
+  documentation, and installation and updates, not just the version. Record the
+  reason when one is left out.
+- The same model or provider may review; prefer a different provider for
+  important releases and particularly sensitive work. Name the reviewed commit
+  and scope. Address every finding; a material fix or a disputed finding gets a
+  follow-up review that includes what changed since.
+- The review apps described below supplement these reviews and do not replace
+  them; their quotas do not decide whether a change was reviewed enough.
+
+A PR's verification section records the commands and their results, the
+platforms tested, the runs of the real-renderer checks when its changes trigger
+them, what the evidence cannot show, and the review it got. CONTRIBUTING.md's
+map of [what the checks prove](./CONTRIBUTING.md#what-the-checks-prove) says
+which checks back which promise and when the expensive ones run. Investigate a
+failing or intermittent check and fix the product or the check; do not rerun it
+until it passes, and do not widen a limit without understanding the failure.
 
 ## Project scope
 
@@ -216,14 +311,14 @@ requires branches to be up to date, so after each merge the other open PRs need
 fast-forward the local `main` before new work, and prune stale tracking refs and
 local task branches.
 
-`.github/rulesets/` records the policies for `main` and version tags; keep it
-and GitHub's settings in sync. The required checks bind to three
-`verify (OS, NODE)` job names in `ci.yml`, where `NODE` is the matrix's major
-version label rather than its exact `node-version`, and to GitHub Actions, app
-15368, so renaming one of those jobs needs a ruleset update. The Node.js 26 job
-is not required. Zero required approvals is deliberate for a single-account,
-agent-maintained repository; PRs, passing checks, and resolved review threads
-remain mandatory.
+`.github/rulesets/` records the policies for `main`, for version tags, and for
+the `site-*` branches that correct the current release's site; keep it and
+GitHub's settings in sync. The required checks bind to three `verify (OS, NODE)`
+job names in `ci.yml`, where `NODE` is the matrix's major version label rather
+than its exact `node-version`, and to GitHub Actions, app 15368, so renaming one
+of those jobs needs a ruleset update. The Node.js 26 job is not required. Zero
+required approvals is deliberate for a single-account, agent-maintained
+repository; PRs, passing checks, and resolved review threads remain mandatory.
 
 Other repository settings, each recorded here with its reason when it changes:
 
@@ -328,14 +423,18 @@ it helps.
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for
   every PR, and the Pages workflow deploys it from the newest stable release's
-  tag. Do not commit its cache or output. VitePress 2 is pinned to an alpha to
-  avoid the Vite 5 vulnerabilities of the stable line.
+  tag, or from a `site-VERSION` branch of corrections to that release's
+  documentation (RELEASING.md). Do not commit its cache or output. VitePress 2
+  is pinned to an alpha to avoid the Vite 5 vulnerabilities of the stable line.
 
 ## Releases
 
 Follow [RELEASING.md](./RELEASING.md). Agents publish a release once it is
-ready, without asking: the owner authorized every release on 2026-10-18. Never
-rerun publication for an existing version or tag, and never store an npm token
-in GitHub. For each release, check the GitHub publication settings, the
-workflow's result, and the registry provenance; the npm settings are the
-maintainer's to check when they change.
+ready, without asking: the owner authorized every release on 2026-10-18. A
+release is ready when its PR has merged after its review; the Release workflow
+then publishes only if CI passed on the commit it releases and GitHub's and
+Obsidian's rendering of the fixed documents agree before and after formatting at
+that commit. Never rerun publication for an existing version or tag, and never
+store an npm token in GitHub. For each release, check the GitHub publication
+settings, the workflow's result, and the registry provenance; the npm settings
+are the maintainer's to check when they change.

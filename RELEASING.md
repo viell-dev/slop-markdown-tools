@@ -28,8 +28,11 @@ On a branch, in one pull request:
    maintainers (`npm view NAME time maintainers`).
 5. Run the checks below, push, and wait for CI.
 
-Review and merge it like any other pull request. Merging publishes nothing and
-leaves the documentation site as it is.
+The pull request normally gets an independent review by a model with stronger
+reasoning, of everything since the previous release, as AGENTS.md describes: the
+changes, unresolved defects, the evidence, compatibility, packaging,
+documentation, and installation. Merge it like any other pull request. Merging
+publishes nothing and leaves the documentation site as it is.
 
 ## Prepare without publishing
 
@@ -50,8 +53,10 @@ starting with `./`, because `artifacts/name.tgz` can be read as a GitHub
 package.
 
 The **Release** workflow, dispatched with `publish` left false, does the same on
-GitHub, adds an audit of the runtime dependencies, and keeps the artifact for 14
-days.
+GitHub after the checks that come before publication, described below, adds an
+audit of the runtime dependencies, warns when the version or its tag already
+exists, and keeps the artifact for 14 days. It publishes nothing, and the Pages
+workflow that follows it leaves the site as it is.
 
 ## Publication prerequisites
 
@@ -90,12 +95,28 @@ ten trusted publishers per package, and each of them can publish.
 
 Merge the release pull request after its checks pass, and review the version,
 the changelog section, and the package manifest once more. Then dispatch
-**Release** on `main` with the exact version and `publish: true`. The workflow
-builds and checks the package again, verifies the artifact's checksum, publishes
-the tested tarball with provenance under `publishConfig.tag`, which it checks
-against the version, and creates the GitHub release at the workflow's commit,
-with the tarball and checksum attached and the changelog section as its notes.
-Tags are exact versions without a `v` prefix.
+**Release** on `main` with the exact version and `publish: true`.
+
+Before it builds anything, the workflow checks the evidence for its commit, and
+any failure publishes nothing:
+
+- CI passed on that exact commit: the three checks that the ruleset for `main`
+  requires and unit coverage (`scripts/release-evidence.mjs`). It waits up to 40
+  minutes for CI that is still running, so it can be dispatched right after the
+  merge.
+- The Rendering and Obsidian workflows find no difference in GitHub's or
+  Obsidian's rendering before and after formatting at that commit. A release
+  compares only fixed documents, the Rendering check's fixed seeds and the
+  Obsidian check's fixtures, so that its result depends only on the commit and
+  the renderers; the random documents of the pull request runs look for new
+  differences, which get issues.
+- The version and its tag are unused.
+
+The workflow then builds and checks the package again, verifies the artifact's
+checksum, publishes the tested tarball with provenance under
+`publishConfig.tag`, which it checks against the version, and creates the GitHub
+release at the workflow's commit, with the tarball and checksum attached and the
+changelog section as its notes. Tags are exact versions without a `v` prefix.
 
 A last job, with read-only access, then checks the publication: the registry's
 `integrity` and `shasum` must match the tested tarball, and the version's
@@ -128,6 +149,34 @@ npm dist-tag ls mdrefine
 Then install the package into a fresh project with an empty cache and run
 `npm audit signatures` there, which verifies the signatures of the registry and
 of the provenance; the workflow's check only reads what the provenance names.
-Check the GitHub release and its assets, the result of the publication check,
-and, for a stable version, the documentation site. Work after the release
-continues through pull requests.
+Check the GitHub release and its assets and the result of the publication check.
+For a stable version, once the Pages workflow has deployed the site, run
+`npm run check:live`, which compares the newest release, npm's `latest`, the
+release's assets, and the site's `version.json` with each other and GitHub's
+settings with the repository. Work after the release continues through pull
+requests.
+
+## Correct the site of the current release
+
+The site describes the newest stable release, so a mistake in its documentation
+cannot wait for the next version, and deploying `main` would describe changes
+that are not released. Correct it without a new version or a moved tag:
+
+1. Fix the documentation on `main` through a pull request, as usual.
+2. If the release has no `site-VERSION` branch yet, create one at its tag:
+   `git push origin refs/tags/VERSION:refs/heads/site-VERSION`. The ruleset for
+   `site-*` branches accepts it because CI passed on the tag's commit, and
+   requires pull requests, CI, and resolved threads from then on, as on `main`.
+3. Open a pull request into `site-VERSION` that applies only the documentation
+   part of the fix, usually by cherry-picking it, and changes nothing outside
+   `docs/`. Its CI checks the pages against that release's code. Merge it.
+4. Dispatch **Pages** on `main` with `tag` set to the version and `ref` set to
+   `site-VERSION`. The workflow refuses a tag that is not the newest stable
+   release, and a branch that does not descend from the tag or that changes
+   anything outside `docs/`. It checks the Markdown, builds the site, and writes
+   `version.json` with the version, the tag's commit, and the commit it built.
+5. Run `npm run check:live` to confirm what is deployed.
+
+The package and its tag stay as they were published; the corrections ship in the
+next version from `main`. The next stable release deploys its own tag, which
+replaces the corrected site.

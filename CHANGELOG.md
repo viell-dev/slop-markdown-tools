@@ -10,6 +10,16 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Changed
+
+- A release is published only after CI has passed on its exact commit and
+  GitHub's and Obsidian's rendering of fixed documents is unchanged by
+  formatting at that commit. Pull requests that change parsing, rules, presets,
+  or dependencies run both renderer comparisons. The documentation site records
+  the release and commit it was built from in `version.json`, and the current
+  release's site can be corrected from a `site-VERSION` branch without a new
+  version ([#485](https://github.com/viell-dev/slop-markdown-tools/issues/485)).
+
 ### Fixed
 
 - The README's opening description and repository About/topics include
