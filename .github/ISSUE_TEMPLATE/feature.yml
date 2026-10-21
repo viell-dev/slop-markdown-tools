@@ -35,6 +35,7 @@ body:
         - Forgejo or Codeberg
         - Gitea
         - Obsidian
+        - VitePress 2
     validations:
       required: true
   - type: textarea

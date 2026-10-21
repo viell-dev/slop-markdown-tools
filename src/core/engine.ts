@@ -547,8 +547,16 @@ function semanticTree(
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
     // A target that is uncertain, because a directory could not be read, is not
     // an identity: only the same spelling is known to name the same note.
-    return resolution?.status === "resolved" && !resolution.unreadable
-      ? `${resolution.target}#${resolution.fragment ?? ""}`
+    return resolution?.status === "resolved" &&
+      typeof resolution.target === "string" &&
+      !resolution.unreadable
+      ? {
+          fragment: resolution.fragment ?? "",
+          ...(document.dialect === "vitepress"
+            ? { query: /\?[^#]*/.exec(url.split("#", 1)[0]!)?.[0] ?? "" }
+            : {}),
+          target: resolution.target,
+        }
       : url;
   };
   // Keys are emitted in sorted order so the JSON text is canonical without a replacer.
@@ -586,7 +594,9 @@ function semanticTree(
           /^\[!([\w-]+)\]/,
           (_, marker: string) => `[!${marker.toLowerCase()}]`,
         );
-        result.calloutTitle = normalize(parse(title, document.dialect, document.path).tree);
+        result.calloutTitle = normalize(
+          parse(title, document.dialect, document.path, [], document.vitepress).tree,
+        );
       }
     }
     for (const key of Object.keys(node).sort()) {

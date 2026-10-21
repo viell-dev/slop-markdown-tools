@@ -43,6 +43,11 @@ The comparison is only as good as the parser's reading:
   workflow does the same with GitHub's renderer, and a check started by hand
   compares Obsidian's Live Preview and Reading view, with Obsidian running in
   Docker. Each difference found is tracked as an issue.
+- The VitePress dialect also compares a synchronous markdown-it reading,
+  including container boundaries, attributes, and Vue-sensitive whitespace.
+  Actual VitePress rendering and Vue SSR are test references. The portable guard
+  does not evaluate Vue, MathJax, or site configuration; its [options and
+  limits](vitepress.md) define the modeled renderer.
 - It reads the document in its dialect, so it cannot notice that the dialect is
   wrong. In CommonMark a table is an ordinary paragraph, and joining its lines
   changes nothing that CommonMark sees. This is why the tool [assumes a

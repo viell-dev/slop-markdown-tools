@@ -44,6 +44,9 @@ function formatted(source: string, options: ProcessOptions = {}) {
   expect(format(result.output, options).output).toBe(result.output);
   return result.output;
 }
+// VitePress uses gray-matter boundaries, tested with its actual renderer.
+const frontMatterDialects = dialects.filter((dialect) => dialect !== "vitepress");
+
 describe("formatting contracts", () => {
   it("orders diagnostic ties by UTF-16 rule IDs on every host", () => {
     const names = ["z", "a", "Z", "ä", "A", "😀"];
@@ -550,23 +553,26 @@ describe("front matter that would end inside a code block", () => {
     result.diagnostics
       .filter((item) => item.rule === "engine/unsafe-format")
       .map((item) => item.message);
-  it.each(dialects)("reads the code block, not front matter, in the %s dialect", (dialect) => {
-    for (const newline of ["\n", "\r\n", "\r"])
-      for (const [source, code] of [
-        [yaml, "a\n---\n___"],
-        [tildes, "---\n***"],
-        [toml, "+++\n***"],
-        // A fence indented by up to three spaces opens a code block too.
-        [`---\nkey: |\n  ${fence}js\n---\n___\n  ${fence}\n`, "---\n___"],
-      ] as const) {
-        const { children } = parse(source.replaceAll("\n", newline), dialect).tree;
-        expect(children.map((node) => node.type)).not.toContain("yaml");
-        expect(children.map((node) => node.type)).not.toContain("toml");
-        const block = children.find((node) => node.type === "code");
-        expect(block && "value" in block && block.value.replaceAll(newline, "\n")).toBe(code);
-      }
-  });
-  it.each(dialects)(
+  it.each(frontMatterDialects)(
+    "reads the code block, not front matter, in the %s dialect",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const [source, code] of [
+          [yaml, "a\n---\n___"],
+          [tildes, "---\n***"],
+          [toml, "+++\n***"],
+          // A fence indented by up to three spaces opens a code block too.
+          [`---\nkey: |\n  ${fence}js\n---\n___\n  ${fence}\n`, "---\n___"],
+        ] as const) {
+          const { children } = parse(source.replaceAll("\n", newline), dialect).tree;
+          expect(children.map((node) => node.type)).not.toContain("yaml");
+          expect(children.map((node) => node.type)).not.toContain("toml");
+          const block = children.find((node) => node.type === "code");
+          expect(block && "value" in block && block.value.replaceAll(newline, "\n")).toBe(code);
+        }
+    },
+  );
+  it.each(frontMatterDialects)(
     "keeps the code and the front matter as written with the recommended preset in the %s dialect",
     (dialect) => {
       // `style/thematic-break` used to change the code's `___` and `***`, and
@@ -591,7 +597,7 @@ describe("front matter that would end inside a code block", () => {
       ]);
     },
   );
-  it.each(dialects)(
+  it.each(frontMatterDialects)(
     "reads an HTML block or display math, not front matter, in the %s dialect",
     (dialect) => {
       // A line that opens an HTML block or display math is valid YAML, but
@@ -611,7 +617,7 @@ describe("front matter that would end inside a code block", () => {
       }
     },
   );
-  it.each(dialects)("still reads other front matter in the %s dialect", (dialect) => {
+  it.each(frontMatterDialects)("still reads other front matter in the %s dialect", (dialect) => {
     for (const [source, output] of [
       ["---\ntitle: x\n---\n\nText *a*.\n\n***\n", "---\ntitle: x\n---\n\nText _a_.\n\n---\n"],
       ["+++\ntitle = 'x'\n+++\n\nText *a*.\n", "+++\ntitle = 'x'\n+++\n\nText _a_.\n"],
@@ -650,36 +656,42 @@ describe("a first line that opens no front matter", () => {
     },
     workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
   });
-  it.each(dialects)("reads the lists and block quotes below it in the %s dialect", (dialect) => {
-    const mark = String.fromCharCode(0xfeff);
-    for (const newline of ["\n", "\r\n", "\r"])
-      for (const before of ["", mark])
+  it.each(frontMatterDialects)(
+    "reads the lists and block quotes below it in the %s dialect",
+    (dialect) => {
+      const mark = String.fromCharCode(0xfeff);
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const before of ["", mark])
+          for (const [source, children] of [
+            ["---\n- One\n- Two\n", ["thematicBreak", "list"]],
+            ["---\n\n> Quote\n", ["thematicBreak", "blockquote"]],
+            ["---\ntitle: a\n\n* b\n", ["thematicBreak", "paragraph", "list"]],
+            ["+++\nx = 1\n\n- item\n", ["paragraph", "list"]],
+            // Spaces or tabs after the fence still let it open front matter.
+            ["---  \n1. One\n", ["thematicBreak", "list"]],
+            ["+++\t\n> Quote", ["paragraph", "blockquote"]],
+            // A longer fence, an indented one, or the other one closes nothing.
+            ["---\n- a\n----\n", ["thematicBreak", "list", "thematicBreak"]],
+            ["---\n- a\n ---\n", ["thematicBreak", "list", "thematicBreak"]],
+            ["+++\n- a\n---\n", ["paragraph", "list", "thematicBreak"]],
+          ] as const)
+            expect(types(before + source.replaceAll("\n", newline), dialect)).toEqual(children);
+    },
+  );
+  it.each(frontMatterDialects)(
+    "still reads front matter that a line closes in the %s dialect",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n", "\r"])
         for (const [source, children] of [
-          ["---\n- One\n- Two\n", ["thematicBreak", "list"]],
-          ["---\n\n> Quote\n", ["thematicBreak", "blockquote"]],
-          ["---\ntitle: a\n\n* b\n", ["thematicBreak", "paragraph", "list"]],
-          ["+++\nx = 1\n\n- item\n", ["paragraph", "list"]],
-          // Spaces or tabs after the fence still let it open front matter.
-          ["---  \n1. One\n", ["thematicBreak", "list"]],
-          ["+++\t\n> Quote", ["paragraph", "blockquote"]],
-          // A longer fence, an indented one, or the other one closes nothing.
-          ["---\n- a\n----\n", ["thematicBreak", "list", "thematicBreak"]],
-          ["---\n- a\n ---\n", ["thematicBreak", "list", "thematicBreak"]],
-          ["+++\n- a\n---\n", ["paragraph", "list", "thematicBreak"]],
+          ["---\n---\n* b\n", ["yaml", "list"]],
+          ["---  \ntitle: a\n---\t\n* b\n", ["yaml", "list"]],
+          ["+++\nx = 1\n+++", ["toml"]],
+          ["---\n- a\n---", ["yaml"]],
         ] as const)
-          expect(types(before + source.replaceAll("\n", newline), dialect)).toEqual(children);
-  });
-  it.each(dialects)("still reads front matter that a line closes in the %s dialect", (dialect) => {
-    for (const newline of ["\n", "\r\n", "\r"])
-      for (const [source, children] of [
-        ["---\n---\n* b\n", ["yaml", "list"]],
-        ["---  \ntitle: a\n---\t\n* b\n", ["yaml", "list"]],
-        ["+++\nx = 1\n+++", ["toml"]],
-        ["---\n- a\n---", ["yaml"]],
-      ] as const)
-        expect(types(source.replaceAll("\n", newline), dialect)).toEqual(children);
-  });
-  it.each(dialects)(
+          expect(types(source.replaceAll("\n", newline), dialect)).toEqual(children);
+    },
+  );
+  it.each(frontMatterDialects)(
     "keeps the lists and block quotes below it with the recommended preset in the %s dialect",
     (dialect) => {
       for (const [source, output] of [
@@ -693,28 +705,31 @@ describe("a first line that opens no front matter", () => {
         );
     },
   );
-  it.each(dialects)("writes no line of --- alone below it in the %s dialect", (dialect) => {
-    // Live Preview shows all of an unclosed YAML document as source (#404).
-    if (dialect === "obsidian") {
-      const source = "---\n\nText *a*.\n\n***\n\n___\n";
-      expect(formatted(source, preset(dialect))).toBe(source);
-      return;
-    }
-    // Such a line would close the front matter, and the safety check refused
-    // every edit of the rule that wrote it.
-    expect(formatted("---\n\nText *a*.\n\n***\n\n___\n", preset(dialect))).toBe(
-      "---\n\nText _a_.\n\n***\n\n___\n",
-    );
-    const setext = preset(dialect, { "style/heading": ["warn", { style: "setext" }] });
-    expect(formatted("---\n\n## Foo\n\nText.\n", setext)).toBe("---\n\nFoo\n----\n\nText.\n");
-    // A break that is not at the start of its line closes nothing, and `---`
-    // does not close front matter that `+++` opens.
-    expect(formatted("---\n\n> ***\n", preset(dialect))).toBe("---\n\n> ---\n");
-    expect(formatted("+++\n\n***\n", preset(dialect))).toBe("+++\n\n---\n");
-    // The first line itself takes the configured marker.
-    const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
-    expect(formatted("---\n\nText.\n", stars)).toBe("***\n\nText.\n");
-  });
+  it.each(frontMatterDialects)(
+    "writes no line of --- alone below it in the %s dialect",
+    (dialect) => {
+      // Live Preview shows all of an unclosed YAML document as source (#404).
+      if (dialect === "obsidian") {
+        const source = "---\n\nText *a*.\n\n***\n\n___\n";
+        expect(formatted(source, preset(dialect))).toBe(source);
+        return;
+      }
+      // Such a line would close the front matter, and the safety check refused
+      // every edit of the rule that wrote it.
+      expect(formatted("---\n\nText *a*.\n\n***\n\n___\n", preset(dialect))).toBe(
+        "---\n\nText _a_.\n\n***\n\n___\n",
+      );
+      const setext = preset(dialect, { "style/heading": ["warn", { style: "setext" }] });
+      expect(formatted("---\n\n## Foo\n\nText.\n", setext)).toBe("---\n\nFoo\n----\n\nText.\n");
+      // A break that is not at the start of its line closes nothing, and `---`
+      // does not close front matter that `+++` opens.
+      expect(formatted("---\n\n> ***\n", preset(dialect))).toBe("---\n\n> ---\n");
+      expect(formatted("+++\n\n***\n", preset(dialect))).toBe("+++\n\n---\n");
+      // The first line itself takes the configured marker.
+      const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
+      expect(formatted("---\n\nText.\n", stars)).toBe("***\n\nText.\n");
+    },
+  );
 });
 
 describe("unclosed YAML front matter in Obsidian", () => {
@@ -1955,7 +1970,7 @@ describe("the block directly below TOML front matter", () => {
     },
     workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
   });
-  it.each(dialects)(
+  it.each(frontMatterDialects)(
     "compares the reading without the front matter in the %s dialect",
     (dialect) => {
       for (const newline of ["\n", "\r\n", "\r"]) {
@@ -1971,7 +1986,7 @@ describe("the block directly below TOML front matter", () => {
       }
     },
   );
-  it.each(dialects)(
+  it.each(frontMatterDialects)(
     "leaves a block that would join the front matter as written in the %s dialect",
     (dialect) => {
       const mark = String.fromCharCode(0xfeff);
@@ -2003,7 +2018,7 @@ describe("the block directly below TOML front matter", () => {
         }
     },
   );
-  it.each(dialects)(
+  it.each(frontMatterDialects)(
     "keeps a paragraph-ending empty marker above a misread list in the %s dialect (#426)",
     (dialect) => {
       for (const newline of ["\n", "\r\n", "\r"])
@@ -2018,20 +2033,23 @@ describe("the block directly below TOML front matter", () => {
         }
     },
   );
-  it.each(dialects)("still formats what renderers read alike in the %s dialect", (dialect) => {
-    const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
-    const cases: [string, string, ProcessOptions?][] = [
-      ["\n* * *\n", "\n---\n"],
-      ["___\n", "***\n", stars],
-      ["# Head #\n", "# Head\n"],
-      ["Text *a*\n", "Text _a_\n"],
-      ["* a\n+ b\n", "- a\n\n* b\n"],
-      ["1) a\n1) b\n", "1. a\n1. b\n"],
-      ["~~~\ncode\n~~~\n", "```\ncode\n```\n"],
-    ];
-    for (const [block, output, options = preset(dialect)] of cases)
-      expect(formatted(matter + block, options)).toBe(matter + output);
-  });
+  it.each(frontMatterDialects)(
+    "still formats what renderers read alike in the %s dialect",
+    (dialect) => {
+      const stars = preset(dialect, { "style/thematic-break": ["warn", { marker: "***" }] });
+      const cases: [string, string, ProcessOptions?][] = [
+        ["\n* * *\n", "\n---\n"],
+        ["___\n", "***\n", stars],
+        ["# Head #\n", "# Head\n"],
+        ["Text *a*\n", "Text _a_\n"],
+        ["* a\n+ b\n", "- a\n\n* b\n"],
+        ["1) a\n1) b\n", "1. a\n1. b\n"],
+        ["~~~\ncode\n~~~\n", "```\ncode\n```\n"],
+      ];
+      for (const [block, output, options = preset(dialect)] of cases)
+        expect(formatted(matter + block, options)).toBe(matter + output);
+    },
+  );
   it("places a refusal where the reading with the front matter first differs", () => {
     // A change of meaning below the front matter changes both readings.
     const plugin: Plugin = {
@@ -2887,7 +2905,7 @@ describe("configuration and plugins", () => {
     [{ extends: ["github", 5] }, '"extends[1]" must be a preset name, not 5'],
     [
       { dialect: "markdown" },
-      '"dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", or "obsidian", not "markdown"',
+      '"dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian", or "vitepress", not "markdown"',
     ],
     [{ rules: [] }, '"rules" must be an object of rule IDs and their settings, not a list'],
     [

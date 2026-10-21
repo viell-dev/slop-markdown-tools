@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { Dialect, LinkResolution } from "../core/types.js";
 import type { TargetIndex } from "./targets.js";
+import { vitepressPage } from "../syntax/vitepress/paths.js";
 
 export function splitDestination(destination: string): { path: string; fragment: string } {
   const hash = destination.indexOf("#");
@@ -44,8 +45,24 @@ export function resolveLink(
     return { status: "external" };
   source = source.replaceAll("\\", "/");
   const parts = splitDestination(destination);
+  if (dialect === "vitepress") {
+    parts.path = parts.path.split("?", 1)[0]!;
+    const at = destination.indexOf("#");
+    if (at >= 0) {
+      const raw = destination.slice(at + 1);
+      try {
+        parts.fragment = decodeURI(raw);
+      } catch {
+        parts.fragment = raw;
+      }
+    }
+  }
   const targetPath = parts.path;
-  if (dialect !== "obsidian" && (targetPath.startsWith("/") || targetPath.includes("?")))
+  if (
+    dialect !== "obsidian" &&
+    dialect !== "vitepress" &&
+    (targetPath.startsWith("/") || targetPath.includes("?"))
+  )
     return { status: "unavailable" };
   const candidates = new Set<string>();
   let ambiguous = false;
@@ -118,7 +135,22 @@ export function resolveLink(
     }
   };
   if (!targetPath) add(source);
-  else if (dialect === "obsidian") {
+  else if (dialect === "vitepress") {
+    const rooted = targetPath.startsWith("/");
+    const directory = rooted ? index.vitepressRoot(source) : path.posix.dirname(source);
+    const candidate = path.posix.join(directory, targetPath.replace(/^\//, ""));
+    const extension = path.posix.extname(targetPath);
+    if (targetPath.endsWith("/")) add(path.posix.join(candidate, "index.md"));
+    else if (extension === ".md") add(candidate);
+    else if (vitepressPage(targetPath)) {
+      const page = extension === ".html" ? candidate.slice(0, -5) : candidate;
+      add(page + ".md");
+      if (!candidates.size && !blocking.size && leaves === undefined)
+        add(path.posix.join(page, "index.md"));
+    } else if (rooted && extension !== ".md")
+      add(path.posix.join(index.vitepressRoot(source), "public", targetPath.slice(1)));
+    else add(candidate);
+  } else if (dialect === "obsidian") {
     if (/^\.{1,2}\//.test(targetPath)) add(path.posix.join(path.posix.dirname(source), targetPath));
     else {
       const rooted = targetPath.replace(/^\//, "");

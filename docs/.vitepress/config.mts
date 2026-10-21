@@ -11,7 +11,7 @@ export default defineConfig({
   },
   title: "mdrefine",
   description:
-    "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, and Obsidian.",
+    "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, Obsidian, and VitePress.",
   lang: "en",
   base: "/slop-markdown-tools/",
   head: [["meta", { name: "theme-color", content: "#12776c" }]],
@@ -58,6 +58,7 @@ export default defineConfig({
           { text: "Configuration", link: "/configuration" },
           { text: "Rules", link: "/rules" },
           { text: "Dialects", link: "/dialects" },
+          { text: "VitePress", link: "/vitepress" },
           { text: "Library API", link: "/api" },
           { text: "Plugins", link: "/plugins" },
         ],

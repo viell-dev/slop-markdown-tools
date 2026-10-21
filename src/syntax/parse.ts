@@ -24,7 +24,7 @@ import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import { gfmTaskListItemFromMarkdown } from "mdast-util-gfm-task-list-item";
 import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
 import { gfmAutolinkLiteralFromMarkdown } from "mdast-util-gfm-autolink-literal";
-import { projectVitePress, recordVitePress } from "./vitepress/projection.js";
+import { projectVitePress, recordVitePress, vitepressCodeText } from "./vitepress/projection.js";
 
 // GFM's tree transform performs GitHub's second, transform-time autolink pass
 // (`[www.example.com]` or a Forgejo shortlink's `|https://` in files), but its
@@ -126,6 +126,8 @@ function codeSpanRecording(): { syntax: SyntaxExtension; tree: TreeExtension } {
  * `parse` did not make is read as if its value were all of its content.
  */
 export function codeSpanText(node: InlineCode): string {
+  const vitepress = vitepressCodeText(node);
+  if (vitepress !== undefined) return vitepress;
   const { padding = [], lazy = {} } = codeSpanSources.get(node) ?? {};
   let line = node.position?.start.line ?? 0;
   const content = `${padding[0] ?? ""}${node.value}${padding[1] ?? ""}`.replace(
@@ -341,7 +343,7 @@ export function parse(
   };
   const result = tree(!unclosedFrontMatter(source));
   if (projection) {
-    recordVitePress(result, projection);
+    recordVitePress(result, projection, source);
     return { source, dialect: read, path, tree: result, vitepress };
   }
   // The tree's types know YAML front matter only; the parser also reads TOML.

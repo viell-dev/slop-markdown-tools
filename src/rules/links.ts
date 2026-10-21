@@ -7,6 +7,7 @@ import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { splitDestination } from "../workspace/index.js";
 import { giteaPyLine } from "./protections.js";
 import { optionsSchema } from "./shared.js";
+import { skipVitePressLink } from "../syntax/vitepress/links.js";
 
 /**
  * What Gitea's `_.py` emphasis exception can see of a link destination: whether
@@ -284,7 +285,7 @@ export const linkRules: Record<string, Rule> = {
       // definition; undefined references stay plain text.
       walk(document.tree, (node) => {
         const url = destination(node);
-        if (url === undefined || !workspace) return;
+        if (url === undefined || !workspace || skipVitePressLink(document, node)) return;
         const result = workspace.resolve(
           document.path,
           url,
@@ -321,7 +322,9 @@ export const linkRules: Record<string, Rule> = {
                 ? `Local target could not be checked: ${url} (${result.leavesRoot} leads outside the workspace root, which the tool does not read).`
                 : result.target === undefined
                   ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
-                  : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
+                  : document.dialect === "vitepress"
+                    ? `Fragment could not be checked: ${url} (${result.target} or its included or renderer-dependent text could not be read or fully checked).`
+                    : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
           });
         } else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });
@@ -344,7 +347,7 @@ export const linkRules: Record<string, Rule> = {
       let inCell: Set<Nodes> | undefined;
       walk(document.tree, (node) => {
         const url = destination(node);
-        if (url === undefined || !workspace) return;
+        if (url === undefined || !workspace || skipVitePressLink(document, node, true)) return;
         const result = workspace.resolve(
           document.path,
           url,
@@ -534,7 +537,7 @@ export const linkRules: Record<string, Rule> = {
           replacement = `[[${target}${pipe()}${label}]]`;
         }
         const url = destination(node);
-        if (!replacement || url === undefined) return;
+        if (!replacement || url === undefined || skipVitePressLink(document, node, true)) return;
         const result = workspace.resolve(
           document.path,
           url,

@@ -5,6 +5,6 @@ artifacts/
 .npm-cache/
 *.tgz
 *.tsbuildinfo
-docs/.vitepress/cache/
-docs/.vitepress/.temp/
-docs/.vitepress/*.timestamp-*.mjs
+**/.vitepress/cache/
+**/.vitepress/.temp/
+**/.vitepress/*.timestamp-*.mjs

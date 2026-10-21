@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- A `vitepress` dialect and preset for VitePress 2, with explicit renderer
+  options, preservation of attributes and Vue-sensitive whitespace, and static
+  page, asset, heading, and include-aware link checks
+  ([#430](https://github.com/viell-dev/slop-markdown-tools/issues/430)).
 - Opt-in `codeFormatters` route named fenced-code languages to configured
   executables in CLI `format` modes and the async `formatWithCode` Node API.
   Failures retain the affected block, report an operational error, and keep
@@ -44,6 +48,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- The semantic guard keeps a resolved filename and fragment separate, so `#`
+  inside either cannot make a rewrite to another file appear equivalent
+  ([#480](https://github.com/viell-dev/slop-markdown-tools/issues/480)).
 - Diagnostics at the same source position use the same rule ID order on every
   machine. This also stabilizes plugin edit precedence when the ranges and
   finding positions match

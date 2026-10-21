@@ -70,8 +70,9 @@ SOFTWARE.
 VitePress 2.0.0-alpha.20
 https://github.com/vuejs/vitepress
 
-The entity-restoration logic in dist/syntax/vitepress/reader.js
-(src/syntax/vitepress/reader.ts) follows restoreEntities.ts.
+The entity-restoration and alert logic in dist/syntax/vitepress/reader.js,
+and slug/region/include syntax in dist/workspace/vitepress.js (under src/
+in the repository), follow VitePress's corresponding Markdown plugins.
 
 MIT License
 

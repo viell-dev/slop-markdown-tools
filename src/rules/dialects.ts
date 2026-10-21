@@ -7,7 +7,7 @@ import { optionsSchema } from "./shared.js";
 import { lastHeadingTextLine } from "../syntax/headings.js";
 import { lineEnd } from "../syntax/source.js";
 
-const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea"]);
+const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea", "vitepress"]);
 function calloutRule(obsidian: boolean): Rule {
   return {
     description: obsidian

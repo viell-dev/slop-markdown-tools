@@ -172,8 +172,8 @@ Not reported:
 
 ## `github/alert-marker`
 
-**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`.
-Dialects: GitHub, Forgejo, Gitea. Options: none.
+**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`,
+`vitepress`. Dialects: GitHub, Forgejo, Gitea, VitePress. Options: none.
 
 Writes the type of a GitHub alert in capitals. The renderers accept any case for
 the five types `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`, and their
@@ -200,7 +200,8 @@ After:
 ## `github/task-marker`
 
 **Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`,
-`obsidian`. Dialects: all but CommonMark. Options: none.
+`obsidian`, `vitepress`. Dialects: all but CommonMark; VitePress needs task
+lists enabled. Options: none.
 
 Writes the mark of a completed task as a lowercase `x`.
 
@@ -1173,7 +1174,8 @@ A **bold** claim.
 ## `style/table`
 
 **Style rule**, fixed by `format`. Presets: `recommended`, `github`, `forgejo`,
-`gitea`, `obsidian`. Dialects: all but CommonMark. Options: `style`.
+`gitea`, `obsidian`, `vitepress`. Dialects: all but CommonMark. Options:
+`style`.
 
 Aligns a table: every cell of a column is padded to the column's width, measured
 in display columns, and the delimiter row keeps each column's alignment. The

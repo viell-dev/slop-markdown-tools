@@ -381,7 +381,9 @@ function onDisk(root: string, name: string): LookupResult | undefined {
   return {
     type: "file",
     path: name,
-    source: isMarkdownName(name) ? () => (cached ??= decodeText(readFileSync(full), name)) : null,
+    // Non-Markdown text is loaded only for an explicit VitePress include;
+    // ordinary fragment checks still reject non-Markdown names before reading.
+    source: () => (cached ??= decodeText(readFileSync(full), name)),
   };
 }
 /** The workspace's record of the vault in `directory`, and of its settings file if unusable. */

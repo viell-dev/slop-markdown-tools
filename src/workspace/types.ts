@@ -1,4 +1,4 @@
-import type { Dialect } from "../core/types.js";
+import type { Dialect, VitePressOptions } from "../core/types.js";
 
 /**
  * A Markdown file's text, null for a file that is not Markdown, or a loader
@@ -32,6 +32,8 @@ export type LookupResult =
 
 /** The options of `createWorkspace`. */
 export interface WorkspaceOptions {
+  /** VitePress syntax, source-directory and anchor choices for this index. */
+  vitepress?: VitePressOptions;
   /** The dialect that link targets are parsed in; `github` when omitted. */
   dialect?: Dialect;
   /**

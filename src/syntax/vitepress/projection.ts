@@ -1,8 +1,10 @@
-import type { Root, RootContent, Nodes } from "mdast";
+import type { Root, RootContent, InlineCode } from "mdast";
 import type Token from "markdown-it/lib/token.mjs";
 import type { Document, Finding } from "../../core/types.js";
 import { lineStarts } from "../source.js";
 import { blank, frontmatterEnd, readVitePress } from "./reader.js";
+import { walk } from "../walk.js";
+import { hasVueElementGap } from "./whitespace.js";
 
 interface Projection {
   source: string;
@@ -11,6 +13,11 @@ interface Projection {
   tokens: Token[];
 }
 const readings = new WeakMap<Root, Projection>();
+const codeTexts = new WeakMap<InlineCode, string>();
+/** markdown-it keeps indentation in multiline spans that GitHub removes. */
+export function vitepressCodeText(node: InlineCode): string | undefined {
+  return codeTexts.get(node);
+}
 
 /** Keep source positions while separating VitePress's block boundaries for mdast. */
 export function projectVitePress(document: Document): Projection {
@@ -55,23 +62,18 @@ export function projectVitePress(document: Document): Projection {
       }
       if (found) protectedParts.push({ start, end, wrapOnly: true });
     }
-    if (["math_block", "vitepress_snippet", "vitepress_toc", "html_block"].includes(token.type)) {
+    if (["math_block", "vitepress_snippet", "vitepress_toc"].includes(token.type)) {
       masked.push({ start, end, literal: true });
       protectedParts.push({ start, end, wrapOnly: false });
     }
+    if (token.type === "html_block" || token.type === "code_block")
+      protectedParts.push({ start, end, wrapOnly: false });
     if (token.type === "inline") {
       // Attribute placement, inline notes, and Vue's newline-only element gaps
       // are left intact. Other paragraphs still receive ordinary reflow.
       const special = document.vitepress?.footnote !== false && /\^\[/.test(token.content);
-      const elements = token.children?.filter(
-        (child) => child.type !== "text" || child.content.trim(),
-      );
-      const hasElements = elements?.some(
-        (child) =>
-          child.nesting ||
-          ["image", "code_inline", "math_inline", "html_inline"].includes(child.type),
-      );
-      if (special || hasElements) protectedParts.push({ start, end, wrapOnly: !special });
+      if (special || hasVueElementGap(token.children ?? []))
+        protectedParts.push({ start, end, wrapOnly: !special });
     }
   }
   // Outer opaque blocks supersede their descendants. Blank each range once.
@@ -112,10 +114,100 @@ export function projectVitePress(document: Document): Projection {
   return { source: projected, literals, protected: protectedParts, tokens };
 }
 /** Attach the secondary reading to the finished, positioned tree. */
-export function recordVitePress(tree: Root, projection: Projection): void {
-  tree.children.push(...projection.literals);
+export function recordVitePress(tree: Root, projection: Projection, source: string): void {
+  // Keep ordinary HTML's list/quote parents. A component mdast reads inline
+  // makes its containing top-level block opaque instead of masking markers.
+  const html = new Map<number, Set<string>>();
+  const normalize = (value: string) => value.replace(/\r\n|\r/g, "\n").replace(/\n$/, "");
+  walk(tree, "html", (node, _index, parent) => {
+    if (
+      !parent ||
+      ["paragraph", "heading", "emphasis", "strong", "link", "tableCell"].includes(parent.type)
+    )
+      return;
+    const line = node.position!.start.line - 1;
+    const values = html.get(line) ?? new Set<string>();
+    values.add(normalize(node.value));
+    html.set(line, values);
+  });
+  const starts = lineStarts(source);
+  const opaque: { first: number; last: number }[] = [];
+  for (const token of projection.tokens) {
+    if (
+      token.type !== "html_block" ||
+      !token.map ||
+      html.get(token.map[0])?.has(normalize(token.content))
+    )
+      continue;
+    const start = starts[token.map[0]] ?? source.length;
+    const end = starts[token.map[1]] ?? source.length;
+    let low = 0;
+    let high = tree.children.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (tree.children[middle]!.position!.end.offset! <= start) low = middle + 1;
+      else high = middle;
+    }
+    const first = low;
+    while (low < tree.children.length && tree.children[low]!.position!.start.offset! < end) low++;
+    if (first < low) opaque.push({ first, last: low - 1 });
+  }
+  opaque.sort((a, b) => a.first - b.first || a.last - b.last);
+  const merged: typeof opaque = [];
+  for (const part of opaque) {
+    const previous = merged.at(-1);
+    if (previous && part.first <= previous.last) previous.last = Math.max(previous.last, part.last);
+    else merged.push({ ...part });
+  }
+  const original = tree.children;
+  const children: RootContent[] = [];
+  let previous = 0;
+  for (const part of merged) {
+    while (previous < part.first) children.push(original[previous++]!);
+    const start = original[part.first]!.position!.start;
+    const end = original[part.last]!.position!.end;
+    children.push({
+      type: "html",
+      value: source.slice(start.offset, end.offset),
+      position: { start, end },
+    });
+    projection.protected.push({ start: start.offset!, end: end.offset!, wrapOnly: false });
+    previous = part.last + 1;
+  }
+  while (previous < original.length) children.push(original[previous++]!);
+  tree.children = children;
+  for (const literal of projection.literals) tree.children.push(literal);
   tree.children.sort((a, b) => a.position!.start.offset! - b.position!.start.offset!);
   readings.set(tree, projection);
+  const fences = new Map(
+    projection.tokens
+      .filter((token) => token.type === "fence" && token.map)
+      .map((token) => [token.map![0], token]),
+  );
+  walk(tree, "code", (node) => {
+    const token = fences.get(node.position!.start.line - 1);
+    if (!token) return;
+    // Keep the written alias, separating highlight/line-number/title suffixes.
+    const language = /^[a-zA-Z0-9_-]+/.exec(token.info)?.[0] ?? "";
+    node.lang = language || null;
+    node.meta = token.info.slice(language.length).trim() || null;
+  });
+  const lines = new Map<number, InlineCode[]>();
+  walk(tree, "inlineCode", (node) => {
+    const line = node.position!.start.line - 1;
+    const found = lines.get(line) ?? [];
+    found.push(node);
+    lines.set(line, found);
+  });
+  for (const token of projection.tokens) {
+    if (token.type !== "inline" || !token.map) continue;
+    const spans: InlineCode[] = [];
+    for (let line = token.map[0]; line < token.map[1]; line++)
+      for (const span of lines.get(line) ?? []) spans.push(span);
+    const read = token.children?.filter((child) => child.type === "code_inline") ?? [];
+    if (spans.length === read.length)
+      spans.forEach((node, index) => codeTexts.set(node, read[index]!.content));
+  }
 }
 export function vitepressTokens(document: Document): Token[] {
   return readings.get(document.tree)?.tokens ?? readVitePress(document.source, document.vitepress);
@@ -132,9 +224,4 @@ export function protectedVitePress(document: Document, name: string, finding: Fi
         ? start >= part.start && start <= part.end
         : start < part.end && end > part.start),
   );
-}
-/** Code nodes at their positioned source lines, used only by the approved-code guard. */
-export function codeLines(node: Nodes): [number, number] | undefined {
-  if (node.type !== "code" || !node.position) return undefined;
-  return [node.position.start.line - 1, node.position.end.line];
 }

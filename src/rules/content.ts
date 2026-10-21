@@ -106,7 +106,10 @@ export const contentRules: Record<string, Rule> = {
             message: `Code language "${node.lang}" is not allowed by allowedLanguages.`,
           });
         }
-        if (options.languageOnly && !/^\S+$/u.test(info)) {
+        if (
+          options.languageOnly &&
+          (!/^\S+$/u.test(info) || (document.dialect === "vitepress" && info !== node.lang))
+        ) {
           findings.push({
             start: end,
             end: infoEnd,

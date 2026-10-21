@@ -85,6 +85,42 @@ function parserFor(options: VitePressOptions): MarkdownIt {
   restoreEntities(parser);
   for (const name of new Set([...containerNames, ...(options.customContainers ?? [])]))
     parser.use(container, { name });
+  parser.core.ruler.after("block", "vitepress_alerts", (state) => {
+    const recognized = new Set([
+      "tip",
+      "info",
+      "warning",
+      "danger",
+      "note",
+      "important",
+      "caution",
+      ...(options.customContainers ?? []),
+    ]);
+    const quotes: Token[] = [];
+    let pending = 0;
+    for (const token of state.tokens) {
+      if (token.type === "blockquote_open") quotes.push(token);
+      else if (token.type === "blockquote_close") {
+        if (quotes.pop()?.type === "vitepress_alert_open") {
+          token.type = "vitepress_alert_close";
+          token.tag = "div";
+        }
+        pending = Math.min(pending, quotes.length);
+      } else if (token.type === "inline") {
+        // Opening order matters: an outer quote consumes its marker before
+        // an inner quote sees that same first inline token. Each is visited once.
+        while (pending < quotes.length) {
+          const quote = quotes[pending++]!;
+          const match = /^\[!([\w-]+)\]([^\n\r]*)/.exec(token.content);
+          if (!match || !recognized.has(match[1]!.toLowerCase())) continue;
+          quote.type = "vitepress_alert_open";
+          quote.tag = "div";
+          quote.info = match[1]!.toLowerCase() + "\n" + match[2]!.trim();
+          token.content = token.content.slice(match[0].length).trimStart();
+        }
+      }
+    }
+  });
   if (options.attrs !== false)
     parser.use(attrs, {
       rule: [

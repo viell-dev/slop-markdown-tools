@@ -6,11 +6,17 @@ import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian" | "vitepress";
 /** Syntax and routing choices of a VitePress 2 site, without executing its config. */
 export interface VitePressOptions {
+  /** Enable markdown-it-mathjax3 dollar syntax; false by default. */
   readonly math?: boolean;
+  /** Enable curly attributes outside fences; true by default. */
   readonly attrs?: boolean;
+  /** Enable named and inline footnotes; true by default. */
   readonly footnote?: boolean;
+  /** Enable task checkboxes; true by default. */
   readonly tasklist?: boolean;
+  /** Enable VitePress's CJK emphasis conditions; true by default. */
   readonly cjkFriendlyEmphasis?: boolean;
+  /** Additional container names; an array replaces inherited custom names. */
   readonly customContainers?: readonly string[];
   /** Source directory relative to the workspace root; inferred from .vitepress when omitted. */
   readonly srcDir?: string;
@@ -104,8 +110,8 @@ export interface LinkResolution {
    * a directory; `external`: a URL with a scheme, or one starting with `//`;
    * `unavailable`: the destination cannot be judged from files.
    * `unreadable` means that the target could not be checked, because the
-   * workspace could not read what it would have to; it is neither found nor
-   * known to be missing.
+   * workspace could not read what it would have to, or included text could not
+   * be fully checked; it is neither found nor known to be missing.
    */
   status:
     "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory" | "unreadable";
@@ -218,6 +224,7 @@ export interface Plugin {
 }
 /** Settings for the documents that match one of `files`. */
 export interface Override {
+  /** Merge VitePress renderer choices for the matching documents. */
   readonly vitepress?: VitePressOptions;
   /** Glob patterns, matched against paths relative to the workspace root, with forward slashes. */
   readonly files: readonly string[];

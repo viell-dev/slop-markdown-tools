@@ -77,7 +77,11 @@
         "customContainers": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9_-]+$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "not": { "enum": ["raw", "v-pre", "code-group"] }
+          }
         },
         "srcDir": { "type": "string" },
         "anchor": { "enum": ["vitepress", "github"] }

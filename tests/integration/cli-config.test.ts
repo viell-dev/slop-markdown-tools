@@ -70,7 +70,7 @@ describe("paths and configuration files that cannot be used", () => {
     fails(
       wrong,
       ["lint", "--config", "gitlab.json"],
-      'Invalid configuration in gitlab.json: "dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", or "obsidian", not "gitlab"',
+      'Invalid configuration in gitlab.json: "dialect" must be "commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian", or "vitepress", not "gitlab"',
     );
     fails(
       wrong,

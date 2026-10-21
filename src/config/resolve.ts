@@ -208,7 +208,11 @@ export const configSchema: JsonSchemaObject = deepFreeze({
         customContainers: {
           type: "array",
           uniqueItems: true,
-          items: { type: "string", pattern: "^[a-z0-9_-]+$" },
+          items: {
+            type: "string",
+            pattern: "^[a-z0-9_-]+$",
+            not: { enum: ["raw", "v-pre", "code-group"] },
+          },
         },
         srcDir: { type: "string" },
         anchor: { enum: ["vitepress", "github"] },
@@ -293,9 +297,28 @@ function formatterProblem(
 /** What is wrong with `value` as a configuration, in plain words, or undefined when it is valid. */
 export function configProblem(value: unknown): string | undefined {
   if (!validate(value)) return configErrors(validate.errors ?? [], value, dialectNames);
+  const sourceDirectory = (directory: string | undefined, where: string) => {
+    if (directory === undefined) return undefined;
+    const name = directory.replaceAll("\\", "/");
+    let depth = 0;
+    if (/^(?:\/|[a-z]:)/i.test(name)) return `${where} must be relative to the workspace root`;
+    for (const part of name.split("/")) {
+      if (part === "..") {
+        if (--depth < 0) return `${where} must stay inside the workspace root`;
+      } else if (part !== "." && part !== "") depth++;
+    }
+    return undefined;
+  };
+  const directory = sourceDirectory(value.vitepress?.srcDir, "vitepress.srcDir");
+  if (directory) return directory;
   const problem = formatterProblem(value.codeFormatters, "codeFormatters");
   if (problem) return problem;
   for (const [index, override] of (value.overrides ?? []).entries()) {
+    const directory = sourceDirectory(
+      override.vitepress?.srcDir,
+      `overrides[${index}].vitepress.srcDir`,
+    );
+    if (directory) return directory;
     const problem = formatterProblem(override.codeFormatters, `overrides[${index}].codeFormatters`);
     if (problem) return problem;
   }

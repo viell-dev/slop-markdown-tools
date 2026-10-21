@@ -7,6 +7,8 @@ import { parse } from "../syntax/parse.js";
 import { refusal } from "./access.js";
 import { isNotUtf8 } from "./encoding.js";
 import type { WorkspaceSource, LookupResult, WorkspaceOptions } from "./types.js";
+import { vitepressAnchors, vitepressSlug } from "./vitepress.js";
+import type { VitePressAnchors } from "./vitepress.js";
 
 /**
  * Whether a file is Markdown by its name: one ending in `.md` or `.markdown`,
@@ -16,7 +18,9 @@ import type { WorkspaceSource, LookupResult, WorkspaceOptions } from "./types.js
  * other file as a note.
  */
 export function isMarkdownName(name: string, dialect?: Dialect): boolean {
-  return (dialect === "obsidian" ? /\.md$/i : /\.(?:md|markdown)$/i).test(name);
+  return (
+    dialect === "obsidian" || dialect === "vitepress" ? /\.md$/i : /\.(?:md|markdown)$/i
+  ).test(name);
 }
 
 /**
@@ -38,6 +42,7 @@ interface Target {
   obsidian?: ObsidianAnchors;
   github?: GithubAnchors;
   forge?: ForgeAnchors;
+  vitepress?: VitePressAnchors;
 }
 /** The workspace's targets and lazy indexes, independent of one link's resolution. */
 export function createTargetIndex(
@@ -64,6 +69,18 @@ export function createTargetIndex(
   }
   for (const name of sources.keys())
     for (const directory of parents(name)) directories.add(directory);
+  const vitepressRoots = [...directories]
+    .filter((name) => path.posix.basename(name) === ".vitepress")
+    .map((name) => path.posix.dirname(name))
+    .sort((a, b) => b.length - a.length);
+  const vitepressRoot = (source: string): string => {
+    const configured = options.vitepress?.srcDir;
+    const root =
+      configured === undefined
+        ? (vitepressRoots.find((name) => name === "." || source.startsWith(name + "/")) ?? ".")
+        : path.posix.normalize(configured.replaceAll("\\", "/"));
+    return root === "." ? "" : root;
+  };
   const unreadable = [
     ...new Set(
       (options.unreadable ?? []).map((name) =>
@@ -162,12 +179,7 @@ export function createTargetIndex(
    * system refuses to let be read, or whose text is not UTF-8, which is marked
    * and not read again.
    */
-  function compute<Anchors>(
-    target: Target,
-    value: string | (() => string),
-    name: string,
-    anchors: (document: Document) => Anchors,
-  ): Anchors | undefined {
+  function textOf(target: Target, value: string | (() => string)): string | undefined {
     if (target.unreadable) return undefined;
     let source: string;
     try {
@@ -178,8 +190,37 @@ export function createTargetIndex(
       target.unreadable = true;
       return undefined;
     }
-    return anchors(parse(source, options.dialect ?? fallbackDialect, name));
+    return source;
   }
+  function compute<Anchors>(
+    target: Target,
+    value: string | (() => string),
+    name: string,
+    anchors: (document: Document) => Anchors,
+  ): Anchors | undefined {
+    const source = textOf(target, value);
+    if (source === undefined) return undefined;
+    return anchors(
+      options.dialect === "vitepress"
+        ? parse(source, "vitepress", name, [], options.vitepress)
+        : parse(source, options.dialect ?? fallbackDialect, name),
+    );
+  }
+  const includeText = (name: string): string | undefined => {
+    let value = sources.has(name) ? sources.get(name) : foundSources.get(name);
+    if (value === null || value === undefined) {
+      const found = lookup(name, false);
+      if (found?.type !== "file") return undefined;
+      value = found.source;
+    }
+    if (value === null || value === undefined) return undefined;
+    try {
+      return typeof value === "function" ? value() : value;
+    } catch (error) {
+      if (refusal(error) || isNotUtf8(error)) return undefined;
+      throw error;
+    }
+  };
   /**
    * Whether the target has the anchor a fragment names, or undefined when the
    * target's source could not be read. GitHub, Forgejo, and Gitea store anchors
@@ -203,6 +244,23 @@ export function createTargetIndex(
     if (value === null || value === undefined || !isMarkdownName(name, dialect)) return true;
     let target = targets.get(name);
     if (!target) targets.set(name, (target = {}));
+    if (dialect === "vitepress") {
+      let anchors = target.vitepress;
+      if (!anchors) {
+        const source = textOf(target, value);
+        if (source === undefined) return undefined;
+        anchors = vitepressAnchors(
+          source,
+          name,
+          options.vitepress ?? {},
+          vitepressRoot(name),
+          includeText,
+        );
+        target.vitepress = anchors;
+      }
+      if (!anchors.complete) return undefined;
+      return anchors.ids.has(vitepressSlug(fragment, options.vitepress));
+    }
     if (dialect === "obsidian") {
       const anchors = target.obsidian ?? compute(target, value, name, obsidianAnchors);
       if (!anchors) return undefined;
@@ -329,6 +387,8 @@ export function createTargetIndex(
     belowRoot,
     overlapCandidates,
     searchCandidates,
+    vitepressRoot,
+    vitepressOptions: options.vitepress ?? {},
   };
 }
 export type TargetIndex = ReturnType<typeof createTargetIndex>;

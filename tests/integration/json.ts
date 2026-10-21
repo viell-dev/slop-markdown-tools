@@ -92,7 +92,7 @@ const explanation = ajv.compile<Explanation>({
         { $ref: configId },
         {
           type: "object",
-          required: ["dialect", "rules", "ignore", "resolve", "codeFormatters"],
+          required: ["dialect", "rules", "ignore", "resolve", "codeFormatters", "vitepress"],
           properties: { dialect: { type: "string", enum: dialects } },
         },
       ],

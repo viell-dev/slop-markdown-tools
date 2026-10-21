@@ -259,6 +259,15 @@ it helps.
   only selected code values and must cover alternative readings; the ordinary
   fingerprint stays exact. Fences and diagnostic locations are shared through
   `src/syntax/fences.ts` and `src/core/diagnostics.ts`.
+- `src/syntax/vitepress/` keeps the positioned projection, synchronous secondary
+  reading, Vue whitespace, and literal URL rules separate. Its guard must retain
+  the selected-code exception without relaxing other literal values. Static
+  anchors and bounded host-supplied includes live in
+  `src/workspace/vitepress.ts`. Keep actual VitePress/Vue rendering and full
+  builds in integration tests.
+- Generated VitePress cache/temp files are ignored at every site root, including
+  the published `examples/workspaces/vitepress-site` before/after projects. Keep
+  their `.vitepress/config.mts` files checked and included in the examples.
 - `src/config/load.ts` locates a plugin not named by path with
   `import-meta-resolve`, a port of Node.js's import resolution, and then with
   CommonJS resolution, because Node.js has no supported call that resolves an

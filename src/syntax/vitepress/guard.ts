@@ -4,14 +4,10 @@ import type { Document, Workspace } from "../../core/types.js";
 import { walk } from "../walk.js";
 import { frontmatterEnd } from "./reader.js";
 import { vitepressTokens } from "./projection.js";
+import { inlineElement, onlyWhitespace } from "./whitespace.js";
+import { vitepressPage } from "./paths.js";
 
 const newline = (text: string) => text.replace(/\r\n|\r/g, "\n");
-const element = (token: Token, closing: boolean) =>
-  token.nesting === (closing ? -1 : 1) ||
-  ["code_inline", "image", "math_inline", "emoji", "checkbox_input", "footnote_ref"].includes(
-    token.type,
-  ) ||
-  (token.type === "html_inline" && (closing ? /^<\// : /^<[^/!]/).test(token.content));
 
 /** VitePress's non-mdast reading, including Vue's newline-only element gaps. */
 export function vitepressSemantics(
@@ -27,12 +23,26 @@ export function vitepressSemantics(
     });
   const url = (value: string) => {
     const found = workspace?.resolve(document.path, value, "vitepress");
-    return found?.status === "resolved" ? `${found.target}#${found.fragment ?? ""}` : value;
+    return found?.status === "resolved" && typeof found.target === "string" && !found.unreadable
+      ? {
+          fragment: found.fragment ?? "",
+          query: /\?[^#]*/.exec(value.split("#", 1)[0]!)?.[0] ?? "",
+          target: found.target,
+        }
+      : value;
   };
   const tokenValue = (token: Token): unknown => {
     const attributes = token.attrs?.map(([name, value]) => [
       name,
-      name === "href" || name === "src" ? url(value) : value,
+      name === "src" ||
+      (name === "href" &&
+        (!vitepressPage(value) ||
+          ((token.attrGet("target") !== null || token.attrGet("download") !== null) &&
+            !value.startsWith("#"))))
+        ? value
+        : name === "href"
+          ? url(value)
+          : value,
     ]);
     let content = newline(token.content);
     if (token.type === "text") return { type: "text", content: content.replace(/[ \t\n]+/g, " ") };
@@ -48,7 +58,9 @@ export function vitepressSemantics(
       hidden: token.hidden,
       attributes,
       content,
-      ...(token.type === "fence" || token.type.startsWith("container_")
+      ...(token.type === "fence" ||
+      token.type === "vitepress_alert_open" ||
+      token.type.startsWith("container_")
         ? { info: token.info.trim() }
         : {}),
       ...(token.children ? { children: inline(token.children) } : {}),
@@ -57,37 +69,51 @@ export function vitepressSemantics(
   };
   function inline(tokens: Token[]): unknown[] {
     const result: unknown[] = [];
+    let text: string[] = [];
+    let endsWithSpace = false;
+    const flush = () => {
+      if (text.length) result.push({ type: "text", content: text.join("") });
+      text = [];
+      endsWithSpace = false;
+    };
     const add = (value: unknown) => {
       const current = value as { type?: string; content?: string };
-      const previous = result.at(-1) as { type?: string; content?: string } | undefined;
-      if (current.type === "text" && previous?.type === "text")
-        previous.content = (previous.content ?? "") + current.content;
-      else result.push(value);
+      if (current.type === "text") {
+        let content = current.content ?? "";
+        if (endsWithSpace && content.startsWith(" ")) content = content.slice(1);
+        if (content) {
+          text.push(content);
+          endsWithSpace = content.endsWith(" ");
+        }
+      } else {
+        flush();
+        result.push(value);
+      }
     };
     for (let index = 0; index < tokens.length; index++) {
       const token = tokens[index]!;
-      if (
-        token.type === "softbreak" ||
-        (token.type === "text" && /^[ \t\n]+$/.test(token.content))
-      ) {
+      if (onlyWhitespace(token)) {
         const from = index;
         let hasNewline = token.type === "softbreak" || /\n/.test(token.content);
         while (index + 1 < tokens.length) {
           const next = tokens[index + 1]!;
-          if (
-            next.type !== "softbreak" &&
-            !(next.type === "text" && /^[ \t\n]+$/.test(next.content))
-          )
-            break;
+          if (!onlyWhitespace(next)) break;
           hasNewline ||= next.type === "softbreak" || /\n/.test(next.content);
           index++;
         }
         const before = tokens[from - 1];
         const after = tokens[index + 1];
-        if (!(hasNewline && before && after && element(before, true) && element(after, false)))
+        if (!(
+          hasNewline &&
+          before &&
+          after &&
+          inlineElement(before, true) &&
+          inlineElement(after, false)
+        ))
           add({ type: "text", content: " " });
       } else add(tokenValue(token));
     }
+    flush();
     return result;
   }
   const end = frontmatterEnd(document.source);

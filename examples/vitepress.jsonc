@@ -1,0 +1,8 @@
+{
+  "extends": ["recommended", "vitepress"],
+  "vitepress": { "math": false, "anchor": "vitepress" },
+  "rules": {
+    "style/wrap": ["warn", { "width": 80 }],
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}
