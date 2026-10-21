@@ -96,6 +96,7 @@
     "prebenchmark": "npm run build",
     "check:obsidian": "run-s build check:obsidian:run",
     "check:obsidian:run": "node scripts/obsidian-check.mjs",
+    "check:live": "node scripts/check-live.mjs",
     "release:prepare": "run-s check release:pack",
     "release:pack": "node scripts/package-smoke.mjs --retain",
     "schema": "run-s build schema:write",

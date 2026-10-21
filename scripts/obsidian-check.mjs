@@ -13,7 +13,7 @@
 // generated documents' names from a report, reduces those to the lines that show the difference.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync } from "node:fs";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 
@@ -32,6 +32,9 @@ if (docker("build", "--tag", image, fileURLToPath(new URL("obsidian", import.met
   process.exit(2);
 rmSync(output, { recursive: true, force: true });
 mkdirSync(output, { recursive: true });
+// The container writes as its own user, which on Linux need not own the checkout, as on a
+// GitHub-hosted runner.
+chmodSync(output, 0o777);
 const environment = ["SEED", "COUNT", "OBSIDIAN_VERSION", "REDUCE", "PROBE"].flatMap((name) =>
   // Docker reads a named variable from its inherited environment. Large PROBE batches must
   // not become process arguments, which Windows limits to about 32,000 characters.

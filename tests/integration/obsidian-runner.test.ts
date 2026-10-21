@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { expect, it, vi } from "vitest";
 
-vi.mock("node:fs", () => ({ mkdirSync: vi.fn(), rmSync: vi.fn() }));
+vi.mock("node:fs", () => ({ chmodSync: vi.fn(), mkdirSync: vi.fn(), rmSync: vi.fn() }));
 vi.mock("node:child_process", async (original) => {
   const actual = await original<typeof import("node:child_process")>();
   return { ...actual, spawnSync: vi.fn() };

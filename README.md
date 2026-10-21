@@ -110,9 +110,10 @@ mdrefine follows a [pre-1.0 versioning
 policy](https://viell-dev.github.io/slop-markdown-tools/versions.html): a minor
 release may change behavior and says how, and a patch release only fixes
 defects. It is written and maintained by AI agents, and no person reviews the
-code. Changes are accepted on their tests, CI on Linux and Windows, and a
-semantic check that refuses any formatting edit that would change a document's
-parsed meaning.
+code. Changes are accepted on their tests, CI on Linux and Windows, comparisons
+of what GitHub and Obsidian show before and after formatting, and a semantic
+check that refuses any formatting edit that would change a document's parsed
+meaning.
 
 ## Contributing, security, and license
 

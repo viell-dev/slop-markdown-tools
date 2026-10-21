@@ -159,9 +159,12 @@ before and after formatting. Its inputs are documents that
 specification's examples in `tests/fixtures/commonmark/`. Each known difference
 is listed with its issue and must still differ, so that a fix shows up as an
 entry to remove; a new one fails the test. The Rendering workflow compares
-GitHub's rendering in the same way every week, through its Markdown API. Run it
-by hand with `gh workflow run rendering.yml`, optionally with `-f seed=N` to
-repeat a run's new seed, or locally after a build with
+GitHub's rendering in the same way, through its Markdown API, every week, for
+pull requests that change a [renderer-sensitive path](#what-the-checks-prove),
+and in the Release workflow. Run it by hand with
+`gh workflow run rendering.yml --ref BRANCH`, optionally with `-f seed=N` to
+repeat a run's new seed or `-f seed=none` for the fixed seeds alone, as the
+Release workflow runs it, or locally after a build with
 `node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
 ten to fifteen minutes; its first lines say what it compares.
 
@@ -182,7 +185,12 @@ documents from a report, shortens each to the lines that still show its
 difference, and `PROBE`, a JSON array of documents, only shows each in Obsidian.
 Live Preview is compared by its lines' text and styles, with the characters that
 it shows as written left out where only the source differs, and Reading view by
-its HTML. The check is started by hand and not in CI.
+its HTML. The Obsidian workflow runs the check for pull requests that change a
+[renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
+by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
+`seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the
+report and the screenshots. It fails when the check compared nothing. Every
+week, and in the Release workflow, it runs the fixtures alone (`COUNT=0`).
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
@@ -195,14 +203,17 @@ safeguards, `cli-access.test.ts` for access failures, `cli-encoding.test.ts` for
 UTF-8 handling, `selection.test.ts` for which files a run selects, compared with
 Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
 `mdrefine/node`, `code-formatters.test.ts` and `code-command.test.ts` for the
-opt-in code tools, and `examples.test.ts` and `docs.test.ts` for the examples
-and documentation. `support.ts` holds the helpers: `fixture()` writes a
-temporary workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take
-away read permission on Unix and on Windows, `denyWrite()` takes away write
-permission on Windows, `windowsTool()` runs a program of Windows such as
-`icacls.exe`, and `linkDirectory()` links a directory, as a junction on Windows.
-Tests that need Unix permission modes are skipped on Windows and for the root
-user, and one that links a file needs `canSymlink`.
+opt-in code tools, `examples.test.ts` and `docs.test.ts` for the examples and
+documentation, `metadata.test.ts` for what the package, the README, the site,
+the issue forms, and the workflows say about the same facts, and
+`release-evidence.test.ts` for the Release workflow's check of CI. `support.ts`
+holds the helpers: `fixture()` writes a temporary workspace, `run()` starts the
+CLI, `restrict()` and `denyRead()` take away read permission on Unix and on
+Windows, `denyWrite()` takes away write permission on Windows, `windowsTool()`
+runs a program of Windows such as `icacls.exe`, and `linkDirectory()` links a
+directory, as a junction on Windows. Tests that need Unix permission modes are
+skipped on Windows and for the root user, and one that links a file needs
+`canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. `tests/performance/` guards
@@ -216,6 +227,89 @@ result outside the clock. Compare growth instead of imposing a wall-clock speed
 requirement; where recoverable, check that the former slow algorithm fails the
 comparison. Garbage-collection checks also run outside coverage, which changes
 execution and allocation costs.
+
+## What the checks prove
+
+Each promise below names the checks that back it, when they run, and what they
+cannot show. "Every pull request" means CI: `npm run check` on Linux with
+Node.js 24, the build and tests on the other jobs, and `npm run test:package` on
+all four.
+
+- **Formatting keeps what a document means.** The engine refuses an edit that
+  changes the parsed reading (`src/core/engine.ts`); the rule tests format
+  twice, compare the meaning, and disable the rule; `renderers.test.ts` compares
+  commonmark.js and markdown-it before and after formatting. Every pull request.
+  The guard compares the parser's own readings, so a parser defect can hide from
+  it; the renderer checks below and the workarounds in the [dependency
+  overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) cover
+  what is known.
+- **Renderers show the same before and after.** GitHub: the Rendering workflow.
+  Obsidian, in Live Preview and Reading view: the Obsidian workflow. VitePress,
+  on every pull request: `vitepress-build.test.ts` builds the example site
+  before and after formatting, and `vitepress.test.ts` renders pages with
+  VitePress's own Markdown renderer and Vue. Math: `math.test.ts` against the
+  renderers' output recorded in `math-renderers.ts`. The Rendering and Obsidian
+  workflows run for pull requests that change a renderer-sensitive path, with
+  fixed and random documents, and every week; the Release workflow runs them at
+  the commit it releases with fixed documents only: the Rendering check's fixed
+  seeds and the Obsidian check's fixtures, which the weekly Obsidian run also
+  uses, so that a new Obsidian release is tested within a week. Generated
+  documents sample the syntax rather than exhaust it, and a random document that
+  shows a new difference gets an issue. Forgejo's and Gitea's own renderers are
+  not compared automatically yet
+  ([#486](https://github.com/viell-dev/slop-markdown-tools/issues/486)); their
+  dialects rest on the reference parsers and on unit tests taken from
+  observations of the forges.
+- **Output is deterministic and formatting converges.** The unit tests format
+  their output again and expect no change, and each example workspace's `after/`
+  tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
+  Every pull request. The benchmark's output hash shows whether the benchmark
+  documents format differently.
+- **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
+  `cli-encoding.test.ts`, and `selection.test.ts`, which compares the files a
+  run selects with Git's own decisions, on Linux and on Windows, which covers
+  access control lists and junctions. Every pull request. macOS is not tested;
+  tests that need Unix permission modes are skipped on Windows and for the root
+  user.
+- **The installed package works.** `npm run test:package` installs the packed
+  package with npm and pnpm and runs the command, `import` and `require()`, a
+  shipped example, and TypeScript consumers, on every pull request.
+  `release:prepare` tests the exact tarball that the Release workflow publishes,
+  and `scripts/verify-publication.mjs` checks that npm serves that tarball with
+  provenance naming the workflow and the commit.
+- **Cost grows with the input as expected.** `tests/performance/` compares
+  growth and checks that memory is released; `large-inputs.test.ts` formats
+  documents beyond the engine's argument limits, each in its own process. Every
+  pull request. The Benchmark workflow's reference timings run for changes to
+  `benchmarks/` and by hand, and the benchmark page documents the known limits.
+- **Public descriptions agree with the package.** `docs.test.ts`,
+  `benchmarks.test.ts`, and `metadata.test.ts` on every pull request;
+  `npm run check:live` for GitHub's settings, the newest release, npm, and the
+  deployed site, by hand after releases and setting changes. Prose still needs
+  reading.
+- **A release is the tested commit.** The Release workflow requires CI to have
+  passed on the commit it releases (`scripts/release-evidence.mjs`), runs both
+  renderer checks there, refuses a version or tag that exists, and publishes the
+  tarball it tested.
+
+The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
+`src/syntax/`, `src/index.ts`, `package.json`, the lockfile,
+`scripts/rendering.mjs`, and each check's own files, as the `pull_request` paths
+of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
+request. Run the checks by hand on a branch whose change could alter what a
+renderer shows from another path. A difference fails the check; investigate it
+and record it in an issue rather than running the check again until it passes.
+While confirmed differences are open, runs with random documents can fail on
+them again: reduce the run's documents, with `REDUCE` for the Obsidian check,
+and compare them with the open issues before filing another. The fix of such a
+difference adds its reduced document to `scripts/obsidian/fixtures.mjs` or a
+unit test, so the fixed documents that releases compare grow from what the
+random ones find. A fixed document that shows a difference blocks releases until
+it is fixed or, in the Rendering check, listed with its issue; the Obsidian
+fixtures have no such list, because each records a defect that was fixed. When a
+new Obsidian release makes a fixture differ, as the weekly run is there to find,
+that is a new defect: the tool adapts to the release's reading, with an issue,
+before the next release.
 
 ## Benchmarks
 
@@ -252,8 +346,11 @@ page, the rule index, and the benchmark page with the code, so update them with
 the behavior they describe. CI builds the site for every pull request. The site
 describes the newest stable release: the Pages workflow deploys it from that
 release's tag after the Release workflow publishes it, as
-[RELEASING.md](RELEASING.md) describes. GitHub Pages must use GitHub Actions as
-its source.
+[RELEASING.md](RELEASING.md) describes. A correction to that release's
+documentation goes to `main` and to the release's `site-VERSION` branch, which
+RELEASING.md also describes, so that the site never describes unreleased
+behavior. The deployed site's `version.json` names the commit it was built from.
+GitHub Pages must use GitHub Actions as its source.
 
 ## Pull requests
 
@@ -265,6 +362,10 @@ behavior; harassment and disclosure of private data are not acceptable.
 
 - Describe the problem, the resulting behavior, and the decisions made and why,
   for a reader who will not read the diff. Link the issue.
+- Give the verification: the commands and their results, the platforms, the runs
+  of the [renderer checks](#what-the-checks-prove) when the change triggers
+  them, and what the evidence cannot show. Maintainers also record which review
+  the change got, as AGENTS.md describes.
 - A change to formatting needs tests of the expected output, of formatting
   twice, and of preserved meaning; a defect that changes rendering needs a
   minimal regression example.

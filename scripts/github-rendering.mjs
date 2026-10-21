@@ -1,12 +1,13 @@
 // Compare GitHub's rendering of generated documents before and after formatting (issue #303).
 //
-//   node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]
+//   node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]
 //
 // Each run seed stands for --documents documents, generated as scripts/rendering.mjs describes
 // with all of GitHub's syntax. The fixed seeds are followed by one new seed, random unless
-// --seed names it; the report names it, so that a finding can be reproduced. Each document is
-// formatted with the presets recommended and github, and a document that formatting changes is
-// rendered before and after by GitHub's Markdown API in two modes:
+// --seed names it, or none with `--seed none`, as the Release workflow runs it so that its result
+// depends only on the commit; the report names the seed, so that a finding can be reproduced.
+// Each document is formatted with the presets recommended and github, and a document that
+// formatting changes is rendered before and after by GitHub's Markdown API in two modes:
 //
 // - `markdown` renders a file and keeps soft line breaks, but leaves out GitHub's task lists,
 //   alerts, and math, whose markers it shows as text. For this mode the document is formatted
@@ -17,7 +18,8 @@
 // The HTML is compared after normalizeHtml, without the random ID that GitHub writes into each
 // response. A document that renders differently and that KNOWN does not list fails the run, and
 // so does a listed document of the fixed seeds that renders alike, because what its entry
-// tracks may be fixed. Each document that renders differently is written to DIR (default
+// tracks may be fixed, and so does a run in which formatting changed no document, which compared
+// nothing. Each document that renders differently is written to DIR (default
 // artifacts/github-rendering) as before.md, after-MODE.md, and the HTML of both. The report, in
 // Markdown, goes to standard output.
 //
@@ -27,7 +29,7 @@
 // to 600 requests and take ten to fifteen minutes. The Rendering workflow runs this every
 // week, and by hand with `gh workflow run rendering.yml`.
 import { Buffer } from "node:buffer";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomInt } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -44,7 +46,7 @@ import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
 const known = [];
 
 const usage =
-  "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N] [--documents 25] [--out DIR]\n";
+  "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]\n";
 /** The run's settings from its arguments. */
 function settings(argv) {
   const result = {
@@ -61,7 +63,7 @@ function settings(argv) {
     const [name, value] = [argv[index], argv[index + 1]];
     if (value === undefined) throw new Error(usage);
     if (name === "--seeds") result.seeds = value === "" ? [] : value.split(",").map(number);
-    else if (name === "--seed") result.seed = number(value);
+    else if (name === "--seed") result.seed = value === "none" ? undefined : number(value);
     else if (name === "--documents") result.documents = number(value);
     else if (name === "--out" && value !== "") result.out = value;
     else throw new Error(usage);
@@ -90,13 +92,38 @@ function gh(body) {
 }
 const pause = 1000;
 let lastRequest = 0;
-/** GitHub's HTML for `text` in `mode`. A failed request is tried again, after longer waits. */
+/** When the token's request limit resets, in milliseconds since the epoch, or in a minute. */
+function rateLimitReset() {
+  const { stdout } = spawnSync("gh", ["api", "rate_limit", "--jq", ".resources.core.reset"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const seconds = Number(stdout?.trim());
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Date.now() + 60000;
+}
+let limitWaits = 0;
+/**
+ * GitHub's HTML for `text` in `mode`. A failed request is tried again, after longer waits. When
+ * the token's request limit is spent, as when runs overlap, the request waits for the limit to
+ * reset, at least a minute and at most an hour, once in a run, so that the run still fits in the
+ * workflow's time limit.
+ */
 async function render(text, mode) {
   for (let attempt = 1; ; attempt++) {
     await delay(Math.max(0, lastRequest + pause - Date.now()));
     lastRequest = Date.now();
     const { status, stdout, stderr } = await gh({ text, mode });
     if (status === 0) return stdout;
+    if (/rate limit/i.test(stderr) && limitWaits < 1) {
+      limitWaits++;
+      const wait = Math.min(Math.max(rateLimitReset() - Date.now() + 5000, 60000), 3600000);
+      process.stderr.write(
+        `${stderr}\nWaiting ${Math.ceil(wait / 60000)} minutes for the request limit to reset.\n`,
+      );
+      await delay(wait);
+      attempt--;
+      continue;
+    }
     if (attempt === 5) throw new Error(`gh api markdown failed: ${stderr}`);
     process.stderr.write(
       `gh api markdown failed: ${stderr}\nTrying again in ${attempt} minutes.\n`,
@@ -141,7 +168,7 @@ try {
   process.stderr.write(error.message);
   process.exit(2);
 }
-const runSeeds = [...options.seeds, options.seed];
+const runSeeds = options.seed === undefined ? options.seeds : [...options.seeds, options.seed];
 const results = [];
 for (const seed of runSeeds)
   for (let index = 0; index < options.documents; index++) {
@@ -175,15 +202,16 @@ const changed = results.filter((result) => result.modes.length > 0).length;
 const lines = [
   "## GitHub's rendering before and after formatting",
   "",
-  `Seeds ${options.seeds.join(", ") || "(none)"} and the new seed **${options.seed}**, ${options.documents} documents each: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently, ${differing.length - unexpected.length} of them known.`,
+  `Seeds ${options.seeds.join(", ") || "(none)"} and ${options.seed === undefined ? "no new seed" : `the new seed **${options.seed}**`}, ${options.documents} documents each: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently, ${differing.length - unexpected.length} of them known.`,
   "",
   "Reproduce with:",
   "",
   "```sh",
-  `node scripts/github-rendering.mjs --seeds "${options.seeds.join(",")}" --seed ${options.seed} --documents ${options.documents}`,
+  `node scripts/github-rendering.mjs --seeds "${options.seeds.join(",")}" --seed ${options.seed ?? "none"} --documents ${options.documents}`,
   "```",
 ];
-if (unexpected.length || stale.length) lines.push("");
+if (unexpected.length || stale.length || !changed) lines.push("");
+if (!changed) lines.push("- Formatting changed no document, so nothing was compared.");
 for (const result of unexpected) {
   const modeNames = result.modes.filter((mode) => mode.differs).map((mode) => mode.mode);
   lines.push(`- Document ${name(result)} renders differently in mode ${modeNames.join(" and ")}.`);
@@ -193,4 +221,4 @@ for (const entry of stale)
     `- Document ${name(entry)} renders alike now; check issue ${entry.issue} and remove its entry.`,
   );
 process.stdout.write(lines.join("\n") + "\n");
-process.exit(unexpected.length || stale.length ? 1 : 0);
+process.exit(unexpected.length || stale.length || !changed ? 1 : 0);

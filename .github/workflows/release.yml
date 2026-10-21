@@ -16,7 +16,41 @@ concurrency:
   group: npm-release
   cancel-in-progress: false
 jobs:
+  # A release is made from the exact commit of this run, so CI must have passed on that commit:
+  # every check that the ruleset for main requires, and unit coverage.
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Require CI of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-evidence.mjs "$GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+  # The real renderers, compared before and after formatting at this commit: GitHub's through
+  # its Markdown API, and Obsidian's in Docker. Their reports are the runs' artifacts. A release
+  # compares only fixed documents, GitHub's fixed seeds and Obsidian's fixtures, so that its
+  # result depends only on the commit and the renderers; the random documents of the pull
+  # request runs look for new differences, which get issues.
+  rendering:
+    uses: ./.github/workflows/rendering.yml
+    with:
+      seed: none
+  obsidian:
+    uses: ./.github/workflows/obsidian.yml
+    with:
+      count: "0"
   prepare:
+    needs: [ci, rendering, obsidian]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -45,9 +79,23 @@ jobs:
           assert.equal(pkg.publishConfig.tag, match[1] ?? 'latest');
           // The release notes are the version's section of CHANGELOG.md; the script fails without one.
           execFileSync(process.execPath, ['scripts/release-notes.mjs', pkg.version], { stdio: ['ignore', 'ignore', 'inherit'] });
-          if (process.env.PUBLISH_REQUESTED === 'true') {
+          const publishing = process.env.PUBLISH_REQUESTED === 'true';
+          if (publishing) {
             assert.equal(process.env.GITHUB_REF, 'refs/heads/main', 'Publish only from main');
             assert.equal(process.env.PUBLISH_ENABLED, 'true', 'Publication is disabled');
+          }
+          // A published version or an existing tag is never published again. Publication stops
+          // here, before anything is built; a dry run only reports it. The publish job checks
+          // once more right before it publishes.
+          const registry = (await fetch(`https://registry.npmjs.org/mdrefine/${pkg.version}`)).status;
+          const tag = execFileSync('git', ['ls-remote', '--tags', 'origin', `refs/tags/${pkg.version}`], { encoding: 'utf8' }).trim();
+          const problems = [];
+          if (registry !== 404) problems.push(registry === 200 ? 'is already on npm' : `could not be looked up on npm (HTTP ${registry})`);
+          if (tag) problems.push('already has a tag');
+          for (const problem of problems) {
+            const message = `mdrefine ${pkg.version} ${problem}`;
+            if (publishing) assert.fail(`${message}; investigate the existing publication before releasing`);
+            console.log(`::warning::${message}; a run that publishes would stop here.`);
           }
           JS
       - run: npm ci
