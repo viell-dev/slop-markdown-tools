@@ -114,7 +114,7 @@ broken or compromised release to be found. Security updates are not delayed.
 | -------------------------- | ------------------------------------- |
 | `npm test`                 | The build, then all three suites      |
 | `npm run test:unit`        | The unit suite; needs no build        |
-| `npm run test:performance` | Complexity regression checks          |
+| `npm run test:performance` | Complexity and retention checks       |
 | `npm run test:coverage`    | Unit tests with coverage reports      |
 | `npm run test:integration` | The build, then the integration suite |
 
@@ -197,10 +197,12 @@ links a file needs `canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. `tests/performance/` guards
-against algorithms whose cost grows faster than their input; add a regression
-check there with the fix for such a defect. Keep substantive output assertions
-alongside the measurements, and exclude preparation costs only when the check is
-specifically about a later operation.
+against algorithms whose cost grows faster than their input and memory that
+should have been released; add a regression check there with the fix for such a
+defect. Keep substantive output assertions alongside the measurements, and
+exclude preparation costs only when the check is specifically about a later
+operation. Garbage-collection checks also run outside coverage, which changes
+execution and allocation costs.
 
 ## Benchmarks
 
