@@ -95,7 +95,7 @@ jobs:
           for (const problem of problems) {
             const message = `mdrefine ${pkg.version} ${problem}`;
             if (publishing) assert.fail(`${message}; investigate the existing publication before releasing`);
-            console.log(`::warning::${message}; a run that publishes would stop here.`);
+            console.log(`::warning::${message}; a run that publishes would stop here, and npm's dry-run publish below refuses it too.`);
           }
           JS
       - run: npm ci
