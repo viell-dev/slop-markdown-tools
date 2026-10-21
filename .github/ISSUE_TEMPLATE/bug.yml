@@ -33,6 +33,7 @@ body:
         - Forgejo or Codeberg
         - Gitea
         - Obsidian
+        - VitePress 2
         - Not sure
     validations:
       required: true

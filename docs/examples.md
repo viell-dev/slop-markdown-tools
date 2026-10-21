@@ -13,7 +13,7 @@ With the installed package, use `npx mdtools` in place of
 
 ## Start from a configuration
 
-Copy one of four starting configurations to the root of your documents as
+Copy one of five starting configurations to the root of your documents as
 `mdtools.config.jsonc`:
 
 - [`examples/github.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/github.jsonc)
@@ -24,6 +24,8 @@ Copy one of four starting configurations to the root of your documents as
   for Gitea instances.
 - [`examples/obsidian.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/obsidian.jsonc)
   for Obsidian vaults, with links written as vault-relative paths.
+- [`examples/vitepress.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/vitepress.jsonc)
+  for VitePress 2 sites, with explicit [renderer options](vitepress.md).
 
 Each wraps prose at 80 columns and chooses a link style; see
 [configuration](configuration.md).
@@ -224,6 +226,16 @@ What to notice:
   because a block identifier belongs to its paragraph's last line.
 - `Garden/Watering schedule.md` links to a note `Compost` that does not exist,
   which `lint` reports before and after formatting.
+
+## Format a VitePress site
+
+[`examples/workspaces/vitepress-site/`](https://github.com/viell-dev/slop-markdown-tools/tree/main/examples/workspaces/vitepress-site)
+has complete `before/` and `after/` sites. It covers custom containers, public
+assets, `.html` page links, included headings, snippet imports, and the
+element-to-element line breaks that Vue treats differently from spaces. The
+tests format `before/` into `after/`, build both with VitePress, and compare the
+rendered page content. Start with [VitePress's renderer options](vitepress.md)
+when adapting it to a site.
 
 ## Write a plugin
 

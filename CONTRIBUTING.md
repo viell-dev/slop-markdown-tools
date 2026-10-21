@@ -93,6 +93,14 @@ procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.
 A parser update can affect output or performance, so those checks cover the
 complete resolved dependency graph.
 
+The VitePress reading uses markdown-it 14.3.3 with the same plugin generation as
+the pinned VitePress 2 reference, including its parser security fixes. Its
+development-only MathJax reference pulls speech-rule-engine 4.1.4, which pins
+vulnerable xmldom 0.9.10; the scoped override selects patched 0.9.12. Keep the
+override until that dependency accepts a fixed version, and check both the
+actual math renderer and the audit when changing it. Tracking issue:
+[#481](https://github.com/viell-dev/slop-markdown-tools/issues/481).
+
 Indirect dependencies can declare version ranges. The repository's development
 lockfile is not shipped or imposed on consumers, so a fresh installation of the
 same mdrefine version can resolve newer indirect dependencies than its release

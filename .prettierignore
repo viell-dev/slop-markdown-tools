@@ -5,10 +5,10 @@ coverage/
 artifacts/
 tests/fixtures/
 package-lock.json
-docs/.vitepress/dist/
-docs/.vitepress/cache/
-docs/.vitepress/.temp/
-docs/.vitepress/*.timestamp-*.mjs
+**/.vitepress/dist/
+**/.vitepress/cache/
+**/.vitepress/.temp/
+**/.vitepress/*.timestamp-*.mjs
 # Markdown is formatted and checked by Markdown Tools itself.
 **/*.md
 **/*.markdown

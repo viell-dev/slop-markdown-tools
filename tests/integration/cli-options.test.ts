@@ -18,7 +18,7 @@ describe("the command line", () => {
       ],
       [
         ["format", "--dialect", "gitlab"],
-        "mdtools: option '--dialect <dialect>' argument 'gitlab' is invalid. The dialects are commonmark, github, forgejo (alias: codeberg), gitea, obsidian.\n",
+        "mdtools: option '--dialect <dialect>' argument 'gitlab' is invalid. The dialects are commonmark, github, forgejo (alias: codeberg), gitea, obsidian, vitepress.\n",
       ],
       [
         ["format", "--check", "--write"],

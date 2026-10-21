@@ -3,4 +3,11 @@
   "extends": ["recommended", "github"],
   // Fixtures and example documents are deliberately unformatted or in another dialect.
   "ignore": ["tests/fixtures/**", "examples/workspaces/**", "examples/plugin/notes/**"],
+  "overrides": [
+    {
+      "files": ["docs/**/*.md"],
+      "dialect": "vitepress",
+      "vitepress": { "anchor": "github", "srcDir": "docs" },
+    },
+  ],
 }

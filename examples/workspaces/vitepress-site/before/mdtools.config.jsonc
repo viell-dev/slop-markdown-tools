@@ -1,0 +1,8 @@
+{
+  "extends": ["recommended", "vitepress"],
+  "vitepress": { "customContainers": ["example"] },
+  "rules": {
+    "style/wrap": ["warn", { "width": 64 }],
+    "links/path": ["warn", { "style": "relative", "leadingDot": true }],
+  },
+}

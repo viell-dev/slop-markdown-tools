@@ -2,7 +2,14 @@ import { access, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { resolveConfig } from "../config/resolve.js";
-import type { Config, Dialect, Plugin, ProcessOptions, Workspace } from "../core/types.js";
+import type {
+  Config,
+  Dialect,
+  Plugin,
+  ProcessOptions,
+  Workspace,
+  VitePressOptions,
+} from "../core/types.js";
 import { pathError } from "./access.js";
 import { discover, isIgnoredInput, unlistedLookup, vaultFor } from "./files.js";
 import type { Skipped } from "./files.js";
@@ -161,17 +168,19 @@ export async function discoverFrom(
   };
   // One index per active dialect, built when a document of the dialect is first
   // processed, and a view of it with each vault's line-break setting.
-  const indexes = new Map<Dialect, Workspace>();
-  const views = new Map<Dialect, Map<Vault, Workspace>>();
+  const indexes = new Map<string, Workspace>();
+  const views = new WeakMap<Workspace, Map<Vault, Workspace>>();
   // Links into folders that discovery does not enter are checked on disk.
   const lookup = unlistedLookup(set);
-  function index(dialect: Dialect): Workspace {
-    let workspace = indexes.get(dialect);
+  function index(dialect: Dialect, vitepress: VitePressOptions): Workspace {
+    const key = JSON.stringify([dialect, dialect === "vitepress" ? vitepress : undefined]);
+    let workspace = indexes.get(key);
     if (workspace) return workspace;
     // The vault that the root is a folder of, if it is one: links may lead out of sight.
     const enclosing = set.vaults.find((item) => item.rootInVault);
     workspace = createWorkspace(set.files, {
       dialect,
+      ...(dialect === "vitepress" ? { vitepress } : {}),
       directories: set.directories,
       // Links into a directory that could not be read are unchecked, not missing.
       unreadable: set.skipped.flatMap((item) =>
@@ -182,7 +191,7 @@ export async function discoverFrom(
       ...(enclosing?.rootInVault ? { rootInVault: enclosing.rootInVault } : {}),
       lookup,
     });
-    indexes.set(dialect, workspace);
+    indexes.set(key, workspace);
     return workspace;
   }
   return {
@@ -200,17 +209,17 @@ export async function discoverFrom(
       known(name);
       const vault = supplied.has(name) ? supplied.get(name) : vaultOf(set.vaults, name);
       const assumed = assumedDialect(vault);
-      const { dialect } = resolveConfig({
+      const { dialect, vitepress } = resolveConfig({
         config: options.config,
         path: name,
         plugins: options.plugins,
         defaultDialect: assumed,
       });
-      let workspace = index(dialect);
+      let workspace = index(dialect, vitepress);
       // Whether a note may be reflowed is a setting of its own vault.
       if (vault?.strictLineBreaks !== undefined) {
-        let ofDialect = views.get(dialect);
-        if (!ofDialect) views.set(dialect, (ofDialect = new Map<Vault, Workspace>()));
+        let ofDialect = views.get(workspace);
+        if (!ofDialect) views.set(workspace, (ofDialect = new Map<Vault, Workspace>()));
         const shared = workspace;
         workspace = ofDialect.get(vault) ?? { ...shared, strictLineBreaks: vault.strictLineBreaks };
         ofDialect.set(vault, workspace);

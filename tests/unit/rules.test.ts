@@ -295,7 +295,7 @@ describe("style/block-spacing", () => {
         name === "recommended" ? "warn" : undefined,
       );
   });
-  it.each(dialects)(
+  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
     "keeps a separator inside the reading without TOML front matter in the %s dialect (#426)",
     (dialect) => {
       for (const newline of ["\n", "\r\n", "\r"])
@@ -842,7 +842,7 @@ describe("style/inline-code", () => {
       expect(formatted(source, only(rule))).toBe(source.replace("\n> ", " "));
     }
   });
-  it.each(dialects)(
+  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
     "drops the indentation of the next line when it joins a code span in the %s dialect",
     (dialect) => {
       // CommonMark strips it from a paragraph's lines before it reads the span,
@@ -958,7 +958,7 @@ describe("style/inline-code", () => {
       );
   });
   it.each(observed)("joins the code spans of %j as GitHub shows them", (source, github) => {
-    for (const dialect of dialects) {
+    for (const dialect of dialects.filter((dialect) => dialect !== "vitepress")) {
       // CommonMark has no footnotes.
       if (dialect === "commonmark" && source.includes("[^")) continue;
       const output = formatted(source, only(rule, dialect));

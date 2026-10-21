@@ -72,8 +72,9 @@ the rendered page, such as a reference without a definition, a skipped heading
 level, or an image without alternative text. The second
 [preset](configuration.md#presets) names where your documents are rendered and
 so their [dialect](dialects.md): replace `github` with `forgejo` (or
-`codeberg`), `gitea`, or `obsidian`. For plain CommonMark, keep only
-`recommended` and add `"dialect": "commonmark"`.
+`codeberg`), `gitea`, `obsidian`, or `vitepress`. Match a VitePress site's
+[renderer options](vitepress.md#renderer-options) explicitly. For plain
+CommonMark, keep only `recommended` and add `"dialect": "commonmark"`.
 
 Without a configuration file, the `recommended` rules apply, and documents are
 read as GitHub Markdown, or as Obsidian notes inside a vault. A configuration

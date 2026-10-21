@@ -75,10 +75,10 @@ const result = format(files["Note.md"], { ...options, workspace });
 ```
 
 `resolveConfig(options)` returns the settings in effect for a document:
-`dialect`, `rules`, `ignore`, `resolve`, and `codeFormatters`. It takes the
-`path`, `config`, `plugins`, and `defaultDialect` of `lint` and `format`, so
-their options serve as they are. The prereleases took these four as separate
-arguments; such a call throws an error that says so.
+`dialect`, `rules`, `ignore`, `resolve`, `codeFormatters`, and `vitepress`. It
+takes the `path`, `config`, `plugins`, and `defaultDialect` of `lint` and
+`format`, so their options serve as they are. The prereleases took these four as
+separate arguments; such a call throws an error that says so.
 
 ## Workspaces
 
@@ -87,30 +87,31 @@ rewriting, and Obsidian wrapping need; without one, none of them happen. `files`
 maps each path, relative to the workspace root with forward slashes, to one of:
 
 - the text of a Markdown document, whose headings are link targets when its name
-  ends in `.md` or `.markdown`, or `.md` for Obsidian links;
+  ends in `.md` or `.markdown`, or `.md` for Obsidian and VitePress links;
 - `null` for a file that is not Markdown, such as an image, so that links to it
   resolve;
 - a synchronous loader, `() => string`, which is called only when a link's
   fragment needs the document. The workspace then keeps the document's anchors,
   not its text. The anchors of Obsidian, of GitHub and CommonMark, and of
-  Forgejo and Gitea differ, so a loader is called once more when the same target
-  is checked for another of these groups. A loader must return the same text
-  each time, so create a new workspace when files change. A loader that throws
-  an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`, or
+  Forgejo and Gitea, and of VitePress differ, so a loader is called once more
+  when the same target is checked for another of these groups. A loader must
+  return the same text each time, so create a new workspace when files change. A
+  loader that throws an error whose `code` is `EACCES`, `EPERM`, or `EBUSY`, or
   `ERR_ENCODING_INVALID_ENCODED_DATA`, which a `TextDecoder` created with
   `fatal: true` throws for a file that is not valid in its encoding, makes a
   link to a heading in that file resolve as `unreadable`, while a link to the
   file itself still resolves; any other error propagates.
 
-| `WorkspaceOptions` | Meaning                                                                                                                     |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `dialect`          | The dialect that link targets are parsed in; `github` when omitted. Give the dialect of the documents that link into them.  |
-| `strictLineBreaks` | `true` when the vault's "Strict line breaks" setting is verified on. Obsidian notes are wrapped only then.                  |
-| `directories`      | Existing directories that hold no files; the others are known from `files`. A link to a directory resolves as `directory`.  |
-| `unreadable`       | Directories whose contents the host could not read. A link that may lead into one resolves as `unreadable`.                 |
-| `vaults`           | Directories below the root that are Obsidian vaults. An Obsidian link in one of their notes reaches only the vault's files. |
-| `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                      |
-| `lookup`           | `(path, folded) => result`: what is at a path that `files` and `directories` do not hold; see below.                        |
+| `WorkspaceOptions` | Meaning                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `dialect`          | The dialect that link targets are parsed in; `github` when omitted. Give the dialect of the documents that link into them.       |
+| `vitepress`        | The same [renderer options](vitepress.md#renderer-options) as the document's configuration. Included files need text or loaders. |
+| `strictLineBreaks` | `true` when the vault's "Strict line breaks" setting is verified on. Obsidian notes are wrapped only then.                       |
+| `directories`      | Existing directories that hold no files; the others are known from `files`. A link to a directory resolves as `directory`.       |
+| `unreadable`       | Directories whose contents the host could not read. A link that may lead into one resolves as `unreadable`.                      |
+| `vaults`           | Directories below the root that are Obsidian vaults. An Obsidian link in one of their notes reaches only the vault's files.      |
+| `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                           |
+| `lookup`           | `(path, folded) => result`: what is at a path that `files` and `directories` do not hold; see below.                             |
 
 `lookup` lets a host leave files out of `files` and still have links to them
 checked. It is called once per path, with `folded` true for an Obsidian link,
@@ -269,8 +270,8 @@ permissions, not an operating-system sandbox.
   the same result. The function reads no files; the first two arguments label
   the patch's old and new files. Identical texts produce headers without hunks;
   skip calling it when an unchanged document should produce no preview.
-- `parse(source, dialect, path, plugins)` returns a `Document`: `source`,
-  `path`, `dialect`, and `tree`, an
+- `parse(source, dialect, path, plugins, vitepress)` returns a `Document`:
+  `source`, `path`, `dialect`, and `tree`, an
   [mdast](https://github.com/syntax-tree/mdast) syntax tree. `document.source`
   starts after any byte order mark, and `range(node)` gives a node's
   `[start, end]` offsets into it. `textContent(node)` gives a node's text. An
@@ -281,7 +282,10 @@ permissions, not an operating-system sandbox.
   describes. In the Obsidian dialect, the tree holds `wikiLink`,
   `obsidianComment`, and `obsidianHighlight` nodes, typed as `WikiLink`,
   `ObsidianComment`, and `ObsidianHighlight` and registered with mdast's node
-  types.
+  types. The optional fifth argument selects VitePress's renderer options; its
+  returned document also carries `vitepress`. Positioned mdast is a conservative
+  view of VitePress syntax: renderer-only blocks and inline footnotes can be
+  opaque, as [preservation](vitepress.md#preservation) describes.
 - `resolveConfig`, described above, and `validateConfig(value)`, which throws
   when a value is not a valid configuration. `configSchema` is the
   configuration's [JSON Schema](configuration.md#json-schema), which the package

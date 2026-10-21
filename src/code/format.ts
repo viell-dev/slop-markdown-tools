@@ -93,7 +93,7 @@ export async function formatWithCode(
     );
   let output = first.output;
   const mark = splitByteOrderMark(output)[0];
-  let document = parse(output, config.dialect, options.path, options.plugins);
+  let document = parse(output, config.dialect, options.path, options.plugins, config.vitepress);
   let nodes = blocks(document);
   let suppressed = suppressions(document);
   let scope = first.scope;
@@ -154,7 +154,7 @@ export async function formatWithCode(
     let accepted = false;
     for (const edits of candidate.choices) {
       const bare = applyEdits(document.source, edits);
-      const tried = parse(bare, config.dialect, options.path, options.plugins);
+      const tried = parse(bare, config.dialect, options.path, options.plugins, config.vitepress);
       if (semanticFingerprint(tried, options.workspace) !== expected) continue;
       const full = edits.map((edit) => ({
         ...edit,

@@ -42,7 +42,10 @@ it.each(dialects)("keeps colon-container boundaries out of tables in %s", (diale
               .map((line, index) => (index && prefix === "- " ? "  " : prefix) + line)
               .join(newline) + newline;
           const result = verify(source, config);
-          expect(result.output).toBe(source);
+          // The VitePress dialect separates recognized containers, so it can
+          // align their tables while retaining the boundary itself.
+          if (dialect === "vitepress") expect(result.output).toContain(boundary);
+          else expect(result.output).toBe(source);
           expect(result.diagnostics).toEqual([]);
         }
 });

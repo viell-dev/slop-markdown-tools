@@ -3,7 +3,7 @@ layout: home
 hero:
   name: mdrefine
   text: Lint and format Markdown
-  tagline: One configuration for checks and formatting, for documents rendered by GitHub, Forgejo, Gitea, Obsidian, or any CommonMark renderer.
+  tagline: One configuration for checks and formatting, for documents rendered by GitHub, Forgejo, Gitea, Obsidian, VitePress, or any CommonMark renderer.
   actions:
     - theme: brand
       text: Get started
@@ -17,7 +17,7 @@ features:
   - title: Changes only what its rules target
     details: Formatting edits the source in place, keeps everything else byte for byte, and refuses an edit that would change what a document means.
   - title: Knows where it renders
-    details: Tables, math, wikilinks, callouts, and heading anchors are read as GitHub, Forgejo, Gitea, or Obsidian read them, and local links are checked the same way.
+    details: Tables, math, wikilinks, callouts, and heading anchors are read as GitHub, Forgejo, Gitea, Obsidian, or VitePress read them, and local links are checked the same way.
 ---
 
 mdrefine is meant to replace a general-purpose linter and formatter, such as

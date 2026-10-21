@@ -29,6 +29,7 @@
       "anyOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
     },
     "dialect": { "$ref": "#/definitions/dialect" },
+    "vitepress": { "$ref": "#/definitions/vitepress" },
     "rules": { "$ref": "#/definitions/rules" },
     "codeFormatters": { "$ref": "#/definitions/codeFormatters" },
     "ignore": {
@@ -56,6 +57,7 @@
             "minItems": 1
           },
           "dialect": { "$ref": "#/definitions/dialect" },
+          "vitepress": { "$ref": "#/definitions/vitepress" },
           "rules": { "$ref": "#/definitions/rules" },
           "codeFormatters": { "$ref": "#/definitions/codeFormatters" }
         }
@@ -63,6 +65,28 @@
     }
   },
   "definitions": {
+    "vitepress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "math": { "type": "boolean" },
+        "attrs": { "type": "boolean" },
+        "footnote": { "type": "boolean" },
+        "tasklist": { "type": "boolean" },
+        "cjkFriendlyEmphasis": { "type": "boolean" },
+        "customContainers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "not": { "enum": ["raw", "v-pre", "code-group"] }
+          }
+        },
+        "srcDir": { "type": "string" },
+        "anchor": { "enum": ["vitepress", "github"] }
+      }
+    },
     "codeFormatters": {
       "description": "Trusted code tools for formatWithCode and CLI format; an array replaces inherited tools, and false disables them. No tools run by default.",
       "anyOf": [
@@ -96,7 +120,7 @@
     },
     "dialect": {
       "description": "The renderer whose syntax documents are read in. When nothing names one, github is assumed, or obsidian inside a vault.",
-      "enum": ["commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian"]
+      "enum": ["commonmark", "github", "forgejo", "codeberg", "gitea", "obsidian", "vitepress"]
     },
     "severity": { "enum": ["off", "warn", "error"] },
     "rules": {

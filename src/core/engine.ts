@@ -1,4 +1,6 @@
 import { diagnostic, sortDiagnostics } from "./diagnostics.js";
+import { protectedVitePress } from "../syntax/vitepress/projection.js";
+import { vitepressSemantics } from "../syntax/vitepress/guard.js";
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
 import { deepFreeze } from "./frozen.js";
@@ -411,7 +413,11 @@ function inspect(
       continue;
     }
     for (const finding of findings)
-      if (!suppressed(name, finding) && !(finding.edit && misread(finding.edit)))
+      if (
+        !suppressed(name, finding) &&
+        !protectedVitePress(document, name, finding) &&
+        !(finding.edit && misread(finding.edit))
+      )
         result.push(diagnostic(starts, name, enabled.severity, finding));
   }
   return result.sort(sortDiagnostics);
@@ -443,7 +449,7 @@ export function lint(source: string, options: ProcessOptions = {}): Diagnostic[]
   if (options.ranges) checkRanges(options.ranges, source);
   const { config, rules } = prepare(options);
   const [mark, text] = splitByteOrderMark(source);
-  const document = parse(text, config.dialect, options.path, options.plugins);
+  const document = parse(text, config.dialect, options.path, options.plugins, config.vitepress);
   const diagnostics = inspect(document, config, rules, host(options.workspace));
   // Ranges count the marks, and the document's positions do not.
   const scope =
@@ -541,8 +547,16 @@ function semanticTree(
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
     // A target that is uncertain, because a directory could not be read, is not
     // an identity: only the same spelling is known to name the same note.
-    return resolution?.status === "resolved" && !resolution.unreadable
-      ? `${resolution.target}#${resolution.fragment ?? ""}`
+    return resolution?.status === "resolved" &&
+      typeof resolution.target === "string" &&
+      !resolution.unreadable
+      ? {
+          fragment: resolution.fragment ?? "",
+          ...(document.dialect === "vitepress"
+            ? { query: /\?[^#]*/.exec(url.split("#", 1)[0]!)?.[0] ?? "" }
+            : {}),
+          target: resolution.target,
+        }
       : url;
   };
   // Keys are emitted in sorted order so the JSON text is canonical without a replacer.
@@ -580,7 +594,9 @@ function semanticTree(
           /^\[!([\w-]+)\]/,
           (_, marker: string) => `[!${marker.toLowerCase()}]`,
         );
-        result.calloutTitle = normalize(parse(title, document.dialect, document.path).tree);
+        result.calloutTitle = normalize(
+          parse(title, document.dialect, document.path, [], document.vitepress).tree,
+        );
       }
     }
     for (const key of Object.keys(node).sort()) {
@@ -615,6 +631,8 @@ function semanticTree(
     return result;
   }
   const result = normalize(document.tree) as Record<string, unknown>;
+  if (document.dialect === "vitepress")
+    result.vitepress = vitepressSemantics(document, workspace, codeValues);
   // Where front matter would end inside a code block, an HTML block, or
   // display math, the document is read without it, and renderers read TOML
   // front matter as a paragraph. An edit has to keep the meaning of both
@@ -732,7 +750,7 @@ function formatText(
   const hosted = host(options.workspace);
   const { workspace } = hosted;
   let output = source;
-  let document = parse(source, config.dialect, options.path, options.plugins);
+  let document = parse(source, config.dialect, options.path, options.plugins, config.vitepress);
   // Where edits may apply, in the positions of the current output.
   const initial = ranges && widen(document.tree, source, ranges);
   let scope = initial;
@@ -749,7 +767,13 @@ function formatText(
   let fingerprint: string | undefined;
   /** `candidate` parsed, and whether it means what the original document means. */
   const check = (candidate: string) => {
-    const parsed = parse(candidate, config.dialect, options.path, options.plugins);
+    const parsed = parse(
+      candidate,
+      config.dialect,
+      options.path,
+      options.plugins,
+      config.vitepress,
+    );
     // Every document accepted so far means what the original means, so the current one serves.
     fingerprint ??= semanticFingerprint(document, workspace);
     return {

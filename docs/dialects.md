@@ -1,30 +1,34 @@
 # Dialects
 
 A dialect names the renderer whose syntax a document is read in: `commonmark`,
-`github`, `forgejo`, `gitea`, or `obsidian`. `codeberg` is another name for
-`forgejo`, because Codeberg runs Forgejo; the canonical name is what
+`github`, `forgejo`, `gitea`, `obsidian`, or `vitepress`. `codeberg` is another
+name for `forgejo`, because Codeberg runs Forgejo; the canonical name is what
 `config explain`, rules, and plugins see. The dialect decides what is syntax and
 what is text, and so what formatting has to leave alone. Choose it in the
 [configuration](configuration.md#dialect).
 
 ## What each dialect reads
 
-| Syntax                                                                    | CommonMark | GitHub | Forgejo | Gitea | Obsidian |
-| ------------------------------------------------------------------------- | ---------- | ------ | ------- | ----- | -------- |
-| CommonMark, and YAML or TOML front matter                                 | Yes        | Yes    | Yes     | Yes   | Yes      |
-| Tables, task lists, strikethrough, footnotes, literal autolinks           | No         | Yes    | Yes     | Yes   | Yes      |
-| Math between `$` signs, and display math                                  | No         | Yes    | Yes     | Yes   | Yes      |
-| Alerts such as `> [!NOTE]`                                                | No         | Yes    | Yes     | Yes   | Callouts |
-| Definition lists, `\(…\)` and `\[…\]` math, `[[…]]` shortlinks            | No         | No     | Yes     | Yes   | No       |
-| Heading attributes such as `{#id}`                                        | No         | No     | Yes     | Yes   | No       |
-| Wikilinks, embeds, highlights (`==…==`), comments (`%%…%%`), `^block-ids` | No         | No     | No      | No    | Yes      |
+| Syntax                                                                                     | CommonMark | GitHub | Forgejo | Gitea | Obsidian | VitePress 2          |
+| ------------------------------------------------------------------------------------------ | ---------- | ------ | ------- | ----- | -------- | -------------------- |
+| CommonMark                                                                                 | Yes        | Yes    | Yes     | Yes   | Yes      | Yes                  |
+| YAML or TOML front matter                                                                  | Yes        | Yes    | Yes     | Yes   | Yes      | gray-matter; no TOML |
+| Tables, task lists, strikethrough, footnotes, literal autolinks                            | No         | Yes    | Yes     | Yes   | Yes      | Yes; syntax options  |
+| Math between `$` signs, and display math                                                   | No         | Yes    | Yes     | Yes   | Yes      | Opt-in               |
+| Alerts such as `> [!NOTE]`                                                                 | No         | Yes    | Yes     | Yes   | Callouts | Yes                  |
+| Definition lists, `\(…\)` and `\[…\]` math, `[[…]]` shortlinks                             | No         | No     | Yes     | Yes   | No       | No                   |
+| Heading attributes such as `{#id}`                                                         | No         | No     | Yes     | Yes   | No       | Yes                  |
+| Wikilinks, embeds, highlights (`==…==`), comments (`%%…%%`), `^block-ids`                  | No         | No     | No      | No    | Yes      | No                   |
+| Curly element attributes, colon containers, Vue components, inline footnotes, CJK emphasis | No         | No     | No      | No    | No       | Yes; syntax options  |
 
 GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian dialects,
 and the rules for GitHub Markdown apply to all three. TOML front matter is read
-in every dialect for site generators, though the renderers read its lines as a
+in those dialects and CommonMark for site generators, though the renderers read its lines as a
 paragraph, and formatting keeps the meaning of [both
-readings](design.md#safety-model). Obsidian marks strikethrough with two tildes
-only, so `~a~` is text there. The syntax that only Forgejo and Gitea have is
+readings](design.md#safety-model). Obsidian and VitePress mark strikethrough with two tildes
+only, so `~a~` is text there. VitePress reads TOML fences as ordinary Markdown;
+its [renderer options and preservation](vitepress.md) describe its separate reading.
+The syntax that only Forgejo and Gitea have is
 protected from formatting rather than parsed; see [Forgejo and
 Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as an Obsidian
 plugin's, is read as text: use a suppression comment or an `ignore` pattern for
@@ -74,12 +78,14 @@ never restyled, and no line is broken inside it.
   a digit, or `_`. `Costs $5 and $6` is prose; `From $5 to 10$` is math.
 - **GitHub** also wants the formula to touch its dollar signs: `$ x $` is math
   on Forgejo and Gitea, and prose on GitHub.
-- **Obsidian:** the opening `$` may not be followed by a space, and a `$` closes
-  the formula only when no space stands before it and no digit follows it.
-  `$ x $` is prose; `a$x$b` holds a formula, as it does on none of the other
-  three.
+- **Obsidian, and VitePress with math enabled:** the opening `$` may not be
+  followed by a space, and a `$` closes the formula only when no space stands
+  before it and no digit follows it. `$ x $` is prose; `a$x$b` holds a formula,
+  unlike GitHub, Forgejo, and Gitea.
 - **Display math**, between lines of `$$` or in a `math` code block, is the same
-  in every dialect.
+  on GitHub, Forgejo, Gitea, and Obsidian. VitePress's optional dollar display
+  math can interrupt a paragraph and close on the same line; a `math` code fence
+  is ordinary code there.
 
 Where a renderer is stricter, the tool still protects the text: a formula with
 emphasis inside, which GitHub does not render, and one that runs over a line
@@ -92,23 +98,24 @@ view, which shows more as a formula.
 A link's fragment (`page.md#install`) is checked against the anchors that the
 dialect's renderer generates.
 
-| Dialect                    | Anchor of a heading                                                                                                                      | Matched                                |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| GitHub, CommonMark         | Rendered text, lowercased; punctuation other than `-` and `_` deleted; spaces become `-`; repeated anchors get `-1`, `-2`                | Ignoring case                          |
-| Forgejo, Gitea before 1.26 | Source of the heading's last line as written, Markdown included; every run of characters other than letters, digits, and `_` becomes `-` | Exactly                                |
-| Gitea 1.26 and later       | Rendered text of all lines, as on GitHub, without combining marks; repeated headings share one anchor                                    | Exactly                                |
-| Obsidian                   | The heading text itself, or as its source writes it; `#A#B` reaches a heading below another, `#^id` a block identifier                   | Headings ignoring case, blocks exactly |
+| Dialect                    | Anchor of a heading                                                                                                                                      | Matched                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| GitHub, CommonMark         | Rendered text, lowercased; punctuation other than `-` and `_` deleted; spaces become `-`; repeated anchors get `-1`, `-2`                                | Ignoring case                               |
+| Forgejo, Gitea before 1.26 | Source of the heading's last line as written, Markdown included; every run of characters other than letters, digits, and `_` becomes `-`                 | Exactly                                     |
+| Gitea 1.26 and later       | Rendered text of all lines, as on GitHub, without combining marks; repeated headings share one anchor                                                    | Exactly                                     |
+| Obsidian                   | The heading text itself, or as its source writes it; `#A#B` reaches a heading below another, `#^id` a block identifier                                   | Headings ignoring case, blocks exactly      |
+| VitePress 2                | Token text with combining marks removed, punctuation runs replaced by `-`, leading digits prefixed by `_`, and duplicates numbered; `{#id}` overrides it | Fragments pass through the selected slugger |
 
 The Gitea dialect accepts the anchors of both Gitea generations, so it cannot
 promise that a fragment exists on every version. Inline HTML in a heading adds
 its text, but not its tags, to the anchors built from rendered text, except for
 tags that the renderer shows as text, such as `<script>`.
 
-| Heading                                     | GitHub           | Forgejo                              | Gitea 1.25                       |
-| ------------------------------------------- | ---------------- | ------------------------------------ | -------------------------------- |
-| `## test.0.1`                               | `#test01`        | `#test-0-1`                          | `#test01`                        |
-| `## Link [text](https://example.com/p) end` | `#link-text-end` | `#link-text-https-example-com-p-end` | `#link-texthttpsexamplecomp-end` |
-| `## A <span>B</span>`                       | `#a-b`           | `#a-span-b-span`                     | `#a-spanbspan`                   |
+| Heading                                     | GitHub           | Forgejo                              | Gitea 1.25                       | VitePress 2      |
+| ------------------------------------------- | ---------------- | ------------------------------------ | -------------------------------- | ---------------- |
+| `## test.0.1`                               | `#test01`        | `#test-0-1`                          | `#test01`                        | `#test-0-1`      |
+| `## Link [text](https://example.com/p) end` | `#link-text-end` | `#link-text-https-example-com-p-end` | `#link-texthttpsexamplecomp-end` | `#link-text-end` |
+| `## A <span>B</span>`                       | `#a-b`           | `#a-span-b-span`                     | `#a-spanbspan`                   | `#a-b`           |
 
 On GitHub, Forgejo, and Gitea, more fragments are valid:
 

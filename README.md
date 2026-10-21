@@ -18,8 +18,8 @@ shows which have a rule.
 - **Changes only what is configured.** Markdown style edits preserve parsed
   meaning. Optional code formatters target fenced bodies while a guard protects
   the surrounding Markdown.
-- **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, and
-  Obsidian: tables, math, wikilinks, and callouts are read as each renderer
+- **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, Obsidian,
+  and VitePress: tables, math, wikilinks, and callouts are read as each renderer
   reads them.
 - **Checks local links** and their heading and block fragments, with each
   renderer's anchors.
@@ -88,7 +88,8 @@ adjacent blocks with a blank line where safe; ends files with a line break; and
 checks links. It also warns about references without a definition, unused
 definitions, empty links, skipped heading levels, images without alternative
 text, and table rows with the wrong number of cells. Use `forgejo`, `codeberg`,
-`gitea`, or `obsidian` in place of `github` for documents rendered there.
+`gitea`, `obsidian`, or `vitepress` in place of `github` for documents rendered
+there.
 
 ## Documentation
 

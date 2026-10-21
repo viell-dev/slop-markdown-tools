@@ -48,6 +48,7 @@ does not accept; the message names the setting, as in
 | `rules`          | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                            |
 | `overrides`      | Objects with `files` and settings              | [Settings for some files](#overrides)                                |
 | `codeFormatters` | Command entries, or `false`                    | [Opt-in code formatting](#code-formatters)                           |
+| `vitepress`      | Renderer options                               | [VitePress syntax, source directory, and anchors](vitepress.md)      |
 | `ignore`         | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)          |
 | `resolve`        | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)                 |
 | `plugins`        | Files or package names                         | [Plugins](#plugins) to load                                          |
@@ -103,6 +104,7 @@ defaults.
 | `codeberg`    | `forgejo`        | The `forgejo` preset under another name                                                                         |
 | `gitea`       | `gitea`          | Documents rendered by Gitea                                                                                     |
 | `obsidian`    | `obsidian`       | An Obsidian vault                                                                                               |
+| `vitepress`   | `vitepress`      | VitePress 2 pages; see [renderer options](vitepress.md#renderer-options)                                        |
 
 Without `extends`, the configuration starts from `recommended`. `extends` names
 one preset or lists several, and replaces that default, so name both, as in
