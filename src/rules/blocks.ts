@@ -11,7 +11,7 @@ import {
 } from "../syntax/parse.js";
 import { misreadLists } from "../syntax/misread-lists.js";
 import { walk } from "../syntax/walk.js";
-import { lineBreak, lineBreaks, lineEnd, lineStart } from "../syntax/source.js";
+import { lineBreak, lineBreaks, lineEnd, lineEnding, lineStart } from "../syntax/source.js";
 import { optionsSchema as schema } from "./shared.js";
 
 /** A physical line: where it starts, where its content ends, and where the next line starts. */
@@ -192,7 +192,7 @@ export function underlineEdit(document: Document, node: Heading): Edit | undefin
     return undefined;
   // Forgejo and Gitea open a definition or display math with these.
   if (/^(?::[ \t]|\\\[)/.test(text)) return undefined;
-  const newline = /\r\n|\r|\n/.exec(source)?.[0] ?? "\n";
+  const newline = lineEnding(source);
   // Below a first line of `---` that opens no front matter, an underline of
   // `---` alone would close it (issue #278).
   const shortest = node.depth === 2 && unclosedFrontMatter(source) === "---" ? 4 : 3;

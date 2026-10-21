@@ -5,6 +5,7 @@ import { range } from "../syntax/parse.js";
 import { headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { optionsSchema } from "./shared.js";
 import { lastHeadingTextLine } from "../syntax/headings.js";
+import { lineEnd } from "../syntax/source.js";
 
 const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea"]);
 function calloutRule(obsidian: boolean): Rule {
@@ -39,12 +40,10 @@ function calloutRule(obsidian: boolean): Rule {
         // the marker alone on its first line and content below it; elsewhere
         // the marker is text, whose letters would change (issue #334).
         if (!obsidian) {
-          const lineEnd = /\r\n|\r|\n|$/.exec(document.source.slice(start + match[0].length))!;
-          const rest = document.source.slice(
-            start + match[0].length,
-            start + match[0].length + lineEnd.index,
-          );
-          const below = start + match[0].length + lineEnd.index < end || node.children.length > 1;
+          const after = start + match[0].length;
+          const ending = lineEnd(document.source, after);
+          const rest = document.source.slice(after, ending);
+          const below = ending < end || node.children.length > 1;
           if (parent?.type !== "root" || /[^ \t]/.test(rest) || !below) return;
         }
         const original = match[1]!;

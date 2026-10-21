@@ -1,6 +1,7 @@
 import { walk } from "../syntax/walk.js";
 import type { Document, Finding } from "./types.js";
 import { range } from "../syntax/parse.js";
+import { lineBreakMatcher } from "../syntax/source.js";
 
 /** A suppression directive and the rules it names, `*` for all of them. */
 export interface Directive {
@@ -30,7 +31,7 @@ export function suppressions(document: Document): (rule: string, finding: Findin
     const [start, end] = range(node);
     if (found.kind === "disable-next-line") {
       // The line after the directive's own, whichever of CommonMark's line endings ends each.
-      const lineBreak = /\r\n|\r|\n/g;
+      const lineBreak = lineBreakMatcher();
       lineBreak.lastIndex = end;
       const first = lineBreak.exec(document.source);
       if (!first) return;

@@ -1,9 +1,16 @@
 /** Any CommonMark line ending, including a lone carriage return. */
 export const lineBreak = /\r\n|\r|\n/;
+/** A split pattern that also keeps the line ending between content pieces. */
+export const capturedLineBreak = new RegExp(`(${lineBreak.source})`);
+
+/** A stateful matcher owned by one source scan. */
+export function lineBreakMatcher(): RegExp {
+  return new RegExp(lineBreak.source, "g");
+}
 
 /** Each complete line ending, with its offset, without shared matcher state. */
 export function lineBreaks(source: string) {
-  return source.matchAll(new RegExp(lineBreak.source, "g"));
+  return source.matchAll(lineBreakMatcher());
 }
 
 /** The source's line ending, taken from its first line break, or LF. */

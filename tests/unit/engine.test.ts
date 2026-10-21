@@ -45,6 +45,43 @@ function formatted(source: string, options: ProcessOptions = {}) {
   return result.output;
 }
 describe("formatting contracts", () => {
+  it("orders diagnostic ties by UTF-16 rule IDs on every host", () => {
+    const names = ["z", "a", "Z", "ä", "A", "😀"];
+    const plugin: Plugin = {
+      name: "ordering",
+      rules: Object.fromEntries(
+        names.map(
+          (name) =>
+            [
+              name,
+              {
+                kind: "problem",
+                description: "Report in reverse source order",
+                check: () => [
+                  { start: 7, message: "Later" },
+                  { start: 0, message: "First" },
+                ],
+              } satisfies Rule,
+            ] as const,
+        ),
+      ),
+    };
+    const options = {
+      plugins: [plugin],
+      config: {
+        extends: [],
+        rules: Object.fromEntries(names.map((name) => [`ordering/${name}`, "warn"] as const)),
+      },
+    };
+    const source = "First.\nLater.\n";
+    const formatted = format(source, options);
+    expect(formatted.output).toBe(source);
+    const expected = [0, 7].flatMap((start) =>
+      ["A", "Z", "a", "z", "ä", "😀"].map((name) => [start, `ordering/${name}`]),
+    );
+    for (const diagnostics of [lint(source, options), formatted.diagnostics])
+      expect(diagnostics.map(({ start, rule }) => [start, rule])).toEqual(expected);
+  });
   it("parses unchanged source once per call, including no-op edits", () => {
     const plugin: Plugin = {
       name: "noop",

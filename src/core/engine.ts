@@ -194,8 +194,9 @@ function diagnostic(
   }
   return { ...finding, rule, severity, line: low + 1, column: finding.start - starts[low]! + 1 };
 }
+/** Tied rule IDs use UTF-16 code-unit order, independent of the host's locale. */
 const sortDiagnostics = (a: Diagnostic, b: Diagnostic) =>
-  a.start - b.start || a.rule.localeCompare(b.rule);
+  a.start - b.start || (a.rule === b.rule ? 0 : a.rule < b.rule ? -1 : 1);
 /** Diagnostics of the engine itself; they concern the whole document. */
 const fromEngine = (item: Diagnostic) => item.rule.startsWith("engine/");
 /** Why `value` is not an offset from `from` to `to`, or undefined when it is one. */

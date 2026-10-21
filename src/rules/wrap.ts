@@ -1,3 +1,4 @@
+import type { Document, RuleContext } from "../core/types.js";
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
 import type { Paragraph, Parents } from "mdast";
@@ -7,7 +8,7 @@ import { definitionLike } from "../syntax/misread-lists.js";
 import { labelEnd, lazyIndentation, parse, range, startsWithMarker } from "../syntax/parse.js";
 import { type Range, located, holds } from "./shared.js";
 import { obsidianOpaque, goldmarkForges, misreadTable } from "./protections.js";
-import { lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
+import { capturedLineBreak, lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 /**
@@ -557,6 +558,481 @@ function obsidianMarkers(source: string, node: Paragraph, start: number, end: nu
 function continuationOf(prefix: string): string {
   return prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) => " ".repeat(value.length));
 }
+interface WrapContext extends Pick<RuleContext, "document" | "options"> {
+  width: number;
+  measure: (text: string) => number;
+  unit: string;
+  newline: string;
+}
+interface PreparedParagraph {
+  node: Paragraph;
+  index: number | undefined;
+  parent: Parents | undefined;
+
+  start: number;
+  end: number;
+  children: Paragraph["children"];
+  original: string;
+  forge: string | undefined;
+  calloutHeader: boolean;
+  belowHeader: boolean;
+  prefix: string;
+  continuation: string;
+  lazyStart: boolean;
+}
+/** Locate the paragraph body and retain any callout header as written. */
+function prepareParagraph(
+  node: Paragraph,
+  index: number | undefined,
+  parent: Parents | undefined,
+  context: WrapContext,
+  findings: Finding[],
+): PreparedParagraph | undefined {
+  const { document, options, width, measure, unit } = context;
+
+  const paragraphStart = range(node)[0];
+  let end = range(node)[1];
+  // Obsidian's Reading view shows the blank space at the end of a footnote
+  // definition's last paragraph before the footnote's backreference (issue
+  // #405). It stays as written, outside the text that is reflowed.
+  if (
+    document.dialect === "obsidian" &&
+    parent?.type === "footnoteDefinition" &&
+    index === parent.children.length - 1
+  )
+    while (end > paragraphStart && /[ \t]/.test(document.source[end - 1]!)) end--;
+  let start = paragraphStart;
+  let children = node.children;
+  // A task item's paragraph range can begin at the checkbox, and its first
+  // text node can begin with the separator. Wrap only the content after them.
+  if (children[0]) {
+    start = Math.max(start, range(children[0])[0]);
+    while (start < end && /[ \t]/.test(document.source[start]!)) start++;
+  }
+  let original = document.source.slice(start, end);
+  const forge = goldmarkForges[document.dialect];
+  // An Obsidian callout or a GitHub, Forgejo, or Gitea alert keeps the line
+  // with its marker, and its title in Obsidian, as written. On Forgejo and
+  // Gitea, a marker written as `\[!NOTE]` starts like display math, and
+  // its paragraph stays as written.
+  let calloutHeader =
+    document.dialect !== "commonmark" &&
+    parent?.type === "blockquote" &&
+    index === 0 &&
+    startsWithMarker(original, node) &&
+    !(forge && original.startsWith("\\["));
+  /** Whether the lines to wrap are the body below that line, in the same paragraph. */
+  let belowHeader = false;
+  let lineStart = start;
+  while (lineStart > 0 && !/[\r\n]/.test(document.source[lineStart - 1]!)) lineStart--;
+  let prefix = document.source.slice(lineStart, start);
+  const continuation = continuationOf(prefix);
+  // Directly below a link reference definition, a paragraph can start with
+  // a lazy continuation line, which lacks some of the container markers of
+  // the lines around it. The later lines' prefixes cannot be told from it.
+  const above = index ? parent?.children[index - 1] : undefined;
+  let lazyStart = false;
+  if (above?.type === "definition" && above.position!.end.line === node.position!.start.line - 1) {
+    const [definitionStart] = range(above);
+    const definitionLine = lineBounds(document.source, definitionStart, definitionStart)[0];
+    lazyStart =
+      continuationOf(document.source.slice(definitionLine, definitionStart)) !== continuation;
+  }
+  if (calloutHeader) {
+    const headerBreak = lineBreak.exec(original);
+    const headerEnd = headerBreak ? start + headerBreak.index : end;
+    const header = document.source.slice(start, headerEnd);
+    const bodyStart = headerEnd + (headerBreak?.[0].length ?? 0) + continuation.length;
+    const bodyLines = headerBreak
+      ? original.slice(headerBreak.index + headerBreak[0].length).split(lineBreak)
+      : [];
+    const supported =
+      bodyLines.every((line) => line.startsWith(continuation)) &&
+      !children.some((child) => {
+        const [a, b] = range(child);
+        return child.type !== "text" && a < bodyStart && b > bodyStart;
+      });
+    // Keep unusual continuations and inline syntax spanning the boundary untouched.
+    if (supported) {
+      if (options.reportUnbreakable === true && lineWidth(prefix + header, measure) > width)
+        findings.push({
+          start,
+          end: start + header.length,
+          message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
+        });
+      if (!headerBreak) return;
+      start = bodyStart;
+      original = document.source.slice(start, end);
+      children = children.filter((child) => range(child)[1] > start);
+      prefix = continuation;
+      calloutHeader = false;
+      belowHeader = true;
+    }
+  }
+  return {
+    node,
+    index,
+    parent,
+    start,
+    end,
+    children,
+    original,
+    forge,
+    calloutHeader,
+    belowHeader,
+    prefix,
+    continuation,
+    lazyStart,
+  };
+}
+/** Join physical lines into words, preserving protected atoms and their rendered spaces. */
+function readWords(
+  document: Document,
+  original: string,
+  start: number,
+  continuation: string,
+  protection: Protection,
+  inline: ReturnType<typeof inlineAtoms>,
+): { words: string[]; failure: string | undefined } {
+  const { source } = document;
+
+  // Collect the words line by line, without the container prefixes. A line
+  // ending between words, or in the text of emphasis or a link, separates
+  // words like a space. One inside an atom joins its lines with the space
+  // that it renders as, or keeps the paragraph as written.
+  const words: string[] = [];
+  let failure: string | undefined;
+  const pieces = original.split(capturedLineBreak);
+  let at = start;
+  let lineEnd = start;
+  for (let i = 0; i < pieces.length && !failure; i += 2) {
+    let line = pieces[i]!;
+    let lineAt = at;
+    at += line.length + (pieces[i + 1]?.length ?? 0);
+    if (i > 0) {
+      if (continuation && line.startsWith(continuation)) {
+        line = line.slice(continuation.length);
+        lineAt += continuation.length;
+      } else if (continuation && /^[\s>]/.test(line)) {
+        failure = "unsupported continuation";
+        break;
+      }
+      // Directly after a bare quote marker, Live Preview reads a tag as
+      // text. Joining that line would put it after a space and create a
+      // tag (issue #414). Inline atoms keep their own reading of `#`.
+      if (
+        document.dialect === "obsidian" &&
+        source[lineAt - 1] === ">" &&
+        obsidianTag.test(line) &&
+        !protection.has(lineAt)
+      ) {
+        failure = "tag-like text directly after a block quote marker";
+        break;
+      }
+      const last = words.at(-1);
+      let joining = protection.has(lineEnd)
+        ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
+        : undefined;
+      if (joining && typeof joining === "object" && "within" in joining)
+        joining = atomAt(joining.within, lineEnd)?.joining ?? "description";
+      if (!joining) words.push(" ");
+      else if (last === undefined || /^[ \t]+$/.test(last)) failure = "line break in inline syntax";
+      else if (joining === "code" || joining === "description") {
+        // In an image description, two spaces or a backslash before the
+        // line ending make a hard break, and other spaces collapse; in a
+        // code span, the spaces before it are code. The spaces and tabs
+        // after it go, as `codeSpanText` reads the span, also the
+        // indentation below a task item's checkbox, which the parser
+        // keeps. A lazy line, which keeps them, is not supported above.
+        if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
+        // In a code span, a backslash before the line ending is a hard
+        // break wherever the backticks do not pair, as on GitHub after an
+        // unpaired longer run (issue #335).
+        if (joining === "code" && last.endsWith("\\"))
+          failure = "backslash at a line end in a code span";
+        const trimmed = line.replace(/^[ \t]+/, "");
+        lineAt += line.length - trimmed.length;
+        line = trimmed;
+        words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
+      } else failure = "reason" in joining ? joining.reason : "line break in inline syntax";
+    }
+    for (const word of protection.split(line, lineAt)) words.push(word);
+    lineEnd = lineAt + line.length;
+  }
+  return { words, failure };
+}
+/** Greedily fill lines, with the first selected atoms kept together. */
+function fillLines(
+  atoms: string[],
+  first: number,
+  prefix: string,
+  continuation: string,
+  width: number,
+  measure: (text: string) => number,
+): string[] {
+  const lines: string[] = [];
+  let line = atoms.slice(0, first).join(" ");
+  let linePrefix = prefix;
+  for (let i = first; i < atoms.length; i++) {
+    const candidate = `${line} ${atoms[i]}`;
+    if (lineWidth(linePrefix + candidate, measure) > width) {
+      lines.push(line);
+      line = atoms[i]!;
+      linePrefix = continuation;
+    } else line = candidate;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+/** Why the paragraph must stay as written, independently of overflow reporting. */
+function paragraphSkipReason(
+  document: Document,
+  prepared: PreparedParagraph,
+  inline: ReturnType<typeof inlineAtoms>,
+  protectedReason: string | undefined,
+): string | undefined {
+  const {
+    node,
+    index,
+    parent,
+    start,
+    end,
+    children,
+    original,
+    forge,
+    belowHeader,
+    prefix,
+    continuation,
+    lazyStart,
+  } = prepared;
+  const { source } = document;
+
+  // Only the first paragraph of a block quote can be a callout, so a
+  // paragraph elsewhere that starts with a linked image, `[![`, is wrapped.
+  // Below the line of a marker, the paragraph's text no longer starts the
+  // lines to wrap.
+  const markerLike = /^\[![^\]]+\]/;
+  const startsLikeMarker =
+    parent?.type === "blockquote" &&
+    index === 0 &&
+    (belowHeader ? markerLike.test(original) : startsWithMarker(original, node, markerLike));
+  const reason = inline.breaks.length
+    ? "hard line break"
+    : children.some((child) => child.type === "html")
+      ? "inline HTML"
+      : startsLikeMarker
+        ? "callout header"
+        : blockIdentifier(document.source, node)
+          ? "block identifier"
+          : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
+            ? "leading block marker"
+            : document.dialect !== "commonmark" && misreadTable(original)
+              ? "table delimiter row as its second line"
+              : original.startsWith("<<<")
+                ? "site-generator snippet import"
+                : startsSiteSyntax(original)
+                  ? "site-generator syntax at the start of a line"
+                  : lazyStart
+                    ? "lazy first line"
+                    : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
+                      ? "unsupported container prefix"
+                      : document.dialect === "obsidian" && obsidianMarkers(source, node, start, end)
+                        ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
+                        : inline.unlocated
+                          ? "inline syntax without a source position"
+                          : undefined;
+  const skipped =
+    reason ??
+    protectedReason ??
+    (document.dialect === "obsidian" &&
+    parent?.type === "blockquote" &&
+    node.position?.start.line === parent.position?.start.line &&
+    prefix !== continuation
+      ? "block quote on a list marker line"
+      : undefined) ??
+    (document.dialect === "obsidian"
+      ? definitionWrapReason(
+          source,
+          start,
+          end,
+          inline.atoms.filter((atom) => atom.joining === "code").map(({ from, to }) => [from, to]),
+        )
+      : undefined) ??
+    (document.dialect === "gitea" && giteaPyParagraph(source, node, start, end)
+      ? "Gitea `_.py` emphasis exception"
+      : undefined);
+  return skipped;
+}
+
+/** Propose wrapping and overflow findings for one located paragraph. */
+function wrapParagraph(
+  node: Paragraph,
+  index: number | undefined,
+  parent: Parents | undefined,
+  context: WrapContext,
+  findings: Finding[],
+): void {
+  const { document, options, width, measure, unit, newline } = context;
+
+  const prepared = prepareParagraph(node, index, parent, context, findings);
+  if (!prepared) return;
+  const { start, end, original, forge, calloutHeader, belowHeader, prefix, continuation } =
+    prepared;
+
+  const openers = [wordOpener, prefixOpener, siteSyntax];
+  if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
+  if (forge) openers.push(forgeLineOpener);
+  // Live Preview reads a tag after blank space or at the start of a line's
+  // content, not directly after a quote marker, so where the lines below
+  // the first start with markers written without a space after them, a
+  // tag stays on the line before it (issue #409).
+  if (document.dialect === "obsidian" && continuation.endsWith(">")) openers.push(obsidianTag);
+  const { source } = document;
+  // GitHub and Obsidian end dollar math at a single dollar after a line
+  // ending, but not after a space, so a word that starts with `$` stays on
+  // the line of the word before it when a dollar comes before it. Obsidian
+  // also begins math at a single dollar before a line ending, but not
+  // before a space, so a word that ends in a dollar of its text, such as a
+  // lone `$`, stays on the line of the word after it when a dollar comes
+  // after it. Forgejo and Gitea have neither condition.
+  const maths: string[] = [];
+  if (document.dialect === "obsidian")
+    walk(node, "inlineMath", (math) => {
+      maths.push(source.slice(...range(math)));
+    });
+  const dollars: DollarEdges = {
+    start: document.dialect === "github" || document.dialect === "obsidian",
+    ...(document.dialect === "obsidian"
+      ? {
+          end: (atom: string) => dollarEnd.test(atom) && !maths.some((math) => atom.endsWith(math)),
+        }
+      : {}),
+  };
+  const inline = inlineAtoms(node, start, document.dialect === "obsidian");
+  const protection = new Protection(start, end);
+  for (const atom of inline.atoms) protection.add(atom.from, atom.to);
+  // Forgejo and Gitea protections apply before paragraphs are skipped, so
+  // that diagnostics still count one-line math and shortlinks as atoms.
+  const protections = forge
+    ? forgeProtections(source, start, end, forge)
+    : document.dialect === "obsidian"
+      ? inlineFootnotes(
+          source,
+          start,
+          end,
+          inline.atoms.filter((atom) => atom.joining === "code").map(({ from, to }) => [from, to]),
+        )
+      : { ranges: [] as Range[] };
+  for (const [from, to] of protections.ranges) protection.add(from, to);
+  for (const [from, to] of templateTags(source.slice(start, end), start)) protection.add(from, to);
+  const reportUnbreakable = () =>
+    findings.push({
+      start,
+      end,
+      message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
+    });
+  const reportSkipped = (reason: string) => {
+    if (options.reportUnreflowed !== true && options.reportUnbreakable !== true) return;
+    let breakable = false;
+    let unbreakable = false;
+    let offset = start;
+    for (const line of original.split(/(?<=\n|\r(?!\n))/)) {
+      const content = line.replace(/(?:\r\n|\r|\n)$/, "");
+      const container =
+        offset === start
+          ? ""
+          : continuation && content.startsWith(continuation)
+            ? continuation
+            : (content.match(/^[ \t>]+/)?.[0] ?? "");
+      const linePrefix = offset === start ? prefix : container;
+      // An Obsidian title occupies one physical line, even when it contains spaces.
+      if (calloutHeader && offset === start) {
+        if (lineWidth(prefix + content, measure) > width) unbreakable = true;
+        offset += line.length;
+        continue;
+      }
+      // Hard-break markers do not count toward the width.
+      let contentEnd = offset + content.length;
+      for (const [a] of inline.breaks) if (a >= offset && a < contentEnd) contentEnd = a;
+      const from = offset + container.length;
+      const words = protection.split(source.slice(from, contentEnd), from);
+      const atoms = wrappingAtoms(words, openers, dollars);
+      const available = width - lineWidth(linePrefix, measure);
+      if (measure(words.join("").trimEnd()) > available) {
+        if (atoms.length > 1) breakable = true;
+        if (atoms.some((atom) => measure(atom) > available)) unbreakable = true;
+      }
+      offset += line.length;
+    }
+    if (options.reportUnreflowed === true && breakable)
+      findings.push({
+        start,
+        end,
+        message: `Paragraph not reflowed: ${reason} (width ${width} ${unit}).`,
+      });
+    if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
+  };
+  const skipped = paragraphSkipReason(document, prepared, inline, protections.reason);
+  if (skipped) {
+    reportSkipped(skipped);
+    return;
+  }
+  const { words, failure } = readWords(document, original, start, continuation, protection, inline);
+
+  if (failure) {
+    reportSkipped(failure);
+    return;
+  }
+  const definitions = document.dialect === "obsidian";
+  const wrapped = wrappingAtoms(words, openers, dollars);
+  const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
+  if (!atoms.length) return;
+  // The first line keeps the words after a first word that would open a
+  // block alone on the line, until the line can no longer open one, and
+  // below an alert's or callout's marker line, after a run of `=` or `-`
+  // that would underline that line as a heading.
+  while (
+    atoms.length > 1 &&
+    (firstWordAlone.test(atoms[0]!) ||
+      (belowHeader && /^(?:=+|-+)$/.test(atoms[0]!)) ||
+      (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
+  )
+    atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
+  let output = fillLines(atoms, 1, prefix, continuation, width, measure);
+  // A paragraph that starts like a link reference definition becomes one
+  // when a line ends after the definition's destination or title. Keep
+  // words on the first line until the lines read as one paragraph again.
+  if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
+    let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
+    while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
+      output = fillLines(atoms, ++first, prefix, continuation, width, measure);
+  }
+  // Live Preview hides the destination after `[`, a label, and `]:` at a
+  // line's content start, including container continuations, so no reflowed line
+  // starts so: the word that opens the label, which may hold blank space,
+  // stays on the line before it (issue #411). The first line has no line
+  // before it, and a paragraph whose first line would start so, as `[a`
+  // and `b]: c d` below it joined, stays as written.
+  // A list's marker line shows its destination as text; ordinary wrapping
+  // there keeps the label on that first line and remains possible (#411).
+  if (definitions && prefix === continuation && definitionLike.test(output[0]!)) {
+    reportSkipped("first line that Obsidian styles as a link reference definition");
+    return;
+  }
+  const replacement = output.join(newline + continuation);
+  if (replacement !== original)
+    findings.push({
+      start,
+      end,
+      message: `Reflow paragraph to ${width} ${unit}.`,
+      edit: { start, end, text: replacement },
+    });
+  if (
+    options.reportUnbreakable === true &&
+    (prefix + replacement).split(lineBreak).some((line) => lineWidth(line, measure) > width)
+  )
+    reportUnbreakable();
+}
 
 const wrap: Rule = {
   description: "Reflow paragraphs using configurable width and protected inline atoms.",
@@ -577,381 +1053,10 @@ const wrap: Rule = {
     const unit = options.measure === "codepoints" ? "code points" : "columns";
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
     const newline = lineEnding(document.source);
-    walk(document.tree, "paragraph", (node, index, parent) => {
-      const paragraphStart = range(node)[0];
-      let end = range(node)[1];
-      // Obsidian's Reading view shows the blank space at the end of a footnote
-      // definition's last paragraph before the footnote's backreference (issue
-      // #405). It stays as written, outside the text that is reflowed.
-      if (
-        document.dialect === "obsidian" &&
-        parent?.type === "footnoteDefinition" &&
-        index === parent.children.length - 1
-      )
-        while (end > paragraphStart && /[ \t]/.test(document.source[end - 1]!)) end--;
-      let start = paragraphStart;
-      let children = node.children;
-      // A task item's paragraph range can begin at the checkbox, and its first
-      // text node can begin with the separator. Wrap only the content after them.
-      if (children[0]) {
-        start = Math.max(start, range(children[0])[0]);
-        while (start < end && /[ \t]/.test(document.source[start]!)) start++;
-      }
-      let original = document.source.slice(start, end);
-      const forge = goldmarkForges[document.dialect];
-      // An Obsidian callout or a GitHub, Forgejo, or Gitea alert keeps the line
-      // with its marker, and its title in Obsidian, as written. On Forgejo and
-      // Gitea, a marker written as `\[!NOTE]` starts like display math, and
-      // its paragraph stays as written.
-      let calloutHeader =
-        document.dialect !== "commonmark" &&
-        parent?.type === "blockquote" &&
-        index === 0 &&
-        startsWithMarker(original, node) &&
-        !(forge && original.startsWith("\\["));
-      /** Whether the lines to wrap are the body below that line, in the same paragraph. */
-      let belowHeader = false;
-      let lineStart = start;
-      while (lineStart > 0 && !/[\r\n]/.test(document.source[lineStart - 1]!)) lineStart--;
-      let prefix = document.source.slice(lineStart, start);
-      const continuation = continuationOf(prefix);
-      // Directly below a link reference definition, a paragraph can start with
-      // a lazy continuation line, which lacks some of the container markers of
-      // the lines around it. The later lines' prefixes cannot be told from it.
-      const above = index ? parent?.children[index - 1] : undefined;
-      let lazyStart = false;
-      if (
-        above?.type === "definition" &&
-        above.position!.end.line === node.position!.start.line - 1
-      ) {
-        const [definitionStart] = range(above);
-        const definitionLine = lineBounds(document.source, definitionStart, definitionStart)[0];
-        lazyStart =
-          continuationOf(document.source.slice(definitionLine, definitionStart)) !== continuation;
-      }
-      if (calloutHeader) {
-        const headerBreak = lineBreak.exec(original);
-        const headerEnd = headerBreak ? start + headerBreak.index : end;
-        const header = document.source.slice(start, headerEnd);
-        const bodyStart = headerEnd + (headerBreak?.[0].length ?? 0) + continuation.length;
-        const bodyLines = headerBreak
-          ? original.slice(headerBreak.index + headerBreak[0].length).split(lineBreak)
-          : [];
-        const supported =
-          bodyLines.every((line) => line.startsWith(continuation)) &&
-          !children.some((child) => {
-            const [a, b] = range(child);
-            return child.type !== "text" && a < bodyStart && b > bodyStart;
-          });
-        // Keep unusual continuations and inline syntax spanning the boundary untouched.
-        if (supported) {
-          if (options.reportUnbreakable === true && lineWidth(prefix + header, measure) > width)
-            findings.push({
-              start,
-              end: start + header.length,
-              message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
-            });
-          if (!headerBreak) return;
-          start = bodyStart;
-          original = document.source.slice(start, end);
-          children = children.filter((child) => range(child)[1] > start);
-          prefix = continuation;
-          calloutHeader = false;
-          belowHeader = true;
-        }
-      }
-      const openers = [wordOpener, prefixOpener, siteSyntax];
-      if (document.dialect !== "commonmark") openers.push(delimiterRowWord);
-      if (forge) openers.push(forgeLineOpener);
-      // Live Preview reads a tag after blank space or at the start of a line's
-      // content, not directly after a quote marker, so where the lines below
-      // the first start with markers written without a space after them, a
-      // tag stays on the line before it (issue #409).
-      if (document.dialect === "obsidian" && continuation.endsWith(">")) openers.push(obsidianTag);
-      const { source } = document;
-      // GitHub and Obsidian end dollar math at a single dollar after a line
-      // ending, but not after a space, so a word that starts with `$` stays on
-      // the line of the word before it when a dollar comes before it. Obsidian
-      // also begins math at a single dollar before a line ending, but not
-      // before a space, so a word that ends in a dollar of its text, such as a
-      // lone `$`, stays on the line of the word after it when a dollar comes
-      // after it. Forgejo and Gitea have neither condition.
-      const maths: string[] = [];
-      if (document.dialect === "obsidian")
-        walk(node, "inlineMath", (math) => {
-          maths.push(source.slice(...range(math)));
-        });
-      const dollars: DollarEdges = {
-        start: document.dialect === "github" || document.dialect === "obsidian",
-        ...(document.dialect === "obsidian"
-          ? {
-              end: (atom: string) =>
-                dollarEnd.test(atom) && !maths.some((math) => atom.endsWith(math)),
-            }
-          : {}),
-      };
-      const inline = inlineAtoms(node, start, document.dialect === "obsidian");
-      const protection = new Protection(start, end);
-      for (const atom of inline.atoms) protection.add(atom.from, atom.to);
-      // Forgejo and Gitea protections apply before paragraphs are skipped, so
-      // that diagnostics still count one-line math and shortlinks as atoms.
-      const protections = forge
-        ? forgeProtections(source, start, end, forge)
-        : document.dialect === "obsidian"
-          ? inlineFootnotes(
-              source,
-              start,
-              end,
-              inline.atoms
-                .filter((atom) => atom.joining === "code")
-                .map(({ from, to }) => [from, to]),
-            )
-          : { ranges: [] as Range[] };
-      for (const [from, to] of protections.ranges) protection.add(from, to);
-      for (const [from, to] of templateTags(source.slice(start, end), start))
-        protection.add(from, to);
-      const reportUnbreakable = () =>
-        findings.push({
-          start,
-          end,
-          message: `Paragraph exceeds ${width} ${unit} because of an unbreakable atom.`,
-        });
-      const reportSkipped = (reason: string) => {
-        if (options.reportUnreflowed !== true && options.reportUnbreakable !== true) return;
-        let breakable = false;
-        let unbreakable = false;
-        let offset = start;
-        for (const line of original.split(/(?<=\n|\r(?!\n))/)) {
-          const content = line.replace(/(?:\r\n|\r|\n)$/, "");
-          const container =
-            offset === start
-              ? ""
-              : continuation && content.startsWith(continuation)
-                ? continuation
-                : (content.match(/^[ \t>]+/)?.[0] ?? "");
-          const linePrefix = offset === start ? prefix : container;
-          // An Obsidian title occupies one physical line, even when it contains spaces.
-          if (calloutHeader && offset === start) {
-            if (lineWidth(prefix + content, measure) > width) unbreakable = true;
-            offset += line.length;
-            continue;
-          }
-          // Hard-break markers do not count toward the width.
-          let contentEnd = offset + content.length;
-          for (const [a] of inline.breaks) if (a >= offset && a < contentEnd) contentEnd = a;
-          const from = offset + container.length;
-          const words = protection.split(source.slice(from, contentEnd), from);
-          const atoms = wrappingAtoms(words, openers, dollars);
-          const available = width - lineWidth(linePrefix, measure);
-          if (measure(words.join("").trimEnd()) > available) {
-            if (atoms.length > 1) breakable = true;
-            if (atoms.some((atom) => measure(atom) > available)) unbreakable = true;
-          }
-          offset += line.length;
-        }
-        if (options.reportUnreflowed === true && breakable)
-          findings.push({
-            start,
-            end,
-            message: `Paragraph not reflowed: ${reason} (width ${width} ${unit}).`,
-          });
-        if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
-      };
-      // Only the first paragraph of a block quote can be a callout, so a
-      // paragraph elsewhere that starts with a linked image, `[![`, is wrapped.
-      // Below the line of a marker, the paragraph's text no longer starts the
-      // lines to wrap.
-      const markerLike = /^\[![^\]]+\]/;
-      const startsLikeMarker =
-        parent?.type === "blockquote" &&
-        index === 0 &&
-        (belowHeader ? markerLike.test(original) : startsWithMarker(original, node, markerLike));
-      const reason = inline.breaks.length
-        ? "hard line break"
-        : children.some((child) => child.type === "html")
-          ? "inline HTML"
-          : startsLikeMarker
-            ? "callout header"
-            : blockIdentifier(document.source, node)
-              ? "block identifier"
-              : leadingMarker.test(original) || (forge && /^:(?:\r|\n)/.test(original))
-                ? "leading block marker"
-                : document.dialect !== "commonmark" && misreadTable(original)
-                  ? "table delimiter row as its second line"
-                  : original.startsWith("<<<")
-                    ? "site-generator snippet import"
-                    : startsSiteSyntax(original)
-                      ? "site-generator syntax at the start of a line"
-                      : lazyStart
-                        ? "lazy first line"
-                        : !/^[\s>\-*+\d.[\]xX)]*$/.test(prefix)
-                          ? "unsupported container prefix"
-                          : document.dialect === "obsidian" &&
-                              obsidianMarkers(source, node, start, end)
-                            ? "Obsidian `==`, `[[`, or `]]` outside highlights and links"
-                            : inline.unlocated
-                              ? "inline syntax without a source position"
-                              : undefined;
-      const skipped =
-        reason ??
-        protections.reason ??
-        (document.dialect === "obsidian" &&
-        parent?.type === "blockquote" &&
-        node.position?.start.line === parent.position?.start.line &&
-        prefix !== continuation
-          ? "block quote on a list marker line"
-          : undefined) ??
-        (document.dialect === "obsidian"
-          ? definitionWrapReason(
-              source,
-              start,
-              end,
-              inline.atoms
-                .filter((atom) => atom.joining === "code")
-                .map(({ from, to }) => [from, to]),
-            )
-          : undefined) ??
-        (document.dialect === "gitea" && giteaPyParagraph(source, node, start, end)
-          ? "Gitea `_.py` emphasis exception"
-          : undefined);
-      if (skipped) {
-        reportSkipped(skipped);
-        return;
-      }
-      // Collect the words line by line, without the container prefixes. A line
-      // ending between words, or in the text of emphasis or a link, separates
-      // words like a space. One inside an atom joins its lines with the space
-      // that it renders as, or keeps the paragraph as written.
-      const words: string[] = [];
-      let failure: string | undefined;
-      const pieces = original.split(/(\r\n|\r|\n)/);
-      let at = start;
-      let lineEnd = start;
-      for (let i = 0; i < pieces.length && !failure; i += 2) {
-        let line = pieces[i]!;
-        let lineAt = at;
-        at += line.length + (pieces[i + 1]?.length ?? 0);
-        if (i > 0) {
-          if (continuation && line.startsWith(continuation)) {
-            line = line.slice(continuation.length);
-            lineAt += continuation.length;
-          } else if (continuation && /^[\s>]/.test(line)) {
-            failure = "unsupported continuation";
-            break;
-          }
-          // Directly after a bare quote marker, Live Preview reads a tag as
-          // text. Joining that line would put it after a space and create a
-          // tag (issue #414). Inline atoms keep their own reading of `#`.
-          if (
-            document.dialect === "obsidian" &&
-            source[lineAt - 1] === ">" &&
-            obsidianTag.test(line) &&
-            !protection.has(lineAt)
-          ) {
-            failure = "tag-like text directly after a block quote marker";
-            break;
-          }
-          const last = words.at(-1);
-          let joining = protection.has(lineEnd)
-            ? (atomAt(inline.atoms, lineEnd)?.joining ?? { reason: "line break in inline syntax" })
-            : undefined;
-          if (joining && typeof joining === "object" && "within" in joining)
-            joining = atomAt(joining.within, lineEnd)?.joining ?? "description";
-          if (!joining) words.push(" ");
-          else if (last === undefined || /^[ \t]+$/.test(last))
-            failure = "line break in inline syntax";
-          else if (joining === "code" || joining === "description") {
-            // In an image description, two spaces or a backslash before the
-            // line ending make a hard break, and other spaces collapse; in a
-            // code span, the spaces before it are code. The spaces and tabs
-            // after it go, as `codeSpanText` reads the span, also the
-            // indentation below a task item's checkbox, which the parser
-            // keeps. A lazy line, which keeps them, is not supported above.
-            if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
-            // In a code span, a backslash before the line ending is a hard
-            // break wherever the backticks do not pair, as on GitHub after an
-            // unpaired longer run (issue #335).
-            if (joining === "code" && last.endsWith("\\"))
-              failure = "backslash at a line end in a code span";
-            const trimmed = line.replace(/^[ \t]+/, "");
-            lineAt += line.length - trimmed.length;
-            line = trimmed;
-            words[words.length - 1] = `${joining === "code" ? last : last.trimEnd()} `;
-          } else failure = "reason" in joining ? joining.reason : "line break in inline syntax";
-        }
-        for (const word of protection.split(line, lineAt)) words.push(word);
-        lineEnd = lineAt + line.length;
-      }
-      if (failure) {
-        reportSkipped(failure);
-        return;
-      }
-      const definitions = document.dialect === "obsidian";
-      const wrapped = wrappingAtoms(words, openers, dollars);
-      const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
-      if (!atoms.length) return;
-      // The first line keeps the words after a first word that would open a
-      // block alone on the line, until the line can no longer open one, and
-      // below an alert's or callout's marker line, after a run of `=` or `-`
-      // that would underline that line as a heading.
-      while (
-        atoms.length > 1 &&
-        (firstWordAlone.test(atoms[0]!) ||
-          (belowHeader && /^(?:=+|-+)$/.test(atoms[0]!)) ||
-          (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
-      )
-        atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
-      /** Fill lines greedily, with the first `first` atoms on the first line. */
-      const fill = (first: number): string[] => {
-        const lines: string[] = [];
-        let line = atoms.slice(0, first).join(" ");
-        let linePrefix = prefix;
-        for (let i = first; i < atoms.length; i++) {
-          const candidate = `${line} ${atoms[i]}`;
-          if (lineWidth(linePrefix + candidate, measure) > width) {
-            lines.push(line);
-            line = atoms[i]!;
-            linePrefix = continuation;
-          } else line = candidate;
-        }
-        if (line) lines.push(line);
-        return lines;
-      };
-      let output = fill(1);
-      // A paragraph that starts like a link reference definition becomes one
-      // when a line ends after the definition's destination or title. Keep
-      // words on the first line until the lines read as one paragraph again.
-      if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
-        let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
-        while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
-          output = fill(++first);
-      }
-      // Live Preview hides the destination after `[`, a label, and `]:` at a
-      // line's content start, including container continuations, so no reflowed line
-      // starts so: the word that opens the label, which may hold blank space,
-      // stays on the line before it (issue #411). The first line has no line
-      // before it, and a paragraph whose first line would start so, as `[a`
-      // and `b]: c d` below it joined, stays as written.
-      // A list's marker line shows its destination as text; ordinary wrapping
-      // there keeps the label on that first line and remains possible (#411).
-      if (definitions && prefix === continuation && definitionLike.test(output[0]!)) {
-        reportSkipped("first line that Obsidian styles as a link reference definition");
-        return;
-      }
-      const replacement = output.join(newline + continuation);
-      if (replacement !== original)
-        findings.push({
-          start,
-          end,
-          message: `Reflow paragraph to ${width} ${unit}.`,
-          edit: { start, end, text: replacement },
-        });
-      if (
-        options.reportUnbreakable === true &&
-        (prefix + replacement).split(lineBreak).some((line) => lineWidth(line, measure) > width)
-      )
-        reportUnbreakable();
-    });
+    const context: WrapContext = { document, options, width, measure, unit, newline };
+    walk(document.tree, "paragraph", (node, index, parent) =>
+      wrapParagraph(node, index, parent, context, findings),
+    );
     return findings;
   },
 };

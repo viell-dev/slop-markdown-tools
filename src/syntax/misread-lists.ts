@@ -1,7 +1,12 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd } from "./parse.js";
-import { lineBreak as lineEndingPattern, lineBreaks } from "./source.js";
+import {
+  capturedLineBreak,
+  lineBreak as lineEndingPattern,
+  lineBreakMatcher,
+  lineBreaks,
+} from "./source.js";
 
 /**
  * A list marker as CommonMark reads one at the start of a line's content: a
@@ -276,7 +281,7 @@ export function misreadLists(document: Document): MisreadLists {
     const end = node.position!.end.offset!;
     // A marker four or more columns right of the text is more of the text.
     const text = columnAt(node.position!.start.offset!);
-    const breaks = /\r\n|\r|\n/g;
+    const breaks = lineBreakMatcher();
     breaks.lastIndex = node.position!.start.offset!;
     for (let found = breaks.exec(source); found && found.index < end; found = breaks.exec(source)) {
       const lineStart = found.index + found[0].length;
@@ -700,7 +705,7 @@ export function misreadLists(document: Document): MisreadLists {
     /** Where each line from `start` to `end` after the first starts and ends. */
     const laterLines = (start: number, end: number): [number, number][] => {
       const found: [number, number][] = [];
-      const breaks = /\r\n|\r|\n/g;
+      const breaks = lineBreakMatcher();
       breaks.lastIndex = start;
       for (let at = breaks.exec(source); at && at.index < end; at = breaks.exec(source)) {
         const from = at.index + at[0].length;
@@ -1048,7 +1053,7 @@ export function misreadLists(document: Document): MisreadLists {
           tableText.add(startingAt(leaf, lineStart(start)));
         else {
           // The rows from the first without a pipe, from the line break above it.
-          const parts = source.slice(start, end).split(/(\r\n|\r|\n)/);
+          const parts = source.slice(start, end).split(capturedLineBreak);
           for (let part = 0, at = start; part < parts.length; part += 2) {
             if (part >= 4 && !piped(parts[part]!)) {
               tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
