@@ -56,7 +56,10 @@ The **Release** workflow, dispatched with `publish` left false, does the same on
 GitHub after the checks that come before publication, described below, adds an
 audit of the runtime dependencies, warns when the version or its tag already
 exists, and keeps the artifact for 14 days. It publishes nothing, and the Pages
-workflow that follows it leaves the site as it is.
+workflow that follows it leaves the site as it is. A dry run is for a version
+that is not published yet: for one that npm has, npm's own dry-run publish
+refuses the version, so the run fails after its checks and packing. The local
+`npm publish … --dry-run` above refuses it the same way.
 
 ## Publication prerequisites
 
