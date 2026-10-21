@@ -172,7 +172,9 @@ that are not released. Correct it without a new version or a moved tag:
    requires pull requests, CI, and resolved threads from then on, as on `main`.
 3. Open a pull request into `site-VERSION` that applies only the documentation
    part of the fix, usually by cherry-picking it, and changes nothing outside
-   `docs/`. Its CI checks the pages against that release's code. Merge it.
+   `docs/`. Its CI checks the pages against that release's code. Merge it. Name
+   its task branch without the `site-` prefix, which the ruleset reserves: it
+   refuses to create such a branch at a commit that CI has not passed.
 4. Dispatch **Pages** on `main` with `tag` set to the version and `corrections`
    checked (`gh workflow run pages.yml -f tag=VERSION -f corrections=true`). The
    workflow deploys only that release's `site-VERSION` branch, and refuses a tag
@@ -184,4 +186,5 @@ that are not released. Correct it without a new version or a moved tag:
 
 The package and its tag stay as they were published; the corrections ship in the
 next version from `main`. The next stable release deploys its own tag, which
-replaces the corrected site.
+replaces the corrected site. Like tags, `site-VERSION` branches cannot be
+deleted, and each stays as the record of what its release's site showed.
