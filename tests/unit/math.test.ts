@@ -168,18 +168,7 @@ describe("where dollar math begins and ends", () => {
     expect(formulas("A $x$ d.", "commonmark")).toEqual([]);
     expect(formulas("$$\nx\n$$\n", "commonmark")).toEqual([]);
   });
-  it("reads a paragraph of many prices once, not once for each price", () => {
-    // In Obsidian a dollar that cannot close is read past, so every price opens a
-    // search to the end of the paragraph unless the first failed search is remembered.
-    const source = `${"pay $5 and $6 now ".repeat(6000)}\n`;
-    const started = performance.now();
-    expect(formulas(source, "obsidian")).toEqual([]);
-    expect(performance.now() - started).toBeLessThan(10000);
-    // A formula after the prices is still found, by the search that the first price began.
-    expect(formulas(`${"pay $5 and $6 now ".repeat(50)}and $x$ too.\n`, "obsidian")).toHaveLength(
-      1,
-    );
-  });
+
   it.each(["github", "forgejo", "gitea", "obsidian"] as const)(
     "keeps display math in %s as it was",
     (dialect) => {

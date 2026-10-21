@@ -1,6 +1,3 @@
-import { setFlagsFromString } from "node:v8";
-import { runInNewContext } from "node:vm";
-import type { Nodes } from "mdast";
 import { describe, expect, it, vi } from "vitest";
 import { stringContaining } from "../assertions.js";
 import {
@@ -11,7 +8,7 @@ import {
   semanticFingerprint,
   textContent,
 } from "../../src/index.js";
-import type { Config, Dialect, Document, LookupResult, Plugin } from "../../src/index.js";
+import type { Config, Dialect, LookupResult, Plugin } from "../../src/index.js";
 import fc from "fast-check";
 import {
   headingAttributeBlock,
@@ -29,34 +26,6 @@ vi.mock("../../src/workspace/heading-attributes.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/workspace/heading-attributes.js")>();
   return { ...actual, headingAttributes: vi.fn(actual.headingAttributes) };
 });
-// Let a test follow every document that is parsed, to check that the workspace lets go of them.
-const parses = vi.hoisted(() => ({
-  watch: undefined as ((document: Document) => void) | undefined,
-}));
-vi.mock("../../src/syntax/parse.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/syntax/parse.js")>();
-  const parse: typeof actual.parse = (...parameters) => {
-    const document = actual.parse(...parameters);
-    parses.watch?.(document);
-    return document;
-  };
-  return { ...actual, parse };
-});
-type AsyncGc = (options: { type: "major"; execution: "async" }) => Promise<void>;
-let gc: AsyncGc | undefined;
-/** Collect after the JavaScript stack unwinds, without conservative stack roots. */
-async function collectGarbage(): Promise<void> {
-  // A WeakRef keeps its target alive until the task that created it has ended.
-  await new Promise((resolve) => setImmediate(resolve));
-  if (!gc) {
-    setFlagsFromString("--expose-gc");
-    gc = runInNewContext("gc") as AsyncGc;
-  }
-  // A synchronous collection may retain stale stack pointers. V8's async
-  // collector runs as a separate task with no JavaScript heap pointers there.
-  await gc({ type: "major", execution: "async" });
-}
-
 const config: Config = {
   extends: [],
   dialect: "obsidian",
@@ -169,132 +138,7 @@ describe("local target resolution", () => {
     expect(read).toHaveBeenCalledTimes(3);
     expect(unused).not.toHaveBeenCalled();
   });
-  it("keeps a target's anchors without its parsed document", async () => {
-    const parsed: WeakRef<object>[] = [];
-    const follow = (node: Nodes) => {
-      parsed.push(new WeakRef(node));
-      if ("children" in node) node.children.forEach(follow);
-    };
-    const index = createWorkspace({
-      "Doc.md": "",
-      "Target.md": '## Install {#setup}\n\n<a name="explicit"></a>\n\n<h2>Html</h2>\n\nText. ^id\n',
-    });
-    const exists = (fragment: string, dialect: Dialect) =>
-      index.resolve("Doc.md", `Target.md#${fragment}`, dialect).fragmentExists;
-    const check = () => {
-      expect(exists("^id", "obsidian")).toBe(true);
-      expect(exists("html", "github")).toBe(true);
-      expect(exists("explicit", "commonmark")).toBe(true);
-      expect(exists("setup", "forgejo")).toBe(true);
-      expect(exists("html", "gitea")).toBe(true);
-    };
-    parses.watch = (document) => {
-      parsed.push(new WeakRef(document));
-      follow(document.tree);
-    };
-    try {
-      check();
-      expect(parsed.length).toBeGreaterThan(0);
-      // The counting mock above records the document it was called with.
-      vi.mocked(headingAttributes).mockClear();
-      await collectGarbage();
-      expect(parsed.filter((node) => node.deref() !== undefined)).toEqual([]);
-      // The anchors answer later links without another parse.
-      parsed.length = 0;
-      check();
-      expect(parsed).toEqual([]);
-    } finally {
-      parses.watch = undefined;
-    }
-  });
-  it("does not keep a target's text alive through its anchors", async () => {
-    // An engine may store a substring as a reference into the string it was cut
-    // from, so a kept anchor could keep megabytes of text. Each target here is
-    // large, its anchors are few and long enough to be stored that way, and
-    // nothing but the index can hold its text: a loader builds it anew on every
-    // call. One target of each kind is plain ASCII and one is not, because the
-    // engine stores and lowercases the two differently.
-    const marks = ["plain", "é-𝒳"];
-    const workspace = (scale: number) => {
-      const long = (words: string, times: number) => `${words} `.repeat(times * scale);
-      const html = (mark: string) => `<p>${long(`filler ${mark} in an HTML block`, 80)}</p>`;
-      const prose = (mark: string) => long(`prose ${mark} in one paragraph`, 40);
-      const files: Record<string, () => string> = {};
-      marks.forEach((mark, target) => {
-        files[`Wide ${target}.md`] = () =>
-          [
-            `## A heading of target ${target} that is long {#custom-heading-id-${mark}}`,
-            "",
-            `<div id="Explicit-Anchor-${mark}">`,
-            html(mark),
-            `<a name="lowercase-anchor-${mark}"></a>`,
-            "</div>",
-            "",
-            "```",
-            long(`code ${mark} in a block that makes the file larger than its parts`, 20),
-            "```",
-            "",
-          ].join("\n");
-        files[`Block ${target}.md`] = () => `${prose(mark)} ^block-identifier-${target}\n`;
-      });
-      return { files, smallest: Math.min(html("plain").length, prose("plain").length) };
-    };
-    const anchors: [Dialect, string, (mark: string, target: number) => string][] = [
-      ["obsidian", "Block", (_, target) => `^block-identifier-${target}`],
-      [
-        "obsidian",
-        "Wide",
-        (mark, target) =>
-          `a heading of target ${target} that is long {%23custom-heading-id-${mark}}`,
-      ],
-      ["github", "Wide", (mark) => `explicit-anchor-${mark}`],
-      ["commonmark", "Wide", (mark) => `EXPLICIT-ANCHOR-${mark.toUpperCase()}`],
-      ["github", "Wide", (mark) => `lowercase-anchor-${mark}`],
-      ["forgejo", "Wide", (mark) => `Explicit-Anchor-${mark}`],
-      ["gitea", "Wide", (mark) => `lowercase-anchor-${mark}`],
-      ["forgejo", "Wide", (mark) => `custom-heading-id-${mark}`],
-      ["gitea", "Wide", (mark) => `custom-heading-id-${mark}`],
-    ];
-    const check = (files: Record<string, () => string>) => {
-      const index = createWorkspace(files);
-      for (const [dialect, file, anchor] of anchors)
-        marks.forEach((mark, target) => {
-          const link = `${file} ${target}.md#${anchor(mark, target)}`;
-          expect(index.resolve("Doc.md", link, dialect).fragmentExists, link).toBe(true);
-          expect(index.resolve("Doc.md", `${link}x`, dialect).fragmentExists, link).toBe(false);
-        });
-      vi.mocked(headingAttributes).mockClear();
-      return index;
-    };
-    const settle = async () => {
-      // The last string that a regular expression was run on stays referenced.
-      /-/.test("-");
-      await collectGarbage();
-      return process.memoryUsage().heapUsed;
-    };
-    // The engine compiles code on the first runs, which also takes memory.
-    check(workspace(1).files);
-    check(workspace(1).files);
-    const { files, smallest } = workspace(1000);
-    expect(smallest).toBeGreaterThan(1_000_000);
-    const documents: WeakRef<object>[] = [];
-    const before = await settle();
-    parses.watch = (document) => documents.push(new WeakRef(document), new WeakRef(document.tree));
-    let index: ReturnType<typeof createWorkspace>;
-    try {
-      index = check(files);
-    } finally {
-      parses.watch = undefined;
-    }
-    const held = (await settle()) - before;
-    expect(documents.length).toBeGreaterThan(0);
-    expect(documents.filter((document) => document.deref() !== undefined)).toEqual([]);
-    // The anchors alone are a few kilobytes. Any one kind of them that kept its
-    // text alive would hold at least the smallest of the large blocks.
-    expect(held).toBeLessThan(smallest / 3);
-    // The anchors are still there.
-    expect(index.resolve("Doc.md", "Wide 0.md#missing", "github").fragmentExists).toBe(false);
-  }, 60_000);
+
   it("computes a dialect's anchors only when a link is checked against it", () => {
     const reads = vi.mocked(headingAttributes);
     reads.mockClear();
@@ -1844,24 +1688,6 @@ describe("repeated heading anchors on Forgejo and Gitea", () => {
       ),
     );
   });
-  it.each(sluggers)("number many repeats on %s in linear time", (_, create) => {
-    const count = 10000;
-    const fastest = (texts: string[]) => {
-      let best = Infinity;
-      for (let run = 0; run < 5; run++) {
-        const slugger = create();
-        const started = performance.now();
-        for (const text of texts) slugger.slug(text);
-        best = Math.min(best, performance.now() - started);
-      }
-      return best;
-    };
-    const repeated = Array.from({ length: count }, () => "Fixed");
-    const distinct = Array.from({ length: count }, (_, index) => `Fixed ${index}`);
-    // Distinct headings need no numbers, which makes them a linear baseline.
-    // Searching from `-1` for each repeat took thousands of times as long.
-    expect(fastest(repeated) / fastest(distinct)).toBeLessThan(10);
-  });
 });
 describe("Forgejo and Gitea heading attributes", () => {
   const note = (...headings: string[]) =>
@@ -2690,31 +2516,6 @@ describe("anchors from HTML in the document", () => {
     expect(exists("user-content-user-content-x", "github")).toBe(true);
     expect(exists("user-content-x", "github")).toBe(false);
   });
-  it("scans unusual HTML in linear time", () => {
-    const hostile = createWorkspace({
-      "Doc.md": "",
-      "Note.md": [
-        `<a ${"x ".repeat(100000)}`,
-        "<a ".repeat(50000),
-        `<a id="${"x".repeat(200000)}`,
-        `<a ${'id="a" '.repeat(20000)}${"'".repeat(20000)}`,
-        // Real HTML blocks: many tags, a raw-text element that never closes,
-        // and, last because it swallows the rest, a comment opener on every line.
-        '<div>\n<span id="s"></span>\n'.repeat(20000),
-        `<div>\n<textarea>${"<a id='t'></a>\n".repeat(20000)}`,
-        "<!--\n".repeat(50000),
-      ].join("\n\n"),
-    });
-    const start = performance.now();
-    expect(hostile.resolve("Doc.md", "Note.md#a", "forgejo").fragmentExists).toBe(false);
-    expect(hostile.resolve("Doc.md", "Note.md#t", "forgejo").fragmentExists).toBe(false);
-    expect(hostile.resolve("Doc.md", "Note.md#s", "forgejo").fragmentExists).toBe(true);
-    // The bound tells linear from quadratic growth, which would take minutes here. It leaves
-    // room for a slow CI runner and for GFM parsing, which the workspace now uses when no
-    // dialect is named and which takes about half as long again as CommonMark on this input.
-    // The scan takes 2 to 4 seconds, but a Windows runner once needed 14 (issue #185).
-    expect(performance.now() - start).toBeLessThan(30000);
-  }, 40_000);
 });
 
 describe("fragment case on GitHub", () => {
@@ -2887,16 +2688,7 @@ describe("anchors of headings written as HTML", () => {
     expect(exists("user-content-user-content-setup", "gitea")).toBe(true);
     expect(exists("setup", "gitea")).toBe(false);
   });
-  it("reads many unclosed headings in linear time", () => {
-    const hostile = createWorkspace({
-      "Doc.md": "",
-      "Note.md": `${"<h2>x\n".repeat(50000)}\n\n<div>\n${'<div title="<h2>">\n'.repeat(20000)}`,
-    });
-    const start = performance.now();
-    expect(hostile.resolve("Doc.md", "Note.md#x", "github").fragmentExists).toBe(true);
-    expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github").fragmentExists).toBe(false);
-    expect(performance.now() - start).toBeLessThan(4000);
-  });
+
   it("gives HTML headings no anchor on Forgejo or Obsidian", () => {
     for (const fragment of ["special-thanks", "inside-div", "same-1", "inline-heading"]) {
       expect(resolves(fragment, "forgejo")).toBe(false);

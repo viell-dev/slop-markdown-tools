@@ -284,8 +284,10 @@ it helps.
   workflow; a local report names its machine's processor and is never published.
   Judge a change by the ratio columns or by runs before and after on one
   machine.
-- The Vitest projects run one after the other (`sequence.groupOrder`), so that
-  integration processes do not disturb the unit tests' time limits.
+- The Vitest projects run unit tests, performance checks, then integration tests
+  (`sequence.groupOrder`). Performance files run serially, outside unit
+  coverage; integration workers are capped at four so CLI subprocesses do not
+  overwhelm a runner. Keep these boundaries when adding checks.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for

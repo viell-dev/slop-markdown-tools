@@ -57,9 +57,9 @@ npm run test:package
 
 `check` runs the TypeScript checks, ESLint, Prettier on everything but Markdown,
 the tool's own lint and format check of the Markdown, the documentation site's
-build, and both test suites. `test:package` packs the package, installs it into
-a temporary project with npm and again with pnpm, whose strict layout lets a
-package use only the dependencies it declares, and runs the installed command,
+build, and all three test suites. `test:package` packs the package, installs it
+into a temporary project with npm and again with pnpm, whose strict layout lets
+a package use only the dependencies it declares, and runs the installed command,
 the library through `import` and `require()`, a shipped example, and TypeScript
 consumers of the published types. npm fetches the pinned pnpm into the
 repository's cache, and both installations can need access to the npm registry.
@@ -112,25 +112,37 @@ broken or compromised release to be found. Security updates are not delayed.
 
 | Command                    | Runs                                  |
 | -------------------------- | ------------------------------------- |
-| `npm test`                 | The build, then both suites           |
+| `npm test`                 | The build, then all three suites      |
 | `npm run test:unit`        | The unit suite; needs no build        |
+| `npm run test:performance` | Complexity and retention checks       |
+| `npm run test:coverage`    | Unit tests with coverage reports      |
 | `npm run test:integration` | The build, then the integration suite |
 
-The suites run one after the other, because the processes that integration tests
-start would make the time limits of a few unit tests unreliable.
+The unit, performance, and integration suites run in that order. Performance
+files run one at a time, apart from coverage and the processes that integration
+tests start. Integration runs use at most four workers, or the machine's
+available parallelism when it has fewer.
 
-`tests/unit/` imports from `src/` and touches neither files nor other processes.
-A defect in how a rule reads or rewrites Markdown belongs here, as the smallest
-synthetic document that shows it, usually checked together with the contracts of
-every formatting change: formatting the output again changes nothing, the parsed
-meaning is unchanged, and disabling the rule leaves the source as written. Rules
-are tested in `rules.test.ts`, list rules in `lists.test.ts`, code fences,
-thematic breaks, and blank space in `blocks.test.ts`, problem rules in
-`references.test.ts`, `structure.test.ts`, and `content.test.ts`, wrapping in
-`wrap.test.ts` and `callout-wrap.test.ts`, links in `links.test.ts`, dollar math
-in `math.test.ts` against the renderers' output recorded in `math-renderers.ts`,
-the engine, configuration, and plugins in `engine.test.ts`, and the diff that
-`format` prints in `diff.test.ts`.
+`test:coverage` uses V8 coverage and writes an HTML report and
+`coverage-summary.json` to `coverage/unit/`. It includes every production
+TypeScript file, including files unit tests never execute. CI publishes the
+`unit-coverage` artifact for 14 days, without a coverage threshold. These are
+unit-coverage figures: performance cases, integration subprocesses, and
+installed package checks are not included, and the command does not replace
+those checks.
+
+`tests/unit/` imports from `src/`; renderer checks also read their fixture and
+probe sources. It does not run the CLI. A defect in how a rule reads or rewrites
+Markdown belongs here, as the smallest synthetic document that shows it, usually
+checked together with the contracts of every formatting change: formatting the
+output again changes nothing, the parsed meaning is unchanged, and disabling the
+rule leaves the source as written. Rules are tested in `rules.test.ts`, list
+rules in `lists.test.ts`, code fences, thematic breaks, and blank space in
+`blocks.test.ts`, problem rules in `references.test.ts`, `structure.test.ts`,
+and `content.test.ts`, wrapping in `wrap.test.ts` and `callout-wrap.test.ts`,
+links in `links.test.ts`, dollar math in `math.test.ts` against the renderers'
+output recorded in `math-renderers.ts`, the engine, configuration, and plugins
+in `engine.test.ts`, and the diff that `format` prints in `diff.test.ts`.
 
 The safety check compares the parser's readings, so `renderers.test.ts` also
 compares the HTML of two other implementations, commonmark.js and markdown-it,
@@ -168,22 +180,29 @@ its HTML. The check is started by hand and not in CI.
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
 machine's user and system Git settings, which would change what Git ignores. A
 defect in what the tool selects, prints, writes, or how it exits belongs here:
-`cli.test.ts` for commands and options, `selection.test.ts` for which files a
-run selects, compared with Git's own decisions, `workflows.test.ts` for whole
-tasks, `node.test.ts` for `mdrefine/node`, and `examples.test.ts` and
-`docs.test.ts` for the examples and documentation. `support.ts` holds the
-helpers: `fixture()` writes a temporary workspace, `run()` starts the CLI,
-`restrict()` and `denyRead()` take away read permission on Unix and on Windows,
-`denyWrite()` takes away write permission on Windows, `windowsTool()` runs a
-program of Windows such as `icacls.exe`, and `linkDirectory()` links a
-directory, as a junction on Windows. Tests that need Unix permission modes are
-skipped on Windows and for the root user, and one that links a file needs
-`canSymlink`.
+`cli.test.ts` and `cli-options.test.ts` for command behavior and options,
+`cli-defaults.test.ts` and `cli-obsidian.test.ts` for dialect detection,
+`cli-config.test.ts` for configuration errors, `filesystem.test.ts` for write
+safeguards, `cli-access.test.ts` for access failures, `cli-encoding.test.ts` for
+UTF-8 handling, `selection.test.ts` for which files a run selects, compared with
+Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
+`mdrefine/node`, and `examples.test.ts` and `docs.test.ts` for the examples and
+documentation. `support.ts` holds the helpers: `fixture()` writes a temporary
+workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take away read
+permission on Unix and on Windows, `denyWrite()` takes away write permission on
+Windows, `windowsTool()` runs a program of Windows such as `icacls.exe`, and
+`linkDirectory()` links a directory, as a junction on Windows. Tests that need
+Unix permission modes are skipped on Windows and for the root user, and one that
+links a file needs `canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
-names its issue; remove the marker with the fix. A few unit tests guard against
-algorithms whose cost grows faster than their input; add one with the fix for
-such a defect.
+names its issue; remove the marker with the fix. `tests/performance/` guards
+against algorithms whose cost grows faster than their input and memory that
+should have been released; add a regression check there with the fix for such a
+defect. Keep substantive output assertions alongside the measurements, and
+exclude preparation costs only when the check is specifically about a later
+operation. Garbage-collection checks also run outside coverage, which changes
+execution and allocation costs.
 
 ## Benchmarks
 
