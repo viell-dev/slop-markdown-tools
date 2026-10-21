@@ -37,7 +37,9 @@ prereleases' notes there are longer than their entries here.
 ### Fixed
 
 - Diagnostics at the same source position use the same rule ID order on every
-  machine ([#229](https://github.com/viell-dev/slop-markdown-tools/issues/229)).
+  machine. This also stabilizes plugin edit precedence when the ranges and
+  finding positions match
+  ([#229](https://github.com/viell-dev/slop-markdown-tools/issues/229)).
 - The benchmark guide identifies the parser's repeated list/table transition
   performance limit and links its standalone reproduction
   ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).

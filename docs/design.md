@@ -18,13 +18,14 @@ that would change it, all of them, because one edit can depend on another; the
 other rules' edits are kept. Each rule left out gets an `engine/unsafe-format`
 error at the line where the meaning would first differ, as in
 `style/wrap would change the parsed meaning at line 12; none of its edits were applied.`
-Of two edits that overlap, the one that starts first is applied, and the other
-rule runs again in the next pass. The phases repeat until nothing changes, for
-at most eight passes. When rules undo each other or formatting does not settle,
-`format` returns the document as it was with an `engine/unsafe-format` error
-that names them. Either way the run ends with exit code `2`, and
-`format --write` still writes the other documents, and this one when the edits
-that were kept changed it.
+Overlapping edits are considered by start offset, then end offset. Identical
+ranges retain diagnostic order: finding offset, then rule ID in UTF-16 code-unit
+order. Other overlapping edits are reconsidered on the next pass. The phases
+repeat until nothing changes, for at most eight passes. When rules undo each
+other or formatting does not settle, `format` returns the document as it was
+with an `engine/unsafe-format` error that names them. Either way the run ends
+with exit code `2`, and `format --write` still writes the other documents, and
+this one when the edits that were kept changed it.
 
 The comparison is only as good as the parser's reading:
 
