@@ -101,6 +101,13 @@
     "schema:write": "node scripts/config-schema.mjs"
   },
   "dependencies": {
+    "@mdit-vue/plugin-component": "3.0.2",
+    "@mdit/plugin-anchor": "1.1.3",
+    "@mdit/plugin-attrs": "1.1.1",
+    "@mdit/plugin-container": "1.0.2",
+    "@mdit/plugin-emoji": "1.1.1",
+    "@mdit/plugin-footnote": "1.0.2",
+    "@mdit/plugin-tasklist": "1.0.2",
     "@types/mdast": "4.0.4",
     "ajv": "8.20.0",
     "commander": "15.0.0",
@@ -112,12 +119,25 @@
     "ignore": "7.0.12",
     "import-meta-resolve": "4.2.0",
     "jsonc-parser": "3.3.1",
+    "markdown-it": "14.3.3",
+    "markdown-it-cjk-friendly": "2.0.2",
     "mdast-util-from-markdown": "2.1.0",
     "mdast-util-frontmatter": "2.0.1",
     "mdast-util-gfm": "3.1.0",
+    "mdast-util-gfm-autolink-literal": "2.0.1",
+    "mdast-util-gfm-footnote": "2.1.0",
+    "mdast-util-gfm-strikethrough": "2.0.1",
+    "mdast-util-gfm-table": "2.0.0",
+    "mdast-util-gfm-task-list-item": "2.0.0",
     "mdast-util-math": "3.0.0",
+    "micromark-extension-cjk-friendly": "2.0.2",
     "micromark-extension-frontmatter": "2.0.0",
     "micromark-extension-gfm": "3.0.0",
+    "micromark-extension-gfm-autolink-literal": "2.1.0",
+    "micromark-extension-gfm-footnote": "2.1.0",
+    "micromark-extension-gfm-strikethrough": "2.1.0",
+    "micromark-extension-gfm-table": "2.1.2",
+    "micromark-extension-gfm-task-list-item": "2.1.0",
     "micromark-factory-space": "2.1.0",
     "micromark-util-character": "2.1.1",
     "micromark-util-types": "2.0.3",
@@ -134,13 +154,18 @@
     "commonmark": "0.31.2",
     "eslint": "10.13.0",
     "fast-check": "4.10.2",
-    "markdown-it": "15.0.3",
+    "markdown-it-mathjax3": "4.3.2",
     "npm-run-all2": "9.0.3",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
     "vitepress": "2.0.0-alpha.20",
     "vitest": "5.0.5"
+  },
+  "overrides": {
+    "speech-rule-engine@4.1.4": {
+      "@xmldom/xmldom": "0.9.12"
+    }
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }

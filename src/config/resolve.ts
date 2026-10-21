@@ -26,6 +26,7 @@ export const dialects: readonly Dialect[] = Object.freeze([
   "forgejo",
   "gitea",
   "obsidian",
+  "vitepress",
 ]);
 /**
  * The dialect assumed when nothing names one and the caller knows no better.
@@ -113,6 +114,10 @@ export const presets: Readonly<Record<string, Readonly<Config>>> = {
       "style/table": "warn",
     },
   },
+  vitepress: {
+    dialect: "vitepress",
+    rules: { "github/task-marker": "warn", "github/alert-marker": "warn", "style/table": "warn" },
+  },
 };
 deepFreeze(presets);
 // Each dialect is followed by its aliases, as the command line lists them.
@@ -156,6 +161,7 @@ export const configSchema: JsonSchemaObject = deepFreeze({
       anyOf: [{ type: "string" }, strings],
     },
     dialect: { $ref: "#/definitions/dialect" },
+    vitepress: { $ref: "#/definitions/vitepress" },
     rules: { $ref: "#/definitions/rules" },
     codeFormatters: { $ref: "#/definitions/codeFormatters" },
     ignore: {
@@ -182,6 +188,7 @@ export const configSchema: JsonSchemaObject = deepFreeze({
             minItems: 1,
           },
           dialect: { $ref: "#/definitions/dialect" },
+          vitepress: { $ref: "#/definitions/vitepress" },
           rules: { $ref: "#/definitions/rules" },
           codeFormatters: { $ref: "#/definitions/codeFormatters" },
         },
@@ -189,6 +196,24 @@ export const configSchema: JsonSchemaObject = deepFreeze({
     },
   },
   definitions: {
+    vitepress: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        math: { type: "boolean" },
+        attrs: { type: "boolean" },
+        footnote: { type: "boolean" },
+        tasklist: { type: "boolean" },
+        cjkFriendlyEmphasis: { type: "boolean" },
+        customContainers: {
+          type: "array",
+          uniqueItems: true,
+          items: { type: "string", pattern: "^[a-z0-9_-]+$" },
+        },
+        srcDir: { type: "string" },
+        anchor: { enum: ["vitepress", "github"] },
+      },
+    },
     codeFormatters: {
       description:
         "Trusted code tools for formatWithCode and CLI format; an array replaces inherited tools, and false disables them. No tools run by default.",
@@ -367,6 +392,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     ignore: [],
     resolve: {},
     codeFormatters: [],
+    vitepress: {},
   };
   const tools = (entries: readonly CodeFormatter[] | false): CodeFormatter[] =>
     entries === false
@@ -388,6 +414,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
       merge(available[name]!, [...chain, name]);
     }
     if (part.dialect) result.dialect = canonicalDialect(part.dialect);
+    if (part.vitepress) result.vitepress = { ...result.vitepress, ...part.vitepress };
     addRules(result.rules, part.rules);
     Object.assign(result.resolve, part.resolve);
     if (part.codeFormatters !== undefined) result.codeFormatters = tools(part.codeFormatters);
@@ -400,6 +427,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
   for (const override of overrides) {
     if (override.files.some((pattern) => overridePattern(pattern)(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
+      if (override.vitepress) result.vitepress = { ...result.vitepress, ...override.vitepress };
       addRules(result.rules, override.rules);
       if (override.codeFormatters !== undefined)
         result.codeFormatters = tools(override.codeFormatters);

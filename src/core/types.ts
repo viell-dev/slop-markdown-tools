@@ -3,7 +3,20 @@ import type { Extension as SyntaxExtension } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 
 /** A dialect: the renderer whose Markdown syntax a document is read in. */
-export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian";
+export type Dialect = "commonmark" | "github" | "forgejo" | "gitea" | "obsidian" | "vitepress";
+/** Syntax and routing choices of a VitePress 2 site, without executing its config. */
+export interface VitePressOptions {
+  readonly math?: boolean;
+  readonly attrs?: boolean;
+  readonly footnote?: boolean;
+  readonly tasklist?: boolean;
+  readonly cjkFriendlyEmphasis?: boolean;
+  readonly customContainers?: readonly string[];
+  /** Source directory relative to the workspace root; inferred from .vitepress when omitted. */
+  readonly srcDir?: string;
+  /** The default VitePress slugger, or a site configured with github-slugger. */
+  readonly anchor?: "vitepress" | "github";
+}
 /**
  * A dialect or one of its aliases, accepted wherever a dialect is named:
  * `codeberg` is `forgejo`. Parsed documents and resolved configurations hold
@@ -80,6 +93,8 @@ export interface Document {
   tree: Root;
   /** The dialect it was read in, never an alias. */
   dialect: Dialect;
+  /** Explicit renderer choices when the dialect is VitePress. */
+  vitepress?: VitePressOptions;
 }
 /** Where a link leads, as `Workspace.resolve` finds it. */
 export interface LinkResolution {
@@ -203,6 +218,7 @@ export interface Plugin {
 }
 /** Settings for the documents that match one of `files`. */
 export interface Override {
+  readonly vitepress?: VitePressOptions;
   /** Glob patterns, matched against paths relative to the workspace root, with forward slashes. */
   readonly files: readonly string[];
   /** The dialect of the matching documents. */
@@ -241,6 +257,8 @@ export interface ResolveOptions {
  * it, and `validateConfig` checks it.
  */
 export interface Config {
+  /** VitePress 2 syntax and routing options; ignored by other dialects. */
+  vitepress?: VitePressOptions;
   /** The JSON Schema for editors; the tool ignores it. */
   $schema?: string;
   /** Files that links may lead to; see `ResolveOptions`. */
@@ -272,6 +290,8 @@ export interface Config {
 }
 /** The settings in effect for one document, which `resolveConfig` returns. */
 export interface ResolvedConfig {
+  /** VitePress choices after preset and override merging. */
+  vitepress: VitePressOptions;
   /** The `resolve` settings of the configuration and its presets. */
   resolve: ResolveOptions;
   /** Code tools after preset and override replacement; empty when disabled. */

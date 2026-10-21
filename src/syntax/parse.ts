@@ -12,6 +12,19 @@ import { knownDialect } from "../config/resolve.js";
 import { math } from "./math.js";
 import type { MathConditions } from "./math.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
+import type { VitePressOptions } from "../core/types.js";
+import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
+import { gfmTable } from "micromark-extension-gfm-table";
+import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
+import { gfmTaskListItem } from "micromark-extension-gfm-task-list-item";
+import { gfmFootnote } from "micromark-extension-gfm-footnote";
+import { gfmAutolinkLiteral } from "micromark-extension-gfm-autolink-literal";
+import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
+import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
+import { gfmTaskListItemFromMarkdown } from "mdast-util-gfm-task-list-item";
+import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
+import { gfmAutolinkLiteralFromMarkdown } from "mdast-util-gfm-autolink-literal";
+import { projectVitePress, recordVitePress } from "./vitepress/projection.js";
 
 // GFM's tree transform performs GitHub's second, transform-time autolink pass
 // (`[www.example.com]` or a Forgejo shortlink's `|https://` in files), but its
@@ -145,6 +158,7 @@ const mathConditions: Record<Exclude<Dialect, "commonmark">, MathConditions> = {
   forgejo: "forge",
   gitea: "forge",
   obsidian: "obsidian",
+  vitepress: "obsidian",
 };
 
 /**
@@ -264,21 +278,50 @@ export function parse(
   dialect: DialectName,
   path = "document.md",
   plugins: readonly Plugin[] = [],
+  vitepress: VitePressOptions = {},
 ): Document {
   const read = knownDialect(dialect);
   source = splitByteOrderMark(source)[1];
+  const projection =
+    read === "vitepress"
+      ? projectVitePress({
+          source,
+          dialect: read,
+          path,
+          tree: { type: "root", children: [] },
+          vitepress,
+        })
+      : undefined;
   const tree = (withFrontMatter: boolean): Root => {
     const codeSpans = codeSpanRecording();
     const extensions = [codeSpans.syntax];
     const mdastExtensions = [labelEndTree, codeSpans.tree];
-    if (withFrontMatter) {
+    if (withFrontMatter && read !== "vitepress") {
       extensions.unshift(frontmatter(["yaml", "toml"]));
       mdastExtensions.unshift(frontmatterFromMarkdown(["yaml", "toml"]));
     }
     // GitHub, Forgejo, and Gitea share GFM tables, task lists, strikethrough,
     // footnotes, autolinks, and dollar math. Forgejo and Gitea syntax beyond
     // that is protected by rules rather than parsed.
-    if (read !== "commonmark") {
+    if (read === "vitepress") {
+      extensions.push(gfmTable(), gfmStrikethrough({ singleTilde: false }), gfmAutolinkLiteral());
+      const autolinks = { ...gfmAutolinkLiteralFromMarkdown() };
+      delete autolinks.transforms;
+      mdastExtensions.push(gfmTableFromMarkdown(), gfmStrikethroughFromMarkdown(), autolinks);
+      if (vitepress.tasklist !== false) {
+        extensions.push(gfmTaskListItem());
+        mdastExtensions.push(gfmTaskListItemFromMarkdown());
+      }
+      if (vitepress.footnote !== false) {
+        extensions.push(gfmFootnote());
+        mdastExtensions.push(gfmFootnoteFromMarkdown());
+      }
+      if (vitepress.cjkFriendlyEmphasis !== false) extensions.push(cjkFriendlyExtension());
+      if (vitepress.math) {
+        extensions.push(math("obsidian"));
+        mdastExtensions.push(mathFromMarkdown());
+      }
+    } else if (read !== "commonmark") {
       // Obsidian marks strikethrough with two tildes only; `~a~` is text there
       // (issue #319).
       extensions.push(gfm({ singleTilde: read !== "obsidian" }), math(mathConditions[read]));
@@ -294,9 +337,13 @@ export function parse(
         mdastExtensions.push(plugin.syntax.mdast);
       }
     }
-    return fromMarkdown(source, { extensions, mdastExtensions });
+    return fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
   };
   const result = tree(!unclosedFrontMatter(source));
+  if (projection) {
+    recordVitePress(result, projection);
+    return { source, dialect: read, path, tree: result, vitepress };
+  }
   // The tree's types know YAML front matter only; the parser also reads TOML.
   const matter = result.children[0] as { type: string; value?: string } | undefined;
   let plain: Root | undefined;
