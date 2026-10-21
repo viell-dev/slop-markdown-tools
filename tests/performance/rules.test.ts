@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
-import { builtInRules, createWorkspace, format, parse } from "../../src/index.js";
+import { applyEdits, builtInRules, createWorkspace, format, parse } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
+import { scaling } from "./scaling.js";
 const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
@@ -40,23 +41,76 @@ it.each(["forgejo", "gitea"] as const)(
   },
 );
 
-it("finds heading lines in time proportional to the document", () => {
+function headingWorkload(count: number) {
+  const source = `${"## Heading\n\n".repeat(count)}*x*\n`;
+  return { source, expected: source.replace("*x*", "_x_") };
+}
+const headingConfig = only(markers, "forgejo");
+it("finds the text line of every heading before formatting emphasis", () => {
   // Every heading used to be searched for a `{` up to the end of the document.
-  const source = `${"## Heading\n\n".repeat(20000)}*x*\n`;
-  const start = performance.now();
-  expect(formatted(source, only(markers, "forgejo"))).toBe(source.replace("*x*", "_x_"));
-  expect(performance.now() - start).toBeLessThan(10000);
+  const { source, expected } = headingWorkload(20000);
+  expect(formatted(source, headingConfig)).toBe(expected);
 });
 
-it("checks a heading with many links in time proportional to its length", () => {
-  const source = `## ${"[x](y.md) ".repeat(10000)}{#h}\n`;
+it("finds heading lines with linear scaling", () => {
+  // Isolate the rule's heading scan so parsing cannot mask a quadratic search.
+  const { check } = builtInRules["style/emphasis"]!;
+  expect(
+    scaling(
+      [2000, 8000],
+      (count) => {
+        // Longer brace-free lines make the suffix search dominate its linear
+        // traversal overhead in the recovered quadratic implementation.
+        const source = `## ${"Heading ".repeat(16)}\n\n`.repeat(count) + "*x*\n";
+        const input = { source, expected: source.replace("*x*", "_x_") };
+        return { ...input, document: parse(input.source, "forgejo") };
+      },
+      ({ document }) => check({ document, options: { marker: "_" } }),
+      (findings, { source, expected }) => {
+        expect(findings).toHaveLength(2);
+        expect(
+          applyEdits(
+            source,
+            findings.map((finding) => finding.edit!),
+          ),
+        ).toBe(expected);
+      },
+      // Each large parsed tree is costly to prepare; its scan is measurable
+      // on its own, without multiplying preparation into a suite bottleneck.
+      1,
+    ),
+  ).toBeLessThan(10);
+});
+
+function linkedHeading(count: number) {
+  const source = `## ${"[x](y.md) ".repeat(count)}{#h}\n`;
   const workspace = createWorkspace({ "Doc.md": source, "y.md": "" });
-  const start = performance.now();
+  return { source, workspace, expected: source.replaceAll("(y.md)", "(./y.md)") };
+}
+const pathConfig = only(
+  { "links/path": ["warn", { style: "relative", leadingDot: true }] },
+  "forgejo",
+);
+it("updates every link in a large heading while preserving its attribute", () => {
+  const { source, workspace, expected } = linkedHeading(10000);
   const result = format(source, {
-    config: only({ "links/path": ["warn", { style: "relative", leadingDot: true }] }, "forgejo"),
+    config: pathConfig,
     path: "Doc.md",
     workspace,
   });
-  expect(result.output).toBe(source.replaceAll("(y.md)", "(./y.md)"));
-  expect(performance.now() - start).toBeLessThan(10000);
+  expect(result.output).toBe(expected);
+});
+
+it("checks heading link attributes with linear scaling", () => {
+  expect(
+    scaling(
+      [1000, 4000],
+      linkedHeading,
+      ({ source, workspace }) => format(source, { config: pathConfig, path: "Doc.md", workspace }),
+      (result, { expected }) => {
+        expect(result.output).toBe(expected);
+        expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+      },
+    ),
+  ).toBeLessThan(10);
 });

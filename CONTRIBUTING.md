@@ -201,7 +201,11 @@ against algorithms whose cost grows faster than their input and memory that
 should have been released; add a regression check there with the fix for such a
 defect. Keep substantive output assertions alongside the measurements, and
 exclude preparation costs only when the check is specifically about a later
-operation. Garbage-collection checks also run outside coverage, which changes
+operation. For scaling checks, warm both measured sizes on separate inputs, use
+fresh inputs for every timed call, and alternate their order. Verify every
+result outside the clock. Compare growth instead of imposing a wall-clock speed
+requirement; where recoverable, check that the former slow algorithm fails the
+comparison. Garbage-collection checks also run outside coverage, which changes
 execution and allocation costs.
 
 ## Benchmarks
