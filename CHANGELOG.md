@@ -26,6 +26,10 @@ prereleases' notes there are longer than their entries here.
 - Contributor checks use TypeScript types during source and test linting, and
   integration tests validate CLI JSON before inspecting it
   ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
+- CI publishes unit coverage reports, complexity checks run separately from
+  coverage, and CLI tests are grouped by responsibility with bounded integration
+  concurrency
+  ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
 
 ### Fixed
 

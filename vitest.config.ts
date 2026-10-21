@@ -1,4 +1,4 @@
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 
@@ -9,8 +9,14 @@ const noGitSettings = path.join(tmpdir(), "mdtools-tests-no-git-settings");
 
 export default defineConfig({
   test: {
-    // The suites run one after the other. Integration tests start many processes, and
-    // a few unit tests have time limits that such a load would make unreliable.
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      reporter: ["text-summary", "html", "json-summary"],
+      reportsDirectory: "coverage/unit",
+    },
+    // Keep complexity measurements apart from unit coverage and the integration
+    // processes. Timing files run one at a time; integration concurrency is bounded.
     projects: [
       {
         test: {
@@ -22,10 +28,20 @@ export default defineConfig({
       },
       {
         test: {
+          name: "performance",
+          include: ["tests/performance/**/*.test.ts"],
+          testTimeout: 60000,
+          fileParallelism: false,
+          sequence: { groupOrder: 1 },
+        },
+      },
+      {
+        test: {
           name: "integration",
           include: ["tests/integration/**/*.test.ts"],
           testTimeout: 30000,
-          sequence: { groupOrder: 1 },
+          maxWorkers: Math.min(4, availableParallelism()),
+          sequence: { groupOrder: 2 },
           env: {
             GIT_CONFIG_GLOBAL: path.join(noGitSettings, "gitconfig"),
             GIT_CONFIG_NOSYSTEM: "1",
