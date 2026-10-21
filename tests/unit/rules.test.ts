@@ -16,7 +16,7 @@ import {
   textContent,
 } from "../../src/index.js";
 import type { Config, Dialect, Plugin, RuleSetting } from "../../src/index.js";
-import { giteaPyLine, inForgeMath } from "../../src/rules/style.js";
+import { giteaPyLine, inForgeMath } from "../../src/rules/protections.js";
 import { codeSpanText, lazyIndentation } from "../../src/syntax/parse.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {

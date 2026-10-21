@@ -1,7 +1,7 @@
 import type { Heading, Nodes, Root, RootContent } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { range, textContent } from "../syntax/parse.js";
-import { optionsSchema } from "./style.js";
+import { optionsSchema } from "./shared.js";
 
 function content(nodes: RootContent[]): RootContent[] {
   return nodes.filter((node) => !["yaml", "toml"].includes(node.type));

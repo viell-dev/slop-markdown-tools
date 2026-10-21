@@ -1,4 +1,5 @@
 import type { Heading, Nodes } from "mdast";
+import { lastHeadingTextLine as lastTextLine } from "../syntax/headings.js";
 import type { Document } from "../core/types.js";
 import { parse, range } from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
@@ -168,25 +169,6 @@ export interface HeadingAttributes {
   heading: Heading;
   /** The source offset at which the block starts. */
   start: number;
-}
-
-/** The source range of the line that can end in a block, without trailing blank space. */
-function lastTextLine(
-  source: string,
-  node: Heading,
-): { start: number; end: number; setext: boolean } {
-  const [start, end] = range(node);
-  // An ATX heading is one line; the last line of a Setext heading is its underline.
-  const breaks = [...source.slice(start, end).matchAll(/\r\n?|\n/g)];
-  const underline = breaks.at(-1);
-  const previous = breaks.at(-2);
-  let lineEnd = underline ? start + underline.index : end;
-  while (source[lineEnd - 1] === " " || source[lineEnd - 1] === "\t") lineEnd--;
-  return {
-    start: previous ? start + previous.index + previous[0].length : start,
-    end: lineEnd,
-    setext: underline !== undefined,
-  };
 }
 
 /**

@@ -45,6 +45,81 @@ function formatted(source: string, options: ProcessOptions = {}) {
   return result.output;
 }
 describe("formatting contracts", () => {
+  it("orders diagnostic ties by UTF-16 rule IDs on every host", () => {
+    const names = ["z", "a", "Z", "ä", "A", "😀"];
+    const plugin: Plugin = {
+      name: "ordering",
+      rules: Object.fromEntries(
+        names.map(
+          (name) =>
+            [
+              name,
+              {
+                kind: "problem",
+                description: "Report in reverse source order",
+                check: () => [
+                  { start: 7, message: "Later" },
+                  { start: 0, message: "First" },
+                ],
+              } satisfies Rule,
+            ] as const,
+        ),
+      ),
+    };
+    const options = {
+      plugins: [plugin],
+      config: {
+        extends: [],
+        rules: Object.fromEntries(names.map((name) => [`ordering/${name}`, "warn"] as const)),
+      },
+    };
+    const source = "First.\nLater.\n";
+    const formatted = format(source, options);
+    expect(formatted.output).toBe(source);
+    const expected = [0, 7].flatMap((start) =>
+      ["A", "Z", "a", "z", "ä", "😀"].map((name) => [start, `ordering/${name}`]),
+    );
+    for (const diagnostics of [lint(source, options), formatted.diagnostics])
+      expect(diagnostics.map(({ start, rule }) => [start, rule])).toEqual(expected);
+  });
+  it("uses diagnostic order for otherwise tied plugin edits", () => {
+    const source = "# Title #\n";
+    const outputs = { a: "Title\n=====\n", A: "# Title\n" };
+    const plugin: Plugin = {
+      name: "ordering",
+      rules: Object.fromEntries(
+        Object.entries(outputs).map(
+          ([name, text]) =>
+            [
+              name,
+              {
+                kind: "style",
+                description: "Convert the original heading once",
+                check: ({ document }) =>
+                  document.source === source
+                    ? [{ start: 0, message: name, edit: { start: 0, end: source.length, text } }]
+                    : [],
+              } satisfies Rule,
+            ] as const,
+        ),
+      ),
+    };
+    const options: ProcessOptions = {
+      config: {
+        extends: [],
+        dialect: "commonmark",
+        rules: { "ordering/a": "warn", "ordering/A": "warn" },
+      },
+      plugins: [plugin],
+    };
+    const result = format(source, options);
+    expect(result.output).toBe(outputs.A);
+    expect(result.diagnostics).toEqual([]);
+    expect(semanticFingerprint(parse(result.output, "commonmark"))).toBe(
+      semanticFingerprint(parse(source, "commonmark")),
+    );
+    expect(format(result.output, options).output).toBe(result.output);
+  });
   it("parses unchanged source once per call, including no-op edits", () => {
     const plugin: Plugin = {
       name: "noop",

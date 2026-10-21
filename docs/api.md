@@ -35,6 +35,9 @@ model](design.md#safety-model) describes, and a rule that fails is reported as
 [`engine/rule-error`](plugins.md#rules). An invalid configuration, an unknown
 rule, invalid rule options, or a plugin rule of the wrong shape throw an error.
 
+Both functions order diagnostics by source offset, then by rule ID using UTF-16
+code units. The order is independent of the machine's locale.
+
 | Option           | Meaning                                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `path`           | The document's path relative to the workspace root, with forward slashes. It selects overrides and resolves links. |

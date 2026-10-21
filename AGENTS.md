@@ -248,6 +248,12 @@ it helps.
   entry never touches the filesystem. `mdrefine/node` exposes
   `src/workspace/discovery.ts`, which the CLI uses for discovery and
   per-document options, so change the two together.
+- Shared rule helpers belong in `src/rules/shared.ts`, renderer-specific edit
+  protections in `protections.ts`, and source-line primitives in
+  `src/syntax/source.ts`. Rule modules do not import the `style.ts` aggregator.
+  Workspace HTML, anchor collection, target indexing, and link resolution are
+  separate modules behind `src/workspace/index.ts`; keep its public entry
+  stable.
 - `src/config/load.ts` locates a plugin not named by path with
   `import-meta-resolve`, a port of Node.js's import resolution, and then with
   CommonJS resolution, because Node.js has no supported call that resolves an

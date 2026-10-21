@@ -23,6 +23,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Rule helpers, syntax protections, source locations, and workspace anchor and
+  target resolution have separate modules for maintenance
+  ([#229](https://github.com/viell-dev/slop-markdown-tools/issues/229)).
 - Contributor checks use TypeScript types during source and test linting, and
   integration tests validate CLI JSON before inspecting it
   ([#227](https://github.com/viell-dev/slop-markdown-tools/issues/227)).
@@ -33,6 +36,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Diagnostics at the same source position use the same rule ID order on every
+  machine. This also stabilizes plugin edit precedence when the ranges and
+  finding positions match
+  ([#229](https://github.com/viell-dev/slop-markdown-tools/issues/229)).
 - The benchmark guide identifies the parser's repeated list/table transition
   performance limit and links its standalone reproduction
   ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).

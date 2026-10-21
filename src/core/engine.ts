@@ -22,6 +22,7 @@ import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
 import { misreadLists } from "../syntax/misread-lists.js";
+import { lineBreak, lineStarts } from "../syntax/source.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
 import type {
@@ -178,14 +179,6 @@ function prepare(options: ProcessOptions) {
   }
   return { config, rules };
 }
-/** CommonMark's line endings. */
-const lineBreaks = /\r\n|\r|\n/g;
-/** Offsets where each line starts, computed once per source so findings locate in O(log lines). */
-function lineStarts(source: string): number[] {
-  const starts = [0];
-  for (const match of source.matchAll(lineBreaks)) starts.push(match.index + match[0].length);
-  return starts;
-}
 function diagnostic(
   starts: number[],
   rule: string,
@@ -201,8 +194,9 @@ function diagnostic(
   }
   return { ...finding, rule, severity, line: low + 1, column: finding.start - starts[low]! + 1 };
 }
+/** Tied rule IDs use UTF-16 code-unit order, independent of the host's locale. */
 const sortDiagnostics = (a: Diagnostic, b: Diagnostic) =>
-  a.start - b.start || a.rule.localeCompare(b.rule);
+  a.start - b.start || (a.rule === b.rule ? 0 : a.rule < b.rule ? -1 : 1);
 /** Diagnostics of the engine itself; they concern the whole document. */
 const fromEngine = (item: Diagnostic) => item.rule.startsWith("engine/");
 /** Why `value` is not an offset from `from` to `to`, or undefined when it is one. */
@@ -585,7 +579,7 @@ function semanticTree(
     }
     if (calloutHeader && document.dialect !== "commonmark" && node.type === "paragraph") {
       const [start, end] = range(node);
-      const header = document.source.slice(start, end).split(/\r\n|\r|\n/, 1)[0]!;
+      const header = document.source.slice(start, end).split(lineBreak, 1)[0]!;
       if (startsWithMarker(header, node)) {
         // CommonMark merges an Obsidian callout's title, or the line of a
         // GitHub alert's marker, and the body into one paragraph. Preserve
