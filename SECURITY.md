@@ -11,9 +11,13 @@ and prereleases do not receive backports.
 
 JavaScript configuration files and plugins run with the permissions of whoever
 runs the tool, so load only code you trust. A JSON configuration is data, but
-its `plugins` entries still load code. In a Git repository, the command line
-runs Git (`git config` and `git ls-files`) to read the ignore rules that Git
-applies. It turns off the file system monitor, which a repository's own
-configuration could otherwise name as a program to run, and on Windows it runs
-Git only from an absolute folder of `PATH`. Link checks never fetch URLs. A
-rendering defect without a security impact belongs in an ordinary issue.
+its `plugins` entries still load code, and opt-in `codeFormatters` execute
+commands during `format`. Those commands have the caller's permissions and can
+access files or the network; code formatting is not sandboxed. Invocation
+timeouts and output limits bound ordinary tool failures. In a Git repository,
+the command line runs Git (`git config` and `git ls-files`) to read the ignore
+rules that Git applies. It turns off the file system monitor, which a
+repository's own configuration could otherwise name as a program to run, and on
+Windows it runs Git only from an absolute folder of `PATH`. Link checks never
+fetch URLs. A rendering defect without a security impact belongs in an ordinary
+issue.

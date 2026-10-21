@@ -3,7 +3,8 @@ import { Command, CommanderError, InvalidArgumentError, Option } from "commander
 import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { format, lint, ruleRegistry } from "../core/engine.js";
+import { lint, ruleRegistry } from "../core/engine.js";
+import { formatWithCode } from "../code/format.js";
 import { loadConfig } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
 import {
@@ -159,7 +160,7 @@ async function workspacePath(root: string, file: string): Promise<string | undef
   return name === ".." || name.startsWith("../") || path.isAbsolute(name) ? undefined : name;
 }
 /** The library's diagnostics for a document that it could not process as configured. */
-const failures = new Set(["engine/unsafe-format", "engine/rule-error"]);
+const failures = new Set(["engine/unsafe-format", "engine/rule-error", "engine/code-formatter"]);
 interface Report {
   path: string;
   changed?: boolean;
@@ -251,7 +252,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     }
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
-      const result = format(source, options);
+      const result = await formatWithCode(source, { ...options, cwd: discovery.root });
       reports.push({
         path: name,
         changed: result.changed,

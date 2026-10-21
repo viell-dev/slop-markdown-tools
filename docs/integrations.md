@@ -123,7 +123,7 @@ yet", keep the other tool for that check.
 | One space after list markers, list indentation; MD005, MD007, MD030              | [`style/list-indent`](rules.md#stylelist-indent), with MD030's spacing and MD007's `indent`           |
 | Inline HTML, bare URLs; MD033, MD034                                             | None yet                                                                                              |
 | Hard tabs; MD010                                                                 | None yet                                                                                              |
-| Formatting the code inside code blocks                                           | None yet                                                                                              |
+| Formatting the code inside code blocks                                           | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                |
 | `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)                                   |
 | Custom rules                                                                     | [Plugins](plugins.md)                                                                                 |
 

@@ -27,6 +27,13 @@ with an `engine/unsafe-format` error that names them. Either way the run ends
 with exit code `2`, and `format --write` still writes the other documents, and
 this one when the edits that were kept changed it.
 
+The opt-in [code formatter pipeline](configuration.md#code-formatters) runs
+after these phases. It compares each tool result against a fingerprint with only
+that code value replaced, including matching code in alternative readings. The
+surrounding Markdown must keep its meaning. Ordinary Markdown formatting and its
+fingerprint still compare code values exactly; the code tool is responsible for
+its programming-language semantics.
+
 The comparison is only as good as the parser's reading:
 
 - It compares syntax trees, and does not run GitHub's, Forgejo's, Gitea's, or
@@ -155,8 +162,11 @@ Formatting:
 - Tables are aligned only outside lists and block quotes.
 - Footnotes, strikethrough, and literal autolinks are read but have no rules of
   their own. Reference definitions are checked but not rewritten.
-- There is no formatting of code inside code blocks, no change of front matter
-  or other metadata, no generation of documents, and no renaming of files.
+- Embedded code is formatted only by explicitly configured [external
+  tools](configuration.md#code-formatters). Their output is checked for changes
+  to surrounding Markdown, not for preservation of program semantics. There is
+  no change of front matter or other metadata, no generation of documents, and
+  no renaming of files.
 
 Files:
 
