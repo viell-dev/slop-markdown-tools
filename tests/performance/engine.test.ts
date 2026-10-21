@@ -176,7 +176,9 @@ it("applies many edits with insertions at both ends", () => {
 it("applies edits with linear scaling", () => {
   expect(
     scaling(
-      [2000, 8000],
+      // The smaller pair varied from 5x to 11x on Node 26 despite more warm-up.
+      // This larger pair keeps the same bound and rejects the former assembler.
+      [8000, 32000],
       editWorkload,
       ({ source, edits }) => applyEdits(source, edits),
       (output, { expected }) => expect(output).toBe(expected),
