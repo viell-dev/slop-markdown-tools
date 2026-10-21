@@ -11,21 +11,9 @@ import {
 } from "../syntax/parse.js";
 import { misreadLists } from "../syntax/misread-lists.js";
 import { walk } from "../syntax/walk.js";
+import { lineBreak, lineBreaks, lineEnd, lineStart } from "../syntax/source.js";
+import { optionsSchema as schema } from "./shared.js";
 
-/** A JSON Schema for an options object with these properties and no others. */
-function schema(properties: Record<string, unknown>) {
-  return { type: "object", properties, additionalProperties: false };
-}
-/** Any CommonMark line ending, including a lone carriage return. */
-const lineBreak = /\r\n|\r|\n/;
-function lineStart(source: string, at: number): number {
-  while (at > 0 && source[at - 1] !== "\n" && source[at - 1] !== "\r") at--;
-  return at;
-}
-function lineEnd(source: string, at: number): number {
-  while (at < source.length && source[at] !== "\n" && source[at] !== "\r") at++;
-  return at;
-}
 /** A physical line: where it starts, where its content ends, and where the next line starts. */
 interface Line {
   start: number;
@@ -35,7 +23,7 @@ interface Line {
 function physicalLines(source: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
-  for (const match of source.matchAll(/\r\n|\r|\n/g)) {
+  for (const match of lineBreaks(source)) {
     lines.push({ start, end: match.index, next: match.index + match[0].length });
     start = match.index + match[0].length;
   }

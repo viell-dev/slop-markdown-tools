@@ -5,7 +5,8 @@ import type { Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { splitDestination } from "../workspace/index.js";
-import { giteaPyLine, optionsSchema } from "./style.js";
+import { giteaPyLine } from "./protections.js";
+import { optionsSchema } from "./shared.js";
 
 /**
  * What Gitea's `_.py` emphasis exception can see of a link destination: whether

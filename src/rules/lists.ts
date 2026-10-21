@@ -2,7 +2,8 @@ import type { Blockquote, FootnoteDefinition, List, ListItem, Nodes, Parents } f
 import type { Document, Finding, Rule } from "../core/types.js";
 import { misreadLists } from "../syntax/misread-lists.js";
 import { joinsTomlFrontMatter } from "../syntax/parse.js";
-import { optionsSchema } from "./style.js";
+import { optionsSchema } from "./shared.js";
+import { lineBreaks } from "../syntax/source.js";
 
 /**
  * The list rules edit the markers of list items and the indentation that the
@@ -127,7 +128,7 @@ function columnAt(source: string, from: number, to: number, column: number): num
 function splitLines(source: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
-  for (const match of source.matchAll(/\r\n|\r|\n/g)) {
+  for (const match of lineBreaks(source)) {
     lines.push({ start, end: match.index });
     start = match.index + match[0].length;
   }
@@ -821,9 +822,7 @@ function renumbered(digits: string[], numbering: string): string[] | undefined {
     return undefined;
   const first = Number(digits[0]);
   const same = numbering === "same" || (numbering !== "ordered" && Number(digits[1]) === first);
-  const numbers = digits.map((value, index) =>
-    index === 0 ? first : same ? first : first + index,
-  );
+  const numbers = digits.map((_, index) => (index === 0 ? first : same ? first : first + index));
   if (numbers.some((value) => value > 999_999_999)) return undefined;
   return numbers.map((value, index) => (index === 0 ? digits[0]! : String(value)));
 }

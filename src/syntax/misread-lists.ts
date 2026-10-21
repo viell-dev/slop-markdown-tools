@@ -1,6 +1,7 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd } from "./parse.js";
+import { lineBreak as lineEndingPattern, lineBreaks } from "./source.js";
 
 /**
  * A list marker as CommonMark reads one at the start of a line's content: a
@@ -480,7 +481,7 @@ export function misreadLists(document: Document): MisreadLists {
         const run = /^[ \t>]*(`{3,}|~{3,})[ \t]*$/.exec(line)?.[1];
         return run !== undefined && run[0] === fence[0] && run.length >= fence.length;
       };
-      const lines = text.split(/\r\n|\r|\n/);
+      const lines = text.split(lineEndingPattern);
       if (lines.length > 1 && closes(lines.at(-1)!)) continue;
       // The fence ends before the document does, so its container ended it.
       // Live Preview reads on to a line that closes it, where the parser opens
@@ -489,7 +490,7 @@ export function misreadLists(document: Document): MisreadLists {
       openFences.add(stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }));
       break;
     }
-    const lines = source.split(/\r\n|\r|\n/);
+    const lines = source.split(lineEndingPattern);
     /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
     const spaced = (number: number) => {
       const line = lines[number - 1] ?? "";
@@ -753,8 +754,7 @@ export function misreadLists(document: Document): MisreadLists {
     // opener; the union scan below visits each token at most once (#435).
     const starts = [0];
     if (htmlRoots.length)
-      for (const found of source.matchAll(/\r\n|\r|\n/g))
-        starts.push(found.index + found[0].length);
+      for (const found of lineBreaks(source)) starts.push(found.index + found[0].length);
     let line = 0;
     const pointAt = (offset: number): Point => {
       // HTML roots and their union ends advance monotonically in source order.
@@ -1039,7 +1039,7 @@ export function misreadLists(document: Document): MisreadLists {
         previous.position !== undefined &&
         previous.position.end.line === leaf.position!.start.line - 1;
       if (leaf.type === "table") {
-        const rows = source.slice(start, end).split(/\r\n|\r|\n/);
+        const rows = source.slice(start, end).split(lineEndingPattern);
         if (below) {
           let at = previous.position!.end.offset!;
           while (source[at - 1] === " " || source[at - 1] === "\t") at--;
@@ -1065,7 +1065,7 @@ export function misreadLists(document: Document): MisreadLists {
         leaf.type === "paragraph" &&
         previous.position!.start.line === previous.position!.end.line &&
         piped(source.slice(previous.position!.start.offset, previous.position!.end.offset)) &&
-        listedDelimiter.test(source.slice(lineStart(start), end).split(/\r\n|\r|\n/)[0]!)
+        listedDelimiter.test(source.slice(lineStart(start), end).split(lineEndingPattern)[0]!)
       )
         tableText.add({
           ...leaf,

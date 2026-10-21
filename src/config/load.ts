@@ -10,6 +10,7 @@ import { reservedPluginName } from "../core/engine.js";
 import { exists, pathError, refusal, refusalText } from "../workspace/access.js";
 import { isVault } from "../workspace/vault.js";
 import { splitByteOrderMark } from "../syntax/parse.js";
+import { lineBreaks } from "../syntax/source.js";
 
 export interface LoadedConfig {
   config: Config;
@@ -35,7 +36,7 @@ const isScript = (file: string) => /\.[cm]?js$/i.test(file);
 function position(text: string, offset: number): { line: number; column: number } {
   let line = 1;
   let start = 0;
-  for (const match of text.slice(0, offset).matchAll(/\r\n|\r|\n/g)) {
+  for (const match of lineBreaks(text.slice(0, offset))) {
     line++;
     start = match.index + match[0].length;
   }

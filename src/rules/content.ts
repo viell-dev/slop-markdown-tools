@@ -2,7 +2,7 @@ import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
-import { optionsSchema } from "./style.js";
+import { optionsSchema } from "./shared.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
 const obsidianSize = /\|\d+(?:x\d+)?$/;

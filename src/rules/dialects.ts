@@ -3,7 +3,8 @@ import type { Dialect, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { range } from "../syntax/parse.js";
 import { headingAttributeBlock } from "../workspace/heading-attributes.js";
-import { optionsSchema } from "./style.js";
+import { optionsSchema } from "./shared.js";
+import { lastHeadingTextLine } from "../syntax/headings.js";
 
 const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea"]);
 function calloutRule(obsidian: boolean): Rule {
@@ -122,19 +123,13 @@ export const dialectRules: Record<string, Rule> = {
       const findings: Finding[] = [];
       const { source } = document;
       walk(document.tree, "heading", (node) => {
-        const [start, end] = range(node);
         // The block ends an ATX heading's line or the last text line of a
         // Setext heading, whose last line is its underline.
-        const breaks = [...source.slice(start, end).matchAll(/\r\n?|\n/g)];
-        const underline = breaks.at(-1);
-        const previous = breaks.at(-2);
-        const lineStart = previous ? start + previous.index + previous[0].length : start;
-        let lineEnd = underline ? start + underline.index : end;
-        while (source[lineEnd - 1] === " " || source[lineEnd - 1] === "\t") lineEnd--;
+        const { start: lineStart, end: lineEnd, setext } = lastHeadingTextLine(source, node);
         let line = source.slice(lineStart, lineEnd);
         let block = headingAttributeBlock(line);
         // Gitea before 1.26 also reads a block followed by a closing `#` sequence.
-        if (!block && !underline) {
+        if (!block && !setext) {
           const closed = /[ \t]+#+$/.exec(line);
           if (closed) {
             line = line.slice(0, closed.index);
