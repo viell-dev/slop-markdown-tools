@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `codeFormatters` route named fenced-code languages to configured
+  executables in CLI `format` modes and the async `formatWithCode` Node API.
+  Failures retain the affected block, report an operational error, and keep
+  other safe edits
+  ([#449](https://github.com/viell-dev/slop-markdown-tools/issues/449)).
 - Existing heading checks accept title levels, preambles, configurable
   front-matter titles, and duplicate-heading scope; code-language checks accept
   allowed names and strict info strings. Defaults and problem-only behavior

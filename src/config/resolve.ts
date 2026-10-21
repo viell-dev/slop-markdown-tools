@@ -4,6 +4,7 @@ import { configErrors } from "./problems.js";
 import { deepFreeze } from "../core/frozen.js";
 import type {
   Config,
+  CodeFormatter,
   Dialect,
   DialectName,
   JsonSchemaObject,
@@ -156,6 +157,7 @@ export const configSchema: JsonSchemaObject = deepFreeze({
     },
     dialect: { $ref: "#/definitions/dialect" },
     rules: { $ref: "#/definitions/rules" },
+    codeFormatters: { $ref: "#/definitions/codeFormatters" },
     ignore: {
       description:
         "Path patterns of documents that are never linted or formatted, matched with their letter case. They stay link targets.",
@@ -181,11 +183,41 @@ export const configSchema: JsonSchemaObject = deepFreeze({
           },
           dialect: { $ref: "#/definitions/dialect" },
           rules: { $ref: "#/definitions/rules" },
+          codeFormatters: { $ref: "#/definitions/codeFormatters" },
         },
       },
     },
   },
   definitions: {
+    codeFormatters: {
+      description:
+        "Trusted code tools for formatWithCode and CLI format; an array replaces inherited tools, and false disables them. No tools run by default.",
+      anyOf: [{ const: false }, { type: "array", items: { $ref: "#/definitions/codeFormatter" } }],
+    },
+    codeFormatter: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "languages", "command", "args"],
+      properties: {
+        id: { type: "string", pattern: "^[a-z][a-z0-9-]*$" },
+        languages: {
+          anyOf: [
+            { type: "array", items: { const: "*" }, minItems: 1, maxItems: 1 },
+            {
+              type: "array",
+              items: { type: "string", pattern: "^[^\\s*]+$" },
+              minItems: 1,
+              uniqueItems: true,
+            },
+          ],
+        },
+        command: { type: "string", minLength: 1 },
+        args: strings,
+        exclude: strings,
+        timeoutMs: { type: "integer", minimum: 1, maximum: 2147483647 },
+        maxOutputBytes: { type: "integer", minimum: 1, maximum: 1073741824 },
+      },
+    },
     dialect: {
       description:
         "The renderer whose syntax documents are read in. When nothing names one, github is assumed, or obsidian inside a vault.",
@@ -211,10 +243,38 @@ export const configSchema: JsonSchemaObject = deepFreeze({
     },
   },
 });
-const validate = new Ajv({ allErrors: true }).compile(configSchema);
+const validate = new Ajv({ allErrors: true }).compile<Config>(configSchema);
+function formatterProblem(
+  formatters: readonly CodeFormatter[] | false | undefined,
+  where: string,
+): string | undefined {
+  if (!formatters) return undefined;
+  const ids = new Set<string>();
+  const languages = new Set<string>();
+  for (const formatter of formatters) {
+    if (ids.has(formatter.id))
+      return `${where} has duplicate formatter id ${JSON.stringify(formatter.id)}`;
+    ids.add(formatter.id);
+    for (const language of formatter.languages) {
+      if (languages.has(language))
+        return language === "*"
+          ? `${where} has more than one fallback formatter`
+          : `${where} has more than one formatter for language ${JSON.stringify(language)}`;
+      languages.add(language);
+    }
+  }
+  return undefined;
+}
 /** What is wrong with `value` as a configuration, in plain words, or undefined when it is valid. */
 export function configProblem(value: unknown): string | undefined {
-  return validate(value) ? undefined : configErrors(validate.errors ?? [], value, dialectNames);
+  if (!validate(value)) return configErrors(validate.errors ?? [], value, dialectNames);
+  const problem = formatterProblem(value.codeFormatters, "codeFormatters");
+  if (problem) return problem;
+  for (const [index, override] of (value.overrides ?? []).entries()) {
+    const problem = formatterProblem(override.codeFormatters, `overrides[${index}].codeFormatters`);
+    if (problem) return problem;
+  }
+  return undefined;
 }
 /**
  * Throws an error that says what is wrong when `value` is not a configuration
@@ -301,7 +361,22 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
   for (const plugin of plugins)
     for (const [name, preset] of Object.entries(plugin.presets ?? {}))
       available[`${plugin.name}/${name}`] = preset;
-  const result: ResolvedConfig = { dialect: assumed, rules: {}, ignore: [], resolve: {} };
+  const result: ResolvedConfig = {
+    dialect: assumed,
+    rules: {},
+    ignore: [],
+    resolve: {},
+    codeFormatters: [],
+  };
+  const tools = (entries: readonly CodeFormatter[] | false): CodeFormatter[] =>
+    entries === false
+      ? []
+      : entries.map((entry) => ({
+          ...entry,
+          languages: [...entry.languages],
+          args: [...entry.args],
+          ...(entry.exclude ? { exclude: [...entry.exclude] } : {}),
+        }));
   const overrides: NonNullable<Config["overrides"]>[number][] = [];
   function merge(part: Readonly<Config>, chain: readonly string[]) {
     validateConfig(part);
@@ -315,6 +390,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     if (part.dialect) result.dialect = canonicalDialect(part.dialect);
     addRules(result.rules, part.rules);
     Object.assign(result.resolve, part.resolve);
+    if (part.codeFormatters !== undefined) result.codeFormatters = tools(part.codeFormatters);
     for (const pattern of part.ignore ?? []) result.ignore.push(pattern);
     for (const override of part.overrides ?? []) overrides.push(override);
   }
@@ -325,6 +401,8 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     if (override.files.some((pattern) => overridePattern(pattern)(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       addRules(result.rules, override.rules);
+      if (override.codeFormatters !== undefined)
+        result.codeFormatters = tools(override.codeFormatters);
     }
   }
   return result;

@@ -254,6 +254,11 @@ it helps.
   Workspace HTML, anchor collection, target indexing, and link resolution are
   separate modules behind `src/workspace/index.ts`; keep its public entry
   stable.
+- `src/code/` is the Node host for configured code tools. Keep execution out of
+  ordinary rules and the portable entry. Its internal fingerprint path permits
+  only selected code values and must cover alternative readings; the ordinary
+  fingerprint stays exact. Fences and diagnostic locations are shared through
+  `src/syntax/fences.ts` and `src/core/diagnostics.ts`.
 - `src/config/load.ts` locates a plugin not named by path with
   `import-meta-resolve`, a port of Node.js's import resolution, and then with
   CommonJS resolution, because Node.js has no supported call that resolves an

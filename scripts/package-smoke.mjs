@@ -28,9 +28,9 @@ function runNode(args, cwd, input) {
 /** A TypeScript consumer of the published types, as an ES module. */
 const consumerModule = `import {
   builtInRules, configSchema, format, lint, parse, presets, resolveConfig, unifiedDiff,
-  type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink,
+  type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink, type FormatResult, type CodeFormatter,
 } from ${named()};
-import { discoverWorkspace, type DiscoverOptions, type Skipped, type WorkspaceDiscovery } from ${named("/node")};
+import { discoverWorkspace, formatWithCode, type DiscoverOptions, type Skipped, type WorkspaceDiscovery, type CodeFormatOptions } from ${named("/node")};
 const schema: JsonSchema = { type: "object", properties: { level: { type: "integer" } } };
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem", schema,
@@ -54,6 +54,9 @@ const discoverOptions: DiscoverOptions = { root: ".", inputs: [], documents: { "
 const discovery: WorkspaceDiscovery = await discoverWorkspace(discoverOptions);
 const skipped: readonly Skipped[] = discovery.skipped; void skipped;
 const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
+const codeTool: CodeFormatter = { id: "javascript", languages: ["js"], command: "formatter", args: [] };
+const codeOptions: CodeFormatOptions = { config: { codeFormatters: [codeTool] }, cwd: "." };
+const codeResult: Promise<FormatResult> = formatWithCode("Text", codeOptions); void codeResult;
 for (const node of parse(output, "obsidian").tree.children) {
   if (node.type === "paragraph") for (const child of node.children) {
     if (child.type === "wikiLink") { const link: WikiLink = child; const target: string = link.target; void target; }
@@ -62,11 +65,11 @@ for (const node of parse(output, "obsidian").tree.children) {
 `;
 /** The same package from a CommonJS module, whose imports become require() calls. */
 const consumerCommonJs = `import { format, unifiedDiff, type Config } from ${named()};
-import { discoverWorkspace } from ${named("/node")};
+import { discoverWorkspace, formatWithCode } from ${named("/node")};
 const config: Config = { extends: ["recommended"] };
 const output: string = format("Text", { config }).output;
 const patch: string = unifiedDiff("a/note.md", "b/note.md", "Text", output);
-void output; void discoverWorkspace; void patch;
+void output; void discoverWorkspace; void patch; void formatWithCode;
 `;
 /** What every installation of the package must do, whatever its layout. */
 async function checkInstalled(project) {
@@ -104,13 +107,13 @@ async function checkInstalled(project) {
       [
         "--input-type=commonjs",
         "-e",
-        `const {format} = require(${named()}); const {discoverWorkspace} = require(${named("/node")});
+        `const {format} = require(${named()}); const {discoverWorkspace,formatWithCode} = require(${named("/node")});
 const schema = require(${named("/config.schema.json")}); const {version} = require(${named("/package.json")});
-process.stdout.write([format("A *small* note.\\n").output.trim(), typeof discoverWorkspace, schema.title, version].join("|"));`,
+process.stdout.write([format("A *small* note.\\n").output.trim(), typeof discoverWorkspace, typeof formatWithCode, schema.title, version].join("|"));`,
       ],
       project,
     ),
-    `A _small_ note.|function|mdtools configuration|${manifest.version}`,
+    `A _small_ note.|function|function|mdtools configuration|${manifest.version}`,
   );
   // The filesystem entry discovers the consumer's own documents.
   await writeFile(path.join(project, "note.md"), "A *small* note.\n");
@@ -126,6 +129,28 @@ process.stdout.write(d.selected.join(",") + ":" + format(d.read("note.md"), d.op
       project,
     ),
     "note.md:A _small_ note.\n",
+  );
+  // A configured command runs through the installed Node entry, including its
+  // runtime process-spawning dependencies in pnpm's strict layout.
+  await writeFile(
+    path.join(project, "formatter.mjs"),
+    'import process from "node:process"; process.stdin.resume(); process.stdin.on("end", () => process.stdout.write("const x = 1;\\n"));\n',
+  );
+  const fence = "`".repeat(3);
+  const codeSource = `${fence}js\nconst x=1\n${fence}\n`;
+  assert.equal(
+    runNode(
+      [
+        "--input-type=module",
+        "-e",
+        `import {formatWithCode} from ${named("/node")};
+const result = await formatWithCode(${JSON.stringify(codeSource)}, {cwd:process.cwd(), config:{extends:[],codeFormatters:[{id:"probe",languages:["js"],command:process.execPath,args:["./formatter.mjs"]}]}});
+if(result.diagnostics.length) throw new Error(JSON.stringify(result.diagnostics));
+process.stdout.write(result.output);`,
+      ],
+      project,
+    ),
+    `${fence}js\nconst x = 1;\n${fence}\n`,
   );
   // The command finds its own dependencies from where it is installed.
   const command = path.join(project, "node_modules", manifest.name, manifest.bin.mdtools);

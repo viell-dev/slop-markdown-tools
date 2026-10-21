@@ -15,8 +15,9 @@ shows which have a rule.
 
 - **One configuration for lint and format.** Style rules report in `lint` and
   fix in `format`; problem rules report what has no single correct repair.
-- **Changes only what its rules target.** Everything else stays byte for byte as
-  written, and an edit that would change a document's parsed meaning is refused.
+- **Changes only what is configured.** Markdown style edits preserve parsed
+  meaning. Optional code formatters target fenced bodies while a guard protects
+  the surrounding Markdown.
 - **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, and
   Obsidian: tables, math, wikilinks, and callouts are read as each renderer
   reads them.

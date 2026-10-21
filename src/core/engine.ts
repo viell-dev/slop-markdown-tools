@@ -1,7 +1,8 @@
+import { diagnostic, sortDiagnostics } from "./diagnostics.js";
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
 import { deepFreeze } from "./frozen.js";
-import type { Nodes } from "mdast";
+import type { Code, Nodes } from "mdast";
 import { resolveConfig, setting } from "../config/resolve.js";
 import { optionErrors, shown } from "../config/problems.js";
 import {
@@ -179,24 +180,6 @@ function prepare(options: ProcessOptions) {
   }
   return { config, rules };
 }
-function diagnostic(
-  starts: number[],
-  rule: string,
-  severity: "warn" | "error",
-  finding: Finding,
-): Diagnostic {
-  let low = 0;
-  let high = starts.length - 1;
-  while (low < high) {
-    const middle = (low + high + 1) >> 1;
-    if (starts[middle]! <= finding.start) low = middle;
-    else high = middle - 1;
-  }
-  return { ...finding, rule, severity, line: low + 1, column: finding.start - starts[low]! + 1 };
-}
-/** Tied rule IDs use UTF-16 code-unit order, independent of the host's locale. */
-const sortDiagnostics = (a: Diagnostic, b: Diagnostic) =>
-  a.start - b.start || (a.rule === b.rule ? 0 : a.rule < b.rule ? -1 : 1);
 /** Diagnostics of the engine itself; they concern the whole document. */
 const fromEngine = (item: Diagnostic) => item.rule.startsWith("engine/");
 /** Why `value` is not an offset from `from` to `to`, or undefined when it is one. */
@@ -535,6 +518,14 @@ function acceptedEdits(source: string, edits: readonly Edit[]): Edit[] {
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   return JSON.stringify(semanticTree(document, workspace));
 }
+/** Internal host guard: replace only explicitly approved literal code values. */
+export function semanticFingerprintWithCode(
+  document: Document,
+  values: WeakMap<Code, string>,
+  workspace?: Workspace,
+): string {
+  return JSON.stringify(semanticTree(document, workspace, undefined, values));
+}
 /**
  * The document's meaning as plain data whose keys are in sorted order. With
  * `origins`, each object of the result that stands for a node of the document
@@ -544,6 +535,7 @@ function semanticTree(
   document: Document,
   workspace?: Workspace,
   origins?: Map<unknown, Nodes>,
+  codeValues?: WeakMap<Code, string>,
 ): unknown {
   const canonicalUrl = (url: string, wiki = false) => {
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
@@ -599,6 +591,8 @@ function semanticTree(
           normalize(child, index === 0 && (node.type === "blockquote" || calloutHeader)),
         );
       } else if (key === "url" && typeof value === "string") result[key] = canonicalUrl(value);
+      else if (key === "value" && node.type === "code" && codeValues?.has(node))
+        result[key] = codeValues.get(node);
       else if (key === "value" && node.type === "text") {
         let text = node.value.replace(/[ \t\r\n]+/g, " ");
         if (calloutHeader && document.dialect !== "commonmark")

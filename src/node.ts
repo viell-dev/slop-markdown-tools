@@ -3,3 +3,5 @@
 export { discoverWorkspace } from "./workspace/discovery.js";
 export type { DiscoverOptions, WorkspaceDiscovery } from "./workspace/discovery.js";
 export type { Skipped } from "./workspace/files.js";
+export { formatWithCode } from "./code/format.js";
+export type { CodeFormatOptions } from "./code/format.js";

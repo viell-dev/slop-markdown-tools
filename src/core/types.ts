@@ -209,6 +209,25 @@ export interface Override {
   readonly dialect?: DialectName;
   /** Rule settings for the matching documents, applied after the configuration's own. */
   readonly rules?: Readonly<Record<string, RuleSetting>>;
+  /** Replace configured code tools for these documents; false disables them. */
+  readonly codeFormatters?: readonly CodeFormatter[] | false;
+}
+/** A trusted external command that formats the contents of selected code fences. */
+export interface CodeFormatter {
+  /** A unique, lowercase name used in operational diagnostics. */
+  readonly id: string;
+  /** Exact, case-sensitive fence languages, or ["*"] as the single fallback. */
+  readonly languages: readonly string[];
+  /** Executable name or path. It is never taken from Markdown or passed as a shell string. */
+  readonly command: string;
+  /** Arguments; {filepath} is replaced with the absolute document filename. */
+  readonly args: readonly string[];
+  /** Case-sensitive document globs to skip, relative to the workspace root. */
+  readonly exclude?: readonly string[];
+  /** Invocation deadline in milliseconds; 10,000 when omitted. */
+  readonly timeoutMs?: number;
+  /** Maximum stdout bytes per invocation; 1 MiB when omitted. */
+  readonly maxOutputBytes?: number;
 }
 /** Files that links may lead to without being linted or formatted. */
 export interface ResolveOptions {
@@ -248,11 +267,15 @@ export interface Config {
    * loads them; the library takes plugin objects through its `plugins` option.
    */
   plugins?: readonly string[];
+  /** Trusted, opt-in code tools; only the CLI and mdrefine/node execute them. */
+  codeFormatters?: readonly CodeFormatter[] | false;
 }
 /** The settings in effect for one document, which `resolveConfig` returns. */
 export interface ResolvedConfig {
   /** The `resolve` settings of the configuration and its presets. */
   resolve: ResolveOptions;
+  /** Code tools after preset and override replacement; empty when disabled. */
+  codeFormatters: CodeFormatter[];
   /** The dialect the document is read in, never an alias. */
   dialect: Dialect;
   /** The setting of every rule that the configuration, its presets, or an override names. */

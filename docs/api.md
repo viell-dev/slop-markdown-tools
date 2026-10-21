@@ -2,8 +2,9 @@
 
 The package's main entry, `mdrefine`, lints and formats strings and never
 touches the filesystem. A second entry, `mdrefine/node`, finds and reads files
-the way the CLI does. Both are TypeScript-typed ES modules, and their exports
-are part of the interface that [version numbers](versions.md) describe.
+the way the CLI does and can run configured code formatters. Both are
+TypeScript-typed ES modules, and their exports are part of the interface that
+[version numbers](versions.md) describe.
 
 ## Lint and format
 
@@ -73,10 +74,10 @@ const result = format(files["Note.md"], { ...options, workspace });
 ```
 
 `resolveConfig(options)` returns the settings in effect for a document:
-`dialect`, `rules`, `ignore`, and `resolve`. It takes the `path`, `config`,
-`plugins`, and `defaultDialect` of `lint` and `format`, so their options serve
-as they are. The prereleases took these four as separate arguments; such a call
-throws an error that says so.
+`dialect`, `rules`, `ignore`, `resolve`, and `codeFormatters`. It takes the
+`path`, `config`, `plugins`, and `defaultDialect` of `lint` and `format`, so
+their options serve as they are. The prereleases took these four as separate
+arguments; such a call throws an error that says so.
 
 ## Workspaces
 
@@ -204,6 +205,50 @@ document. Both throw for a name that is not selected. A root or input that
 cannot be used is an error in the CLI's words, such as
 `Input does not exist: notes/absent.md`.
 
+## Formatting embedded code
+
+`formatWithCode(source, options)` from `mdrefine/node` returns a
+`Promise<FormatResult>`. It applies ordinary Markdown formatting, then runs the
+selected [code formatters](configuration.md#code-formatters):
+
+```js
+import { formatWithCode } from "mdrefine/node";
+
+const source = "~~~js\nconst x={a:1}\n~~~\n";
+const result = await formatWithCode(source, {
+  path: "guide.md",
+  config: {
+    codeFormatters: [
+      {
+        id: "javascript",
+        languages: ["js", "javascript"],
+        command: "prettier",
+        args: ["--stdin-filepath", "{filepath}.js"],
+      },
+    ],
+  },
+});
+```
+
+It takes the same options as `format`, plus `cwd`, the tool working directory
+and local executable context. Without `cwd`, it uses `process.cwd()`.
+`{filepath}` is resolved against that directory. A discovery host should pass
+`cwd: discovery.root` alongside `discovery.options(name)`, as the CLI does. No
+command runs unless `codeFormatters` selects a block; synchronous `format` and
+`lint` never execute these tools.
+
+Widened range scope and suppression comments apply to code formatting too, and
+`scope` moves with accepted code edits. The guard permits only the selected code
+values to change and keeps surrounding Markdown and alternative readings intact.
+The chosen tool is trusted to format its programming language; this guard does
+not verify program semantics.
+
+Configuration errors reject the Promise. A failed or unsafe tool invocation
+returns an `engine/code-formatter` error diagnostic, retains that block, and
+keeps other safe edits. Only complete, valid UTF-8 output within the configured
+limit is inserted. Commands are trusted programs running with the caller's
+permissions, not an operating-system sandbox.
+
 ## Other exports
 
 - `unifiedDiff(oldFileName, newFileName, before, after): string` returns the
@@ -254,9 +299,10 @@ shared by every caller in the process, so they are frozen and typed read-only;
 copy what you want to change. Each export has a doc comment, and the TypeScript
 types of these values are exported too, among them `Config`, `ProcessOptions`,
 `FormatResult`, `Diagnostic`, `Plugin`, `Rule`, `JsonSchema`, `Workspace`,
-`WorkspaceOptions`, and `LinkResolution`; `mdrefine/node` exports
-`DiscoverOptions`, `WorkspaceDiscovery`, and `Skipped`. The type declarations
-depend on `@types/mdast`, which the package installs.
+`WorkspaceOptions`, `LinkResolution`, and `CodeFormatter`; `mdrefine/node`
+exports `DiscoverOptions`, `WorkspaceDiscovery`, `Skipped`, and
+`CodeFormatOptions`. The type declarations depend on `@types/mdast`, which the
+package installs.
 
 Both entries are ES modules. A CommonJS module can load them with `require()`,
 which the supported Node.js versions allow for ES modules.

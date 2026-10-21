@@ -21,6 +21,12 @@ or reads the one that `--config` names. With `--json` it prints
 `{ "rules": [...] }`, each rule an object with its `id`, `kind`, and
 `description`.
 
+With configured [code formatters](configuration.md#code-formatters), every
+`format` mode also formats selected fenced code. `lint` checks Markdown rules
+and does not run those tools; use `format --check` to check their formatting. A
+failed tool reports `engine/code-formatter` and exits with `2`, retaining that
+block and keeping other safe edits.
+
 ## Options
 
 `lint` and `format` accept these options; the last three are for `format` only
@@ -211,8 +217,9 @@ it proposes, with `start`, `end`, and the replacement `text`. In a `format`
 report, positions refer to the formatted text. Besides the rules, the engine
 reports `engine/unsafe-format` for edits that it could not apply safely (see the
 [safety model](design.md#safety-model)), `engine/rule-error` for a rule that
-failed on a document (see [rules](plugins.md#rules)), `engine/unreadable-file`,
-and `engine/unwritable-file`.
+failed on a document (see [rules](plugins.md#rules)), `engine/code-formatter`
+for a failed or unsafe code tool, `engine/unreadable-file`, and
+`engine/unwritable-file`.
 
 ## Exit codes
 

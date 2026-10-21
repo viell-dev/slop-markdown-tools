@@ -40,16 +40,17 @@ does not accept; the message names the setting, as in
 }
 ```
 
-| Key         | Value                                          | Purpose                                                              |
-| ----------- | ---------------------------------------------- | -------------------------------------------------------------------- |
-| `$schema`   | A string                                       | Ignored by the tool; gives an editor the [JSON Schema](#json-schema) |
-| `extends`   | A preset name or a list of them                | [Presets](#presets) to start from                                    |
-| `dialect`   | A [dialect](dialects.md) name                  | The renderer whose syntax documents are read in                      |
-| `rules`     | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                            |
-| `overrides` | Objects with `files`, and `dialect` or `rules` | [Settings for some files](#overrides)                                |
-| `ignore`    | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)          |
-| `resolve`   | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)                 |
-| `plugins`   | Files or package names                         | [Plugins](#plugins) to load                                          |
+| Key              | Value                                          | Purpose                                                              |
+| ---------------- | ---------------------------------------------- | -------------------------------------------------------------------- |
+| `$schema`        | A string                                       | Ignored by the tool; gives an editor the [JSON Schema](#json-schema) |
+| `extends`        | A preset name or a list of them                | [Presets](#presets) to start from                                    |
+| `dialect`        | A [dialect](dialects.md) name                  | The renderer whose syntax documents are read in                      |
+| `rules`          | Rule IDs and settings                          | [Rules and severity](#rules-and-severity)                            |
+| `overrides`      | Objects with `files` and settings              | [Settings for some files](#overrides)                                |
+| `codeFormatters` | Command entries, or `false`                    | [Opt-in code formatting](#code-formatters)                           |
+| `ignore`         | Path patterns                                  | [Documents not to process](#ignored-files-and-link-targets)          |
+| `resolve`        | `{ "gitIgnored": …, "nestedRepositories": … }` | [More link targets](#ignored-files-and-link-targets)                 |
+| `plugins`        | Files or package names                         | [Plugins](#plugins) to load                                          |
 
 ### JSON Schema
 
@@ -137,10 +138,78 @@ its presets, though not one set by a matching override. When neither the
 configuration, its presets and overrides, nor `--dialect` names one, the dialect
 is [assumed](dialects.md#the-assumed-dialect).
 
+## Code formatters
+
+`codeFormatters` lets `format` send fenced code to commands you choose. Install
+those tools yourself; no preset enables one. `lint` checks Markdown rules, so
+use `format --check` to check code formatting. The portable, synchronous library
+`format` never executes commands; library hosts use
+[`formatWithCode`](api.md#formatting-embedded-code) from `mdrefine/node`.
+
+```jsonc
+{
+  "codeFormatters": [
+    {
+      "id": "javascript",
+      "languages": ["js", "javascript"],
+      "command": "prettier",
+      "args": ["--stdin-filepath", "{filepath}.js"],
+    },
+    {
+      "id": "rust",
+      "languages": ["rs", "rust"],
+      "command": "rustfmt",
+      "args": ["--emit", "stdout"],
+    },
+  ],
+  "overrides": [{ "files": ["drafts/**"], "codeFormatters": false }],
+}
+```
+
+Each entry has a unique lowercase `id`, an explicit `languages` array, an
+executable `command`, and an `args` array. Languages are decoded fence names,
+matched case-sensitively; aliases are listed explicitly. Indented code and
+fences without a usable language are left as written. A single `["*"]` entry can
+provide a fallback for other named languages. Duplicate language routes or IDs,
+and more than one fallback, are configuration errors.
+
+Arguments substitute only `{filepath}`, the absolute document filename. Append a
+suffix when a tool chooses its parser from the extension, as the Prettier
+example does. Code goes through stdin; the complete stdout becomes the code
+body. The working directory is the workspace root, and its `node_modules/.bin`
+comes before `PATH`, including Windows command shims. The selected tool
+discovers its own configuration from that directory and filename. Commands are
+passed as executable names and argument arrays.
+
+Optional entry settings:
+
+| Setting          | Meaning                                                                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exclude`        | Document globs relative to the workspace root, with the same case-sensitive matching as overrides. An excluded exact route does not fall through to the fallback. |
+| `timeoutMs`      | Invocation deadline in milliseconds, from 1 to 2,147,483,647. Default: 10,000.                                                                                    |
+| `maxOutputBytes` | Maximum stdout bytes, from 1 to 1,073,741,824. Default: 1,048,576 (1 MiB).                                                                                        |
+
+An array replaces inherited formatter entries; `false` disables them. Both forms
+work in presets and overrides. A suppression such as
+`<!-- mdtools-disable engine/code-formatter -->`, a suppression for all rules,
+or `mdtools-disable-next-line` before the opening fence skips a block.
+
+Markdown is formatted first, then selected code blocks in document order.
+Container prefixes, metadata, the document's line endings, and safe fence
+lengths are preserved. A guard approves only the requested code-body change and
+checks the surrounding Markdown and alternative parser readings. It does not
+prove that a tool preserves programming-language semantics.
+
+A failed, missing, timed-out, non-UTF-8, oversized, or unsafe tool result keeps
+that block's content and reports `engine/code-formatter`. The CLI exits with
+`2`, and other safe edits remain available. Partial stdout is never inserted.
+Configured commands, including commands in JSON files, run with your
+permissions; use configurations and tools you trust.
+
 ## Overrides
 
-Each entry of `overrides` applies its `dialect` and `rules` to the documents
-that match one of its `files` patterns:
+Each entry of `overrides` applies its `dialect`, `rules`, and `codeFormatters`
+to the documents that match one of its `files` patterns:
 
 ```jsonc
 {
