@@ -7,6 +7,7 @@ export function scaling<Input, Output>(
   prepare: (size: number) => Input,
   run: (input: Input) => Output,
   verify: (output: Output, input: Input) => void,
+  maxCalls = 8,
 ): number {
   const elapsed = (inputs: Input[]): number => {
     const outputs: Output[] = [];
@@ -21,7 +22,7 @@ export function scaling<Input, Output>(
   const calibration = Math.min(...Array.from({ length: 3 }, () => elapsed([prepare(sizes[0])])));
   // One bounded call count for both sizes targets a measurable small batch.
   // Cap preparation too: fast scans can need expensive, freshly parsed trees.
-  const calls = Math.max(1, Math.min(8, Math.ceil(25 / calibration)));
+  const calls = Math.max(1, Math.min(maxCalls, Math.ceil(25 / calibration)));
   const fastest = [Infinity, Infinity];
   for (let round = 0; round < 4; round++) {
     const inputs = sizes.map((size) => Array.from({ length: calls }, () => prepare(size)));

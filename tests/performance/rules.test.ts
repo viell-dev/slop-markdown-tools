@@ -75,6 +75,9 @@ it("finds heading lines with linear scaling", () => {
           ),
         ).toBe(expected);
       },
+      // Each large parsed tree is costly to prepare; its scan is measurable
+      // on its own, without multiplying preparation into a suite bottleneck.
+      1,
     ),
   ).toBeLessThan(10);
 });
