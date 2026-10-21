@@ -173,11 +173,13 @@ that are not released. Correct it without a new version or a moved tag:
 3. Open a pull request into `site-VERSION` that applies only the documentation
    part of the fix, usually by cherry-picking it, and changes nothing outside
    `docs/`. Its CI checks the pages against that release's code. Merge it.
-4. Dispatch **Pages** on `main` with `tag` set to the version and `ref` set to
-   `site-VERSION`. The workflow refuses a tag that is not the newest stable
-   release, and a branch that does not descend from the tag or that changes
-   anything outside `docs/`. It checks the Markdown, builds the site, and writes
-   `version.json` with the version, the tag's commit, and the commit it built.
+4. Dispatch **Pages** on `main` with `tag` set to the version and `corrections`
+   checked (`gh workflow run pages.yml -f tag=VERSION -f corrections=true`). The
+   workflow deploys only that release's `site-VERSION` branch, and refuses a tag
+   that is not the newest stable release and a branch that does not descend from
+   the tag or that changes anything outside `docs/`, renames included. It checks
+   the Markdown, builds the site, and writes `version.json` with the version,
+   the tag's commit, and the commit it built.
 5. Run `npm run check:live` to confirm what is deployed.
 
 The package and its tag stay as they were published; the corrections ship in the

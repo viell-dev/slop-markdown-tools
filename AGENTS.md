@@ -330,7 +330,12 @@ Other repository settings, each recorded here with its reason when it changes:
   permissions.
 - The publication settings, environments included, are listed in
   [RELEASING.md](./RELEASING.md#publication-prerequisites).
-- CodeQL's default setup scans JavaScript, TypeScript, and the workflows.
+- CodeQL's default setup scans JavaScript, TypeScript, and the workflows. Its
+  `actions/cache-poisoning/poisonable-step` alerts on the Pages build job are
+  dismissed as won't fix: that job runs code from a release tag or a
+  `site-VERSION` branch on `main`'s behalf, which only maintainers can dispatch,
+  and tags are immutable and those branches change only through pull requests
+  with CI. Reopen them if the job ever builds another ref.
 - Wiki, Projects, and Discussions are off; issues and pull requests are the only
   channels.
 - #330, the overview of upstream defects, is pinned.

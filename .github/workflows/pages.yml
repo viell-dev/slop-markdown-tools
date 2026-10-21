@@ -1,11 +1,12 @@
 name: Pages
 # The site documents the newest stable release. After a Release run that published a stable
 # version, this workflow builds the site from that version's tag and deploys it. Dispatched by
-# hand with the newest stable release's tag, it deploys that tag's site, or, with `ref`, the
-# documentation corrections on a branch cut from the tag, such as site-0.4.0: that commit must
-# descend from the tag and change nothing outside docs/, so the site can be corrected without a
-# new version and without describing unreleased changes. Either way the workflow runs on main,
-# which the github-pages environment requires, and only the checkout uses the tag or the branch.
+# hand with the newest stable release's tag, it deploys that tag's site, or, with `corrections`,
+# the documentation corrections on the tag's site-TAG branch, such as site-0.4.0, which a ruleset
+# protects like main: that branch must descend from the tag and change nothing outside docs/, so
+# the site can be corrected without a new version and without describing unreleased changes.
+# Either way the workflow runs on main, which the github-pages environment requires, and only the
+# checkout uses the tag or the branch.
 # The site's version.json names the version, the tag's commit, and the commit it was built from.
 # CI builds the site for every pull request.
 on:
@@ -17,10 +18,10 @@ on:
       tag:
         description: The newest stable release's tag (an exact version, without a v prefix)
         required: true
-      ref:
-        description:
-          A branch or commit of documentation corrections cut from the tag; the tag when empty
-        required: false
+      corrections:
+        description: Deploy the documentation corrections on the tag's site-TAG branch
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -46,7 +47,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-          REF: ${{ inputs.ref }}
+          CORRECTIONS: ${{ inputs.corrections }}
           JOBS_URL: ${{ github.event.workflow_run.jobs_url }}
           RELEASED_COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: |
@@ -72,9 +73,12 @@ jobs:
           latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
           [ "$latest" = "$TAG" ] || fail "$TAG is not the newest stable release, $latest"
           commit=$tag_commit
-          if [ -n "$REF" ]; then
-            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" --jq .sha) ||
-              fail "$REF names no commit"
+          if [ "$CORRECTIONS" = true ]; then
+            # Only the protected branch of this release, so that every correction went through a
+            # pull request and CI.
+            REF="site-$TAG"
+            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/heads/$REF" --jq .sha) ||
+              fail "The branch $REF does not exist"
             # The corrections must build on the release and touch only its documentation.
             gh api "repos/$GITHUB_REPOSITORY/compare/$tag_commit...$commit" > compare.json
             status=$(jq -r .status compare.json)
@@ -111,8 +115,10 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.commit }}
           persist-credentials: false
-      # No dependency cache: this job runs on main's behalf with code from a tag or a correction
-      # branch, and a cache it saved would be restored by main's other workflows.
+      # This job runs code from a release tag or a site-TAG branch on main's behalf, so it could
+      # write Actions caches that main's workflows restore; tags are immutable and site-TAG
+      # branches take changes only through pull requests with CI, under rulesets. It saves no
+      # dependency cache of its own.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24

@@ -105,7 +105,8 @@ let limitWaits = 0;
 /**
  * GitHub's HTML for `text` in `mode`. A failed request is tried again, after longer waits. When
  * the token's request limit is spent, as when runs overlap, the request waits for the limit to
- * reset, at least a minute and at most an hour, twice at most in a run.
+ * reset, at least a minute and at most an hour, once in a run, so that the run still fits in the
+ * workflow's time limit.
  */
 async function render(text, mode) {
   for (let attempt = 1; ; attempt++) {
@@ -113,7 +114,7 @@ async function render(text, mode) {
     lastRequest = Date.now();
     const { status, stdout, stderr } = await gh({ text, mode });
     if (status === 0) return stdout;
-    if (/rate limit/i.test(stderr) && limitWaits < 2) {
+    if (/rate limit/i.test(stderr) && limitWaits < 1) {
       limitWaits++;
       const wait = Math.min(Math.max(rateLimitReset() - Date.now() + 5000, 60000), 3600000);
       process.stderr.write(

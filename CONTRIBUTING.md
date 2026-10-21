@@ -306,7 +306,10 @@ difference adds its reduced document to `scripts/obsidian/fixtures.mjs` or a
 unit test, so the fixed documents that releases compare grow from what the
 random ones find. A fixed document that shows a difference blocks releases until
 it is fixed or, in the Rendering check, listed with its issue; the Obsidian
-fixtures have no such list, because each records a defect that was fixed.
+fixtures have no such list, because each records a defect that was fixed. When a
+new Obsidian release makes a fixture differ, as the weekly run is there to find,
+that is a new defect: the tool adapts to the release's reading, with an issue,
+before the next release.
 
 ## Benchmarks
 
