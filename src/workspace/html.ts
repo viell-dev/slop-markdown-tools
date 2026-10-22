@@ -67,6 +67,9 @@ function htmlTokens(html: string): HtmlToken[] {
         continue;
       }
       const name = tag[1]!.toLowerCase();
+      // An unquoted value may consume the slash. Only the suffix after the
+      // attribute capture can contain the tag's actual self-closing marker.
+      const selfClosing = open && tag[0].slice(1 + name.length + open[2]!.length).endsWith("/>");
       end = at + tag[0].length;
       text(at);
       if (!open) tokens.push({ name, attributes: "", close: true });
@@ -75,11 +78,7 @@ function htmlTokens(html: string): HtmlToken[] {
           name,
           attributes: tag[2]!,
           close: false,
-          // The attribute capture includes a slash consumed by an unquoted
-          // value (`class=x/>`), which does not self-close the element.
-          ...(tag[0].endsWith("/>") && !tag[2]!.endsWith("/")
-            ? { selfClosing: true as const }
-            : {}),
+          ...(selfClosing ? { selfClosing: true as const } : {}),
         });
       else {
         const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);

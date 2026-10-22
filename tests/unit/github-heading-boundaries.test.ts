@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { semanticFingerprintWithCode } from "../../src/core/engine.js";
 import { createWorkspace, format, lint, parse, semanticFingerprint } from "../../src/index.js";
 import type { Plugin } from "../../src/index.js";
 
@@ -47,6 +49,7 @@ describe("GitHub heading source and anchor boundaries", () => {
     "### a <div class=x /> b",
     '### a <div class="x"/> b',
     "### a <div bare/> b",
+    "### a <div x=/ /> b",
     "### a <hr/> b",
     "### a <custom> b",
     "### a <scripty> b</scripty>",
@@ -202,6 +205,49 @@ describe("GitHub heading source and anchor boundaries", () => {
         fragmentIncomplete: true,
       });
     expect(format(source, { config }).output).toBe(source.replace("before  text", "before text"));
+  });
+
+  it.each(["tr", "tbody", "thead", "tfoot", "colgroup", "col", "caption"])(
+    "preserves opening %s tags that can move headings before the table",
+    (tag) => {
+      const source = `| First | Second |\n| --- | --- |\n| <h2>X</h2> | <h2>X</h2><${tag}><h2>X-1</h2> |\n`;
+      const workspace = createWorkspace({ "Note.md": source });
+      expect(workspace.resolve("From.md", "Note.md#x-1-1", "github")).toMatchObject({
+        status: "unreadable",
+        fragmentIncomplete: true,
+      });
+      expect(format(source, { config }).output).toBe(source);
+    },
+  );
+
+  it("keeps well-formed raw table headings known and marks reordered raw tables incomplete", () => {
+    const prefix = "<h2>X</h2>\n";
+    const safe = "<table><tr><td><h2>X</h2></td></tr></table>\n<h2>X-1</h2>\n";
+    const unsafe = "<table><tr><td><h2>X</h2></td></tr><h2>X-1</h2></table>\n";
+    const known = createWorkspace({ "Note.md": prefix + safe });
+    expect(known.resolve("From.md", "Note.md#x-1-1", "github").fragmentExists).toBe(true);
+    const uncertain = createWorkspace({ "Note.md": prefix + unsafe });
+    expect(uncertain.resolve("From.md", "Note.md#x", "github").fragmentExists).toBe(true);
+    expect(uncertain.resolve("From.md", "Note.md#x-1-1", "github")).toMatchObject({
+      status: "unreadable",
+      fragmentIncomplete: true,
+    });
+  });
+
+  it("retains anchor semantics in alternate front-matter readings during approved code changes", () => {
+    const source = readFileSync(
+      new URL("../fixtures/front-matter-heading.md", import.meta.url),
+      "utf8",
+    );
+    for (const input of [source, source.replace("# a  b", "### a <div> b\n\nc  d")]) {
+      const before = parse(input, "github");
+      const after = parse(input.replace("a  b", "a b").replace("c  d", "c d"), "github");
+      const code = before.tree.children.find((node) => node.type === "code")!;
+      const changed = after.tree.children.find((node) => node.type === "code")!;
+      expect(semanticFingerprintWithCode(before, new WeakMap([[code, changed.value]]))).not.toBe(
+        semanticFingerprint(after),
+      );
+    }
   });
 
   it.each([

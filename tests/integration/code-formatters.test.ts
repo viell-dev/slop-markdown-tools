@@ -144,6 +144,35 @@ it("changes code after TOML in both readings, and refuses to change a different 
   ]);
 });
 
+it("refuses code whitespace changes that alter an alternate GitHub heading anchor", async () => {
+  const { root, config, tool } = await setup();
+  const source = await readFile(
+    new URL("../fixtures/front-matter-heading.md", import.meta.url),
+    "utf8",
+  );
+  const collapse = tool({
+    args: [
+      "--input-type=module",
+      "-e",
+      `
+    let source = "";
+    for await (const chunk of process.stdin) source += chunk;
+    process.stdout.write(source.replaceAll("  ", " "));
+  `,
+    ],
+  });
+  const configured = config([collapse]);
+  const refused = await formatWithCode(source, { cwd: root, config: configured });
+  expect(refused.output).toBe(source);
+  expect(refused.diagnostics).toEqual([
+    expect.objectContaining({ rule: "engine/code-formatter", severity: "error" }),
+  ]);
+  const ordinary = block("a  b");
+  expect((await formatWithCode(ordinary, { cwd: root, config: configured })).output).toBe(
+    block("a b"),
+  );
+});
+
 it.each(["fail", "invalid", "oversize", "timeout"])(
   "retains a %s tool's block while keeping safe Markdown edits",
   async (mode) => {

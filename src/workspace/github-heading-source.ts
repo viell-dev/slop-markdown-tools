@@ -5,7 +5,8 @@ import { htmlTokens, htmlView } from "./html.js";
 
 type Tokens = ReturnType<typeof htmlTokens>;
 const heading = /^h[1-6]$/;
-const tableStructure = new Set("table tbody tfoot thead tr td th caption colgroup".split(" "));
+const tableStructure = new Set("table tbody tfoot thead tr td th caption colgroup col".split(" "));
+const cellTags = new Set(["td", "th"]);
 const blocks = new Set(
   "address article aside blockquote body caption center colgroup dd details dialog dir dl dt fieldset figcaption figure footer form frameset h1 h2 h3 h4 h5 h6 header hgroup html legend li main menu nav ol optgroup option p pre search section select summary table tbody td template tfoot th thead tr ul".split(
     " ",
@@ -13,6 +14,27 @@ const blocks = new Set(
 );
 const cached = new WeakMap<Root, { start: number | undefined }>();
 const prefixes = new WeakMap<Nodes, number>();
+
+/** A raw table that reorders headings, or remains open across later blocks. */
+function tableLimit(tokens: Tokens): number | undefined {
+  const cells: boolean[] = [];
+  let start: number | undefined;
+  for (const [index, token] of tokens.entries()) {
+    if (token.name === undefined) continue;
+    if (token.name === "table") {
+      if (token.close) cells.pop();
+      else {
+        if (!cells.length) start = index;
+        cells.push(false);
+      }
+    } else if (cells.length) {
+      if (!token.close && heading.test(token.name) && !cells.at(-1)) return start;
+      if (tableStructure.has(token.name))
+        cells[cells.length - 1] = cellTags.has(token.name) && !token.close;
+    }
+  }
+  return cells.length ? start : undefined;
+}
 
 /**
  * A heading's structural HTML can keep its generated closing tag from ending
@@ -38,9 +60,11 @@ function structural(tokens: Tokens, closeAtEnd = false): boolean {
 
 /** Known headings before the first uncertain one in a raw block or paragraph. */
 function rawHeading(tokens: Tokens, closeAtEnd = false): { uncertain: boolean; known: number } {
+  const table = tableLimit(tokens);
   let from: number | undefined;
   let known = 0;
   for (const [index, token] of tokens.entries()) {
+    if (index === table) return { uncertain: true, known };
     if (token.name === undefined || !heading.test(token.name)) continue;
     if (!token.close) {
       if (token.selfClosing || (from !== undefined && structural(tokens.slice(from, index))))
@@ -86,8 +110,12 @@ export function githubHeadingLimit(document: Document): number | undefined {
         row.children.some((cell) => {
           const tokens = htmlTokens(htmlView(cell));
           return (
-            tokens.some((token) => token.name && token.close && tableStructure.has(token.name)) ||
-            rawHeading(tokens, true).uncertain
+            tokens.some(
+              (token) =>
+                token.name &&
+                tableStructure.has(token.name) &&
+                (token.close || (!cellTags.has(token.name) && token.name !== "table")),
+            ) || rawHeading(tokens, true).uncertain
           );
         }),
       );
