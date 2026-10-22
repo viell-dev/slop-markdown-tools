@@ -125,7 +125,11 @@ note shows there, the tool keeps the text as written:
   ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
   Reading view reads the definition as more of the paragraph, and its indented
   lines as code. No rule changes the definition or the end of the line above it.
-  Below a blank line, a heading, or another definition, it is a footnote.
+  Adjacent pipe rows can remain literal text even when the definition's final
+  parsed block is HTML, a heading, or code, so their table formatting stays too.
+  A tab-containing blank line does not establish a safe end to that context; an
+  empty or space-only line does. A definition below a heading or a definite
+  paragraph break remains independent.
 - The blank space at the end of a footnote definition's last line, where a
   paragraph ends the definition, as in `[^1]: Note ` with a space after the
   text. Reading view shows it before the footnote's backreference, `↩︎`, where

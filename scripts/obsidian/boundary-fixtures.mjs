@@ -4,6 +4,89 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  {
+    issue: 549,
+    name: "tab continuation before a joined footnote's HTML ending",
+    source: "text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "tab continuation below indented paragraph text before a joined footnote",
+    source: "  text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "tab continuation after adjacent paragraph-consumed footnotes",
+    source: "  text\n[^1]: first\n[^2]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in indented div",
+    source: "text\n[^1]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in closed div",
+    source: "text\n[^1]: note\n    <div> words </div>\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote with HTML on marker line",
+    source: "text\n[^1]: <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in a closing HTML tag",
+    source: "text\n[^1]: note\n    </div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in span paragraph",
+    source: "text\n[^1]: note\n    <span> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in plain paragraph",
+    source: "text\n[^1]: note\n    words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in heading",
+    source: "text\n[^1]: note\n    # heading\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "joined footnote ending in fenced code",
+    source: "text\n[^1]: note\n    ```\n    code\n    ```\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "independent footnote after physical blank",
+    source: "Ref[^1].\n\n[^1]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    preserve: false,
+  },
+  {
+    issue: 549,
+    name: "physical blank before indented HTML body",
+    source: "text\n[^1]: note\n\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    preserve: false,
+  },
+  {
+    issue: 549,
+    name: "physical blank before following table",
+    source: "text\n[^1]: note\n    <div> words\n\n| __h__ |\n| - |\n| v |\n",
+    preserve: false,
+  },
+  {
+    issue: 549,
+    name: "unindented HTML interrupts joined paragraph",
+    source: "text\n[^1]: note\n<div> words\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 549,
+    name: "ordinary paragraph with indented HTML",
+    source: "text\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+  },
   ...[
     ">1) a\n>   > 1)  b\n2) c\n",
     ">1) a\n>  > 1)  b\n2) c\n",

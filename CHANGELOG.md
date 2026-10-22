@@ -22,6 +22,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting preserves literal table rows after paragraph-consumed
+  footnotes, including HTML, heading, and code endings and ambiguous tab
+  separators. Independent footnotes and empty or space-only separators still
+  permit table formatting
+  ([#549](https://github.com/viell-dev/slop-markdown-tools/issues/549)).
+- Obsidian comparisons ignore native table-cell editing controls when a rendered
+  preview is available, while retaining table content, styling, code spacing,
+  alignment, row counts, links, and nested authored HTML
+  ([#550](https://github.com/viell-dev/slop-markdown-tools/issues/550)).
 - Obsidian protection searches for backticks only within each text node,
   avoiding repeated scans of the remaining document
   ([#547](https://github.com/viell-dev/slop-markdown-tools/issues/547)).

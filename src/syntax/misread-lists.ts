@@ -1406,6 +1406,23 @@ export function misreadLists(document: Document): MisreadLists {
       return cells.every((cell) => /^[ \t]*:?-+:?[ \t]*$/.test(cell));
     };
     const paragraphHeadingEnds = new Set([...underlines].map((node) => node.position!.end.offset));
+    // A joined footnote can end in HTML, a heading, or code in the primary
+    // parse while still continuing its preceding Reading paragraph (#549).
+    // Only physical empty or space-only lines establish a boundary here:
+    // tabs can continue Reading text (#398), so keep uncertain tab contexts.
+    // Share one lazy prefix across overlapping footnote/table ranges.
+    const footnoteBlanks = [0];
+    const continuesFootnoteParagraph = (leaf: Nodes): boolean => {
+      const footnote = inFootnotes.get(leaf);
+      if (!footnote?.position || !leaf.position || !joined.has(footnote)) return false;
+      while (footnoteBlanks.length <= leaf.position.end.line)
+        footnoteBlanks.push(
+          footnoteBlanks.at(-1)! + Number(/^ *$/.test(lines[footnoteBlanks.length - 1] ?? "")),
+        );
+      return (
+        footnoteBlanks[leaf.position.end.line] === footnoteBlanks[footnote.position.start.line - 1]
+      );
+    };
     // A run of pipe rows can contain several blocks of the primary parse.
     // Scan its union once, rather than once per parsed table within it.
     let tableUntil = 0;
@@ -1433,6 +1450,9 @@ export function misreadLists(document: Document): MisreadLists {
       // text: the next table belongs to that same paragraph (#489).
       const below =
         (previous?.type === "paragraph" ||
+          (leaf.type === "table" &&
+            previous !== undefined &&
+            continuesFootnoteParagraph(previous)) ||
           (previous?.type === "heading" &&
             paragraphHeadingEnds.has(previous.position?.end.offset))) &&
         previous.position !== undefined &&

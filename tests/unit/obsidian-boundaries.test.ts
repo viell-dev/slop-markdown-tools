@@ -26,9 +26,97 @@ function checked(source: string, settings = config) {
 /** Minimal regressions also exercised in the real Obsidian fixture suite. */
 const boundaries = boundaryFixtures
   .filter(({ issue, preserve }) => preserve !== false && ![496, 497, 499, 508].includes(issue))
-  .map(({ issue, source }) => [issue, source] as const);
+  .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each([
+    [
+      "independent footnote after physical blank",
+      "Ref[^1].\n\n[^1]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "Ref[^1].\n\n[^1]: note\n    <div> words\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "physical blank before indented HTML body",
+      "text\n[^1]: note\n\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n\n    <div> words\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "physical blank before following table",
+      "text\n[^1]: note\n    <div> words\n\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n    <div> words\n\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "multiple tables in one joined footnote",
+      "text\n[^1]: note\n    # first\n    | __a__ |\n    | - |\n    | x |\n    # second\n    | __b__ |\n    | - |\n    | y |\n",
+      "text\n[^1]: note\n    # first\n    | __a__ |\n    | - |\n    | x |\n    # second\n    | __b__ |\n    | - |\n    | y |\n",
+    ],
+    [
+      "later blank ends earlier joined-footnote context",
+      "text\n[^1]: note\n    # first\n    | __a__ |\n    | - |\n    | x |\n\n    # second\n| __b__ |\n| - |\n| y |\n",
+      "text\n[^1]: note\n    # first\n    | __a__ |\n    | - |\n    | x |\n\n    # second\n| **b** |\n| ----- |\n| y     |\n",
+    ],
+    [
+      "space-only separator ends joined-footnote context",
+      "text\n[^1]: note\n \n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n \n    <div> words\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "tab-only separator continues joined-footnote context",
+      "text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "adjacent joined footnote definitions",
+      "text\n[^1]: first\n[^2]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: first\n[^2]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "nested joined footnote definitions",
+      "text\n[^1]: first\n    [^2]: note\n        <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: first\n    [^2]: note\n        <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "same-line nested joined footnote definitions",
+      "text\n[^1]: [^2]: note\n        <div> words\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: [^2]: note\n        <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "two separate joined-footnote table boundaries",
+      "text\n[^1]: first\n    <div> words\n| __a__ |\n| - |\n| x |\n\nMore\n[^2]: second\n    # heading\n| __b__ |\n| - |\n| y |\n",
+      "text\n[^1]: first\n    <div> words\n| __a__ |\n| - |\n| x |\n\nMore\n[^2]: second\n    # heading\n| __b__ |\n| - |\n| y |\n",
+    ],
+    [
+      "two-column paragraph and left tab",
+      "  text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "  text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "paragraph and first definition both indented 1",
+      " text\n [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      " text\n [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "paragraph and first definition both indented 2",
+      "  text\n  [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "  text\n  [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "paragraph and first definition both indented 3",
+      "   text\n   [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "   text\n   [^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "later joined definition dedents before tab",
+      "  text\n  [^1]: first\n[^2]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+      "  text\n  [^1]: first\n[^2]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",
+    ],
+  ])("retains the paragraph boundary with %s (#549)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
   it("retains both delimiter directions across an ordered continuation (#543)", () => {
     const source = ">1. first\n2) second\n";
     expect(
@@ -238,7 +326,13 @@ describe("Obsidian boundaries read differently by its views", () => {
 
   it("formats an independent paragraph after each protected region", () => {
     for (const [, source] of boundaries.filter(
-      ([issue]) => ![488, 494, 519, 524, 529, 548].includes(issue),
+      // These inline HTML openers already carry Live Preview's HTML through EOF (#435).
+      ([issue, , name]) =>
+        ![488, 494, 519, 524, 529, 548].includes(issue) &&
+        ![
+          "joined footnote ending in span paragraph",
+          "ordinary paragraph with indented HTML",
+        ].includes(name),
     ))
       expect(checked(`${source}\nLater *outside*.\n`)).toContain("Later _outside_.");
   });
