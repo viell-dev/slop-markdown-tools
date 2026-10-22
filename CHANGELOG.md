@@ -24,9 +24,9 @@ prereleases' notes there are longer than their entries here.
 
 - Obsidian formatting preserves adjacent ordered continuations of tab-continued
   text, separate table headers, lazy paragraphs below list headings, multiline
-  comment endings, non-one lists below quotes, uneven footnote paragraph
-  indentation, fences inside HTML after carried inline code, and setext text
-  continued across tabs
+  comment endings, non-one lists below quotes, footnote continuation text
+  outside the four-column margin, fences inside HTML after carried inline code,
+  and setext text continued across tabs
   ([#510](https://github.com/viell-dev/slop-markdown-tools/issues/510),
   [#511](https://github.com/viell-dev/slop-markdown-tools/issues/511),
   [#513](https://github.com/viell-dev/slop-markdown-tools/issues/513),

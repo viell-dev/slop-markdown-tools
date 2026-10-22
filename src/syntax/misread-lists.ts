@@ -778,9 +778,9 @@ export function misreadLists(document: Document): MisreadLists {
       };
     };
     // List reflow adds its own continuation margin, which Live Preview can
-    // read outside the footnote (#496). Uneven paragraph indentation also
-    // changes that styling when joined (#518). Ordinary paragraphs still wrap, and
-    // trailing space after the list remains eligible for safe cleanup (#405).
+    // read outside the footnote (#496). Continuation text outside the four-column
+    // margin can change that styling when joined (#518). Paragraphs at that margin
+    // wrap, and trailing space after the list remains eligible for cleanup (#405).
     for (const [footnote] of footnotes)
       if ("children" in footnote)
         for (const child of footnote.children.slice(1)) {
@@ -864,6 +864,16 @@ export function misreadLists(document: Document): MisreadLists {
       }
       return false;
     };
+    /** The final block inside any trailing list items or quotes. */
+    const endsWithHeading = (node: Nodes): boolean => {
+      let last = node;
+      while (last.type === "list" || last.type === "listItem" || last.type === "blockquote") {
+        const child = last.children.at(-1);
+        if (!child) return false;
+        last = child;
+      }
+      return last.type === "heading";
+    };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
@@ -881,11 +891,7 @@ export function misreadLists(document: Document): MisreadLists {
             boundaryText.add(stretch(child, previous.position.end));
           // Reading view retains an unindented paragraph directly below a
           // heading in a list's last item, where the parser ends that list (#513).
-          if (
-            previous.type === "list" &&
-            previous.children.at(-1)?.children.at(-1)?.type === "heading" &&
-            child.type === "paragraph"
-          )
+          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph")
             boundaryText.add(stretch(child, previous.position.end));
           if (
             previous.type === "paragraph" &&
@@ -1220,11 +1226,12 @@ export function misreadLists(document: Document): MisreadLists {
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
     const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
     const delimiterRow = (line: string) => {
+      if (!piped(line)) return false;
       let value = line.replace(/^[ \t>]+/, "").trimEnd();
       if (value.startsWith("|")) value = value.slice(1);
       if (value.endsWith("|")) value = value.slice(0, -1);
       const cells = value.split("|");
-      return cells.length > 1 && cells.every((cell) => /^[ \t]*:?-+:?[ \t]*$/.test(cell));
+      return cells.every((cell) => /^[ \t]*:?-+:?[ \t]*$/.test(cell));
     };
     const paragraphHeadingEnds = new Set([...underlines].map((node) => node.position!.end.offset));
     // A run of pipe rows can contain several blocks of the primary parse.
@@ -1273,12 +1280,14 @@ export function misreadLists(document: Document): MisreadLists {
           // The rows from the first without a pipe, from the line break above it.
           const parts = source.slice(start, end).split(capturedLineBreak);
           for (let part = 0, at = start; part < parts.length; part += 2) {
-            // Reading view starts another table at a non-leading-pipe header
-            // and delimiter inside the parser's table. Adding pipes merges it
-            // into the preceding table (#511).
+            // A missing leading pipe on a header or delimiter changes where
+            // Reading view ends this table or starts another one. Adding pipes
+            // merges the remaining source into the preceding table (#511).
             const next = parts[part + 2];
             const newTable =
-              !/^[ \t>]*\|/.test(parts[part]!) && next !== undefined && delimiterRow(next);
+              next !== undefined &&
+              (!/^[ \t>]*\|/.test(parts[part]!) || !/^[ \t>]*\|/.test(next)) &&
+              delimiterRow(next);
             if (part >= 4 && (!piped(parts[part]!) || newTable)) {
               tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
               break;

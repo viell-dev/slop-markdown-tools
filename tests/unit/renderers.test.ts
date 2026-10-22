@@ -308,6 +308,11 @@ describe("Obsidian Live Preview normalizer", () => {
       livePreview([task("*", "first"), blank, task("*", "second")]),
     );
     expect(livePreview([task("*", "first")])).not.toEqual(livePreview([task("*", "first", "x")]));
+    // Empty unchecked ordered tasks have no non-whitespace run after the widget.
+    expect(() => livePreview([task("1.", " ")])).not.toThrow();
+    expect(livePreview([task("1.", " "), task("2)", "second")])).toEqual(
+      livePreview([task("1.", " "), blank, task("2)", "second")]),
+    );
   });
 
   it("normalizes only font-style whitespace while retaining styled characters (#514)", () => {

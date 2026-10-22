@@ -295,6 +295,7 @@ function livePreview(lines) {
     // both forms (#443); keep the numeric marker's classes and space separately.
     const ordered =
       listFamily === "ol" &&
+      leading &&
       !/\bcm-inline-code\b/.test(leading[0]) &&
       /^(\d+[.)])([ \t]+)$/.exec(leading[1]);
     if (ordered)

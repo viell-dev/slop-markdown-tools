@@ -21,9 +21,41 @@ export const boundaryFixtures = [
     preserve: false,
   },
   {
+    issue: 511,
+    name: "non-leading-pipe delimiter ends a table",
+    source: "| a | b |\n| - | - |\n| c | d |\n| e | *f*\n:-- | --:\ng | h\n",
+  },
+  {
+    issue: 511,
+    name: "single-column header starts a second table",
+    source: "| a | b |\n| - | - |\n| c | d |\ne |\n--- |\ng |\n",
+  },
+  {
     issue: 513,
     name: "lazy paragraph below a list heading",
     source: "- # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "lazy paragraph below a nested list heading",
+    source: "- a\n  - # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "lazy paragraph below a quoted list heading",
+    source: "- > # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "blank-separated paragraph below a nested list heading",
+    source: "- a\n  - # heading\n\nlazy *words*\n",
+    preserve: false,
+  },
+  {
+    issue: 517,
+    name: "non-one list after a quote inside a list",
+    source: "- > word\n2. *item*\n",
+    preserve: false,
   },
   {
     issue: 514,

@@ -216,26 +216,26 @@ latest installable release:
   Preview can carry that style into its literal list markers. A blank line
   resets that emphasis state.
 - Lists and quotes that start on continuation lines in footnote definitions keep
-  their layout. Continuation paragraphs with inconsistent indentation also keep
-  their layout because joining them can move normal text into footnote styling;
-  consistently indented paragraphs still wrap, and trailing space after a list
-  can go. Lines of spaces below a link reference or footnote definition stay,
-  including after empty lines, because emptying them can change Live Preview's
-  code styling. An ordered list not starting at 1 directly below a footnote
-  stays beside it: Reading view keeps that line in the footnote rather than
-  starting a visible list. A non-one ordered list directly below a block quote
-  also keeps its boundary: Reading view retains it inside that quote, including
-  below a quoted heading.
+  their layout. Continuation paragraphs with text indented other than four
+  columns past the definition also keep their layout because joining them can
+  move normal text into footnote styling. Paragraphs at that four-column margin
+  still wrap, and trailing space after a list can go. Lines of spaces below a
+  link reference or footnote definition stay, including after empty lines,
+  because emptying them can change Live Preview's code styling. An ordered list
+  not starting at 1 directly below a footnote stays beside it: Reading view
+  keeps that line in the footnote rather than starting a visible list. A non-one
+  ordered list directly below a block quote also keeps its boundary: Reading
+  view retains it inside that quote, including below a quoted heading.
 - An ordered list directly below a callout title stays together even when its
   first number is not 1. Its source markers keep a consistent delimiter.
 - Tables below setext text that Reading view keeps as a paragraph stay as text.
   Pipe-containing table rows that the parser reads as headings, lists, quotes,
   or fences keep their source and preceding boundary: inserting a blank line
-  would end Reading view's table. When non-leading-pipe headers and alignment
-  rows start another table inside the primary parse's table, their source stays
-  too: adding leading pipes would merge the tables. Text continued across a tab
-  separator also keeps immediately following ordered continuations and setext
-  boundaries as written.
+  would end Reading view's table. Headers or alignment rows without leading
+  pipes can start another table or end Reading view's table inside the primary
+  parse's table. Their source stays too: adding leading pipes would merge those
+  regions. Text continued across a tab separator also keeps immediately
+  following ordered continuations and setext boundaries as written.
 
 Independent blocks outside these regions still format. These protections are
 specific to the Obsidian dialect.
