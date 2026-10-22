@@ -22,6 +22,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub fragment checks include headings and explicit IDs inside tagfiltered
+  HTML, whose outer tags render as text. Unsupported inline attribute markup
+  remains incomplete instead of producing guessed missing fragments
+  ([#541](https://github.com/viell-dev/slop-markdown-tools/issues/541)).
+- Raw HTML heading fragments retain literal character-reference text split by
+  tags or comments, including the numbering of later duplicate headings
+  ([#552](https://github.com/viell-dev/slop-markdown-tools/issues/552)).
 - Obsidian wrapping retains possible comments that cross a blank line, avoiding
   an unsafe-format refusal when wrapping would put their closer alone on a line
   ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).

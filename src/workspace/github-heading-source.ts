@@ -1,7 +1,7 @@
 import type { Nodes, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { walk } from "../syntax/walk.js";
-import { htmlTokens, htmlView } from "./html.js";
+import { htmlTokens, htmlView, htmlFlow, htmlViewUncertain } from "./html.js";
 
 type Tokens = ReturnType<typeof htmlTokens>;
 const heading = /^h[1-6]$/;
@@ -101,14 +101,19 @@ export function githubHeadingLimit(document: Document): number | undefined {
   let start: number | undefined;
   walk(document.tree, (node, _index, parent) => {
     if (start !== undefined) return;
-    let uncertain = node.type === "heading" && structural(htmlTokens(htmlView(node)));
+    const options = { tagfilter: "github" as const, flow: htmlFlow(node, parent) };
+    let uncertain =
+      (node.type === "heading" &&
+        (htmlViewUncertain(node, options) || structural(htmlTokens(htmlView(node, options))))) ||
+      (node.type === "html" && htmlViewUncertain(node, options));
     // Cell boundaries close ordinary headings, including an open div. Raw
     // table closers can instead move a later heading before the whole table,
     // changing duplicate numbering. Retain that table rather than guessing.
     if (node.type === "table")
       uncertain = node.children.some((row) =>
         row.children.some((cell) => {
-          const tokens = htmlTokens(htmlView(cell));
+          if (htmlViewUncertain(cell, options)) return true;
+          const tokens = htmlTokens(htmlView(cell, options));
           return (
             tokens.some(
               (token) =>
@@ -119,15 +124,10 @@ export function githubHeadingLimit(document: Document): number | undefined {
           );
         }),
       );
-    if (
-      node.type === "paragraph" ||
-      (node.type === "html" &&
-        (parent?.type === "root" ||
-          parent?.type === "blockquote" ||
-          parent?.type === "listItem" ||
-          parent?.type === "footnoteDefinition"))
-    ) {
-      const result = rawHeading(htmlTokens(htmlView(node)));
+    if (node.type === "paragraph" || htmlFlow(node, parent)) {
+      const result = htmlViewUncertain(node, options)
+        ? { uncertain: true, known: 0 }
+        : rawHeading(htmlTokens(htmlView(node, options)));
       uncertain = result.uncertain;
       if (uncertain) prefixes.set(node, result.known);
     }

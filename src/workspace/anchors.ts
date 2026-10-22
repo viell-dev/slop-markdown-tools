@@ -8,7 +8,16 @@ import { parse, range, textContent } from "../syntax/parse.js";
 import { lineBreak } from "../syntax/source.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
-import { htmlTokens, htmlAnchors, htmlHeadings, htmlView } from "./html.js";
+import {
+  htmlTokens,
+  htmlAnchors,
+  htmlHeadings,
+  htmlText,
+  htmlView,
+  htmlFlow,
+  htmlViewUncertain,
+} from "./html.js";
+import type { HtmlViewOptions } from "./html.js";
 import { githubHeadingLimit, githubHeadingPrefix } from "./github-heading-source.js";
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
@@ -18,13 +27,6 @@ interface Rendering {
   /** What a hard line break contributes. */
   lineBreak: string;
 }
-
-/** GFM's tagfilter makes GitHub show these tags as text; a hard break adds nothing. */
-const github: Rendering = {
-  shownTags:
-    /^<\/?(?:iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/i,
-  lineBreak: "",
-};
 
 /**
  * Gitea 1.26 and later show these tags as text, drop other disallowed tags
@@ -38,7 +40,7 @@ const gitea: Rendering = {
 };
 
 /**
- * Heading text as rendered, which GitHub and Gitea 1.26 and later build anchors
+ * Heading text as rendered, which Gitea 1.26 and later builds anchors
  * from: inline HTML tags and comments are left out and the text between tags
  * stays, so `## A <span>B</span>` reads `A B`, except for the tags that the
  * renderer shows as text.
@@ -87,7 +89,7 @@ interface ObsidianAnchors {
 
 /** What GitHub links to, and CommonMark in its stead. */
 interface GithubAnchors {
-  /** Whether generated anchors are known after all of the document's HTML. */
+  /** Whether absence from the known IDs proves that a fragment is missing. */
   complete: boolean;
   /** GitHub's numbered heading anchors. */
   slugs: Set<string>;
@@ -109,6 +111,8 @@ interface ForgeAnchors {
 interface HtmlPart {
   anchors: string[];
   headings: { text: string; hasId: boolean }[];
+  /** An inline tagfilter escape exposes unsupported attribute markup. */
+  uncertain?: true;
 }
 
 /**
@@ -134,22 +138,30 @@ function detachAll(...sets: Set<string>[]): void {
 }
 
 /** The document's HTML, tokenized once for the headings and the explicit anchors of a group. */
-function htmlParts(document: Document, tableHeadings = false): Map<Nodes, HtmlPart> {
+function htmlParts(
+  document: Document,
+  options: Pick<HtmlViewOptions, "tagfilter"> & { tableHeadings?: boolean } = {},
+): Map<Nodes, HtmlPart> {
   const parts = new Map<Nodes, HtmlPart>();
   const { source, tree } = document;
-  walk(tree, (node) => {
+  walk(tree, (node, _index, parent) => {
     if (node.type === "html") {
-      const tokens = htmlTokens(node.value);
+      const view = { ...options, flow: htmlFlow(node, parent) };
+      if (htmlViewUncertain(node, view)) {
+        parts.set(node, { anchors: [], headings: [], uncertain: true });
+        return;
+      }
+      const tokens = htmlTokens(htmlView(node, view));
       parts.set(node, { anchors: htmlAnchors(tokens), headings: htmlHeadings(tokens) });
     } else if (
-      (node.type === "paragraph" || (tableHeadings && node.type === "tableCell")) &&
+      (node.type === "paragraph" || (options.tableHeadings && node.type === "tableCell")) &&
       /<h[1-6]/i.test(source.slice(...range(node)))
     )
       // An inline heading's tags and text are separate nodes, at any depth;
       // their explicit anchors come from the tags' own nodes.
       parts.set(node, {
         anchors: [],
-        headings: htmlHeadings(htmlTokens(htmlView(node)), node.type === "tableCell"),
+        headings: htmlHeadings(htmlTokens(htmlView(node, options)), node.type === "tableCell"),
       });
   });
   return parts;
@@ -218,7 +230,11 @@ function githubAnchors(
     explicit: new Set(),
   };
   const slugger = new GithubSlugger();
-  const parts = htmlParts(document, true);
+  const parts = htmlParts(document, { tableHeadings: true, tagfilter: "github" });
+  let explicitLimit: number | undefined;
+  for (const [node, part] of parts)
+    if (part.uncertain)
+      explicitLimit = Math.min(explicitLimit ?? Infinity, node.position?.start.offset ?? 0);
   // GitHub numbers the anchors of Markdown and HTML headings together, in
   // document order, and prefixes an id only when it does not already start
   // with the prefix.
@@ -236,11 +252,17 @@ function githubAnchors(
         ? part.headings.slice(0, githubHeadingPrefix(node))
         : part.headings)
         add(heading.text, node);
-    else if (node.type === "heading" && start !== limit) add(renderedText(node, github), node);
+    else if (node.type === "heading" && start !== limit)
+      add(htmlText(htmlTokens(htmlView(node, { tagfilter: "github" }))), node);
   });
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
-  for (const part of parts.values())
+  for (const [node, part] of parts) {
+    // A filtered inline attribute can expose HTML whose sanitizer context is
+    // unknown. Keep earlier explicit IDs, and report later targets incomplete.
+    if (explicitLimit !== undefined && (node.position?.start.offset ?? 0) >= explicitLimit)
+      continue;
     for (const anchor of part.anchors) anchors.explicit.add(anchor.toLowerCase());
+  }
   detachAll(anchors.slugs, anchors.explicit);
   return anchors;
 }

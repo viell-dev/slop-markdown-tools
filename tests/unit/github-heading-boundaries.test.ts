@@ -282,6 +282,6 @@ describe("GitHub heading source and anchor boundaries", () => {
       workspace,
     });
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain("structural HTML makes heading anchors");
+    expect(diagnostics[0]!.message).toContain("are not fully known for this renderer");
   });
 });

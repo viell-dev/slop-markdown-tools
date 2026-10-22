@@ -115,6 +115,12 @@ document. Fragment checks retain known earlier headings and explicit HTML IDs;
 other fragments are reported as not fully checked, without guessing an anchor.
 The CommonMark fallback uses the same fragment-checking limit.
 
+Those versions also account for GitHub's tag filtering: tags such as `script`
+and `style` render as text, while the HTML between them can still supply
+headings and explicit IDs. Malformed inline attributes can expose uncertain
+markup and leave later fragments incomplete. Character references split by a
+real HTML tag or comment retain their literal text when heading IDs are built.
+
 | Dialect                    | Anchor of a heading                                                                                                                                      | Matched                                     |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | GitHub, CommonMark         | Rendered text, lowercased; punctuation other than `-` and `_` deleted; spaces become `-`; repeated anchors get `-1`, `-2`                                | Ignoring case                               |

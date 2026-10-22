@@ -418,9 +418,9 @@ not visit, such as `dist`, or through a symbolic link is checked on disk; see
 | `Fragment could not be checked: …`     | The target exists but could not be read.                                                                     |
 
 In versions after 0.4.0, `Fragment could not be checked` also reports a readable
-target whose structural HTML makes generated heading anchors uncertain. It does
-not claim the fragment is missing; earlier known headings and explicit HTML IDs
-remain checkable.
+target whose renderer-dependent anchor information is incomplete. It does not
+claim the fragment is missing; verified headings or explicit HTML IDs remain
+checkable.
 
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on

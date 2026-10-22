@@ -323,7 +323,7 @@ export const linkRules: Record<string, Rule> = {
                 : result.target === undefined
                   ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
                   : result.fragmentIncomplete
-                    ? `Fragment could not be checked: ${url} (structural HTML makes heading anchors in ${result.target} uncertain).`
+                    ? `Fragment could not be checked: ${url} (anchors in ${result.target} are not fully known for this renderer).`
                     : document.dialect === "vitepress"
                       ? `Fragment could not be checked: ${url} (${result.target} or its included or renderer-dependent text could not be read or fully checked).`
                       : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,

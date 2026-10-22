@@ -1,0 +1,218 @@
+[
+  {
+    "name": "all-tag-families",
+    "source": "<h2>iframe-repeat</h2>\n\n<iframe><h2>iframe-repeat</h2></iframe>\n\n<h2>iframe-repeat</h2>\n\n<h2>noembed-repeat</h2>\n\n<noembed><h2>noembed-repeat</h2></noembed>\n\n<h2>noembed-repeat</h2>\n\n<h2>noframes-repeat</h2>\n\n<noframes><h2>noframes-repeat</h2></noframes>\n\n<h2>noframes-repeat</h2>\n\n<h2>plaintext-repeat</h2>\n\n<plaintext><h2>plaintext-repeat</h2></plaintext>\n\n<h2>plaintext-repeat</h2>\n\n<h2>script-repeat</h2>\n\n<script><h2>script-repeat</h2></script>\n\n<h2>script-repeat</h2>\n\n<h2>style-repeat</h2>\n\n<style><h2>style-repeat</h2></style>\n\n<h2>style-repeat</h2>\n\n<h2>title-repeat</h2>\n\n<title><h2>title-repeat</h2></title>\n\n<h2>title-repeat</h2>\n\n<h2>textarea-repeat</h2>\n\n<textarea><h2>textarea-repeat</h2></textarea>\n\n<h2>textarea-repeat</h2>\n\n<h2>xmp-repeat</h2>\n\n<xmp><h2>xmp-repeat</h2></xmp>\n\n<h2>xmp-repeat</h2>\n",
+    "observedIds": [
+      "iframe-repeat",
+      "iframe-repeat-1",
+      "iframe-repeat-2",
+      "noembed-repeat",
+      "noembed-repeat-1",
+      "noembed-repeat-2",
+      "noframes-repeat",
+      "noframes-repeat-1",
+      "noframes-repeat-2",
+      "plaintext-repeat",
+      "plaintext-repeat-1",
+      "plaintext-repeat-2",
+      "script-repeat",
+      "script-repeat-1",
+      "script-repeat-2",
+      "style-repeat",
+      "style-repeat-1",
+      "style-repeat-2",
+      "title-repeat",
+      "title-repeat-1",
+      "title-repeat-2",
+      "textarea-repeat",
+      "textarea-repeat-1",
+      "textarea-repeat-2",
+      "xmp-repeat",
+      "xmp-repeat-1",
+      "xmp-repeat-2"
+    ],
+    "knownIds": [
+      "iframe-repeat",
+      "iframe-repeat-1",
+      "iframe-repeat-2",
+      "noembed-repeat",
+      "noembed-repeat-1",
+      "noembed-repeat-2",
+      "noframes-repeat",
+      "noframes-repeat-1",
+      "noframes-repeat-2",
+      "plaintext-repeat",
+      "plaintext-repeat-1",
+      "plaintext-repeat-2",
+      "script-repeat",
+      "script-repeat-1",
+      "script-repeat-2",
+      "style-repeat",
+      "style-repeat-1",
+      "style-repeat-2",
+      "title-repeat",
+      "title-repeat-1",
+      "title-repeat-2",
+      "textarea-repeat",
+      "textarea-repeat-1",
+      "textarea-repeat-2",
+      "xmp-repeat",
+      "xmp-repeat-1",
+      "xmp-repeat-2"
+    ],
+    "complete": true
+  },
+  {
+    "name": "literal-heading-entities",
+    "source": "<h2>T <textarea title=\"A&amp;B\">&lt;em&gt; &amp; <b>B</b></textarea> Y</h2>\n",
+    "observedIds": [
+      "t-textarea-titleabem--btextarea-y"
+    ],
+    "knownIds": [
+      "t-textarea-titleabem--btextarea-y"
+    ],
+    "complete": true
+  },
+  {
+    "name": "ids",
+    "source": "<textarea id=\"outer\"><a id=\"inner\">x</a></textarea>\n",
+    "observedIds": [
+      "inner"
+    ],
+    "knownIds": [
+      "inner"
+    ],
+    "complete": true
+  },
+  {
+    "name": "filtered-quoted-tag",
+    "source": "<script data-x=\"<h2>Fake</h2>\"><h2>Real</h2></script>\n",
+    "observedIds": [
+      "fake",
+      "real"
+    ],
+    "knownIds": [
+      "fake",
+      "real"
+    ],
+    "complete": true
+  },
+  {
+    "name": "ordinary-quoted-tag",
+    "source": "<span data-x=\"<h2>Fake</h2>\"><h2>Real</h2></span>\n",
+    "observedIds": [
+      "real"
+    ],
+    "knownIds": [
+      "real"
+    ],
+    "complete": true
+  },
+  {
+    "name": "comment",
+    "source": "<!-- <textarea><h2>Fake</h2></textarea> -->\n\n## Real\n",
+    "observedIds": [
+      "real"
+    ],
+    "knownIds": [
+      "real"
+    ],
+    "complete": true
+  },
+  {
+    "name": "escaped-code",
+    "source": "&lt;textarea&gt;&lt;h2&gt;escaped&lt;/h2&gt;&lt;/textarea&gt;\n\n`<textarea><h2>inline</h2></textarea>`\n\n```html\n<textarea><h2>fenced</h2></textarea>\n```\n\n## Real\n",
+    "observedIds": [
+      "real"
+    ],
+    "knownIds": [
+      "real"
+    ],
+    "complete": true
+  },
+  {
+    "name": "filtered-table-structural",
+    "source": "<h2>Known</h2>\n\n<textarea><table><tr><td><h2>X</h2></td></tr><h2>X-1</h2></table></textarea>\n\n## X\n",
+    "observedIds": [
+      "known",
+      "x-1",
+      "x",
+      "x-2"
+    ],
+    "knownIds": [
+      "known"
+    ],
+    "complete": false
+  },
+  {
+    "name": "filtered-table-cell",
+    "source": "| <textarea><h2>X</h2></td><h2>X-1</h2></textarea> |\n| - |\n\n## X\n",
+    "observedIds": [
+      "x",
+      "x-1",
+      "x-2"
+    ],
+    "knownIds": [],
+    "complete": false
+  },
+  {
+    "name": "inline-filtered-quoted-filtered",
+    "source": "## A <script data-x=\"<textarea>\">X</script> B\n\n## Later\n",
+    "observedIds": [
+      "a-script-data-xxscript-b",
+      "later"
+    ],
+    "knownIds": [],
+    "complete": false
+  },
+  {
+    "name": "flow-filtered-quoted-filtered",
+    "source": "<script data-x=\"<textarea>\"><h2>Real</h2></script>\n\n## Later\n",
+    "observedIds": [
+      "real",
+      "later"
+    ],
+    "knownIds": [
+      "real",
+      "later"
+    ],
+    "complete": true
+  },
+  {
+    "name": "inline-filtered-quoted-heading",
+    "source": "## A <script data-x=\"<h2>Fake</h2>\">X</script> B\n\n## Later\n",
+    "observedIds": [
+      "a-script-data-x",
+      "fake",
+      "later"
+    ],
+    "knownIds": [],
+    "complete": false
+  },
+  {
+    "name": "ordinary-filtered-attribute",
+    "source": "<h2><span title=\"<textarea>\" id=\"literal<script>\">Real</span></h2>\n",
+    "observedIds": [
+      "literal<script>",
+      "real"
+    ],
+    "knownIds": [
+      "literal<script>",
+      "real"
+    ],
+    "complete": true
+  },
+  {
+    "name": "markdown-heading-filtered-entities",
+    "source": "## T <textarea title=\"A&amp;B\">x</textarea> end\n\n## U <script title=\"&lt;em&gt;\">&amp;</script> end\n",
+    "observedIds": [
+      "t-textarea-titleabxtextarea-end",
+      "u-script-titleemscript-end"
+    ],
+    "knownIds": [
+      "t-textarea-titleabxtextarea-end",
+      "u-script-titleemscript-end"
+    ],
+    "complete": true
+  }
+]
