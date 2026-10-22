@@ -22,6 +22,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub repository-file fragment checks follow YAML preprocessing: mappings and
+  YAML error displays render the body after front matter, while ordinary
+  non-mappings remain Markdown. Unsettled YAML classes retain only anchors
+  shared by both readings, with incomplete checks reported explicitly
+  ([#540](https://github.com/viell-dev/slop-markdown-tools/issues/540)).
 - GitHub fragment checks include headings and explicit IDs inside tagfiltered
   HTML, whose outer tags render as text. Unsupported inline attribute markup
   remains incomplete instead of producing guessed missing fragments

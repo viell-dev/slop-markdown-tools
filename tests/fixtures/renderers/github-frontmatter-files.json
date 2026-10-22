@@ -1,0 +1,492 @@
+{
+  "fixtureCommit": "004799257d45b2a2a8b88a60d7a04479c8cfe3ec",
+  "renderer": "GitHub Contents API application/vnd.github.html",
+  "observation": "Actual DOM IDs/table/error/body contexts; not POST Markdown API",
+  "cases": [
+    {
+      "name": "valid-block-code",
+      "file": "valid-block-code.md",
+      "sourceSha256": "0bb9e77adfb6d612a0409c038f93988d9ae8033d257767882f274123550e1932",
+      "htmlSha256": "69449c413f5084f1ba68220f3470e446aae36ffa766a55b9ebbaa7f273b49e61",
+      "generatedIds": [
+        "body-valid-block-code",
+        "body-valid-block-code-1",
+        "body-valid-block-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "valid-block-html",
+      "file": "valid-block-html.md",
+      "sourceSha256": "a9db131d7d526fea13a70f09aa3c251f1360a15fd4e4d1b722ae1b9427d9e689",
+      "htmlSha256": "0441fb8fd3160a72936759a9064fd8ac012835bb8e1e2d73203830adc72d0ce3",
+      "generatedIds": [
+        "body-valid-block-html",
+        "body-valid-block-html-1",
+        "body-valid-block-html-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "valid-quoted-code",
+      "file": "valid-quoted-code.md",
+      "sourceSha256": "20894ae65df4fc9291898d1995ca64946b91391fed8d1732715c817c93f44e50",
+      "htmlSha256": "45c4b32469edcf0f4cdaf920ab3ca6040dbe7385e881daf1665edfc6e0b06957",
+      "generatedIds": [
+        "body-valid-quoted-code",
+        "body-valid-quoted-code-1",
+        "body-valid-quoted-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "ordinary-map",
+      "file": "ordinary-map.md",
+      "sourceSha256": "9640487381c203aaf5c5fd38ee16a515254252c935b23b0a2e1d66fb847cec22",
+      "htmlSha256": "452c2b5b1d1fbf156e6cd9d0fc65c59318a3036524d751cfcee8e9311e341afa",
+      "generatedIds": [
+        "body-ordinary-map",
+        "body-ordinary-map-1",
+        "body-ordinary-map-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "invalid-flow-code",
+      "file": "invalid-flow-code.md",
+      "sourceSha256": "47be5d887385ac508191e1eeb5da19832f5f68bf0b9d149f106c9e727ae2d1ad",
+      "htmlSha256": "4b414842a5a2fbb1fd2f84c2dd2ae06d398bcd0f96bdab5f23b641654feab606",
+      "generatedIds": [
+        "body-invalid-flow-code",
+        "body-invalid-flow-code-1",
+        "body-invalid-flow-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "nonmap-sequence-code",
+      "file": "nonmap-sequence-code.md",
+      "sourceSha256": "f08172a24eed5abae5b5ba7713a1fdd118e8516ce6340de812ef92a8062c2da8",
+      "htmlSha256": "7056c2af0fb8485f8a2e249d92b77100189638a162aabcbd4391ec41b187d02f",
+      "generatedIds": [
+        "body-nonmap-sequence-code",
+        "body-nonmap-sequence-code-1",
+        "body-nonmap-sequence-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "nonmap-scalar-code",
+      "file": "nonmap-scalar-code.md",
+      "sourceSha256": "972ac6aa5b46483d8e7f384c564ae5a2aff368c737f6abc36ec5338b92712355",
+      "htmlSha256": "577d52010cdac92a079b98ee9a117cf31c231f10e07c1c0fc73330f132ec3605",
+      "generatedIds": [],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "pre",
+          "inParagraph": false,
+          "inPreformatted": true
+        }
+      ]
+    },
+    {
+      "name": "nonmap-null",
+      "file": "nonmap-null.md",
+      "sourceSha256": "67580301cbfd07a4cbd04cdbea62757462b1add547ec25aa0b5f8486e0619c46",
+      "htmlSha256": "1c4c020f6c631644d8102f31ea2a864ed68b8be0d4bfc5e7a837ecb8bc46e1bc",
+      "generatedIds": [
+        "null",
+        "body-nonmap-null",
+        "body-nonmap-null-1",
+        "body-nonmap-null-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "file": "empty.md",
+      "sourceSha256": "b7949f2585af1f3b56ee08a192a159c24cdf7348a169512d3f95bfb078d4188b",
+      "htmlSha256": "43b691622efdf4f8dee62f4fc0e4fb55677f63285afad8144109c88f422faf1f",
+      "generatedIds": [
+        "body-empty",
+        "body-empty-1",
+        "body-empty-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "duplicate-keys-code",
+      "file": "duplicate-keys-code.md",
+      "sourceSha256": "fb2d433ead2aa44403513d258198a656588da187009e9acaa0b41558005d1187",
+      "htmlSha256": "2e32f6d77e9d765f2fab81928041f56d36954868d2b631bf6f17d6314d1d7fc4",
+      "generatedIds": [
+        "body-duplicate-keys-code",
+        "body-duplicate-keys-code-1",
+        "body-duplicate-keys-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "alias-code",
+      "file": "alias-code.md",
+      "sourceSha256": "638c33fb84ed70ea399bfeb943a71fd041fedead5baed597377afaa58f9ac2bb",
+      "htmlSha256": "a4e72cee7b40996df0bed5eb2d7687f007bb3d6383c168885e4a28cf3c22dfaf",
+      "generatedIds": [
+        "body-alias-code",
+        "body-alias-code-1",
+        "body-alias-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "unknown-alias-code",
+      "file": "unknown-alias-code.md",
+      "sourceSha256": "f39512f4ac3ae11a21a5794bb514126ba3b0f29adbb3edf55d465b7ad2971254",
+      "htmlSha256": "119f59aa6c2260d57d3155de7641a1cda25c053c3bea1d5e492f758f0795fa8f",
+      "generatedIds": [
+        "body-unknown-alias-code",
+        "body-unknown-alias-code-1",
+        "body-unknown-alias-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "custom-tag-code",
+      "file": "custom-tag-code.md",
+      "sourceSha256": "6141af979327a11300a23fe434b435be999fa38abd2af6504b0358e14981ea43",
+      "htmlSha256": "ca27eb379568b3bed89f7400bbcfe8c0ef8f15f7b75cc6f241518bee47647ad1",
+      "generatedIds": [
+        "body-custom-tag-code",
+        "body-custom-tag-code-1",
+        "body-custom-tag-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "complex-key-code",
+      "file": "complex-key-code.md",
+      "sourceSha256": "8bae73adc3dd2af5b78970d0d67712843282ebd1d937e0d62b5980aef96fce4e",
+      "htmlSha256": "73e07bc71937b0ca918dd5b2a6c655b8fcde17d256096284090db3bafcb30dd1",
+      "generatedIds": [
+        "body-complex-key-code",
+        "body-complex-key-code-1",
+        "body-complex-key-code-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "trailing-fence-space",
+      "file": "trailing-fence-space.md",
+      "sourceSha256": "4798d66a8afc9d23c4d92740e01a415cd73701fb7485e94f5f1c2e5223cd99cf",
+      "htmlSha256": "abec669db5112e35e98b76feee90e1e07c26ff88ea184ca1123da1bbea022f75",
+      "generatedIds": [
+        "body-trailing-fence-space",
+        "body-trailing-fence-space-1",
+        "body-trailing-fence-space-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "closing-dots",
+      "file": "closing-dots.md",
+      "sourceSha256": "cdc8fd3e95a115350386a0784f7b775fb289bf7f9aa41503f95fdc6cf185c8e0",
+      "htmlSha256": "1918a8a9d49627ffcfbca387a219abbfa7a1ba5416f6011fb322ff8ebaece5da",
+      "generatedIds": [],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "pre",
+          "inParagraph": false,
+          "inPreformatted": true
+        }
+      ]
+    },
+    {
+      "name": "leading-bom",
+      "file": "leading-bom.md",
+      "sourceSha256": "a9ca52d08205fbcee97cfbd2c6dc2054e8a9e9efa19ba82d6a387359ba365a2b",
+      "htmlSha256": "3aa8b283e052add1af4741088bd1f357d53fd42d48b689ea2ab10ed3db5b62f8",
+      "generatedIds": [],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "pre",
+          "inParagraph": false,
+          "inPreformatted": true
+        }
+      ]
+    },
+    {
+      "name": "crlf",
+      "file": "crlf.md",
+      "sourceSha256": "00714eac57826fb65efaf036601559f9c5fae30f83a5fb959c10af4c7c45ec8c",
+      "htmlSha256": "f369e0ff4f5013c018de7f15a0400560b74ef949e904515534325b13287e3528",
+      "generatedIds": [
+        "body-crlf",
+        "body-crlf-1",
+        "body-crlf-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "leading-blank",
+      "file": "leading-blank.md",
+      "sourceSha256": "c5557074d8149baaaecf50657f357240ee78f069babe83784bdda5e47c90475f",
+      "htmlSha256": "77827a82890fa9517c1a8cc88f5d8699ba4003c8b68330b81cac53a2ee7820f3",
+      "generatedIds": [],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "pre",
+          "inParagraph": false,
+          "inPreformatted": true
+        }
+      ]
+    },
+    {
+      "name": "unclosed",
+      "file": "unclosed.md",
+      "sourceSha256": "bbfdaa5793450bf64a86007e74524f25fac4f91513f873a51c8ce7f9193a81d7",
+      "htmlSha256": "a7d471a5f763db4ac5d5b7c5bae8bf7b40aba8cc91726997734f2e107304c41d",
+      "generatedIds": [],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "bodyMarkerContexts": [
+        {
+          "element": "pre",
+          "inParagraph": false,
+          "inPreformatted": true
+        }
+      ]
+    },
+    {
+      "name": "ordinary-scalar-values",
+      "file": "ordinary-scalar-values.md",
+      "sourceSha256": "9821693be8458d9b6645072faf04a61dff32d29b055084d6f8fdf0b37a0954a6",
+      "htmlSha256": "d7370660a3d12c51f4b0fabd8e453f33dd4821e431598eeb5cca35c2bc48815b",
+      "generatedIds": [
+        "body-ordinary-scalar-values",
+        "body-ordinary-scalar-values-1",
+        "body-ordinary-scalar-values-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "ordinary-nested-map",
+      "file": "ordinary-nested-map.md",
+      "sourceSha256": "1b41468c434d48e63d35c05a1d3e43f0d773068bf7fceef371115313ea6c8eab",
+      "htmlSha256": "fc450884c24f6132df85eafe777b7896906d82686184c28d7f97925e2d020a8e",
+      "generatedIds": [
+        "body-ordinary-nested-map",
+        "body-ordinary-nested-map-1",
+        "body-ordinary-nested-map-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "ordinary-sequence-value",
+      "file": "ordinary-sequence-value.md",
+      "sourceSha256": "beebddbcc8a4657973e0e15cdfa6721c9e12c26bfb479a4afde80fe4efb51b3e",
+      "htmlSha256": "de97d801b77ac02ff24e9050c0877c15ec7c8c5a8f4a75fa9e1a7db82133b95c",
+      "generatedIds": [
+        "body-ordinary-sequence-value",
+        "body-ordinary-sequence-value-1",
+        "body-ordinary-sequence-value-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "table",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "merge-key-map",
+      "file": "merge-key-map.md",
+      "sourceSha256": "373bc601719a24754740b78770167ee0d19ab4c77508fdfa409ddb02a19b28a1",
+      "htmlSha256": "ab3f5c4e0a45c3bb9bf625d2408e061c03a8177d90d3b5b200ffc96c34643050",
+      "generatedIds": [
+        "body-merge-key-map",
+        "body-merge-key-map-1",
+        "body-merge-key-map-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    }
+  ]
+}

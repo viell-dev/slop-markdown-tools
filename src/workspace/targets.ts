@@ -1,5 +1,6 @@
 import { hasHeadingPath, obsidianAnchors, githubAnchors, forgeAnchors } from "./anchors.js";
 import type { ObsidianAnchors, GithubAnchors, ForgeAnchors } from "./anchors.js";
+import { githubFileAnchors } from "./github-file-anchors.js";
 import path from "node:path";
 import type { Dialect, Document } from "../core/types.js";
 import { fallbackDialect } from "../config/resolve.js";
@@ -40,7 +41,12 @@ interface Target {
   /** Whether the system refused to let the target's source be read, or it is not UTF-8 text. */
   unreadable?: true;
   obsidian?: ObsidianAnchors;
-  github?: GithubAnchors;
+  github?: {
+    /** The supplied Markdown reading, also used for CommonMark as before. */
+    markdown: GithubAnchors;
+    /** GitHub's repository-file reading, after YAML preprocessing. */
+    file: GithubAnchors;
+  };
   forge?: ForgeAnchors;
   vitepress?: VitePressAnchors;
 }
@@ -196,7 +202,7 @@ export function createTargetIndex(
     target: Target,
     value: string | (() => string),
     name: string,
-    anchors: (document: Document) => Anchors,
+    anchors: (document: Document, originalSource: string) => Anchors,
   ): Anchors | undefined {
     const source = textOf(target, value);
     if (source === undefined) return undefined;
@@ -204,6 +210,7 @@ export function createTargetIndex(
       options.dialect === "vitepress"
         ? parse(source, "vitepress", name, [], options.vitepress)
         : parse(source, options.dialect ?? fallbackDialect, name),
+      source,
     );
   }
   const includeText = (name: string): string | undefined => {
@@ -279,9 +286,15 @@ export function createTargetIndex(
       if (slugs.has(anchor) || slugs.has(fragment)) return true;
       return forge.explicit.has(anchor) || forge.explicit.has(fragment);
     }
-    const anchors = target.github ?? compute(target, value, name, githubAnchors);
-    if (!anchors) return undefined;
-    target.github = anchors;
+    const group =
+      target.github ??
+      compute(target, value, name, (document, originalSource) => {
+        const markdown = githubAnchors(document);
+        return { markdown, file: githubFileAnchors(document, markdown, originalSource) };
+      });
+    if (!group) return undefined;
+    target.github = group;
+    const anchors = dialect === "github" ? group.file : group.markdown;
     const folded = anchor.toLowerCase();
     if (anchors.slugs.has(folded) || anchors.explicit.has(folded)) return true;
     return anchors.complete ? false : "incomplete";
