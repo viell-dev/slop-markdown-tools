@@ -601,15 +601,10 @@ const trailingSpace: Rule = {
           proseBlocks[proseBlock]![0] <= start &&
           line.next < proseBlocks[proseBlock]![1];
         // Trimming would expose an odd literal backslash to the newline.
-        // VitePress also reads two final spaces after a Tab as a hard break,
+        // Two final spaces after a Tab can still mark a native hard break,
         // even when the primary tree reads a soft line ending. Keep either
         // separator exactly as written while the prose block continues.
-        if (
-          continues &&
-          (escaped(source, start) ||
-            (document.dialect === "vitepress" && source.endsWith("  ", end)))
-        )
-          continue;
+        if (continues && (escaped(source, start) || source.endsWith("  ", end))) continue;
         const text = emptyMarker ? " " : "";
         if (source.slice(start, end) === text) continue;
         findings.push({

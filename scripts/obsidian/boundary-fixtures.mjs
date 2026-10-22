@@ -4,6 +4,65 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  ...[
+    [
+      "mixed whitespace inside a short multiline code span",
+      "before `a\t  \nb` and more plain words follow here\n",
+    ],
+    ["short code resets at a bare newline", "before `a\nb` and *right*\n"],
+    [
+      "two-backtick multiline code keeps its literal suffix",
+      "before ``a  \nb`` and *right* __strong__ tail\n",
+    ],
+    [
+      "later paired spans remain out of phase",
+      "before `a  \nb` and *right* ` recovered ` and *after*\n",
+    ],
+    [
+      "backslash newline in a short span keeps literal suffix",
+      "before `a\\\nb` and *right* __strong__ tail\n",
+    ],
+    ["containing emphasis keeps both delimiters", "*before `a\nb` after* and __strong__\n"],
+    [
+      "short code inside a multiline inline comment",
+      "before *left* %%`a\nb`%% and *right* __strong__ tail\n",
+    ],
+    [
+      "short code inside a multiline image description",
+      "before *left* ![``a\nb``](image.png) and *right* __strong__ tail\n",
+    ],
+  ].map(([name, source]) => ({ issue: 565, name, source })),
+  ...[
+    [
+      "safe prefix and independent paragraph around a short code span",
+      "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n",
+    ],
+    [
+      "paired long multiline code still reflows",
+      "before ```a  \nb``` and *right*\n\nlater *outside*\n",
+    ],
+    ["code closed before a soft newline still reflows", "before `a  `\nb and *right*\n"],
+    [
+      "paired long code in a multiline inline comment",
+      "before *left* %%```a\nb```%% and *right* __strong__ tail\n",
+    ],
+  ].map(([name, source]) => ({ issue: 565, name, source, preserve: false })),
+  {
+    issue: 566,
+    name: "long code in an image description keeps source while surrounding text formats",
+    source: "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n",
+    preserve: false,
+  },
+  {
+    issue: 566,
+    name: "long code in a reference image retains its description boundary",
+    source: "before *left* ![```a\nb```][img] and *right* __strong__ tail\n\n[img]: image.png\n",
+    preserve: false,
+  },
+  ...[
+    ["Tab followed by two spaces before continuing text", "a\t  \nb\n"],
+    ["even backslashes before a mixed-whitespace hard break", "a\\\\\t  \nb\n"],
+  ].map(([name, source]) => ({ issue: 562, name, source })),
   {
     issue: 563,
     name: "terminal spaces before a Tab-only paragraph continuation",
@@ -33,6 +92,8 @@ export const boundaryFixtures = [
     ["hard break before a spaced underline", "a  \n=== \n"],
     ["literal backslash before an indented underline", "a\\ \n  ===\n"],
     ["hard break before an indented underline", "a  \n  ===\n"],
+    ["multiline level-one title with a native hard break", "a\nb  \n===\n"],
+    ["multiline level-one title with a literal backslash", "a\nb\\ \n===\n"],
   ].map(([name, source]) => ({ issue: 383, name, source })),
   ...[
     ["nested lazy paragraph before an enclosing ordered list", "+ - a\nb\n  1) c\n"],

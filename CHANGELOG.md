@@ -22,6 +22,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep the physical multiline image description containing backticks in Obsidian
+  so wrapping cannot turn displayed source into an embed; safe surrounding
+  inline text still formats
+  ([#566](https://github.com/viell-dev/slop-markdown-tools/issues/566)).
+- Retain short multiline Obsidian code spans and their following inline source
+  when Live Preview resets code styling at the physical newline. Earlier text
+  and later independent paragraphs can still format
+  ([#565](https://github.com/viell-dev/slop-markdown-tools/issues/565)).
 - Keep the terminal separator before an Obsidian Tab-only paragraph
   continuation, preserving hard breaks and literal backslashes while allowing
   earlier wrapping and safe whitespace cleanup
@@ -35,9 +43,10 @@ prereleases' notes there are longer than their entries here.
 - Preserve the spaces or tabs after a literal backslash when trimming them would
   create a hard line break, avoiding a guarded trailing-space refusal
   ([#560](https://github.com/viell-dev/slop-markdown-tools/issues/560)).
-- Keep mixed trailing whitespace that marks a VitePress hard line break,
-  avoiding a guarded cleanup refusal while preserving ordinary trailing-space
-  cleanup ([#562](https://github.com/viell-dev/slop-markdown-tools/issues/562)).
+- Keep hard breaks written as a Tab followed by two spaces, preventing silent
+  break loss or guarded cleanup refusals while preserving ordinary
+  trailing-space cleanup
+  ([#562](https://github.com/viell-dev/slop-markdown-tools/issues/562)).
 - Obsidian wrapping retains possible comments that cross a blank line, avoiding
   an unsafe-format refusal when wrapping would put their closer alone on a line
   ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).

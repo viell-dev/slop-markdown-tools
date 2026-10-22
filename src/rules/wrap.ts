@@ -370,6 +370,7 @@ function inlineAtoms(
   paragraph: Paragraph,
   start: number,
   wholeLinks: boolean,
+  source: string,
 ): { atoms: InlineAtom[]; breaks: Range[]; unlocated: boolean } {
   const atoms: InlineAtom[] = [];
   const breaks: Range[] = [];
@@ -424,7 +425,16 @@ function inlineAtoms(
         });
       else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
         const close = labelEnd(child)!;
-        atoms.push({ from: a, to: close, joining: "description" });
+        atoms.push({
+          from: a,
+          to: close,
+          // Joining raw image text with backticks can turn Live Preview's
+          // displayed source into an embed, even for long paired runs (#566).
+          joining:
+            wholeLinks && source.slice(a, close).includes("`")
+              ? { reason: "line break in an image description with backticks" }
+              : "description",
+        });
         atoms.push({ from: close, to: b, joining: destination });
       } else {
         const name = lineBreakIn[child.type] ?? (holds(child, "html") ? "inline HTML" : undefined);
@@ -767,6 +777,12 @@ function readWords(
         : undefined;
       if (joining && typeof joining === "object" && "within" in joining)
         joining = atomAt(joining.within, lineEnd)?.joining ?? "description";
+      // A Tab before two final spaces hides this native hard break from the
+      // primary tree (#562). Opaque atoms keep their own joining rules.
+      if (!joining && source.endsWith("  ", lineEnd)) {
+        failure = "hard line break";
+        break;
+      }
       if (!joining) words.push(" ");
       else if (last === undefined || /^[ \t]+$/.test(last)) failure = "line break in inline syntax";
       else if (joining === "code" || joining === "description") {
@@ -940,7 +956,7 @@ function wrapParagraph(
         }
       : {}),
   };
-  const inline = inlineAtoms(node, start, document.dialect === "obsidian");
+  const inline = inlineAtoms(node, start, document.dialect === "obsidian", source);
   const protection = new Protection(start, end);
   for (const atom of inline.atoms) protection.add(atom.from, atom.to);
   // Forgejo and Gitea protections apply before paragraphs are skipped, so

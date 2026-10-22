@@ -100,10 +100,7 @@ note shows there, the tool keeps the text as written:
   fenced code or math block, a thematic break, or an HTML block such as `<div>`
   starts a block of its own. No rule empties the line or changes those blocks. A
   tab left of the text's column, as in `- Item` and a tab alone below it, is a
-  blank line. After 0.4.0, wrapping and trailing-space cleanup also retain the
-  preceding paragraph's separator when it marks a hard break or keeps a
-  backslash literal. Earlier text can still wrap. Quoted margins are handled
-  conservatively, retaining a possibly removable separator.
+  blank line.
 - A line of blank space directly below an HTML block such as `<div>…</div>`,
   which continues the block. The blocks below such a line are more of the HTML
   block too, up to an empty line, and Reading view shows them as written. No
@@ -115,9 +112,7 @@ note shows there, the tool keeps the text as written:
   underline of a heading whose one line of text starts at the first column with
   `[`, a label, and `]:`, as in `[ref]: see the page` and `===` below it, which
   it styles as a link reference definition. No rule writes such a heading with
-  `#` or changes its underline. After 0.4.0, this also retains a preceding
-  separator whose removal would create or remove a hard line break in the
-  paragraph that Reading view displays. Earlier inline text can still format.
+  `#` or changes its underline.
 - A paragraph in a block quote or list item with a lazy line of `=` or `-`, as
   in `> Text` and `=` below it, which Reading view reads as a heading's
   underline where CommonMark reads more of the text. No rule joins that line to
@@ -125,9 +120,7 @@ note shows there, the tool keeps the text as written:
 - A paragraph of a list item with a lazy line, one that starts left of the
   item's text, as in `- Text` and `more` below it, and the blocks after it in
   the item. Live Preview reads those blocks outside the list, where an indented
-  paragraph is code. No rule changes the paragraph or those blocks. After 0.4.0,
-  this also applies to blocks in an enclosing item whose margin the lazy line
-  crosses, preserving their nesting in Live Preview.
+  paragraph is code. No rule changes the paragraph or those blocks.
 - A footnote definition directly below a line of paragraph text, also one that
   ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
   Reading view reads the definition as more of the paragraph, and its indented
@@ -204,6 +197,32 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- An image description containing backticks stays split across its existing
+  lines, where joining could turn displayed Live Preview source into an embed.
+  Safe inline formatting before and after it remains available.
+- A code span with one or two backticks that crosses a physical newline keeps
+  its source and the rest of its inline block. Live Preview ends short code at
+  that newline, so the written closer can start code over later text. Earlier
+  text and later independent paragraphs still format; a paired multiline span
+  with three or more backticks keeps its ordinary formatting behavior. Short
+  spans in an inline comment or image description conservatively keep the whole
+  inline block.
+- A lazy paragraph line also keeps later blocks in an enclosing list item when
+  it crosses that item's content margin. Joining or indenting the line would
+  otherwise change their nesting in Live Preview. Properly indented
+  continuations and terminal lazy paragraphs still format.
+- Before a Tab-only paragraph continuation, wrapping and trailing-space cleanup
+  retain the preceding separator when it marks a hard break or keeps a backslash
+  literal. Earlier text can still wrap. Quoted margins are handled
+  conservatively, retaining a possibly removable separator.
+- An uncertain Setext underline that Reading view keeps in a paragraph also
+  retains its preceding separator when removing it would create or remove a hard
+  break. Earlier inline text still formats. An underline treated as text only by
+  Live Preview does not need this extra separator protection.
+- A Tab followed by two or more final spaces keeps its hard break while the text
+  continues, even when the primary Markdown parser reads a soft line ending.
+  Ordinary trailing whitespace can still be cleaned where it has no rendered
+  meaning.
 - A table keeps the source from a body row that changes its header's
   leading-pipe convention, or has only its leading pipe. Both views can end the
   table there while the primary parser keeps another row. Adding border pipes

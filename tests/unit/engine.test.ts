@@ -1736,6 +1736,7 @@ describe("underlined headings whose text Live Preview styles as a definition", (
     // The text is formatted; only the heading keeps its underline.
     ["[r]: *a* b\n===\n", "[r]: _a_ b\n===\n"],
     ["[r]: a b  \n===\n", "[r]: a b\n===\n"],
+    ["[r]: a b\\ \n===\n", "[r]: a b\\\n===\n"],
     // A backslash, or other text between `]` and `:`, makes Live Preview read
     // a heading.
     ["\\[r]: a b\n===\n", "# \\[r]: a b\n"],

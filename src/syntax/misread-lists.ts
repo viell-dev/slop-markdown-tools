@@ -74,6 +74,12 @@ export interface MisreadLists {
    * run of the same length outside an indented code block, which it closes
    * there, a fenced code block, or a list item. Those blocks are in the set as
    * well, with a table that holds such a run.
+   *
+   * A paired code span with one or two backticks that crosses a physical line
+   * also resets in Live Preview (#565). Its range starts at the opener, or a
+   * containing inline node, and continues through its inline block, since
+   * later primary spans may be out of phase too. Earlier text and independent
+   * blocks remain editable.
    */
   unclosedCode: ReadonlySet<Nodes>;
   /** Either Obsidian view can keep code through EOF after an HTML/code transition (#433, #529). */
@@ -749,10 +755,18 @@ export function misreadLists(document: Document): MisreadLists {
      * the parser does not read as code spans; a backtick in a link's
      * destination or title starts none, but counts in an image's source.
      */
-    const openRuns = (node: Nodes): Run[] => {
+    const openRuns = (node: Nodes, blockEnd: Point, inlineStart?: Point): Run[] => {
       const start = node.position?.start.offset;
       const end = node.position?.end.offset;
       if (start === undefined || end === undefined) return [];
+      if (
+        node.type === "inlineCode" &&
+        node.position!.end.line > node.position!.start.line &&
+        !source.startsWith("```", start)
+      ) {
+        unclosedCode.add(stretch(node, inlineStart ?? node.position!.start, blockEnd));
+        return [];
+      }
       if (
         node.type === "obsidianHighlight" ||
         node.type === "obsidianComment" ||
@@ -763,7 +777,11 @@ export function misreadLists(document: Document): MisreadLists {
       // The parser reads every run that another closes as code, so every one
       // left in text is unclosed.
       if (node.type === "text") return backtickRuns(source, start, end);
-      return "children" in node ? node.children.flatMap(openRuns) : [];
+      return "children" in node
+        ? node.children.flatMap((child) =>
+            openRuns(child, blockEnd, inlineStart ?? child.position?.start),
+          )
+        : [];
     };
     /**
      * The length of a run of three or more backticks whose code Live Preview
@@ -826,7 +844,7 @@ export function misreadLists(document: Document): MisreadLists {
             ? [leaf]
             : [];
       const runs = parts.flatMap((part) => {
-        const open = openRuns(part);
+        const open = openRuns(part, part.position!.end);
         if (open.length > 0) unclosedCode.add(part);
         return open;
       });
@@ -1336,13 +1354,13 @@ export function misreadLists(document: Document): MisreadLists {
           const definitionText =
             /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
+          const readingParagraph =
+            /[ \t]$/.test(underline) ||
+            columnAt(from + prefix) > columnAt(text) ||
+            (child.depth === 1 && child.position!.end.line > textLine + 1);
           if (
             from > start &&
-            (/[ \t]$/.test(underline) ||
-              /^[ \t>]*-[ \t]*$/.test(underline) ||
-              columnAt(from + prefix) > columnAt(text) ||
-              (child.depth === 1 && child.position!.end.line > textLine + 1) ||
-              definitionText)
+            (readingParagraph || /^[ \t>]*-[ \t]*$/.test(underline) || definitionText)
           ) {
             const boundary = breakBefore(child, from, to);
             let ending = from;
@@ -1352,7 +1370,11 @@ export function misreadLists(document: Document): MisreadLists {
             while (source[separator - 1] === " " || source[separator - 1] === "\t") separator--;
             // Reading view can keep this underline in the paragraph. Retain
             // a suffix whose cleanup would change its preceding break (#383).
-            if (separator < ending && (source.endsWith("  ", ending) || escaped(source, separator)))
+            if (
+              readingParagraph &&
+              separator < ending &&
+              (source.endsWith("  ", ending) || escaped(source, separator))
+            )
               boundary.position!.start.offset = separator;
             underlines.add(boundary);
           }
@@ -1985,7 +2007,9 @@ function backtickRuns(source: string, start: number, end: number): Run[] {
 
 /**
  * The runs of backticks from `start` to `end` that no later run of the same
- * length there closes, as CommonMark pairs them into code spans.
+ * length there closes. Runs of one or two also remain open when their next
+ * matching run is on another physical line: Live Preview resets short code
+ * there, including inside inline comments and image descriptions (#565).
  */
 function unclosedRuns(source: string, start: number, end: number): Run[] {
   const runs = backtickRuns(source, start, end);
@@ -1999,8 +2023,14 @@ function unclosedRuns(source: string, start: number, end: number): Run[] {
   }
   const open: Run[] = [];
   for (let index = 0; index < runs.length; index++) {
-    if (next[index]! < 0) open.push(runs[index]!);
-    else index = next[index]!;
+    const run = runs[index]!;
+    const close = next[index]!;
+    if (
+      close < 0 ||
+      (run[1] < 3 && lineEndingPattern.test(source.slice(run[0] + run[1], runs[close]![0])))
+    )
+      open.push(run);
+    else index = close;
   }
   return open;
 }

@@ -978,6 +978,13 @@ joined line would read differently:
   pair, as on GitHub after an unpaired longer run, that backslash is a hard line
   break. `style/wrap` keeps such a paragraph as written too.
 
+After 0.4.0, Obsidian also retains a multiline span with one or two backticks
+and the following source in its inline block: Live Preview resets short code at
+the physical newline. Earlier independent inline text and later paragraphs can
+still format. The [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections) describe the
+conservative cases.
+
 Before:
 
 ```markdown
@@ -1287,11 +1294,12 @@ includes spaces and tabs inside paragraphs, headings, lists, and quotes. Blank
 space at the end of a paragraph or file can still be removed; `hardBreak`
 continues to control existing hard line breaks.
 
-Also after 0.4.0, in VitePress, a Tab followed by two or more spaces can mark a
-hard line break even where the primary Markdown reading has a soft line ending.
-That suffix stays exactly as written, including with `hardBreak: "backslash"`,
-so both readings keep their meaning. Ordinary trailing Tabs and spaces, and
-those on the last content line of a paragraph or heading, can still be removed.
+Also after 0.4.0, a Tab followed by two or more spaces can mark a hard line
+break even where the primary Markdown reading has a soft line ending. Across
+dialects, that suffix stays exactly as written, including with
+`hardBreak: "backslash"`. Ordinary trailing Tabs and spaces, and those on the
+last content line of a paragraph or heading, can still be removed where they
+have no rendered meaning.
 
 After 0.4.0, Obsidian also keeps the preceding paragraph's separator before a
 Tab-only continuation when it marks a hard break or keeps a backslash literal. A
@@ -1438,6 +1446,14 @@ what it means, that is, when it:
 After 0.4.0, Obsidian wrapping retains the exact terminal separator before a
 Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
 preceding backslash literal. The earlier paragraph text can still wrap.
+Paragraphs with a Tab followed by two final spaces before continuing text also
+stay unreflowed: native renderers can read that separator as a hard break even
+when the primary parser reads a soft line ending. Code spans keep their own
+whitespace rules, so wrapping outside them remains available.
+
+After 0.4.0, Obsidian also leaves a multiline image description containing
+backticks unreflowed, where joining could turn displayed Live Preview source
+into an embed. Surrounding inline preferences can still be applied.
 
 In the Obsidian dialect, the rule wraps only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). [Forgejo and

@@ -29,16 +29,100 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
-  it.each(["a\\ \n=== \n", "a  \n=== \n", "a\\ \n  ===\n", "a  \n  ===\n"])(
-    "retains the terminal separator before a literal underline (#383): %j",
+  it.each([
+    "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n",
+    "before *left* ![```a\nb```][img] and *right* __strong__ tail\n\n[img]: image.png\n",
+  ])(
+    "keeps a long-code image description boundary while surrounding inline text formats (#566): %j",
     (source) => {
       for (const newline of ["\n", "\r\n", "\r"])
-        for (const bom of ["", "\uFEFF"])
-          expect(checked(bom + source.replaceAll("\n", newline))).toBe(
-            bom + source.replaceAll("\n", newline),
-          );
+        for (const bom of ["", "\uFEFF"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(
+            checked(input, { extends: [], dialect: "obsidian", rules: { "style/wrap": "warn" } }),
+          ).toBe(input);
+        }
     },
   );
+
+  it("formats inline text around an unreflowed multiline code image (#566)", () => {
+    const source = "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n";
+    expect(checked(source)).toBe(
+      "before _left_ ![```a\nb```](image.png) and _right_ **strong** tail\n",
+    );
+    expect(format(source, { config: { extends: ["recommended", "github"] } }).output).toContain(
+      "![```a b```](image.png)",
+    );
+  });
+
+  it.each([
+    "style/wrap",
+    "style/inline-code",
+    "style/emphasis",
+    "style/strong",
+    "style/trailing-space",
+  ])("retains short multiline code and literal suffix with only %s (#565)", (rule) => {
+    const source = "before `a\t  \nb` and *right* __strong__ tail\n";
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { [rule]: "warn" },
+      }),
+    ).toBe(source);
+  });
+
+  it.each(["*before `a\nb` after* and __strong__\n", "[before `a\nb` after](u) and *right*\n"])(
+    "retains containing paired inline markup without partial edits (#565): %j",
+    (source) => expect(checked(source)).toBe(source),
+  );
+
+  it("permits safe prefix formatting and resumes after a blank paragraph (#565)", () => {
+    const source = "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n";
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(
+          input.replace("*left*", "_left_").replace("*outside*", "_outside_"),
+        );
+      }
+  });
+
+  it("bounds the short multiline-code protection to its first containing inline node (#565)", () => {
+    const source = "*left* and **before `a\nb` after** and *right*\n\nLater *outside*.\n";
+    const document = parse(source, "obsidian");
+    const regions = [...misreadLists(document).unclosedCode];
+    expect(
+      regions.map(({ position }) =>
+        document.source.slice(position!.start.offset, position!.end.offset),
+      ),
+    ).toEqual(["**before `a\nb` after** and *right*"]);
+    expect(checked(source)).toBe(
+      source.replace("*left*", "_left_").replace("*outside*", "_outside_"),
+    );
+  });
+
+  it("retains ordinary multiline-code joining in GitHub (#565)", () => {
+    expect(
+      format("before `a\nb` and *right*\n", { config: { extends: ["recommended", "github"] } })
+        .output,
+    ).toBe("before `a b` and _right_\n");
+  });
+
+  it.each([
+    "a\\ \n=== \n",
+    "a  \n=== \n",
+    "a\\ \n  ===\n",
+    "a  \n  ===\n",
+    "a\nb  \n===\n",
+    "a\nb\\ \n===\n",
+  ])("retains the terminal separator before a literal underline (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + source.replaceAll("\n", newline),
+        );
+  });
 
   it("permits earlier inline formatting above a literal underline (#383)", () => {
     expect(checked("*alpha* beta\\ \n=== \n")).toBe("_alpha_ beta\\ \n=== \n");

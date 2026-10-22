@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   createWorkspace,
+  dialects,
   format,
   lint,
   parse,
@@ -930,6 +931,11 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
         const definitionLines = definitions.replaceAll("\n", newline);
         const source = paragraph(newline) + definitionLines;
         const result = verify(source, config, workspace);
+        // Live Preview resets short code at each physical newline (#565).
+        if (dialect === "obsidian" && construct.includes("`")) {
+          expect(result.output).toBe(source);
+          continue;
+        }
         expect(result.output, JSON.stringify(source)).toBe(
           verify(paragraph(" ") + definitionLines, config, workspace).output,
         );
@@ -982,8 +988,9 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
               `${prefix}Run \`npm run${separator}build\` now, and then more words so that it wraps.\n`;
             const source = text(`\n${continuation}${indentation}`);
             const result = verify(source, config, workspace);
-            if (dialect === "obsidian" && prefix === "- > ") {
-              // #429: moving text across the list's marker line changes quote styling.
+            if (dialect === "obsidian") {
+              // #565: short code resets at the physical newline in Live Preview.
+              // #429 also protects a quote opening on the list's marker line.
               expect(result.output).toBe(source);
               expect(lint(source, { config, workspace }).every((item) => !item.edit)).toBe(true);
               continue;
@@ -1035,7 +1042,9 @@ describe("line breaks inside link text, emphasis, and code spans", () => {
         const span = inline.replace(/\n/g, `\n${continuation}`);
         const source = `${prefix}Some text with ${span} and more words that run past the width.\n`;
         const config: Config = { ...wrap({ width: 30 }), dialect };
-        expect(verify(source, config, workspace).output).toContain(joined);
+        expect(verify(source, config, workspace).output).toContain(
+          dialect === "obsidian" ? span : joined,
+        );
       }
   });
   it.each([
@@ -1200,6 +1209,11 @@ describe("link text in the Obsidian dialect", () => {
         const joined = (paragraph(" ") + definitions).replaceAll("\n", newline);
         for (const width of [20, 40, 80]) {
           const result = verify(source, obsidian(width), workspace);
+          if (link === "[a link `with|code` inside](u)") {
+            // A short multiline code span also resets inside link text (#565).
+            expect(result.output).toBe(source);
+            continue;
+          }
           expect(result.output, JSON.stringify([source, width])).toBe(
             verify(joined, obsidian(width), workspace).output,
           );
@@ -1234,11 +1248,12 @@ describe("Obsidian inline footnotes", () => {
       verify("Words ^[open and a note^[with several words] at the end.\n", obsidian(20), workspace)
         .output,
     ).toBe("Words ^[open and a\nnote^[with several words]\nat the end.\n");
-    // `^[` in a code span that spans lines is code, so the paragraph is wrapped.
+    // Reading view keeps `^[` in code, but Live Preview resets short code at
+    // the newline, so the span and its following source stay as written (#565).
     expect(
       verify("Some words and `code ^[x\ny] here` and more words.\n", obsidian(80), workspace)
         .output,
-    ).toBe("Some words and `code ^[x y] here` and more words.\n");
+    ).toBe("Some words and `code ^[x\ny] here` and more words.\n");
   });
   it("keeps a paragraph with an inline footnote across lines as written", () => {
     const source =
@@ -1296,8 +1311,11 @@ describe("multiline code spans", () => {
       const rules: Config = { extends: [], dialect, rules: { "style/wrap": "warn" } };
       for (const source of [">* `\n>  `\n", ">3) `\n>   `\n", ">* `a\n>  b`\n"])
         expect(verify(source, rules, workspace).output).toBe(source);
-      // With the space, the line continues the item, and the span is joined.
-      expect(verify("> * `a\n>   b`\n", rules, workspace).output).toBe("> * `a b`\n");
+      // With the space, the line continues the item. Obsidian still retains
+      // the short span's physical newline for Live Preview (#565).
+      expect(verify("> * `a\n>   b`\n", rules, workspace).output).toBe(
+        dialect === "obsidian" ? "> * `a\n>   b`\n" : "> * `a b`\n",
+      );
     },
   );
   it.each(["\n", "\r\n", "\r"])(
@@ -1646,7 +1664,8 @@ describe("tag-like text on a continuation line directly after a bare quote marke
     [">a\n> #b c\n", ">a #b c\n"],
     [">a\n>#1984 c\n", ">a #1984 c\n"],
     [">a\n>\\#b c\n", ">a \\#b c\n"],
-    [">a `code\n>#b` c\n", ">a `code #b` c\n"],
+    // The tag is code in Reading view, but short code resets in Live Preview (#565).
+    [">a `code\n>#b` c\n", ">a `code\n>#b` c\n"],
     [">a [link\n>#b](page) c\n", ">a [link #b](page) c\n"],
   ])("still reflows %j in Obsidian", (source, output) => {
     expect(verify(source, obsidian(80), workspace).output).toBe(output);
@@ -1880,6 +1899,24 @@ describe("potential Obsidian flow comments across a blank line (#559)", () => {
     const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect };
     const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
     expect(verify(source, config, workspace).output).toBe(expected);
+  });
+});
+
+describe("mixed-whitespace hard breaks (#562)", () => {
+  it.each(dialects)("preserves native line endings in %s", (dialect) => {
+    const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+    const config: Config = { ...wrap({ width: 20 }), dialect };
+    for (const source of [
+      "a\t  \nb\n",
+      "a\\\\\t  \nb\n",
+      "- alpha\t  \n  beta\n",
+      "> alpha\t  \n> beta\n",
+    ])
+      for (const eol of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"])
+          expect(verify(bom + source.replaceAll("\n", eol), config, workspace).output).toBe(
+            bom + source.replaceAll("\n", eol),
+          );
   });
 });
 

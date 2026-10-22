@@ -300,7 +300,6 @@ describe("style/trailing-space", () => {
     ["Text \nmore\t\nend \t \n", "Text\nmore\nend\n"],
     ["Text  \n", "Text\n"],
     ["Text  \n\nMore\n", "Text\n\nMore\n"],
-    ["Text\t  \nmore\n", "Text\nmore\n"],
     ["# Title  \n", "# Title\n"],
     ["Title  \n===  \n", "Title\n===\n"],
     ["> Text \n>  \n> more\n", "> Text\n>\n> more\n"],
@@ -323,6 +322,7 @@ describe("style/trailing-space", () => {
   });
   it.each([
     // A hard line break written as spaces stays exactly as written.
+    ["Text\t  \nmore\n"],
     ["One  \ntwo\n"],
     ["One     \ntwo\n"],
     ["> One  \n> two\n"],
@@ -1054,7 +1054,7 @@ describe("literal backslashes before trailing blank space (#560)", () => {
   });
 });
 
-describe("VitePress mixed-whitespace hard breaks (#562)", () => {
+describe("mixed-whitespace hard breaks (#562)", () => {
   const configured = (hardBreak: "keep" | "backslash") =>
     only({ "style/trailing-space": ["warn", { hardBreak }] }, "vitepress");
 
@@ -1102,16 +1102,13 @@ describe("VitePress mixed-whitespace hard breaks (#562)", () => {
       }
   });
 
-  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
-    "keeps ordinary mixed-whitespace cleanup in %s",
-    (dialect) => {
-      for (const mode of ["keep", "backslash"] as const) {
-        const config = only({ "style/trailing-space": ["warn", { hardBreak: mode }] }, dialect);
-        expect(formatted("a\t  \nb\n", config)).toBe("a\nb\n");
-        expect(formatted("a\\\\\t  \nb\n", config)).toBe("a\\\\\nb\n");
-      }
-    },
-  );
+  it.each(dialects)("retains mixed-whitespace hard breaks in %s", (dialect) => {
+    for (const mode of ["keep", "backslash"] as const) {
+      const config = only({ "style/trailing-space": ["warn", { hardBreak: mode }] }, dialect);
+      kept("a\t  \nb\n", config);
+      kept("a\\\\\t  \nb\n", config);
+    }
+  });
 
   it("retains the native-reading guard and existing hard-break modes", () => {
     expect(semanticFingerprint(parse("a\t  \nb\n", "vitepress"))).not.toBe(

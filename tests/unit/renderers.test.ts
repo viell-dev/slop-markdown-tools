@@ -137,6 +137,47 @@ function expectKnown(renderer: string, cases: string[], differing: Map<string, s
 const seeds = [1, 2, 3];
 const documentsPerSeed = 50;
 describe.each(targets)("rendering by $renderer", (target) => {
+  it.each(["a\t  \nb\n", "a\\\\\t  \nb\n"])(
+    "retains a native mixed-whitespace hard break (#562): %j",
+    (source) => {
+      const native = normalizeHtml(target.render(source));
+      expect(native).toContain("<br");
+      for (const config of [
+        {
+          extends: [],
+          dialect: target.config.dialect ?? "github",
+          rules: { "style/trailing-space": "warn" },
+        },
+        {
+          extends: [],
+          dialect: target.config.dialect ?? "github",
+          rules: { "style/wrap": ["warn", { width: 20 }] },
+        },
+        target.config,
+      ] satisfies Config[]) {
+        const result = format(source, { config });
+        expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+        expect(result.output).toBe(source);
+        expect(format(result.output, { config }).output).toBe(source);
+        expect(normalizeHtml(target.render(result.output))).toBe(native);
+      }
+      expect(normalizeHtml(target.render(source.replaceAll("\t  \n", "\n")))).not.toBe(native);
+    },
+  );
+
+  it("still wraps outside a code span with mixed trailing whitespace (#562)", () => {
+    const source = "before `a\t  \nb` and more plain words follow here\n";
+    const config: Config = {
+      extends: [],
+      dialect: target.config.dialect ?? "github",
+      rules: { "style/wrap": ["warn", { width: 20 }] },
+    };
+    const result = format(source, { config });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+    expect(result.output).not.toBe(source);
+    expect(normalizeHtml(target.render(result.output))).toBe(normalizeHtml(target.render(source)));
+  });
+
   it.each(seeds)("does not change for the generated documents of seed %i", (seed) => {
     const cases: string[] = [];
     const differing = new Map<string, string>();
