@@ -196,6 +196,12 @@ export interface MisreadLists {
   tableText: ReadonlySet<Nodes>;
   /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
   boundaryText: ReadonlySet<Nodes>;
+  /**
+   * Lists at a quote's or footnote's end whose markers and indentation affect
+   * a following non-one ordered continuation outside that container (#543).
+   * Inline formatting remains safe; the structural list unit stays as written.
+   */
+  boundaryLists: ReadonlySet<List>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -386,6 +392,7 @@ export function misreadLists(document: Document): MisreadLists {
   const itemHtml = new Set<Nodes>();
   const commentText = new Set<Nodes>();
   const boundaryText = new Set<Nodes>();
+  const boundaryLists = new Set<List>();
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     const quotedLeaves = new Set<Nodes>();
@@ -911,6 +918,20 @@ export function misreadLists(document: Document): MisreadLists {
     };
     /** Whether a source line holds a pipe that no backslash escapes. */
     const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
+    /** The first ordered list on a container's trailing path, including nested lists. */
+    const trailingOrderedList = (node: Nodes): List | undefined => {
+      let last: Nodes | undefined = node;
+      while (
+        last?.type === "blockquote" ||
+        last?.type === "footnoteDefinition" ||
+        last?.type === "list" ||
+        last?.type === "listItem"
+      ) {
+        if (last.type === "list" && last.ordered) return last;
+        last = last.children.at(-1);
+      }
+      return undefined;
+    };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
@@ -924,8 +945,15 @@ export function misreadLists(document: Document): MisreadLists {
             child.type === "list" &&
             child.ordered &&
             child.start !== 1
-          )
+          ) {
             boundaryText.add(stretch(child, previous.position.end));
+            // Reading view can continue the earlier list across the missing
+            // container prefix. Either delimiter direction can join or split
+            // it, so keep that list's structural unit, including nested lists,
+            // while allowing safe inline changes (#543).
+            const list = trailingOrderedList(previous);
+            if (list) boundaryLists.add(list);
+          }
           // An unpiped table row starts paragraph text in Reading view. A
           // non-one ordered list cannot interrupt it (#532). Retain the list
           // and separating break: its later items can still continue that
@@ -1428,6 +1456,7 @@ export function misreadLists(document: Document): MisreadLists {
     itemHtml,
     commentText,
     boundaryText,
+    boundaryLists,
   };
   found.set(document.tree, result);
   return result;

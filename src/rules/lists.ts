@@ -188,7 +188,12 @@ function analyze(document: Document): Analysis {
           }
           target = group;
         }
-        if (misread.nested.has(child) || misread.next.has(child)) target.valid = false;
+        if (
+          misread.nested.has(child) ||
+          misread.next.has(child) ||
+          misread.boundaryLists.has(child)
+        )
+          target.valid = false;
         const previous = children[index - 1];
         if (!run || previous?.type !== "list" || previous.ordered !== child.ordered) {
           run = [];

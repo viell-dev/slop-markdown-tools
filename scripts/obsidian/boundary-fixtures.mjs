@@ -4,6 +4,34 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  ...[
+    ">1) first\n2) second\n",
+    ">2) first\n3) second\n",
+    ">1) first\n2. second\n",
+    ">1) first\n>\n2) second\n",
+    ">>1) first\n2) second\n",
+    ">1) first\n>    - nested\n2) second\n",
+    "Ref[^n].\n\n[^n]: 1) first\n2) second\n",
+    "Ref[^n].\n\n[^n]: 1) first\n2. second\n",
+  ].map((source, index) => ({
+    issue: 543,
+    name: `ordered list continued beyond its container ${index}`,
+    source,
+  })),
+  ...[
+    ">1) first\n>   trailing prose\n2) second\n",
+    ">1) first\n>2) second\n",
+    ">1) first\n\n2) second\n",
+    ">1) first\n1) second\n",
+    ">1) first\n># Heading\n2) second\n",
+    "Ref[^n].\n\n[^n]: 1) first\n\n2) second\n",
+    ">+ first\n2) second\n",
+  ].map((source, index) => ({
+    issue: 543,
+    name: `independent structural list formatting ${index}`,
+    source,
+    preserve: false,
+  })),
   {
     issue: 533,
     name: "terminal whitespace in an unclosed fence info string",

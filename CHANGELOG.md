@@ -22,6 +22,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian list formatting retains ordered-list boundaries across a missing
+  quote or footnote prefix, and its comparison keeps adjacent headings distinct
+  with or without blank separators
+  ([#543](https://github.com/viell-dev/slop-markdown-tools/issues/543),
+  [#544](https://github.com/viell-dev/slop-markdown-tools/issues/544)).
 - GitHub table headers and continued rows take precedence over dollar display
   math, restoring table-column diagnostics and rejecting edits that split those
   rows into math

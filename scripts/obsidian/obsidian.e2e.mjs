@@ -291,7 +291,14 @@ function livePreview(lines) {
     }
     // The line that underlines a heading, which `style/heading` writes as `#` instead, and the
     // text above it, which has the heading's style but not its line's class.
-    if (line.kind.includes("HyperMD-header-line")) continue;
+    if (line.kind.includes("HyperMD-header-line")) {
+      current = undefined;
+      continue;
+    }
+    // Native heading lines start separate visible blocks, even at the same
+    // level without a blank separator (#544). Inferred Setext text below keeps
+    // its existing soft-line handling; its underline ends the heading above.
+    const headingStart = /\bHyperMD-header\b/.test(line.kind);
     const level = line.runs
       .map(([classes]) => /\bcm-header-(\d)\b/.exec(classes)?.[1])
       .find(Boolean);
@@ -354,6 +361,7 @@ function livePreview(lines) {
       current &&
       !code &&
       !differentList &&
+      !headingStart &&
       (current.kind === line.kind || line.continuation || lazy)
     ) {
       if (listFamily) current.listFamily = listFamily;
@@ -578,6 +586,35 @@ const reduce = process.env.REDUCE?.split(",")
 const probe = process.env.PROBE ? JSON.parse(process.env.PROBE) : undefined;
 
 describe("Obsidian before and after formatting", function () {
+  it("retains heading boundaries while ignoring their optional blank separators (#544)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = [
+      "## alpha\n## beta\n",
+      "## alpha\n\n## beta\n",
+      "alpha\n---\nbeta\n---\n",
+      "## alpha beta\n",
+      "## alpha\n### beta\n",
+      "## alpha\n## *beta*\n",
+      "## alpha\n## gamma\n",
+      "## alpha ![[first.png]]\n## beta\n",
+      "## alpha ![[second.png]]\n## beta\n",
+    ];
+    const views = [];
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/heading-boundary-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.push(await shown(path, source));
+    }
+    const normalized = views.map(({ lines }) => livePreview(lines));
+    expect(normalized[0]).toEqual(normalized[1]);
+    expect(normalized[0]).toEqual(normalized[2]);
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[2].reading));
+    expect(normalized[0]).toHaveLength(2);
+    for (const changed of normalized.slice(3, 7)) expect(normalized[0]).not.toEqual(changed);
+    expect(normalized[7]).not.toEqual(normalized[8]);
+  });
+
   it("normalizes styled fence separators while retaining code and info content (#533)", async function () {
     if (probe || reduce) this.skip();
     const sources = [

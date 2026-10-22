@@ -29,6 +29,19 @@ const boundaries = boundaryFixtures
   .map(({ issue, source }) => [issue, source] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it("retains both delimiter directions across an ordered continuation (#543)", () => {
+    const source = ">1. first\n2) second\n";
+    expect(
+      checked(source, {
+        ...config,
+        rules: { ...config.rules, "style/ordered-list": ["warn", { delimiter: ")" }] },
+      }),
+    ).toBe(source);
+  });
+  it("continues safe inline formatting in the earlier structural list unit (#543)", () => {
+    const source = ">1) *first*\n>2) *second*\n3) *third*\n\n*outside*\n";
+    expect(checked(source)).toBe(">1) _first_\n>2) _second_\n3) *third*\n\n_outside_\n");
+  });
   it("ignores a plugin paragraph without source positions", () => {
     const document = parse("words\n", "obsidian");
     delete document.tree.children[0]!.position;
