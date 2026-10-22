@@ -374,9 +374,17 @@ const tokenizeMathFenced: Tokenizer = function (effects, ok, nok) {
   };
   return start;
 };
-const mathFlow: Construct = { tokenize: tokenizeMathFenced, concrete: true, name: "mathFlow" };
-
-/** The micromark syntax for dollar math, with the conditions of one renderer for math in text. */
+/** The micromark syntax for dollar math, with the conditions of one renderer. */
 export function math(conditions: MathConditions): Extension {
+  const mathFlow: Construct = {
+    tokenize(effects, ok, nok) {
+      // GitHub builds display math from a whole paragraph. Dollar fences cannot
+      // interrupt one, including a list item's or block quote's lazy continuation (#491).
+      if (conditions === "github" && this.interrupt) return nok;
+      return tokenizeMathFenced.call(this, effects, ok, nok);
+    },
+    concrete: true,
+    name: "mathFlow",
+  };
   return { flow: { [dollar]: mathFlow }, text: { [dollar]: mathText(conditions) } };
 }
