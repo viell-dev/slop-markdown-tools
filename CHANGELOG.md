@@ -22,8 +22,8 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Obsidian formatting preserves code carried into nested quoted lists, empty
-  task separators, bare HTML-comment markers, fences whose openers remain in
+- Obsidian formatting preserves code carried into nested quoted lists, task
+  checkbox separators, bare HTML-comment markers, fences whose openers remain in
   HTML, and indented code read outside a quote
   ([#524](https://github.com/viell-dev/slop-markdown-tools/issues/524),
   [#525](https://github.com/viell-dev/slop-markdown-tools/issues/525),

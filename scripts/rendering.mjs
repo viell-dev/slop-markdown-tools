@@ -339,7 +339,12 @@ export function normalizeGithubHtml(html, mode, tree) {
   const visit = (node) => {
     if (node.type === "code") codes.push(node);
     if (node.type === "footnoteDefinition") footnotes = true;
-    if (node.type === "math" || node.type === "inlineMath") math = true;
+    if (
+      node.type === "math" ||
+      node.type === "inlineMath" ||
+      (node.type === "code" && node.lang === "math")
+    )
+      math = true;
     if (node.type === "html" && /<\/?pre(?:[\s>])/i.test(node.value)) rawPre = true;
     if (node.type === "html" && /\bdata-(?:footnotes|run-id)\b|user-content-fn/.test(node.value))
       rawFootnotes = true;

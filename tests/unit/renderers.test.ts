@@ -321,6 +321,21 @@ describe("GitHub source-verified code normalization (#515)", () => {
     expect(normalize(response, response)).not.toBe(normalize(other, other));
     expect(normalize(response, input + response)).not.toBe(normalize(other, input + other));
   });
+
+  it("handles GitHub's generated fenced math without normalizing ordinary code (#523)", () => {
+    const input = "```math\nx = signal\n```\n";
+    const response = readFileSync(
+      new URL("../fixtures/renderers/github-fenced-math.html", import.meta.url),
+      "utf8",
+    );
+    const other = response.replace(/data-run-id="[0-9a-f]{32}"/, `data-run-id="${"b".repeat(32)}"`);
+    expect(normalize(response, input)).toBe(normalize(other, input));
+    expect(normalize(response, input)).not.toBe(normalize(other.replace("signal", "other"), input));
+    expect(normalize(response, input.replace("math", "text"))).not.toBe(
+      normalize(other, input.replace("math", "text")),
+    );
+    expect(normalize(response, response)).not.toBe(normalize(other, other));
+  });
 });
 
 describe("Obsidian Live Preview normalizer", () => {
