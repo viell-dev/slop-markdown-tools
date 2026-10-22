@@ -1281,6 +1281,24 @@ to that one space where safe. Quoted markers and further markers on the same
 physical line keep ordinary trailing-space cleanup, because Live Preview reads
 them as text.
 
+After 0.4.0, blank space after a literal backslash stays as written when
+removing it would turn a continuing prose line into a hard line break. This
+includes spaces and tabs inside paragraphs, headings, lists, and quotes. Blank
+space at the end of a paragraph or file can still be removed; `hardBreak`
+continues to control existing hard line breaks.
+
+Also after 0.4.0, in VitePress, a Tab followed by two or more spaces can mark a
+hard line break even where the primary Markdown reading has a soft line ending.
+That suffix stays exactly as written, including with `hardBreak: "backslash"`,
+so both readings keep their meaning. Ordinary trailing Tabs and spaces, and
+those on the last content line of a paragraph or heading, can still be removed.
+
+After 0.4.0, Obsidian also keeps the preceding paragraph's separator before a
+Tab-only continuation when it marks a hard break or keeps a backslash literal. A
+Tab that begins before an unquoted paragraph's content column does not continue
+that paragraph merely by advancing past the column. Quoted margins are handled
+conservatively, retaining a possibly removable separator.
+
 With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
 
 ```markdown
@@ -1416,6 +1434,10 @@ what it means, that is, when it:
 - would start, in the Obsidian dialect, with `[`, a label, and `]:` on its first
   line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
   styles as a link reference definition.
+
+After 0.4.0, Obsidian wrapping retains the exact terminal separator before a
+Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
+preceding backslash literal. The earlier paragraph text can still wrap.
 
 In the Obsidian dialect, the rule wraps only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). [Forgejo and

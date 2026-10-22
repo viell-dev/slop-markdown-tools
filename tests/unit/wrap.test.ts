@@ -1882,3 +1882,38 @@ describe("potential Obsidian flow comments across a blank line (#559)", () => {
     expect(verify(source, config, workspace).output).toBe(expected);
   });
 });
+
+describe("terminal separators before Obsidian Tab-only continuations (#563)", () => {
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const config: Config = { ...wrap({ width: 20 }), dialect: "obsidian" };
+
+  it.each([
+    ["a\n    b   \n\t\n# c\n", "a b   \n\t\n# c\n"],
+    [
+      "alpha beta gamma delta epsilon zeta   \n\t\n# tail\n",
+      "alpha beta gamma\ndelta epsilon zeta   \n\t\n# tail\n",
+    ],
+    ["a\\ \n\t\n# c\n", "a\\ \n\t\n# c\n"],
+    ["a\\\t\n\t\n# c\n", "a\\\t\n\t\n# c\n"],
+    // An actual terminal backslash stays a marker, including while earlier lines join.
+    ["alpha\nbeta\\\n\t\n# c\n", "alpha beta\\\n\t\n# c\n"],
+  ])("preserves the terminal separator while wrapping %j", (source, output) => {
+    for (const eol of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        expect(verify(bom + source.replaceAll("\n", eol), config, workspace).output).toBe(
+          bom + output.replaceAll("\n", eol),
+        );
+  });
+
+  it.each([
+    ["a \n\t\n# c\n", "a\n\t\n# c\n"],
+    ["a\\\\ \n\t\n# c\n", "a\\\\\n\t\n# c\n"],
+    ["a\\ \n\n# c\n", "a\\\n\n# c\n"],
+    ["a   \n \n# c\n", "a\n \n# c\n"],
+    ["- alpha  \n\t\n# c\n", "- alpha\n\t\n# c\n"],
+    ["-    alpha  \n\t\n# c\n", "-    alpha\n\t\n# c\n"],
+    ["1000. alpha  \n\t\t\n# c\n", "1000. alpha\n\t\t\n# c\n"],
+  ])("still trims an ordinary terminal separator in %j", (source, output) => {
+    expect(verify(source, config, workspace).output).toBe(output);
+  });
+});

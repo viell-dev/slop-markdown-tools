@@ -7,7 +7,7 @@ import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/misread-lists.js";
 import { labelEnd, lazyIndentation, parse, range, startsWithMarker } from "../syntax/parse.js";
 import { type Range, located, holds } from "./shared.js";
-import { obsidianOpaque, goldmarkForges, misreadTable } from "./protections.js";
+import { obsidianOpaque, obsidianTabBreak, goldmarkForges, misreadTable } from "./protections.js";
 import { capturedLineBreak, lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
@@ -628,6 +628,11 @@ function prepareParagraph(
     index === parent.children.length - 1
   )
     while (end > paragraphStart && /[ \t]/.test(document.source[end - 1]!)) end--;
+  // The parser ends this paragraph before a Tab-only line, but Obsidian's
+  // continuation can still give its terminal separator meaning (#563).
+  const tabBreak =
+    document.dialect === "obsidian" ? obsidianTabBreak(node, document.source) : undefined;
+  if (tabBreak) end = tabBreak[0];
   let start = paragraphStart;
   let children = node.children;
   // A task item's paragraph range can begin at the checkbox, and its first

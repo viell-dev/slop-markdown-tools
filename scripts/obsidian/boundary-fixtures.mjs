@@ -4,6 +4,56 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  {
+    issue: 563,
+    name: "terminal spaces before a Tab-only paragraph continuation",
+    source: "a\n    b   \n\t\n# c\n",
+    preserve: false,
+  },
+  {
+    issue: 563,
+    name: "literal backslash separator before a Tab-only continuation",
+    source: "*alpha* beta\\ \n\t\n# tail\n",
+    preserve: false,
+  },
+  {
+    issue: 563,
+    name: "full generated terminal-break regression",
+    source: readFileSync(new URL("./fixtures/563.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  {
+    issue: 376,
+    name: "full generated enclosing-list continuation regression",
+    source: readFileSync(new URL("./fixtures/376-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    ["literal backslash before a spaced underline", "a\\ \n=== \n"],
+    ["hard break before a spaced underline", "a  \n=== \n"],
+    ["literal backslash before an indented underline", "a\\ \n  ===\n"],
+    ["hard break before an indented underline", "a  \n  ===\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source })),
+  ...[
+    ["nested lazy paragraph before an enclosing ordered list", "+ - a\nb\n  1) c\n"],
+    [
+      "nested lazy paragraph before an enclosing ordered continuation",
+      "+ - a\nb\n  1) c\n     d\n",
+    ],
+    ["direct lazy paragraph before its ordered list", "- a\nb\n  1) c\n"],
+  ].map(([name, source]) => ({ issue: 376, name, source })),
+  {
+    issue: 376,
+    name: "fully indented inner continuation permits enclosing list reflow",
+    source: "+ - a\n    b\n  1) c\n",
+    preserve: false,
+  },
+  {
+    issue: 560,
+    name: "literal backslash before a continuing line in the full generated document",
+    source: readFileSync(new URL("./fixtures/560.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
   ...[
     {
       name: "multiline inline comment with blank line",

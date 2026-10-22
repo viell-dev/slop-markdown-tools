@@ -983,3 +983,180 @@ describe("the block and whitespace rules together", () => {
     );
   });
 });
+
+describe("literal backslashes before trailing blank space (#560)", () => {
+  const configured = (dialect: Dialect, hardBreak: "keep" | "backslash") =>
+    only({ "style/trailing-space": ["warn", { hardBreak }] }, dialect);
+
+  it.each(dialects)("keeps the exact separating suffix in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const source of [
+        "a\\ \nb\n",
+        "a\\\t\nb\n",
+        "a\\ \t\nb\n",
+        "a\\\t \nb\n",
+        "a\\\t\t\nb\n",
+        "a\\  \t\nb\n",
+        "a\\\t  \nb\n",
+        "a\\\t\t  \nb\n",
+        "a\\\\\\ \nb\n",
+        "*a\\ \nb*\n",
+        "[a\\ \nb](url)\n",
+        "a\\ \nb\n===\n",
+      ])
+        kept(source, configured(dialect, hardBreak));
+  });
+
+  it.each(dialects)("still trims safe prose in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const [source, output] of [
+        ["a\\\\ \nb\n", "a\\\\\nb\n"],
+        ["a\\\\\\\\\t\nb\n", "a\\\\\\\\\nb\n"],
+        ["a\\ \n", "a\\\n"],
+        ["a\\ ", "a\\"],
+        ["a\\ \n\nb \n", "a\\\n\nb\n"],
+        ["a\\ \n# b \n", "a\\\n# b\n"],
+        ["# a\\ \nb\n", "# a\\\nb\n"],
+        ["- a\\ \n  - b\n", "- a\\\n  - b\n"],
+        ["a \nb\t\n", "a\nb\n"],
+      ])
+        expect(formatted(source!, configured(dialect, hardBreak))).toBe(output);
+  });
+
+  it.each(dialects)("distinguishes a Setext title's final content line in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      expect(formatted("a\\ \n=== \n", configured(dialect, hardBreak))).toBe(
+        dialect === "obsidian" ? "a\\ \n=== \n" : "a\\\n===\n",
+      );
+  });
+
+  it.each(dialects)("keeps container offsets and line endings in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const eol of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"])
+          for (const [source, output] of [
+            ["- a\\\t\n  b \n", "- a\\\t\n  b\n"],
+            ["> a\\\t\n> b \n", "> a\\\t\n> b\n"],
+            ["- a\\\\ \n  b \n", "- a\\\\\n  b\n"],
+            ["> a\\\\ \n> b \n", "> a\\\\\n> b\n"],
+          ])
+            expect(
+              formatted(bom + source!.replaceAll("\n", eol), configured(dialect, hardBreak)),
+            ).toBe(bom + output!.replaceAll("\n", eol));
+  });
+
+  it.each(dialects)("retains existing hard-break choices in %s", (dialect) => {
+    expect(formatted("a  \nb \n", configured(dialect, "keep"))).toBe("a  \nb\n");
+    expect(formatted("a  \nb \n", configured(dialect, "backslash"))).toBe("a\\\nb\n");
+    kept("a\\  \nb\n", configured(dialect, "keep"));
+    kept("a\\  \nb\n", configured(dialect, "backslash"));
+    expect(formatted("a\\\nb \n", configured(dialect, "backslash"))).toBe("a\\\nb\n");
+  });
+});
+
+describe("VitePress mixed-whitespace hard breaks (#562)", () => {
+  const configured = (hardBreak: "keep" | "backslash") =>
+    only({ "style/trailing-space": ["warn", { hardBreak }] }, "vitepress");
+
+  it.each(["keep", "backslash"] as const)("retains the ambiguous suffix with %s", (mode) => {
+    for (const source of [
+      "a\t  \nb\n",
+      "a\t\t  \nb\n",
+      "a \t   \nb\n",
+      "a\\\t  \nb\n",
+      "a\\\\\t  \nb\n",
+      "a\\\\\\\\\t  \nb\n",
+      "a\t  \nb\n===\n",
+      "*a\t  \nb*\n",
+      "[a\t  \nb](url)\n",
+    ])
+      kept(source, configured(mode));
+  });
+
+  it.each(["keep", "backslash"] as const)("still trims other lines with %s", (mode) => {
+    for (const [source, output] of [
+      ["- a\t  \n  b \n", "- a\t  \n  b\n"],
+      ["> a\t  \n> b \n", "> a\t  \n> b\n"],
+      ["> - a\t  \n>   b \n", "> - a\t  \n>   b\n"],
+      ["a\t\nb\n", "a\nb\n"],
+      ["a\t \nb\n", "a\nb\n"],
+      ["a\t  \t\nb\n", "a\nb\n"],
+      ["a\t  \n", "a\n"],
+      ["a\t  ", "a"],
+      ["a\t  \n\nb \n", "a\n\nb\n"],
+      ["a\t  \n# b \n", "a\n# b\n"],
+      ["# a\t  \nb\n", "# a\nb\n"],
+      ["a\t  \n===\n", "a\n===\n"],
+    ])
+      expect(formatted(source!, configured(mode))).toBe(output);
+  });
+
+  it.each(["\n", "\r\n", "\r"])("keeps offsets and BOMs with %j endings", (eol) => {
+    for (const bom of ["", "\uFEFF"])
+      for (const mode of ["keep", "backslash"] as const) {
+        for (const source of ["a\t  \nb\n", "a\\\\\t  \nb\n"])
+          kept(bom + source.replaceAll("\n", eol), configured(mode));
+        expect(formatted(bom + "> - a\t  \n>   b \n".replaceAll("\n", eol), configured(mode))).toBe(
+          bom + "> - a\t  \n>   b\n".replaceAll("\n", eol),
+        );
+      }
+  });
+
+  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
+    "keeps ordinary mixed-whitespace cleanup in %s",
+    (dialect) => {
+      for (const mode of ["keep", "backslash"] as const) {
+        const config = only({ "style/trailing-space": ["warn", { hardBreak: mode }] }, dialect);
+        expect(formatted("a\t  \nb\n", config)).toBe("a\nb\n");
+        expect(formatted("a\\\\\t  \nb\n", config)).toBe("a\\\\\nb\n");
+      }
+    },
+  );
+
+  it("retains the native-reading guard and existing hard-break modes", () => {
+    expect(semanticFingerprint(parse("a\t  \nb\n", "vitepress"))).not.toBe(
+      semanticFingerprint(parse("a\nb\n", "vitepress")),
+    );
+    expect(formatted("a  \nb\n", configured("keep"))).toBe("a  \nb\n");
+    expect(formatted("a  \nb\n", configured("backslash"))).toBe("a\\\nb\n");
+  });
+});
+
+describe("terminal separators before Obsidian Tab-only continuations (#563)", () => {
+  it.each(["keep", "backslash"] as const)("retains required separators with %s", (hardBreak) => {
+    const config = only({ "style/trailing-space": ["warn", { hardBreak }] }, "obsidian");
+    for (const source of [
+      "a  \n\t\n# c\n",
+      "a   \n\t\n# c\n",
+      "a   \n\t\n",
+      "a\\ \n\t\n# c\n",
+      "a\\\t\n\t\n# c\n",
+      "> alpha   \n>\t\n\n# tail\n",
+      "- alpha   \n  \t\n\n# tail\n",
+    ])
+      for (const eol of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) kept(bom + source.replaceAll("\n", eol), config);
+  });
+
+  it.each([
+    ["a \n\t\n# c\n", "a\n\t\n# c\n"],
+    ["a\\\\ \n\t\n# c\n", "a\\\\\n\t\n# c\n"],
+    ["a\\ \n\n# c\n", "a\\\n\n# c\n"],
+    ["a   \n \n# c\n", "a\n\n# c\n"],
+    ["# a   \n\t\n# c\n", "# a\n\t\n# c\n"],
+    ["- alpha  \n\t\n# c\n", "- alpha\n\t\n# c\n"],
+    ["-    alpha  \n\t\n# c\n", "-    alpha\n\t\n# c\n"],
+    ["1000. alpha  \n\t\t\n# c\n", "1000. alpha\n\t\t\n# c\n"],
+  ])("retains ordinary cleanup for %j", (source, output) => {
+    expect(formatted(source, only({ "style/trailing-space": "warn" }, "obsidian"))).toBe(output);
+  });
+
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "retains terminal cleanup in %s",
+    (dialect) => {
+      expect(formatted("a   \n\t\n# c\n", only({ "style/trailing-space": "warn" }, dialect))).toBe(
+        "a\n\n# c\n",
+      );
+    },
+  );
+});

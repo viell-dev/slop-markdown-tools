@@ -29,6 +29,57 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each(["a\\ \n=== \n", "a  \n=== \n", "a\\ \n  ===\n", "a  \n  ===\n"])(
+    "retains the terminal separator before a literal underline (#383): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"])
+          expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+            bom + source.replaceAll("\n", newline),
+          );
+    },
+  );
+
+  it("permits earlier inline formatting above a literal underline (#383)", () => {
+    expect(checked("*alpha* beta\\ \n=== \n")).toBe("_alpha_ beta\\ \n=== \n");
+  });
+
+  it("still cleans a proper Setext title's terminal separator (#383)", () => {
+    const settings: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/trailing-space": "warn" },
+    };
+    expect(checked("a\\ \n===\n", settings)).toBe("a\\\n===\n");
+    expect(checked("a  \n===\n", settings)).toBe("a\n===\n");
+  });
+
+  it.each(["+ - a\nb\n  1) c\n", "+ - a\nb\n  1) c\n     d\n", "- a\nb\n  1) c\n"])(
+    "retains lazy text and later blocks in the affected enclosing item (#376): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(input);
+          const document = parse(input, "obsidian");
+          const following = document.source.lastIndexOf("c");
+          expect(
+            [...misreadLists(document).lazyItems].some(
+              ({ position }) => position!.start.offset === 0 && position!.end.offset! > following,
+            ),
+          ).toBe(true);
+        }
+    },
+  );
+
+  it.each(["+ - a\n    b\n  1) c\n", "+ - a\nb\n", "+ - a\nb\n\n1) c\n"])(
+    "permits list reflow without a later affected enclosing block (#376): %j",
+    (source) => {
+      expect(misreadLists(parse(source, "obsidian")).lazyItems.size).toBe(0);
+      expect(checked(source)).not.toBe(source);
+    },
+  );
+
   it.each(
     boundaryFixtures.filter(
       ({ issue, name, preserve }) =>

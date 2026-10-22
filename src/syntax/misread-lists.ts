@@ -1,4 +1,4 @@
-import type { List, Nodes, Parents, Root } from "mdast";
+import type { List, ListItem, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd, range, startsWithMarker } from "./parse.js";
 import {
@@ -1308,6 +1308,9 @@ export function misreadLists(document: Document): MisreadLists {
         break;
       }
     }
+    // Items enclosing the current parent; a nested paragraph can leave later
+    // blocks in an outer item even when its immediate item ends there.
+    const enclosingItems: ListItem[] = [];
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
@@ -1340,8 +1343,19 @@ export function misreadLists(document: Document): MisreadLists {
               columnAt(from + prefix) > columnAt(text) ||
               (child.depth === 1 && child.position!.end.line > textLine + 1) ||
               definitionText)
-          )
-            underlines.add(breakBefore(child, from, to));
+          ) {
+            const boundary = breakBefore(child, from, to);
+            let ending = from;
+            if (source[ending - 1] === "\n") ending--;
+            if (source[ending - 1] === "\r") ending--;
+            let separator = ending;
+            while (source[separator - 1] === " " || source[separator - 1] === "\t") separator--;
+            // Reading view can keep this underline in the paragraph. Retain
+            // a suffix whose cleanup would change its preceding break (#383).
+            if (separator < ending && (source.endsWith("  ", ending) || escaped(source, separator)))
+              boundary.position!.start.offset = separator;
+            underlines.add(boundary);
+          }
         }
         if (child.type === "paragraph") {
           // A line whose content starts with `[`, a label, and `]:` hides its
@@ -1433,23 +1447,36 @@ export function misreadLists(document: Document): MisreadLists {
           for (const [from, to] of later)
             if (/^[ \t>]*(?:=+|-+)[ \t]*$/.test(source.slice(from, to)))
               underlines.add(breakBefore(child, from, to));
-          // A lazy line, left of the item's content, ends the item in Live
-          // Preview for the blocks after it (issue #376).
-          const content = parent.children[0]?.position?.start.offset;
-          if (
-            parent.type === "listItem" &&
-            index < parent.children.length - 1 &&
-            content !== undefined &&
-            later.some(([from, to]) => {
+          // A lazy line, left of an item's content, ends its Live Preview
+          // state for later blocks (#376). Those blocks can belong to an
+          // enclosing item while the immediate inner item ends at this paragraph.
+          if (parent.type === "listItem" && later.length > 0) {
+            let lazyColumn = Infinity;
+            for (const [from, to] of later) {
               let at = from;
               while (at < to && (source[at] === " " || source[at] === "\t" || source[at] === ">"))
                 at++;
-              return columnAt(at) < columnAt(content);
-            })
-          )
-            lazyItems.add(wholeLines(child, parent.children.at(-1)));
+              lazyColumn = Math.min(lazyColumn, columnAt(at));
+            }
+            const retains = (item: ListItem) => {
+              const content = item.children[0]?.position?.start.offset;
+              const last = item.children.at(-1)?.position?.end.offset;
+              return (
+                content !== undefined &&
+                last !== undefined &&
+                last > end &&
+                lazyColumn < columnAt(content)
+              );
+            };
+            const item = enclosingItems.find(retains) ?? (retains(parent) ? parent : undefined);
+            if (item) lazyItems.add(wholeLines(child, item.children.at(-1)));
+          }
         }
-        if ("children" in child && !leaves.has(child.type)) visitLines(child);
+        if ("children" in child && !leaves.has(child.type)) {
+          if (parent.type === "listItem") enclosingItems.push(parent);
+          visitLines(child);
+          if (parent.type === "listItem") enclosingItems.pop();
+        }
       });
     visitLines(document.tree);
     /** The point where the line holding `node`'s start begins, less one: the line break before it. */

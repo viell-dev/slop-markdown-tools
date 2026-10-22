@@ -22,6 +22,22 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep the terminal separator before an Obsidian Tab-only paragraph
+  continuation, preserving hard breaks and literal backslashes while allowing
+  earlier wrapping and safe whitespace cleanup
+  ([#563](https://github.com/viell-dev/slop-markdown-tools/issues/563)).
+- Preserve lazy paragraph lines that determine the Live Preview nesting of later
+  blocks in an enclosing list item
+  ([#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
+- Retain the separator before an uncertain Obsidian Setext underline when
+  trimming it would create or remove a Reading-view hard break
+  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
+- Preserve the spaces or tabs after a literal backslash when trimming them would
+  create a hard line break, avoiding a guarded trailing-space refusal
+  ([#560](https://github.com/viell-dev/slop-markdown-tools/issues/560)).
+- Keep mixed trailing whitespace that marks a VitePress hard line break,
+  avoiding a guarded cleanup refusal while preserving ordinary trailing-space
+  cleanup ([#562](https://github.com/viell-dev/slop-markdown-tools/issues/562)).
 - Obsidian wrapping retains possible comments that cross a blank line, avoiding
   an unsafe-format refusal when wrapping would put their closer alone on a line
   ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).
