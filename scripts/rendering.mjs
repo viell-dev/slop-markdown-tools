@@ -333,13 +333,18 @@ export function normalizeGithubHtml(html, mode, tree) {
   let rawPre = false;
   let footnotes = false;
   let rawFootnotes = false;
+  let math = false;
+  let rawMath = false;
   /** @param {import("mdast").Nodes} node */
   const visit = (node) => {
     if (node.type === "code") codes.push(node);
     if (node.type === "footnoteDefinition") footnotes = true;
+    if (node.type === "math" || node.type === "inlineMath") math = true;
     if (node.type === "html" && /<\/?pre(?:[\s>])/i.test(node.value)) rawPre = true;
     if (node.type === "html" && /\bdata-(?:footnotes|run-id)\b|user-content-fn/.test(node.value))
       rawFootnotes = true;
+    if (node.type === "html" && /<\/?math-renderer\b|\bdata-run-id\b/.test(node.value))
+      rawMath = true;
     if ("children" in node) node.children.forEach(visit);
   };
   visit(tree);
@@ -370,8 +375,8 @@ export function normalizeGithubHtml(html, mode, tree) {
     kept.push(value);
     return `${mark}${kept.length - 1}${mark}`;
   });
-  // Only GitHub's generated footnote section establishes a response ID. A
-  // hexadecimal paragraph, anchor, URL, or source-authored HTML stays exact (#523).
+  // GitHub's generated footnotes and math carry response IDs. A hexadecimal
+  // paragraph, anchor, URL, or source-authored HTML stays exact (#523).
   const ids = new Set();
   const footnoteSection = (tag) =>
     /^<section\b/.test(tag) && /\bdata-footnotes(?:=|[ >])/.test(tag);
@@ -398,7 +403,10 @@ export function normalizeGithubHtml(html, mode, tree) {
   const text = outside.replace(/<[^>]*>/g, (tag) =>
     tag.replace(/ (data-run-id|id|href)="([^"]*)"/g, (attribute, name, value) => {
       if (name === "data-run-id")
-        return footnoteSection(tag) && ids.has(value) ? ' data-run-id="ID"' : attribute;
+        return (footnoteSection(tag) && ids.has(value)) ||
+          (math && !rawMath && /^<math-renderer\b/.test(tag) && /^[0-9a-f]{32}$/.test(value))
+          ? ' data-run-id="ID"'
+          : attribute;
       const id = /^((?:#)?user-content-fn(?:ref)?-[^"\s]+-)([0-9a-f]{32})$/.exec(value);
       return id && ids.has(id[2]) ? ` ${name}="${id[1]}ID"` : attribute;
     }),

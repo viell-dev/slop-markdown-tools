@@ -171,8 +171,9 @@ comparison verifies rendered code text against the parsed source before
 accepting highlighting-wrapper and final-line variations. Code values, language,
 metadata, and actual content differences remain significant; raw HTML `pre`
 elements are compared strictly. Only generated footnote identifiers established
-by the response's footnote section are normalized; visible hexadecimal text,
-ordinary URLs and anchors, and source-authored reserved HTML remain significant.
+by the response's footnote section and generated math response attributes are
+normalized; visible hexadecimal text, ordinary URLs and anchors, and
+source-authored reserved HTML remain significant.
 
 HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
 Reading view read some Markdown otherwise. `npm run check:obsidian` builds the

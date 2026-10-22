@@ -308,6 +308,19 @@ describe("GitHub source-verified code normalization (#515)", () => {
     expect(normalize(html(a), input)).not.toBe(normalize(html(a).replace("other", b), input));
     expect(normalize(html(a), html(a))).not.toBe(normalize(html(b), html(b)));
   });
+
+  it("normalizes generated math response IDs while retaining its content (#523)", () => {
+    const input = "$$\nx = signal\n$$\n";
+    const response = readFileSync(
+      new URL("../fixtures/renderers/github-math.html", import.meta.url),
+      "utf8",
+    );
+    const other = response.replace(/data-run-id="[0-9a-f]{32}"/, `data-run-id="${"b".repeat(32)}"`);
+    expect(normalize(response, input)).toBe(normalize(other, input));
+    expect(normalize(response, input)).not.toBe(normalize(other.replace("signal", "other"), input));
+    expect(normalize(response, response)).not.toBe(normalize(other, other));
+    expect(normalize(response, input + response)).not.toBe(normalize(other, input + other));
+  });
 });
 
 describe("Obsidian Live Preview normalizer", () => {
