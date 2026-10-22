@@ -24,7 +24,7 @@ function checked(source: string, settings = config) {
 
 /** Minimal regressions also exercised in the real Obsidian fixture suite. */
 const boundaries = boundaryFixtures
-  .filter(({ issue }) => ![496, 497, 499, 508].includes(issue))
+  .filter(({ issue, preserve }) => preserve !== false && ![496, 497, 499, 508].includes(issue))
   .map(({ issue, source }) => [issue, source] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
@@ -40,6 +40,26 @@ describe("Obsidian boundaries read differently by its views", () => {
     const source = "[^1]: *note*\n    * anchor *basket ember* with enough words to wrap\n";
     expect(checked(source)).toBe(source.replace("*note*", "_note_"));
   });
+
+  it("keeps a quoted continuation block in a footnote (#496)", () => {
+    const source = boundaryFixtures.find(
+      ({ name }) => name === "quoted continuation block in a footnote",
+    )!.source;
+    expect(checked(source)).toBe(source);
+  });
+
+  it.each(["*", "_"])("honors escaped and intraword %s opener controls (#506)", (marker) => {
+    const source = `text a${marker}b\\\n> + one *two*\n`;
+    if (marker === "*") expect(checked(source)).toBe(source);
+    else expect(checked(source)).toContain("_two_");
+    expect(checked(`text \\${marker}b\\\n> + one *two*\n`)).toContain("_two_");
+    expect(checked(`text \\\\${marker}b\\\n> + one *two*\n`)).not.toContain("> -");
+  });
+
+  it.each(boundaryFixtures.filter(({ preserve }) => preserve === false))(
+    "continues formatting the host-verified control $name",
+    ({ source }) => expect(checked(source)).not.toBe(source),
+  );
 
   it("keeps callout lists starting after their title together (#499)", () => {
     const source = "> [!note] title\n> 9) first\n>\n> 10) second *word*\n";

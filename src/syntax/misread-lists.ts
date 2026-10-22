@@ -6,6 +6,7 @@ import {
   lineBreak as lineEndingPattern,
   lineBreakMatcher,
   lineBreaks,
+  escaped,
 } from "./source.js";
 
 /**
@@ -749,7 +750,7 @@ export function misreadLists(document: Document): MisreadLists {
     for (const [footnote] of footnotes)
       if ("children" in footnote)
         for (const child of footnote.children.slice(1)) {
-          if (child.type !== "list") continue;
+          if (child.type !== "list" && child.type !== "blockquote") continue;
           const block = wholeLines(child);
           let end = block.position!.end.offset!;
           while (source[end - 1] === " " || source[end - 1] === "\t") end--;
@@ -768,11 +769,12 @@ export function misreadLists(document: Document): MisreadLists {
         continue;
       let until = lineAround(leaf.position!.end.offset!)[1];
       for (let line = leaf.position!.end.line; line < lines.length; line++) {
-        if (!/^[ \t>]+$/.test(lines[line]!) || !/[ \t]/.test(lines[line]!)) break;
+        if (!/^[ \t>]*$/.test(lines[line]!)) break;
         until += (source.startsWith("\r\n", until) ? 2 : 1) + lines[line]!.length;
-        boundaryText.add(
-          stretch(leaf, leaf.position!.end, { ...leaf.position!.end, offset: until }),
-        );
+        if (/[ \t]/.test(lines[line]!))
+          boundaryText.add(
+            stretch(leaf, leaf.position!.end, { ...leaf.position!.end, offset: until }),
+          );
       }
     }
     // A task item's fence is parsed as paragraph text, but starts a real code
@@ -781,10 +783,10 @@ export function misreadLists(document: Document): MisreadLists {
     for (const [leaf] of order) {
       if (leaf.type !== "paragraph" || !leaf.position) continue;
       const start = leaf.position.start.offset!;
-      const prefix = source.slice(lineStart(start), start);
-      if (!/^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[[ xX]\][ \t]+$/.test(prefix)) continue;
-      const fence = /^(`{3,}|~{3,})/.exec(source.slice(start, leaf.position.end.offset))?.[1];
-      if (!fence) continue;
+      const line = source.slice(lineStart(start), lineAround(start)[1]);
+      const task =
+        /^[ \t]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)+\[[^\]\r\n]\][ \t]+(`{3,}|~{3,})(.*)$/.exec(line);
+      if (!task || (task[1]![0] === "`" && task[2]!.includes("`"))) continue;
       boundaryText.add(
         stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }),
       );
@@ -796,7 +798,23 @@ export function misreadLists(document: Document): MisreadLists {
       const start = node.position?.start.offset;
       if (start === undefined) return false;
       const text = source.slice(start, node.position!.end.offset);
-      return /(?:^|[^\p{L}\p{N}\\])(?:\*+|_+)(?=\S)/u.test(text);
+      for (const match of text.matchAll(/\*+|_+/g)) {
+        let at = start + match.index;
+        const end = at + match[0].length;
+        // An escape consumes just the first marker of a run, not the rest.
+        if (escaped(source, at)) at++;
+        if (at === end) continue;
+        const before = source[at - 1];
+        const after = source[end];
+        const beforeSpace = before === undefined || /\s/.test(before);
+        const afterSpace = after === undefined || /\s/.test(after);
+        const beforePunctuation = before !== undefined && /\p{P}|\p{S}/u.test(before);
+        const afterPunctuation = after !== undefined && /\p{P}|\p{S}/u.test(after);
+        const left = !afterSpace && (!afterPunctuation || beforeSpace || beforePunctuation);
+        const right = !beforeSpace && (!beforePunctuation || afterSpace || afterPunctuation);
+        if (left && (source[at] === "*" || !right || beforePunctuation)) return true;
+      }
+      return false;
     };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
@@ -1094,7 +1112,7 @@ export function misreadLists(document: Document): MisreadLists {
         // view retain the preceding list's original indentation (#492).
         if (
           /^<!--/.test(child.value) &&
-          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+-->/.test(child.value)
+          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+[^\r\n]*-->/.test(child.value)
         )
           for (const marker of markersOf(list, lineOf(list))) itemHtml.add(marker);
         let next = index + 1;

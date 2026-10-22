@@ -201,19 +201,22 @@ latest installable release:
 - Lists following a closing-tag HTML block keep their source when Live Preview
   reads a marker inside that block as their parent. List indentation also stays
   when an HTML comment below the list closes after a marker on a later line.
-- A fence immediately after a task checkbox keeps the remaining source as
-  written. Live Preview opens code there, while the parser reads paragraph text,
-  so subsequent fences can pair differently throughout the note.
-- Inline code carried into a quoted list protects its quote and list markers
-  too. An unmatched emphasis opener immediately before a block quote preserves
-  the opening paragraph and the quote, because Live Preview can carry that style
-  into its literal list markers. A blank line resets that emphasis state.
-- List blocks inside footnote definitions keep their layout; ordinary
-  continuation paragraphs still wrap, and trailing space after a list can go.
-  Lines of spaces below a link reference or footnote definition stay, because
-  emptying them can change Live Preview's code styling. An ordered list not
-  starting at 1 directly below a footnote stays beside it: Reading view keeps
-  that line in the footnote rather than starting a visible list.
+- A fence immediately after a task checkbox, including a custom status such as
+  `[-]`, keeps the remaining source as written. Live Preview opens code there,
+  while the parser reads paragraph text, so subsequent fences can pair
+  differently throughout the note.
+- Inline code carried from a preceding block into a quoted list protects its
+  quote and list markers too. An unmatched emphasis opener immediately before a
+  block quote preserves the opening paragraph and the quote, because Live
+  Preview can carry that style into its literal list markers. A blank line
+  resets that emphasis state.
+- Lists and quotes that start on continuation lines in footnote definitions keep
+  their layout; ordinary continuation paragraphs still wrap, and trailing space
+  after a list can go. Lines of spaces below a link reference or footnote
+  definition stay, including after empty lines, because emptying them can change
+  Live Preview's code styling. An ordered list not starting at 1 directly below
+  a footnote stays beside it: Reading view keeps that line in the footnote
+  rather than starting a visible list.
 - An ordered list directly below a callout title stays together even when its
   first number is not 1. Its source markers keep a consistent delimiter.
 - Tables below setext text that Reading view keeps as a paragraph stay as text.
