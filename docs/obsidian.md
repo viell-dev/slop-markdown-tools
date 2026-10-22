@@ -211,7 +211,9 @@ latest installable release:
   markers and the source below them until a physically empty line, including
   empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading
   view's HTML block. HTML inside a quote still follows that quote's own
-  boundaries.
+  boundaries. Empty list markers between that HTML and a fence also remain raw
+  source. If an empty line inside the fence makes its closer open code in
+  Reading view, the remaining note stays as written.
 - A fence immediately after a task checkbox, including a custom status such as
   `[-]`, keeps the remaining source as written. Live Preview opens code there,
   while the parser reads paragraph text, so subsequent fences can pair

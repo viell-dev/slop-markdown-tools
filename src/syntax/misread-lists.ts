@@ -539,7 +539,7 @@ export function misreadLists(document: Document): MisreadLists {
     // A top-level HTML block reads quote markers literally. Only a physical
     // empty line ends that reading; a contained block can consume its prefixes.
     const continuesHtml = (number: number) =>
-      spaced(number) || (topLevel && /^>+$/.test(lines[number - 1] ?? ""));
+      topLevel ? (lines[number - 1] ?? "").length > 0 : spaced(number);
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       if (open && previous?.position && leaf.position) {
@@ -1757,14 +1757,18 @@ type Point = NonNullable<Nodes["position"]>["start"];
  */
 function backtickRuns(source: string, start: number, end: number): Run[] {
   const runs: Run[] = [];
-  for (let at = source.indexOf("`", start); at >= 0 && at < end;) {
+  // Bound the search itself: text without ticks must not repeatedly scan the
+  // rest of the document before discovering that the result lies past `end`.
+  const text = source.slice(start, end);
+  for (let found = text.indexOf("`"); found >= 0;) {
+    const at = start + found;
     let after = at;
     while (after < end && source[after] === "`") after++;
     let slashes = 0;
     while (source[at - 1 - slashes] === "\\") slashes++;
     const from = slashes % 2 === 0 ? at : at + 1;
     if (after > from) runs.push([from, after - from]);
-    at = source.indexOf("`", after);
+    found = text.indexOf("`", after - start);
   }
   return runs;
 }

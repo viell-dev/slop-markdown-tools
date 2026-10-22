@@ -276,6 +276,31 @@ export const boundaryFixtures = [
     source: `<div>\ntext\n</div>\n\t\n\`\`\`js\nx\n${marker}\n\`\`\`\n\n*outside*\n`,
     preserve: false,
   })),
+  ...[
+    "<div>\n   \n-\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n*\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n+\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n1.\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n1)\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n-\n```\na\n\n```\ntext *x* and __y__\n",
+    "<div></div>\n   \n-\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n>\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+  ].map((source, index) => ({
+    issue: 548,
+    name: `fence pairing after an empty container in top-level HTML ${index}`,
+    source,
+  })),
+  ...[
+    "<div>\n   \n-\n\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n\n-\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+    "<div>\n   \n-\n~~~\na\n~~~\n\ntext *x* and __y__\n",
+    "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext *x* and __y__\n",
+  ].map((source, index) => ({
+    issue: 548,
+    name: `independent prose after a fence and top-level HTML ${index}`,
+    source,
+    preserve: false,
+  })),
   {
     issue: 517,
     name: "non-one list after a quote inside a list",

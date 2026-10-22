@@ -124,6 +124,34 @@ describe("Obsidian boundaries read differently by its views", () => {
           bom + expected.replaceAll("\n", newline),
         );
   });
+  it.each([
+    [
+      "physical empty line before a fence",
+      "<div>\n   \n-\n\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+      "<div>\n   \n-\n\n```\na\n\n```\ntext _x_ and **y**\n",
+    ],
+    [
+      "physical empty line before a list marker",
+      "<div>\n\n-\n~~~\na\n\n~~~\ntext *x* and __y__\n",
+      "<div>\n\n-\n\n```\na\n\n```\ntext _x_ and **y**\n",
+    ],
+    [
+      "fence body without an empty line",
+      "<div>\n   \n-\n~~~\na\n~~~\n\ntext *x* and __y__\n",
+      "<div>\n   \n-\n~~~\na\n~~~\n\ntext _x_ and **y**\n",
+    ],
+    [
+      "fence body with a space-only line",
+      "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext *x* and __y__\n",
+      "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext _x_ and **y**\n",
+    ],
+  ])("keeps outside prose formattable with a %s (#548)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
   it("ignores a plugin paragraph without source positions", () => {
     const document = parse("words\n", "obsidian");
     delete document.tree.children[0]!.position;
@@ -210,7 +238,7 @@ describe("Obsidian boundaries read differently by its views", () => {
 
   it("formats an independent paragraph after each protected region", () => {
     for (const [, source] of boundaries.filter(
-      ([issue]) => ![488, 494, 519, 524, 529].includes(issue),
+      ([issue]) => ![488, 494, 519, 524, 529, 548].includes(issue),
     ))
       expect(checked(`${source}\nLater *outside*.\n`)).toContain("Later _outside_.");
   });

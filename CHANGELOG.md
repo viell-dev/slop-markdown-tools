@@ -22,6 +22,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian protection searches for backticks only within each text node,
+  avoiding repeated scans of the remaining document
+  ([#547](https://github.com/viell-dev/slop-markdown-tools/issues/547)).
+- Obsidian HTML continuation retains empty container markers before fences and
+  protects code opened by the later fence through the end of the note
+  ([#548](https://github.com/viell-dev/slop-markdown-tools/issues/548)).
 - Obsidian formatting retains both list boundaries around lazy text below a
   list-item heading and keeps top-level HTML source continued through literal
   quote markers
