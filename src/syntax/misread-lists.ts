@@ -785,7 +785,9 @@ export function misreadLists(document: Document): MisreadLists {
       const start = leaf.position.start.offset!;
       const line = source.slice(lineStart(start), lineAround(start)[1]);
       const task =
-        /^[ \t]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)+\[[^\]\r\n]\][ \t]+(`{3,}|~{3,})(.*)$/.exec(line);
+        /^[ \t]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)+\[[^\]\r\n]\][ \t]+(`{3,}|~{3,})([^\r\n]*)$/.exec(
+          line,
+        );
       if (!task || (task[1]![0] === "`" && task[2]!.includes("`"))) continue;
       boundaryText.add(
         stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }),
@@ -1112,7 +1114,7 @@ export function misreadLists(document: Document): MisreadLists {
         // view retain the preceding list's original indentation (#492).
         if (
           /^<!--/.test(child.value) &&
-          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+[^\r\n]*-->/.test(child.value)
+          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t][^\r\n]*-->/.test(child.value)
         )
           for (const marker of markersOf(list, lineOf(list))) itemHtml.add(marker);
         let next = index + 1;

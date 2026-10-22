@@ -105,6 +105,16 @@ export const boundaryFixtures = [
     source: "- [-] ``` x\n- *inside*\n",
   },
   {
+    issue: 488,
+    name: "task fence info containing a Unicode line separator",
+    source: "- [-] ``` x\u2028y\n- *inside*\n",
+  },
+  {
+    issue: 488,
+    name: "task fence info containing a Unicode paragraph separator",
+    source: "- [-] ``` x\u2029y\n- *inside*\n",
+  },
+  {
     issue: 496,
     name: "quoted continuation block in a footnote",
     source:
