@@ -360,6 +360,116 @@ describe("Obsidian Live Preview normalizer", () => {
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
 
+  describe("heading and normalized-empty records (#544, #545)", () => {
+    const normalized = (lines: unknown[]) =>
+      (livePreview as (lines: unknown[]) => string[])(structuredClone(lines));
+    const line = (text: string, kind = "", classes = "") => ({
+      kind,
+      runs: [[classes, text]],
+    });
+    const blank = { kind: "", runs: [] };
+    const heading = (text: string, level = 1) =>
+      line(text, `HyperMD-header HyperMD-header-${level}`, `cm-header-${level}`);
+
+    it.each([
+      ["=", 1, "HyperMD-header HyperMD-header-1"],
+      ["===", 1, "HyperMD-header-line HyperMD-header-line-1"],
+      ["---", 2, "HyperMD-header-line HyperMD-header-line-2"],
+    ] as const)(
+      "ignores the actual styled %s underline without adding a heading",
+      (marker, level, kind) => {
+        // Obsidian 1.14.4 gives a single = the native heading kind, unlike ===.
+        const underline = line(
+          marker,
+          kind,
+          `cm-formatting cm-formatting-header cm-formatting-header-${level} cm-header-${level}`,
+        );
+        const first = heading("alpha", level);
+        const second = heading("beta", level);
+        expect(normalized([first, underline])).toEqual(normalized([first]));
+        expect(normalized([first, underline, second, underline])).toEqual(
+          normalized([first, blank, second]),
+        );
+        expect(normalized([first, underline, second, underline])).toHaveLength(2);
+      },
+    );
+
+    it("retains native empty headings, literal equals content, levels, and styles", () => {
+      const first = heading("alpha");
+      const empty = { kind: first.kind, runs: [] };
+      expect(normalized([empty, first])).toHaveLength(2);
+      expect(normalized([empty, first])).not.toEqual(normalized([first]));
+      expect(normalized([heading("=")])).not.toEqual(normalized([empty]));
+      expect(normalized([first, heading("beta")])).not.toEqual(normalized([heading("alpha beta")]));
+      expect(normalized([first, heading("beta")])).not.toEqual(
+        normalized([first, heading("beta", 2)]),
+      );
+      const emphasized = line("beta", first.kind, "cm-em cm-header-1");
+      const strong = line("beta", first.kind, "cm-header-1 cm-strong");
+      expect(normalized([first, emphasized])).not.toEqual(normalized([first, strong]));
+    });
+
+    it("omits only normalized-empty unstyled records after preserving paragraph splits", () => {
+      const before = line("before");
+      const after = line("after");
+      expect(normalized([line("***")])).toEqual([]);
+      expect(normalized([before, blank, line("---"), blank, after])).toEqual(
+        normalized([before, blank, after]),
+      );
+      expect(normalized([before, blank, line("---"), blank, after])).toHaveLength(2);
+      expect(normalized([before, line("***"), after])).not.toEqual(
+        normalized([before, blank, line("---"), blank, after]),
+      );
+      // The reduced raw-HTML failure already has a blank before the marker.
+      expect(normalized([before, blank, line("***"), after])).toEqual(
+        normalized([before, blank, line("---"), blank, after]),
+      );
+    });
+
+    it.each(["cm-inline-code", "cm-highlight", "cm-strikethrough"])(
+      "retains punctuation with the visible %s style",
+      (classes) => {
+        expect(normalized([line("=", "", classes)])).toHaveLength(1);
+        expect(normalized([line("=", "", classes)])).not.toEqual(
+          normalized([line("-", "", classes)]),
+        );
+      },
+    );
+
+    it("retains code, structural empty records, widgets, and embed payloads", () => {
+      expect(normalized([line("=", "HyperMD-codeblock")])).not.toEqual(
+        normalized([line("-", "HyperMD-codeblock")]),
+      );
+      expect(normalized([{ kind: "HyperMD-codeblock", runs: [] }])).toHaveLength(1);
+      expect(normalized([{ kind: "HyperMD-hr", runs: [] }])).toHaveLength(1);
+      for (const widget of ["", "cm-table-widget"])
+        expect(normalized([{ widget, html: "" }])).toHaveLength(1);
+      expect(normalized([line("first.png", "", " embed")])).not.toEqual(
+        normalized([line("second.png", "", " embed")]),
+      );
+    });
+  });
+
+  it("ignores terminal styled fence separators while retaining code and metadata (#533)", () => {
+    const line = (
+      value: string,
+      kind = "HyperMD-codeblock-begin",
+      classes = "cm-formatting cm-formatting-code-block",
+    ) => ({
+      kind: `HyperMD-codeblock ${kind}`,
+      runs: [[classes, value]],
+    });
+    expect(livePreview([line("~~~js  \t")])).toEqual(livePreview([line("```js")]));
+    expect(livePreview([line("~~~ \t", "HyperMD-codeblock-end")])).toEqual(
+      livePreview([line("```", "HyperMD-codeblock-end")]),
+    );
+    expect(livePreview([line("~~~js one  two")])).not.toEqual(livePreview([line("```js one two")]));
+    expect(livePreview([line("x  ", "", "")])).not.toEqual(livePreview([line("x", "", "")]));
+    expect(livePreview([line("~~~js  ", "HyperMD-codeblock-begin", "")])).not.toEqual(
+      livePreview([line("~~~js", "HyperMD-codeblock-begin", "")]),
+    );
+  });
+
   it("retains empty unchecked checkbox widgets and their count (#522)", () => {
     const task = {
       kind: "HyperMD-list-line HyperMD-list-line-1 HyperMD-task-line",

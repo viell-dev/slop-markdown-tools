@@ -1,7 +1,7 @@
 import type { Nodes } from "mdast";
 import { describe, expect, it } from "vitest";
 import { format, lint, parse, range, semanticFingerprint } from "../../src/index.js";
-import type { Config, Dialect } from "../../src/index.js";
+import type { Config, Dialect, Plugin } from "../../src/index.js";
 import { githubMathContinuations, mathCases, obsidianMathCases } from "./math-renderers.js";
 import type { MathRenderer } from "./math-renderers.js";
 
@@ -88,6 +88,94 @@ describe("dollar math, compared with what the renderers render", () => {
 });
 
 describe("where dollar math begins and ends", () => {
+  // Observed in both live GitHub Markdown API modes on 2026-10-22. A table
+  // must get the chance to recognize its header and rows before display math.
+  it.each([
+    "| a |\n| - |\n| b |\n$$\nx\n$$\n",
+    "| a |\n| - |\n$$\nx\n$$\n",
+    "| a |\n| - |\n| b |\n   $$\n   x\n   $$\n",
+    "| a |\n| - |\n| b |\n$$x$$\n",
+    "$$ |\n-- |\nx\n$$\n",
+    "$$ | a\n-- | --\nx | y\n$$\n",
+    "> | a |\n> | - |\n> | b |\n> $$\n> x\n> $$\n",
+    "- | a |\n  | - |\n  | b |\n  $$\n  x\n  $$\n",
+    "- > | a |\n  > | - |\n  > | b |\n  > $$\n  > x\n  > $$\n",
+  ])("keeps GitHub table precedence for %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      const { tree } = parse(input, "github");
+      const tables: Nodes[] = [];
+      const maths: Nodes[] = [];
+      const visit = (node: Nodes) => {
+        if (node.type === "table") tables.push(node);
+        if (node.type === "math") maths.push(node);
+        if ("children" in node) node.children.forEach(visit);
+      };
+      visit(tree);
+      expect(tables).toHaveLength(1);
+      expect(maths).toEqual([]);
+      const options = { config: { extends: ["recommended", "github"] } };
+      const result = format(input, options);
+      expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+      expect(format(result.output, options).output).toBe(result.output);
+      expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+        semanticFingerprint(parse(input, "github")),
+      );
+      expect(format(input, { config: { extends: [], dialect: "github" } }).output).toBe(input);
+    }
+  });
+
+  it("still ends GitHub tables at blank lines, indentation and container exits", () => {
+    for (const source of [
+      "| a |\n| - |\n| b |\n\n$$\nx\n$$\n",
+      "| a |\n| - |\n| b |\n  \n$$\nx\n$$\n",
+      "| a |\n| - |\n| b |\n\t\n$$\nx\n$$\n",
+      "> | a |\n> | - |\n> | b |\n$$\nx\n$$\n",
+      "- | a |\n  | - |\n  | b |\n$$\nx\n$$\n",
+    ])
+      expect(parse(source, "github").tree.children.at(-1)?.type).toBe("math");
+    expect(
+      parse("| a |\n| - |\n| b |\n    $$\n    x\n    $$\n", "github").tree.children.at(-1)?.type,
+    ).toBe("code");
+  });
+
+  it("finds column diagnostics in dollar rows instead of hiding them in math", () => {
+    const config: Config = {
+      extends: [],
+      dialect: "github",
+      rules: { "content/table-columns": "error" },
+    };
+    expect(lint("| a | b |\n| - | - |\n| c | d |\n$$\nx\n$$\n", { config })).toHaveLength(3);
+    expect(lint("| a |\n| - |\n| b |\n$$\nx | y\n$$\n", { config })).toHaveLength(1);
+  });
+
+  it("rejects a plugin separating table rows into display math", () => {
+    const source = "| a |\n| - |\n| b |\n$$\nx\n$$\n";
+    const plugin: Plugin = {
+      name: "split",
+      rules: {
+        dollars: {
+          kind: "style",
+          description: "Separate dollar lines",
+          check: ({ document }) => {
+            const start = document.source.indexOf("$$");
+            return document.source.slice(0, start).endsWith("\n\n")
+              ? []
+              : [{ start, message: "Separate", edit: { start, end: start, text: "\n" } }];
+          },
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "github", rules: { "split/dollars": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ rule: "engine/unsafe-format", severity: "error" }),
+    );
+  });
+
   it.each(githubMathContinuations)(
     "keeps dollar lines in their GitHub $type instead of interrupting it",
     ({ type, source }) => {

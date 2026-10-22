@@ -44,6 +44,109 @@ it("scans a shared Obsidian table-row region once (#505)", () => {
   ).toBeLessThan(10);
 });
 
+it.each([
+  { name: "independent", shared: false },
+  { name: "shared", shared: true },
+])("scans $name top-level HTML continuations proportionally (#546)", ({ shared }) => {
+  // Many roots exercise constant-time identity lookup; a single continuation
+  // must visit each gap once. Parse distinct trees before timing so neither
+  // the parser's work nor the range cache hides the continuation scan.
+  const raw = "<div></div>\n \n> first\n>\n> *literal*\n";
+  const unit = shared ? `${raw} \n` : `${raw}\nAfter *safe*.\n\n`;
+  const shown = [
+    [raw.indexOf("\n>\n") + 1, 1],
+    [raw.indexOf("*literal*"), "*literal*".length],
+  ] as const;
+  const sizes = [800, 3200] as const;
+  // Parse each real fixture once. These HTML/text/emphasis trees carry all
+  // guard inputs in their own fields; cloning preserves their source positions.
+  // Every timed call still gets a fresh tree, so the range cache cannot hide work.
+  const templates = new Map<number, Document>(
+    sizes.map((count) => {
+      const source = unit.repeat(count) + (shared ? "\nAfter *safe*.\n" : "");
+      return [count, parse(source, "obsidian")] as const;
+    }),
+  );
+  expect(
+    scaling(
+      sizes,
+      (count) => {
+        const template = templates.get(count)!;
+        return { document: { ...template, tree: structuredClone(template.tree) }, count };
+      },
+      ({ document }) => misreadLists(document),
+      (result, { document, count }) => {
+        const ranges = [...result.htmlText]
+          .map((node) => [node.position!.start.offset!, node.position!.end.offset!] as const)
+          .sort(([a], [b]) => a - b);
+        let next = 0;
+        let end = 0;
+        let allProtected = true;
+        // Bare quote-only gaps have no parsed leaf, but are literal HTML text too.
+        for (let index = 0; index < count; index++)
+          for (const [relative, length] of shown) {
+            const start = index * unit.length + relative;
+            while (next < ranges.length && ranges[next]![0] <= start)
+              end = Math.max(end, ranges[next++]![1]);
+            if (end < start + length) allProtected = false;
+          }
+        expect(allProtected).toBe(true);
+        expect(result.htmlCodeToEnd).toBe(false);
+        const outside = document.source.lastIndexOf("After *safe*.");
+        expect(outside).toBeGreaterThan(0);
+        expect(
+          [...result.htmlText].some(
+            (node) =>
+              node.position!.start.offset! <= outside && outside < node.position!.end.offset!,
+          ),
+        ).toBe(false);
+      },
+      4,
+    ),
+  ).toBeLessThan(10);
+  // This fixture has no ticks: each native lookup searches its whole remaining
+  // receiver. Observe the real guard after timing to reject the former unbounded
+  // suffix search even when native search is too fast to dominate elapsed time.
+  const work = sizes.map((count) => {
+    const template = templates.get(count)!;
+    const document = { ...template, tree: structuredClone(template.tree) };
+    // Called with an explicit receiver below, then restored in finally.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const native = String.prototype.indexOf;
+    let volume = 0;
+    let unexpected = false;
+    let result: ReturnType<typeof misreadLists> | undefined;
+    try {
+      String.prototype.indexOf = function (this: string, needle: string, from = 0) {
+        const found = native.call(this, needle, from);
+        if (needle === "\u0060") {
+          unexpected ||= found !== -1 || !Number.isInteger(from) || from < 0;
+          volume += Math.max(0, this.length - Math.min(this.length, from));
+        }
+        return found;
+      };
+      result = misreadLists(document);
+    } finally {
+      String.prototype.indexOf = native;
+    }
+    // Restore before assertions or the comparison guard can make other calls.
+    expect(unexpected).toBe(false);
+    const expected = misreadLists(template);
+    // Both traversals preserve insertion order. Comparing arrays retains every
+    // node field without unordered Set equality revisiting all pairs of nodes.
+    for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
+      const actualValue = result[key];
+      const expectedValue = expected[key];
+      expect(typeof actualValue === "boolean" ? actualValue : [...actualValue]).toEqual(
+        typeof expectedValue === "boolean" ? expectedValue : [...expectedValue],
+      );
+    }
+    expect(volume).toBeGreaterThan(0);
+    return volume;
+  });
+  expect(work[1]! / work[0]!).toBeLessThan(6);
+});
+
 function formatted(source: string, options: ProcessOptions = {}) {
   const result = format(source, options);
   expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);

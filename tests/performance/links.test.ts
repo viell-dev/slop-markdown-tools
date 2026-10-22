@@ -73,10 +73,13 @@ function unclosedHeadings(count: number) {
     }),
   };
 }
-it("reads closed HTML headings and omits the last unclosed one", () => {
+it("reads closed HTML headings and reports the last unclosed one as uncertain", () => {
   const { workspace: hostile } = unclosedHeadings(50000);
   expect(hostile.resolve("Doc.md", "Note.md#x", "github").fragmentExists).toBe(true);
-  expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github").fragmentExists).toBe(false);
+  expect(hostile.resolve("Doc.md", "Note.md#x-49999", "github")).toMatchObject({
+    status: "unreadable",
+    fragmentIncomplete: true,
+  });
 });
 
 it("reads unclosed headings with linear scaling", () => {
@@ -86,9 +89,9 @@ it("reads unclosed headings with linear scaling", () => {
       unclosedHeadings,
       ({ workspace, count }) => [
         workspace.resolve("Doc.md", "Note.md#x", "github").fragmentExists,
-        workspace.resolve("Doc.md", `Note.md#x-${count - 1}`, "github").fragmentExists,
+        workspace.resolve("Doc.md", `Note.md#x-${count - 1}`, "github").fragmentIncomplete,
       ],
-      (found) => expect(found).toEqual([true, false]),
+      (found) => expect(found).toEqual([true, true]),
     ),
   ).toBeLessThan(10);
 });

@@ -1,6 +1,6 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
-import { labelEnd, startsWithMarker } from "./parse.js";
+import { labelEnd, range, startsWithMarker } from "./parse.js";
 import {
   capturedLineBreak,
   lineBreak as lineEndingPattern,
@@ -88,7 +88,8 @@ export interface MisreadLists {
    * each range spans both views' raw regions, through their later terminator
    * or EOF, starting at the HTML opener (issue #428).
    * An inline HTML opener can carry Live Preview's raw state across blocks
-   * too, through its closer or EOF (issue #435).
+   * too, through its closer or EOF (issue #435). In root HTML, an unclosed
+   * child can retain that state after the parent's closer (issue #556).
    */
   htmlText: ReadonlySet<Nodes>;
   /**
@@ -100,9 +101,19 @@ export interface MisreadLists {
    * #434); and paragraphs in a block quote or list item
    * with a lazy line of `=` or `-`, which Reading view reads as an underline
    * (issue #377). Each counts from the line break before the underline to the
-   * end of its line.
+   * end of its line. Also the final text line before a compact hyphen break
+   * outside its container: a quote's lazy continuation, or a list's second
+   * or later continuation after an earlier lazy line. Its range runs from
+   * the prior break through the underline, including any inline node that
+   * crosses that break, preserving the physical heading line (#554).
    */
   underlines: ReadonlySet<Nodes>;
+  /**
+   * Zero-based physical line indexes of earlier lazy list continuations
+   * that supply the final Live Preview heading before an external hyphen
+   * break (#554). Narrowing a list item's content column must keep them lazy.
+   */
+  headingLazyLines: ReadonlySet<number>;
   /**
    * In the Obsidian dialect, the blocks that Reading view reads as more of a
    * paragraph above them, across lines of blank space that hold a tab at or
@@ -192,10 +203,28 @@ export interface MisreadLists {
    * line with a pipe above a list item that reads as a delimiter row, as
    * `x | y` and `- | -` do, which Reading view reads as a table. Each counts
    * from the line break or line where Obsidian's reading starts to differ.
+   * Also the final physical table line directly above a compact hyphen
+   * break, which Live Preview displays as a heading: its final body row,
+   * or its delimiter when it has no body. That line's preceding break and
+   * the underline count too (#553).
+   * A body row that changes its header's leading-pipe convention, or has
+   * only its leading pipe, begins a protected suffix too: adding borders
+   * can otherwise absorb native paragraph text into the table (#558).
    */
   tableText: ReadonlySet<Nodes>;
-  /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
+  /**
+   * Obsidian footnote, task-fence, and cross-block emphasis boundaries
+   * (#488, #493–#496, #506, #507), plus an earlier lazy list line's preceding
+   * break and margin through its first character or containing inline node
+   * where that boundary makes a later final line a Live Preview heading (#554).
+   */
   boundaryText: ReadonlySet<Nodes>;
+  /**
+   * Lists whose markers and indentation affect continuations outside their
+   * parsed container, including a lazy paragraph after a heading (#513, #543).
+   * Inline formatting remains safe; the structural list unit stays as written.
+   */
+  boundaryLists: ReadonlySet<List>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -377,6 +406,7 @@ export function misreadLists(document: Document): MisreadLists {
   const unclosedCode = new Set<Nodes>();
   let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
+  const headingLazyLines = new Set<number>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
   const definitionCode = new Set<Nodes>();
@@ -386,6 +416,7 @@ export function misreadLists(document: Document): MisreadLists {
   const itemHtml = new Set<Nodes>();
   const commentText = new Set<Nodes>();
   const boundaryText = new Set<Nodes>();
+  const boundaryLists = new Set<List>();
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     const quotedLeaves = new Set<Nodes>();
@@ -456,14 +487,33 @@ export function misreadLists(document: Document): MisreadLists {
     };
     /** Footnote definitions that Reading view reads as paragraph text. */
     const joined = new Set<Nodes>();
+    const lines = source.split(lineEndingPattern);
+    // A joined footnote can end in HTML, a heading, or code in the primary
+    // parse while still continuing its preceding Reading paragraph (#549, #551).
+    // Only physical empty or space-only lines establish a boundary here:
+    // tabs can continue Reading text (#398), so keep uncertain tab contexts.
+    // Share one lazy prefix across overlapping footnote/table ranges.
+    const footnoteBlanks = [0];
+    const continuesFootnoteParagraph = (leaf: Nodes): boolean => {
+      const footnote = inFootnotes.get(leaf);
+      if (!footnote?.position || !leaf.position || !joined.has(footnote)) return false;
+      while (footnoteBlanks.length <= leaf.position.end.line)
+        footnoteBlanks.push(
+          footnoteBlanks.at(-1)! + Number(/^ *$/.test(lines[footnoteBlanks.length - 1] ?? "")),
+        );
+      return (
+        footnoteBlanks[leaf.position.end.line] === footnoteBlanks[footnote.position.start.line - 1]
+      );
+    };
     for (const [footnote, count] of footnotes) {
       const previous = order[count - 1]?.[0];
       // A definition below another that is text, as `[^1]: a` and `[^2]: b`
-      // below `Text` are, is text too.
+      // below `Text` are, is text too, even after a non-paragraph leaf
+      // of the first definition while its Reading paragraph stays open (#551).
       const around = previous && inFootnotes.get(previous);
       if (
-        previous?.type === "paragraph" &&
-        (around === undefined || joined.has(around)) &&
+        ((previous?.type === "paragraph" && (around === undefined || joined.has(around))) ||
+          (previous !== undefined && continuesFootnoteParagraph(previous))) &&
         previous.position &&
         footnote.position &&
         previous.position.end.line === footnote.position.start.line - 1
@@ -513,7 +563,6 @@ export function misreadLists(document: Document): MisreadLists {
       openFences.add(stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }));
       break;
     }
-    const lines = source.split(lineEndingPattern);
     /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
     const spaced = (number: number) => {
       const line = lines[number - 1] ?? "";
@@ -525,12 +574,19 @@ export function misreadLists(document: Document): MisreadLists {
      * Leaf blocks count, not containers, because an empty line inside a list
      * ends the HTML block there.
      */
+    const topHtml = new Set<Nodes>(document.tree.children.filter((node) => node.type === "html"));
     let open = false;
+    let topLevel = false;
+    let topUntil = 0;
+    // A top-level HTML block reads quote markers literally. Only a physical
+    // empty line ends that reading; a contained block can consume its prefixes.
+    const continuesHtml = (number: number) =>
+      topLevel ? (lines[number - 1] ?? "").length > 0 : spaced(number);
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       if (open && previous?.position && leaf.position) {
         for (let line = previous.position.end.line + 1; line < leaf.position.start.line; line++)
-          if (!spaced(line)) open = false;
+          if (!continuesHtml(line)) open = false;
         if (open) {
           // From the start of its line: a list item's marker there, `- ` in
           // `- *a*`, is text of the HTML block too.
@@ -548,7 +604,7 @@ export function misreadLists(document: Document): MisreadLists {
             source
               .slice(offset, leaf.position.end.offset)
               .split(lineEndingPattern)
-              .some((line) => /^[>]*$/.test(line))
+              .some((line) => (topLevel ? line.length === 0 : /^[>]*$/.test(line)))
           ) {
             openFences.add(stretch(leaf, start, { ...leaf.position.end, offset: source.length }));
             htmlCodeToEnd = true;
@@ -556,15 +612,25 @@ export function misreadLists(document: Document): MisreadLists {
         }
       }
       // Other HTML blocks end at their own end marker, as a comment does at `-->`.
-      if (
-        !open &&
-        leaf.type === "html" &&
-        leaf.position &&
-        !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
-          leaf.value.trimStart(),
-        )
-      )
-        open = spaced(leaf.position.end.line + 1);
+      if (!open && leaf.position && blankTerminatedHtml(leaf)) {
+        topLevel = topHtml.has(leaf);
+        open = continuesHtml(leaf.position.end.line + 1);
+        if (open && topLevel && leaf.position.start.offset! >= topUntil) {
+          // Empty quotes have no leaves in `order`, but their literal markers
+          // are still Reading-view HTML text. Protect the whole continuation,
+          // independently of Live Preview's code/HTML union. Each root inside
+          // that span is covered once, including gaps with no leaf at all.
+          let end = leaf.position.end;
+          for (let cursor = lineBreak(source, end.offset!); cursor < source.length;) {
+            const from = cursor + (source.startsWith("\r\n", cursor) ? 2 : 1);
+            cursor = lineBreak(source, from);
+            if (cursor === from) break;
+            end = { offset: cursor, line: end.line + 1, column: cursor - from + 1 };
+          }
+          topUntil = end.offset!;
+          htmlText.add(stretch(leaf, leaf.position.start, end));
+        }
+      }
     });
     /**
      * Whether line `number`, counted from 1, holds blank space and block quote
@@ -909,6 +975,38 @@ export function misreadLists(document: Document): MisreadLists {
       }
       return last.type === "heading";
     };
+    /** Whether a source line holds a pipe that no backslash escapes. */
+    const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
+    /** Ordered structural units still open at a container's trailing boundary. */
+    const retainTrailingLists = (node: Nodes) => {
+      const pending = [node];
+      while (pending.length) {
+        const last = pending.pop()!;
+        if (last.type === "list") {
+          if (last.ordered) boundaryLists.add(last);
+          else {
+            const item = last.children.at(-1);
+            if (item) pending.push(item);
+          }
+        } else if (
+          last.type === "blockquote" ||
+          last.type === "footnoteDefinition" ||
+          last.type === "listItem"
+        ) {
+          let index = last.children.length - 1;
+          // Reading view can retain these quotes inside an earlier ordered
+          // item even when the primary tree makes them siblings. Retain both
+          // units rather than inferring independence from that tree (#543).
+          while (
+            last.children[index]?.type === "blockquote" ||
+            last.children[index]?.type === "footnoteDefinition"
+          )
+            pending.push(last.children[index--]!);
+          const list = last.children[index];
+          if (list?.type === "list") pending.push(list);
+        }
+      }
+    };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
@@ -917,17 +1015,189 @@ export function misreadLists(document: Document): MisreadLists {
           child.position &&
           previous.position.end.line === child.position.start.line - 1
         ) {
+          // A compact hyphen break can underline the last physical row in
+          // Live Preview, where the parser and Reading view keep a table.
+          // Its pipes and padding display as heading text, so keep that
+          // physical source line and both boundaries as written.
+          if (
+            previous.type === "table" &&
+            child.type === "thematicBreak" &&
+            /^-{3,}[ \t]*$/.test(source.slice(...range(child)))
+          ) {
+            // The delimiter is the final physical line without a body row;
+            // the header's child position would protect the wrong line.
+            tableText.add(
+              breakBefore(
+                previous,
+                lineAround(previous.position.end.offset!)[0],
+                child.position.end.offset!,
+              ),
+            );
+          }
+          // A view underlines a final text line after a lazy continuation
+          // where the parser closes its container before a hyphen break. Retain
+          // that physical line and both boundaries: merely keeping its final
+          // newline would still allow wrapping to split the displayed title.
+          if (
+            child.type === "thematicBreak" &&
+            /^-{3,}[ \t]*$/.test(source.slice(...range(child)))
+          ) {
+            let listed = false;
+            let quoted = false;
+            let last: Nodes = previous;
+            while (
+              last.type === "list" ||
+              last.type === "listItem" ||
+              last.type === "blockquote" ||
+              last.type === "footnoteDefinition"
+            ) {
+              if (last.type === "list") listed = true;
+              if (last.type === "blockquote") quoted = true;
+              const next: Nodes | undefined = last.children.at(-1);
+              if (!next) break;
+              last = next;
+            }
+            if (
+              last !== previous &&
+              last.type === "paragraph" &&
+              last.position &&
+              (quoted || listed) &&
+              last.position.start.line < last.position.end.line &&
+              last.position.end.line === child.position.start.line - 1
+            ) {
+              const [from, to] = lineAround(last.position.end.offset!);
+              const prefix = /^[ \t>]*/.exec(source.slice(from, to))![0].length;
+              const opening = source.slice(
+                lineAround(last.position.start.offset!)[0],
+                last.position.start.offset,
+              );
+              const contentColumn = columnAt(last.position.start.offset!);
+              const missingQuote =
+                quoted &&
+                (source.slice(from, from + prefix).match(/>/g)?.length ?? 0) <
+                  (opening.match(/>/g)?.length ?? 0);
+              const later = listed
+                ? laterLines(last.position.start.offset!, last.position.end.offset!)
+                : [];
+              const lazy =
+                later.length > 1
+                  ? later.find(([start, end]) => {
+                      const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
+                      return columnAt(start + margin) < contentColumn;
+                    })
+                  : undefined;
+              const lazyList = lazy !== undefined && lazy[0] < from;
+              if (missingQuote || lazyList) {
+                const parts = last.children;
+                const inlineAt = (at: number) =>
+                  parts.find(
+                    (node) =>
+                      node.type !== "text" &&
+                      node.position?.start.offset !== undefined &&
+                      node.position.end.offset !== undefined &&
+                      node.position.start.offset <= at &&
+                      node.position.end.offset > at,
+                  );
+                const across = inlineAt(from - 1);
+                // Paired inline syntax crossing that newline stays whole.
+                underlines.add(
+                  stretch(child, {
+                    ...child.position.start,
+                    offset: Math.min(from - 1, across?.position?.start.offset ?? from - 1),
+                  }),
+                );
+                if (lazyList) {
+                  // later[0] is the physical line after the paragraph's
+                  // start, so this sum is its zero-based line index.
+                  headingLazyLines.add(last.position.start.line + later.indexOf(lazy));
+                  const [start, end] = lazy;
+                  const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
+                  // That earlier lazy margin supplies the heading's context.
+                  // Reflow can keep the final line as an exact common suffix
+                  // while indenting this one. Include its first character so
+                  // an insertion at the content's start is inside the range.
+                  const first = start + margin;
+                  // Keep paired markers together if that character belongs
+                  // to inline syntax, including a span opened on an earlier
+                  // line. Suppressing just one delimiter is not a safe edit.
+                  const inline = inlineAt(first);
+                  boundaryText.add(
+                    stretch(
+                      last,
+                      {
+                        ...last.position.start,
+                        offset: Math.min(start - 1, inline?.position?.start.offset ?? start - 1),
+                      },
+                      {
+                        ...last.position.end,
+                        offset: Math.max(first + 1, inline?.position?.end.offset ?? first + 1),
+                      },
+                    ),
+                  );
+                }
+              }
+            }
+          }
           if (
             (previous.type === "footnoteDefinition" || previous.type === "blockquote") &&
             child.type === "list" &&
             child.ordered &&
             child.start !== 1
-          )
+          ) {
             boundaryText.add(stretch(child, previous.position.end));
+            // Reading view can continue the earlier list across the missing
+            // container prefix. Either delimiter direction can join or split
+            // it, so keep that list's structural unit, including nested lists,
+            // while allowing safe inline changes (#543).
+            retainTrailingLists(previous);
+          }
+          // An unpiped table row starts paragraph text in Reading view. A
+          // non-one ordered list cannot interrupt it (#532). Retain the list
+          // and separating break: its later items can still continue that
+          // paragraph, and an empty item may have no leaf in `order` at all.
+          if (
+            previous.type === "table" &&
+            child.type === "list" &&
+            child.ordered &&
+            (child.start ?? 1) !== 1 &&
+            source
+              .slice(...range(previous))
+              .split(lineEndingPattern)
+              .slice(2)
+              .some((row) => !piped(row))
+          )
+            boundaryText.add(
+              stretch(child, {
+                ...previous.position.end,
+                offset: previous.position.end.offset! - 1,
+              }),
+            );
           // Reading view retains an unindented paragraph directly below a
           // heading in a list's last item, where the parser ends that list (#513).
-          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph")
-            boundaryText.add(stretch(child, previous.position.end));
+          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph") {
+            let end = child.position.end;
+            const next = parent.children[index + 1];
+            if (
+              next?.type === "list" &&
+              next.position &&
+              next.position.start.line === child.position.end.line + 1
+            ) {
+              // A blank before the next item changes the host list's
+              // tightness, and independent marker changes can merge runs.
+              boundaryLists.add(previous);
+              boundaryLists.add(next);
+              const marker = listMarker.exec(
+                source.slice(next.position.start.offset, next.position.start.offset! + 11),
+              );
+              const length = marker?.[0].length ?? 1;
+              end = {
+                ...next.position.start,
+                offset: next.position.start.offset! + length,
+                column: next.position.start.column + length,
+              };
+            }
+            boundaryText.add(stretch(child, previous.position.end, end));
+          }
           if (
             previous.type === "paragraph" &&
             child.type === "blockquote" &&
@@ -951,7 +1221,7 @@ export function misreadLists(document: Document): MisreadLists {
       if (code?.toEnd) htmlCodeToEnd = true;
       return code;
     };
-    const htmlRoots: [Nodes, boolean][] = [];
+    const htmlRoots: [Nodes, boolean, number?][] = [];
     const inlineHtml = (node: Nodes) => {
       if (node.type === "html" && /^<[a-z][a-z0-9-]*(?=[\s/>])/i.test(node.value))
         htmlRoots.push([node, false]);
@@ -959,6 +1229,11 @@ export function misreadLists(document: Document): MisreadLists {
     };
     for (const [leaf] of order) {
       if (containerHtml.has(leaf)) htmlRoots.push([leaf, true]);
+      // Root Reading protection above already handles physical continuations.
+      // Start Live Preview with only the parsed HTML extent: a closed root
+      // must not pull genuine later fences into its inline-code scan (#529).
+      else if (topHtml.has(leaf) && leaf.position)
+        htmlRoots.push([leaf, true, leaf.position.end.offset!]);
       else if ("children" in leaf) leaf.children.forEach(inlineHtml);
     }
     // Source positions for the extended raw regions. Build once, not once per
@@ -972,11 +1247,11 @@ export function misreadLists(document: Document): MisreadLists {
       while (line + 1 < starts.length && starts[line + 1]! <= offset) line++;
       return { offset, line: line + 1, column: offset - starts[line]! + 1 };
     };
-    for (const [leaf, block] of htmlRoots) {
+    for (const [leaf, block, rootEnd] of htmlRoots) {
       if (!leaf.position) continue;
       const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
       if (start < htmlUntil) continue;
-      const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block);
+      const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block, rootEnd);
       htmlUntil = until;
       if (block && until <= end) continue;
       htmlText.add({
@@ -1290,8 +1565,6 @@ export function misreadLists(document: Document): MisreadLists {
       ...node,
       position: { ...node.position!, start: { ...node.position!.start, offset: start } },
     });
-    /** Whether `line` holds a pipe that no backslash escapes. */
-    const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
     const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
     const delimiterRow = (line: string) => {
@@ -1330,6 +1603,9 @@ export function misreadLists(document: Document): MisreadLists {
       // text: the next table belongs to that same paragraph (#489).
       const below =
         (previous?.type === "paragraph" ||
+          (leaf.type === "table" &&
+            previous !== undefined &&
+            continuesFootnoteParagraph(previous)) ||
           (previous?.type === "heading" &&
             paragraphHeadingEnds.has(previous.position?.end.offset))) &&
         previous.position !== undefined &&
@@ -1346,7 +1622,10 @@ export function misreadLists(document: Document): MisreadLists {
         } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
           tableText.add(startingAt(leaf, lineStart(start)));
         else {
-          // The rows from the first without a pipe, from the line break above it.
+          // Keep the physical row convention of the header. Either view ends
+          // a bordered table before an unbordered row, or before a leading
+          // pipe with no second divider, even when GFM keeps that row (#558).
+          const bordered = /^[ \t>]*\|/.test(rows[0]!);
           const parts = source.slice(start, end).split(capturedLineBreak);
           for (let part = 0, at = start; part < parts.length; part += 2) {
             // A missing leading pipe on a header or delimiter changes where
@@ -1357,7 +1636,11 @@ export function misreadLists(document: Document): MisreadLists {
               next !== undefined &&
               (!/^[ \t>]*\|/.test(parts[part]!) || !/^[ \t>]*\|/.test(next)) &&
               delimiterRow(next);
-            if (part >= 4 && (!piped(parts[part]!) || newTable)) {
+            const leading = /^[ \t>]*\|/.exec(parts[part]!);
+            const rowBoundary = bordered
+              ? !leading || !piped(parts[part]!.slice(leading[0].length))
+              : leading !== null;
+            if (part >= 4 && (!piped(parts[part]!) || rowBoundary || newTable)) {
               tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
               break;
             }
@@ -1397,6 +1680,7 @@ export function misreadLists(document: Document): MisreadLists {
     htmlCodeToEnd,
     htmlText,
     underlines,
+    headingLazyLines,
     lazyItems,
     footnoteText,
     definitionCode,
@@ -1407,9 +1691,20 @@ export function misreadLists(document: Document): MisreadLists {
     itemHtml,
     commentText,
     boundaryText,
+    boundaryLists,
   };
   found.set(document.tree, result);
   return result;
+}
+
+/** Whether an HTML block ends at a blank line instead of an explicit marker. */
+function blankTerminatedHtml(node: Nodes): boolean {
+  return (
+    node.type === "html" &&
+    !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
+      node.value.trimStart(),
+    )
+  );
 }
 
 /**
@@ -1439,12 +1734,13 @@ const voidHtml = new Set([
   "wbr",
 ]);
 
-/** The union's last line for block HTML, or the exact Live Preview inline HTML end. */
+/** Both views' contained HTML union, or Live Preview's inline/root HTML end. */
 function obsidianHtmlEnd(
   source: string,
   start: number,
   codeEnd: (at: number) => HtmlCode | undefined,
   block = true,
+  rootEnd?: number,
 ): number {
   // Only the opening token's prefix is needed here. Inline roots on one long
   // line must not repeatedly search or copy the remaining physical-line suffix.
@@ -1460,8 +1756,8 @@ function obsidianHtmlEnd(
           : /^<![A-Za-z]/.test(first)
             ? ">"
             : undefined;
-  let reading = block ? lineBreak(source, start) : start + 1;
-  if (block && explicit) {
+  let reading = rootEnd ?? (block ? lineBreak(source, start) : start + 1);
+  if (block && rootEnd === undefined && explicit) {
     const from = start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
     let end: number;
     if (typeof explicit === "string") {
@@ -1473,7 +1769,7 @@ function obsidianHtmlEnd(
       end = close ? close.index + close[0].length : source.length;
     }
     reading = lineBreak(source, end);
-  } else if (block) {
+  } else if (block && rootEnd === undefined) {
     let cursor = reading;
     while (cursor < source.length) {
       cursor += source.startsWith("\r\n", cursor) ? 2 : 1;
@@ -1490,7 +1786,9 @@ function obsidianHtmlEnd(
   // A later opener before Reading view's end, or on that closing source line,
   // can open another such region, including inside a separate parsed HTML leaf.
   // Quoted attribute values and comments cannot supply closing tags; void and
-  // self-closing tags need no closer. A mismatched closer ends its open stack.
+  // self-closing tags need no closer. Each ordinary closer consumes one open
+  // element, even when its name differs; it cannot close an entire ancestor
+  // stack (#556). Raw-text elements below still require their own closer.
   const stack: string[] = [];
   // Cache the physical line end: consecutive roots on that line must not
   // rescan its remaining suffix for every closing tag or explicit token.
@@ -1566,15 +1864,14 @@ function obsidianHtmlEnd(
     // its prefix. Quoted values above are each traversed only once as well.
     if (source[end] === "<") continue;
     cursor++;
-    // Container markers can stand inside a multiline tag's source. Without
-    // reconstructing that HTML token stream, retain the remaining source.
-    if (multiline) return source.length;
+    // Root-origin scans read physical HTML source beyond its parsed extent.
+    // Keep the conservative multiline fallback for inline/contained entries,
+    // whose source can include Markdown container prefixes.
+    if (multiline && rootEnd === undefined) return source.length;
     const raw = stack.at(-1);
     if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
-    if (closing) {
-      const matched = stack.lastIndexOf(name);
-      stack.length = matched < 0 ? 0 : matched;
-    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
+    if (closing) stack.pop();
+    else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
       stack.push(name);
     // Inline HTML resumes Markdown on the same line. Later parsed inline
     // roots are visited independently, preserving the Markdown between them
@@ -1643,14 +1940,18 @@ type Point = NonNullable<Nodes["position"]>["start"];
  */
 function backtickRuns(source: string, start: number, end: number): Run[] {
   const runs: Run[] = [];
-  for (let at = source.indexOf("`", start); at >= 0 && at < end;) {
+  // Bound the search itself: text without ticks must not repeatedly scan the
+  // rest of the document before discovering that the result lies past `end`.
+  const text = source.slice(start, end);
+  for (let found = text.indexOf("`"); found >= 0;) {
+    const at = start + found;
     let after = at;
     while (after < end && source[after] === "`") after++;
     let slashes = 0;
     while (source[at - 1 - slashes] === "\\") slashes++;
     const from = slashes % 2 === 0 ? at : at + 1;
     if (after > from) runs.push([from, after - from]);
-    at = source.indexOf("`", after);
+    found = text.indexOf("`", after - start);
   }
   return runs;
 }

@@ -24,7 +24,10 @@ import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
+import { githubAnchors } from "../workspace/anchors.js";
+import { githubHeadingLimit } from "../workspace/github-heading-source.js";
 import { misreadLists } from "../syntax/misread-lists.js";
+import { walk } from "../syntax/walk.js";
 import { lineBreak, lineStarts } from "../syntax/source.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
@@ -266,6 +269,12 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   if (plain) readings.push(misreadLists({ ...document, tree: plain }));
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
+  let githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
+  const githubReading = document.dialect === "github" && otherReading(document.tree);
+  if (githubReading) {
+    const limit = githubHeadingLimit({ ...document, tree: githubReading });
+    if (limit !== undefined) githubLimit = Math.min(githubLimit ?? limit, limit);
+  }
   for (const [start, end] of Array.from(
     readings.flatMap((misread) => [
       ...misread.text,
@@ -291,6 +300,13 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     if (last && start < last[1]) last[1] = Math.max(last[1], end);
     else blocks.push([start, end]);
   }
+  if (githubLimit !== undefined) {
+    // Merge with any existing ranges before the shared binary search.
+    while (blocks.length && blocks.at(-1)![0] >= githubLimit) blocks.pop();
+    const last = blocks.at(-1);
+    if (last && last[1] >= githubLimit) last[1] = document.source.length;
+    else blocks.push([githubLimit, document.source.length]);
+  }
   if (!blocks.length) return () => false;
   const { source } = document;
   const within = (from: number, to: number) => {
@@ -305,6 +321,13 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     return block !== undefined && from < block[1] && to > block[0];
   };
   return (edit) => {
+    if (
+      githubLimit !== undefined &&
+      edit.start === source.length &&
+      edit.end === edit.start &&
+      edit.text
+    )
+      return true;
     if (!within(edit.start, edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
     const { text } = edit;
@@ -544,6 +567,29 @@ function semanticTree(
   origins?: Map<unknown, Nodes>,
   codeValues?: WeakMap<Code, string>,
 ): unknown {
+  const githubHeadings = new Map<Nodes, string[]>();
+  const githubSources = new Map<Nodes, string>();
+  if (document.dialect === "github") {
+    const alternative = otherReading(document.tree);
+    for (const tree of alternative ? [document.tree, alternative] : [document.tree]) {
+      const reading = { ...document, tree };
+      githubAnchors(reading, (node, slug) => {
+        const headings = githubHeadings.get(node);
+        if (headings) headings.push(slug);
+        else githubHeadings.set(node, [slug]);
+      });
+      const limit = githubHeadingLimit(reading);
+      if (limit !== undefined) {
+        let recorded = false;
+        walk(tree, (node) => {
+          if (!recorded && node.type !== "root" && node.position?.start.offset === limit) {
+            githubSources.set(node, document.source.slice(limit));
+            recorded = true;
+          }
+        });
+      }
+    }
+  }
   const canonicalUrl = (url: string, wiki = false) => {
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
     // A target that is uncertain, because a directory could not be read, is not
@@ -575,6 +621,12 @@ function semanticTree(
       return link;
     }
     const result: Record<string, unknown> = {};
+    // Anchor differences belong to their heading/block, so a refusal names
+    // that source location instead of stopping at root-level metadata.
+    const headingSlugs = githubHeadings.get(node);
+    if (headingSlugs) result.githubAnchors = headingSlugs;
+    const headingSource = githubSources.get(node);
+    if (headingSource !== undefined) result.githubHeadingSource = headingSource;
     // Forgejo and Gitea read a heading's trailing `{...}` block as attributes,
     // character for character, where the tree holds ordinary inline content,
     // and generate the anchor from the heading's last line as written.

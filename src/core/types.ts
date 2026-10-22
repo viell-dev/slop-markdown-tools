@@ -111,7 +111,8 @@ export interface LinkResolution {
    * `unavailable`: the destination cannot be judged from files.
    * `unreadable` means that the target could not be checked, because the
    * workspace could not read what it would have to, or included text could not
-   * be fully checked; it is neither found nor known to be missing.
+   * be fully checked, or renderer-dependent heading boundaries are uncertain;
+   * it is neither found nor known to be missing.
    */
   status:
     "resolved" | "missing" | "ambiguous" | "external" | "unavailable" | "directory" | "unreadable";
@@ -125,10 +126,13 @@ export interface LinkResolution {
    * a fragment.
    */
   fragmentExists?: boolean;
+  /** The target was read, but structural HTML makes generated heading anchors uncertain. */
+  fragmentIncomplete?: true;
   /**
    * What could not be read and limits the result. With status `unreadable` it
-   * is the target file itself, when `target` is set and its content was needed
-   * to check the fragment, or else the directories that may hold the target.
+   * is the target file itself when reading it failed, or else the directories
+   * that may hold the target. An incomplete renderer-dependent fragment check
+   * sets `fragmentIncomplete` instead, without an unreadable file or directory.
    * With status `resolved` the target was found among the readable files, by an
    * Obsidian name search or in a place that Obsidian tries after one of these
    * directories. They may hold another match, or the one Obsidian would choose,

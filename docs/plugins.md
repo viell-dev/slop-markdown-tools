@@ -164,24 +164,28 @@ export default {
 
 The result's `status` is one of:
 
-| Status        | Meaning                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
-| `resolved`    | One file matches. `target` is its path from the workspace root.                                               |
-| `missing`     | No file matches.                                                                                              |
-| `ambiguous`   | Several files match and nothing decides between them, such as two notes whose names differ only by case.      |
-| `directory`   | The destination names a directory.                                                                            |
-| `external`    | The destination is a URL with a scheme, or starts with `//`. It is not checked.                               |
-| `unavailable` | The destination cannot be judged from files: it starts with `/` or holds a `?`, outside the Obsidian dialect. |
-| `unreadable`  | The target could not be checked, because something that may hold it could not be read.                        |
+| Status        | Meaning                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `resolved`    | One file matches. `target` is its path from the workspace root.                                                     |
+| `missing`     | No file matches.                                                                                                    |
+| `ambiguous`   | Several files match and nothing decides between them, such as two notes whose names differ only by case.            |
+| `directory`   | The destination names a directory.                                                                                  |
+| `external`    | The destination is a URL with a scheme, or starts with `//`. It is not checked.                                     |
+| `unavailable` | The destination cannot be judged from files: it starts with `/` or holds a `?`, outside the Obsidian dialect.       |
+| `unreadable`  | The target could not be fully checked: files could not be read, or a renderer-dependent fragment remains uncertain. |
 
 The other fields are present when they apply:
 
 - `target`: the file found, with status `resolved`, and with `unreadable` when
-  the file exists but its content could not be read.
+  the file exists but its content could not be read or fully checked.
 - `fragment`: the part after `#`, decoded, or an empty string; `fragmentExists`:
   with status `resolved`, whether the target has that heading, block, or anchor
   by the rules of `dialect`, and `true` without a fragment and for a target that
   is not Markdown, whose fragments are its own.
+- In versions after 0.4.0, `fragmentIncomplete: true`, with status `unreadable`,
+  means the file was read but structural HTML makes its generated heading
+  anchors uncertain. No `unreadable` file/directory list accompanies this
+  result. Known earlier headings and explicit IDs can still resolve normally.
 - `unreadable`: the directories or the file that stood in the way. An entry that
   starts with `..` stands for the part of a vault outside the workspace root. In
   the Obsidian dialect, a search by note name that finds nothing readable

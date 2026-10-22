@@ -2565,6 +2565,10 @@ describe("fragment case on GitHub", () => {
 });
 
 describe("anchors of headings written as HTML", () => {
+  it("still omits an unclosed HTML heading on Gitea", () => {
+    const workspace = createWorkspace({ "Note.md": "<h2>Unclosed\n" });
+    expect(workspace.resolve("Doc.md", "Note.md#unclosed", "gitea").fragmentExists).toBe(false);
+  });
   // GitHub generates an anchor for an HTML heading as for a Markdown one
   // (`<h3 align="center">Special Sponsor</h3>` is #special-sponsor on a live
   // README). Gitea 1.27.3 and 28.0.0, run locally, do the same for headings
@@ -2593,7 +2597,6 @@ describe("anchors of headings written as HTML", () => {
       "`<h2>In code</h2>`",
       "```html\n<h2>Fenced</h2>\n```",
       "<h7>Not a heading</h7>",
-      "<h2>Unclosed",
     ].join("\n\n"),
   });
   const resolves = (fragment: string, dialect: Dialect) =>
@@ -2628,7 +2631,6 @@ describe("anchors of headings written as HTML", () => {
     ["in-code", false, false],
     ["fenced", false, false],
     ["not-a-heading", false, false],
-    ["unclosed", false, false],
   ])("resolves #%s as %s on GitHub and %s on Gitea", (fragment, github, gitea) => {
     expect(resolves(fragment, "github")).toBe(github);
     expect(resolves(fragment, "commonmark")).toBe(github);

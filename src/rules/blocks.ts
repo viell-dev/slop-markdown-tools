@@ -313,11 +313,16 @@ const thematicBreak: Rule = {
       if (marker === "---") {
         // Directly below a paragraph or a link reference definition, `---`
         // would underline it as a heading, and so it would display math,
-        // which GitHub builds from a paragraph (issue #336).
+        // which GitHub builds from a paragraph (issue #336). In Obsidian,
+        // it can take the last table row out of Live Preview's table too.
+        // The reverse direction and the literal row are range-protected.
         const above = index && parent ? lastBlock(parent.children[index - 1]!) : undefined;
         if (
           above &&
-          (above.type === "paragraph" || above.type === "definition" || above.type === "math") &&
+          (above.type === "paragraph" ||
+            above.type === "definition" ||
+            above.type === "math" ||
+            (document.dialect === "obsidian" && above.type === "table")) &&
           above.position?.end.line === node.position!.start.line - 1
         )
           return;

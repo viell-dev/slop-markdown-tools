@@ -9,6 +9,7 @@ import { lineBreak } from "../syntax/source.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 import { htmlTokens, htmlAnchors, htmlHeadings, htmlView } from "./html.js";
+import { githubHeadingLimit, githubHeadingPrefix } from "./github-heading-source.js";
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
 interface Rendering {
@@ -86,6 +87,8 @@ interface ObsidianAnchors {
 
 /** What GitHub links to, and CommonMark in its stead. */
 interface GithubAnchors {
+  /** Whether generated anchors are known after all of the document's HTML. */
+  complete: boolean;
   /** GitHub's numbered heading anchors. */
   slugs: Set<string>;
   /** `id` and `<a name>` values from the document's HTML, lowercased, as GitHub stores and matches them. */
@@ -131,17 +134,23 @@ function detachAll(...sets: Set<string>[]): void {
 }
 
 /** The document's HTML, tokenized once for the headings and the explicit anchors of a group. */
-function htmlParts(document: Document): Map<Nodes, HtmlPart> {
+function htmlParts(document: Document, tableHeadings = false): Map<Nodes, HtmlPart> {
   const parts = new Map<Nodes, HtmlPart>();
   const { source, tree } = document;
   walk(tree, (node) => {
     if (node.type === "html") {
       const tokens = htmlTokens(node.value);
       parts.set(node, { anchors: htmlAnchors(tokens), headings: htmlHeadings(tokens) });
-    } else if (node.type === "paragraph" && /<h[1-6]/i.test(source.slice(...range(node))))
+    } else if (
+      (node.type === "paragraph" || (tableHeadings && node.type === "tableCell")) &&
+      /<h[1-6]/i.test(source.slice(...range(node)))
+    )
       // An inline heading's tags and text are separate nodes, at any depth;
       // their explicit anchors come from the tags' own nodes.
-      parts.set(node, { anchors: [], headings: htmlHeadings(htmlTokens(htmlView(node))) });
+      parts.set(node, {
+        anchors: [],
+        headings: htmlHeadings(htmlTokens(htmlView(node)), node.type === "tableCell"),
+      });
   });
   return parts;
 }
@@ -198,18 +207,36 @@ function obsidianAnchors(document: Document): ObsidianAnchors {
 }
 
 /** A target's anchors for GitHub and CommonMark. */
-function githubAnchors(document: Document): GithubAnchors {
-  const anchors: GithubAnchors = { slugs: new Set(), explicit: new Set() };
+function githubAnchors(
+  document: Document,
+  onHeading?: (node: Nodes, slug: string) => void,
+): GithubAnchors {
+  const limit = githubHeadingLimit(document);
+  const anchors: GithubAnchors = {
+    complete: limit === undefined,
+    slugs: new Set(),
+    explicit: new Set(),
+  };
   const slugger = new GithubSlugger();
-  const parts = htmlParts(document);
+  const parts = htmlParts(document, true);
   // GitHub numbers the anchors of Markdown and HTML headings together, in
   // document order, and prefixes an id only when it does not already start
   // with the prefix.
-  const add = (text: string) => anchors.slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
+  const add = (text: string, node: Nodes) => {
+    const slug = slugger.slug(text).replace(/^user-content-/, "");
+    anchors.slugs.add(slug);
+    onHeading?.(node, slug);
+  };
   walk(document.tree, (node) => {
+    const start = node.position?.start.offset ?? 0;
+    if (limit !== undefined && start > limit) return;
     const part = parts.get(node);
-    if (part) for (const heading of part.headings) add(heading.text);
-    else if (node.type === "heading") add(renderedText(node, github));
+    if (part)
+      for (const heading of limit === start
+        ? part.headings.slice(0, githubHeadingPrefix(node))
+        : part.headings)
+        add(heading.text, node);
+    else if (node.type === "heading" && start !== limit) add(renderedText(node, github), node);
   });
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
   for (const part of parts.values())

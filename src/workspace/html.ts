@@ -31,7 +31,8 @@ const rawText = new Set([
 
 /** A tag that becomes an element, or the text between tags. */
 type HtmlToken =
-  { name: string; attributes: string; close: boolean } | { name?: undefined; text: string };
+  | { name: string; attributes: string; close: boolean; selfClosing?: true }
+  | { name?: undefined; text: string };
 
 /**
  * HTML as a browser tokenizes it, in one forward pass: comments, which run to
@@ -66,10 +67,19 @@ function htmlTokens(html: string): HtmlToken[] {
         continue;
       }
       const name = tag[1]!.toLowerCase();
+      // An unquoted value may consume the slash. Only the suffix after the
+      // attribute capture can contain the tag's actual self-closing marker.
+      const selfClosing = open && tag[0].slice(1 + name.length + open[2]!.length).endsWith("/>");
       end = at + tag[0].length;
       text(at);
       if (!open) tokens.push({ name, attributes: "", close: true });
-      else if (!rawText.has(name)) tokens.push({ name, attributes: tag[2]!, close: false });
+      else if (!rawText.has(name))
+        tokens.push({
+          name,
+          attributes: tag[2]!,
+          close: false,
+          ...(selfClosing ? { selfClosing: true as const } : {}),
+        });
       else {
         const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
         const after = close < 0 ? -1 : html.indexOf(">", close);
@@ -141,7 +151,7 @@ const headingTag = /^h[1-6]$/;
  * closes it. A heading left open at the end is not reported: the renderers
  * continue it through the Markdown that follows, which is not modeled.
  */
-function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
+function htmlHeadings(tokens: HtmlToken[], closeAtEnd = false): { text: string; hasId: boolean }[] {
   const headings: { text: string; hasId: boolean }[] = [];
   let open: { text: string; hasId: boolean } | undefined;
   const close = () => {
@@ -162,6 +172,7 @@ function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
         };
     }
   }
+  if (closeAtEnd) close();
   return headings;
 }
 

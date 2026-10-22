@@ -235,7 +235,7 @@ export function createTargetIndex(
     dialect: Dialect,
     fragment: string,
     anchor: string,
-  ): boolean | undefined {
+  ): boolean | "incomplete" | undefined {
     const value = sources.has(name) ? sources.get(name) : foundSources.get(name);
     // Only a Markdown file's anchors are known. Other files take fragments of
     // their own, such as an image's `#gh-dark-mode-only`, a PDF's `#page=2`, or
@@ -283,7 +283,8 @@ export function createTargetIndex(
     if (!anchors) return undefined;
     target.github = anchors;
     const folded = anchor.toLowerCase();
-    return anchors.slugs.has(folded) || anchors.explicit.has(folded);
+    if (anchors.slugs.has(folded) || anchors.explicit.has(folded)) return true;
+    return anchors.complete ? false : "incomplete";
   }
   // Vaults of their own, deepest first, so that a note belongs to the nearest one.
   const vaults = [

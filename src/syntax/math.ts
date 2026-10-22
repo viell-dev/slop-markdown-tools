@@ -386,5 +386,12 @@ export function math(conditions: MathConditions): Extension {
     concrete: true,
     name: "mathFlow",
   };
-  return { flow: { [dollar]: mathFlow }, text: { [dollar]: mathText(conditions) } };
+  return {
+    // GitHub's tables own dollar-prefixed headers and continued rows (#504,
+    // #534). Let the table fallback try first, including its container/lazy
+    // rules, rather than duplicating those rules in the math tokenizer.
+    flow:
+      conditions === "github" ? { null: { ...mathFlow, add: "after" } } : { [dollar]: mathFlow },
+    text: { [dollar]: mathText(conditions) },
+  };
 }

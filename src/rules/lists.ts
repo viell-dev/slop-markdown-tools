@@ -106,7 +106,10 @@ interface Analysis {
   units: Unit[];
   items: Map<ListItem, Item>;
   containers: Map<Container, ContainerInfo>;
-  /** Later lines of inline code, math, and other inline nodes that keep their whitespace. */
+  /**
+   * Later lines of inline nodes that keep their whitespace, and lazy lines
+   * whose margin supplies a renderer heading beyond the list (#554).
+   */
   sensitive: Set<number>;
   match(line: number): Matched;
 }
@@ -160,6 +163,9 @@ function analyze(document: Document): Analysis {
   // marker or indentation could move a list among them into or out of that
   // item, or join it to that list, so its group of lists stays as written.
   const misread = misreadLists(document);
+  // Such text can look safe to capture while its lazy margin supplies a
+  // later Live Preview heading. Reuse feasibility's existing margin guard.
+  for (const line of misread.headingLazyLines) sensitive.add(line);
 
   const visit = (node: Parents, parent: Container | undefined, unit: Unit | undefined) => {
     const children = node.children as Nodes[];
@@ -188,7 +194,12 @@ function analyze(document: Document): Analysis {
           }
           target = group;
         }
-        if (misread.nested.has(child) || misread.next.has(child)) target.valid = false;
+        if (
+          misread.nested.has(child) ||
+          misread.next.has(child) ||
+          misread.boundaryLists.has(child)
+        )
+          target.valid = false;
         const previous = children[index - 1];
         if (!run || previous?.type !== "list" || previous.ordered !== child.ordered) {
           run = [];

@@ -3,7 +3,7 @@
 // scripts/obsidian-check.mjs starts, with the repository mounted read-only at /repo, and writes
 // its report to /out. SEED repeats a run's generated documents, COUNT sets how many there are.
 import console from "node:console";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { browser, expect } from "@wdio/globals";
 import { obsidianPage } from "wdio-obsidian-service";
@@ -124,6 +124,28 @@ async function shown(path, text) {
       const widget = (element) => {
         const copy = element.cloneNode(true);
         for (const control of copy.querySelectorAll(ui)) control.remove();
+        if (copy.classList.contains("cm-table-widget")) {
+          const table = copy.querySelector(":scope > .table-wrapper > table.table-editor");
+          for (const cell of table?.querySelectorAll("th, td") ?? []) {
+            if (cell.closest("table") !== table) continue;
+            const wrappers = [...cell.children].filter((child) =>
+              child.classList.contains("table-cell-wrapper"),
+            );
+            if (wrappers.some((child) => !child.querySelector(".cm-editor"))) {
+              for (const wrapper of wrappers) {
+                if (
+                  wrapper.getAttribute("data-ignore-swipe") === "true" &&
+                  wrapper.querySelector(
+                    ":scope > .cm-s-obsidian.mod-cm6.is-live-preview > .cm-editor",
+                  )
+                )
+                  wrapper.remove();
+              }
+            }
+            cell.classList.remove("mod-active-row-handle", "mod-active-col-handle");
+            if (!cell.classList.length) cell.removeAttribute("class");
+          }
+        }
         return copy.innerHTML;
       };
       // Live Preview renders the lines in view; scroll through the note and collect them all.
@@ -164,7 +186,13 @@ async function shown(path, text) {
             });
           else
             lines.set(key, {
-              widget: [...element.classList].filter((name) => name !== "cm-embed-block").join(" "),
+              widget: [...element.classList]
+                .filter(
+                  (name) =>
+                    name !== "cm-embed-block" &&
+                    !(element.classList.contains("cm-table-widget") && name === "has-focus"),
+                )
+                .join(" "),
               html: widget(element),
               // An embed on a line of its own shows as a block, also where a wrapper
               // holds it.
@@ -291,7 +319,20 @@ function livePreview(lines) {
     }
     // The line that underlines a heading, which `style/heading` writes as `#` instead, and the
     // text above it, which has the heading's style but not its line's class.
-    if (line.kind.includes("HyperMD-header-line")) continue;
+    const styledUnderline =
+      /\bHyperMD-header\b/.test(line.kind) &&
+      /^(?:=+|-+)$/.test(text.trim()) &&
+      line.runs.every(
+        ([classes, value]) => !value.trim() || /\bcm-formatting-header\b/.test(classes),
+      );
+    if (line.kind.includes("HyperMD-header-line") || styledUnderline) {
+      current = undefined;
+      continue;
+    }
+    // Native heading lines start separate visible blocks, even at the same
+    // level without a blank separator (#544). Inferred Setext text below keeps
+    // its existing soft-line handling; its underline ends the heading above.
+    const headingStart = /\bHyperMD-header\b/.test(line.kind);
     const level = line.runs
       .map(([classes]) => /\bcm-header-(\d)\b/.exec(classes)?.[1])
       .find(Boolean);
@@ -354,6 +395,7 @@ function livePreview(lines) {
       current &&
       !code &&
       !differentList &&
+      !headingStart &&
       (current.kind === line.kind || line.continuation || lazy)
     ) {
       if (listFamily) current.listFamily = listFamily;
@@ -383,7 +425,7 @@ function livePreview(lines) {
       blocks.push(current);
     }
   }
-  return blocks.map((block) => {
+  const normalized = blocks.map((block) => {
     if (typeof block === "string") return block;
     const merged = [];
     for (const [classes, value] of block.runs.filter(
@@ -424,9 +466,14 @@ function livePreview(lines) {
         // and an item's number, which `style/ordered-list` chooses.
         if (/\blist-bullet\b/.test(classes)) text = "•";
         // A code block's fence, whose characters and length `style/code-fence` chooses.
-        else if (/\bcm-formatting-code-block\b/.test(classes))
+        else if (/\bcm-formatting-code-block\b/.test(classes)) {
           text = text.replace(/^(?:`{3,}|~{3,})/, "```");
-        else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
+          // Source-only trailing separators on a styled fence carry no code
+          // or info-string content (#533). Code body and internal info spaces
+          // remain exact, as do unstyled text runs that happen to contain ticks.
+          if (/\bHyperMD-codeblock-(?:begin|end)\b/.test(block.kind))
+            text = text.replace(/[ \t]+$/, "");
+        } else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
         else if (/\bcm-(?:hmd-barelink|link)\b/.test(classes))
           text = text.replace(/^X(?=\s|$)/, "x");
         // Unstyled text shows the source as written, where Live Preview reads no syntax, such as
@@ -472,8 +519,13 @@ function livePreview(lines) {
         classes ? `{${classes}}${text}{/}` : block.code ? text : text.replace(/\s+/g, " "),
       )
       .join("");
+    // Source-only punctuation already contributes no content above (#545).
+    // Omit its empty unstyled record after grouping, retaining all real block
+    // kinds and the paragraph boundaries established by blank-line resets.
+    if (!block.kind && !block.code && !body.trim()) return undefined;
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
   });
+  return normalized.filter((block) => block !== undefined);
 }
 
 /** A line's runs after its quote markers, which wrapping moves. */
@@ -573,6 +625,339 @@ const reduce = process.env.REDUCE?.split(",")
 const probe = process.env.PROBE ? JSON.parse(process.env.PROBE) : undefined;
 
 describe("Obsidian before and after formatting", function () {
+  it("retains rendered table content while a real cell editor owns focus (#550)", async function () {
+    if (probe || reduce) this.skip();
+    // Capture with the exact production runs/widget/class/scroll body. Real
+    // WebDriver input must occur between opening the note and this capture;
+    // shown() stays one page callback for ordinary corpus comparisons.
+    const spec = readFileSync("/repo/scripts/obsidian/obsidian.e2e.mjs", "utf8");
+    const start = spec.indexOf("      const ui =");
+    const end = spec.indexOf("      // Reading view itself,", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const capture = new Function(`return async function ({ app }, path, source) {
+      const leaf = app.workspace.getLeaf(false);
+      if (leaf.view.file?.path !== path) throw new Error("Wrong table-focus fixture");
+      const cm = leaf.view.editor.cm;
+      const settle = ms => new Promise(resolve => setTimeout(resolve, ms));
+      ${spec.slice(start, end)}
+      const authored = document.createElement("div");
+      authored.className = "cm-table-widget markdown-rendered";
+      authored.innerHTML = '<div class="table-wrapper"><table class="table-editor"><tbody><tr><td><div class="table-cell-wrapper">outer<table><tbody><tr><td class="mod-active-row-handle mod-active-col-handle"><div class="table-cell-wrapper">authored preview</div><div class="table-cell-wrapper" data-ignore-swipe="true"><div class="cm-s-obsidian mod-cm6 is-live-preview"><div class="cm-editor">authored payload</div></div></div></td></tr></tbody></table></div></td></tr></tbody></table></div>';
+      const authoredBefore = authored.innerHTML;
+      const authoredAfter = widget(authored);
+      return {
+        lines: [...lines].sort((a,b) => a[0] - b[0]).map(([, line]) => line),
+        sourceUnchanged: cm.state.doc.toString() === source,
+        nestedEditorFocused: [...cm.contentDOM.querySelectorAll(".cm-table-widget .cm-editor")].some(editor => editor.contains(document.activeElement)),
+        authoredBefore, authoredAfter,
+      };
+    }`)();
+    const cases = [
+      {
+        name: "styled header",
+        source:
+          "| **header**                              | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: true,
+      },
+      {
+        name: "code cell",
+        source:
+          "| **header**                              | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "tbody tr:first-child td:nth-child(2)",
+        equal: true,
+      },
+      {
+        name: "link cell beside plain text",
+        source:
+          "| **header**                              | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "tbody tr:nth-child(2) td:first-child",
+        equal: true,
+      },
+      {
+        name: "different header text",
+        source:
+          "| **changed**                             | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+      {
+        name: "different header style",
+        source:
+          "| header                                  | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+      {
+        name: "different code spacing",
+        source:
+          "| **header**                              | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a b`  |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+      {
+        name: "different alignment",
+        source:
+          "| **header**                              | second |\n| --------------------------------------: | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+      {
+        name: "different row count",
+        source:
+          "| **header**                              | second |\n| --------------------------------------- | ------ |\n| _body_                                  | `a  b` |\n| near [label](https://example.com/first) | final  |\n| extra                                   | row    |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+      {
+        name: "different link destination",
+        source:
+          "| **header**                               | second |\n| ---------------------------------------- | ------ |\n| _body_                                   | `a  b` |\n| near [label](https://example.com/second) | final  |\n",
+        selector: "thead tr:first-child th:first-child",
+        equal: false,
+      },
+    ];
+    const records = [];
+    let baseline;
+    for (const [index, { name, source, selector, equal }] of cases.entries()) {
+      const path = `controls/table-focus-${index}.md`;
+      await obsidianPage.write(path, source);
+      const natural = await shown(path, source);
+      const target = await browser.executeObsidian(
+        async ({ app, require }, path, selector) => {
+          const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const leaf = app.workspace.getLeaf(false);
+          await leaf.openFile(app.vault.getFileByPath(path), {
+            active: true,
+            state: { mode: "source", source: false },
+          });
+          const cm = leaf.view.editor.cm;
+          cm.contentDOM.blur();
+          await settle(150);
+          if (!require("@codemirror/language").forceParsing(cm, cm.state.doc.length, 10000))
+            throw new Error("Table-focus fixture did not parse");
+          cm.scrollDOM.scrollTop = 0;
+          await settle(100);
+          const cell = cm.contentDOM.querySelector(".cm-table-widget")?.querySelector(selector);
+          if (!cell) throw new Error("Table-focus cell not found: " + selector);
+          cell.setAttribute("data-mdrefine-table-focus", "target");
+          const alreadyEditing = !!cell
+            .querySelector(".cm-editor")
+            ?.contains(document.activeElement);
+          if (!cell.querySelector("a")) return { alreadyEditing };
+          const rect = cell.getBoundingClientRect();
+          for (const x of [rect.right - 20, rect.left + 10, rect.left + rect.width / 2]) {
+            const y = rect.top + rect.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            if (
+              hit &&
+              cell.contains(hit) &&
+              !hit.closest("a, input, .table-row-drag-handle, .table-col-drag-handle")
+            )
+              return { alreadyEditing, point: { x: Math.round(x), y: Math.round(y) } };
+          }
+          throw new Error("No non-link click point in the table-focus fixture");
+        },
+        path,
+        selector,
+      );
+      if (!target.alreadyEditing) {
+        if (target.point) {
+          await browser
+            .action("pointer")
+            .move(target.point.x, target.point.y)
+            .down({ button: 0 })
+            .up({ button: 0 })
+            .pause(80)
+            .down({ button: 0 })
+            .up({ button: 0 })
+            .perform();
+        } else await (await browser.$('[data-mdrefine-table-focus="target"]')).doubleClick();
+      }
+      const focused = await browser.executeObsidian(
+        async ({ app }, path, selector) => {
+          const leaf = app.workspace.getLeaf(false);
+          for (let wait = 0; wait < 20; wait++) {
+            const cell = leaf.view.editor.cm.contentDOM
+              .querySelector(".cm-table-widget")
+              ?.querySelector(selector);
+            const editor = cell?.querySelector(".cm-editor");
+            if (leaf.view.file?.path === path && editor?.contains(document.activeElement)) {
+              cell.removeAttribute("data-mdrefine-table-focus");
+              return true;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          return false;
+        },
+        path,
+        selector,
+      );
+      expect({ [name]: focused }).toEqual({ [name]: true });
+      const captured = await browser.executeObsidian(capture, path, source);
+      const before = livePreview(natural.lines);
+      const after = livePreview(captured.lines);
+      const reading = cleanHtml(natural.reading);
+      records.push({ name, source, selector, equal, before, after, reading, ...captured });
+      writeFileSync("/out/table-focus-controls.json", JSON.stringify(records, null, 2));
+      if (index < 3) await browser.saveScreenshot(`/out/table-focus-${index}.png`);
+      expect(captured.nestedEditorFocused).toBe(true);
+      expect(captured.sourceUnchanged).toBe(true);
+      expect(captured.authoredAfter).toEqual(captured.authoredBefore);
+      expect({ [name]: after }).toEqual({ [name]: before });
+      baseline ??= { livePreview: before, reading };
+      if (equal) {
+        expect({ [name]: after }).toEqual({ [name]: baseline.livePreview });
+        expect({ [name]: reading }).toEqual({ [name]: baseline.reading });
+      } else {
+        expect({ [name]: after }).not.toEqual({ [name]: baseline.livePreview });
+        expect({ [name]: reading }).not.toEqual({ [name]: baseline.reading });
+      }
+    }
+  });
+
+  it("retains heading boundaries while ignoring their optional blank separators (#544)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = [
+      "## alpha\n## beta\n",
+      "## alpha\n\n## beta\n",
+      "alpha\n---\nbeta\n---\n",
+      "## alpha beta\n",
+      "## alpha\n### beta\n",
+      "## alpha\n## *beta*\n",
+      "## alpha\n## gamma\n",
+      "## alpha ![[first.png]]\n## beta\n",
+      "## alpha ![[second.png]]\n## beta\n",
+    ];
+    const views = [];
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/heading-boundary-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.push(await shown(path, source));
+    }
+    const normalized = views.map(({ lines }) => livePreview(lines));
+    expect(normalized[0]).toEqual(normalized[1]);
+    expect(normalized[0]).toEqual(normalized[2]);
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[2].reading));
+    expect(normalized[0]).toHaveLength(2);
+    for (const changed of normalized.slice(3, 7)) expect(normalized[0]).not.toEqual(changed);
+    expect(normalized[7]).not.toEqual(normalized[8]);
+  });
+
+  it("normalizes styled Setext markers while retaining real heading content (#544)", async function () {
+    if (probe || reduce) this.skip();
+    const cases = [
+      ["single equals", "alpha\n=\n", "# alpha\n", true],
+      ["single equals at EOF", "alpha\n=", "# alpha\n", true],
+      ["long equals", "alpha\n===\n", "# alpha\n", true],
+      ["styled content", "*alpha* beta\n=\n", "# _alpha_ beta\n", true],
+      ["adjacent Setext headings", "alpha\n=\nbeta\n=\n", "# alpha\n# beta\n", true],
+      ["optional heading blank", "# alpha\n# beta\n", "# alpha\n\n# beta\n", true],
+      ["multiline Setext styles", "alpha\nbeta\n=\n", "# alpha beta\n", false],
+      ["dash underline", "alpha\n---\n", "## alpha\n", true],
+      ["literal equals content", "# =\n", "#\n", false],
+      ["empty native heading", "#\n# alpha\n", "# alpha\n", false],
+      ["heading level", "# alpha\n# beta\n", "# alpha\n## beta\n", false],
+      ["heading styling", "# alpha\n# *beta*\n", "# alpha\n# **beta**\n", false],
+    ];
+    const sources = [...new Set(cases.flatMap(([, source, paired]) => [source, paired]))];
+    const views = new Map();
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/setext-marker-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.set(source, await shown(path, source));
+    }
+    const normalized = (source) => livePreview(globalThis.structuredClone(views.get(source).lines));
+    for (const [name, source, paired, equal] of cases) {
+      const before = {
+        livePreview: normalized(source),
+        reading: cleanHtml(views.get(source).reading),
+      };
+      const after = {
+        livePreview: normalized(paired),
+        reading: cleanHtml(views.get(paired).reading),
+      };
+      if (equal) expect({ [name]: before }).toEqual({ [name]: after });
+      else {
+        expect({ [name]: before.livePreview }).not.toEqual({ [name]: after.livePreview });
+        expect({ [name]: before.reading }).not.toEqual({ [name]: after.reading });
+      }
+    }
+    expect(normalized("alpha\n=\nbeta\n=\n")).toHaveLength(2);
+  });
+
+  it("omits raw-source empty records while retaining visible paragraph splits (#545)", async function () {
+    if (probe || reduce) this.skip();
+    const cases = [
+      [
+        "open HTML",
+        "<div> raw\n\n## Heading\n\n***\nnext\n=\n",
+        "<div> raw\n\n## Heading\n\n---\n\nnext\n=\n",
+        true,
+      ],
+      [
+        "closed HTML",
+        "<div> raw\n</div>\n\n## Heading\n\n***\nnext\n=\n",
+        "<div> raw\n</div>\n\n## Heading\n\n---\n\nnext\n=\n",
+        true,
+      ],
+      [
+        "visible paragraph split",
+        "<div> raw\n\nbefore\n***\nafter\n",
+        "<div> raw\n\nbefore\n\n---\n\nafter\n",
+        false,
+      ],
+      [
+        "equal surrounding blanks",
+        "<div> raw\n\nbefore\n\n***\n\nafter\n",
+        "<div> raw\n\nbefore\n\n---\n\nafter\n",
+        true,
+      ],
+    ];
+    const sources = [...new Set(cases.flatMap(([, source, paired]) => [source, paired]))];
+    const views = new Map();
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/empty-source-record-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.set(source, await shown(path, source));
+    }
+    const normalized = (source) => livePreview(globalThis.structuredClone(views.get(source).lines));
+    for (const [name, source, paired, equal] of cases) {
+      if (equal) expect({ [name]: normalized(source) }).toEqual({ [name]: normalized(paired) });
+      else expect({ [name]: normalized(source) }).not.toEqual({ [name]: normalized(paired) });
+      // Reading view agrees even when raw Live Preview has a real paragraph split.
+      expect({ [name]: cleanHtml(views.get(source).reading) }).toEqual({
+        [name]: cleanHtml(views.get(paired).reading),
+      });
+    }
+  });
+
+  it("normalizes styled fence separators while retaining code and info content (#533)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = [
+      "~~~js  \nx\n",
+      "```js\nx\n",
+      "~~~js\nx  \n",
+      "~~~js one  two\nx\n",
+      "~~~js one two\nx\n",
+    ];
+    const views = [];
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/fence-info-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.push(await shown(path, source));
+    }
+    expect(
+      views[0].lines.some((line) => line.runs.some(([, value]) => value.endsWith("js  "))),
+    ).toBe(true);
+    expect(livePreview(views[0].lines)).toEqual(livePreview(views[1].lines));
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
+    expect(cleanHtml(views[2].reading)).not.toEqual(cleanHtml(views[1].reading));
+    expect(livePreview(views[3].lines)).not.toEqual(livePreview(views[4].lines));
+  });
+
   it("normalizes lone list paragraphs while retaining paragraph boundaries (#528)", async function () {
     if (probe || reduce) this.skip();
     const sources = [

@@ -125,7 +125,6 @@ note shows there, the tool keeps the text as written:
   ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
   Reading view reads the definition as more of the paragraph, and its indented
   lines as code. No rule changes the definition or the end of the line above it.
-  Below a blank line, a heading, or another definition, it is a footnote.
 - The blank space at the end of a footnote definition's last line, where a
   paragraph ends the definition, as in `[^1]: Note ` with a space after the
   text. Reading view shows it before the footnote's backreference, `↩︎`, where
@@ -198,12 +197,56 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A table keeps the source from a body row that changes its header's
+  leading-pipe convention, or has only its leading pipe. Both views can end the
+  table there while the primary parser keeps another row. Adding border pipes
+  could otherwise absorb a paragraph or split a wiki alias or link destination
+  across cells. Consistent table rows and text after a real blank still format.
+- Open root HTML keeps later source until Live Preview's tag depth closes,
+  including when a nested tag remains after the parent's closer. Parsed fences
+  do not end that raw state. Formatting conservatively retains the source there,
+  including punctuation preferences; balanced HTML and explicit recovery still
+  allow later Markdown to format.
+- A leading inline comment stays with the next wrapping atom so that it cannot
+  become a standalone comment block. Later words still wrap normally.
+- A possible comment whose leading `%%` and first closer cross a blank line
+  stays unreflowed. Moving text after the closer could otherwise turn literal
+  paragraphs into a comment block. This also applies at widths where the old
+  wrapping would have left text after the closer.
+- A table immediately below a paragraph-consumed footnote keeps its literal rows
+  even when the definition's final parsed block is HTML, a heading, or code.
+  This context continues through adjacent definitions while no definite
+  paragraph break separates their contents. A tab-containing blank line does not
+  establish a safe end to that context; an empty or space-only line does. A
+  definition below a heading or a definite paragraph break remains independent.
+- A thematic break directly below a table keeps a marker that does not turn the
+  last table line into a heading in Live Preview. Where an existing compact
+  hyphen break already displays that line as a heading, its literal text and
+  underline stay, including the delimiter of a header-only table. A blank line
+  between the table and break still permits ordinary table and marker
+  formatting.
+- An underlined heading displayed after lazy list or quote text keeps its final
+  physical heading line, the preceding boundary, and its underline. Wrapping or
+  inserting a blank there can remove the heading in either Obsidian view. An
+  earlier lazy line that determines that reading keeps its boundary and margin
+  too. List padding and number width can shrink only when that dependency stays
+  lazy. Safe inline edits above the heading remain eligible.
 - Lists following a closing-tag HTML block keep their source when Live Preview
   reads a marker inside that block as their parent. List indentation also stays
   when an HTML comment below the list closes after a marker, including when its
   closer is on a subsequent line or the marker has no following text. An
   unindented paragraph directly below a heading in the last list item keeps its
-  boundary: Reading view still nests it in that item.
+  boundaries: Reading view still nests it in that item. An immediately following
+  list keeps its separator and both participating lists keep their markers and
+  indentation, because changing them can alter list tightness or merge runs.
+  Safe inline formatting in the following list still applies.
+- Top-level HTML continued across whitespace-only lines keeps literal quote
+  markers and the source below them until a physically empty line, including
+  empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading
+  view's HTML block. HTML inside a quote still follows that quote's own
+  boundaries. Empty list markers between that HTML and a fence also remain raw
+  source. If an empty line inside the fence makes its closer open code in
+  Reading view, the remaining note stays as written.
 - A fence immediately after a task checkbox, including a custom status such as
   `[-]`, keeps the remaining source as written. Live Preview opens code there,
   while the parser reads paragraph text, so subsequent fences can pair
@@ -237,6 +280,10 @@ latest installable release:
   keeps that line in the footnote rather than starting a visible list. A non-one
   ordered list directly below a block quote also keeps its boundary: Reading
   view retains it inside that quote, including below a quoted heading.
+  Participating ordered lists keep their markers and indentation, including
+  lists followed by nested quotes that the primary parser places beside them:
+  changing only a delimiter can join or split the rendered lists. Safe inline
+  changes there still apply.
 - An ordered list directly below a callout title stays together even when its
   first number is not 1. Its source markers keep a consistent delimiter.
 - Tables below setext text that Reading view keeps as a paragraph stay as text.
@@ -246,7 +293,10 @@ latest installable release:
   pipes can start another table or end Reading view's table inside the primary
   parse's table. Their source stays too: adding leading pipes would merge those
   regions. Text continued across a tab separator also keeps immediately
-  following ordered continuations and setext boundaries as written.
+  following ordered continuations and setext boundaries as written. A non-one
+  ordered list immediately after an unpiped table row keeps its source and
+  separating break: Reading view retains that row and its numbered continuations
+  as paragraph text.
 
 Independent blocks outside these regions still format. These protections are
 specific to the Obsidian dialect.

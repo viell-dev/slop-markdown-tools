@@ -22,6 +22,85 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian wrapping retains possible comments that cross a blank line, avoiding
+  an unsafe-format refusal when wrapping would put their closer alone on a line
+  ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).
+- Obsidian table formatting keeps a following paragraph from becoming another
+  row when its leading-pipe style differs from the header, including alias and
+  link-destination pipes. Ordinary table rows and text after a real blank still
+  format ([#558](https://github.com/viell-dev/slop-markdown-tools/issues/558)).
+- Obsidian wrapping keeps a leading inline comment with the next atom, avoiding
+  an unsafe-format refusal when a long link or other atom would leave the
+  comment alone on its first line. The rest of the paragraph still wraps
+  ([#557](https://github.com/viell-dev/slop-markdown-tools/issues/557)).
+- Obsidian formatting preserves literal blocks after root HTML whose nested tags
+  remain open, including URL-shaped children. A parent's closer cannot
+  prematurely end that protection; balanced, void, and self-closing HTML still
+  permit later Markdown formatting. Parsed fences do not close the raw state;
+  formatting conservatively retains source across them until the HTML closes
+  ([#556](https://github.com/viell-dev/slop-markdown-tools/issues/556)).
+- Obsidian formatting keeps thematic breaks below tables from turning their last
+  physical line into a literal Live Preview heading, including header-only
+  tables. Existing literal headings retain their row text and underline
+  ([#553](https://github.com/viell-dev/slop-markdown-tools/issues/553)).
+- Obsidian formatting preserves underlined headings displayed after lazy list or
+  quote text, retaining the final heading line, its boundaries, and the lazy
+  margin when list padding or number width shrinks. Safe inline changes above it
+  remain available
+  ([#554](https://github.com/viell-dev/slop-markdown-tools/issues/554)).
+- Obsidian formatting preserves literal table rows after paragraph-consumed
+  footnotes, including HTML, heading, and code endings, adjacent definitions,
+  and ambiguous tab separators. Independent footnotes and empty or space-only
+  separators still permit table formatting
+  ([#549](https://github.com/viell-dev/slop-markdown-tools/issues/549),
+  [#551](https://github.com/viell-dev/slop-markdown-tools/issues/551)).
+- Obsidian comparisons ignore native table-cell editing controls when a rendered
+  preview is available, while retaining table content, styling, code spacing,
+  alignment, row counts, links, and nested authored HTML
+  ([#550](https://github.com/viell-dev/slop-markdown-tools/issues/550)).
+- Obsidian protection searches for backticks only within each text node,
+  avoiding repeated scans of the remaining document
+  ([#547](https://github.com/viell-dev/slop-markdown-tools/issues/547)).
+- Obsidian HTML continuation retains empty container markers before fences and
+  protects code opened by the later fence through the end of the note
+  ([#548](https://github.com/viell-dev/slop-markdown-tools/issues/548)).
+- Obsidian formatting retains both list boundaries around lazy text below a
+  list-item heading and keeps top-level HTML source continued through literal
+  quote markers
+  ([#513](https://github.com/viell-dev/slop-markdown-tools/issues/513),
+  [#546](https://github.com/viell-dev/slop-markdown-tools/issues/546)).
+- Obsidian comparisons recognize single-character Setext underlines and omit
+  unstyled records emptied by existing punctuation normalization, while keeping
+  actual heading, paragraph, code, and widget boundaries distinct
+  ([#544](https://github.com/viell-dev/slop-markdown-tools/issues/544),
+  [#545](https://github.com/viell-dev/slop-markdown-tools/issues/545)).
+- Obsidian list formatting retains ordered-list boundaries across a missing
+  quote or footnote prefix, and its comparison keeps adjacent headings distinct
+  with or without blank separators
+  ([#543](https://github.com/viell-dev/slop-markdown-tools/issues/543),
+  [#544](https://github.com/viell-dev/slop-markdown-tools/issues/544)).
+- GitHub table headers and continued rows take precedence over dollar display
+  math, restoring table-column diagnostics and rejecting edits that split those
+  rows into math
+  ([#504](https://github.com/viell-dev/slop-markdown-tools/issues/504),
+  [#534](https://github.com/viell-dev/slop-markdown-tools/issues/534)).
+- GitHub formatting preserves source whose structural heading HTML makes its
+  anchor boundary uncertain. Fragment checks report that limit instead of
+  guessing IDs, and the semantic guard rejects plugin edits that change ordinary
+  heading anchors
+  ([#498](https://github.com/viell-dev/slop-markdown-tools/issues/498),
+  [#535](https://github.com/viell-dev/slop-markdown-tools/issues/535),
+  [#536](https://github.com/viell-dev/slop-markdown-tools/issues/536)).
+- GitHub fragment checks include HTML headings in Markdown table cells,
+  including headings closed by their cell boundary, and report raw-table
+  reordering as uncertain
+  ([#538](https://github.com/viell-dev/slop-markdown-tools/issues/538),
+  [#539](https://github.com/viell-dev/slop-markdown-tools/issues/539)).
+- Obsidian formatting keeps non-one ordered continuations after unpiped table
+  text as written, and its comparison ignores terminal whitespace on styled
+  fence separators while retaining code and internal metadata whitespace
+  ([#532](https://github.com/viell-dev/slop-markdown-tools/issues/532),
+  [#533](https://github.com/viell-dev/slop-markdown-tools/issues/533)).
 - Obsidian formatting preserves code carried into nested quoted lists, task
   checkbox separators, bare HTML-comment markers, fences whose openers remain in
   HTML, and indented code read outside a quote
