@@ -200,18 +200,22 @@ it("keeps paired file anchors without either Markdown reading or the YAML AST", 
   };
   try {
     check();
-    for (const result of vi.mocked(parseDocument).mock.results) {
-      if (result.type !== "return") continue;
-      held.push(new WeakRef(result.value));
-      const pending: unknown[] = [result.value.contents];
-      while (pending.length) {
-        const node = pending.pop();
-        if (node === null || typeof node !== "object") continue;
-        held.push(new WeakRef(node));
-        if (isPair(node)) pending.push(node.key, node.value);
-        else if (isMap(node) || isSeq(node)) for (const item of node.items) pending.push(item);
+    // Keep returned ASTs out of this async function's resumable locals.
+    const recordYamlResults = (): void => {
+      for (const result of vi.mocked(parseDocument).mock.results) {
+        if (result.type !== "return") continue;
+        held.push(new WeakRef(result.value));
+        const pending: unknown[] = [result.value.contents];
+        while (pending.length) {
+          const node = pending.pop();
+          if (node === null || typeof node !== "object") continue;
+          held.push(new WeakRef(node));
+          if (isPair(node)) pending.push(node.key, node.value);
+          else if (isMap(node) || isSeq(node)) for (const item of node.items) pending.push(item);
+        }
       }
-    }
+    };
+    recordYamlResults();
     expect(held.length).toBeGreaterThan(0);
     // Mocks' result logs themselves retain their arguments/AST results.
     vi.mocked(parseDocument).mockClear();
