@@ -135,7 +135,7 @@ it.each([
     // Both traversals preserve insertion order. Comparing arrays retains every
     // node field without unordered Set equality revisiting all pairs of nodes.
     for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
-      const actualValue = result![key];
+      const actualValue = result[key];
       const expectedValue = expected[key];
       expect(typeof actualValue === "boolean" ? actualValue : [...actualValue]).toEqual(
         typeof expectedValue === "boolean" ? expectedValue : [...expectedValue],

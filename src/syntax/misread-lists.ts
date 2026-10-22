@@ -1058,7 +1058,7 @@ export function misreadLists(document: Document): MisreadLists {
               const prefix = /^[ \t>]*/.exec(source.slice(from, to))![0].length;
               const opening = source.slice(
                 lineAround(last.position.start.offset!)[0],
-                last.position.start.offset!,
+                last.position.start.offset,
               );
               const contentColumn = columnAt(last.position.start.offset!);
               const missingQuote =
@@ -1096,7 +1096,7 @@ export function misreadLists(document: Document): MisreadLists {
                   }),
                 );
                 if (lazyList) {
-                  const [start, end] = lazy!;
+                  const [start, end] = lazy;
                   const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
                   // That earlier lazy margin supplies the heading's context.
                   // Reflow can keep the final line as an exact common suffix
