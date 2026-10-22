@@ -762,7 +762,8 @@ or what a comment applies to:
 - In the Obsidian dialect, inside continued HTML source: Live Preview can carry
   an inline opener's raw state through later blocks until its closer or the
   document's end, and Reading view continues HTML across a whitespace-only line
-  into the blocks below it until an empty line.
+  into the blocks below it until an empty line. In top-level HTML, bare quote
+  markers remain literal source and do not provide that empty line.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put

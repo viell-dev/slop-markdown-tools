@@ -206,12 +206,15 @@ whitespace and internal info-string spacing remain significant. A host control
 checks both the normalization and those negative cases. Native heading lines and
 Setext underlines retain heading boundaries independently of optional blank
 separators; host controls retain changes to their count, levels, text, styles,
-and embeds. For the default Obsidian theme, a lone unattributed paragraph
-directly inside a list item has no extra spacing and is compared as inline
-content. Multiple paragraphs, attributed paragraphs, and other block boundaries
-remain significant; a deterministic host control checks these cases on every
-comparison run. The Obsidian workflow runs the check for pull requests that
-change a [renderer-sensitive path](#what-the-checks-prove), in the Release
+and embeds, including single-character underlines and empty headings. Unstyled
+records emptied by punctuation normalization are omitted after grouping, so
+their removal cannot join visible paragraphs. Styled records, code, and widgets
+remain significant. For the default Obsidian theme, a lone unattributed
+paragraph directly inside a list item has no extra spacing and is compared as
+inline content. Multiple paragraphs, attributed paragraphs, and other block
+boundaries remain significant; a deterministic host control checks these cases
+on every comparison run. The Obsidian workflow runs the check for pull requests
+that change a [renderer-sensitive path](#what-the-checks-prove), in the Release
 workflow, and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the
 inputs `seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds
 the report and the screenshots. It fails when the check compared nothing. Every

@@ -197,8 +197,8 @@ export interface MisreadLists {
   /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
   boundaryText: ReadonlySet<Nodes>;
   /**
-   * Lists near a quote's or footnote's end whose markers and indentation affect
-   * a following non-one ordered continuation outside that container (#543).
+   * Lists whose markers and indentation affect continuations outside their
+   * parsed container, including a lazy paragraph after a heading (#513, #543).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -532,12 +532,19 @@ export function misreadLists(document: Document): MisreadLists {
      * Leaf blocks count, not containers, because an empty line inside a list
      * ends the HTML block there.
      */
+    const topHtml = new Set<Nodes>(document.tree.children.filter(blankTerminatedHtml));
     let open = false;
+    let topLevel = false;
+    let topUntil = 0;
+    // A top-level HTML block reads quote markers literally. Only a physical
+    // empty line ends that reading; a contained block can consume its prefixes.
+    const continuesHtml = (number: number) =>
+      spaced(number) || (topLevel && /^>+$/.test(lines[number - 1] ?? ""));
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       if (open && previous?.position && leaf.position) {
         for (let line = previous.position.end.line + 1; line < leaf.position.start.line; line++)
-          if (!spaced(line)) open = false;
+          if (!continuesHtml(line)) open = false;
         if (open) {
           // From the start of its line: a list item's marker there, `- ` in
           // `- *a*`, is text of the HTML block too.
@@ -555,7 +562,7 @@ export function misreadLists(document: Document): MisreadLists {
             source
               .slice(offset, leaf.position.end.offset)
               .split(lineEndingPattern)
-              .some((line) => /^[>]*$/.test(line))
+              .some((line) => (topLevel ? line.length === 0 : /^[>]*$/.test(line)))
           ) {
             openFences.add(stretch(leaf, start, { ...leaf.position.end, offset: source.length }));
             htmlCodeToEnd = true;
@@ -563,15 +570,25 @@ export function misreadLists(document: Document): MisreadLists {
         }
       }
       // Other HTML blocks end at their own end marker, as a comment does at `-->`.
-      if (
-        !open &&
-        leaf.type === "html" &&
-        leaf.position &&
-        !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
-          leaf.value.trimStart(),
-        )
-      )
-        open = spaced(leaf.position.end.line + 1);
+      if (!open && leaf.position && blankTerminatedHtml(leaf)) {
+        topLevel = topHtml.has(leaf);
+        open = continuesHtml(leaf.position.end.line + 1);
+        if (open && topLevel && leaf.position.start.offset! >= topUntil) {
+          // Empty quotes have no leaves in `order`, but their literal markers
+          // are still Reading-view HTML text. Protect the whole continuation,
+          // independently of Live Preview's code/HTML union. Each root inside
+          // that span is covered once, including gaps with no leaf at all.
+          let end = leaf.position.end;
+          for (let cursor = lineBreak(source, end.offset!); cursor < source.length;) {
+            const from = cursor + (source.startsWith("\r\n", cursor) ? 2 : 1);
+            cursor = lineBreak(source, from);
+            if (cursor === from) break;
+            end = { offset: cursor, line: end.line + 1, column: cursor - from + 1 };
+          }
+          topUntil = end.offset!;
+          htmlText.add(stretch(leaf, leaf.position.start, end));
+        }
+      }
     });
     /**
      * Whether line `number`, counted from 1, holds blank space and block quote
@@ -992,8 +1009,30 @@ export function misreadLists(document: Document): MisreadLists {
             );
           // Reading view retains an unindented paragraph directly below a
           // heading in a list's last item, where the parser ends that list (#513).
-          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph")
-            boundaryText.add(stretch(child, previous.position.end));
+          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph") {
+            let end = child.position.end;
+            const next = parent.children[index + 1];
+            if (
+              next?.type === "list" &&
+              next.position &&
+              next.position.start.line === child.position.end.line + 1
+            ) {
+              // A blank before the next item changes the host list's
+              // tightness, and independent marker changes can merge runs.
+              boundaryLists.add(previous);
+              boundaryLists.add(next);
+              const marker = listMarker.exec(
+                source.slice(next.position.start.offset, next.position.start.offset! + 11),
+              );
+              const length = marker?.[0].length ?? 1;
+              end = {
+                ...next.position.start,
+                offset: next.position.start.offset! + length,
+                column: next.position.start.column + length,
+              };
+            }
+            boundaryText.add(stretch(child, previous.position.end, end));
+          }
           if (
             previous.type === "paragraph" &&
             child.type === "blockquote" &&
@@ -1475,6 +1514,16 @@ export function misreadLists(document: Document): MisreadLists {
   };
   found.set(document.tree, result);
   return result;
+}
+
+/** Whether an HTML block ends at a blank line instead of an explicit marker. */
+function blankTerminatedHtml(node: Nodes): boolean {
+  return (
+    node.type === "html" &&
+    !/^<(?:!--|\?|!\[CDATA\[|![A-Za-z]|(?:script|pre|style|textarea)(?:[\s>]|$))/i.test(
+      node.value.trimStart(),
+    )
+  );
 }
 
 /**

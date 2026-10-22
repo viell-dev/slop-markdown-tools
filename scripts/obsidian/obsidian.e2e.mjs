@@ -291,7 +291,13 @@ function livePreview(lines) {
     }
     // The line that underlines a heading, which `style/heading` writes as `#` instead, and the
     // text above it, which has the heading's style but not its line's class.
-    if (line.kind.includes("HyperMD-header-line")) {
+    const styledUnderline =
+      /\bHyperMD-header\b/.test(line.kind) &&
+      /^(?:=+|-+)$/.test(text.trim()) &&
+      line.runs.every(
+        ([classes, value]) => !value.trim() || /\bcm-formatting-header\b/.test(classes),
+      );
+    if (line.kind.includes("HyperMD-header-line") || styledUnderline) {
       current = undefined;
       continue;
     }
@@ -391,7 +397,7 @@ function livePreview(lines) {
       blocks.push(current);
     }
   }
-  return blocks.map((block) => {
+  const normalized = blocks.map((block) => {
     if (typeof block === "string") return block;
     const merged = [];
     for (const [classes, value] of block.runs.filter(
@@ -485,8 +491,13 @@ function livePreview(lines) {
         classes ? `{${classes}}${text}{/}` : block.code ? text : text.replace(/\s+/g, " "),
       )
       .join("");
+    // Source-only punctuation already contributes no content above (#545).
+    // Omit its empty unstyled record after grouping, retaining all real block
+    // kinds and the paragraph boundaries established by blank-line resets.
+    if (!block.kind && !block.code && !body.trim()) return undefined;
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
   });
+  return normalized.filter((block) => block !== undefined);
 }
 
 /** A line's runs after its quote markers, which wrapping moves. */
@@ -613,6 +624,94 @@ describe("Obsidian before and after formatting", function () {
     expect(normalized[0]).toHaveLength(2);
     for (const changed of normalized.slice(3, 7)) expect(normalized[0]).not.toEqual(changed);
     expect(normalized[7]).not.toEqual(normalized[8]);
+  });
+
+  it("normalizes styled Setext markers while retaining real heading content (#544)", async function () {
+    if (probe || reduce) this.skip();
+    const cases = [
+      ["single equals", "alpha\n=\n", "# alpha\n", true],
+      ["single equals at EOF", "alpha\n=", "# alpha\n", true],
+      ["long equals", "alpha\n===\n", "# alpha\n", true],
+      ["styled content", "*alpha* beta\n=\n", "# _alpha_ beta\n", true],
+      ["adjacent Setext headings", "alpha\n=\nbeta\n=\n", "# alpha\n# beta\n", true],
+      ["optional heading blank", "# alpha\n# beta\n", "# alpha\n\n# beta\n", true],
+      ["multiline Setext styles", "alpha\nbeta\n=\n", "# alpha beta\n", false],
+      ["dash underline", "alpha\n---\n", "## alpha\n", true],
+      ["literal equals content", "# =\n", "#\n", false],
+      ["empty native heading", "#\n# alpha\n", "# alpha\n", false],
+      ["heading level", "# alpha\n# beta\n", "# alpha\n## beta\n", false],
+      ["heading styling", "# alpha\n# *beta*\n", "# alpha\n# **beta**\n", false],
+    ];
+    const sources = [...new Set(cases.flatMap(([, source, paired]) => [source, paired]))];
+    const views = new Map();
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/setext-marker-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.set(source, await shown(path, source));
+    }
+    const normalized = (source) => livePreview(globalThis.structuredClone(views.get(source).lines));
+    for (const [name, source, paired, equal] of cases) {
+      const before = {
+        livePreview: normalized(source),
+        reading: cleanHtml(views.get(source).reading),
+      };
+      const after = {
+        livePreview: normalized(paired),
+        reading: cleanHtml(views.get(paired).reading),
+      };
+      if (equal) expect({ [name]: before }).toEqual({ [name]: after });
+      else {
+        expect({ [name]: before.livePreview }).not.toEqual({ [name]: after.livePreview });
+        expect({ [name]: before.reading }).not.toEqual({ [name]: after.reading });
+      }
+    }
+    expect(normalized("alpha\n=\nbeta\n=\n")).toHaveLength(2);
+  });
+
+  it("omits raw-source empty records while retaining visible paragraph splits (#545)", async function () {
+    if (probe || reduce) this.skip();
+    const cases = [
+      [
+        "open HTML",
+        "<div> raw\n\n## Heading\n\n***\nnext\n=\n",
+        "<div> raw\n\n## Heading\n\n---\n\nnext\n=\n",
+        true,
+      ],
+      [
+        "closed HTML",
+        "<div> raw\n</div>\n\n## Heading\n\n***\nnext\n=\n",
+        "<div> raw\n</div>\n\n## Heading\n\n---\n\nnext\n=\n",
+        true,
+      ],
+      [
+        "visible paragraph split",
+        "<div> raw\n\nbefore\n***\nafter\n",
+        "<div> raw\n\nbefore\n\n---\n\nafter\n",
+        false,
+      ],
+      [
+        "equal surrounding blanks",
+        "<div> raw\n\nbefore\n\n***\n\nafter\n",
+        "<div> raw\n\nbefore\n\n---\n\nafter\n",
+        true,
+      ],
+    ];
+    const sources = [...new Set(cases.flatMap(([, source, paired]) => [source, paired]))];
+    const views = new Map();
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/empty-source-record-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.set(source, await shown(path, source));
+    }
+    const normalized = (source) => livePreview(globalThis.structuredClone(views.get(source).lines));
+    for (const [name, source, paired, equal] of cases) {
+      if (equal) expect({ [name]: normalized(source) }).toEqual({ [name]: normalized(paired) });
+      else expect({ [name]: normalized(source) }).not.toEqual({ [name]: normalized(paired) });
+      // Reading view agrees even when raw Live Preview has a real paragraph split.
+      expect({ [name]: cleanHtml(views.get(source).reading) }).toEqual({
+        [name]: cleanHtml(views.get(paired).reading),
+      });
+    }
   });
 
   it("normalizes styled fence separators while retaining code and info content (#533)", async function () {

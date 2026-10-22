@@ -44,6 +44,58 @@ it("scans a shared Obsidian table-row region once (#505)", () => {
   ).toBeLessThan(10);
 });
 
+it.each([
+  { name: "independent", shared: false },
+  { name: "shared", shared: true },
+])("scans $name top-level HTML continuations proportionally (#546)", ({ shared }) => {
+  // Many roots exercise constant-time identity lookup; a single continuation
+  // must visit each gap once. Parse distinct trees before timing so neither
+  // the parser's work nor the range cache hides the continuation scan.
+  const raw = "<div></div>\n \n> first\n>\n> *literal*\n";
+  const unit = shared ? `${raw} \n` : `${raw}\nAfter *safe*.\n\n`;
+  const shown = [
+    [raw.indexOf("\n>\n") + 1, 1],
+    [raw.indexOf("*literal*"), "*literal*".length],
+  ] as const;
+  expect(
+    scaling(
+      [800, 3200],
+      (count) => {
+        const source = unit.repeat(count) + (shared ? "\nAfter *safe*.\n" : "");
+        return { document: parse(source, "obsidian"), count };
+      },
+      ({ document }) => misreadLists(document),
+      (result, { document, count }) => {
+        const ranges = [...result.htmlText]
+          .map((node) => [node.position!.start.offset!, node.position!.end.offset!] as const)
+          .sort(([a], [b]) => a - b);
+        let next = 0;
+        let end = 0;
+        let allProtected = true;
+        // Bare quote-only gaps have no parsed leaf, but are literal HTML text too.
+        for (let index = 0; index < count; index++)
+          for (const [relative, length] of shown) {
+            const start = index * unit.length + relative;
+            while (next < ranges.length && ranges[next]![0] <= start)
+              end = Math.max(end, ranges[next++]![1]);
+            if (end < start + length) allProtected = false;
+          }
+        expect(allProtected).toBe(true);
+        expect(result.htmlCodeToEnd).toBe(false);
+        const outside = document.source.lastIndexOf("After *safe*.");
+        expect(outside).toBeGreaterThan(0);
+        expect(
+          [...result.htmlText].some(
+            (node) =>
+              node.position!.start.offset! <= outside && outside < node.position!.end.offset!,
+          ),
+        ).toBe(false);
+      },
+      1,
+    ),
+  ).toBeLessThan(10);
+});
+
 function formatted(source: string, options: ProcessOptions = {}) {
   const result = format(source, options);
   expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);

@@ -42,6 +42,88 @@ describe("Obsidian boundaries read differently by its views", () => {
     const source = ">1) *first*\n>2) *second*\n3) *third*\n\n*outside*\n";
     expect(checked(source)).toBe(">1) _first_\n>2) _second_\n3) *third*\n\n_outside_\n");
   });
+  it.each([".", ")"])(
+    "retains either list's ordered delimiter around a lazy heading paragraph with %s (#513)",
+    (delimiter) => {
+      const source = "1) # heading\nlazy *words*\n1. next\n";
+      expect(
+        checked(source, {
+          ...config,
+          rules: { ...config.rules, "style/ordered-list": ["warn", { delimiter }] },
+        }),
+      ).toBe(source);
+    },
+  );
+  it("formats inline text in both retained list units around a lazy heading paragraph (#513)", () => {
+    const source = "- # *heading*\nlazy *words*\n+ next *safe*\n";
+    expect(checked(source)).toBe("- # _heading_\nlazy *words*\n+ next _safe_\n");
+  });
+  it("keeps a blank-separated following list formattable (#513)", () => {
+    const source = "- # heading\nlazy *words*\n\n- next *safe*\n";
+    expect(checked(source)).toBe("- # heading\nlazy *words*\n\n- next _safe_\n");
+  });
+  it.each([
+    [
+      "following heading",
+      "- # heading\nlazy *words*\n# next\n",
+      "- # heading\nlazy *words*\n\n# next\n",
+    ],
+    [
+      "blank-separated paragraph",
+      "- # heading\n\nlazy *words*\n- next\n",
+      "- # heading\n\nlazy _words_\n\n- next\n",
+    ],
+    [
+      "indented paragraph",
+      "- # heading\n  lazy *words*\n- next\n",
+      "- # heading\n  lazy _words_\n- next\n",
+    ],
+  ])("keeps the %s control formattable (#513)", (_name, source, expected) => {
+    expect(checked(source)).toBe(expected);
+  });
+  it.each([
+    [
+      "physical blank after a root",
+      "<div>\nx\n</div>\n\n> first\n>\n> *second*\n\n_____\n",
+      "<div>\nx\n</div>\n\n> first\n>\n> _second_\n\n---\n",
+    ],
+    [
+      "empty quote line after contained HTML",
+      "> <div>\n> x\n> </div>\n>\n> *second*\n\nAfter *third*.\n",
+      "> <div>\n> x\n> </div>\n>\n> _second_\n\nAfter _third_.\n",
+    ],
+    [
+      "independent prose after a root",
+      "<div></div>\n \n> a\n>\n> *b*\n\nAfter *c*.\n",
+      "<div></div>\n \n> a\n>\n> *b*\n\nAfter _c_.\n",
+    ],
+    [
+      "physical blank after literal empty quotes",
+      "<div></div>\n \n>\n>\n\nAfter *c*.\n",
+      "<div></div>\n \n>\n>\n\nAfter _c_.\n",
+    ],
+    [
+      "physical blank before genuine empty quotes",
+      "<div></div>\n\n>\n>\n>\n\nAfter *c*.\n",
+      "<div></div>\n\n>\n\nAfter _c_.\n",
+    ],
+    [
+      "closed fence holding a bare quote marker",
+      "<div>\ntext\n</div>\n\t\n```js\nx\n>\n```\n\n*outside*\n",
+      "<div>\ntext\n</div>\n\t\n```js\nx\n>\n```\n\n_outside_\n",
+    ],
+    [
+      "closed fence holding nested quote markers",
+      "<div>\ntext\n</div>\n\t\n```js\nx\n>>\n```\n\n*outside*\n",
+      "<div>\ntext\n</div>\n\t\n```js\nx\n>>\n```\n\n_outside_\n",
+    ],
+  ])("resumes formatting after a %s (#546)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
   it("ignores a plugin paragraph without source positions", () => {
     const document = parse("words\n", "obsidian");
     delete document.tree.children[0]!.position;

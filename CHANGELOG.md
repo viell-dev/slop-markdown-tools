@@ -22,6 +22,16 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting retains both list boundaries around lazy text below a
+  list-item heading and keeps top-level HTML source continued through literal
+  quote markers
+  ([#513](https://github.com/viell-dev/slop-markdown-tools/issues/513),
+  [#546](https://github.com/viell-dev/slop-markdown-tools/issues/546)).
+- Obsidian comparisons recognize single-character Setext underlines and omit
+  unstyled records emptied by existing punctuation normalization, while keeping
+  actual heading, paragraph, code, and widget boundaries distinct
+  ([#544](https://github.com/viell-dev/slop-markdown-tools/issues/544),
+  [#545](https://github.com/viell-dev/slop-markdown-tools/issues/545)).
 - Obsidian list formatting retains ordered-list boundaries across a missing
   quote or footnote prefix, and its comparison keeps adjacent headings distinct
   with or without blank separators

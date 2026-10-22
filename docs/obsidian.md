@@ -203,7 +203,15 @@ latest installable release:
   when an HTML comment below the list closes after a marker, including when its
   closer is on a subsequent line or the marker has no following text. An
   unindented paragraph directly below a heading in the last list item keeps its
-  boundary: Reading view still nests it in that item.
+  boundaries: Reading view still nests it in that item. An immediately following
+  list keeps its separator and both participating lists keep their markers and
+  indentation, because changing them can alter list tightness or merge runs.
+  Safe inline formatting in the following list still applies.
+- Top-level HTML continued across whitespace-only lines keeps literal quote
+  markers and the source below them until a physically empty line, including
+  empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading
+  view's HTML block. HTML inside a quote still follows that quote's own
+  boundaries.
 - A fence immediately after a task checkbox, including a custom status such as
   `[-]`, keeps the remaining source as written. Live Preview opens code there,
   while the parser reads paragraph text, so subsequent fences can pair
