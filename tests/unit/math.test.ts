@@ -103,6 +103,7 @@ describe("where dollar math begins and ends", () => {
         expect(block.children.map((node) => node.type)).toEqual(["paragraph"]);
       for (const rules of [
         undefined,
+        {},
         { "style/block-spacing": "error" },
         { "style/blank-lines": "error" },
         { "style/list-marker": "error", "style/list-indent": "error" },
@@ -110,7 +111,7 @@ describe("where dollar math begins and ends", () => {
         const options = {
           path: "note.md",
           config: rules
-            ? { dialect: "github" as const, rules }
+            ? { extends: [], dialect: "github" as const, rules }
             : { extends: ["recommended", "github"] },
         };
         const result = format(source, options);
