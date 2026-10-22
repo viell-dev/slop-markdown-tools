@@ -27,8 +27,9 @@ prereleases' notes there are longer than their entries here.
   tables. Existing literal headings retain their row text and underline
   ([#553](https://github.com/viell-dev/slop-markdown-tools/issues/553)).
 - Obsidian formatting preserves underlined headings displayed after lazy list or
-  quote text, retaining the final heading line and its boundaries while allowing
-  safe inline changes above it
+  quote text, retaining the final heading line, its boundaries, and the lazy
+  margin when list padding or number width shrinks. Safe inline changes above it
+  remain available
   ([#554](https://github.com/viell-dev/slop-markdown-tools/issues/554)).
 - Obsidian formatting preserves literal table rows after paragraph-consumed
   footnotes, including HTML, heading, and code endings, adjacent definitions,

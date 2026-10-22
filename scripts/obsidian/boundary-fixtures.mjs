@@ -5,6 +5,35 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 554,
+    name: "padding shrink would capture earlier lazy margin",
+    source: "+    alpha\n  beta\n  gamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "ordered marker width shrink would capture lazy margin",
+    source: "9. first\n10. alpha\n   beta\n   gamma\n---\n",
+  },
+  {
+    issue: 554,
+    name: "nested padding shrink would capture earlier lazy margin",
+    source: "- outer\n  +    alpha\n    beta\n    gamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "padding decrease keeps zero-column lines lazy",
+    source: "+    alpha\nbeta\ngamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "blank ends heading-dependent padding context",
+    source: "+    alpha\n  beta\n  gamma\n\n---\n",
+    preserve: false,
+  },
+  {
     issue: 553,
     name: "spaced break immediately below a table",
     source: "| h |\n| - |\n| v |\n- - -\n",

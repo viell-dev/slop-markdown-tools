@@ -108,6 +108,12 @@ export interface MisreadLists {
    */
   underlines: ReadonlySet<Nodes>;
   /**
+   * Zero-based physical line indexes of earlier lazy list continuations
+   * that supply the final Live Preview heading before an external hyphen
+   * break (#554). Narrowing a list item's content column must keep them lazy.
+   */
+  headingLazyLines: ReadonlySet<number>;
+  /**
    * In the Obsidian dialect, the blocks that Reading view reads as more of a
    * paragraph above them, across lines of blank space that hold a tab at or
    * right of the paragraph's column, which it reads as more of the paragraph
@@ -396,6 +402,7 @@ export function misreadLists(document: Document): MisreadLists {
   const unclosedCode = new Set<Nodes>();
   let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
+  const headingLazyLines = new Set<number>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
   const definitionCode = new Set<Nodes>();
@@ -1096,6 +1103,9 @@ export function misreadLists(document: Document): MisreadLists {
                   }),
                 );
                 if (lazyList) {
+                  // later[0] is the physical line after the paragraph's
+                  // start, so this sum is its zero-based line index.
+                  headingLazyLines.add(last.position.start.line + later.indexOf(lazy));
                   const [start, end] = lazy;
                   const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
                   // That earlier lazy margin supplies the heading's context.
@@ -1654,6 +1664,7 @@ export function misreadLists(document: Document): MisreadLists {
     htmlCodeToEnd,
     htmlText,
     underlines,
+    headingLazyLines,
     lazyItems,
     footnoteText,
     definitionCode,

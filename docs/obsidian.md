@@ -213,7 +213,8 @@ latest installable release:
   physical heading line, the preceding boundary, and its underline. Wrapping or
   inserting a blank there can remove the heading in either Obsidian view. An
   earlier lazy line that determines that reading keeps its boundary and margin
-  too. Safe inline edits above the heading remain eligible.
+  too. List padding and number width can shrink only when that dependency stays
+  lazy. Safe inline edits above the heading remain eligible.
 - Lists following a closing-tag HTML block keep their source when Live Preview
   reads a marker inside that block as their parent. List indentation also stays
   when an HTML comment below the list closes after a marker, including when its

@@ -31,6 +31,110 @@ const boundaries = boundaryFixtures
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
     [
+      "padding decrease captures dependency line",
+      "+    alpha\n  beta\n  gamma\n---\n",
+      { extends: [], dialect: "obsidian", rules: { "style/list-indent": "warn" } },
+      "+    alpha\n  beta\n  gamma\n---\n",
+    ],
+    [
+      "physical line index includes preceding blocks",
+      "# intro\n\n+    alpha\n  beta\n  gamma\n---\n",
+      { extends: [], dialect: "obsidian", rules: { "style/list-indent": "warn" } },
+      "# intro\n\n+    alpha\n  beta\n  gamma\n---\n",
+    ],
+    [
+      "recommended passes keep the lazy threshold",
+      "+    alpha\n  beta\n  gamma\n---\n",
+      config,
+      "-    alpha\n  beta\n  gamma\n---\n",
+    ],
+    [
+      "smaller padding remains above lazy indentation",
+      "+    alpha\n  beta\n  gamma\n---\n",
+      {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-indent": ["warn", { bulletSpaces: 2 }] },
+      },
+      "+  alpha\n  beta\n  gamma\n---\n",
+    ],
+    [
+      "larger padding keeps lazy lines outside",
+      "+ alpha\nbeta\ngamma\n---\n",
+      {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-indent": ["warn", { bulletSpaces: 4 }] },
+      },
+      "+    alpha\nbeta\ngamma\n---\n",
+    ],
+    [
+      "padding decrease cannot capture zero-column text",
+      "+    alpha\nbeta\ngamma\n---\n",
+      { extends: [], dialect: "obsidian", rules: { "style/list-indent": "warn" } },
+      "+ alpha\nbeta\ngamma\n---\n",
+    ],
+    [
+      "ordered digit shrink captures dependency line",
+      "9. first\n10. alpha\n   beta\n   gamma\n---\n",
+      {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/ordered-list": ["warn", { numbering: "same" }] },
+      },
+      "9. first\n10. alpha\n   beta\n   gamma\n---\n",
+    ],
+    [
+      "ordered digit shrink leaves zero-column text lazy",
+      "9. first\n10. alpha\nbeta\ngamma\n---\n",
+      {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/ordered-list": ["warn", { numbering: "same" }] },
+      },
+      "9. first\n9. alpha\nbeta\ngamma\n---\n",
+    ],
+    [
+      "ordered digit increase remains eligible",
+      "9. first\n9. alpha\n  beta\n  gamma\n---\n",
+      {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/ordered-list": ["warn", { numbering: "ordered" }] },
+      },
+      "9. first\n10. alpha\n  beta\n  gamma\n---\n",
+    ],
+    [
+      "nested padding shrink captures dependency line",
+      "- outer\n  +    alpha\n    beta\n    gamma\n---\n",
+      { extends: [], dialect: "obsidian", rules: { "style/list-indent": "warn" } },
+      "- outer\n  +    alpha\n    beta\n    gamma\n---\n",
+    ],
+    [
+      "blank before break ends dependency",
+      "+    alpha\n  beta\n  gamma\n\n---\n",
+      config,
+      "- alpha beta gamma\n\n---\n",
+    ],
+    [
+      "single continuation has no heading dependency",
+      "+    alpha\n  beta\n---\n",
+      config,
+      "- alpha beta\n\n---\n",
+    ],
+  ] satisfies [string, string, Config, string][])(
+    "keeps heading-dependent lazy margins with %s (#554)",
+    (_name, source, settings, expected) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)])
+          expect(checked(bom + source.replaceAll("\n", newline), settings)).toBe(
+            bom + expected.replaceAll("\n", newline),
+          );
+    },
+  );
+
+  it.each([
+    [
       "spaced break under body row",
       "| h |\n| - |\n| v |\n- - -\n",
       "| h   |\n| --- |\n| v   |\n- - -\n",
