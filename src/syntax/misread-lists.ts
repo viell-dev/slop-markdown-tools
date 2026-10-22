@@ -743,11 +743,20 @@ export function misreadLists(document: Document): MisreadLists {
         },
       };
     };
-    // A nested list's continuation indentation must stay at the footnote's
-    // four-column margin in Live Preview, rather than at a list's margin (#496).
+    // List reflow adds its own continuation margin, which Live Preview can
+    // read outside the footnote (#496). Ordinary paragraphs still wrap, and
+    // trailing space after the list remains eligible for safe cleanup (#405).
     for (const [footnote] of footnotes)
       if ("children" in footnote)
-        for (const child of footnote.children.slice(1)) boundaryText.add(wholeLines(child));
+        for (const child of footnote.children.slice(1)) {
+          if (child.type !== "list") continue;
+          const block = wholeLines(child);
+          let end = block.position!.end.offset!;
+          while (source[end - 1] === " " || source[end - 1] === "\t") end--;
+          boundaryText.add(
+            stretch(block, block.position!.start, { ...block.position!.end, offset: end }),
+          );
+        }
     // A nonempty line of spaces resets Live Preview's definition continuation
     // state; an empty line or a tab does not (#493, #495). Preserve that boundary.
     for (const [leaf] of order) {

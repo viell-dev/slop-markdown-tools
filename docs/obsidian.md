@@ -208,7 +208,8 @@ latest installable release:
   too. An unmatched emphasis opener immediately before a block quote preserves
   the opening paragraph and the quote, because Live Preview can carry that style
   into its literal list markers. A blank line resets that emphasis state.
-- Continuation blocks inside footnote definitions keep their source margin.
+- List blocks inside footnote definitions keep their layout; ordinary
+  continuation paragraphs still wrap, and trailing space after a list can go.
   Lines of spaces below a link reference or footnote definition stay, because
   emptying them can change Live Preview's code styling. An ordered list not
   starting at 1 directly below a footnote stays beside it: Reading view keeps
