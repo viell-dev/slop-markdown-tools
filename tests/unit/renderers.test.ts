@@ -360,6 +360,26 @@ describe("Obsidian Live Preview normalizer", () => {
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
 
+  it("ignores terminal styled fence separators while retaining code and metadata (#533)", () => {
+    const line = (
+      value: string,
+      kind = "HyperMD-codeblock-begin",
+      classes = "cm-formatting cm-formatting-code-block",
+    ) => ({
+      kind: `HyperMD-codeblock ${kind}`,
+      runs: [[classes, value]],
+    });
+    expect(livePreview([line("~~~js  \t")])).toEqual(livePreview([line("```js")]));
+    expect(livePreview([line("~~~ \t", "HyperMD-codeblock-end")])).toEqual(
+      livePreview([line("```", "HyperMD-codeblock-end")]),
+    );
+    expect(livePreview([line("~~~js one  two")])).not.toEqual(livePreview([line("```js one two")]));
+    expect(livePreview([line("x  ", "", "")])).not.toEqual(livePreview([line("x", "", "")]));
+    expect(livePreview([line("~~~js  ", "HyperMD-codeblock-begin", "")])).not.toEqual(
+      livePreview([line("~~~js", "HyperMD-codeblock-begin", "")]),
+    );
+  });
+
   it("retains empty unchecked checkbox widgets and their count (#522)", () => {
     const task = {
       kind: "HyperMD-list-line HyperMD-list-line-1 HyperMD-task-line",

@@ -177,11 +177,15 @@ The result's `status` is one of:
 The other fields are present when they apply:
 
 - `target`: the file found, with status `resolved`, and with `unreadable` when
-  the file exists but its content could not be read.
+  the file exists but its content could not be read or fully checked.
 - `fragment`: the part after `#`, decoded, or an empty string; `fragmentExists`:
   with status `resolved`, whether the target has that heading, block, or anchor
   by the rules of `dialect`, and `true` without a fragment and for a target that
   is not Markdown, whose fragments are its own.
+- **Unreleased:** `fragmentIncomplete: true`, with status `unreadable`, means
+  the file was read but structural HTML makes its generated heading anchors
+  uncertain. It is not a missing fragment or a file-read failure. Known earlier
+  headings and explicit IDs can still resolve normally.
 - `unreadable`: the directories or the file that stood in the way. An entry that
   starts with `..` stands for the part of a vault outside the workspace root. In
   the Obsidian dialect, a search by note name that finds nothing readable

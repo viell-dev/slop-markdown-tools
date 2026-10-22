@@ -1,6 +1,6 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
-import { labelEnd, startsWithMarker } from "./parse.js";
+import { labelEnd, range, startsWithMarker } from "./parse.js";
 import {
   capturedLineBreak,
   lineBreak as lineEndingPattern,
@@ -909,6 +909,8 @@ export function misreadLists(document: Document): MisreadLists {
       }
       return last.type === "heading";
     };
+    /** Whether a source line holds a pipe that no backslash escapes. */
+    const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
@@ -924,6 +926,27 @@ export function misreadLists(document: Document): MisreadLists {
             child.start !== 1
           )
             boundaryText.add(stretch(child, previous.position.end));
+          // An unpiped table row starts paragraph text in Reading view. A
+          // non-one ordered list cannot interrupt it (#532). Retain the list
+          // and separating break: its later items can still continue that
+          // paragraph, and an empty item may have no leaf in `order` at all.
+          if (
+            previous.type === "table" &&
+            child.type === "list" &&
+            child.ordered &&
+            (child.start ?? 1) !== 1 &&
+            source
+              .slice(...range(previous))
+              .split(lineEndingPattern)
+              .slice(2)
+              .some((row) => !piped(row))
+          )
+            boundaryText.add(
+              stretch(child, {
+                ...previous.position.end,
+                offset: previous.position.end.offset! - 1,
+              }),
+            );
           // Reading view retains an unindented paragraph directly below a
           // heading in a list's last item, where the parser ends that list (#513).
           if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph")
@@ -1290,8 +1313,6 @@ export function misreadLists(document: Document): MisreadLists {
       ...node,
       position: { ...node.position!, start: { ...node.position!.start, offset: start } },
     });
-    /** Whether `line` holds a pipe that no backslash escapes. */
-    const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
     const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
     const delimiterRow = (line: string) => {

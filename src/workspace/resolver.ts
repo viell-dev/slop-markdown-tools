@@ -211,6 +211,14 @@ export function resolveLink(
   let fragmentExists = true;
   if (fragment) {
     const found = hasAnchor(resolved, dialect, fragment, fragment.replace(/^user-content-/, ""));
+    if (found === "incomplete")
+      return {
+        status: "unreadable",
+        target: resolved,
+        fragment,
+        fragmentIncomplete: true,
+        ...(vault ? { vault } : {}),
+      };
     // The file is there, but what it contains could not be read.
     if (found === undefined)
       return {

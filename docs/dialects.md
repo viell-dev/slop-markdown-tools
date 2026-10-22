@@ -87,9 +87,12 @@ never restyled, and no line is broken inside it.
   math needs its own paragraph: `$$` directly below an existing paragraph stays
   in that paragraph, including a list item's or block quote's continuation.
   Formatting preserves these continuations in versions after 0.4.0
-  ([#491](https://github.com/viell-dev/slop-markdown-tools/issues/491)).
-  VitePress's optional dollar display math can interrupt a paragraph and close
-  on the same line; a `math` code fence is ordinary code there.
+  ([#491](https://github.com/viell-dev/slop-markdown-tools/issues/491)). In
+  those versions, table syntax also takes precedence over dollar display math:
+  dollar-prefixed headers and contiguous dollar rows remain table cells. A blank
+  line ends the table before a subsequent math block. VitePress's optional
+  dollar display math can interrupt a paragraph and close on the same line; a
+  `math` code fence is ordinary code there.
 
 Where a renderer is stricter, the tool still protects the text: a formula with
 emphasis inside, which GitHub does not render, and one that runs over a line
@@ -101,6 +104,14 @@ view, which shows more as a formula.
 
 A link's fragment (`page.md#install`) is checked against the anchors that the
 dialect's renderer generates.
+
+In versions after 0.4.0, GitHub heading anchors also participate in the semantic
+guard for rule and plugin edits. Structural HTML can close a generated heading
+early or carry its text into later blocks. When that boundary is uncertain, the
+GitHub formatter preserves the source from that heading through the end of the
+document. Fragment checks retain known earlier headings and explicit HTML IDs;
+other fragments are reported as not fully checked, without guessing an anchor.
+The CommonMark fallback uses the same fragment-checking limit.
 
 | Dialect                    | Anchor of a heading                                                                                                                                      | Matched                                     |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |

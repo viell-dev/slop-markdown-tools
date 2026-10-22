@@ -24,6 +24,8 @@ import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { headingAnchorSource, headingAttributeSource } from "../workspace/heading-attributes.js";
+import { githubAnchors } from "../workspace/anchors.js";
+import { githubHeadingLimit } from "../workspace/github-heading-source.js";
 import { misreadLists } from "../syntax/misread-lists.js";
 import { lineBreak, lineStarts } from "../syntax/source.js";
 import { suppressions } from "./directives.js";
@@ -266,6 +268,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   if (plain) readings.push(misreadLists({ ...document, tree: plain }));
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
+  const githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
   for (const [start, end] of Array.from(
     readings.flatMap((misread) => [
       ...misread.text,
@@ -291,6 +294,13 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     if (last && start < last[1]) last[1] = Math.max(last[1], end);
     else blocks.push([start, end]);
   }
+  if (githubLimit !== undefined) {
+    // Merge with any existing ranges before the shared binary search.
+    while (blocks.length && blocks.at(-1)![0] >= githubLimit) blocks.pop();
+    const last = blocks.at(-1);
+    if (last && last[1] >= githubLimit) last[1] = document.source.length;
+    else blocks.push([githubLimit, document.source.length]);
+  }
   if (!blocks.length) return () => false;
   const { source } = document;
   const within = (from: number, to: number) => {
@@ -305,6 +315,13 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     return block !== undefined && from < block[1] && to > block[0];
   };
   return (edit) => {
+    if (
+      githubLimit !== undefined &&
+      edit.start === source.length &&
+      edit.end === edit.start &&
+      edit.text
+    )
+      return true;
     if (!within(edit.start, edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
     const { text } = edit;
@@ -632,6 +649,11 @@ function semanticTree(
     return result;
   }
   const result = normalize(document.tree) as Record<string, unknown>;
+  if (document.dialect === "github") {
+    result.githubAnchors = [...githubAnchors(document).slugs];
+    const limit = githubHeadingLimit(document);
+    if (limit !== undefined) result.githubHeadingSource = document.source.slice(limit);
+  }
   if (document.dialect === "vitepress")
     result.vitepress = vitepressSemantics(document, workspace, codeValues);
   // Where front matter would end inside a code block, an HTML block, or

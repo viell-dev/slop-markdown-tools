@@ -246,7 +246,10 @@ latest installable release:
   pipes can start another table or end Reading view's table inside the primary
   parse's table. Their source stays too: adding leading pipes would merge those
   regions. Text continued across a tab separator also keeps immediately
-  following ordered continuations and setext boundaries as written.
+  following ordered continuations and setext boundaries as written. A non-one
+  ordered list immediately after an unpiped table row keeps its source and
+  separating break: Reading view retains that row and its numbered continuations
+  as paragraph text.
 
 Independent blocks outside these regions still format. These protections are
 specific to the Obsidian dialect.

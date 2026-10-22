@@ -31,7 +31,8 @@ const rawText = new Set([
 
 /** A tag that becomes an element, or the text between tags. */
 type HtmlToken =
-  { name: string; attributes: string; close: boolean } | { name?: undefined; text: string };
+  | { name: string; attributes: string; close: boolean; selfClosing?: true }
+  | { name?: undefined; text: string };
 
 /**
  * HTML as a browser tokenizes it, in one forward pass: comments, which run to
@@ -69,7 +70,13 @@ function htmlTokens(html: string): HtmlToken[] {
       end = at + tag[0].length;
       text(at);
       if (!open) tokens.push({ name, attributes: "", close: true });
-      else if (!rawText.has(name)) tokens.push({ name, attributes: tag[2]!, close: false });
+      else if (!rawText.has(name))
+        tokens.push({
+          name,
+          attributes: tag[2]!,
+          close: false,
+          ...(tag[0].endsWith("/>") ? { selfClosing: true as const } : {}),
+        });
       else {
         const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
         const after = close < 0 ? -1 : html.indexOf(">", close);

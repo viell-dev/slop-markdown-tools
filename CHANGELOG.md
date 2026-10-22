@@ -22,6 +22,23 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub table headers and continued rows take precedence over dollar display
+  math, restoring table-column diagnostics and rejecting edits that split those
+  rows into math
+  ([#504](https://github.com/viell-dev/slop-markdown-tools/issues/504),
+  [#534](https://github.com/viell-dev/slop-markdown-tools/issues/534)).
+- GitHub formatting preserves source whose structural heading HTML makes its
+  anchor boundary uncertain. Fragment checks report that limit instead of
+  guessing IDs, and the semantic guard rejects plugin edits that change ordinary
+  heading anchors
+  ([#498](https://github.com/viell-dev/slop-markdown-tools/issues/498),
+  [#535](https://github.com/viell-dev/slop-markdown-tools/issues/535),
+  [#536](https://github.com/viell-dev/slop-markdown-tools/issues/536)).
+- Obsidian formatting keeps non-one ordered continuations after unpiped table
+  text as written, and its comparison ignores terminal whitespace on styled
+  fence separators while retaining code and internal metadata whitespace
+  ([#532](https://github.com/viell-dev/slop-markdown-tools/issues/532),
+  [#533](https://github.com/viell-dev/slop-markdown-tools/issues/533)).
 - Obsidian formatting preserves code carried into nested quoted lists, task
   checkbox separators, bare HTML-comment markers, fences whose openers remain in
   HTML, and indented code read outside a quote

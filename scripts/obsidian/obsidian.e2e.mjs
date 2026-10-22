@@ -424,9 +424,14 @@ function livePreview(lines) {
         // and an item's number, which `style/ordered-list` chooses.
         if (/\blist-bullet\b/.test(classes)) text = "•";
         // A code block's fence, whose characters and length `style/code-fence` chooses.
-        else if (/\bcm-formatting-code-block\b/.test(classes))
+        else if (/\bcm-formatting-code-block\b/.test(classes)) {
           text = text.replace(/^(?:`{3,}|~{3,})/, "```");
-        else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
+          // Source-only trailing separators on a styled fence carry no code
+          // or info-string content (#533). Code body and internal info spaces
+          // remain exact, as do unstyled text runs that happen to contain ticks.
+          if (/\bHyperMD-codeblock-(?:begin|end)\b/.test(block.kind))
+            text = text.replace(/[ \t]+$/, "");
+        } else if (/\bcm-formatting-list-ol\b/.test(classes)) text = text.replace(/\d+[.)]/, "#.");
         else if (/\bcm-(?:hmd-barelink|link)\b/.test(classes))
           text = text.replace(/^X(?=\s|$)/, "x");
         // Unstyled text shows the source as written, where Live Preview reads no syntax, such as
@@ -573,6 +578,30 @@ const reduce = process.env.REDUCE?.split(",")
 const probe = process.env.PROBE ? JSON.parse(process.env.PROBE) : undefined;
 
 describe("Obsidian before and after formatting", function () {
+  it("normalizes styled fence separators while retaining code and info content (#533)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = [
+      "~~~js  \nx\n",
+      "```js\nx\n",
+      "~~~js\nx  \n",
+      "~~~js one  two\nx\n",
+      "~~~js one two\nx\n",
+    ];
+    const views = [];
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/fence-info-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.push(await shown(path, source));
+    }
+    expect(
+      views[0].lines.some((line) => line.runs.some(([, value]) => value.endsWith("js  "))),
+    ).toBe(true);
+    expect(livePreview(views[0].lines)).toEqual(livePreview(views[1].lines));
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
+    expect(cleanHtml(views[2].reading)).not.toEqual(cleanHtml(views[1].reading));
+    expect(livePreview(views[3].lines)).not.toEqual(livePreview(views[4].lines));
+  });
+
   it("normalizes lone list paragraphs while retaining paragraph boundaries (#528)", async function () {
     if (probe || reduce) this.skip();
     const sources = [

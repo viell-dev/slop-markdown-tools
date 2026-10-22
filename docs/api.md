@@ -102,6 +102,12 @@ maps each path, relative to the workspace root with forward slashes, to one of:
   link to a heading in that file resolve as `unreadable`, while a link to the
   file itself still resolves; any other error propagates.
 
+In versions after 0.4.0, a readable GitHub target with structural HTML in a
+heading can also leave fragment checks incomplete. The result has status
+`unreadable` and `fragmentIncomplete: true`; known earlier headings and explicit
+IDs remain checkable. This distinguishes an uncertain renderer boundary from a
+missing anchor or unreadable file.
+
 | `WorkspaceOptions` | Meaning                                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `dialect`          | The dialect that link targets are parsed in; `github` when omitted. Give the dialect of the documents that link into them.       |

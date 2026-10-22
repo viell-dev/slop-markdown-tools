@@ -2593,7 +2593,6 @@ describe("anchors of headings written as HTML", () => {
       "`<h2>In code</h2>`",
       "```html\n<h2>Fenced</h2>\n```",
       "<h7>Not a heading</h7>",
-      "<h2>Unclosed",
     ].join("\n\n"),
   });
   const resolves = (fragment: string, dialect: Dialect) =>
@@ -2628,7 +2627,6 @@ describe("anchors of headings written as HTML", () => {
     ["in-code", false, false],
     ["fenced", false, false],
     ["not-a-heading", false, false],
-    ["unclosed", false, false],
   ])("resolves #%s as %s on GitHub and %s on Gitea", (fragment, github, gitea) => {
     expect(resolves(fragment, "github")).toBe(github);
     expect(resolves(fragment, "commonmark")).toBe(github);

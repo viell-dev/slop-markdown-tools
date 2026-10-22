@@ -322,9 +322,11 @@ export const linkRules: Record<string, Rule> = {
                 ? `Local target could not be checked: ${url} (${result.leavesRoot} leads outside the workspace root, which the tool does not read).`
                 : result.target === undefined
                   ? `Local target could not be checked: ${url} (no readable match; ${reasons.join("; ")}).`
-                  : document.dialect === "vitepress"
-                    ? `Fragment could not be checked: ${url} (${result.target} or its included or renderer-dependent text could not be read or fully checked).`
-                    : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
+                  : result.fragmentIncomplete
+                    ? `Fragment could not be checked: ${url} (structural HTML makes heading anchors in ${result.target} uncertain).`
+                    : document.dialect === "vitepress"
+                      ? `Fragment could not be checked: ${url} (${result.target} or its included or renderer-dependent text could not be read or fully checked).`
+                      : `Fragment could not be checked: ${url} (cannot read ${result.target}).`,
           });
         } else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });

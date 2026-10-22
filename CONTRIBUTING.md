@@ -201,16 +201,19 @@ The comparison retains the source delimiter of styled list lines, including
 checkbox widgets, and normalizes spaces within and around italic and bold runs
 while keeping styled characters, code, highlights, and decorations significant.
 Unchecked checkbox widgets retain their presence and count even with no text.
-For the default Obsidian theme, a lone unattributed paragraph directly inside a
-list item has no extra spacing and is compared as inline content. Multiple
-paragraphs, attributed paragraphs, and other block boundaries remain
-significant; a deterministic host control checks these cases on every comparison
-run. The Obsidian workflow runs the check for pull requests that change a
-[renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
-by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
-`seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the
-report and the screenshots. It fails when the check compared nothing. Every
-week, and in the Release workflow, it runs the fixtures alone (`COUNT=0`).
+Styled fence delimiters ignore only their terminal spaces and tabs; code body
+whitespace and internal info-string spacing remain significant. A host control
+checks both the normalization and those negative cases. For the default Obsidian
+theme, a lone unattributed paragraph directly inside a list item has no extra
+spacing and is compared as inline content. Multiple paragraphs, attributed
+paragraphs, and other block boundaries remain significant; a deterministic host
+control checks these cases on every comparison run. The Obsidian workflow runs
+the check for pull requests that change a [renderer-sensitive
+path](#what-the-checks-prove), in the Release workflow, and by hand with
+`gh workflow run obsidian.yml --ref BRANCH`, with the inputs `seed`, `count`,
+and `obsidian-version`; its `obsidian` artifact holds the report and the
+screenshots. It fails when the check compared nothing. Every week, and in the
+Release workflow, it runs the fixtures alone (`COUNT=0`).
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the

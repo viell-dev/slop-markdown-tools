@@ -5,6 +5,33 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 533,
+    name: "terminal whitespace in an unclosed fence info string",
+    source: "~~~ &copy;  \nx\n",
+    preserve: false,
+  },
+  ...[
+    "| a |\n| - |\n| b |\ntext\n2) first *words*\n3) second\n",
+    "> | a |\n> | - |\n> | b |\n> text\n> 2) first *words*\n> 3) second\n",
+    "- | a |\n  | - |\n  | b |\n  text\n  2) first *words*\n  3) second\n",
+    "| a |\n| - |\n| b |\ntext\n2) \n   *next*\n",
+    "| a |\n| - |\n| b |\ntext\n2) \n3) \n",
+  ].map((source, index) => ({
+    issue: 532,
+    name: `non-one continuation after an unpiped table row ${index}`,
+    source,
+  })),
+  ...[
+    "| a |\n| - |\n| b |\n2) first *words*\n3) second\n",
+    "| a |\n| - |\n| b |\ntext\n\n2) first *words*\n3) second\n",
+    "| a |\n| - |\n| b |\ntext\n1) first *words*\n2) second\n",
+  ].map((source, index) => ({
+    issue: 532,
+    name: `independent list below a table ${index}`,
+    source,
+    preserve: false,
+  })),
+  {
     issue: 524,
     name: "carried code through a nested quoted list",
     source: "text ```\n> 1) *first*\n>    - *second*\n",

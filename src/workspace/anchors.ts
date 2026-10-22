@@ -9,6 +9,7 @@ import { lineBreak } from "../syntax/source.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 import { htmlTokens, htmlAnchors, htmlHeadings, htmlView } from "./html.js";
+import { githubHeadingLimit } from "./github-heading-source.js";
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
 interface Rendering {
@@ -86,6 +87,8 @@ interface ObsidianAnchors {
 
 /** What GitHub links to, and CommonMark in its stead. */
 interface GithubAnchors {
+  /** Whether generated anchors are known after all of the document's HTML. */
+  complete: boolean;
   /** GitHub's numbered heading anchors. */
   slugs: Set<string>;
   /** `id` and `<a name>` values from the document's HTML, lowercased, as GitHub stores and matches them. */
@@ -199,7 +202,12 @@ function obsidianAnchors(document: Document): ObsidianAnchors {
 
 /** A target's anchors for GitHub and CommonMark. */
 function githubAnchors(document: Document): GithubAnchors {
-  const anchors: GithubAnchors = { slugs: new Set(), explicit: new Set() };
+  const limit = githubHeadingLimit(document);
+  const anchors: GithubAnchors = {
+    complete: limit === undefined,
+    slugs: new Set(),
+    explicit: new Set(),
+  };
   const slugger = new GithubSlugger();
   const parts = htmlParts(document);
   // GitHub numbers the anchors of Markdown and HTML headings together, in
@@ -207,6 +215,7 @@ function githubAnchors(document: Document): GithubAnchors {
   // with the prefix.
   const add = (text: string) => anchors.slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
   walk(document.tree, (node) => {
+    if (limit !== undefined && (node.position?.start.offset ?? 0) >= limit) return;
     const part = parts.get(node);
     if (part) for (const heading of part.headings) add(heading.text);
     else if (node.type === "heading") add(renderedText(node, github));
