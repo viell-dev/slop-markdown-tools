@@ -82,10 +82,14 @@ never restyled, and no line is broken inside it.
   followed by a space, and a `$` closes the formula only when no space stands
   before it and no digit follows it. `$ x $` is prose; `a$x$b` holds a formula,
   unlike GitHub, Forgejo, and Gitea.
-- **Display math**, between lines of `$$` or in a `math` code block, is the same
-  on GitHub, Forgejo, Gitea, and Obsidian. VitePress's optional dollar display
-  math can interrupt a paragraph and close on the same line; a `math` code fence
-  is ordinary code there.
+- **Display math**, between lines of `$$` or in a `math` code block, is
+  protected on GitHub, Forgejo, Gitea, and Obsidian. GitHub's dollar display
+  math needs its own paragraph: `$$` directly below an existing paragraph stays
+  in that paragraph, including a list item's or block quote's continuation.
+  Preserving these continuations is an unreleased fix
+  ([#491](https://github.com/viell-dev/slop-markdown-tools/issues/491)).
+  VitePress's optional dollar display math can interrupt a paragraph and close
+  on the same line; a `math` code fence is ordinary code there.
 
 Where a renderer is stricter, the tool still protects the text: a formula with
 emphasis inside, which GitHub does not render, and one that runs over a line

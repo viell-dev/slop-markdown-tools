@@ -22,6 +22,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub dollar display fences no longer interrupt an existing paragraph in the
+  parser. Formatting keeps dollar lines directly below a list item inside that
+  item, including lazy continuations, instead of moving them outside the list
+  ([#491](https://github.com/viell-dev/slop-markdown-tools/issues/491)).
 - The README's opening description and repository About/topics include
   VitePress, matching the released dialect support. Maintenance instructions
   require public descriptions and discovery metadata to be updated with feature

@@ -2,7 +2,7 @@ import type { Nodes } from "mdast";
 import { describe, expect, it } from "vitest";
 import { format, lint, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
-import { mathCases, obsidianMathCases } from "./math-renderers.js";
+import { githubMathContinuations, mathCases, obsidianMathCases } from "./math-renderers.js";
 import type { MathRenderer } from "./math-renderers.js";
 
 /** The source text of every formula the tool reads in a document, in order. */
@@ -88,6 +88,69 @@ describe("dollar math, compared with what the renderers render", () => {
 });
 
 describe("where dollar math begins and ends", () => {
+  it.each(githubMathContinuations)(
+    "keeps dollar lines in their GitHub $type instead of interrupting it",
+    ({ type, source }) => {
+      // GitHub's file and comment renderers keep these lines in the paragraph,
+      // including its lazy continuations; a math block would end the container (#491).
+      const { tree } = parse(source, "github");
+      expect(tree.children.map((node) => node.type)).toEqual([type]);
+      expect(tree.children[0]?.position?.end.offset).toBe(source.length - 1);
+      const block = tree.children[0];
+      if (block?.type === "list")
+        expect(block.children[0]?.children.map((node) => node.type)).toEqual(["paragraph"]);
+      if (block?.type === "blockquote")
+        expect(block.children.map((node) => node.type)).toEqual(["paragraph"]);
+      for (const rules of [
+        undefined,
+        { "style/block-spacing": "error" },
+        { "style/blank-lines": "error" },
+        { "style/list-marker": "error", "style/list-indent": "error" },
+      ] as const) {
+        const options = {
+          path: "note.md",
+          config: rules
+            ? { dialect: "github" as const, rules }
+            : { extends: ["recommended", "github"] },
+        };
+        const result = format(source, options);
+        expect(result.output).toBe(source);
+        expect(result.diagnostics).toEqual([]);
+        expect(format(result.output, options).changed).toBe(false);
+        expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+          semanticFingerprint(parse(source, "github")),
+        );
+      }
+    },
+  );
+
+  it("still starts GitHub display math at a block boundary", () => {
+    for (const source of [
+      "$$\nx\n$$\n",
+      "a\n\n$$\nx\n$$\n",
+      "- a\n\n  $$\n  x\n  $$\n",
+      "- $$\n  x\n  $$\n",
+      "a\n- $$\n  x\n  $$\n",
+      "> $$\n> x\n> $$\n",
+    ]) {
+      expect(formulas(source, "github")).toEqual([source.slice(source.indexOf("$$"), -1)]);
+    }
+    expect(parse("- a\n\n$$\nx\n$$\n", "github").tree.children.map((node) => node.type)).toEqual([
+      "list",
+      "math",
+    ]);
+  });
+
+  it.each(["forgejo", "gitea", "obsidian"] as const)(
+    "retains the existing display-math paragraph interruption in %s",
+    (dialect) => {
+      expect(parse("a\n$$\nx\n$$\n", dialect).tree.children.map((node) => node.type)).toEqual([
+        "paragraph",
+        "math",
+      ]);
+    },
+  );
+
   it("finds the formula that the renderers find when an earlier dollar opens nothing", () => {
     for (const dialect of renderers) {
       expect(formulas("It costs $5 but $x$ is math and $6 is not.", dialect), dialect).toEqual([

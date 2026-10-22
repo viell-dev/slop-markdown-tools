@@ -29,6 +29,21 @@ export interface MathCase {
   math: MathRenderer[];
   observed?: MathRenderer[];
 }
+/**
+ * GitHub's Markdown API in both `markdown` (files) and `gfm` (comments) modes,
+ * observed on 2026-10-22 for #491: these dollar lines stay in the existing
+ * paragraph, including lazy container continuations, rather than opening a
+ * display block. `type` is the paragraph's outermost block.
+ */
+export const githubMathContinuations = [
+  { type: "paragraph", source: "a\n$$\nx\n$$\n" },
+  { type: "list", source: "1. a\n$$\nx\n$$\n" },
+  { type: "list", source: "- a\n$$\nx\n$$\n" },
+  { type: "list", source: "- a\n  $$\n  x\n  $$\n" },
+  { type: "blockquote", source: "> a\n$$\nx\n$$\n" },
+  { type: "blockquote", source: "> a\n> $$\n> x\n> $$\n" },
+];
+
 export const mathCases: MathCase[] = [
   { name: "basic", source: "A $x$ d.", math: ["github", "forgejo", "gitea"] },
   { name: "space-after-open", source: "A $ x$ d.", math: ["forgejo", "gitea"] },
