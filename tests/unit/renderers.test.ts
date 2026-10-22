@@ -347,6 +347,36 @@ describe("Obsidian Live Preview normalizer", () => {
         ]),
       ]),
     );
+    // A nested quote's unstyled `>` separates the soft-line join from the
+    // following word until quote punctuation is removed later in normalization.
+    const quote = (runs: string[][]) => ({ kind: "HyperMD-quote HyperMD-quote-2", runs });
+    const quote1 = "cm-formatting cm-formatting-quote cm-formatting-quote-1";
+    const quote2 = "cm-formatting cm-formatting-quote cm-formatting-quote-2";
+    expect(
+      livePreview([
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          ["cm-strong", "basket"],
+          ["", " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    ).toEqual(
+      livePreview([
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          ["cm-strong", "basket"],
+        ]),
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          [quote2, " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    );
     for (const style of ["cm-inline-code", "cm-highlight", "cm-strikethrough"])
       expect(
         livePreview([
