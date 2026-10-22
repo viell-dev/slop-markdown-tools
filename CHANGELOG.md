@@ -34,6 +34,9 @@ prereleases' notes there are longer than their entries here.
   ([#498](https://github.com/viell-dev/slop-markdown-tools/issues/498),
   [#535](https://github.com/viell-dev/slop-markdown-tools/issues/535),
   [#536](https://github.com/viell-dev/slop-markdown-tools/issues/536)).
+- GitHub fragment checks include HTML headings in Markdown table cells,
+  including headings closed by their cell boundary
+  ([#538](https://github.com/viell-dev/slop-markdown-tools/issues/538)).
 - Obsidian formatting keeps non-one ordered continuations after unpiped table
   text as written, and its comparison ignores terminal whitespace on styled
   fence separators while retaining code and internal metadata whitespace

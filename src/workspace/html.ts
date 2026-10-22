@@ -75,7 +75,11 @@ function htmlTokens(html: string): HtmlToken[] {
           name,
           attributes: tag[2]!,
           close: false,
-          ...(tag[0].endsWith("/>") ? { selfClosing: true as const } : {}),
+          // The attribute capture includes a slash consumed by an unquoted
+          // value (`class=x/>`), which does not self-close the element.
+          ...(tag[0].endsWith("/>") && !tag[2]!.endsWith("/")
+            ? { selfClosing: true as const }
+            : {}),
         });
       else {
         const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
@@ -148,7 +152,7 @@ const headingTag = /^h[1-6]$/;
  * closes it. A heading left open at the end is not reported: the renderers
  * continue it through the Markdown that follows, which is not modeled.
  */
-function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
+function htmlHeadings(tokens: HtmlToken[], closeAtEnd = false): { text: string; hasId: boolean }[] {
   const headings: { text: string; hasId: boolean }[] = [];
   let open: { text: string; hasId: boolean } | undefined;
   const close = () => {
@@ -169,6 +173,7 @@ function htmlHeadings(tokens: HtmlToken[]): { text: string; hasId: boolean }[] {
         };
     }
   }
+  if (closeAtEnd) close();
   return headings;
 }
 

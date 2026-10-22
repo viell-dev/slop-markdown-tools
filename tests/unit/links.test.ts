@@ -2565,6 +2565,10 @@ describe("fragment case on GitHub", () => {
 });
 
 describe("anchors of headings written as HTML", () => {
+  it("still omits an unclosed HTML heading on Gitea", () => {
+    const workspace = createWorkspace({ "Note.md": "<h2>Unclosed\n" });
+    expect(workspace.resolve("Doc.md", "Note.md#unclosed", "gitea").fragmentExists).toBe(false);
+  });
   // GitHub generates an anchor for an HTML heading as for a Markdown one
   // (`<h3 align="center">Special Sponsor</h3>` is #special-sponsor on a live
   // README). Gitea 1.27.3 and 28.0.0, run locally, do the same for headings

@@ -5,6 +5,7 @@ import { htmlTokens, htmlView } from "./html.js";
 
 type Tokens = ReturnType<typeof htmlTokens>;
 const heading = /^h[1-6]$/;
+const tableStructure = new Set("table tbody tfoot thead tr td th caption colgroup".split(" "));
 const blocks = new Set(
   "address article aside blockquote body caption center colgroup dd details dialog dir dl dt fieldset figcaption figure footer form frameset h1 h2 h3 h4 h5 h6 header hgroup html legend li main menu nav ol optgroup option p pre search section select summary table tbody td template tfoot th thead tr ul".split(
     " ",
@@ -20,7 +21,7 @@ const prefixes = new WeakMap<Nodes, number>();
  * are safe controls; other structural block tags are conservatively uncertain
  * (#498, #535). This classifies boundaries rather than emulating HTML parsing.
  */
-function structural(tokens: Tokens): boolean {
+function structural(tokens: Tokens, closeAtEnd = false): boolean {
   let divs = 0;
   for (const token of tokens) {
     if (token.name === undefined) continue;
@@ -32,11 +33,11 @@ function structural(tokens: Tokens): boolean {
       } else divs++;
     } else if (blocks.has(token.name)) return true;
   }
-  return divs > 0;
+  return divs > 0 && !closeAtEnd;
 }
 
 /** Known headings before the first uncertain one in a raw block or paragraph. */
-function rawHeading(tokens: Tokens): { uncertain: boolean; known: number } {
+function rawHeading(tokens: Tokens, closeAtEnd = false): { uncertain: boolean; known: number } {
   let from: number | undefined;
   let known = 0;
   for (const [index, token] of tokens.entries()) {
@@ -53,7 +54,10 @@ function rawHeading(tokens: Tokens): { uncertain: boolean; known: number } {
       from = undefined;
     }
   }
-  return { uncertain: from !== undefined, known };
+  return {
+    uncertain: from !== undefined && (!closeAtEnd || structural(tokens.slice(from), closeAtEnd)),
+    known,
+  };
 }
 
 /** Known raw headings in the block whose source starts the uncertain suffix. */
@@ -74,16 +78,26 @@ export function githubHeadingLimit(document: Document): number | undefined {
   walk(document.tree, (node, _index, parent) => {
     if (start !== undefined) return;
     let uncertain = node.type === "heading" && structural(htmlTokens(htmlView(node)));
+    // Cell boundaries close ordinary headings, including an open div. Raw
+    // table closers can instead move a later heading before the whole table,
+    // changing duplicate numbering. Retain that table rather than guessing.
+    if (node.type === "table")
+      uncertain = node.children.some((row) =>
+        row.children.some((cell) => {
+          const tokens = htmlTokens(htmlView(cell));
+          return (
+            tokens.some((token) => token.name && token.close && tableStructure.has(token.name)) ||
+            rawHeading(tokens, true).uncertain
+          );
+        }),
+      );
     if (
       node.type === "paragraph" ||
       (node.type === "html" &&
-        parent?.type !== "paragraph" &&
-        parent?.type !== "emphasis" &&
-        parent?.type !== "strong" &&
-        parent?.type !== "delete" &&
-        parent?.type !== "link" &&
-        parent?.type !== "linkReference" &&
-        parent?.type !== "heading")
+        (parent?.type === "root" ||
+          parent?.type === "blockquote" ||
+          parent?.type === "listItem" ||
+          parent?.type === "footnoteDefinition"))
     ) {
       const result = rawHeading(htmlTokens(htmlView(node)));
       uncertain = result.uncertain;

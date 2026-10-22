@@ -22,6 +22,8 @@ const uncertain = [
   "### a <table/> b\n\nc  d\n",
   "<h2>Unclosed\n\nc  d\n",
   "Inline <h2>Unclosed\n\nc  d\n",
+  "### a <div class=x/> b\n\nc  d\n",
+  "### a <div class = x/> b\n\nc  d\n",
 ];
 
 describe("GitHub heading source and anchor boundaries", () => {
@@ -42,6 +44,9 @@ describe("GitHub heading source and anchor boundaries", () => {
     "### a <span> b",
     "### a <br> b",
     "### a <div/> b",
+    "### a <div class=x /> b",
+    '### a <div class="x"/> b',
+    "### a <div bare/> b",
     "### a <hr/> b",
     "### a <custom> b",
     "### a <scripty> b</scripty>",
@@ -113,6 +118,90 @@ describe("GitHub heading source and anchor boundaries", () => {
   it("retains EOF source without an unsafe final-newline diagnostic", () => {
     const source = "### a <div> b\n\nc  d";
     expect(format(source, { config })).toMatchObject({ output: source, diagnostics: [] });
+  });
+
+  it.each([
+    "<h2>x</h2>",
+    "<h2>x",
+    "<h2>*x*</h2>",
+    "<h2>x<div>",
+    '<h2 title="</td></tr></table>">x</h2>',
+  ])("bounds a raw heading at the table cell and checks its anchor: %j", (heading) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const source = `| ${heading} |\n| - |\n\nc  d\n\n## Later\n`.replaceAll("\n", newline);
+      const workspace = createWorkspace({ "Note.md": source });
+      expect(workspace.resolve("From.md", "Note.md#x", "github").fragmentExists).toBe(true);
+      expect(workspace.resolve("From.md", "Note.md#later", "github").fragmentExists).toBe(true);
+      expect(workspace.resolve("From.md", "Note.md#absent", "github").fragmentExists).toBe(false);
+      const result = format(source, { config });
+      expect(result.output).toContain(`${newline}c d${newline}`);
+      expect(result.diagnostics).toEqual([]);
+      expect(format(result.output, { config }).output).toBe(result.output);
+      expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+        semanticFingerprint(parse(source, "github")),
+      );
+    }
+  });
+
+  it("locates a heading-anchor refusal at its heading instead of the document root", () => {
+    const source = "Intro\n\nMore text\n\n# a  b\n";
+    const plugin: Plugin = {
+      name: "change",
+      rules: {
+        heading: {
+          kind: "style",
+          description: "Change heading source",
+          check: () => [
+            {
+              start: source.indexOf("#"),
+              message: "Change",
+              edit: { start: source.indexOf("  "), end: source.indexOf("  ") + 2, text: " " },
+            },
+          ],
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "github", rules: { "change/heading": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ rule: "engine/unsafe-format", line: 5 }),
+    );
+  });
+
+  it.each(["p", "table"])("does not guess an early-closed %s cell heading anchor", (tag) => {
+    const source = `| <h2>a <${tag}> b |\n| - |\n\n## Later\n`;
+    const workspace = createWorkspace({ "Note.md": source });
+    expect(workspace.resolve("From.md", "Note.md#a--b", "github")).toMatchObject({
+      status: "unreadable",
+      fragmentIncomplete: true,
+    });
+  });
+
+  it("numbers headings across cells and later Markdown headings in their rendered order", () => {
+    const source =
+      "| <h2>Repeat | <h2>Repeat</h2> |\n| - | - |\n| <h2>Repeat | <h3>Repeat |\n\n## Repeat\n";
+    const workspace = createWorkspace({ "Note.md": source });
+    for (const suffix of ["", "-1", "-2", "-3", "-4"])
+      expect(workspace.resolve("From.md", `Note.md#repeat${suffix}`, "github").fragmentExists).toBe(
+        true,
+      );
+    expect(workspace.resolve("From.md", "Note.md#repeat-5", "github").fragmentExists).toBe(false);
+  });
+
+  it("preserves malformed table boundaries that reorder headings before the table", () => {
+    const source =
+      "before  text\n\n# Known\n\n| First | Second |\n| --- | --- |\n| <h2>X</h2> | <h2>X</h2></td><h2>X-1</h2> |\n\nafter  text\n";
+    const workspace = createWorkspace({ "Note.md": source });
+    expect(workspace.resolve("From.md", "Note.md#known", "github").fragmentExists).toBe(true);
+    for (const anchor of ["x", "x-1", "x-2", "x-1-1"])
+      expect(workspace.resolve("From.md", `Note.md#${anchor}`, "github")).toMatchObject({
+        status: "unreadable",
+        fragmentIncomplete: true,
+      });
+    expect(format(source, { config }).output).toBe(source.replace("before  text", "before text"));
   });
 
   it.each([

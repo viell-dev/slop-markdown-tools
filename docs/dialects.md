@@ -107,8 +107,10 @@ dialect's renderer generates.
 
 In versions after 0.4.0, GitHub heading anchors also participate in the semantic
 guard for rule and plugin edits. Structural HTML can close a generated heading
-early or carry its text into later blocks. When that boundary is uncertain, the
-GitHub formatter preserves the source from that heading through the end of the
+early or carry its text into later blocks. HTML headings inside table cells also
+contribute anchors; ordinary cell boundaries close them, while malformed table
+HTML can reorder them. When a boundary is uncertain, the GitHub formatter
+preserves the source from the affected heading or table through the end of the
 document. Fragment checks retain known earlier headings and explicit HTML IDs;
 other fragments are reported as not fully checked, without guessing an anchor.
 The CommonMark fallback uses the same fragment-checking limit.

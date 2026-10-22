@@ -561,6 +561,15 @@ function semanticTree(
   origins?: Map<unknown, Nodes>,
   codeValues?: WeakMap<Code, string>,
 ): unknown {
+  const githubHeadings = new Map<Nodes, string[]>();
+  const githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
+  let githubSourceRecorded = false;
+  if (document.dialect === "github")
+    githubAnchors(document, (node, slug) => {
+      const headings = githubHeadings.get(node);
+      if (headings) headings.push(slug);
+      else githubHeadings.set(node, [slug]);
+    });
   const canonicalUrl = (url: string, wiki = false) => {
     const resolution = workspace?.resolve(document.path, url, document.dialect, wiki);
     // A target that is uncertain, because a directory could not be read, is not
@@ -592,6 +601,19 @@ function semanticTree(
       return link;
     }
     const result: Record<string, unknown> = {};
+    // Anchor differences belong to their heading/block, so a refusal names
+    // that source location instead of stopping at root-level metadata.
+    const githubAnchors = githubHeadings.get(node);
+    if (githubAnchors) result.githubAnchors = githubAnchors;
+    if (
+      !githubSourceRecorded &&
+      node.type !== "root" &&
+      githubLimit !== undefined &&
+      node.position?.start.offset === githubLimit
+    ) {
+      result.githubHeadingSource = document.source.slice(githubLimit);
+      githubSourceRecorded = true;
+    }
     // Forgejo and Gitea read a heading's trailing `{...}` block as attributes,
     // character for character, where the tree holds ordinary inline content,
     // and generate the anchor from the heading's last line as written.
@@ -649,11 +671,6 @@ function semanticTree(
     return result;
   }
   const result = normalize(document.tree) as Record<string, unknown>;
-  if (document.dialect === "github") {
-    result.githubAnchors = [...githubAnchors(document).slugs];
-    const limit = githubHeadingLimit(document);
-    if (limit !== undefined) result.githubHeadingSource = document.source.slice(limit);
-  }
   if (document.dialect === "vitepress")
     result.vitepress = vitepressSemantics(document, workspace, codeValues);
   // Where front matter would end inside a code block, an HTML block, or
