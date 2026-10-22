@@ -1,6 +1,6 @@
 import type { List, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
-import { labelEnd } from "./parse.js";
+import { labelEnd, startsWithMarker } from "./parse.js";
 import {
   capturedLineBreak,
   lineBreak as lineEndingPattern,
@@ -193,6 +193,8 @@ export interface MisreadLists {
    * from the line break or line where Obsidian's reading starts to differ.
    */
   tableText: ReadonlySet<Nodes>;
+  /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
+  boundaryText: ReadonlySet<Nodes>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -277,7 +279,7 @@ export function misreadLists(document: Document): MisreadLists {
    * `node` after its first that Obsidian reads as starting a list item where
    * CommonMark reads text; `quoted` says whether `node` is in a block quote.
    */
-  const obsidianItem = (node: Nodes, quoted: boolean): number | undefined => {
+  const obsidianItem = (node: Nodes, quoted: boolean, callout: boolean): number | undefined => {
     const end = node.position!.end.offset!;
     // A marker four or more columns right of the text is more of the text.
     const text = columnAt(node.position!.start.offset!);
@@ -293,7 +295,7 @@ export function misreadLists(document: Document): MisreadLists {
       const ordered = /^(\d{1,9})[.)][ \t]+\S/.exec(content);
       if (
         columnAt(lineStart + prefix) - text <= 3 &&
-        ((ordered && Number(ordered[1]) !== 1 && !quoted) ||
+        ((ordered && Number(ordered[1]) !== 1 && (!quoted || callout)) ||
           /^(?:[*+]|-(?=[ \t])|0*1[.)])[ \t]*$/.test(content))
       )
         return lineStart + prefix;
@@ -333,7 +335,13 @@ export function misreadLists(document: Document): MisreadLists {
         start !== undefined &&
         (listMarker.test(source.slice(start, start + 11)) || adjacent) &&
         !(index === 0 && parent.type === "listItem" && typeof parent.checked === "boolean");
-      const item = obsidian && start !== undefined ? obsidianItem(child, quoted) : undefined;
+      const callout =
+        parent.type === "blockquote" &&
+        child.type === "paragraph" &&
+        index === 0 &&
+        startsWithMarker(source.slice(offset, child.position!.end.offset), child);
+      const item =
+        obsidian && start !== undefined ? obsidianItem(child, quoted, callout) : undefined;
       const misread = atStart || item !== undefined;
       if (misread || adjacent || reach !== undefined) {
         const column = columnAt(atStart ? start : (item ?? offset));
@@ -376,6 +384,7 @@ export function misreadLists(document: Document): MisreadLists {
   const tabText = new Set<Nodes>();
   const itemHtml = new Set<Nodes>();
   const commentText = new Set<Nodes>();
+  const boundaryText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     /**
@@ -663,9 +672,10 @@ export function misreadLists(document: Document): MisreadLists {
       if (start === undefined || end === undefined) continue;
       if (carry !== undefined) {
         const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
-        if (item || fenced) carry = undefined;
+        if ((item && openers.get(leaf)?.type !== "blockquote") || fenced) carry = undefined;
         else {
-          unclosedCode.add(leaf);
+          // Quoted markers are literal code in Live Preview too (#494).
+          unclosedCode.add(stretch(leaf, lineOf(leaf)));
           // Live Preview shows an indented code block there as more of the
           // code, and its backticks close nothing.
           if (leaf.type === "code") continue;
@@ -733,6 +743,78 @@ export function misreadLists(document: Document): MisreadLists {
         },
       };
     };
+    // A nested list's continuation indentation must stay at the footnote's
+    // four-column margin in Live Preview, rather than at a list's margin (#496).
+    for (const [footnote] of footnotes)
+      if ("children" in footnote)
+        for (const child of footnote.children.slice(1)) boundaryText.add(wholeLines(child));
+    // A nonempty line of spaces resets Live Preview's definition continuation
+    // state; an empty line or a tab does not (#493, #495). Preserve that boundary.
+    for (const [leaf] of order) {
+      const footnote = inFootnotes.get(leaf);
+      if (
+        leaf.type !== "definition" &&
+        !(footnote && "children" in footnote && footnote.children[0] === leaf)
+      )
+        continue;
+      let until = lineAround(leaf.position!.end.offset!)[1];
+      for (let line = leaf.position!.end.line; line < lines.length; line++) {
+        if (!/^[ \t>]+$/.test(lines[line]!) || !/[ \t]/.test(lines[line]!)) break;
+        until += (source.startsWith("\r\n", until) ? 2 : 1) + lines[line]!.length;
+        boundaryText.add(
+          stretch(leaf, leaf.position!.end, { ...leaf.position!.end, offset: until }),
+        );
+      }
+    }
+    // A task item's fence is parsed as paragraph text, but starts a real code
+    // block in Live Preview. Later fences pair differently in the two readings,
+    // as for an open container fence, so preserve the remaining source (#488).
+    for (const [leaf] of order) {
+      if (leaf.type !== "paragraph" || !leaf.position) continue;
+      const start = leaf.position.start.offset!;
+      const prefix = source.slice(lineStart(start), start);
+      if (!/^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[[ xX]\][ \t]+$/.test(prefix)) continue;
+      const fence = /^(`{3,}|~{3,})/.exec(source.slice(start, leaf.position.end.offset))?.[1];
+      if (!fence) continue;
+      boundaryText.add(
+        stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }),
+      );
+      break;
+    }
+    /** Unpaired emphasis openers left in text, outside code, math, and escaped syntax. */
+    const openEmphasis = (node: Nodes): boolean => {
+      if (node.type !== "text") return "children" in node && node.children.some(openEmphasis);
+      const start = node.position?.start.offset;
+      if (start === undefined) return false;
+      const text = source.slice(start, node.position!.end.offset);
+      return /(?:^|[^\p{L}\p{N}\\])(?:\*+|_+)(?=\S)/u.test(text);
+    };
+    const visitBoundaries = (parent: Parents) => {
+      parent.children.forEach((child, index) => {
+        const previous = parent.children[index - 1];
+        if (
+          previous?.position &&
+          child.position &&
+          previous.position.end.line === child.position.start.line - 1
+        ) {
+          if (
+            previous.type === "footnoteDefinition" &&
+            child.type === "list" &&
+            child.ordered &&
+            child.start !== 1
+          )
+            boundaryText.add(stretch(child, previous.position.end));
+          if (
+            previous.type === "paragraph" &&
+            child.type === "blockquote" &&
+            openEmphasis(previous)
+          )
+            boundaryText.add(wholeLines(previous, child));
+        }
+        if ("children" in child && !leaves.has(child.type)) visitBoundaries(child);
+      });
+    };
+    visitBoundaries(document.tree);
     // A container can end the parser's HTML block before Obsidian stops reading
     // its source as HTML (#428). Reading view and Live Preview have different
     // ends; preserve their union, including a closer inside another leaf block.
@@ -959,6 +1041,19 @@ export function misreadLists(document: Document): MisreadLists {
     const visitHtml = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         if ("children" in child && !leaves.has(child.type)) visitHtml(child);
+        // Live Preview recognizes list markers inside a closing-tag HTML
+        // block, so the following list can be nested in that list (#487).
+        const followingList = parent.children[index + 1];
+        if (
+          child.type === "html" &&
+          /^<\//.test(child.value) &&
+          child.value
+            .split(lineEndingPattern)
+            .slice(1)
+            .some((line) => listMarker.test(line.trimStart())) &&
+          followingList?.type === "list"
+        )
+          itemHtml.add(wholeLines(child, followingList));
         const list = parent.children[index - 1];
         // Reading view keeps an HTML block directly below a list inside the
         // list's last item, where the parser ends the list (issue #399), and
@@ -986,6 +1081,13 @@ export function misreadLists(document: Document): MisreadLists {
         let at = list.position.end.offset!;
         while (source[at - 1] === " " || source[at - 1] === "\t") at--;
         itemHtml.add(stretch(child, { ...list.position.end, offset: at }));
+        // A comment closing after a marker on a later line makes Reading
+        // view retain the preceding list's original indentation (#492).
+        if (
+          /^<!--/.test(child.value) &&
+          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+-->/.test(child.value)
+        )
+          for (const marker of markersOf(list, lineOf(list))) itemHtml.add(marker);
         let next = index + 1;
         for (; next < parent.children.length; next++) {
           const block = parent.children[next]!;
@@ -1033,17 +1135,42 @@ export function misreadLists(document: Document): MisreadLists {
     const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
     const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
+    const paragraphHeadingEnds = new Set([...underlines].map((node) => node.position!.end.offset));
+    // A run of pipe rows can contain several blocks of the primary parse.
+    // Scan its union once, rather than once per parsed table within it.
+    let tableUntil = 0;
+    const tableContinuation = (leaf: Nodes) => {
+      if (leaf.position!.end.offset! < tableUntil) return;
+      let until = leaf.position!.end.offset!;
+      for (let line = leaf.position!.end.line; line < lines.length && piped(lines[line]!); line++)
+        until += (source.startsWith("\r\n", until) ? 2 : 1) + lines[line]!.length;
+      if (until > leaf.position!.end.offset!)
+        tableText.add(
+          stretch(
+            leaf,
+            { ...leaf.position!.end, offset: leaf.position!.end.offset! - 1 },
+            { ...leaf.position!.end, offset: until },
+          ),
+        );
+      tableUntil = until;
+    };
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       const start = leaf.position?.start.offset;
       const end = leaf.position?.end.offset;
       if (start === undefined || end === undefined) return;
-      // Directly below a line of paragraph text, from the end of that line.
+      // Also below a setext underline that Reading view keeps as paragraph
+      // text: the next table belongs to that same paragraph (#489).
       const below =
-        previous?.type === "paragraph" &&
+        (previous?.type === "paragraph" ||
+          (previous?.type === "heading" &&
+            paragraphHeadingEnds.has(previous.position?.end.offset))) &&
         previous.position !== undefined &&
         previous.position.end.line === leaf.position!.start.line - 1;
       if (leaf.type === "table") {
+        // Reading view retains pipe-containing rows even when they start a
+        // heading, list, quote, or fence in the parser or Live Preview (#505).
+        tableContinuation(leaf);
         const rows = source.slice(start, end).split(lineEndingPattern);
         if (below) {
           let at = previous.position!.end.offset!;
@@ -1071,7 +1198,8 @@ export function misreadLists(document: Document): MisreadLists {
         previous.position!.start.line === previous.position!.end.line &&
         piped(source.slice(previous.position!.start.offset, previous.position!.end.offset)) &&
         listedDelimiter.test(source.slice(lineStart(start), end).split(lineEndingPattern)[0]!)
-      )
+      ) {
+        tableContinuation(leaf);
         tableText.add({
           ...leaf,
           position: {
@@ -1082,6 +1210,7 @@ export function misreadLists(document: Document): MisreadLists {
             end: leaf.position!.end,
           },
         });
+      }
     });
   }
   const result = {
@@ -1102,6 +1231,7 @@ export function misreadLists(document: Document): MisreadLists {
     tabText,
     itemHtml,
     commentText,
+    boundaryText,
   };
   found.set(document.tree, result);
   return result;

@@ -283,6 +283,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.tabText,
       ...misread.itemHtml,
       ...misread.commentText,
+      ...misread.boundaryText,
     ]),
     (node) => range(node),
   ).sort((a, b) => a[0] - b[0])) {

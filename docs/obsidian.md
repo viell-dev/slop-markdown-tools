@@ -193,6 +193,36 @@ paragraph text: a table or footnote definition directly below its closing fence
 is more of that text in Obsidian, so it stays as written. A separating blank
 line or a block that interrupts a paragraph still starts a block of its own.
 
+### Unreleased boundary protections
+
+The following additions are on the development branch and are not yet in the
+latest installable release:
+
+- Lists following a closing-tag HTML block keep their source when Live Preview
+  reads a marker inside that block as their parent. List indentation also stays
+  when an HTML comment below the list closes after a marker on a later line.
+- A fence immediately after a task checkbox keeps the remaining source as
+  written. Live Preview opens code there, while the parser reads paragraph text,
+  so subsequent fences can pair differently throughout the note.
+- Inline code carried into a quoted list protects its quote and list markers
+  too. An unmatched emphasis opener immediately before a block quote preserves
+  the opening paragraph and the quote, because Live Preview can carry that style
+  into its literal list markers. A blank line resets that emphasis state.
+- Continuation blocks inside footnote definitions keep their source margin.
+  Lines of spaces below a link reference or footnote definition stay, because
+  emptying them can change Live Preview's code styling. An ordered list not
+  starting at 1 directly below a footnote stays beside it: Reading view keeps
+  that line in the footnote rather than starting a visible list.
+- An ordered list directly below a callout title stays together even when its
+  first number is not 1. Its source markers keep a consistent delimiter.
+- Tables below setext text that Reading view keeps as a paragraph stay as text.
+  Pipe-containing table rows that the parser reads as headings, lists, quotes,
+  or fences keep their source and preceding boundary: inserting a blank line
+  would end Reading view's table.
+
+Independent blocks outside these regions still format. These protections are
+specific to the Obsidian dialect.
+
 ## Vaults inside a larger workspace
 
 A note belongs to the nearest vault at or above its directory, wherever the
