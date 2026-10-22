@@ -9,6 +9,12 @@ export const boundaryFixtures = [
     name: "carried code through a nested quoted list",
     source: "text ```\n> 1) *first*\n>    - *second*\n",
   },
+  {
+    issue: 524,
+    name: "an outside item resets carry before its nested quote",
+    source: "a ``` b\n\n- > c *d*\n\ne *f*\n",
+    preserve: false,
+  },
   ...["1. [ ] ", "+ [ ] ", "> - [x] ", "- [-] ", "- > 1. [ ] "].map((source) => ({
     issue: 525,
     name: `empty task separator ${source.trim()}`,

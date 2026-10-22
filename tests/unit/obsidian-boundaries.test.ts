@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createWorkspace, format, parse, semanticFingerprint } from "../../src/index.js";
 import type { Config } from "../../src/index.js";
 import { boundaryFixtures } from "../../scripts/obsidian/boundary-fixtures.mjs";
+import { misreadLists } from "../../src/syntax/misread-lists.js";
 
 const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
 const config: Config = {
@@ -28,6 +29,11 @@ const boundaries = boundaryFixtures
   .map(({ issue, source }) => [issue, source] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it("ignores a plugin paragraph without source positions", () => {
+    const document = parse("words\n", "obsidian");
+    delete document.tree.children[0]!.position;
+    expect(() => misreadLists(document)).not.toThrow();
+  });
   it.each(boundaries)("preserves the source for #%i", (_issue, source) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", String.fromCharCode(0xfeff)]) {

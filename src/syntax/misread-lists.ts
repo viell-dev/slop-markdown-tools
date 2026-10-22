@@ -389,6 +389,7 @@ export function misreadLists(document: Document): MisreadLists {
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     const quotedLeaves = new Set<Nodes>();
+    const quotedItems = new Set<Nodes>();
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
      * inside a container that does, as in `- > a`.
@@ -410,6 +411,7 @@ export function misreadLists(document: Document): MisreadLists {
       opener: Parents | undefined,
       contained: boolean,
       quoted: boolean,
+      quotedItem: boolean,
     ) => {
       if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
       if (leaves.has(node.type) || !("children" in node)) {
@@ -418,6 +420,7 @@ export function misreadLists(document: Document): MisreadLists {
         if (opener) openers.set(node, opener);
         if (contained && node.type === "html") containerHtml.add(node);
         if (quoted) quotedLeaves.add(node);
+        if (item && quotedItem) quotedItems.add(node);
       } else
         node.children.forEach((child, index) =>
           collect(
@@ -429,10 +432,11 @@ export function misreadLists(document: Document): MisreadLists {
               : undefined,
             contained || node.type === "listItem" || node.type === "blockquote",
             quoted || node.type === "blockquote",
+            index === 0 && (item || node.type === "listItem") && (item ? quotedItem : quoted),
           ),
         );
     };
-    collect(document.tree, false, undefined, undefined, false, false);
+    collect(document.tree, false, undefined, undefined, false, false, false);
     /** Where the line holding `offset` starts. */
     const lineStart = (offset: number) => {
       let at = offset;
@@ -712,7 +716,7 @@ export function misreadLists(document: Document): MisreadLists {
       if (start === undefined || end === undefined) continue;
       if (carry !== undefined) {
         const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
-        if ((item && (!quotedLeaves.has(leaf) || carryInQuote)) || fenced) carry = undefined;
+        if ((item && (!quotedItems.has(leaf) || carryInQuote)) || fenced) carry = undefined;
         else {
           // Quoted markers are literal code in Live Preview too (#494).
           unclosedCode.add(stretch(leaf, lineOf(leaf)));
@@ -806,7 +810,11 @@ export function misreadLists(document: Document): MisreadLists {
     // both Obsidian views. Wrapping as well as trailing-space cleanup can
     // otherwise turn the widget into literal bracket text (#525).
     for (const [leaf] of order)
-      if (leaf.type === "paragraph" && leaf.position!.start.line === leaf.position!.end.line) {
+      if (
+        leaf.type === "paragraph" &&
+        leaf.position &&
+        leaf.position.start.line === leaf.position.end.line
+      ) {
         const block = wholeLines(leaf);
         if (
           /^[ \t>]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+(?:>[ \t]*)*)+\[[^\]\r\n]\][ \t]+$/.test(
