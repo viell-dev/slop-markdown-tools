@@ -760,10 +760,14 @@ or what a comment applies to:
   list marker and the text directly below it, which Reading view takes into the
   item.
 - In the Obsidian dialect, inside continued HTML source: Live Preview can carry
-  an inline opener's raw state through later blocks until its closer or the
-  document's end, and Reading view continues HTML across a whitespace-only line
-  into the blocks below it until an empty line. In top-level HTML, bare quote
-  markers remain literal source and do not provide that empty line.
+  raw state through later blocks until the open tags close or the document ends.
+  An unclosed nested tag can keep that state after its parent's closer,
+  including a URL or email written in angle brackets inside HTML. Reading view
+  continues HTML across a whitespace-only line into the blocks below it until an
+  empty line. In top-level HTML, bare quote markers remain literal source and do
+  not provide that empty line. A parsed fence does not close Live Preview's open
+  HTML state; formatting conservatively retains that source until its tags
+  close, including otherwise harmless punctuation preferences.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
@@ -1196,6 +1200,11 @@ A table containing a standalone colon-container boundary such as `:::` or
 container, where GFM reads another row. Cells written with table borders, such
 as `| ::: |`, are formatted normally.
 
+In Obsidian, a body row that changes its header's leading-pipe convention, or
+has only its leading pipe, can instead begin paragraph text. That row and the
+remaining primary table retain their source and preceding boundary, so adding
+table borders cannot absorb the paragraph or split pipes inside links.
+
 Before:
 
 ```markdown
@@ -1330,9 +1339,11 @@ more than one word when its first word alone would open a block, such as `***`
 or `$$`, or, in the body below the line of an alert's or callout's marker, would
 underline that line as a heading, such as `==` or `--`. It also keeps a
 paragraph that starts like a link reference definition (`[Note]: see …`) from
-becoming one. On GitHub and in Obsidian, a word that starts with `$` stays on
-the line before it when a `$` comes earlier in the paragraph, and in Obsidian a
-word that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
+becoming one. In Obsidian, a leading inline comment stays with the next atom, so
+wrapping cannot turn it into a standalone comment block; later text still wraps
+normally. On GitHub and in Obsidian, a word that starts with `$` stays on the
+line before it when a `$` comes earlier in the paragraph, and in Obsidian a word
+that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
 comes later: at the edge of a line, a dollar can begin or end math that it
 cannot begin or end next to a space. In Obsidian, no new line's content starts
 with `[`, a label, and `]:`, such as `[ref]: …`: Live Preview hides its

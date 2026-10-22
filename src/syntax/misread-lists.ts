@@ -88,7 +88,8 @@ export interface MisreadLists {
    * each range spans both views' raw regions, through their later terminator
    * or EOF, starting at the HTML opener (issue #428).
    * An inline HTML opener can carry Live Preview's raw state across blocks
-   * too, through its closer or EOF (issue #435).
+   * too, through its closer or EOF (issue #435). In root HTML, an unclosed
+   * child can retain that state after the parent's closer (issue #556).
    */
   htmlText: ReadonlySet<Nodes>;
   /**
@@ -206,6 +207,9 @@ export interface MisreadLists {
    * break, which Live Preview displays as a heading: its final body row,
    * or its delimiter when it has no body. That line's preceding break and
    * the underline count too (#553).
+   * A body row that changes its header's leading-pipe convention, or has
+   * only its leading pipe, begins a protected suffix too: adding borders
+   * can otherwise absorb native paragraph text into the table (#558).
    */
   tableText: ReadonlySet<Nodes>;
   /**
@@ -570,7 +574,7 @@ export function misreadLists(document: Document): MisreadLists {
      * Leaf blocks count, not containers, because an empty line inside a list
      * ends the HTML block there.
      */
-    const topHtml = new Set<Nodes>(document.tree.children.filter(blankTerminatedHtml));
+    const topHtml = new Set<Nodes>(document.tree.children.filter((node) => node.type === "html"));
     let open = false;
     let topLevel = false;
     let topUntil = 0;
@@ -1217,7 +1221,7 @@ export function misreadLists(document: Document): MisreadLists {
       if (code?.toEnd) htmlCodeToEnd = true;
       return code;
     };
-    const htmlRoots: [Nodes, boolean][] = [];
+    const htmlRoots: [Nodes, boolean, number?][] = [];
     const inlineHtml = (node: Nodes) => {
       if (node.type === "html" && /^<[a-z][a-z0-9-]*(?=[\s/>])/i.test(node.value))
         htmlRoots.push([node, false]);
@@ -1225,6 +1229,11 @@ export function misreadLists(document: Document): MisreadLists {
     };
     for (const [leaf] of order) {
       if (containerHtml.has(leaf)) htmlRoots.push([leaf, true]);
+      // Root Reading protection above already handles physical continuations.
+      // Start Live Preview with only the parsed HTML extent: a closed root
+      // must not pull genuine later fences into its inline-code scan (#529).
+      else if (topHtml.has(leaf) && leaf.position)
+        htmlRoots.push([leaf, true, leaf.position.end.offset!]);
       else if ("children" in leaf) leaf.children.forEach(inlineHtml);
     }
     // Source positions for the extended raw regions. Build once, not once per
@@ -1238,11 +1247,11 @@ export function misreadLists(document: Document): MisreadLists {
       while (line + 1 < starts.length && starts[line + 1]! <= offset) line++;
       return { offset, line: line + 1, column: offset - starts[line]! + 1 };
     };
-    for (const [leaf, block] of htmlRoots) {
+    for (const [leaf, block, rootEnd] of htmlRoots) {
       if (!leaf.position) continue;
       const [start, end] = [leaf.position.start.offset!, leaf.position.end.offset!];
       if (start < htmlUntil) continue;
-      const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block);
+      const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block, rootEnd);
       htmlUntil = until;
       if (block && until <= end) continue;
       htmlText.add({
@@ -1613,7 +1622,10 @@ export function misreadLists(document: Document): MisreadLists {
         } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
           tableText.add(startingAt(leaf, lineStart(start)));
         else {
-          // The rows from the first without a pipe, from the line break above it.
+          // Keep the physical row convention of the header. Either view ends
+          // a bordered table before an unbordered row, or before a leading
+          // pipe with no second divider, even when GFM keeps that row (#558).
+          const bordered = /^[ \t>]*\|/.test(rows[0]!);
           const parts = source.slice(start, end).split(capturedLineBreak);
           for (let part = 0, at = start; part < parts.length; part += 2) {
             // A missing leading pipe on a header or delimiter changes where
@@ -1624,7 +1636,11 @@ export function misreadLists(document: Document): MisreadLists {
               next !== undefined &&
               (!/^[ \t>]*\|/.test(parts[part]!) || !/^[ \t>]*\|/.test(next)) &&
               delimiterRow(next);
-            if (part >= 4 && (!piped(parts[part]!) || newTable)) {
+            const leading = /^[ \t>]*\|/.exec(parts[part]!);
+            const rowBoundary = bordered
+              ? !leading || !piped(parts[part]!.slice(leading[0].length))
+              : leading !== null;
+            if (part >= 4 && (!piped(parts[part]!) || rowBoundary || newTable)) {
               tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
               break;
             }
@@ -1718,12 +1734,13 @@ const voidHtml = new Set([
   "wbr",
 ]);
 
-/** The union's last line for block HTML, or the exact Live Preview inline HTML end. */
+/** Both views' contained HTML union, or Live Preview's inline/root HTML end. */
 function obsidianHtmlEnd(
   source: string,
   start: number,
   codeEnd: (at: number) => HtmlCode | undefined,
   block = true,
+  rootEnd?: number,
 ): number {
   // Only the opening token's prefix is needed here. Inline roots on one long
   // line must not repeatedly search or copy the remaining physical-line suffix.
@@ -1739,8 +1756,8 @@ function obsidianHtmlEnd(
           : /^<![A-Za-z]/.test(first)
             ? ">"
             : undefined;
-  let reading = block ? lineBreak(source, start) : start + 1;
-  if (block && explicit) {
+  let reading = rootEnd ?? (block ? lineBreak(source, start) : start + 1);
+  if (block && rootEnd === undefined && explicit) {
     const from = start + (first.startsWith("<?") ? 1 : first.startsWith("<![CDATA[") ? 9 : 2);
     let end: number;
     if (typeof explicit === "string") {
@@ -1752,7 +1769,7 @@ function obsidianHtmlEnd(
       end = close ? close.index + close[0].length : source.length;
     }
     reading = lineBreak(source, end);
-  } else if (block) {
+  } else if (block && rootEnd === undefined) {
     let cursor = reading;
     while (cursor < source.length) {
       cursor += source.startsWith("\r\n", cursor) ? 2 : 1;
@@ -1769,7 +1786,9 @@ function obsidianHtmlEnd(
   // A later opener before Reading view's end, or on that closing source line,
   // can open another such region, including inside a separate parsed HTML leaf.
   // Quoted attribute values and comments cannot supply closing tags; void and
-  // self-closing tags need no closer. A mismatched closer ends its open stack.
+  // self-closing tags need no closer. Each ordinary closer consumes one open
+  // element, even when its name differs; it cannot close an entire ancestor
+  // stack (#556). Raw-text elements below still require their own closer.
   const stack: string[] = [];
   // Cache the physical line end: consecutive roots on that line must not
   // rescan its remaining suffix for every closing tag or explicit token.
@@ -1850,10 +1869,8 @@ function obsidianHtmlEnd(
     if (multiline) return source.length;
     const raw = stack.at(-1);
     if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
-    if (closing) {
-      const matched = stack.lastIndexOf(name);
-      stack.length = matched < 0 ? 0 : matched;
-    } else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
+    if (closing) stack.pop();
+    else if (!voidHtml.has(name) && !/\/[ \t\r\n]*$/.test(source.slice(from, end)))
       stack.push(name);
     // Inline HTML resumes Markdown on the same line. Later parsed inline
     // roots are visited independently, preserving the Markdown between them

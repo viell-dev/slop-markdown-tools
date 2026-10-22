@@ -197,6 +197,18 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A table keeps the source from a body row that changes its header's
+  leading-pipe convention, or has only its leading pipe. Both views can end the
+  table there while the primary parser keeps another row. Adding border pipes
+  could otherwise absorb a paragraph or split a wiki alias or link destination
+  across cells. Consistent table rows and text after a real blank still format.
+- Open root HTML keeps later source until Live Preview's tag depth closes,
+  including when a nested tag remains after the parent's closer. Parsed fences
+  do not end that raw state. Formatting conservatively retains the source there,
+  including punctuation preferences; balanced HTML and explicit recovery still
+  allow later Markdown to format.
+- A leading inline comment stays with the next wrapping atom so that it cannot
+  become a standalone comment block. Later words still wrap normally.
 - A table immediately below a paragraph-consumed footnote keeps its literal rows
   even when the definition's final parsed block is HTML, a heading, or code.
   This context continues through adjacent definitions while no definite

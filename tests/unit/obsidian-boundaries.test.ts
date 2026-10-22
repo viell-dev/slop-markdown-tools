@@ -29,6 +29,136 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each([1, 2, 3])(
+    "keeps a bordered table's physical row boundary with %i columns (#558)",
+    (columns) => {
+      const row = (count: number, prefix: string) =>
+        Array.from({ length: count }, (_, index) => `${prefix}${index + 1}`).join(" | ");
+      const table = `| ${row(columns, "h")} |\n| ${Array(columns).fill("-").join(" | ")} |\n| ${row(columns, "a")} |\n`;
+      for (const cells of [1, 2, 3, 4]) {
+        for (const tail of [row(cells, "x"), `${row(cells, "x")} |`]) {
+          const source = `${table}${tail}\n`;
+          expect(checked(source)).toBe(source);
+          const document = parse(source, "obsidian");
+          expect(
+            [...misreadLists(document).tableText].some(
+              ({ position }) =>
+                position!.start.offset === table.length - 1 &&
+                position!.end.offset === source.length - 1,
+            ),
+          ).toBe(true);
+        }
+      }
+      const leadingOnly = `${table}| x1\n`;
+      expect(checked(leadingOnly)).toBe(leadingOnly);
+    },
+  );
+
+  it.each([1, 2, 3])("permits native pipe rows under a %i-column header (#558)", (columns) => {
+    const row = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => `${prefix}${index + 1}`).join(" | ");
+    const table = `| ${row(columns, "h")} |\n| ${Array(columns).fill("-").join(" | ")} |\n| ${row(columns, "a")} |\n`;
+    for (const cells of [1, 2, 3, 4]) {
+      // A leading-only row needs another pipe. Body cell count can be shorter
+      // or longer than its header; the existing printer decides what it can edit.
+      for (const tail of [
+        `| ${row(cells, "x")} |`,
+        ...(cells > 1 ? [`| ${row(cells, "x")}`] : []),
+      ]) {
+        const source = `${table}${tail}\n`;
+        expect(misreadLists(parse(source, "obsidian")).tableText.size).toBe(0);
+        checked(source);
+      }
+    }
+  });
+
+  it("keeps every later primary row after the first native table boundary (#558)", () => {
+    const source = "| a | b |\n| - | - |\n| c | d |\nleft | *right*\n| later | __row__ |\n";
+    const document = parse(source, "obsidian");
+    expect(checked(source)).toBe(source);
+    expect(
+      [...misreadLists(document).tableText].some(
+        ({ position }) =>
+          position!.start.offset === source.indexOf("\nleft") &&
+          position!.end.offset === source.length - 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps unbordered tables formattable and does not apply the native boundary to GitHub (#558)", () => {
+    expect(checked("h1 | h2\n-|-\na1 | a2\nx1 | x2\n")).toBe(
+      "| h1  | h2  |\n| --- | --- |\n| a1  | a2  |\n| x1  | x2  |\n",
+    );
+    const source = "| a | b |\n| - | - |\n| c | d |\nleft | right\n";
+    expect(checked(source, { extends: ["recommended"], dialect: "github" })).toBe(
+      "| a    | b     |\n| ---- | ----- |\n| c    | d     |\n| left | right |\n",
+    );
+  });
+
+  // Every shared preserve fixture automatically gets all three newline spellings,
+  // BOM, no-rules, idempotence, primary fingerprint and no engine-diagnostic checks
+  // through the existing generic tests; independent appended prose is also covered.
+
+  it.each(boundaryFixtures.filter(({ issue, preserve }) => issue === 556 && preserve !== false))(
+    "keeps root HTML depth through later literal blocks with $name (#556)",
+    ({ source }) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(input);
+          const document = parse(input, "obsidian");
+          const { htmlText, htmlCodeToEnd } = misreadLists(document);
+          expect(htmlCodeToEnd).toBe(false);
+          expect(
+            [...htmlText].some(
+              ({ position }) =>
+                position?.start.offset === 0 &&
+                position.end.offset === document.source.length &&
+                position.end.line === source.split("\n").length &&
+                position.end.column === 1,
+            ),
+          ).toBe(true);
+        }
+    },
+  );
+
+  it.each(["style/block-spacing", "style/emphasis"])(
+    "keeps the raw tail with isolated %s (#556)",
+    (rule) => {
+      const source = "<div>\n<span>text\n</div>\n\n# *title*\n> *quote*\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it("formats independent text before and after the root HTML depth closes (#556)", () => {
+    const raw = "<div>\n<span>text\n</div>\n\n# *literal*\n> *quote*\n\n</span>";
+    const source = `Before *safe*.\n\n${raw}\n\nAfter *safe*.\n`;
+    const output = checked(source);
+    expect(output).toContain(raw);
+    expect(output).toContain("Before _safe_.");
+    expect(output).toContain("After _safe_.");
+    const ranges = [...misreadLists(parse(source, "obsidian")).htmlText];
+    const outside = source.lastIndexOf("After");
+    expect(
+      ranges.some(
+        ({ position }) => position!.start.offset! <= outside && outside < position!.end.offset!,
+      ),
+    ).toBe(false);
+  });
+
+  it("scans later roots within the original root HTML leaf (#556)", () => {
+    const source = "<div></div><span>text\n\n# title\n> quote\n";
+    expect(checked(source)).toBe(source);
+  });
+
+  it("resumes after closing root HTML below a joined definition (#556)", () => {
+    const source =
+      "text\n[^1]: note\n<div> words\n| __h__ |\n| - |\n| v |\n\n</div>\n\nLater *outside*.\n";
+    expect(checked(source)).toContain("Later _outside_.");
+  });
+
   it.each([
     [
       "padding decrease captures dependency line",
@@ -522,31 +652,15 @@ describe("Obsidian boundaries read differently by its views", () => {
         );
   });
   it.each([
-    [
-      "physical empty line before a fence",
-      "<div>\n   \n-\n\n~~~\na\n\n~~~\ntext *x* and __y__\n",
-      "<div>\n   \n-\n\n```\na\n\n```\ntext _x_ and **y**\n",
-    ],
-    [
-      "physical empty line before a list marker",
-      "<div>\n\n-\n~~~\na\n\n~~~\ntext *x* and __y__\n",
-      "<div>\n\n-\n\n```\na\n\n```\ntext _x_ and **y**\n",
-    ],
-    [
-      "fence body without an empty line",
-      "<div>\n   \n-\n~~~\na\n~~~\n\ntext *x* and __y__\n",
-      "<div>\n   \n-\n~~~\na\n~~~\n\ntext _x_ and **y**\n",
-    ],
-    [
-      "fence body with a space-only line",
-      "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext *x* and __y__\n",
-      "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext _x_ and **y**\n",
-    ],
-  ])("keeps outside prose formattable with a %s (#548)", (_name, source, expected) => {
+    ["physical empty line before a fence", "<div>\n   \n-\n\n~~~\na\n\n~~~\ntext *x* and __y__\n"],
+    ["physical empty line before a list marker", "<div>\n\n-\n~~~\na\n\n~~~\ntext *x* and __y__\n"],
+    ["fence body without an empty line", "<div>\n   \n-\n~~~\na\n~~~\n\ntext *x* and __y__\n"],
+    ["fence body with a space-only line", "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext *x* and __y__\n"],
+  ])("keeps unclosed HTML literal across a %s (#548, #556)", (_name, source) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", String.fromCharCode(0xfeff)])
         expect(checked(bom + source.replaceAll("\n", newline))).toBe(
-          bom + expected.replaceAll("\n", newline),
+          bom + source.replaceAll("\n", newline),
         );
   });
   it("ignores a plugin paragraph without source positions", () => {
@@ -635,12 +749,13 @@ describe("Obsidian boundaries read differently by its views", () => {
 
   it("formats an independent paragraph after each protected region", () => {
     for (const [, source] of boundaries.filter(
-      // These inline HTML openers already carry Live Preview's HTML through EOF (#435).
+      // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556].includes(issue) &&
         ![
           "joined footnote ending in span paragraph",
           "ordinary paragraph with indented HTML",
+          "unindented HTML interrupts joined paragraph",
         ].includes(name),
     ))
       expect(checked(`${source}\nLater *outside*.\n`)).toContain("Later _outside_.");

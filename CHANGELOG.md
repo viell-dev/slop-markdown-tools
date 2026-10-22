@@ -22,6 +22,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian table formatting keeps a following paragraph from becoming another
+  row when its leading-pipe style differs from the header, including alias and
+  link-destination pipes. Ordinary table rows and text after a real blank still
+  format ([#558](https://github.com/viell-dev/slop-markdown-tools/issues/558)).
+- Obsidian wrapping keeps a leading inline comment with the next atom, avoiding
+  an unsafe-format refusal when a long link or other atom would leave the
+  comment alone on its first line. The rest of the paragraph still wraps
+  ([#557](https://github.com/viell-dev/slop-markdown-tools/issues/557)).
+- Obsidian formatting preserves literal blocks after root HTML whose nested tags
+  remain open, including URL-shaped children. A parent's closer cannot
+  prematurely end that protection; balanced, void, and self-closing HTML still
+  permit later Markdown formatting. Parsed fences do not close the raw state;
+  formatting conservatively retains source across them until the HTML closes
+  ([#556](https://github.com/viell-dev/slop-markdown-tools/issues/556)).
 - Obsidian formatting keeps thematic breaks below tables from turning their last
   physical line into a literal Live Preview heading, including header-only
   tables. Existing literal headings retain their row text and underline

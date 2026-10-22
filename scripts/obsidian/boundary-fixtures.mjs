@@ -5,6 +5,252 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 558,
+    name: "native table boundary: plain prefix, wiki alias pipe only",
+    source: "| a | b |\n| - | - |\n| c | d |\nbefore [[Target|Alias]] after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: plain prefix, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\nbefore left | right\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: wiki starts line, wiki alias pipe only",
+    source: "| a | b |\n| - | - |\n| c | d |\n[[Target|Alias]] after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: wiki starts line, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\nleft | right\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: normal-link prefix, wiki alias pipe only",
+    source: "| a | b |\n| - | - |\n| c | d |\n[link](https://example.com) [[Target|Alias]] after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: normal-link prefix, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\n[link](https://example.com) left | right\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: linked-image prefix, wiki alias pipe only",
+    source:
+      "| a | b |\n| - | - |\n| c | d |\n[![alt](https://img.example.com/a.svg)](https://example.com) [[Target|Alias]] after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: linked-image prefix, ordinary pipe",
+    source:
+      "| a | b |\n| - | - |\n| c | d |\n[![alt](https://img.example.com/a.svg)](https://example.com) left | right\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: image-only prefix, wiki alias pipe only",
+    source:
+      "| a | b |\n| - | - |\n| c | d |\n![alt](https://img.example.com/a.svg) [[Target|Alias]] after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: image-only prefix, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\n![alt](https://img.example.com/a.svg) left | right\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: footnote-reference prefix, wiki alias pipe only",
+    source: "| a | b |\n| - | - |\n| c | d |\n[^n] [[Target|Alias]] after\n\n[^n]: note\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: footnote-reference prefix, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\n[^n] left | right\n\n[^n]: note\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: reference-link prefix, wiki alias pipe only",
+    source:
+      "| a | b |\n| - | - |\n| c | d |\n[ref] [[Target|Alias]] after\n\n[ref]: https://example.com\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: reference-link prefix, ordinary pipe",
+    source: "| a | b |\n| - | - |\n| c | d |\n[ref] left | right\n\n[ref]: https://example.com\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: pipe inside a Markdown destination",
+    source: "| a | b |\n| - | - |\n| c | d |\nbefore [link](https://example.com/a|b) after\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: reference-definition row",
+    source: "| a | b |\n| - | - |\n| c | d |\n[ref]: https://example.com/a|b\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header1-body1-leading",
+    source: "| h1 |\n| - |\n| a1 |\n| x1\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header1-body1-both",
+    source: "| h1 |\n| - |\n| a1 |\n| x1 |\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header3-body2-leading",
+    source: "| h1 | h2 | h3 |\n| - | - | - |\n| a1 | a2 | a3 |\n| x1 | x2\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header3-body2-trailing",
+    source: "| h1 | h2 | h3 |\n| - | - | - |\n| a1 | a2 | a3 |\nx1 | x2 |\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header3-body3-leading",
+    source: "| h1 | h2 | h3 |\n| - | - | - |\n| a1 | a2 | a3 |\n| x1 | x2 | x3\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: header3-body3-both",
+    source: "| h1 | h2 | h3 |\n| - | - | - |\n| a1 | a2 | a3 |\n| x1 | x2 | x3 |\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: unbordered-header-and-body-compact-delimiter",
+    source: "h1 | h2\n-|-\na1 | a2\nx1 | x2\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: unbordered-header-bordered-body",
+    source: "h1 | h2\n-|-\n| a1 | a2 |\nx1 | x2\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: bordered-header-unbordered-first-body",
+    source: "| h1 | h2 |\n| - | - |\nx1 | x2\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: escaped-pipe-bordered-row",
+    source: "| h1 | h2 |\n| - | - |\n| a1 | a2 |\n| x1 \\| x2 | a |\n",
+    preserve: false,
+  },
+  {
+    issue: 558,
+    name: "native table boundary: spaces-before-unbordered-row",
+    source: "| h1 | h2 |\n| - | - |\n| a1 | a2 |\n  x1 | x2\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: quote-unbordered-row",
+    source: "> | h1 | h2 |\n> | - | - |\n> | a1 | a2 |\n> x1 | x2\n",
+  },
+  {
+    issue: 558,
+    name: "native table boundary: blank-separated wiki paragraph",
+    source: "| a | b |\n| - | - |\n| c | d |\n\nbefore *word* [[Target|Alias]] after\n",
+    preserve: false,
+  },
+
+  ...[
+    {
+      name: "root comment before over-width badge",
+      source:
+        "%%candle candle%% [![zephyr](https://img.example.com/badge/yonder-grove.svg)](https://example.com/ribbon) engine lantern amber saddle kettle timber more ordinary words remain available for wrapping after this protected opening\n",
+      preserve: false,
+    },
+    {
+      name: "list comment before over-width badge",
+      source:
+        "* %%candle candle%% [![zephyr](https://img.example.com/badge/yonder-grove.svg)](https://example.com/ribbon) engine lantern amber saddle kettle timber more ordinary words remain available for wrapping after this protected opening\n",
+      preserve: false,
+    },
+    {
+      name: "quoted comment before over-width badge",
+      source:
+        "> %%candle candle%% [![zephyr](https://img.example.com/badge/yonder-grove.svg)](https://example.com/ribbon) engine lantern amber saddle kettle timber more ordinary words remain available for wrapping after this protected opening\n",
+      preserve: false,
+    },
+    {
+      name: "callout body comment before over-width badge",
+      source:
+        "> [!NOTE] Preserve This Title\n> %%candle candle%% [![zephyr](https://img.example.com/badge/yonder-grove.svg)](https://example.com/ribbon) engine lantern amber saddle kettle timber more ordinary words remain available for wrapping after this protected opening\n",
+      preserve: false,
+    },
+    {
+      name: "visible prefix before comment control",
+      source:
+        "visible %%candle candle%% [![zephyr](https://img.example.com/badge/yonder-grove.svg)](https://example.com/ribbon) engine lantern amber saddle kettle timber more ordinary words remain available for wrapping after this protected opening\n",
+      preserve: false,
+    },
+  ].map((fixture) => ({ issue: 557, ...fixture })),
+  ...[
+    "<div>\n\n# title\n> quote\n",
+    "<div>\ntext\n\n# title\n> quote\n",
+    ...["~~~", "```"].flatMap((fence) =>
+      ["<div>", "<div>\n<span>text\n</div>"].map(
+        (root) => `${root}\n\n${fence}\nx\n${fence}\n\n# title\n> quote\n`,
+      ),
+    ),
+  ].map((source, index) => ({
+    issue: 556,
+    name: `open root HTML retains literal paragraph boundaries ${index}`,
+    source,
+  })),
+  ...[
+    ["URL-shaped child inside root HTML", "<https://example.com/a>"],
+    ["URL-shaped child after root HTML text", "text <https://example.com/a> tail"],
+    ["unclosed ordinary child inside root HTML", "<span>text"],
+    ["unclosed custom child inside root HTML", "<thing>text"],
+    ["unclosed same-name child inside root HTML", "<div>text"],
+    ["email-shaped child inside root HTML", "<a@example.com>"],
+    ["unclosed colon child inside root HTML", "<x:y>text"],
+    ["unclosed raw-text child inside root HTML", "<script>text"],
+  ].map(([name, child]) => ({
+    issue: 556,
+    name,
+    source: `<div>\n${child}\n</div>\n\n# title\n> quote\n`,
+  })),
+  {
+    issue: 556,
+    name: "one unmatched closer leaves root HTML open",
+    source: "<div>\n<span>text\n</missing>\n\n# title\n> quote\n",
+  },
+  {
+    issue: 556,
+    name: "root HTML reopened after an ancestor closer",
+    source: "<div>\n<span>text\n</div>\n<thing>\n</span>\n\n# title\n> quote\n",
+  },
+  ...[
+    ["properly closed ordinary child", "<span>text</span>"],
+    ["properly closed custom child", "<thing>text</thing>"],
+    ["properly closed colon child", "<x:y>text</x:y>"],
+    ["void line-break child", "<br>"],
+    ["void image child", '<img src="missing.png">'],
+    ["self-closing custom child", "<thing />"],
+    ["unmatched child closer", "<span>text</thing>"],
+  ].map(([name, child]) => ({
+    issue: 556,
+    name: `root HTML with ${name}`,
+    source: `<div>\n${child}\n</div>\n\n# title\n> quote\n`,
+    preserve: false,
+  })),
+  {
+    issue: 556,
+    name: "two unmatched closers end root HTML",
+    source: "<div>\n<span>text\n</missing>\n</missing>\n\n# title\n> quote\n",
+    preserve: false,
+  },
+  {
     issue: 554,
     name: "padding shrink would capture earlier lazy margin",
     source: "+    alpha\n  beta\n  gamma\n---\n",
@@ -565,9 +811,8 @@ export const boundaryFixtures = [
     "<div>\n   \n-\n~~~\na\n  \n~~~\n\ntext *x* and __y__\n",
   ].map((source, index) => ({
     issue: 548,
-    name: `independent prose after a fence and top-level HTML ${index}`,
+    name: `unclosed root HTML stays literal beyond a parsed fence ${index}`,
     source,
-    preserve: false,
   })),
   {
     issue: 517,

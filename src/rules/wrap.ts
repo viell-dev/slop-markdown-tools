@@ -987,6 +987,16 @@ function wrapParagraph(
   const wrapped = wrappingAtoms(words, openers, dollars);
   const atoms = definitions ? keepDefinitionStarts(wrapped) : wrapped;
   if (!atoms.length) return;
+  // A leading inline comment alone on the first output line becomes a
+  // standalone comment block. Keep its following atom with it, including
+  // an over-width badge; comments elsewhere retain ordinary wrapping.
+  const first = node.children[0];
+  const leadingComment =
+    document.dialect === "obsidian" &&
+    first?.type === "obsidianComment" &&
+    range(first)[0] === start
+      ? source.slice(...range(first))
+      : undefined;
   // The first line keeps the words after a first word that would open a
   // block alone on the line, until the line can no longer open one, and
   // below an alert's or callout's marker line, after a run of `=` or `-`
@@ -994,6 +1004,7 @@ function wrapParagraph(
   while (
     atoms.length > 1 &&
     (firstWordAlone.test(atoms[0]!) ||
+      (leadingComment !== undefined && atoms[0] === leadingComment) ||
       (belowHeader && /^(?:=+|-+)$/.test(atoms[0]!)) ||
       (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
   )
