@@ -6,6 +6,9 @@
 // mulberry32, whose low bits do not repeat with a short period, unlike a linear congruential
 // generator in floating point. Every word and line is synthetic.
 
+import { decodeHTML } from "entities/decode";
+import { escapeAttribute, escapeText } from "entities/escape";
+
 /** A seeded generator (mulberry32) of unsigned 32-bit integers. */
 function random(seed) {
   let state = seed >>> 0;
@@ -314,4 +317,59 @@ export function normalizeHtml(html) {
   });
   const parts = outside.replace(/\s+/g, " ").replace(blockTag, "$1").trim().split(mark);
   return parts.map((part, index) => (index === 0 ? part : kept[index - 1] + part)).join("");
+}
+
+/**
+ * GitHub's comparison, with code verified against the source parse before
+ * accepting highlighting-wrapper or final-line variations (#515). A mismatch
+ * stays exact. Raw HTML pre elements are not source code blocks.
+ * @param {string} html
+ * @param {string} mode
+ * @param {import("mdast").Root} tree
+ */
+export function normalizeGithubHtml(html, mode, tree) {
+  /** @type {import("mdast").Code[]} */
+  const codes = [];
+  let rawPre = false;
+  /** @param {import("mdast").Nodes} node */
+  const visit = (node) => {
+    if (node.type === "code") codes.push(node);
+    if (node.type === "html" && /<\/?pre(?:[\s>])/i.test(node.value)) rawPre = true;
+    if ("children" in node) node.children.forEach(visit);
+  };
+  visit(tree);
+  const pre =
+    /<div class="highlight [^"]*"><pre\b[^>]*>([\s\S]*?)<\/pre><\/div>|<pre\b[^>]*><code\b[^>]*>([\s\S]*?)<\/code><\/pre>/g;
+  const matches = [...html.matchAll(pre)];
+  if (
+    !rawPre &&
+    matches.length === codes.length &&
+    html.match(/<pre(?=[\s>])/g)?.length === codes.length
+  ) {
+    let index = 0;
+    html = html.replace(pre, (whole, highlighted, plain) => {
+      const node = codes[index++];
+      const content = (highlighted ?? plain).replace(/<\/?span(?:\s[^>]*)?>/g, "");
+      // Only highlighting spans are markup inside code; actual code brackets
+      // must be escaped. Otherwise normalizing could conceal rendered HTML.
+      if (/[<>]/.test(content)) return whole;
+      const value = decodeHTML(content).replace(/\r\n?/g, "\n");
+      if (value !== node.value && value !== node.value + "\n") return whole;
+      return `<pre data-source-language="${escapeAttribute(node.lang ?? "")}" data-source-meta="${escapeAttribute(node.meta ?? "")}"><code>${escapeText(node.value)}</code></pre>`;
+    });
+  }
+  // Response IDs and gfm's soft breaks are outside literal code. In particular,
+  // a 32-digit hexadecimal code value must not become an incidental ID.
+  const kept = [];
+  const outside = html.replace(literal, (value) => {
+    kept.push(value);
+    return `${mark}${kept.length - 1}${mark}`;
+  });
+  const text = outside.replace(/[0-9a-f]{32}/g, "ID");
+  return normalizeHtml(
+    (mode === "gfm" ? text.replace(/<br\s*\/?>/g, " ") : text).replace(
+      new RegExp(`${mark}(\\d+)${mark}`, "g"),
+      (_, index) => kept[Number(index)],
+    ),
+  );
 }

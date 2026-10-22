@@ -134,6 +134,11 @@ async function shown(path, text) {
                 .join(" "),
               // A list item's next line, which shows as more of its text.
               continuation: element.classList.contains("HyperMD-list-line-nobullet"),
+              // Checkbox widgets hide the marker's classes. Its source family
+              // still distinguishes adjacent lists with different delimiters (#512).
+              marker: /^[ \t]*(\d{1,9}[.)]|[-+*])(?:[ \t]|$)/.exec(
+                cm.state.doc.lineAt(at).text,
+              )?.[1],
               runs: runs(element, "", []),
             });
           else
@@ -277,8 +282,14 @@ function livePreview(lines) {
     const leading = line.runs.find(([, value]) => value.trim());
     const listFamily =
       !code && !quoted && line.kind.includes("HyperMD-list-line")
-        ? /\bcm-formatting-list-(ol|ul)\b/.exec(leading?.[0] ?? "")?.[1]
+        ? (/\bcm-formatting-list-(ol|ul)\b/.exec(leading?.[0] ?? "")?.[1] ??
+          (line.runs.some(([classes]) => /\bcheckbox\b/.test(classes)) && line.marker
+            ? /^\d/.test(line.marker)
+              ? "ol"
+              : "ul"
+            : undefined))
         : undefined;
+    const listDelimiter = listFamily && line.marker?.at(-1);
     // A marker-only line loses its styled trailing space when soft lines join,
     // while a marker beside text keeps it. The separator has the same role in
     // both forms (#443); keep the numeric marker's classes and space separately.
@@ -302,7 +313,8 @@ function livePreview(lines) {
       current?.kind === line.kind &&
       current.listFamily &&
       listFamily &&
-      current.listFamily !== listFamily;
+      (current.listFamily !== listFamily ||
+        (current.listDelimiter && listDelimiter && current.listDelimiter !== listDelimiter));
     // A lazy continuation line, without the markers of the list item or quote that it continues.
     const lazy = !line.kind && current && /HyperMD-(?:list-line|quote)/.test(current.kind);
     if (
@@ -312,6 +324,7 @@ function livePreview(lines) {
       (current.kind === line.kind || line.continuation || lazy)
     ) {
       if (listFamily) current.listFamily = listFamily;
+      if (listDelimiter) current.listDelimiter = listDelimiter;
       // The runs on each side of the line break that show text, not a line's quote markers,
       // which wrapping moves, or a nested quote's `>`, which Live Preview leaves unstyled.
       const shows = ([classes, value]) =>
@@ -333,7 +346,7 @@ function livePreview(lines) {
       }
       current.runs.push([last && first && last[0] === first[0] ? last[0] : "", " "], ...line.runs);
     } else {
-      current = { kind: line.kind, runs: [...line.runs], code, listFamily };
+      current = { kind: line.kind, runs: [...line.runs], code, listFamily, listDelimiter };
       blocks.push(current);
     }
   }
@@ -401,6 +414,28 @@ function livePreview(lines) {
         }
         return [classes, text];
       })
+      // Wrapping can assign a separating space to the neighboring italic or
+      // bold run. Keep the space, and compare the styling of visible text
+      // rather than this incidental boundary (#514). Literal code and styles
+      // with visible backgrounds or decorations retain their whitespace.
+      .flatMap(([classes, text]) => {
+        if (
+          block.code ||
+          !classes ||
+          !classes.split(" ").every((name) => name === "cm-em" || name === "cm-strong")
+        )
+          return [[classes, text]];
+        const start = text.slice(0, text.length - text.trimStart().length);
+        const end = text.slice(text.trimEnd().length);
+        const value = text.trim();
+        return value
+          ? [
+              ["", start],
+              [classes, value],
+              ["", end],
+            ]
+          : [["", text]];
+      })
       // Unstyled text that shows nothing, such as a nested quote's `>`, separates nothing.
       .filter(([classes, text]) => classes || text)
       .reduce((runs, [classes, text]) => {
@@ -409,7 +444,9 @@ function livePreview(lines) {
         else runs.push([classes, text]);
         return runs;
       }, [])
-      .map(([classes, text]) => (classes ? `{${classes}}${text}{/}` : text))
+      .map(([classes, text]) =>
+        classes ? `{${classes}}${text}{/}` : block.code ? text : text.replace(/\s+/g, " "),
+      )
       .join("");
     return `[${block.kind}] ${block.code ? body : body.trim()}`;
   });

@@ -35,8 +35,8 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
-import { format } from "../dist/index.js";
-import { documentSeed, generateDocument, normalizeHtml } from "./rendering.mjs";
+import { format, parse } from "../dist/index.js";
+import { documentSeed, generateDocument, normalizeGithubHtml } from "./rendering.mjs";
 
 /**
  * Documents of the fixed seeds that render differently, with the issue that tracks each. The
@@ -132,9 +132,8 @@ async function render(text, mode) {
   }
 }
 /** The HTML as compared: without the response's ID, and in `gfm` mode without <br>. */
-function compared(html, mode) {
-  const text = html.replace(/[0-9a-f]{32}/g, "ID");
-  return normalizeHtml(mode === "gfm" ? text.replace(/<br\s*\/?>/g, " ") : text);
+function compared(html, mode, source) {
+  return normalizeGithubHtml(html, mode, parse(source, "github").tree);
 }
 
 const config = { extends: ["recommended", "github"] };
@@ -155,7 +154,7 @@ async function renderings(source) {
       output,
       before,
       after,
-      differs: compared(before, mode) !== compared(after, mode),
+      differs: compared(before, mode, source) !== compared(after, mode, output),
     });
   }
   return result;
