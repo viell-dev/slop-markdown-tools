@@ -34,7 +34,7 @@ async function shown(path, text) {
     if (!loaded) throw new Error("Obsidian did not load the vault's strict line breaks setting");
   }
   return browser.executeObsidian(
-    async ({ app, obsidian }, path, text) => {
+    async ({ app, obsidian, require }, path, text) => {
       const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       let file = app.vault.getFileByPath(path);
       for (let wait = 0; !file && wait < 50; wait++) {
@@ -46,6 +46,13 @@ async function shown(path, text) {
       const cm = leaf.view.editor.cm;
       cm.contentDOM.blur();
       await settle(150);
+      // Background parsing can lag behind scrolling in long notes (#508).
+      // forceParsing also dispatches the finished tree to the editor, so the
+      // captured styles describe parsed content rather than temporary plain text.
+      const language = require("@codemirror/language");
+      if (!language.forceParsing(cm, cm.state.doc.length, 10000))
+        throw new Error(`Live Preview did not parse all of ${path}`);
+      await settle(100);
 
       // Reading view, through the renderer that it uses. Before any note was
       // open, its first rendering differed from Reading view's, as of a line
@@ -222,7 +229,11 @@ function livePreview(lines) {
     // A line that shows only an image is not blank.
     const embed = line.runs.some(([classes]) => /\bembed\b/.test(classes));
     // A blank line below a footnote definition takes its class, and shows nothing either.
-    if ((!line.kind || line.kind === "HyperMD-footnote") && !text.trim() && !embed) {
+    if (
+      (!line.kind || line.kind === "HyperMD-footnote" || /^HyperMD-table-row\b/.test(line.kind)) &&
+      !text.trim() &&
+      !embed
+    ) {
       current = undefined;
       continue;
     }

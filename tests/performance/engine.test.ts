@@ -5,6 +5,45 @@ import { misreadLists } from "../../src/syntax/misread-lists.js";
 import { scaling } from "./scaling.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
+it("scans a comment's long marker line without quadratic backtracking (#492)", () => {
+  expect(
+    scaling(
+      [10000, 40000],
+      (count) => parse(`- a\n<!--\n- ${" ".repeat(count)}x\n`, "obsidian"),
+      (document) => misreadLists(document),
+      (result, document) => {
+        expect([...result.itemHtml].map((node) => node.position)).toEqual([
+          {
+            start: { line: 1, column: 4, offset: 3 },
+            end: { line: 4, column: 1, offset: document.source.length },
+          },
+        ]);
+      },
+      1,
+    ),
+  ).toBeLessThan(10);
+}, 120_000);
+
+it("scans a shared Obsidian table-row region once (#505)", () => {
+  expect(
+    scaling(
+      [800, 3200],
+      (count) => parse("a | b\n-- | --\n# row | b\n".repeat(count), "obsidian"),
+      (document) => misreadLists(document),
+      (result, document) => {
+        expect(
+          [...result.tableText].some(
+            (node) =>
+              node.position!.start.offset! < document.source.indexOf("# row") &&
+              node.position!.end.offset === document.source.length - 1,
+          ),
+        ).toBe(true);
+      },
+      4,
+    ),
+  ).toBeLessThan(10);
+});
+
 function formatted(source: string, options: ProcessOptions = {}) {
   const result = format(source, options);
   expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);

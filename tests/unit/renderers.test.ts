@@ -235,6 +235,20 @@ describe("Obsidian Live Preview normalizer", () => {
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
 
+  it("ignores empty table source rows while retaining table content (#497)", () => {
+    const widget = { widget: "cm-table-widget", html: "<table><tr><td>a</td></tr></table>" };
+    const empty = { kind: "HyperMD-table-row HyperMD-table-row-1", runs: [] };
+    const visible = { ...empty, runs: [["", "actual text"]] };
+    // The normalizer accepts both raw lines and widgets read from Obsidian.
+    const normalize = livePreview as (lines: unknown[]) => string[];
+    expect(normalize([empty, widget])).toEqual(normalize([widget]));
+    expect(normalize([visible, widget])).not.toEqual(normalize([widget]));
+    expect(normalize([{ ...empty, runs: [[" embed", "image.png"]] }, widget])).not.toEqual(
+      normalize([widget]),
+    );
+    expect(normalize([{ kind: "HyperMD-codeblock", runs: [] }])).toHaveLength(1);
+  });
+
   describe("styled list-family boundaries (#440)", () => {
     type PreviewLine = { kind: string; continuation?: boolean; runs: string[][] };
     const plain = (text: string): PreviewLine => ({ kind: "", runs: [["", text]] });

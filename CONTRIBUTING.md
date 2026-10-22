@@ -185,7 +185,12 @@ documents from a report, shortens each to the lines that still show its
 difference, and `PROBE`, a JSON array of documents, only shows each in Obsidian.
 Live Preview is compared by its lines' text and styles, with the characters that
 it shows as written left out where only the source differs, and Reading view by
-its HTML. The Obsidian workflow runs the check for pull requests that change a
+its HTML. The check requires the editor to finish parsing the whole note and
+publish that syntax tree before collecting styles; incomplete parsing fails the
+run. Empty table source rows with no text or embed are ignored. Boundary
+regressions in `scripts/obsidian/boundary-fixtures.mjs` are shared with the unit
+suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
+The Obsidian workflow runs the check for pull requests that change a
 [renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
 by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
 `seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the

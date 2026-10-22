@@ -22,6 +22,27 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting preserves the boundaries its views read differently: lists
+  around HTML, task fences, multiline setext text, footnote continuation margins
+  and separators, callout lists, heading-like table rows, and inline code or
+  emphasis carried into quoted lists
+  ([#487](https://github.com/viell-dev/slop-markdown-tools/issues/487),
+  [#488](https://github.com/viell-dev/slop-markdown-tools/issues/488),
+  [#489](https://github.com/viell-dev/slop-markdown-tools/issues/489),
+  [#492](https://github.com/viell-dev/slop-markdown-tools/issues/492),
+  [#493](https://github.com/viell-dev/slop-markdown-tools/issues/493),
+  [#494](https://github.com/viell-dev/slop-markdown-tools/issues/494),
+  [#495](https://github.com/viell-dev/slop-markdown-tools/issues/495),
+  [#496](https://github.com/viell-dev/slop-markdown-tools/issues/496),
+  [#499](https://github.com/viell-dev/slop-markdown-tools/issues/499),
+  [#505](https://github.com/viell-dev/slop-markdown-tools/issues/505),
+  [#506](https://github.com/viell-dev/slop-markdown-tools/issues/506),
+  [#507](https://github.com/viell-dev/slop-markdown-tools/issues/507)).
+- The Obsidian comparison finishes and publishes the editor's syntax tree before
+  capturing long notes, and ignores empty table source rows that show nothing.
+  Real text, embeds, and empty code lines still count
+  ([#497](https://github.com/viell-dev/slop-markdown-tools/issues/497),
+  [#508](https://github.com/viell-dev/slop-markdown-tools/issues/508)).
 - GitHub dollar display fences no longer interrupt an existing paragraph in the
   parser. Formatting preserves dollar lines as paragraph continuations,
   including inside list items and block quotes
