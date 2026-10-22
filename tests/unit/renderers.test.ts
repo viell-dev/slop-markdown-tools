@@ -267,6 +267,32 @@ describe("GitHub source-verified code normalization (#515)", () => {
       normalize(`<p><code>${b}</code></p>`, `\`${b}\`\n`),
     );
   });
+
+  it("keeps visible hexadecimal text and ordinary attribute values significant (#523)", () => {
+    const a = "a".repeat(32),
+      b = "b".repeat(32);
+    for (const html of [
+      "<p>VALUE</p>",
+      '<p id="VALUE">same</p>',
+      '<a href="https://example.com/VALUE">same</a>',
+    ])
+      expect(normalize(html.replaceAll("VALUE", a), a)).not.toBe(
+        normalize(html.replaceAll("VALUE", b), b),
+      );
+  });
+
+  it("normalizes only generated footnote response identifiers (#523)", () => {
+    const a = "a".repeat(32),
+      b = "b".repeat(32);
+    const input = "text[^note]\n\n[^note]: note\n";
+    const html = (id: string) =>
+      `<p><a id="user-content-fnref-note-${id}" href="#user-content-fn-note-${id}">1</a></p><section data-footnotes class="footnotes" data-run-id="${id}"><ol><li id="user-content-fn-note-${id}"><p>note <a href="#user-content-fnref-note-${id}">back</a></p></li></ol></section>`;
+    expect(normalize(html(a), input)).toBe(normalize(html(b), input));
+    expect(normalize(`<p data-run-id="${a}">text</p>`, input)).not.toBe(
+      normalize(`<p data-run-id="${b}">text</p>`, input),
+    );
+    expect(normalize(html(a), html(a))).not.toBe(normalize(html(b), html(b)));
+  });
 });
 
 describe("Obsidian Live Preview normalizer", () => {
@@ -290,6 +316,19 @@ describe("Obsidian Live Preview normalizer", () => {
     `${body}; return { livePreview };`,
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
+
+  it("retains empty unchecked checkbox widgets and their count (#522)", () => {
+    const task = {
+      kind: "HyperMD-list-line HyperMD-list-line-1 HyperMD-task-line",
+      marker: "-",
+      runs: [[" checkbox", " "]],
+    };
+    expect(livePreview([task])).not.toEqual(livePreview([task, task]));
+    expect(livePreview([task])).not.toEqual(
+      livePreview([{ kind: task.kind, marker: "-", runs: [] }]),
+    );
+    expect(livePreview([task])).not.toEqual(livePreview([{ ...task, runs: [[" checkbox", "x"]] }]));
+  });
 
   it("keeps task list delimiter boundaries when widgets hide marker classes (#512)", () => {
     const task = (marker: string, text: string, checked = " ") => ({

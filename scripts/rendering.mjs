@@ -331,10 +331,15 @@ export function normalizeGithubHtml(html, mode, tree) {
   /** @type {import("mdast").Code[]} */
   const codes = [];
   let rawPre = false;
+  let footnotes = false;
+  let rawFootnotes = false;
   /** @param {import("mdast").Nodes} node */
   const visit = (node) => {
     if (node.type === "code") codes.push(node);
+    if (node.type === "footnoteDefinition") footnotes = true;
     if (node.type === "html" && /<\/?pre(?:[\s>])/i.test(node.value)) rawPre = true;
+    if (node.type === "html" && /\bdata-(?:footnotes|run-id)\b|user-content-fn/.test(node.value))
+      rawFootnotes = true;
     if ("children" in node) node.children.forEach(visit);
   };
   visit(tree);
@@ -365,7 +370,24 @@ export function normalizeGithubHtml(html, mode, tree) {
     kept.push(value);
     return `${mark}${kept.length - 1}${mark}`;
   });
-  const text = outside.replace(/[0-9a-f]{32}/g, "ID");
+  // Only GitHub's generated footnote section establishes a response ID. A
+  // hexadecimal paragraph, anchor, URL, or source-authored HTML stays exact (#523).
+  const ids = new Set();
+  const footnoteSection = (tag) =>
+    /^<section\b/.test(tag) && /\bdata-footnotes(?:=|[ >])/.test(tag);
+  if (footnotes && !rawFootnotes)
+    for (const [tag] of outside.matchAll(/<[^>]*>/g)) {
+      const id = footnoteSection(tag) && /\bdata-run-id="([0-9a-f]{32})"/.exec(tag)?.[1];
+      if (id) ids.add(id);
+    }
+  const text = outside.replace(/<[^>]*>/g, (tag) =>
+    tag.replace(/ (data-run-id|id|href)="([^"]*)"/g, (attribute, name, value) => {
+      if (name === "data-run-id")
+        return footnoteSection(tag) && ids.has(value) ? ' data-run-id="ID"' : attribute;
+      const id = /^((?:#)?user-content-fn(?:ref)?-[^"\s]+-)([0-9a-f]{32})$/.exec(value);
+      return id && ids.has(id[2]) ? ` ${name}="${id[1]}ID"` : attribute;
+    }),
+  );
   return normalizeHtml(
     (mode === "gfm" ? text.replace(/<br\s*\/?>/g, " ") : text).replace(
       new RegExp(`${mark}(\\d+)${mark}`, "g"),

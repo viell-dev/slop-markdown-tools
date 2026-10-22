@@ -170,7 +170,9 @@ ten to fifteen minutes; its first lines say what it compares. The GitHub
 comparison verifies rendered code text against the parsed source before
 accepting highlighting-wrapper and final-line variations. Code values, language,
 metadata, and actual content differences remain significant; raw HTML `pre`
-elements are compared strictly.
+elements are compared strictly. Only generated footnote identifiers established
+by the response's footnote section are normalized; visible hexadecimal text,
+ordinary URLs and anchors, and source-authored reserved HTML remain significant.
 
 HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
 Reading view read some Markdown otherwise. `npm run check:obsidian` builds the
@@ -197,7 +199,12 @@ suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
 The comparison retains the source delimiter of styled list lines, including
 checkbox widgets, and normalizes spaces within and around italic and bold runs
 while keeping styled characters, code, highlights, and decorations significant.
-The Obsidian workflow runs the check for pull requests that change a
+Unchecked checkbox widgets retain their presence and count even with no text.
+For the default Obsidian theme, a lone unattributed paragraph directly inside a
+list item has no extra spacing and is compared as inline content. Multiple
+paragraphs, attributed paragraphs, and other block boundaries remain
+significant; a deterministic host control checks these cases on every comparison
+run. The Obsidian workflow runs the check for pull requests that change a
 [renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
 by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
 `seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the
