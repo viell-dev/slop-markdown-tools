@@ -22,6 +22,25 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting preserves adjacent ordered continuations of tab-continued
+  text, separate table headers, lazy paragraphs below list headings, multiline
+  comment endings, non-one lists below quotes, footnote continuation text
+  outside the four-column margin, fences inside HTML after carried inline code,
+  and setext text continued across tabs
+  ([#510](https://github.com/viell-dev/slop-markdown-tools/issues/510),
+  [#511](https://github.com/viell-dev/slop-markdown-tools/issues/511),
+  [#513](https://github.com/viell-dev/slop-markdown-tools/issues/513),
+  [#516](https://github.com/viell-dev/slop-markdown-tools/issues/516),
+  [#517](https://github.com/viell-dev/slop-markdown-tools/issues/517),
+  [#518](https://github.com/viell-dev/slop-markdown-tools/issues/518),
+  [#519](https://github.com/viell-dev/slop-markdown-tools/issues/519),
+  [#520](https://github.com/viell-dev/slop-markdown-tools/issues/520)).
+- Renderer comparisons retain task-list delimiter boundaries, ignore incidental
+  font styling on separating spaces, and verify GitHub's highlighted code
+  against the source before normalizing wrapper and final-line variations
+  ([#512](https://github.com/viell-dev/slop-markdown-tools/issues/512),
+  [#514](https://github.com/viell-dev/slop-markdown-tools/issues/514),
+  [#515](https://github.com/viell-dev/slop-markdown-tools/issues/515)).
 - Obsidian formatting preserves the boundaries its views read differently: lists
   around HTML, task fences, multiline setext text, footnote continuation margins
   and separators, callout lists, heading-like table rows, and inline code or

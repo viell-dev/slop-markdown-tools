@@ -596,6 +596,13 @@ export function misreadLists(document: Document): MisreadLists {
     let column: number | undefined;
     /** The end of a list or footnote definition that Reading view read as text, while inside it. */
     let joinedEnd = 0;
+    const paragraphLike = (leaf: Nodes) =>
+      leaf.type === "paragraph" ||
+      (leaf.type === "heading" &&
+        leaf.depth === 1 &&
+        leaf.position!.end.line >
+          (leaf.children[0]?.position?.start.line ?? leaf.position!.start.line) + 1 &&
+        source[leaf.position!.start.offset!] !== "#");
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       const start = leaf.position?.start.offset;
@@ -609,7 +616,8 @@ export function misreadLists(document: Document): MisreadLists {
       // The table's own range is protected below, with the other tables.
       if (
         column !== undefined &&
-        previous?.type === "paragraph" &&
+        previous !== undefined &&
+        paragraphLike(previous) &&
         leaf.type === "table" &&
         previous.position!.end.line === leaf.position!.start.line - 1
       )
@@ -619,8 +627,16 @@ export function misreadLists(document: Document): MisreadLists {
       // the code; Reading view reads it below the code's last line of text.
       if (below !== undefined && previous!.type === "code")
         while (below > previous.position!.start.line && /^[ \t]*$/.test(lines[below - 1]!)) below--;
+      // A block already read as text keeps continuing on the next line, even
+      // when the primary parse starts another list there (#510).
+      const adjacent =
+        previous?.position !== undefined &&
+        previous.position.end.offset! <= joinedEnd &&
+        leaf.position!.start.line === below! + 1;
       let joins =
-        column !== undefined && below !== undefined && leaf.position!.start.line > below + 1;
+        column !== undefined &&
+        below !== undefined &&
+        (leaf.position!.start.line > below + 1 || adjacent);
       for (let line = (below ?? 0) + 1; joins && line < leaf.position!.start.line; line++)
         if (!tabbedAt(line, column!)) joins = false;
       if (joins && !interrupts(leaf)) {
@@ -630,11 +646,13 @@ export function misreadLists(document: Document): MisreadLists {
         const opener = openers.get(leaf);
         const block =
           opener?.type === "list" || opener?.type === "footnoteDefinition" ? opener : leaf;
-        tabText.add(stretch(block, lineOf(leaf), block.position!.end));
+        tabText.add(
+          stretch(block, adjacent ? previous.position!.end : lineOf(leaf), block.position!.end),
+        );
         joinedEnd = block.position!.end.offset!;
         return;
       }
-      column = leaf.type === "paragraph" ? columnAt(start) : undefined;
+      column = paragraphLike(leaf) ? columnAt(textStart(leaf) ?? start) : undefined;
     });
     /**
      * The runs of backticks that nothing closes in the text of `node`, outside
@@ -677,6 +695,21 @@ export function misreadLists(document: Document): MisreadLists {
         else {
           // Quoted markers are literal code in Live Preview too (#494).
           unclosedCode.add(stretch(leaf, lineOf(leaf)));
+          // A physical fence in HTML source starts code in Live Preview even
+          // when the primary parse has no code node there (#519). Subsequent
+          // fence pairings disagree, so the rest of the source must stay.
+          if (
+            leaf.type === "html" &&
+            leaf.value.split(lineEndingPattern).some((line) => {
+              const fence = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)$/.exec(line);
+              return fence && (fence[1]![0] === "~" || !fence[2]!.includes("`"));
+            })
+          ) {
+            openFences.add(
+              stretch(leaf, lineOf(leaf), { ...leaf.position!.end, offset: source.length }),
+            );
+            break;
+          }
           // Live Preview shows an indented code block there as more of the
           // code, and its backticks close nothing.
           if (leaf.type === "code") continue;
@@ -745,12 +778,25 @@ export function misreadLists(document: Document): MisreadLists {
       };
     };
     // List reflow adds its own continuation margin, which Live Preview can
-    // read outside the footnote (#496). Ordinary paragraphs still wrap, and
-    // trailing space after the list remains eligible for safe cleanup (#405).
+    // read outside the footnote (#496). Continuation text outside the four-column
+    // margin can change that styling when joined (#518). Paragraphs at that margin
+    // wrap, and trailing space after the list remains eligible for cleanup (#405).
     for (const [footnote] of footnotes)
       if ("children" in footnote)
         for (const child of footnote.children.slice(1)) {
-          if (child.type !== "list" && child.type !== "blockquote") continue;
+          const uneven =
+            child.type === "paragraph" &&
+            [
+              lineAround(child.position!.start.offset!),
+              ...laterLines(child.position!.start.offset!, child.position!.end.offset!),
+            ].some(([from, to]) => {
+              const prefix = /^[ \t>]*/.exec(source.slice(from, to))![0];
+              return (
+                from + prefix.length < to &&
+                columnAt(from + prefix.length) !== columnAt(footnote.position!.start.offset!) + 4
+              );
+            });
+          if (child.type !== "list" && child.type !== "blockquote" && !uneven) continue;
           const block = wholeLines(child);
           let end = block.position!.end.offset!;
           while (source[end - 1] === " " || source[end - 1] === "\t") end--;
@@ -818,6 +864,16 @@ export function misreadLists(document: Document): MisreadLists {
       }
       return false;
     };
+    /** The final block inside any trailing list items or quotes. */
+    const endsWithHeading = (node: Nodes): boolean => {
+      let last = node;
+      while (last.type === "list" || last.type === "listItem" || last.type === "blockquote") {
+        const child = last.children.at(-1);
+        if (!child) return false;
+        last = child;
+      }
+      return last.type === "heading";
+    };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
@@ -827,11 +883,15 @@ export function misreadLists(document: Document): MisreadLists {
           previous.position.end.line === child.position.start.line - 1
         ) {
           if (
-            previous.type === "footnoteDefinition" &&
+            (previous.type === "footnoteDefinition" || previous.type === "blockquote") &&
             child.type === "list" &&
             child.ordered &&
             child.start !== 1
           )
+            boundaryText.add(stretch(child, previous.position.end));
+          // Reading view retains an unindented paragraph directly below a
+          // heading in a list's last item, where the parser ends that list (#513).
+          if (previous.type === "list" && endsWithHeading(previous) && child.type === "paragraph")
             boundaryText.add(stretch(child, previous.position.end));
           if (
             previous.type === "paragraph" &&
@@ -1112,9 +1172,10 @@ export function misreadLists(document: Document): MisreadLists {
         itemHtml.add(stretch(child, { ...list.position.end, offset: at }));
         // A comment closing after a marker on a later line makes Reading
         // view retain the preceding list's original indentation (#492).
+        const commentEnd = child.value.startsWith("<!--") ? child.value.indexOf("-->") : -1;
         if (
-          /^<!--/.test(child.value) &&
-          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t][^\r\n]*-->/.test(child.value)
+          commentEnd >= 0 &&
+          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]/.test(child.value.slice(0, commentEnd))
         )
           for (const marker of markersOf(list, lineOf(list))) itemHtml.add(marker);
         let next = index + 1;
@@ -1164,6 +1225,14 @@ export function misreadLists(document: Document): MisreadLists {
     const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
     /** A delimiter row that starts with `-` and a space, which the parser reads as a list item. */
     const listedDelimiter = /^[ \t>]*-[ \t]+\|(?:[ \t]*:?-+:?[ \t]*\|)*(?:[ \t]*:?-+:?[ \t]*)?$/;
+    const delimiterRow = (line: string) => {
+      if (!piped(line)) return false;
+      let value = line.replace(/^[ \t>]+/, "").trimEnd();
+      if (value.startsWith("|")) value = value.slice(1);
+      if (value.endsWith("|")) value = value.slice(0, -1);
+      const cells = value.split("|");
+      return cells.every((cell) => /^[ \t]*:?-+:?[ \t]*$/.test(cell));
+    };
     const paragraphHeadingEnds = new Set([...underlines].map((node) => node.position!.end.offset));
     // A run of pipe rows can contain several blocks of the primary parse.
     // Scan its union once, rather than once per parsed table within it.
@@ -1211,7 +1280,15 @@ export function misreadLists(document: Document): MisreadLists {
           // The rows from the first without a pipe, from the line break above it.
           const parts = source.slice(start, end).split(capturedLineBreak);
           for (let part = 0, at = start; part < parts.length; part += 2) {
-            if (part >= 4 && !piped(parts[part]!)) {
+            // A missing leading pipe on a header or delimiter changes where
+            // Reading view ends this table or starts another one. Adding pipes
+            // merges the remaining source into the preceding table (#511).
+            const next = parts[part + 2];
+            const newTable =
+              next !== undefined &&
+              (!/^[ \t>]*\|/.test(parts[part]!) || !/^[ \t>]*\|/.test(next)) &&
+              delimiterRow(next);
+            if (part >= 4 && (!piped(parts[part]!) || newTable)) {
               tableText.add(startingAt(leaf, at - parts[part - 1]!.length));
               break;
             }

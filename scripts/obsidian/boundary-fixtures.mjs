@@ -5,6 +5,101 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 510,
+    name: "adjacent ordered continuations after a tab-continued table",
+    source: "a\n| b | c |\n| - | - |\n\t\n9. first\n2) second *word*\n",
+  },
+  {
+    issue: 511,
+    name: "non-leading-pipe header starts a second table",
+    source: "| a | b |\n| - | - |\n| c | d |\ne | *f*\n:-- | --:\ng | h\n",
+  },
+  {
+    issue: 512,
+    name: "adjacent task lists with different bullet delimiters",
+    source: "* [ ] first *words*\n+ [x] second *words*\n",
+    preserve: false,
+  },
+  {
+    issue: 511,
+    name: "non-leading-pipe delimiter ends a table",
+    source: "| a | b |\n| - | - |\n| c | d |\n| e | *f*\n:-- | --:\ng | h\n",
+  },
+  {
+    issue: 511,
+    name: "single-column header starts a second table",
+    source: "| a | b |\n| - | - |\n| c | d |\ne |\n--- |\ng |\n",
+  },
+  {
+    issue: 513,
+    name: "lazy paragraph below a list heading",
+    source: "- # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "lazy paragraph below a nested list heading",
+    source: "- a\n  - # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "lazy paragraph below a quoted list heading",
+    source: "- > # heading\nlazy *words*\n",
+  },
+  {
+    issue: 513,
+    name: "blank-separated paragraph below a nested list heading",
+    source: "- a\n  - # heading\n\nlazy *words*\n",
+    preserve: false,
+  },
+  {
+    issue: 517,
+    name: "non-one list after a quote inside a list",
+    source: "- > word\n2. *item*\n",
+    preserve: false,
+  },
+  {
+    issue: 514,
+    name: "emphasis whitespace at a wrapped quote boundary",
+    source:
+      ">  2) grove method ember timber saddle walnut orchard saddle _lantern_ <span>lantern</span> __zephyr__ delta\n>  3) lantern fabric timber birch _valley_ __engine__ walnut juniper \n>     pebble kettle delta anchor `birch  basket` kettle glacier _meadow_ > *birch harbor* *glacier meadow* **ember** lantern fabric\n",
+    preserve: false,
+  },
+  {
+    issue: 516,
+    name: "comment closes on the line after its list marker",
+    source: "   + first\n\n+ [ ] second\n<!-- comment\n+ x\n-->\n",
+  },
+  {
+    issue: 517,
+    name: "non-one ordered continuation after a quote",
+    source: "> word\n2. *item*\n",
+  },
+  {
+    issue: 517,
+    name: "non-one ordered continuation after a quoted heading",
+    source: "> # heading\n2. *item*\n",
+  },
+  {
+    issue: 518,
+    name: "footnote paragraph with uneven continuation indentation",
+    source: "[^1]: note\n\n    const walnut = 67;\n      kettle(fabric)\n",
+  },
+  {
+    issue: 519,
+    name: "tilde fence inside HTML after carried inline code",
+    source: "text ```\n<div>\n~~~\n</div>\n\n1. *inside*\n",
+  },
+  {
+    issue: 519,
+    name: "backtick fence inside HTML after carried inline code",
+    source: "text ```\n<div>\n```\n</div>\n\n1. *inside*\n",
+  },
+  {
+    issue: 520,
+    name: "tab continues multiline setext text into the next heading",
+    source: "a\nb\n===\n\t\nc\n---\n",
+  },
+  {
     issue: 487,
     name: "list following a closing-tag HTML block",
     source: "</div>\n+ ember\n\n  * cedar\n",

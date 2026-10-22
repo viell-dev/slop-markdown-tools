@@ -166,7 +166,11 @@ and in the Release workflow. Run it by hand with
 repeat a run's new seed or `-f seed=none` for the fixed seeds alone, as the
 Release workflow runs it, or locally after a build with
 `node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
-ten to fifteen minutes; its first lines say what it compares.
+ten to fifteen minutes; its first lines say what it compares. The GitHub
+comparison verifies rendered code text against the parsed source before
+accepting highlighting-wrapper and final-line variations. Code values, language,
+metadata, and actual content differences remain significant; raw HTML `pre`
+elements are compared strictly.
 
 HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
 Reading view read some Markdown otherwise. `npm run check:obsidian` builds the
@@ -190,6 +194,9 @@ publish that syntax tree before collecting styles; incomplete parsing fails the
 run. Empty table source rows with no text or embed are ignored. Boundary
 regressions in `scripts/obsidian/boundary-fixtures.mjs` are shared with the unit
 suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
+The comparison retains the source delimiter of styled list lines, including
+checkbox widgets, and normalizes spaces within and around italic and bold runs
+while keeping styled characters, code, highlights, and decorations significant.
 The Obsidian workflow runs the check for pull requests that change a
 [renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
 by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs

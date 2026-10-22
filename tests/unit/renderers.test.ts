@@ -2,8 +2,13 @@ import { readFileSync } from "node:fs";
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
-import { documentSeed, generateDocument, normalizeHtml } from "../../scripts/rendering.mjs";
-import { format } from "../../src/index.js";
+import {
+  documentSeed,
+  generateDocument,
+  normalizeGithubHtml,
+  normalizeHtml,
+} from "../../scripts/rendering.mjs";
+import { format, parse } from "../../src/index.js";
 import type { Config } from "../../src/index.js";
 import examples from "../fixtures/commonmark/spec.json" with { type: "json" };
 
@@ -215,6 +220,55 @@ describe("normalizeHtml", () => {
   });
 });
 
+describe("GitHub source-verified code normalization (#515)", () => {
+  const source = "~~~md\nconst fern = 52;\n  lantern(engine)   \n\n~~~\n";
+  const highlighted =
+    '<div class="highlight highlight-text-md"><pre class="notranslate">const fern = 52;\n  lantern(engine)   \n</pre></div>';
+  const fallback =
+    '<pre lang="md" class="notranslate"><code class="notranslate">const fern = 52;\n  lantern(engine)   \n\n</code></pre>';
+  const normalize = (html: string, input = source) =>
+    normalizeGithubHtml(html, "gfm", parse(input, "github").tree);
+
+  it("accepts the retained highlighting and final-line variation for unchanged source", () => {
+    expect(normalize(highlighted)).toBe(normalize(fallback, source.replaceAll("~~~", "```")));
+  });
+
+  it("keeps actual source code changes, including final blank lines, significant", () => {
+    expect(normalize(fallback)).not.toBe(
+      normalize(fallback.replace("52", "53"), source.replace("52", "53")),
+    );
+    expect(normalize(fallback)).not.toBe(
+      normalize(fallback.replace("\n\n</code>", "\n</code>"), source.replace("\n\n~~~", "\n~~~")),
+    );
+    expect(normalize(fallback)).not.toBe(normalize(fallback.replace("  lantern", " lantern")));
+    expect(normalize(fallback)).not.toBe(normalize(fallback.replace("lantern", "missing")));
+  });
+
+  it("compares code language, metadata, count, escaping, and raw HTML strictly", () => {
+    expect(normalize(fallback)).not.toBe(normalize(fallback, source.replace("md\n", "js\n")));
+    expect(normalize(fallback)).not.toBe(normalize(fallback, source.replace("md\n", "md title\n")));
+    expect(normalize(fallback)).not.toBe(normalize(fallback + fallback));
+    expect(normalize(highlighted, "<pre><code>raw</code></pre>\n")).not.toBe(
+      normalize(fallback, "<pre><code>raw</code></pre>\n"),
+    );
+    const htmlSource = "```html\n<span>text</span>\n```\n";
+    expect(
+      normalize("<pre><code>&lt;span&gt;text&lt;/span&gt;\n</code></pre>", htmlSource),
+    ).not.toBe(normalize("<pre><code><span>text</span>\n</code></pre>", htmlSource));
+  });
+
+  it("keeps hexadecimal and whitespace content inside code literal", () => {
+    const a = "a".repeat(32),
+      b = "b".repeat(32);
+    expect(normalize(`<pre><code>${a}\n</code></pre>`, `\`\`\`\n${a}\n\`\`\`\n`)).not.toBe(
+      normalize(`<pre><code>${b}\n</code></pre>`, `\`\`\`\n${b}\n\`\`\`\n`),
+    );
+    expect(normalize(`<p><code>${a}</code></p>`, `\`${a}\`\n`)).not.toBe(
+      normalize(`<p><code>${b}</code></p>`, `\`${b}\`\n`),
+    );
+  });
+});
+
 describe("Obsidian Live Preview normalizer", () => {
   const source = readFileSync(
     new URL("../../scripts/obsidian/obsidian.e2e.mjs", import.meta.url),
@@ -225,7 +279,9 @@ describe("Obsidian Live Preview normalizer", () => {
     source.indexOf("/** The documents to format:"),
   );
   type NormalizerFactory = (normalize: typeof normalizeHtml) => {
-    livePreview: (lines: { kind: string; continuation?: boolean; runs: string[][] }[]) => string[];
+    livePreview: (
+      lines: { kind: string; continuation?: boolean; marker?: string; runs: string[][] }[],
+    ) => string[];
   };
   // The probe executes the repository's browser helper with its dependency injected.
   // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Verbatim helper probe.
@@ -234,6 +290,110 @@ describe("Obsidian Live Preview normalizer", () => {
     `${body}; return { livePreview };`,
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
+
+  it("keeps task list delimiter boundaries when widgets hide marker classes (#512)", () => {
+    const task = (marker: string, text: string, checked = " ") => ({
+      kind: "HyperMD-list-line HyperMD-list-line-1 HyperMD-task-line",
+      marker,
+      runs: [
+        [" checkbox", checked],
+        ["", text],
+      ],
+    });
+    const blank = { kind: "", runs: [] };
+    expect(livePreview([task("*", "first"), task("+", "second", "x")])).toEqual(
+      livePreview([task("-", "first"), blank, task("*", "second", "x")]),
+    );
+    expect(livePreview([task("*", "first"), task("*", "second")])).not.toEqual(
+      livePreview([task("*", "first"), blank, task("*", "second")]),
+    );
+    expect(livePreview([task("*", "first")])).not.toEqual(livePreview([task("*", "first", "x")]));
+    // Empty unchecked ordered tasks have no non-whitespace run after the widget.
+    expect(() => livePreview([task("1.", " ")])).not.toThrow();
+    expect(livePreview([task("1.", " "), task("2)", "second")])).toEqual(
+      livePreview([task("1.", " "), blank, task("2)", "second")]),
+    );
+  });
+
+  it("normalizes only font-style whitespace while retaining styled characters (#514)", () => {
+    const line = (runs: string[][]) => ({ kind: "", runs });
+    const plain = [
+      ["", "a "],
+      ["cm-em", "word"],
+    ];
+    expect(livePreview([line(plain)])).toEqual(
+      livePreview([
+        line([
+          ["", "a"],
+          ["cm-em", " word"],
+        ]),
+      ]),
+    );
+    expect(livePreview([line(plain)])).toEqual(
+      livePreview([
+        line([
+          ["", "a "],
+          ["cm-em", " word"],
+        ]),
+      ]),
+    );
+    expect(livePreview([line(plain)])).not.toEqual(livePreview([line([["", "a word"]])]));
+    expect(livePreview([line([["cm-strong", "basket engine"]])])).toEqual(
+      livePreview([
+        line([
+          ["cm-strong", "basket"],
+          ["", " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    );
+    // A nested quote's unstyled `>` separates the soft-line join from the
+    // following word until quote punctuation is removed later in normalization.
+    const quote = (runs: string[][]) => ({ kind: "HyperMD-quote HyperMD-quote-2", runs });
+    const quote1 = "cm-formatting cm-formatting-quote cm-formatting-quote-1";
+    const quote2 = "cm-formatting cm-formatting-quote cm-formatting-quote-2";
+    expect(
+      livePreview([
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          ["cm-strong", "basket"],
+          ["", " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    ).toEqual(
+      livePreview([
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          ["cm-strong", "basket"],
+        ]),
+        quote([
+          [quote1, ">"],
+          ["", ">"],
+          [quote2, " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    );
+    for (const style of ["cm-inline-code", "cm-highlight", "cm-strikethrough"])
+      expect(
+        livePreview([
+          line([
+            ["", "a "],
+            [style, "word"],
+          ]),
+        ]),
+      ).not.toEqual(
+        livePreview([
+          line([
+            ["", "a"],
+            [style, " word"],
+          ]),
+        ]),
+      );
+  });
 
   it("ignores empty table source rows while retaining table content (#497)", () => {
     const widget = { widget: "cm-table-widget", html: "<table><tr><td>a</td></tr></table>" };
