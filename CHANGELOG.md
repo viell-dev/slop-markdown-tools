@@ -27,9 +27,10 @@ prereleases' notes there are longer than their entries here.
   non-mappings remain Markdown. Unsettled YAML classes retain only anchors
   shared by both readings, with incomplete checks reported explicitly
   ([#540](https://github.com/viell-dev/slop-markdown-tools/issues/540)).
-- GitHub fragment checks include headings and explicit IDs inside tagfiltered
-  HTML, whose outer tags render as text. Unsupported inline attribute markup
-  remains incomplete instead of producing guessed missing fragments
+- GitHub fragment checks and the CommonMark fallback include headings and
+  explicit IDs inside tagfiltered HTML, whose outer tags render as text.
+  Unsupported inline attributes and raw-text tag spellings remain incomplete
+  instead of producing guessed missing fragments
   ([#541](https://github.com/viell-dev/slop-markdown-tools/issues/541)).
 - Raw HTML heading fragments retain literal character-reference text split by
   tags or comments, including the numbering of later duplicate headings

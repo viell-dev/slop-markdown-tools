@@ -214,5 +214,52 @@
       "u-script-titleemscript-end"
     ],
     "complete": true
+  },
+  {
+    "name": "review1-bounded-flow-matrix",
+    "source": "<div>\n<title><h2>R541 Normal child</h2></title>\n</div>\n\n## R541 Normal child\n\n<div>\n<title/><h2>R541 Self child</h2></title>\n</div>\n\n## R541 Self child\n\n<div>\n<title/x><h2>Slash child</h2></title/x>\n</div>\n\n## Slash child\n\n<div>\n<title/ ><h2>R541 Spaced slash child</h2></title/ >\n</div>\n\n## R541 Spaced slash child\n\n<div>\n<title\u000b><h2>VT child</h2></title>\n</div>\n\n## VT child\n\n<div>\n<title-suffix><h2>R541 Suffix child</h2></title-suffix>\n</div>\n\n## R541 Suffix child\n\n<div>\n<h2>R541 Boundary child</h2>\n</div>\n<title\n\nR541 later visible body.\n\n## R541 Boundary child\n\n## R541 Boundary child\n",
+    "observedIds": [
+      "r541-normal-child",
+      "r541-normal-child-1",
+      "r541-self-child",
+      "r541-self-child-1",
+      "slash-child",
+      "r541-spaced-slash-child",
+      "vt-child",
+      "r541-suffix-child",
+      "r541-suffix-child-1",
+      "r541-boundary-child",
+      "r541-boundary-child-1",
+      "r541-boundary-child-2"
+    ],
+    "knownIds": [
+      "r541-normal-child",
+      "r541-normal-child-1",
+      "r541-self-child",
+      "r541-self-child-1"
+    ],
+    "complete": false
+  },
+  {
+    "name": "review1-unterminated-title-at-eof-with-final-newline",
+    "source": "<div>\n<h2>R541 EOF newline child</h2>\n</div>\n<title\n",
+    "observedIds": [
+      "r541-eof-newline-child"
+    ],
+    "knownIds": [
+      "r541-eof-newline-child"
+    ],
+    "complete": true
+  },
+  {
+    "name": "review1-unterminated-title-at-eof-without-final-newline",
+    "source": "<div>\n<h2>R541 EOF no-newline child</h2>\n</div>\n<title",
+    "observedIds": [
+      "r541-eof-no-newline-child"
+    ],
+    "knownIds": [
+      "r541-eof-no-newline-child"
+    ],
+    "complete": true
   }
 ]

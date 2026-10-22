@@ -37,11 +37,21 @@ export interface HtmlViewOptions {
   flow?: boolean;
 }
 
-// Keep the flow/inline distinction of gfmTagfilterHtml(): htmlFlowData uses a
-// global filter, while each htmlTextData token uses the anchored expression.
-const githubFlowTagfilter =
-  /<(\/?)(iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)(?=[\t\n\f\r />])/gi;
-const githubInlineTagfilter = new RegExp("^" + githubFlowTagfilter.source, "i");
+// Flow HTML is serialized with a final newline, even at source EOF. Keep
+// that boundary in the filter without adding text bytes to the source view.
+const githubTagfilterStart = String.raw`<(\/?)(iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)`;
+const githubFlowTagfilter = new RegExp(
+  githubTagfilterStart + String.raw`(?=[\t\n\f\r >]|/>|$)`,
+  "gi",
+);
+const githubInlineTagfilter = new RegExp(
+  "^" + githubTagfilterStart + String.raw`(?=[\t\n\f\r >]|/>)`,
+  "i",
+);
+// Raw flow can contain spellings outside the inline HTML grammar. GitHub
+// suppresses child headings for these, but its API modes differ in HTML.
+// Decline exact anchors instead of treating their contents as ordinary tags.
+const githubUnsupportedRawText = new RegExp(githubTagfilterStart + String.raw`(?:/(?!>)|\v)`, "i");
 
 /** A tag that becomes an element, or the text between tags. */
 type HtmlToken =
@@ -226,15 +236,15 @@ function htmlFlow(node: Nodes, parent?: Nodes): boolean {
 
 /**
  * Escaping an inline filtered tag can expose markup inside its old attributes.
- * GitHub's sanitizer can then change the text/structure further. Do not guess
- * anchors for this unsupported case or filter the assembled view a second time.
+ * Raw-flow slash/VT spellings also have unsupported sanitizer behavior. Do not
+ * guess anchors for either case or filter the assembled view a second time.
  */
 function htmlViewUncertain(node: Nodes, options: HtmlViewOptions = {}): boolean {
   if (options.tagfilter !== "github") return false;
   if (node.type === "html")
-    return (
-      !options.flow && githubInlineTagfilter.test(node.value) && node.value.indexOf("<", 1) >= 0
-    );
+    return options.flow
+      ? githubUnsupportedRawText.test(node.value)
+      : githubInlineTagfilter.test(node.value) && node.value.indexOf("<", 1) >= 0;
   return (
     "children" in node &&
     node.children.some((child) => htmlViewUncertain(child, { ...options, flow: false }))

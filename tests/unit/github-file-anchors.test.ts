@@ -31,8 +31,18 @@ const evidence = JSON.parse(
     reading: "metadata" | "plain";
   }[];
 };
-const sourceOf = (file: string) =>
-  readFileSync(new URL(`../fixtures/frontmatter-anchors/${file}`, import.meta.url), "utf8");
+const scalarEvidence = JSON.parse(
+  readFileSync(
+    new URL("../fixtures/renderers/github-frontmatter-scalar-classes.json", import.meta.url),
+    "utf8",
+  ),
+) as typeof evidence;
+const fixtures = [
+  { fixtureDir: "frontmatter-anchors", cases: evidence.cases },
+  { fixtureDir: "frontmatter-anchor-classes", cases: scalarEvidence.cases },
+].flatMap(({ fixtureDir, cases }) => cases.map((fixture) => ({ ...fixture, fixtureDir })));
+const sourceOf = (file: string, fixtureDir = "frontmatter-anchors") =>
+  readFileSync(new URL(`../fixtures/${fixtureDir}/${file}`, import.meta.url), "utf8");
 
 it("retains the complete immutable actual-file matrix", () => {
   expect(evidence.fixtureCommit).toBe("004799257d45b2a2a8b88a60d7a04479c8cfe3ec");
@@ -40,8 +50,14 @@ it("retains the complete immutable actual-file matrix", () => {
   expect(new Set(evidence.cases.map(({ file }) => file)).size).toBe(24);
 });
 
-it.each(evidence.cases)("matches immutable Contents anchors for $name", (fixture) => {
-  const source = sourceOf(fixture.file);
+it("retains the additional immutable scalar-class matrix", () => {
+  expect(scalarEvidence.fixtureCommit).toBe("c83b12b28abf8728a3b5a243b6adfa504196cbed");
+  expect(scalarEvidence.cases).toHaveLength(6);
+  expect(new Set(scalarEvidence.cases.map(({ file }) => file)).size).toBe(6);
+});
+
+it.each(fixtures)("matches immutable Contents anchors for $name", (fixture) => {
+  const source = sourceOf(fixture.file, fixture.fixtureDir);
   expect(createHash("sha256").update(source).digest("hex")).toBe(fixture.sourceSha256);
   const document = syntax.parse(source, "github");
   const markdown = githubAnchors(document);
@@ -65,8 +81,8 @@ it.each([
   ["commonmark", "github"],
 ] as const)("keeps file selection independent of %s/%s cache order", (first, second) => {
   const parseEntry = vi.spyOn(syntax, "parse");
-  for (const fixture of evidence.cases) {
-    const source = sourceOf(fixture.file);
+  for (const fixture of fixtures) {
+    const source = sourceOf(fixture.file, fixture.fixtureDir);
     const markdown = githubAnchors(syntax.parse(source, "github"));
     const read = vi.fn(() => source);
     const workspace = createWorkspace({ "Target.md": read });

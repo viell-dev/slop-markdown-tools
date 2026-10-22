@@ -185,4 +185,63 @@ describe("GitHub filtered HTML tags (#541)", () => {
       expect(diagnostics[0]!.message).toContain("are not fully known for this renderer");
     },
   );
+
+  it("keeps the serialized flow EOF boundary without appending text bytes", () => {
+    for (const source of ["<div>\n<title\n", "<div>\n<title"]) {
+      const node = parse(source, "github").tree.children[0]!;
+      expect(node).toMatchObject({ type: "html", value: "<div>\n<title" });
+      expect(htmlView(node, { ...github, flow: true })).toBe("<div>\n&lt;title");
+      expect(htmlViewUncertain(node, { ...github, flow: true })).toBe(false);
+      expect(htmlView(node)).toBe("<div>\n<title");
+    }
+    // An arbitrary inline lexeme has no implicit flow newline boundary.
+    const inline = { type: "html" as const, value: "<title" };
+    expect(htmlView(inline, github)).toBe("<title");
+    expect(htmlView(inline, { ...github, flow: true })).toBe("&lt;title");
+    expect(htmlView({ type: "html", value: "<title\n" }, { ...github, flow: true })).toBe(
+      "&lt;title\n",
+    );
+  });
+
+  it.each([
+    ["<title/x>", "</title/x>"],
+    ["<title/ >", "</title/ >"],
+    ["<title\u000b>", "</title>"],
+  ])("declines unsupported raw-flow %j without fabricating duplicate IDs", (open, close) => {
+    const value = `${open}<h2>Child</h2>${close}`;
+    const node = { type: "html" as const, value };
+    expect(htmlView(node, { ...github, flow: true })).toContain(open);
+    expect(htmlViewUncertain(node, { ...github, flow: true })).toBe(true);
+    expect(htmlViewUncertain(node)).toBe(false);
+
+    const source =
+      `## Before\n\n<a id="known">x</a>\n\n<div>\n${value}\n</div>\n\n` +
+      '## Child\n\n<a id="later">x</a>\n';
+    const anchors = githubAnchors(parse(source, "github"));
+    expect(anchors.complete).toBe(false);
+    expect([...anchors.slugs]).toEqual(["before"]);
+    expect([...anchors.explicit]).toEqual(["known"]);
+    const workspace = createWorkspace({ "Note.md": source });
+    for (const id of ["before", "known"])
+      expect(workspace.resolve("From.md", `Note.md#${id}`, "github").fragmentExists).toBe(true);
+    for (const id of ["child", "child-1", "later"])
+      expect(workspace.resolve("From.md", `Note.md#${id}`, "github")).toMatchObject({
+        status: "unreadable",
+        fragmentIncomplete: true,
+      });
+  });
+
+  it.each([
+    ["<title>", "</title>"],
+    ["<title/>", "</title>"],
+    ["<title />", "</title>"],
+    ["<title-suffix>", "</title-suffix>"],
+  ])("keeps the supported raw-flow %j control complete", (open, close) => {
+    const source = `<div>\n${open}<h2>Control</h2>${close}\n</div>\n\n## Control\n`;
+    const node = parse(source, "github").tree.children[0]!;
+    expect(htmlViewUncertain(node, { ...github, flow: true })).toBe(false);
+    const anchors = githubAnchors(parse(source, "github"));
+    expect(anchors.complete).toBe(true);
+    expect([...anchors.slugs]).toEqual(["control", "control-1"]);
+  });
 });

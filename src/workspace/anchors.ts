@@ -111,7 +111,7 @@ interface ForgeAnchors {
 interface HtmlPart {
   anchors: string[];
   headings: { text: string; hasId: boolean }[];
-  /** An inline tagfilter escape exposes unsupported attribute markup. */
+  /** Unsupported tagfilter markup makes later renderer anchors uncertain. */
   uncertain?: true;
 }
 

@@ -117,9 +117,10 @@ The CommonMark fallback uses the same fragment-checking limit.
 
 Those versions also account for GitHub's tag filtering: tags such as `script`
 and `style` render as text, while the HTML between them can still supply
-headings and explicit IDs. Malformed inline attributes can expose uncertain
-markup and leave later fragments incomplete. Character references split by a
-real HTML tag or comment retain their literal text when heading IDs are built.
+headings and explicit IDs. Unsupported inline attributes and raw tags such as
+`<title/x>` can expose uncertain markup and leave later fragments incomplete.
+Character references split by a real HTML tag or comment retain their literal
+text when heading IDs are built.
 
 GitHub repository-file checks also select the reading used after YAML front
 matter preprocessing. A byte-zero `---` envelope with a mapping, or with a YAML
