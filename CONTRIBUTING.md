@@ -195,9 +195,9 @@ run. Empty table source rows with no text or embed are ignored. Boundary
 regressions in `scripts/obsidian/boundary-fixtures.mjs` are shared with the unit
 suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
 The comparison retains the source delimiter of styled list lines, including
-checkbox widgets, and normalizes spaces at italic and bold run edges while
-keeping styled characters, code, highlights, and decorations significant. The
-Obsidian workflow runs the check for pull requests that change a
+checkbox widgets, and normalizes spaces within and around italic and bold runs
+while keeping styled characters, code, highlights, and decorations significant.
+The Obsidian workflow runs the check for pull requests that change a
 [renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
 by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
 `seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the

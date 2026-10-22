@@ -338,6 +338,15 @@ describe("Obsidian Live Preview normalizer", () => {
       ]),
     );
     expect(livePreview([line(plain)])).not.toEqual(livePreview([line([["", "a word"]])]));
+    expect(livePreview([line([["cm-strong", "basket engine"]])])).toEqual(
+      livePreview([
+        line([
+          ["cm-strong", "basket"],
+          ["", " "],
+          ["cm-strong", "engine"],
+        ]),
+      ]),
+    );
     for (const style of ["cm-inline-code", "cm-highlight", "cm-strikethrough"])
       expect(
         livePreview([

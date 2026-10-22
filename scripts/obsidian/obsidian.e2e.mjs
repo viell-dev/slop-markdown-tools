@@ -415,9 +415,9 @@ function livePreview(lines) {
         }
         return [classes, text];
       })
-      // Wrapping can assign a separating space to the neighboring italic or
-      // bold run. Keep the space, and compare the styling of visible text
-      // rather than this incidental boundary (#514). Literal code and styles
+      // Wrapping can split an italic or bold run around a separating space.
+      // Keep every space plain, including inside a run, and compare the styling
+      // of visible text rather than this incidental boundary (#514). Code and styles
       // with visible backgrounds or decorations retain their whitespace.
       .flatMap(([classes, text]) => {
         if (
@@ -426,16 +426,7 @@ function livePreview(lines) {
           !classes.split(" ").every((name) => name === "cm-em" || name === "cm-strong")
         )
           return [[classes, text]];
-        const start = text.slice(0, text.length - text.trimStart().length);
-        const end = text.slice(text.trimEnd().length);
-        const value = text.trim();
-        return value
-          ? [
-              ["", start],
-              [classes, value],
-              ["", end],
-            ]
-          : [["", text]];
+        return text.split(/(\s+)/).map((part) => [part.trim() ? classes : "", part]);
       })
       // Unstyled text that shows nothing, such as a nested quote's `>`, separates nothing.
       .filter(([classes, text]) => classes || text)
