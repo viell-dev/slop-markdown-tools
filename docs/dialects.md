@@ -86,7 +86,7 @@ never restyled, and no line is broken inside it.
   protected on GitHub, Forgejo, Gitea, and Obsidian. GitHub's dollar display
   math needs its own paragraph: `$$` directly below an existing paragraph stays
   in that paragraph, including a list item's or block quote's continuation.
-  Preserving these continuations is an unreleased fix
+  Formatting preserves these continuations in versions after 0.4.0
   ([#491](https://github.com/viell-dev/slop-markdown-tools/issues/491)).
   VitePress's optional dollar display math can interrupt a paragraph and close
   on the same line; a `math` code fence is ordinary code there.
