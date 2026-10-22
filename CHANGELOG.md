@@ -22,6 +22,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting preserves code carried into nested quoted lists, empty
+  task separators, bare HTML-comment markers, fences whose openers remain in
+  HTML, and indented code read outside a quote
+  ([#524](https://github.com/viell-dev/slop-markdown-tools/issues/524),
+  [#525](https://github.com/viell-dev/slop-markdown-tools/issues/525),
+  [#526](https://github.com/viell-dev/slop-markdown-tools/issues/526),
+  [#529](https://github.com/viell-dev/slop-markdown-tools/issues/529),
+  [#530](https://github.com/viell-dev/slop-markdown-tools/issues/530)).
+- Renderer comparisons retain empty checkbox widgets and visible hexadecimal
+  text, and ignore lone list-paragraph wrappers whose spacing is unchanged in
+  Obsidian's default theme
+  ([#522](https://github.com/viell-dev/slop-markdown-tools/issues/522),
+  [#523](https://github.com/viell-dev/slop-markdown-tools/issues/523),
+  [#528](https://github.com/viell-dev/slop-markdown-tools/issues/528)).
 - Obsidian formatting preserves adjacent ordered continuations of tab-continued
   text, separate table headers, lazy paragraphs below list headings, multiline
   comment endings, non-one lists below quotes, footnote continuation text

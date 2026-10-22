@@ -104,7 +104,9 @@ describe("Obsidian boundaries read differently by its views", () => {
   });
 
   it("formats an independent paragraph after each protected region", () => {
-    for (const [, source] of boundaries.filter(([issue]) => ![488, 494, 519].includes(issue)))
+    for (const [, source] of boundaries.filter(
+      ([issue]) => ![488, 494, 519, 524, 529].includes(issue),
+    ))
       expect(checked(`${source}\nLater *outside*.\n`)).toContain("Later _outside_.");
   });
 

@@ -76,7 +76,7 @@ export interface MisreadLists {
    * well, with a table that holds such a run.
    */
   unclosedCode: ReadonlySet<Nodes>;
-  /** Live Preview can keep code through EOF after an HTML/code transition (#433). */
+  /** Either Obsidian view can keep code through EOF after an HTML/code transition (#433, #529). */
   htmlCodeToEnd: boolean;
   /**
    * In the Obsidian dialect, the blocks that Reading view reads as more of an
@@ -388,6 +388,7 @@ export function misreadLists(document: Document): MisreadLists {
   const boundaryText = new Set<Nodes>();
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
+    const quotedLeaves = new Set<Nodes>();
     /**
      * Leaf blocks in document order, and whether each starts a list item, also
      * inside a container that does, as in `- > a`.
@@ -408,6 +409,7 @@ export function misreadLists(document: Document): MisreadLists {
       footnote: Nodes | undefined,
       opener: Parents | undefined,
       contained: boolean,
+      quoted: boolean,
     ) => {
       if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
       if (leaves.has(node.type) || !("children" in node)) {
@@ -415,6 +417,7 @@ export function misreadLists(document: Document): MisreadLists {
         if (footnote) inFootnotes.set(node, footnote);
         if (opener) openers.set(node, opener);
         if (contained && node.type === "html") containerHtml.add(node);
+        if (quoted) quotedLeaves.add(node);
       } else
         node.children.forEach((child, index) =>
           collect(
@@ -425,10 +428,11 @@ export function misreadLists(document: Document): MisreadLists {
               ? (opener ?? (node.type === "root" ? undefined : node))
               : undefined,
             contained || node.type === "listItem" || node.type === "blockquote",
+            quoted || node.type === "blockquote",
           ),
         );
     };
-    collect(document.tree, false, undefined, undefined, false);
+    collect(document.tree, false, undefined, undefined, false, false);
     /** Where the line holding `offset` starts. */
     const lineStart = (offset: number) => {
       let at = offset;
@@ -531,6 +535,20 @@ export function misreadLists(document: Document): MisreadLists {
           while (from > 0 && source[from - 1] !== "\n" && source[from - 1] !== "\r") from--;
           const start = { ...leaf.position.start, offset: from, column: 1 };
           htmlText.add(from === offset ? leaf : { ...leaf, position: { ...leaf.position, start } });
+          // The opener is still HTML source in Reading view. A physical empty
+          // line inside its body ends that HTML, so its closer instead opens
+          // Reading-view code and later fences pair differently (#529).
+          if (
+            leaf.type === "code" &&
+            /^(?:`{3,}|~{3,})/.test(source.slice(offset, offset + 3)) &&
+            source
+              .slice(offset, leaf.position.end.offset)
+              .split(lineEndingPattern)
+              .some((line) => /^[>]*$/.test(line))
+          ) {
+            openFences.add(stretch(leaf, start, { ...leaf.position.end, offset: source.length }));
+            htmlCodeToEnd = true;
+          }
         }
       }
       // Other HTML blocks end at their own end marker, as a comment does at `-->`.
@@ -685,13 +703,16 @@ export function misreadLists(document: Document): MisreadLists {
      * those inside the code.
      */
     let carry: number | undefined;
+    // A run opened inside a quote resets at its next item. One opened outside
+    // keeps styling even nested quoted items until a real outer reset (#524).
+    let carryInQuote = false;
     for (const [leaf, item] of order) {
       const start = leaf.position?.start.offset;
       const end = leaf.position?.end.offset;
       if (start === undefined || end === undefined) continue;
       if (carry !== undefined) {
         const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
-        if ((item && openers.get(leaf)?.type !== "blockquote") || fenced) carry = undefined;
+        if ((item && (!quotedLeaves.has(leaf) || carryInQuote)) || fenced) carry = undefined;
         else {
           // Quoted markers are literal code in Live Preview too (#494).
           unclosedCode.add(stretch(leaf, lineOf(leaf)));
@@ -715,7 +736,10 @@ export function misreadLists(document: Document): MisreadLists {
           if (leaf.type === "code") continue;
           const runs = backtickRuns(source, start, end);
           const close = runs.findIndex(([, length]) => length === carry);
-          if (close >= 0) carry = carried(source, runs.slice(close + 1));
+          if (close >= 0) {
+            carry = carried(source, runs.slice(close + 1));
+            carryInQuote = quotedLeaves.has(leaf);
+          }
           continue;
         }
       }
@@ -737,6 +761,7 @@ export function misreadLists(document: Document): MisreadLists {
       const after = backtickRuns(source, long[0] + long[1], end);
       const close = after.findIndex(([, length]) => length === long[1]);
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
+      carryInQuote = quotedLeaves.has(leaf);
     }
     /** The offsets where the line holding `offset` starts and ends. */
     const lineAround = (offset: number): [number, number] => {
@@ -777,6 +802,19 @@ export function misreadLists(document: Document): MisreadLists {
         },
       };
     };
+    // Empty task widgets need the separator after their checkbox source in
+    // both Obsidian views. Wrapping as well as trailing-space cleanup can
+    // otherwise turn the widget into literal bracket text (#525).
+    for (const [leaf] of order)
+      if (leaf.type === "paragraph" && leaf.position!.start.line === leaf.position!.end.line) {
+        const block = wholeLines(leaf);
+        if (
+          /^[ \t>]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+(?:>[ \t]*)*)+\[[^\]\r\n]\][ \t]+$/.test(
+            source.slice(block.position!.start.offset, block.position!.end.offset),
+          )
+        )
+          boundaryText.add(block);
+      }
     // List reflow adds its own continuation margin, which Live Preview can
     // read outside the footnote (#496). Continuation text outside the four-column
     // margin can change that styling when joined (#518). Paragraphs at that margin
@@ -1085,6 +1123,21 @@ export function misreadLists(document: Document): MisreadLists {
           (parent.type === "blockquote" || parent.type === "listItem")
         ) {
           const later = laterLines(start, end);
+          // Reading view ends the quote at an unquoted indented continuation
+          // and reads its four-column margin as literal code, although the
+          // primary parse keeps the line in the quoted paragraph (#530).
+          if (parent.type === "blockquote")
+            for (const [from, to] of later) {
+              const prefix = /^[ \t]+/.exec(source.slice(from, to))?.[0];
+              if (
+                prefix &&
+                columnAt(from + prefix.length) >= 4 &&
+                !/^[ \t]*>/.test(source.slice(from, to))
+              ) {
+                boundaryText.add(breakBefore(child, from, end));
+                break;
+              }
+            }
           // A lazy line of `=` or `-` underlines the text in Reading view,
           // where the parser reads more of the text (issue #377). It stays on
           // its own line, as written.
@@ -1175,7 +1228,9 @@ export function misreadLists(document: Document): MisreadLists {
         const commentEnd = child.value.startsWith("<!--") ? child.value.indexOf("-->") : -1;
         if (
           commentEnd >= 0 &&
-          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]/.test(child.value.slice(0, commentEnd))
+          /(?:\r\n|\r|\n)[ \t>]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|(?=\r|\n|$))/.test(
+            child.value.slice(0, commentEnd),
+          )
         )
           for (const marker of markersOf(list, lineOf(list))) itemHtml.add(marker);
         let next = index + 1;
