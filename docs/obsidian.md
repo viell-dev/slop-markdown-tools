@@ -201,20 +201,31 @@ latest installable release:
 - Lists following a closing-tag HTML block keep their source when Live Preview
   reads a marker inside that block as their parent. List indentation also stays
   when an HTML comment below the list closes after a marker, including when its
-  closer is on a subsequent line. An unindented paragraph directly below a
-  heading in the last list item keeps its boundary: Reading view still nests it
-  in that item.
+  closer is on a subsequent line or the marker has no following text. An
+  unindented paragraph directly below a heading in the last list item keeps its
+  boundary: Reading view still nests it in that item.
 - A fence immediately after a task checkbox, including a custom status such as
   `[-]`, keeps the remaining source as written. Live Preview opens code there,
   while the parser reads paragraph text, so subsequent fences can pair
   differently throughout the note. A fence inside HTML after carried inline code
   keeps the remaining source for the same reason, even though the primary parse
   has no code block there.
+- A fence whose opener is still part of whitespace-continued HTML keeps the
+  remaining source when an empty line in its body makes its closer open a
+  Reading-view code block instead. Later fence pairings then disagree.
+- Task items with no text after their checkbox on its source line keep the
+  separator and paragraph, including ordered lists, quotes, custom statuses, and
+  text continued on the next line. Removing that separator can turn the checkbox
+  into literal bracket text.
 - Inline code carried from a preceding block into a quoted list protects its
-  quote and list markers too. An unmatched emphasis opener immediately before a
-  block quote preserves the opening paragraph and the quote, because Live
-  Preview can carry that style into its literal list markers. A blank line
-  resets that emphasis state.
+  quote and list markers too, including nested items when the code starts
+  outside the quote. Existing protection for items opening a quote remains.
+  Unquoted lines indented four columns or more inside a quoted paragraph or list
+  keep their source: Reading view reads them as code, where the primary parser
+  keeps paragraph text. An unmatched emphasis opener immediately before a block
+  quote preserves the opening paragraph and the quote, because Live Preview can
+  carry that style into its literal list markers. A blank line resets that
+  emphasis state.
 - Lists and quotes that start on continuation lines in footnote definitions keep
   their layout. Continuation paragraphs with text indented other than four
   columns past the definition also keep their layout because joining them can

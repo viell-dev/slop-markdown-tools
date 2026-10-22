@@ -62,6 +62,27 @@ async function shown(path, text) {
       const container = document.createElement("div");
       await obsidian.MarkdownRenderer.render(app, text, container, path, component);
       await settle(50);
+      const rawReading = container.innerHTML;
+      // Obsidian's default Reading-view styles give a lone list paragraph no
+      // extra spacing (#528). Keep multiple paragraphs and attributed wrappers:
+      // their boundaries or styling can be visible.
+      for (const item of container.querySelectorAll("li")) {
+        if (item.closest("section[data-footnotes], .footnotes")) continue;
+        const paragraphs = [...item.children].filter((child) => child.tagName === "P");
+        if (paragraphs.length !== 1 || paragraphs[0].attributes.length) continue;
+        const paragraph = paragraphs[0];
+        if (
+          [...item.childNodes].some(
+            (child) =>
+              child !== paragraph &&
+              (child.nodeType === Node.TEXT_NODE
+                ? child.textContent.trim()
+                : child.nodeType !== Node.ELEMENT_NODE || !child.matches("ul, ol")),
+          )
+        )
+          continue;
+        paragraph.replaceWith(...paragraph.childNodes);
+      }
       const reading = container.innerHTML;
       component.unload();
 
@@ -164,6 +185,7 @@ async function shown(path, text) {
         leaf.view.containerEl.querySelector(".markdown-preview-sizer")?.innerHTML ?? "";
       return {
         reading,
+        rawReading,
         preview,
         lines: [...lines].sort((a, b) => a[0] - b[0]).map(([, line]) => line),
       };
@@ -211,6 +233,16 @@ function livePreview(lines) {
   // The column where the list item's content starts, for the lines of a code block in it.
   let content;
   for (let line of lines) {
+    // An unchecked widget is visible even though its captured value is blank.
+    // Give it content before whitespace trimming and soft-line joining (#522).
+    if (line.runs?.some(([classes]) => /\bcheckbox\b/.test(classes)))
+      line = {
+        ...line,
+        runs: line.runs.map(([classes, value]) => [
+          classes,
+          /\bcheckbox\b/.test(classes) ? (value.trim() ? "[x]" : "[ ]") : value,
+        ]),
+      };
     // An embed that Live Preview shows as a block where the source gives it a line of its
     // own, which wrapping can do, shows the same file as an embed in the line.
     if (line.embed) line = { kind: "", runs: [[" embed", line.embed]] };
@@ -541,20 +573,42 @@ const reduce = process.env.REDUCE?.split(",")
 const probe = process.env.PROBE ? JSON.parse(process.env.PROBE) : undefined;
 
 describe("Obsidian before and after formatting", function () {
+  it("normalizes lone list paragraphs while retaining paragraph boundaries (#528)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = [
+      "- first\n- second\n",
+      "- first\n\n- second\n",
+      "- first\n\n  another paragraph\n",
+      "- first another paragraph\n",
+      '- <p class="visible-style">first</p>\n',
+      "- first\n",
+    ];
+    const views = [];
+    for (const [index, source] of sources.entries()) {
+      const path = `controls/list-paragraph-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.push(await shown(path, source));
+    }
+    expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
+    expect(cleanHtml(views[0].rawReading)).not.toEqual(cleanHtml(views[1].rawReading));
+    expect(cleanHtml(views[2].reading)).not.toEqual(cleanHtml(views[3].reading));
+    expect(cleanHtml(views[4].reading)).not.toEqual(cleanHtml(views[5].reading));
+  });
+
   it("shows the documents to probe", async function () {
     if (!probe) this.skip();
     const shownProbes = [];
     for (const [index, source] of probe.entries()) {
       const path = `probes/${index}.md`;
       await obsidianPage.write(path, source);
-      const { reading, preview, lines } = await shown(path, source);
+      const { reading, rawReading, preview, lines } = await shown(path, source);
       const views = {
         reading: cleanHtml(reading),
         preview: cleanHtml(preview),
         livePreview: livePreview(lines),
       };
       // The lines as read, for finding out what the comparison makes of them.
-      shownProbes.push({ source, ...views, lines });
+      shownProbes.push({ source, ...views, rawReading, lines });
       console.log(
         `${JSON.stringify(source)}\n  reading: ${views.reading}\n  reading view: ${views.preview}\n  live preview: ${JSON.stringify(views.livePreview)}`,
       );

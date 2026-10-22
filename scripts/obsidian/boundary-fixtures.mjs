@@ -5,6 +5,86 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 524,
+    name: "carried code through a nested quoted list",
+    source: "text ```\n> 1) *first*\n>    - *second*\n",
+  },
+  {
+    issue: 524,
+    name: "an outside item resets carry before its nested quote",
+    source: "a ``` b\n\n- > c *d*\n\ne *f*\n",
+    preserve: false,
+  },
+  {
+    issue: 524,
+    name: "quoted carry retains the next quote-opening item",
+    source: "> text ```\n\n> - *item*\n",
+  },
+  {
+    issue: 524,
+    name: "quoted item carry retains a following item",
+    source: "> - a ```\n> - *b*\n",
+  },
+  ...["1. [ ] ", "+ [ ] ", "> - [x] ", "- [-] ", "- > 1. [ ] "].map((source) => ({
+    issue: 525,
+    name: `empty task separator ${source.trim()}`,
+    source: `${source}\n`,
+  })),
+  ...["- [ ] \n  more\n", "> 1. [x] \n>    more\n", "- [-] \n  more *words*\n"].map((source) => ({
+    issue: 525,
+    name: `task separator before continuation ${source.split("\n")[0].trim()}`,
+    source,
+  })),
+  {
+    issue: 526,
+    name: "bare comment marker before a later closer",
+    source: "   + first\n\n+ [ ] second\n<!-- comment\n+\n-->\n",
+  },
+  {
+    issue: 528,
+    name: "list tightness after whitespace-only separator cleanup",
+    source: "* one\n* two\n  \n* three\n",
+    preserve: false,
+  },
+  {
+    issue: 529,
+    name: "fence opened inside whitespace-continued HTML",
+    source: "<div>\ntext\n</div>\n\t\n```js\nx\n\n```\n\n*inside*\n",
+  },
+  {
+    issue: 529,
+    name: "spaces in a fence body do not end continued HTML",
+    source: "<div>\ntext\n</div>\n\t\n```js\nx\n  \n```\n\n*outside*\n",
+    preserve: false,
+  },
+  {
+    issue: 530,
+    name: "three-space lazy quote continuation remains prose",
+    source: "> word\nlazy\n   *three spaces*   \n",
+    preserve: false,
+  },
+  {
+    issue: 530,
+    name: "unquoted indented code below a quoted paragraph",
+    source: "> word\n    *literal*   \n",
+  },
+  {
+    issue: 530,
+    name: "unquoted tab-indented code after a lazy quote line",
+    source: "> word\nlazy\n\t*literal*   \n",
+  },
+  {
+    issue: 530,
+    name: "unquoted indented code below a quoted list",
+    source: "> - word\n    *lazy*   \n",
+  },
+  ...["    ", "\t"].map((prefix) => ({
+    issue: 530,
+    name: `indented quote marker remains prose ${JSON.stringify(prefix)}`,
+    source: `> word\n${prefix}> *literal*\n`,
+    preserve: false,
+  })),
+  {
     issue: 510,
     name: "adjacent ordered continuations after a tab-continued table",
     source: "a\n| b | c |\n| - | - |\n\t\n9. first\n2) second *word*\n",
