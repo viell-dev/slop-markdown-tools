@@ -282,15 +282,30 @@ describe("GitHub source-verified code normalization (#515)", () => {
   });
 
   it("normalizes only generated footnote response identifiers (#523)", () => {
-    const a = "a".repeat(32),
+    const a = "13b2bef4044873100ccc1e1a3cb0bb74",
       b = "b".repeat(32);
-    const input = "text[^note]\n\n[^note]: note\n";
-    const html = (id: string) =>
-      `<p><a id="user-content-fnref-note-${id}" href="#user-content-fn-note-${id}">1</a></p><section data-footnotes class="footnotes" data-run-id="${id}"><ol><li id="user-content-fn-note-${id}"><p>note <a href="#user-content-fnref-note-${id}">back</a></p></li></ol></section>`;
+    const input = "a[^n] b[^n] c[^lab-el]\n\n[^n]: note\n[^lab-el]: other\n";
+    // GitHub's live gfm API response, captured 2026-10-22. It has repeated
+    // references and no data-run-id on the generated section.
+    const response = readFileSync(
+      new URL("../fixtures/renderers/github-footnotes.html", import.meta.url),
+      "utf8",
+    );
+    const html = (id: string) => response.replaceAll(a, id);
     expect(normalize(html(a), input)).toBe(normalize(html(b), input));
+    const oldShape = (id: string) =>
+      html(id).replace(
+        '<section data-footnotes=""',
+        `<section data-run-id="${id}" data-footnotes=""`,
+      );
+    expect(normalize(oldShape(a), input)).toBe(normalize(oldShape(b), input));
     expect(normalize(`<p data-run-id="${a}">text</p>`, input)).not.toBe(
       normalize(`<p data-run-id="${b}">text</p>`, input),
     );
+    expect(normalize(html(a), input)).not.toBe(
+      normalize(html(a).replace(`fn-lab-el-${a}`, `fn-lab-el-${b}`), input),
+    );
+    expect(normalize(html(a), input)).not.toBe(normalize(html(a).replace("other", b), input));
     expect(normalize(html(a), html(a))).not.toBe(normalize(html(b), html(b)));
   });
 });

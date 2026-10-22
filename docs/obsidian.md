@@ -213,18 +213,19 @@ latest installable release:
 - A fence whose opener is still part of whitespace-continued HTML keeps the
   remaining source when an empty line in its body makes its closer open a
   Reading-view code block instead. Later fence pairings then disagree.
-- Empty task items keep the spacing after their checkbox source, including
-  ordered lists, quotes, and custom statuses. Removing that separator can turn
-  the checkbox into literal bracket text.
+- Task items with no text after their checkbox on its source line keep the
+  separator and paragraph, including ordered lists, quotes, custom statuses, and
+  text continued on the next line. Removing that separator can turn the checkbox
+  into literal bracket text.
 - Inline code carried from a preceding block into a quoted list protects its
   quote and list markers too, including nested items when the code starts
-  outside the quote. Code starting inside a quote still resets at its next item.
-  Unquoted lines indented four columns or more inside a quoted paragraph keep
-  their source: Reading view reads them as code, where the primary parser keeps
-  paragraph text. An unmatched emphasis opener immediately before a block quote
-  preserves the opening paragraph and the quote, because Live Preview can carry
-  that style into its literal list markers. A blank line resets that emphasis
-  state.
+  outside the quote. Existing protection for items opening a quote remains.
+  Unquoted lines indented four columns or more inside a quoted paragraph or list
+  keep their source: Reading view reads them as code, where the primary parser
+  keeps paragraph text. An unmatched emphasis opener immediately before a block
+  quote preserves the opening paragraph and the quote, because Live Preview can
+  carry that style into its literal list markers. A blank line resets that
+  emphasis state.
 - Lists and quotes that start on continuation lines in footnote definitions keep
   their layout. Continuation paragraphs with text indented other than four
   columns past the definition also keep their layout because joining them can

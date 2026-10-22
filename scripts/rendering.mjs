@@ -375,11 +375,26 @@ export function normalizeGithubHtml(html, mode, tree) {
   const ids = new Set();
   const footnoteSection = (tag) =>
     /^<section\b/.test(tag) && /\bdata-footnotes(?:=|[ >])/.test(tag);
+  let sectionDepth = 0;
+  let definitions = 0;
   if (footnotes && !rawFootnotes)
     for (const [tag] of outside.matchAll(/<[^>]*>/g)) {
-      const id = footnoteSection(tag) && /\bdata-run-id="([0-9a-f]{32})"/.exec(tag)?.[1];
-      if (id) ids.add(id);
+      if (footnoteSection(tag) || (sectionDepth && /^<section\b/.test(tag))) {
+        sectionDepth++;
+        const id = footnoteSection(tag) && /\bdata-run-id="([0-9a-f]{32})"/.exec(tag)?.[1];
+        if (id) ids.add(id);
+      } else if (sectionDepth && /^<\/section\s*>/.test(tag)) sectionDepth--;
+      if (sectionDepth && /^<li\b/.test(tag)) {
+        const id = /\bid="user-content-fn-[^"\s]+-([0-9a-f]{32})"/.exec(tag)?.[1];
+        if (id) {
+          ids.add(id);
+          definitions++;
+        }
+      }
     }
+  // Current responses put the suffix only on the definitions and references;
+  // older retained responses also had data-run-id. Require one shared suffix.
+  if (!definitions || ids.size !== 1) ids.clear();
   const text = outside.replace(/<[^>]*>/g, (tag) =>
     tag.replace(/ (data-run-id|id|href)="([^"]*)"/g, (attribute, name, value) => {
       if (name === "data-run-id")

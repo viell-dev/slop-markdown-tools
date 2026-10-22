@@ -34,6 +34,10 @@ describe("Obsidian boundaries read differently by its views", () => {
     delete document.tree.children[0]!.position;
     expect(() => misreadLists(document)).not.toThrow();
   });
+  it("retains prior protection for a quote-opening ordered item (#524)", () => {
+    const source = "> text ```\n\n> 1) *first*\n>    - *second*\n";
+    expect(checked(source)).toContain("> 1) *first*\n");
+  });
   it.each(boundaries)("preserves the source for #%i", (_issue, source) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", String.fromCharCode(0xfeff)]) {

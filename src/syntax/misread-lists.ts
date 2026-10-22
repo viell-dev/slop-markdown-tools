@@ -707,8 +707,8 @@ export function misreadLists(document: Document): MisreadLists {
      * those inside the code.
      */
     let carry: number | undefined;
-    // A run opened inside a quote resets at its next item. One opened outside
-    // keeps styling even nested quoted items until a real outer reset (#524).
+    // An outer run keeps styling nested quoted items (#524). Preserve the
+    // existing protection for items that open their blockquote too (#494).
     let carryInQuote = false;
     for (const [leaf, item] of order) {
       const start = leaf.position?.start.offset;
@@ -716,7 +716,13 @@ export function misreadLists(document: Document): MisreadLists {
       if (start === undefined || end === undefined) continue;
       if (carry !== undefined) {
         const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
-        if ((item && (!quotedItems.has(leaf) || carryInQuote)) || fenced) carry = undefined;
+        if (
+          (item &&
+            openers.get(leaf)?.type !== "blockquote" &&
+            (!quotedItems.has(leaf) || carryInQuote)) ||
+          fenced
+        )
+          carry = undefined;
         else {
           // Quoted markers are literal code in Live Preview too (#494).
           unclosedCode.add(stretch(leaf, lineOf(leaf)));
@@ -806,23 +812,6 @@ export function misreadLists(document: Document): MisreadLists {
         },
       };
     };
-    // Empty task widgets need the separator after their checkbox source in
-    // both Obsidian views. Wrapping as well as trailing-space cleanup can
-    // otherwise turn the widget into literal bracket text (#525).
-    for (const [leaf] of order)
-      if (
-        leaf.type === "paragraph" &&
-        leaf.position &&
-        leaf.position.start.line === leaf.position.end.line
-      ) {
-        const block = wholeLines(leaf);
-        if (
-          /^[ \t>]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+(?:>[ \t]*)*)+\[[^\]\r\n]\][ \t]+$/.test(
-            source.slice(block.position!.start.offset, block.position!.end.offset),
-          )
-        )
-          boundaryText.add(block);
-      }
     // List reflow adds its own continuation margin, which Live Preview can
     // read outside the footnote (#496). Continuation text outside the four-column
     // margin can change that styling when joined (#518). Paragraphs at that margin
@@ -1131,10 +1120,27 @@ export function misreadLists(document: Document): MisreadLists {
           (parent.type === "blockquote" || parent.type === "listItem")
         ) {
           const later = laterLines(start, end);
+          // A task whose first source line ends after its checkbox needs that
+          // separator, even with text on a following line (#525). The task
+          // parser can place the paragraph's start after that first line, so
+          // take the opening source from its item. Keep the whole paragraph
+          // so wrapping cannot remove the separator either.
+          if (parent.type === "listItem" && index === 0 && parent.position) {
+            const block = wholeLines(parent, child);
+            if (
+              /^[ \t>]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+(?:>[ \t]*)*)+\[[^\]\r\n]\][ \t]+$/.test(
+                source.slice(
+                  block.position!.start.offset,
+                  lineAround(parent.position.start.offset!)[1],
+                ),
+              )
+            )
+              boundaryText.add(block);
+          }
           // Reading view ends the quote at an unquoted indented continuation
           // and reads its four-column margin as literal code, although the
           // primary parse keeps the line in the quoted paragraph (#530).
-          if (parent.type === "blockquote")
+          if (quotedLeaves.has(child))
             for (const [from, to] of later) {
               const prefix = /^[ \t]+/.exec(source.slice(from, to))?.[0];
               if (

@@ -15,10 +15,25 @@ export const boundaryFixtures = [
     source: "a ``` b\n\n- > c *d*\n\ne *f*\n",
     preserve: false,
   },
+  {
+    issue: 524,
+    name: "quoted carry retains the next quote-opening item",
+    source: "> text ```\n\n> - *item*\n",
+  },
+  {
+    issue: 524,
+    name: "quoted item carry retains a following item",
+    source: "> - a ```\n> - *b*\n",
+  },
   ...["1. [ ] ", "+ [ ] ", "> - [x] ", "- [-] ", "- > 1. [ ] "].map((source) => ({
     issue: 525,
     name: `empty task separator ${source.trim()}`,
     source: `${source}\n`,
+  })),
+  ...["- [ ] \n  more\n", "> 1. [x] \n>    more\n", "- [-] \n  more *words*\n"].map((source) => ({
+    issue: 525,
+    name: `task separator before continuation ${source.split("\n")[0].trim()}`,
+    source,
   })),
   {
     issue: 526,
@@ -58,6 +73,17 @@ export const boundaryFixtures = [
     name: "unquoted tab-indented code after a lazy quote line",
     source: "> word\nlazy\n\t*literal*   \n",
   },
+  {
+    issue: 530,
+    name: "unquoted indented code below a quoted list",
+    source: "> - word\n    *lazy*   \n",
+  },
+  ...["    ", "\t"].map((prefix) => ({
+    issue: 530,
+    name: `indented quote marker remains prose ${JSON.stringify(prefix)}`,
+    source: `> word\n${prefix}> *literal*\n`,
+    preserve: false,
+  })),
   {
     issue: 510,
     name: "adjacent ordered continuations after a tab-continued table",
