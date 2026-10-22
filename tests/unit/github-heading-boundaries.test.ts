@@ -115,6 +115,19 @@ describe("GitHub heading source and anchor boundaries", () => {
     expect(format(source, { config })).toMatchObject({ output: source, diagnostics: [] });
   });
 
+  it.each([
+    "<h2>Known</h2>\n<h2>a <div> b</h2>\n",
+    "Inline <h2>Known</h2> <h2>a <div> b</h2>\n",
+    "<h2>Known<h2>Unclosed\n",
+  ])("keeps earlier raw headings within the same uncertain block: %j", (source) => {
+    const workspace = createWorkspace({ "Note.md": source });
+    expect(workspace.resolve("From.md", "Note.md#known", "github").fragmentExists).toBe(true);
+    expect(workspace.resolve("From.md", "Note.md#absent", "github")).toMatchObject({
+      status: "unreadable",
+      fragmentIncomplete: true,
+    });
+  });
+
   it("keeps known anchors while reporting the rest as incomplete, rather than missing", () => {
     const source = "# Known\n\n" + uncertain[0] + '\n<a id="explicit">x</a>\n\n# Later\n';
     const workspace = createWorkspace({ "Note.md": source });

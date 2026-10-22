@@ -9,7 +9,7 @@ import { lineBreak } from "../syntax/source.js";
 import { headingAttributes, lastLineSource } from "./heading-attributes.js";
 import { createForgejoSlugger, createGiteaSlugger, giteaAnchor } from "./slug.js";
 import { htmlTokens, htmlAnchors, htmlHeadings, htmlView } from "./html.js";
-import { githubHeadingLimit } from "./github-heading-source.js";
+import { githubHeadingLimit, githubHeadingPrefix } from "./github-heading-source.js";
 
 /** How a renderer shows a heading's inline content when it builds the anchor from the rendered text. */
 interface Rendering {
@@ -215,10 +215,15 @@ function githubAnchors(document: Document): GithubAnchors {
   // with the prefix.
   const add = (text: string) => anchors.slugs.add(slugger.slug(text).replace(/^user-content-/, ""));
   walk(document.tree, (node) => {
-    if (limit !== undefined && (node.position?.start.offset ?? 0) >= limit) return;
+    const start = node.position?.start.offset ?? 0;
+    if (limit !== undefined && start > limit) return;
     const part = parts.get(node);
-    if (part) for (const heading of part.headings) add(heading.text);
-    else if (node.type === "heading") add(renderedText(node, github));
+    if (part)
+      for (const heading of limit === start
+        ? part.headings.slice(0, githubHeadingPrefix(node))
+        : part.headings)
+        add(heading.text);
+    else if (node.type === "heading" && start !== limit) add(renderedText(node, github));
   });
   // Explicit anchors, inline or in HTML blocks, do not affect heading numbering.
   for (const part of parts.values())

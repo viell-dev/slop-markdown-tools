@@ -1,4 +1,4 @@
-import type { Root } from "mdast";
+import type { Nodes, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { walk } from "../syntax/walk.js";
 import { htmlTokens, htmlView } from "./html.js";
@@ -11,6 +11,7 @@ const blocks = new Set(
   ),
 );
 const cached = new WeakMap<Root, { start: number | undefined }>();
+const prefixes = new WeakMap<Nodes, number>();
 
 /**
  * A heading's structural HTML can keep its generated closing tag from ending
@@ -34,22 +35,30 @@ function structural(tokens: Tokens): boolean {
   return divs > 0;
 }
 
-/** Whether a raw HTML block contains a heading whose text cannot be modeled. */
-function rawHeading(tokens: Tokens): boolean {
+/** Known headings before the first uncertain one in a raw block or paragraph. */
+function rawHeading(tokens: Tokens): { uncertain: boolean; known: number } {
   let from: number | undefined;
+  let known = 0;
   for (const [index, token] of tokens.entries()) {
     if (token.name === undefined || !heading.test(token.name)) continue;
     if (!token.close) {
       if (token.selfClosing || (from !== undefined && structural(tokens.slice(from, index))))
-        return true;
+        return { uncertain: true, known };
       // As in htmlHeadings(), another heading start closes the previous one.
+      if (from !== undefined) known++;
       from = index + 1;
     } else if (from !== undefined) {
-      if (structural(tokens.slice(from, index))) return true;
+      if (structural(tokens.slice(from, index))) return { uncertain: true, known };
+      known++;
       from = undefined;
     }
   }
-  return from !== undefined;
+  return { uncertain: from !== undefined, known };
+}
+
+/** Known raw headings in the block whose source starts the uncertain suffix. */
+export function githubHeadingPrefix(node: Nodes): number {
+  return prefixes.get(node) ?? 0;
 }
 
 /**
@@ -64,9 +73,9 @@ export function githubHeadingLimit(document: Document): number | undefined {
   let start: number | undefined;
   walk(document.tree, (node, _index, parent) => {
     if (start !== undefined) return;
+    let uncertain = node.type === "heading" && structural(htmlTokens(htmlView(node)));
     if (
-      (node.type === "heading" && structural(htmlTokens(htmlView(node)))) ||
-      (node.type === "paragraph" && rawHeading(htmlTokens(htmlView(node)))) ||
+      node.type === "paragraph" ||
       (node.type === "html" &&
         parent?.type !== "paragraph" &&
         parent?.type !== "emphasis" &&
@@ -74,10 +83,13 @@ export function githubHeadingLimit(document: Document): number | undefined {
         parent?.type !== "delete" &&
         parent?.type !== "link" &&
         parent?.type !== "linkReference" &&
-        parent?.type !== "heading" &&
-        rawHeading(htmlTokens(node.value)))
-    )
-      start = node.position?.start.offset ?? 0;
+        parent?.type !== "heading")
+    ) {
+      const result = rawHeading(htmlTokens(htmlView(node)));
+      uncertain = result.uncertain;
+      if (uncertain) prefixes.set(node, result.known);
+    }
+    if (uncertain) start = node.position?.start.offset ?? 0;
   });
   cached.set(document.tree, { start });
   return start;
