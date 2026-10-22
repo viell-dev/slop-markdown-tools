@@ -30,6 +30,28 @@ const boundaries = boundaryFixtures
 
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
+    ["before %%`a\n``` b`%%\n\nlater *outside*\n", true],
+    ["before %%`a\n``` b` c```%%\n\nlater *outside*\n", false],
+    ["before %%`a ``` b` c```%%\n\nlater *outside*\n", true],
+  ] as const)(
+    "carries long code after a short-code reset only while unclosed (#565): %j",
+    (source, carries) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(carries ? input : input.replace("*outside*", "_outside_"));
+          const document = parse(input, "obsidian");
+          const later = document.source.lastIndexOf("later");
+          expect(
+            [...misreadLists(document).unclosedCode].some(
+              ({ position }) => position!.start.offset! <= later && later < position!.end.offset!,
+            ),
+          ).toBe(carries);
+        }
+    },
+  );
+
+  it.each([
     "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n",
     "before *left* ![```a\nb```][img] and *right* __strong__ tail\n\n[img]: image.png\n",
   ])(
@@ -921,6 +943,7 @@ describe("Obsidian boundaries read differently by its views", () => {
       ([issue, , name]) =>
         ![488, 494, 519, 524, 529, 548, 556].includes(issue) &&
         ![
+          "short reset exposes an unclosed long run in an inline comment",
           "joined footnote ending in span paragraph",
           "ordinary paragraph with indented HTML",
           "unindented HTML interrupts joined paragraph",

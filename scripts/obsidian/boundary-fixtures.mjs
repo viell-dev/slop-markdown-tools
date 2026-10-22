@@ -6,6 +6,10 @@ import { URL } from "node:url";
 export const boundaryFixtures = [
   ...[
     [
+      "short reset exposes an unclosed long run in an inline comment",
+      "before %%`a\n``` b`%%\n\nlater *outside*\n",
+    ],
+    [
       "mixed whitespace inside a short multiline code span",
       "before `a\t  \nb` and more plain words follow here\n",
     ],
@@ -33,6 +37,10 @@ export const boundaryFixtures = [
     ],
   ].map(([name, source]) => ({ issue: 565, name, source })),
   ...[
+    [
+      "short reset permits a later paired long run to recover",
+      "before %%`a\n``` b` c```%%\n\nlater *outside*\n",
+    ],
     [
       "safe prefix and independent paragraph around a short code span",
       "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n",

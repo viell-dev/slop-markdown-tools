@@ -843,7 +843,7 @@ describe("style/inline-code", () => {
     }
   });
   it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
-    "drops the indentation of the next line when it joins a code span in the %s dialect",
+    "handles multiline code indentation in the %s dialect",
     (dialect) => {
       // CommonMark strips it from a paragraph's lines before it reads the span,
       // and GitHub shows `npm run build`; the parser keeps it in the span.
@@ -854,7 +854,9 @@ describe("style/inline-code", () => {
         ["- Run `npm run\n     build` now.\n", "- Run `npm run build` now.\n"],
         ["- [ ] Run `npm run\n      build` now.\n", "- [ ] Run `npm run build` now.\n"],
       ] as const)
-        expect(formatted(source, only(rule, dialect))).toBe(output);
+        expect(formatted(source, only(rule, dialect))).toBe(
+          dialect === "obsidian" ? source : output,
+        );
     },
   );
   it("compares code spans without the indentation after their line endings", () => {
@@ -971,12 +973,19 @@ describe("style/inline-code", () => {
       else if (codeSpans(source, dialect).some(lazyIndentation)) expect(output).toBe(source);
     }
   });
-  it("still joins code spans beside a single `==` or below a callout's title", () => {
-    expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(
+  it("retains short code beside a single `==` or below a callout's title (#565)", () => {
+    for (const source of [
+      "An == sign and `code\nspan` here.\n",
+      "> [!note] Title\n> Body `code\n> span` here.\n",
+    ])
+      expect(formatted(source, only(rule, "obsidian"))).toBe(source);
+  });
+  it("still joins long code beside a single `==` or below a callout's title (#565)", () => {
+    expect(formatted("An == sign and ```code\nspan``` here.\n", only(rule, "obsidian"))).toBe(
       "An == sign and `code span` here.\n",
     );
     expect(
-      formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian")),
+      formatted("> [!note] Title\n> Body ```code\n> span``` here.\n", only(rule, "obsidian")),
     ).toBe("> [!note] Title\n> Body `code span` here.\n");
   });
   it.each([
@@ -990,12 +999,12 @@ describe("style/inline-code", () => {
   it.each([
     ["Ticks ``code\nspan`` and a ` after.\n", "Ticks `code span` and a ` after.\n"],
     ["`a` and `b\nc` here.\n", "`a` and `b c` here.\n"],
-  ])("still joins %j", (source, output) => {
-    // In Obsidian, a backtick that nothing closes keeps its paragraph as
-    // written, since Live Preview shows the text after it as code (#362).
+  ])("formats %j while retaining Obsidian's physical code lines", (source, output) => {
+    // Live Preview keeps unmatched backticks and resets short multiline
+    // spans, so either Obsidian paragraph stays as written (#362, #565).
     for (const dialect of dialects)
       expect(formatted(source, only(rule, dialect)), dialect).toBe(
-        dialect === "obsidian" && source.includes(" ` ") ? source : output,
+        dialect === "obsidian" ? source : output,
       );
   });
 });

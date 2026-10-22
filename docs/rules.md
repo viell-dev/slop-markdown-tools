@@ -1445,11 +1445,11 @@ what it means, that is, when it:
 
 After 0.4.0, Obsidian wrapping retains the exact terminal separator before a
 Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
-preceding backslash literal. The earlier paragraph text can still wrap.
-Paragraphs with a Tab followed by two final spaces before continuing text also
-stay unreflowed: native renderers can read that separator as a hard break even
-when the primary parser reads a soft line ending. Code spans keep their own
-whitespace rules, so wrapping outside them remains available.
+preceding backslash literal. The earlier paragraph text can still wrap. In every
+dialect, paragraphs with a Tab followed by two final spaces before continuing
+text also stay unreflowed: native renderers can read that separator as a hard
+break even when the primary parser reads a soft line ending. Code spans keep
+their own whitespace rules, so wrapping outside them remains available.
 
 After 0.4.0, Obsidian also leaves a multiline image description containing
 backticks unreflowed, where joining could turn displayed Live Preview source

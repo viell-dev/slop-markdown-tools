@@ -85,11 +85,9 @@ describe("direct Obsidian callout body reflow", () => {
     );
   });
 
-  it("joins a code span that the body writes across lines", () => {
+  it("retains a short code span that the body writes across lines (#565)", () => {
     const source = `> [!info] Title\n> ${body} with \`multiline\n> code\`.\n`;
-    expect(verify(source).output).toBe(
-      "> [!info] Title\n> A body line with enough ordinary words\n> to wrap across several lines without\n> changing its meaning. with\n> `multiline code`.\n",
-    );
+    expect(verify(source).output).toBe(source);
   });
 
   it("keeps header diagnostics separate from reflow and unbreakable body atoms", () => {
