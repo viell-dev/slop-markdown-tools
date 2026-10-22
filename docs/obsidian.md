@@ -209,6 +209,10 @@ latest installable release:
   allow later Markdown to format.
 - A leading inline comment stays with the next wrapping atom so that it cannot
   become a standalone comment block. Later words still wrap normally.
+- A possible comment whose leading `%%` and first closer cross a blank line
+  stays unreflowed. Moving text after the closer could otherwise turn literal
+  paragraphs into a comment block. This also applies at widths where the old
+  wrapping would have left text after the closer.
 - A table immediately below a paragraph-consumed footnote keeps its literal rows
   even when the definition's final parsed block is HTML, a heading, or code.
   This context continues through adjacent definitions while no definite

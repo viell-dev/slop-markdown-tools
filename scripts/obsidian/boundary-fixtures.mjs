@@ -4,6 +4,71 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  ...[
+    {
+      name: "multiline inline comment with blank line",
+      source: "%%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "list blank-inside comment",
+      source: "- %%one\n\n  two%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "quote blank-inside comment",
+      source: "> %%one\n>\n> two%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "complete middle paragraph stays opaque",
+      source:
+        "%%one\n\ncomment middle words remain exactly as written though this line is long\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "list opener with outer closer",
+      source: "- %%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+  ].map((fixture) => ({ issue: 559, ...fixture })),
+  ...[
+    ["balanced multiline div", '<div\n  class="note">\ntext\n</div>\n\nLater *outside*.\n'],
+    [
+      "balanced multiline iframe",
+      '<iframe\n  title="probe">\ntext\n</iframe>\n\nLater *outside*.\n',
+    ],
+    ["multiline void hr", '<hr\n  class="note">\n\nLater *outside*.\n'],
+    ["multiline self-closing div", '<div\n  class="note" />\n\nLater *outside*.\n'],
+    [
+      "quoted greater-than attribute",
+      '<div\n  title="one > two">\ntext\n</div>\n\nLater *outside*.\n',
+    ],
+    [
+      "newline inside quoted attribute",
+      '<div title="one\n  two > three">\ntext\n</div>\n\nLater *outside*.\n',
+    ],
+    ["multiline closing tag", "<div>\ntext\n</div\n  >\n\nLater *outside*.\n"],
+    [
+      "opening tag crosses parsed extent",
+      '<div\n\n  class="note">\ntext\n</div>\n\nLater *outside*.\n',
+    ],
+    ["closing tag crosses parsed extent", "<div>\ntext\n</div\n\n  >\n\nLater *outside*.\n"],
+  ].map(([name, source]) => ({
+    issue: 556,
+    name: `multiline root: ${name}`,
+    source,
+    preserve: false,
+  })),
+  ...[
+    [
+      "unclosed multiline root before heading and quote",
+      '<div\n  class="note">\n\n# title\n> quote\n',
+    ],
+    [
+      "unclosed multiline child before parent closer",
+      '<div\n  class="note">\n<span>text\n</div>\n\n# title\n> quote\n',
+    ],
+  ].map(([name, source]) => ({
+    issue: 556,
+    name: `multiline root: ${name}`,
+    source,
+  })),
   {
     issue: 558,
     name: "native table boundary: plain prefix, wiki alias pipe only",

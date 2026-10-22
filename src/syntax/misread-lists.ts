@@ -1864,9 +1864,10 @@ function obsidianHtmlEnd(
     // its prefix. Quoted values above are each traversed only once as well.
     if (source[end] === "<") continue;
     cursor++;
-    // Container markers can stand inside a multiline tag's source. Without
-    // reconstructing that HTML token stream, retain the remaining source.
-    if (multiline) return source.length;
+    // Root-origin scans read physical HTML source beyond its parsed extent.
+    // Keep the conservative multiline fallback for inline/contained entries,
+    // whose source can include Markdown container prefixes.
+    if (multiline && rootEnd === undefined) return source.length;
     const raw = stack.at(-1);
     if (raw && /^(?:script|style|textarea)$/.test(raw) && (!closing || name !== raw)) continue;
     if (closing) stack.pop();

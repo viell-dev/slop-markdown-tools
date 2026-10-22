@@ -29,6 +29,39 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each(
+    boundaryFixtures.filter(
+      ({ issue, name, preserve }) =>
+        issue === 556 && name.startsWith("multiline root:") && preserve === false,
+    ),
+  )("resumes after a balanced $name (#556)", ({ source }) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input.replace("*outside*", "_outside_"));
+        const document = parse(input, "obsidian");
+        const outside = document.source.lastIndexOf("Later");
+        const { htmlText, htmlCodeToEnd } = misreadLists(document);
+        expect(htmlCodeToEnd).toBe(false);
+        expect(
+          [...htmlText].some(
+            ({ position }) => position!.start.offset! <= outside && outside < position!.end.offset!,
+          ),
+        ).toBe(false);
+      }
+  });
+
+  it.each([
+    '> <div\n>   class="note">\n> text\n> </div>\n\nLater *outside*.\n',
+    '- <div\n    class="note">\n  text\n  </div>\n\nLater *outside*.\n',
+  ])("retains the existing contained multiline fallback in %j (#556)", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + source.replaceAll("\n", newline),
+        );
+  });
+
   it.each([1, 2, 3])(
     "keeps a bordered table's physical row boundary with %i columns (#558)",
     (columns) => {

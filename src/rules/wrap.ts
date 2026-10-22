@@ -558,7 +558,34 @@ function obsidianMarkers(source: string, node: Paragraph, start: number, end: nu
 function continuationOf(prefix: string): string {
   return prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) => " ".repeat(value.length));
 }
+/**
+ * A failed flow comment can be plain paragraphs when blank lines split its
+ * inline reading and text follows its closing marker. Reflowing that marker
+ * onto a line of its own would accept the complete flow comment instead.
+ */
+function blankLineComments(document: Document): ReadonlySet<Paragraph> {
+  const protectedParagraphs = new Set<Paragraph>();
+  const { source } = document;
+  if (document.dialect !== "obsidian" || !source.includes("%%")) return protectedParagraphs;
+  let through = 0;
+  walk(document.tree, "paragraph", (node) => {
+    const [start, end] = range(node);
+    if (start < through) {
+      protectedParagraphs.add(node);
+      return;
+    }
+    if (node.children[0]?.type !== "text" || !source.startsWith("%%", start)) return;
+    const close = source.indexOf("%%", start + 2);
+    if (close < end) return;
+    if (!/(?:\r\n|\r|\n)[ \t>]*(?:\r\n|\r|\n)/.test(source.slice(end, close))) return;
+    through = close + 2;
+    protectedParagraphs.add(node);
+  });
+  return protectedParagraphs;
+}
+
 interface WrapContext extends Pick<RuleContext, "document" | "options"> {
+  blankCommentParagraphs: ReadonlySet<Paragraph>;
   width: number;
   measure: (text: string) => number;
   unit: string;
@@ -972,7 +999,9 @@ function wrapParagraph(
       });
     if (options.reportUnbreakable === true && unbreakable) reportUnbreakable();
   };
-  const skipped = paragraphSkipReason(document, prepared, inline, protections.reason);
+  const skipped = context.blankCommentParagraphs.has(node)
+    ? "Obsidian comment crossing a blank line"
+    : paragraphSkipReason(document, prepared, inline, protections.reason);
   if (skipped) {
     reportSkipped(skipped);
     return;
@@ -1064,7 +1093,15 @@ const wrap: Rule = {
     const unit = options.measure === "codepoints" ? "code points" : "columns";
     // Detect the line ending once; scanning the whole source per paragraph is quadratic.
     const newline = lineEnding(document.source);
-    const context: WrapContext = { document, options, width, measure, unit, newline };
+    const context: WrapContext = {
+      document,
+      options,
+      width,
+      measure,
+      unit,
+      newline,
+      blankCommentParagraphs: blankLineComments(document),
+    };
     walk(document.tree, "paragraph", (node, index, parent) =>
       wrapParagraph(node, index, parent, context, findings),
     );

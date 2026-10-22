@@ -22,6 +22,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian wrapping retains possible comments that cross a blank line, avoiding
+  an unsafe-format refusal when wrapping would put their closer alone on a line
+  ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).
 - Obsidian table formatting keeps a following paragraph from becoming another
   row when its leading-pipe style differs from the header, including alias and
   link-destination pipes. Ordinary table rows and text after a real blank still

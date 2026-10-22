@@ -1785,3 +1785,100 @@ describe("leading Obsidian comments when wrapping (#557)", () => {
       }
   });
 });
+
+describe("potential Obsidian flow comments across a blank line (#559)", () => {
+  it.each([
+    {
+      name: "multiline inline comment with blank line",
+      source: "%%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "list blank-inside comment",
+      source: "- %%one\n\n  two%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "quote blank-inside comment",
+      source: "> %%one\n>\n> two%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "complete middle paragraph stays opaque",
+      source:
+        "%%one\n\ncomment middle words remain exactly as written though this line is long\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "list opener with outer closer",
+      source: "- %%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+  ])("retains complete source for $name", ({ source }) => {
+    const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect: "obsidian" };
+    const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const original = bom + source.replaceAll("\n", newline);
+        const result = verify(original, config, workspace);
+        expect(result.output).toBe(original);
+        expect(
+          result.diagnostics.some(
+            ({ message }) =>
+              message ===
+              "Paragraph not reflowed: Obsidian comment crossing a blank line (width 20 columns).",
+          ),
+        ).toBe(true);
+      }
+  });
+  it.each([
+    {
+      name: "spaces within leading comment",
+      source: "%%one two three%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "%%one two three%% aaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+    {
+      name: "two consecutive leading comments",
+      source: "%%one two%% %%three four%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "%%one two%% %%three four%%\naaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+    {
+      name: "multiline inline comment",
+      source: "%%one\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "%%one\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+    },
+    {
+      name: "visible prefix before pending opener",
+      source: "visible %%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "visible %%one\n\ntwo%%\naaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+    {
+      name: "callout header before blank-inside comment",
+      source: "> [!NOTE] Title\n> %%one\n>\n> two%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected:
+        "> [!NOTE] Title\n> %%one\n>\n> two%%\n> aaaaaaaaaaaaaaaaaaaa\n> tail words follow\n> here\n",
+    },
+    {
+      name: "escaped opener control",
+      source: "\\%%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "\\%%one\n\ntwo%%\naaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+    {
+      name: "closed flow comment control",
+      source: "%%one\n\ntwo%%\naaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "obsidian",
+      expected: "%%one\n\ntwo%%\naaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+    {
+      name: "other dialect control",
+      source: "%%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
+      dialect: "github",
+      expected: "%%one\n\ntwo%%\naaaaaaaaaaaaaaaaaaaa\ntail words follow\nhere\n",
+    },
+  ] as const)("retains existing behavior for $name", ({ source, dialect, expected }) => {
+    const config: Config = { ...wrap({ width: 20, reportUnreflowed: true }), dialect };
+    const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+    expect(verify(source, config, workspace).output).toBe(expected);
+  });
+});

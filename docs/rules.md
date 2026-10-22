@@ -1341,20 +1341,22 @@ underline that line as a heading, such as `==` or `--`. It also keeps a
 paragraph that starts like a link reference definition (`[Note]: see …`) from
 becoming one. In Obsidian, a leading inline comment stays with the next atom, so
 wrapping cannot turn it into a standalone comment block; later text still wraps
-normally. On GitHub and in Obsidian, a word that starts with `$` stays on the
-line before it when a `$` comes earlier in the paragraph, and in Obsidian a word
-that ends in `$`, such as a lone `$`, stays on the line after it when a `$`
-comes later: at the edge of a line, a dollar can begin or end math that it
-cannot begin or end next to a space. In Obsidian, no new line's content starts
-with `[`, a label, and `]:`, such as `[ref]: …`: Live Preview hides its
-destination, including after indentation or quote markers. The complete label
-stays on the preceding word's line, also when it holds spaces. Existing
-reference-like lines stay on their own lines; an empty colon line also preserves
-the following destination line, even across blank lines. A list's marker line
-still wraps normally, because it shows the label and destination as text. In a
-block quote whose markers are written without a space after them, such as
-`>text`, a tag such as `#tag` stays on the line before it too, because Live
-Preview reads a tag directly after `>` as text.
+normally. A possible comment whose leading `%%` and first closer cross a blank
+line stays unreflowed: moving text after the closer could turn literal
+paragraphs into a comment block. On GitHub and in Obsidian, a word that starts
+with `$` stays on the line before it when a `$` comes earlier in the paragraph,
+and in Obsidian a word that ends in `$`, such as a lone `$`, stays on the line
+after it when a `$` comes later: at the edge of a line, a dollar can begin or
+end math that it cannot begin or end next to a space. In Obsidian, no new line's
+content starts with `[`, a label, and `]:`, such as `[ref]: …`: Live Preview
+hides its destination, including after indentation or quote markers. The
+complete label stays on the preceding word's line, also when it holds spaces.
+Existing reference-like lines stay on their own lines; an empty colon line also
+preserves the following destination line, even across blank lines. A list's
+marker line still wraps normally, because it shows the label and destination as
+text. In a block quote whose markers are written without a space after them,
+such as `>text`, a tag such as `#tag` stays on the line before it too, because
+Live Preview reads a tag directly after `>` as text.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
