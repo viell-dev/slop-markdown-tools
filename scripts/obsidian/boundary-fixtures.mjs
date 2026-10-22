@@ -5,6 +5,12 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   ...[
+    ">1) a\n>   > 1)  b\n2) c\n",
+    ">1) a\n>  > 1)  b\n2) c\n",
+    ">1) a\n> > 1)  b\n2) c\n",
+    ">1) a\n>> 1)  b\n2) c\n",
+    ">1) a\n>\n>   > 1)  b\n2) c\n",
+    "Ref[^n].\n\n[^n]: 1) a\n    > 1)  b\n2) c\n",
     ">1) first\n2) second\n",
     ">2) first\n3) second\n",
     ">1) first\n2. second\n",
@@ -19,6 +25,10 @@ export const boundaryFixtures = [
     source,
   })),
   ...[
+    ">1) a\n>   > -   b\n2) c\n",
+    ">1) a\n>   > # *b*\n2) c\n",
+    ">1) a\n>   > *b*\n2) c\n",
+    "Ref[^n].\n\n[^n]: 1) first\n    -   nested\n2) second\n",
     ">1) first\n>   trailing prose\n2) second\n",
     ">1) first\n>2) second\n",
     ">1) first\n\n2) second\n",

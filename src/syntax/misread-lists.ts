@@ -197,7 +197,7 @@ export interface MisreadLists {
   /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
   boundaryText: ReadonlySet<Nodes>;
   /**
-   * Lists at a quote's or footnote's end whose markers and indentation affect
+   * Lists near a quote's or footnote's end whose markers and indentation affect
    * a following non-one ordered continuation outside that container (#543).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
@@ -918,19 +918,35 @@ export function misreadLists(document: Document): MisreadLists {
     };
     /** Whether a source line holds a pipe that no backslash escapes. */
     const piped = (line: string) => /(?:^|[^\\])(?:\\\\)*\|/.test(line);
-    /** The first ordered list on a container's trailing path, including nested lists. */
-    const trailingOrderedList = (node: Nodes): List | undefined => {
-      let last: Nodes | undefined = node;
-      while (
-        last?.type === "blockquote" ||
-        last?.type === "footnoteDefinition" ||
-        last?.type === "list" ||
-        last?.type === "listItem"
-      ) {
-        if (last.type === "list" && last.ordered) return last;
-        last = last.children.at(-1);
+    /** Ordered structural units still open at a container's trailing boundary. */
+    const retainTrailingLists = (node: Nodes) => {
+      const pending = [node];
+      while (pending.length) {
+        const last = pending.pop()!;
+        if (last.type === "list") {
+          if (last.ordered) boundaryLists.add(last);
+          else {
+            const item = last.children.at(-1);
+            if (item) pending.push(item);
+          }
+        } else if (
+          last.type === "blockquote" ||
+          last.type === "footnoteDefinition" ||
+          last.type === "listItem"
+        ) {
+          let index = last.children.length - 1;
+          // Reading view can retain these quotes inside an earlier ordered
+          // item even when the primary tree makes them siblings. Retain both
+          // units rather than inferring independence from that tree (#543).
+          while (
+            last.children[index]?.type === "blockquote" ||
+            last.children[index]?.type === "footnoteDefinition"
+          )
+            pending.push(last.children[index--]!);
+          const list = last.children[index];
+          if (list?.type === "list") pending.push(list);
+        }
       }
-      return undefined;
     };
     const visitBoundaries = (parent: Parents) => {
       parent.children.forEach((child, index) => {
@@ -951,8 +967,7 @@ export function misreadLists(document: Document): MisreadLists {
             // container prefix. Either delimiter direction can join or split
             // it, so keep that list's structural unit, including nested lists,
             // while allowing safe inline changes (#543).
-            const list = trailingOrderedList(previous);
-            if (list) boundaryLists.add(list);
+            retainTrailingLists(previous);
           }
           // An unpiped table row starts paragraph text in Reading view. A
           // non-one ordered list cannot interrupt it (#532). Retain the list

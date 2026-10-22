@@ -236,10 +236,11 @@ latest installable release:
   not starting at 1 directly below a footnote stays beside it: Reading view
   keeps that line in the footnote rather than starting a visible list. A non-one
   ordered list directly below a block quote also keeps its boundary: Reading
-  view retains it inside that quote, including below a quoted heading. When the
-  quote or footnote ends with an ordered list, that earlier list also keeps its
-  markers and indentation: changing only its delimiter can join or split the
-  rendered lists. Safe inline changes there still apply.
+  view retains it inside that quote, including below a quoted heading.
+  Participating ordered lists keep their markers and indentation, including
+  lists followed by nested quotes that the primary parser places beside them:
+  changing only a delimiter can join or split the rendered lists. Safe inline
+  changes there still apply.
 - An ordered list directly below a callout title stays together even when its
   first number is not 1. Its source markers keep a consistent delimiter.
 - Tables below setext text that Reading view keeps as a paragraph stay as text.
