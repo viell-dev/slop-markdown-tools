@@ -262,6 +262,14 @@ requirement; where recoverable, check that the former slow algorithm fails the
 comparison. Garbage-collection checks also run outside coverage, which changes
 execution and allocation costs.
 
+The HTML-continuation check parses its fixtures once per size and clones their
+positioned trees for fresh range-cache keys. Those fixtures need no separate
+parser metadata; do not generalize that preparation to arbitrary parsed nodes.
+It retains the elapsed-time growth bound and observes native backtick search
+volume separately, so the former repeated suffix search fails even when its
+native calls do not dominate timing. The observer restores the native method
+before assertions and is never active during timed samples.
+
 ## What the checks prove
 
 Each promise below names the checks that back it, when they run, and what they

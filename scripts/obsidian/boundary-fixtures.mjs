@@ -5,6 +5,162 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   {
+    issue: 553,
+    name: "spaced break immediately below a table",
+    source: "| h |\n| - |\n| v |\n- - -\n",
+    preserve: false,
+  },
+  {
+    issue: 553,
+    name: "star break immediately below a table",
+    source: "| h |\n| - |\n| v |\n***\n",
+    preserve: false,
+  },
+  {
+    issue: 553,
+    name: "spaced break below a header-only table",
+    source: "| h |\n| - |\n- - -\n",
+    preserve: false,
+  },
+  {
+    issue: 553,
+    name: "compact break below an unspaced final table row",
+    source: "|h|\n|-|\n|last|\n---\n",
+  },
+  {
+    issue: 553,
+    name: "compact break below a header-only delimiter",
+    source: "|h|\n|-|\n---\n",
+  },
+  {
+    issue: 553,
+    name: "blank separates table and break control",
+    source: "| h |\n| - |\n| v |\n\n- - -\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "second lazy list continuation above hyphen break",
+    source: "- alpha\nbeta\ngamma\n---\n",
+  },
+  {
+    issue: 554,
+    name: "earlier lazy line before indented title",
+    source: "- alpha\nbeta\n  gamma\n---\n",
+  },
+  {
+    issue: 554,
+    name: "ordered lazy continuations above hyphen break",
+    source: "1) alpha\nbeta\ngamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "nested lazy continuations above hyphen break",
+    source: "- outer\n  + alpha\nbeta\ngamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "quoted lazy continuation before external underline",
+    source: "> alpha\nbeta\n---\n",
+  },
+  {
+    issue: 554,
+    name: "short single lazy continuation control",
+    source: "- alpha\nbeta\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "only final continuation lazy control",
+    source: "- alpha\n  beta\ngamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "reflow keeps final title as exact suffix",
+    source:
+      "- alpha beta enough words to fill a line\nlazy omegaomegaomegaomegaomega\n  gamma\n---\n",
+  },
+  {
+    issue: 554,
+    name: "zero-width insertion would indent earlier lazy line",
+    source: "- alpha\nomegaomegaomegaomegaomega\n  gamma\n---\n",
+  },
+  {
+    issue: 554,
+    name: "earlier and interior inline text remain eligible",
+    source: "- *alpha*\nmiddle *beta*\n  gamma\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 554,
+    name: "paired inline markers cross final boundary",
+    source: "- *alpha\nbeta\ngamma*\n---\n",
+  },
+  {
+    issue: 554,
+    name: "plain lazy prefix before multiline emphasis",
+    source: "- alpha\nplain *beta\ngamma*\n---\n",
+  },
+  {
+    issue: 554,
+    name: "plain lazy prefix before multiline link",
+    source: "- alpha\nplain [*beta\ngamma*](https://example.com/a)\n---\n",
+  },
+  {
+    issue: 554,
+    name: "blank separates list and break control",
+    source: "- alpha\nbeta\ngamma\n\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 551,
+    name: "HTML-ended first definition then HTML-ended second",
+    source: "text\n[^1]: note\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "closed-HTML-ended first definition",
+    source:
+      "text\n[^1]: note\n    <div> a </div>\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "heading-ended first definition",
+    source: "text\n[^1]: note\n    # first\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "code-ended first definition",
+    source:
+      "text\n[^1]: note\n    ```\n    a\n    ```\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "paragraph-ended first definition control",
+    source: "text\n[^1]: note\n    first\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "three definitions after different parsed leaves",
+    source:
+      "text\n[^1]: note\n    <div> a\n[^2]: second\n    # next\n[^3]: third\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+  },
+  {
+    issue: 551,
+    name: "physical blank between definitions control",
+    source: "text\n[^1]: note\n    <div> a\n\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+    preserve: false,
+  },
+  {
+    issue: 551,
+    name: "physical blank inside first definition control",
+    source: "text\n[^1]: note\n\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+    preserve: false,
+  },
+  {
     issue: 549,
     name: "tab continuation before a joined footnote's HTML ending",
     source: "text\n[^1]: note\n\t\n    <div> words\n| __h__ |\n| - |\n| v |\n",

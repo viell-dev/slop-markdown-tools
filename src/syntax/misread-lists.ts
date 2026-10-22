@@ -100,7 +100,11 @@ export interface MisreadLists {
    * #434); and paragraphs in a block quote or list item
    * with a lazy line of `=` or `-`, which Reading view reads as an underline
    * (issue #377). Each counts from the line break before the underline to the
-   * end of its line.
+   * end of its line. Also the final text line before a compact hyphen break
+   * outside its container: a quote's lazy continuation, or a list's second
+   * or later continuation after an earlier lazy line. Its range runs from
+   * the prior break through the underline, including any inline node that
+   * crosses that break, preserving the physical heading line (#554).
    */
   underlines: ReadonlySet<Nodes>;
   /**
@@ -192,9 +196,18 @@ export interface MisreadLists {
    * line with a pipe above a list item that reads as a delimiter row, as
    * `x | y` and `- | -` do, which Reading view reads as a table. Each counts
    * from the line break or line where Obsidian's reading starts to differ.
+   * Also the final physical table line directly above a compact hyphen
+   * break, which Live Preview displays as a heading: its final body row,
+   * or its delimiter when it has no body. That line's preceding break and
+   * the underline count too (#553).
    */
   tableText: ReadonlySet<Nodes>;
-  /** Obsidian footnote, task-fence, and cross-block emphasis boundaries (#488, #493–#496, #506, #507). */
+  /**
+   * Obsidian footnote, task-fence, and cross-block emphasis boundaries
+   * (#488, #493–#496, #506, #507), plus an earlier lazy list line's preceding
+   * break and margin through its first character or containing inline node
+   * where that boundary makes a later final line a Live Preview heading (#554).
+   */
   boundaryText: ReadonlySet<Nodes>;
   /**
    * Lists whose markers and indentation affect continuations outside their
@@ -463,14 +476,33 @@ export function misreadLists(document: Document): MisreadLists {
     };
     /** Footnote definitions that Reading view reads as paragraph text. */
     const joined = new Set<Nodes>();
+    const lines = source.split(lineEndingPattern);
+    // A joined footnote can end in HTML, a heading, or code in the primary
+    // parse while still continuing its preceding Reading paragraph (#549, #551).
+    // Only physical empty or space-only lines establish a boundary here:
+    // tabs can continue Reading text (#398), so keep uncertain tab contexts.
+    // Share one lazy prefix across overlapping footnote/table ranges.
+    const footnoteBlanks = [0];
+    const continuesFootnoteParagraph = (leaf: Nodes): boolean => {
+      const footnote = inFootnotes.get(leaf);
+      if (!footnote?.position || !leaf.position || !joined.has(footnote)) return false;
+      while (footnoteBlanks.length <= leaf.position.end.line)
+        footnoteBlanks.push(
+          footnoteBlanks.at(-1)! + Number(/^ *$/.test(lines[footnoteBlanks.length - 1] ?? "")),
+        );
+      return (
+        footnoteBlanks[leaf.position.end.line] === footnoteBlanks[footnote.position.start.line - 1]
+      );
+    };
     for (const [footnote, count] of footnotes) {
       const previous = order[count - 1]?.[0];
       // A definition below another that is text, as `[^1]: a` and `[^2]: b`
-      // below `Text` are, is text too.
+      // below `Text` are, is text too, even after a non-paragraph leaf
+      // of the first definition while its Reading paragraph stays open (#551).
       const around = previous && inFootnotes.get(previous);
       if (
-        previous?.type === "paragraph" &&
-        (around === undefined || joined.has(around)) &&
+        ((previous?.type === "paragraph" && (around === undefined || joined.has(around))) ||
+          (previous !== undefined && continuesFootnoteParagraph(previous))) &&
         previous.position &&
         footnote.position &&
         previous.position.end.line === footnote.position.start.line - 1
@@ -520,7 +552,6 @@ export function misreadLists(document: Document): MisreadLists {
       openFences.add(stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }));
       break;
     }
-    const lines = source.split(lineEndingPattern);
     /** Whether line `number`, counted from 1, holds blank space and more than block quote markers. */
     const spaced = (number: number) => {
       const line = lines[number - 1] ?? "";
@@ -973,6 +1004,126 @@ export function misreadLists(document: Document): MisreadLists {
           child.position &&
           previous.position.end.line === child.position.start.line - 1
         ) {
+          // A compact hyphen break can underline the last physical row in
+          // Live Preview, where the parser and Reading view keep a table.
+          // Its pipes and padding display as heading text, so keep that
+          // physical source line and both boundaries as written.
+          if (
+            previous.type === "table" &&
+            child.type === "thematicBreak" &&
+            /^-{3,}[ \t]*$/.test(source.slice(...range(child)))
+          ) {
+            // The delimiter is the final physical line without a body row;
+            // the header's child position would protect the wrong line.
+            tableText.add(
+              breakBefore(
+                previous,
+                lineAround(previous.position.end.offset!)[0],
+                child.position.end.offset!,
+              ),
+            );
+          }
+          // A view underlines a final text line after a lazy continuation
+          // where the parser closes its container before a hyphen break. Retain
+          // that physical line and both boundaries: merely keeping its final
+          // newline would still allow wrapping to split the displayed title.
+          if (
+            child.type === "thematicBreak" &&
+            /^-{3,}[ \t]*$/.test(source.slice(...range(child)))
+          ) {
+            let listed = false;
+            let quoted = false;
+            let last: Nodes = previous;
+            while (
+              last.type === "list" ||
+              last.type === "listItem" ||
+              last.type === "blockquote" ||
+              last.type === "footnoteDefinition"
+            ) {
+              if (last.type === "list") listed = true;
+              if (last.type === "blockquote") quoted = true;
+              const next: Nodes | undefined = last.children.at(-1);
+              if (!next) break;
+              last = next;
+            }
+            if (
+              last !== previous &&
+              last.type === "paragraph" &&
+              last.position &&
+              (quoted || listed) &&
+              last.position.start.line < last.position.end.line &&
+              last.position.end.line === child.position.start.line - 1
+            ) {
+              const [from, to] = lineAround(last.position.end.offset!);
+              const prefix = /^[ \t>]*/.exec(source.slice(from, to))![0].length;
+              const opening = source.slice(
+                lineAround(last.position.start.offset!)[0],
+                last.position.start.offset!,
+              );
+              const contentColumn = columnAt(last.position.start.offset!);
+              const missingQuote =
+                quoted &&
+                (source.slice(from, from + prefix).match(/>/g)?.length ?? 0) <
+                  (opening.match(/>/g)?.length ?? 0);
+              const later = listed
+                ? laterLines(last.position.start.offset!, last.position.end.offset!)
+                : [];
+              const lazy =
+                later.length > 1
+                  ? later.find(([start, end]) => {
+                      const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
+                      return columnAt(start + margin) < contentColumn;
+                    })
+                  : undefined;
+              const lazyList = lazy !== undefined && lazy[0] < from;
+              if (missingQuote || lazyList) {
+                const parts = last.children;
+                const inlineAt = (at: number) =>
+                  parts.find(
+                    (node) =>
+                      node.type !== "text" &&
+                      node.position?.start.offset !== undefined &&
+                      node.position.end.offset !== undefined &&
+                      node.position.start.offset <= at &&
+                      node.position.end.offset > at,
+                  );
+                const across = inlineAt(from - 1);
+                // Paired inline syntax crossing that newline stays whole.
+                underlines.add(
+                  stretch(child, {
+                    ...child.position.start,
+                    offset: Math.min(from - 1, across?.position?.start.offset ?? from - 1),
+                  }),
+                );
+                if (lazyList) {
+                  const [start, end] = lazy!;
+                  const margin = /^[ \t>]*/.exec(source.slice(start, end))![0].length;
+                  // That earlier lazy margin supplies the heading's context.
+                  // Reflow can keep the final line as an exact common suffix
+                  // while indenting this one. Include its first character so
+                  // an insertion at the content's start is inside the range.
+                  const first = start + margin;
+                  // Keep paired markers together if that character belongs
+                  // to inline syntax, including a span opened on an earlier
+                  // line. Suppressing just one delimiter is not a safe edit.
+                  const inline = inlineAt(first);
+                  boundaryText.add(
+                    stretch(
+                      last,
+                      {
+                        ...last.position.start,
+                        offset: Math.min(start - 1, inline?.position?.start.offset ?? start - 1),
+                      },
+                      {
+                        ...last.position.end,
+                        offset: Math.max(first + 1, inline?.position?.end.offset ?? first + 1),
+                      },
+                    ),
+                  );
+                }
+              }
+            }
+          }
           if (
             (previous.type === "footnoteDefinition" || previous.type === "blockquote") &&
             child.type === "list" &&
@@ -1406,23 +1557,6 @@ export function misreadLists(document: Document): MisreadLists {
       return cells.every((cell) => /^[ \t]*:?-+:?[ \t]*$/.test(cell));
     };
     const paragraphHeadingEnds = new Set([...underlines].map((node) => node.position!.end.offset));
-    // A joined footnote can end in HTML, a heading, or code in the primary
-    // parse while still continuing its preceding Reading paragraph (#549).
-    // Only physical empty or space-only lines establish a boundary here:
-    // tabs can continue Reading text (#398), so keep uncertain tab contexts.
-    // Share one lazy prefix across overlapping footnote/table ranges.
-    const footnoteBlanks = [0];
-    const continuesFootnoteParagraph = (leaf: Nodes): boolean => {
-      const footnote = inFootnotes.get(leaf);
-      if (!footnote?.position || !leaf.position || !joined.has(footnote)) return false;
-      while (footnoteBlanks.length <= leaf.position.end.line)
-        footnoteBlanks.push(
-          footnoteBlanks.at(-1)! + Number(/^ *$/.test(lines[footnoteBlanks.length - 1] ?? "")),
-        );
-      return (
-        footnoteBlanks[leaf.position.end.line] === footnoteBlanks[footnote.position.start.line - 1]
-      );
-    };
     // A run of pipe rows can contain several blocks of the primary parse.
     // Scan its union once, rather than once per parsed table within it.
     let tableUntil = 0;

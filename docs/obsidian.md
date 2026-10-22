@@ -125,11 +125,6 @@ note shows there, the tool keeps the text as written:
   ends a list item or block quote, as in `Text` and `[^1]: Note` below it.
   Reading view reads the definition as more of the paragraph, and its indented
   lines as code. No rule changes the definition or the end of the line above it.
-  Adjacent pipe rows can remain literal text even when the definition's final
-  parsed block is HTML, a heading, or code, so their table formatting stays too.
-  A tab-containing blank line does not establish a safe end to that context; an
-  empty or space-only line does. A definition below a heading or a definite
-  paragraph break remains independent.
 - The blank space at the end of a footnote definition's last line, where a
   paragraph ends the definition, as in `[^1]: Note ` with a space after the
   text. Reading view shows it before the footnote's backreference, `↩︎`, where
@@ -202,6 +197,23 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A table immediately below a paragraph-consumed footnote keeps its literal rows
+  even when the definition's final parsed block is HTML, a heading, or code.
+  This context continues through adjacent definitions while no definite
+  paragraph break separates their contents. A tab-containing blank line does not
+  establish a safe end to that context; an empty or space-only line does. A
+  definition below a heading or a definite paragraph break remains independent.
+- A thematic break directly below a table keeps a marker that does not turn the
+  last table line into a heading in Live Preview. Where an existing compact
+  hyphen break already displays that line as a heading, its literal text and
+  underline stay, including the delimiter of a header-only table. A blank line
+  between the table and break still permits ordinary table and marker
+  formatting.
+- An underlined heading displayed after lazy list or quote text keeps its final
+  physical heading line, the preceding boundary, and its underline. Wrapping or
+  inserting a blank there can remove the heading in either Obsidian view. An
+  earlier lazy line that determines that reading keeps its boundary and margin
+  too. Safe inline edits above the heading remain eligible.
 - Lists following a closing-tag HTML block keep their source when Live Preview
   reads a marker inside that block as their parent. List indentation also stays
   when an HTML comment below the list closes after a marker, including when its

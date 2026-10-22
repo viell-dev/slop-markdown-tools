@@ -22,11 +22,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian formatting keeps thematic breaks below tables from turning their last
+  physical line into a literal Live Preview heading, including header-only
+  tables. Existing literal headings retain their row text and underline
+  ([#553](https://github.com/viell-dev/slop-markdown-tools/issues/553)).
+- Obsidian formatting preserves underlined headings displayed after lazy list or
+  quote text, retaining the final heading line and its boundaries while allowing
+  safe inline changes above it
+  ([#554](https://github.com/viell-dev/slop-markdown-tools/issues/554)).
 - Obsidian formatting preserves literal table rows after paragraph-consumed
-  footnotes, including HTML, heading, and code endings and ambiguous tab
-  separators. Independent footnotes and empty or space-only separators still
-  permit table formatting
-  ([#549](https://github.com/viell-dev/slop-markdown-tools/issues/549)).
+  footnotes, including HTML, heading, and code endings, adjacent definitions,
+  and ambiguous tab separators. Independent footnotes and empty or space-only
+  separators still permit table formatting
+  ([#549](https://github.com/viell-dev/slop-markdown-tools/issues/549),
+  [#551](https://github.com/viell-dev/slop-markdown-tools/issues/551)).
 - Obsidian comparisons ignore native table-cell editing controls when a rendered
   preview is available, while retaining table content, styling, code spacing,
   alignment, row counts, links, and nested authored HTML

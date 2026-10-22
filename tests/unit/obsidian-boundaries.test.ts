@@ -31,6 +31,211 @@ const boundaries = boundaryFixtures
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
     [
+      "spaced break under body row",
+      "| h |\n| - |\n| v |\n- - -\n",
+      "| h   |\n| --- |\n| v   |\n- - -\n",
+    ],
+    ["star break under body row", "| h |\n| - |\n| v |\n***\n", "| h   |\n| --- |\n| v   |\n***\n"],
+    [
+      "spaced break under header-only delimiter",
+      "| h |\n| - |\n- - -\n",
+      "| h   |\n| --- |\n- - -\n",
+    ],
+    [
+      "compact break preserves literal body-row spacing",
+      "|h|\n|-|\n|last|\n---\n",
+      "|h|\n|-|\n|last|\n---\n",
+    ],
+    ["compact break preserves literal header-only delimiter", "|h|\n|-|\n---\n", "|h|\n|-|\n---\n"],
+    [
+      "blank-separated table remains formattable",
+      "| h |\n| - |\n| v |\n\n- - -\n",
+      "| h   |\n| --- |\n| v   |\n\n---\n",
+    ],
+  ])("preserves table/underline boundaries with %s (#553)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
+
+  it.each(["|h|\n|-|\n|last|\n---\n", "|h|\n|-|\n---\n"])(
+    "retains existing compact table underlines for another preferred marker (#553)",
+    (source) => {
+      expect(
+        checked(source, {
+          ...config,
+          rules: { "style/thematic-break": ["warn", { marker: "***" }] },
+        }),
+      ).toBe(source);
+    },
+  );
+
+  it.each([
+    ["two lazy list continuations", "- alpha\nbeta\ngamma\n---\n", "- alpha\nbeta\ngamma\n---\n"],
+    [
+      "earlier lazy line before indented title",
+      "- alpha\nbeta\n  gamma\n---\n",
+      "- alpha\nbeta\n  gamma\n---\n",
+    ],
+    ["quoted lazy continuation", "> alpha\nbeta\n---\n", "> alpha\nbeta\n---\n"],
+    ["short single continuation control", "- alpha\nbeta\n---\n", "- alpha beta\n\n---\n"],
+    [
+      "only final continuation lazy control",
+      "- alpha\n  beta\ngamma\n---\n",
+      "- alpha beta gamma\n\n---\n",
+    ],
+    ["blank-separated control", "- alpha\nbeta\ngamma\n\n---\n", "- alpha beta gamma\n\n---\n"],
+    [
+      "earlier inline text remains eligible",
+      "- *alpha*\nmiddle *beta*\n*gamma*\n---\n",
+      "- _alpha_\nmiddle _beta_\n*gamma*\n---\n",
+    ],
+    [
+      "paired first inline markers stay together",
+      "- *alpha*\n*beta* interior *delta*\n  gamma\n---\n",
+      "- _alpha_\n*beta* interior _delta_\n  gamma\n---\n",
+    ],
+    [
+      "paired inline markers cross final boundary",
+      "- *alpha\nbeta\ngamma*\n---\n",
+      "- *alpha\nbeta\ngamma*\n---\n",
+    ],
+  ])("preserves lazy-container heading lines with %s (#554)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
+
+  it.each(["style/wrap", "style/block-spacing"])(
+    "retains both lazy-heading boundaries with isolated %s (#554)",
+    (rule) => {
+      const source = "- alpha\nbeta\ngamma\n---\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it.each([
+    "- alpha beta enough words to fill a line\nlazy omegaomegaomegaomegaomega\n  gamma\n---\n",
+    "- alpha\nomegaomegaomegaomegaomega\n  gamma\n---\n",
+    "1) alpha\nomegaomegaomegaomegaomega\n   gamma\n---\n",
+  ])(
+    "retains the earlier lazy margin when reflow keeps the final title suffix (#554)",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)])
+          expect(
+            checked(bom + source.replaceAll("\n", newline), {
+              extends: [],
+              dialect: "obsidian",
+              rules: { "style/wrap": ["warn", { width: 30 }] },
+            }),
+          ).toBe(bom + source.replaceAll("\n", newline));
+    },
+  );
+
+  it.each([
+    "- *alpha\nbeta\ngamma*\n---\n",
+    "- alpha\nplain *beta\ngamma*\n---\n",
+    "- alpha\nplain __beta\ngamma__\n---\n",
+    "- alpha\nplain [*beta\ngamma*](https://example.com/a)\n---\n",
+    "- [*alpha\nbeta\ngamma*](https://example.com/a)\n---\n",
+    "> *alpha\nbeta*\n---\n",
+  ])("keeps paired inline edits whole across protected lazy boundaries (#554)", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + source.replaceAll("\n", newline),
+        );
+  });
+
+  it.each([
+    [
+      "style/list-marker",
+      { marker: "-" },
+      "+ alpha\nbeta\ngamma\n---\n",
+      "- alpha\nbeta\ngamma\n---\n",
+    ],
+    [
+      "style/ordered-list",
+      { delimiter: "." },
+      "1) alpha\nbeta\ngamma\n---\n",
+      "1. alpha\nbeta\ngamma\n---\n",
+    ],
+    [
+      "style/list-indent",
+      { bulletSpaces: 4 },
+      "+ alpha\nbeta\ngamma\n---\n",
+      "+    alpha\nbeta\ngamma\n---\n",
+    ],
+  ] as const)(
+    "retains safe isolated structural formatting with %s (#554)",
+    (rule, options, source, expected) => {
+      expect(
+        checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: ["warn", options] } }),
+      ).toBe(expected);
+    },
+  );
+
+  it("keeps the table marker restriction specific to Obsidian (#553)", () => {
+    const source = "| h |\n| - |\n| v |\n- - -\n";
+    expect(
+      format(source, {
+        config: { extends: [], dialect: "github", rules: { "style/thematic-break": "warn" } },
+      }).output,
+    ).toBe("| h |\n| - |\n| v |\n---\n");
+  });
+
+  it.each([
+    [
+      "physical blank between definitions control",
+      "text\n[^1]: note\n    <div> a\n\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n    <div> a\n\n[^2]: second\n    <div> b\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "physical blank inside first definition control",
+      "text\n[^1]: note\n\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n\n    <div> a\n[^2]: second\n    <div> b\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "space-only line ends prior joined definition context",
+      "text\n[^1]: note\n \n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n \n    <div> a\n[^2]: second\n    <div> b\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+    [
+      "tab-only line retains prior joined definition context",
+      "text\n[^1]: note\n\t\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n\t\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "nested definition after a joined heading leaf",
+      "text\n[^1]: note\n    # first\n    [^2]: second\n        <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n    # first\n    [^2]: second\n        <div> b\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "same-line nested definitions after a joined HTML leaf",
+      "text\n[^1]: note\n    <div> a\n[^2]: [^3]: second\n        <div> b\n| __h__ |\n| - |\n| v |\n",
+      "text\n[^1]: note\n    <div> a\n[^2]: [^3]: second\n        <div> b\n| __h__ |\n| - |\n| v |\n",
+    ],
+    [
+      "definitions without an initial paragraph remain independent",
+      "[^1]: note\n    <div> a\n[^2]: second\n    <div> b\n| __h__ |\n| - |\n| v |\n",
+      "[^1]: note\n    <div> a\n[^2]: second\n    <div> b\n| **h** |\n| ----- |\n| v     |\n",
+    ],
+  ])("retains chained footnote boundaries with %s (#551)", (_name, source, expected) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", String.fromCharCode(0xfeff)])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + expected.replaceAll("\n", newline),
+        );
+  });
+  it.each([
+    [
       "independent footnote after physical blank",
       "Ref[^1].\n\n[^1]: note\n    <div> words\n| __h__ |\n| - |\n| v |\n",
       "Ref[^1].\n\n[^1]: note\n    <div> words\n| **h** |\n| ----- |\n| v     |\n",

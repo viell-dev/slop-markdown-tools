@@ -57,12 +57,22 @@ it.each([
     [raw.indexOf("\n>\n") + 1, 1],
     [raw.indexOf("*literal*"), "*literal*".length],
   ] as const;
+  const sizes = [800, 3200] as const;
+  // Parse each real fixture once. These HTML/text/emphasis trees carry all
+  // guard inputs in their own fields; cloning preserves their source positions.
+  // Every timed call still gets a fresh tree, so the range cache cannot hide work.
+  const templates = new Map<number, Document>(
+    sizes.map((count) => {
+      const source = unit.repeat(count) + (shared ? "\nAfter *safe*.\n" : "");
+      return [count, parse(source, "obsidian")] as const;
+    }),
+  );
   expect(
     scaling(
-      [800, 3200],
+      sizes,
       (count) => {
-        const source = unit.repeat(count) + (shared ? "\nAfter *safe*.\n" : "");
-        return { document: parse(source, "obsidian"), count };
+        const template = templates.get(count)!;
+        return { document: { ...template, tree: structuredClone(template.tree) }, count };
       },
       ({ document }) => misreadLists(document),
       (result, { document, count }) => {
@@ -91,9 +101,50 @@ it.each([
           ),
         ).toBe(false);
       },
-      1,
+      4,
     ),
   ).toBeLessThan(10);
+  // This fixture has no ticks: each native lookup searches its whole remaining
+  // receiver. Observe the real guard after timing to reject the former unbounded
+  // suffix search even when native search is too fast to dominate elapsed time.
+  const work = sizes.map((count) => {
+    const template = templates.get(count)!;
+    const document = { ...template, tree: structuredClone(template.tree) };
+    // Called with an explicit receiver below, then restored in finally.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const native = String.prototype.indexOf;
+    let volume = 0;
+    let unexpected = false;
+    let result: ReturnType<typeof misreadLists> | undefined;
+    try {
+      String.prototype.indexOf = function (this: string, needle: string, from = 0) {
+        const found = native.call(this, needle, from);
+        if (needle === "\u0060") {
+          unexpected ||= found !== -1 || !Number.isInteger(from) || from < 0;
+          volume += Math.max(0, this.length - Math.min(this.length, from));
+        }
+        return found;
+      };
+      result = misreadLists(document);
+    } finally {
+      String.prototype.indexOf = native;
+    }
+    // Restore before assertions or the comparison guard can make other calls.
+    expect(unexpected).toBe(false);
+    const expected = misreadLists(template);
+    // Both traversals preserve insertion order. Comparing arrays retains every
+    // node field without unordered Set equality revisiting all pairs of nodes.
+    for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
+      const actualValue = result![key];
+      const expectedValue = expected[key];
+      expect(typeof actualValue === "boolean" ? actualValue : [...actualValue]).toEqual(
+        typeof expectedValue === "boolean" ? expectedValue : [...expectedValue],
+      );
+    }
+    expect(volume).toBeGreaterThan(0);
+    return volume;
+  });
+  expect(work[1]! / work[0]!).toBeLessThan(6);
 });
 
 function formatted(source: string, options: ProcessOptions = {}) {
