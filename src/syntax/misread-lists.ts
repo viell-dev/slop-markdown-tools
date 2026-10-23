@@ -787,7 +787,7 @@ export function misreadLists(document: Document): MisreadLists {
           const continuedTitle =
             (previous?.type === "obsidianComment" ||
               (previous?.type === "heading" && readingParagraphHeadings.has(previous))) &&
-            previous.position!.end.line === child.position!.start.line - 1;
+            previous.position?.end.line === child.position!.start.line - 1;
           if (continuedTitle) continuedTitleHeadings.add(child);
           const literalUnderline = child.depth === 1 || /^-{1,2}$/.test(underline.slice(prefix));
           if (

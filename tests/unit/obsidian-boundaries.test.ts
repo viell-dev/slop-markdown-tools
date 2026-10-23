@@ -59,6 +59,27 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
       }),
     ).toBe("%%c%%\n## alpha\n");
   });
+  it("handles a plugin's standalone comment without a source position (#383)", () => {
+    const plugin: Plugin = {
+      name: "unlocated-comment",
+      syntax: {
+        micromark: {},
+        mdast: {
+          transforms: [
+            (tree) => {
+              for (const child of tree.children)
+                if (child.type === "obsidianComment") delete child.position;
+            },
+          ],
+        },
+      },
+    };
+    const result = format("%%c%%\nalpha\n---\n", {
+      plugins: [plugin],
+      config: { extends: [], dialect: "obsidian", rules: { "style/heading": "warn" } },
+    });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+  });
   it.each([
     "- a\n> b\n- c\n",
     "* a\n> b\n* c\n",

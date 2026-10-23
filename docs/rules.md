@@ -992,8 +992,9 @@ beside ordinary title text remain eligible. Independent blocks below the heading
 still get their spacing, inline formatting, and table or list preferences.
 
 After 0.4.0, a Setext title directly after a standalone Obsidian comment keeps
-its underline where Reading view treats it as paragraph text. Inline title
-formatting remains available, and a real blank permits heading conversion.
+its underline, since conversion can turn Reading-view paragraph text into a
+heading. Inline title formatting remains available, and a real blank permits
+heading conversion.
 
 ## `style/inline-code`
 

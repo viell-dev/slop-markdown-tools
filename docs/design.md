@@ -191,9 +191,9 @@ Syntax:
   suppress formatting around them or use comment blocks. A comment on lines of
   its own directly above text is read as a block before a paragraph, where
   Obsidian reads one paragraph. After 0.4.0, formatting retains that boundary so
-  it cannot split the native paragraph, and retains adjacent Setext underlines
-  where conversion would change Reading view. Following inline style edits
-  remain available. Heading nesting paths in links, property aliases, PDF
+  it cannot split the native paragraph, and retains directly adjacent Setext
+  underlines since conversion can change Reading view. Following inline style
+  edits remain available. Heading nesting paths in links, property aliases, PDF
   subpaths, and the syntax of community plugins are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
   and shortlinks, is protected rather than read, and shortlinks are not checked
