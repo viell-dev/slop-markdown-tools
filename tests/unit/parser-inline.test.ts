@@ -17,6 +17,15 @@ import {
 } from "../parser-inline-regressions.mjs";
 
 const sources = inlineSources(examples);
+const compatibilitySources = [
+  ...sources,
+  "*before $x$ ~~strike~~ [link](u) after*\n",
+  "==漢*x*== %%*hidden*%% [[Note|*name*]]\n",
+  "[*mail* abc@example.com www.example.com](url) and *outside*\n",
+  "![*image*](img) ![^a]\n\n[^a]: *note*\n",
+  "---\ntitle: *name*\n---\n*text* $x$ ~~strike~~\n",
+  "+++\ntitle='demo'\n+++\n漢*字*漢 `*code*`\n",
+];
 
 it.each(["commonmark", "github", "obsidian", "forgejo", "gitea", "vitepress"] as const)(
   "keeps public fast/empty-syntax-plugin positioned readings equal in %s",
@@ -25,7 +34,7 @@ it.each(["commonmark", "github", "obsidian", "forgejo", "gitea", "vitepress"] as
       name: "empty-syntax",
       syntax: { micromark: {}, mdast: {} },
     };
-    for (const source of sources)
+    for (const source of compatibilitySources)
       expect(parse(source, dialect).tree, JSON.stringify(source)).toEqual(
         parse(source, dialect, "compatibility.md", [plugin]).tree,
       );

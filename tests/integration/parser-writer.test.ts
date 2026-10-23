@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rm, rmdir, stat, utimes, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, rmdir, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildParser, bundleParser } from "../../scripts/build-parser.mjs";
@@ -67,12 +67,40 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       files[`source/${name}`] = await readFile(path.join(repository, name), "utf8");
     const root = await fixture(files);
     const source = path.join(root, "source");
-    await linkDirectory(path.join(repository, "node_modules"), path.join(source, "node_modules"));
+    // Keep the small parser dependency graph inside this checkout. Linking it
+    // outside the build root can produce absolute region paths on CI, which
+    // the builder correctly rejects. Only the build tool stays shared.
+    const packages = JSON.parse(
+      await readFile(path.join(repository, "scripts/parser-packages.json"), "utf8"),
+    ) as { name: string }[];
+    const pending = packages.map(({ name }) => name);
+    const copied = new Set<string>();
+    while (pending.length) {
+      const name = pending.pop()!;
+      if (copied.has(name)) continue;
+      copied.add(name);
+      const installed = path.join(repository, "node_modules", name);
+      const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8")) as {
+        dependencies?: Record<string, string>;
+      };
+      // Bundlers resolve imports before tree shaking; include dependencies
+      // whose code is absent from the final 34-package runtime graph too.
+      pending.push(...Object.keys(metadata.dependencies ?? {}));
+      await cp(installed, path.join(source, "node_modules", name), {
+        recursive: true,
+        dereference: true,
+      });
+    }
+    await linkDirectory(
+      path.join(repository, "node_modules/rolldown"),
+      path.join(source, "node_modules/rolldown"),
+    );
     const linked = path.join(root, "linked");
     await linkDirectory(source, linked);
-    // Rolldown's region comments depend on the build root. Compare against
-    // the actual in-memory builder at this copied root, with the same graph.
+    // Compare against the actual builder at this copied root and require the
+    // same portable bytes as the original checkout.
     const oracle = await expectedArtifacts(source);
+    expect(oracle).toEqual(expected);
     const output = execFileSync(process.execPath, [path.join(linked, "scripts/build-parser.mjs")], {
       cwd: linked,
       encoding: "utf8",
@@ -107,7 +135,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       );
   });
 
-  it("finishes two concurrent deterministic writers with complete artifacts and no owned temps", async () => {
+  it("finishes two concurrent deterministic builders with complete artifacts and no owned temps", async () => {
     const root = await fixture({});
     const outputDirectory = path.join(root, "concurrent");
     // Wait for both even when one fails, so fixture cleanup cannot race a live

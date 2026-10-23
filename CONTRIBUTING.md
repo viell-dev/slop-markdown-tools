@@ -335,7 +335,7 @@ all four.
   `parser-generated`, `parser-build`, and `parser-work` check complete
   positioned trees, observer compatibility, token identity, source guards,
   provenance and deterministic work. `parser-writer.test.ts` checks actual
-  output, concurrent writes, unchanged timestamps and recovery. Every pull
+  output, concurrent builders, unchanged timestamps and recovery. Every pull
   request. These checks do not prove native-host behavior or compatibility with
   arbitrary event-history rewrites by external extensions. Deeply nested
   wrappers still copy their interiors; syntax plugins retain the original

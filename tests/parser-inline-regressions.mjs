@@ -67,7 +67,7 @@ export function inlineSources(specifications) {
     "Code spans",
   ]);
   for (const item of specifications) if (sections.has(item.section)) sources.add(item.markdown);
-  // Same LCG/seed/token families as the retained proof; a bounded normal-test subset.
+  // Bounded LCG corpus using high bits; it differs from the retained low-bit proof.
   const parts = [
     "a",
     "b",

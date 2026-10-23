@@ -226,8 +226,8 @@ thousands of files.
   retain the original attention/strikethrough resolvers for event compatibility,
   so that part of the former cost can remain with a syntax plugin. These
   corrections cover repeated reference pairs and the measured inline families,
-  not every possible large paragraph. Deeply nested bracket labels remain
-  separate work in
+  not every possible large paragraph. Deeply nested bracket labels and emphasis
+  remain separate work in
   [#94](https://github.com/viell-dev/slop-markdown-tools/issues/94).
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
