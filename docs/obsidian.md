@@ -197,6 +197,45 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- Lists connected through an adjacent quote, table or display formula keep both
+  original marker and indentation units. Their adjacent separating boundary
+  stays too: adding a blank can make a native list loose even when the markers
+  match. This applies to ordered and bullet lists; safe inline formatting
+  remains available outside existing whole-list protections for lazy
+  continuations. A real blank before the quote or an intervening block ends this
+  relationship. A structural indentation edit crossing a protected separator
+  conservatively keeps its whole unit; independent inline changes remain
+  available.
+- A Setext title that Reading view continues as paragraph text retains an
+  immediately following title, including across a Tab-only continuation. Literal
+  `#5` title text is handled as Setext. A proper hyphen thematic break ends this
+  paragraph state, so later independent headings can still convert.
+- A physical list-item backtick or tilde fence hidden inside a primary paragraph
+  keeps that paragraph and the remaining source through end of file. This
+  includes blank gaps, paired multiline spans and earlier backtick runs that
+  hide the opener from the primary inline parse. Later text conservatively stays
+  unformatted because the views can pair later fences differently; earlier
+  independent text still formats. Ordinary inline backticks, escaped list
+  markers and backticks in fence info keep their previous behavior.
+- Display math immediately below a list keeps its separating boundary. Reading
+  view keeps the formula inside the final item even after a heading or code
+  block, and inserting a blank would move it outside. The separator before an
+  adjacent table also stays when the final item ends with a heading or code.
+  Independent inline and marker formatting remains available; genuinely
+  separated math stays separate.
+- Table rows immediately after a list item's closing code fence, including a
+  fence in its final nested list, keep their literal source, which Live Preview
+  displays as text. A preceding heading, indented code, a root fence or a
+  separating blank still permits table padding.
+- A standalone one-line `$$…$$` formula keeps its physical line and adjacent
+  separators when the primary parser reads inline math. Joining it into prose
+  would turn Live Preview's display widget into inline math. Safe independent
+  inline changes remain available, and math already beside prose still wraps.
+- Plugin edits cannot insert a blank at a protected separator or before its
+  existing trailing spaces, including by copying source into a replacement or
+  writing a quoted blank line. Safe inline replacements and ordinary spacing
+  before a protected whole line remain available. Removing a quote-only marker
+  is also rejected when it would create a real blank at that separator.
 - A list whose HTML continues outside its parsed item keeps its markers when
   that HTML already protects a later list's marker. Changing only the earlier
   bullet could split one Reading-view list into two. When the HTML closes before
@@ -221,10 +260,10 @@ latest installable release:
   its source and the rest of its inline block. Live Preview ends short code at
   that newline, so the written closer can start code over later text. Earlier
   independent inline markup and later independent paragraphs still format.
-  Wrapping leaves the paragraph holding that span unreflowed. A paired multiline
-  span with three or more backticks keeps its ordinary formatting behavior.
-  Short spans in an inline comment or image description conservatively keep the
-  whole inline block.
+  Wrapping leaves the paragraph holding that span unreflowed. Outside a misread
+  list fence, a paired multiline span with three or more backticks keeps its
+  ordinary formatting behavior. Short spans in an inline comment or image
+  description conservatively keep the whole inline block.
 - A lazy paragraph line also keeps later blocks in an enclosing list item when
   it crosses that item's content margin. Joining or indenting the line would
   otherwise change their nesting in Live Preview. Properly indented
@@ -237,6 +276,22 @@ latest installable release:
   retains its preceding separator when removing it would create or remove a hard
   break. Earlier inline text still formats. An underline treated as text only by
   Live Preview does not need this extra separator protection.
+- A Setext title ending in a raw `#` run after whitespace keeps its heading
+  form. Escaping that run during ATX conversion can reveal hashes in Live
+  Preview. Inline title styles remain available; tight, already escaped,
+  code-span and nonterminal hashes still allow heading preferences.
+- A list at document level that ends in a nested list, followed by a quoted list
+  opening with exactly two spaces after `>`, keeps both indentation units under
+  `style/list-indent`. Blank lines alone do not reset this relationship.
+  Numbering also retains the existing digit width; same-width numbers,
+  delimiters and inline styles remain editable. An intervening block restores
+  ordinary indentation preferences.
+- A quoted block opened by a Tab directly after `>`, or after `>` and one space,
+  keeps its physical source and same-block continuations. Reading view can read
+  code where the primary parser reads a list, heading or paragraph. Quoted blank
+  rows between consecutive such blocks stay too: Reading view keeps them inside
+  one code block. Later independent blocks, space-only margins, and two spaces
+  before the Tab still allow formatting.
 - A Setext title line beginning directly with math, or a title containing only
   an image/embed, keeps its whole source. Converting it to ATX can change the
   math widget's inherited font or move a standalone image into the heading. The
@@ -259,6 +314,11 @@ latest installable release:
   allow later Markdown to format.
 - A leading inline comment stays with the next wrapping atom so that it cannot
   become a standalone comment block. Later words still wrap normally.
+- `style/block-spacing` keeps the boundary after a standalone `%%` comment. A
+  new blank can split a native paragraph, including before text the parser reads
+  as a Setext heading. Directly adjacent titles retain their underline, since
+  conversion can change Reading view. Existing blanks and following inline style
+  edits remain available.
 - A possible comment whose leading `%%` and first closer cross a blank line
   stays unreflowed. Moving text after the closer could otherwise turn literal
   paragraphs into a comment block. This also applies at widths where the old
@@ -290,6 +350,11 @@ latest installable release:
   list keeps its separator and both participating lists keep their markers and
   indentation, because changing them can alter list tightness or merge runs.
   Safe inline formatting in the following list still applies.
+- After 0.4.0, a list directly after another list's final secondary paragraph or
+  indented code block keeps its separator: a new blank splits text that Live
+  Preview groups together. Numbering, markers and inline styles remain eligible.
+  A sole first paragraph, final heading, closed fence or existing blank still
+  permits independent block spacing.
 - Top-level HTML continued across whitespace-only lines keeps literal quote
   markers and the source below them until a physically empty line, including
   empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading

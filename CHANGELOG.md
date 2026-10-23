@@ -22,6 +22,51 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian keeps the boundary after standalone comments so that heading/list
+  spacing cannot split a native paragraph. Following inline style edits remain
+  available
+  ([#357](https://github.com/viell-dev/slop-markdown-tools/issues/357)).
+- Setext titles directly after standalone Obsidian comments keep their
+  underlines, since conversion can turn Reading-view paragraph text into a
+  heading. Titles ending in whitespace-separated raw `#` runs also keep their
+  Setext form, preserving Live Preview's title text
+  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
+- Obsidian keeps list indentation and number width where a preceding nested list
+  affects the painted bullet of a following quoted list. Same-width numbering,
+  delimiter preferences and inline styles remain available
+  ([#596](https://github.com/viell-dev/slop-markdown-tools/issues/596)).
+- Quoted blocks opened after a Tab keep their literal source where Reading view
+  reads code instead of the parsed list, heading or paragraph. Blank quote rows
+  between consecutive such blocks stay as literal code content too. Independent
+  blocks and ordinary space-only quote margins still format
+  ([#597](https://github.com/viell-dev/slop-markdown-tools/issues/597)).
+- Obsidian keeps the separator before a list directly following another list's
+  final secondary paragraph or indented code block, preserving Live Preview's
+  paragraph grouping while allowing safe inline and marker preferences
+  ([#598](https://github.com/viell-dev/slop-markdown-tools/issues/598)).
+- Obsidian preserves list markers and tightness across quote and table
+  continuations, literal table rows after list code fences, adjacent Setext
+  titles that Reading view still reads as paragraph text across Tab lines, and
+  blank lines inside physical list fences hidden by the primary inline parse
+  ([#582](https://github.com/viell-dev/slop-markdown-tools/issues/582),
+  [#583](https://github.com/viell-dev/slop-markdown-tools/issues/583),
+  [#584](https://github.com/viell-dev/slop-markdown-tools/issues/584)).
+- Obsidian keeps adjacent display math inside its final list item and retains
+  standalone one-line display widgets when wrapping
+  ([#586](https://github.com/viell-dev/slop-markdown-tools/issues/586),
+  [#587](https://github.com/viell-dev/slop-markdown-tools/issues/587)).
+- Protected separator starts also reject plugin insertions and replacements that
+  add a blank before the existing line break or remove a quote-only marker,
+  while safe terminal inline edits remain available
+  ([#590](https://github.com/viell-dev/slop-markdown-tools/issues/590)).
+- Rendering comparisons account for omitted terminal line feeds in highlighted
+  GitHub code, generated math response IDs inside raw HTML, and invisible
+  Reading-view whitespace beside Obsidian display math, retaining exact source
+  code, authored attributes, formula content and visible inline spacing
+  ([#515](https://github.com/viell-dev/slop-markdown-tools/issues/515),
+  [#588](https://github.com/viell-dev/slop-markdown-tools/issues/588),
+  [#589](https://github.com/viell-dev/slop-markdown-tools/issues/589)).
+
 - Release-evidence validation runs through linked checkout paths, and the parser
   builder rejects dependencies resolved outside its checkout consistently across
   platforms while accepting valid checkout directory names

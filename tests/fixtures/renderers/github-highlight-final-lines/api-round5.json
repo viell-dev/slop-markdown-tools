@@ -1,0 +1,93 @@
+{
+  "observedAt": "2026-10-23T11:45:36.474Z",
+  "rows": [
+    {
+      "name": "js-finalLF0",
+      "source": "```js\nconst lantern = 73;\n  needle(birch)   \n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   ",
+      "html": "<div class=\"highlight highlight-source-js\"><pre><span class=\"pl-k\">const</span> <span class=\"pl-s1\">lantern</span> <span class=\"pl-c1\">=</span> <span class=\"pl-c1\">73</span><span class=\"pl-kos\">;</span>\n  <span class=\"pl-en\">needle</span><span class=\"pl-kos\">(</span><span class=\"pl-s1\">birch</span><span class=\"pl-kos\">)</span>   </pre></div>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   ",
+      "highlighted": true,
+      "exact": true,
+      "plusLF": false,
+      "strippedFinalLF": true
+    },
+    {
+      "name": "js-finalLF1",
+      "source": "```js\nconst lantern = 73;\n  needle(birch)   \n\n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   \n",
+      "html": "<div class=\"highlight highlight-source-js\"><pre><span class=\"pl-k\">const</span> <span class=\"pl-s1\">lantern</span> <span class=\"pl-c1\">=</span> <span class=\"pl-c1\">73</span><span class=\"pl-kos\">;</span>\n  <span class=\"pl-en\">needle</span><span class=\"pl-kos\">(</span><span class=\"pl-s1\">birch</span><span class=\"pl-kos\">)</span>   </pre></div>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   ",
+      "highlighted": true,
+      "exact": false,
+      "plusLF": false,
+      "strippedFinalLF": true
+    },
+    {
+      "name": "js-finalLF2",
+      "source": "```js\nconst lantern = 73;\n  needle(birch)   \n\n\n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   \n\n",
+      "html": "<div class=\"highlight highlight-source-js\"><pre><span class=\"pl-k\">const</span> <span class=\"pl-s1\">lantern</span> <span class=\"pl-c1\">=</span> <span class=\"pl-c1\">73</span><span class=\"pl-kos\">;</span>\n  <span class=\"pl-en\">needle</span><span class=\"pl-kos\">(</span><span class=\"pl-s1\">birch</span><span class=\"pl-kos\">)</span>   \n</pre></div>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   \n",
+      "highlighted": true,
+      "exact": false,
+      "plusLF": false,
+      "strippedFinalLF": false
+    },
+    {
+      "name": "js-finalLF3",
+      "source": "```js\nconst lantern = 73;\n  needle(birch)   \n\n\n\n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   \n\n\n",
+      "html": "<div class=\"highlight highlight-source-js\"><pre><span class=\"pl-k\">const</span> <span class=\"pl-s1\">lantern</span> <span class=\"pl-c1\">=</span> <span class=\"pl-c1\">73</span><span class=\"pl-kos\">;</span>\n  <span class=\"pl-en\">needle</span><span class=\"pl-kos\">(</span><span class=\"pl-s1\">birch</span><span class=\"pl-kos\">)</span>   \n\n</pre></div>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   \n\n",
+      "highlighted": true,
+      "exact": false,
+      "plusLF": false,
+      "strippedFinalLF": false
+    },
+    {
+      "name": "js-empty",
+      "source": "```js\n\n```\n",
+      "value": "",
+      "html": "<div class=\"highlight highlight-source-js\"><pre></pre></div>\n",
+      "decoded": "",
+      "highlighted": true,
+      "exact": true,
+      "plusLF": false,
+      "strippedFinalLF": true
+    },
+    {
+      "name": "js-blank-only",
+      "source": "```js\n\n\n\n```\n",
+      "value": "\n\n",
+      "html": "<div class=\"highlight highlight-source-js\"><pre></pre></div>\n",
+      "decoded": "",
+      "highlighted": true,
+      "exact": false,
+      "plusLF": false,
+      "strippedFinalLF": true
+    },
+    {
+      "name": "js-whitespace-only-last-line",
+      "source": "```js\nconst lantern = 73;\n  needle(birch)   \n  \n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   \n  ",
+      "html": "<div class=\"highlight highlight-source-js\"><pre><span class=\"pl-k\">const</span> <span class=\"pl-s1\">lantern</span> <span class=\"pl-c1\">=</span> <span class=\"pl-c1\">73</span><span class=\"pl-kos\">;</span>\n  <span class=\"pl-en\">needle</span><span class=\"pl-kos\">(</span><span class=\"pl-s1\">birch</span><span class=\"pl-kos\">)</span>   \n  </pre></div>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   \n  ",
+      "highlighted": true,
+      "exact": true,
+      "plusLF": false,
+      "strippedFinalLF": true
+    },
+    {
+      "name": "text-finalLF1-control",
+      "source": "```text\nconst lantern = 73;\n  needle(birch)   \n\n```\n",
+      "value": "const lantern = 73;\n  needle(birch)   \n",
+      "html": "<pre lang=\"text\"><code>const lantern = 73;\n  needle(birch)   \n\n</code></pre>\n",
+      "decoded": "const lantern = 73;\n  needle(birch)   \n\n",
+      "highlighted": false,
+      "exact": false,
+      "plusLF": true,
+      "strippedFinalLF": false
+    }
+  ]
+}

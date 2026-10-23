@@ -289,6 +289,15 @@ requirement; where recoverable, check that the former slow algorithm fails the
 comparison. Garbage-collection checks also run outside coverage, which changes
 execution and allocation costs.
 
+The retained-text check writes numeric failure evidence for #413 under
+`artifacts/workspace-memory/`; CI uploads only its `report.json` files. Its
+original measured delta and assertion remain unchanged. To inspect retaining
+paths in a disposable container containing only synthetic inputs and no
+credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
+can contain process secrets, so it is never captured or uploaded automatically.
+Snapshot generation can itself collect or transform the heap; it cannot replace
+or explain away the original measurement.
+
 The HTML-continuation check parses its fixtures once per size and clones their
 positioned trees for fresh range-cache keys. Those fixtures need no separate
 parser metadata; do not generalize that preparation to arbitrary parsed nodes.

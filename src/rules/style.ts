@@ -197,6 +197,9 @@ const styleRules: Record<string, Rule> = {
         if (lineBounds(source, start, start)[0] !== start) return;
         let text = source.slice(start, range(last)[1]);
         if (/[\r\n]/.test(text)) return;
+        // Live Preview can hide a Setext title's closing hash run, where the
+        // escaped ATX form reveals it. Keep that heading form in Obsidian (#383).
+        if (document.dialect === "obsidian" && /(^|\s)(#+)$/.test(text)) return;
         // A trailing run of # after whitespace would become an ATX closing
         // sequence and disappear from the heading; escape its first character.
         text = text.replace(/(^|\s)(#+)$/, "$1\\$2");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createWorkspace, format, parse, semanticFingerprint } from "../../src/index.js";
-import type { Config } from "../../src/index.js";
+import type { Config, Plugin } from "../../src/index.js";
 import { boundaryFixtures } from "../../scripts/obsidian/boundary-fixtures.mjs";
 import { misreadLists } from "../../src/syntax/misread-lists.js";
 
@@ -23,10 +23,571 @@ function checked(source: string, settings = config) {
   return result.output;
 }
 
+describe.each(["\n", "\r\n", "\r"])("secondary list block boundaries with %j (#598)", (newline) => {
+  it.each([
+    "* a\n\n    b\n9) c\n",
+    "* a\n\t\n    b\n1) c\n",
+    "* a\n\n  b\n+ c\n",
+    "* a\n\n      b\n9) c\n",
+    "* a\n\t\n      b\n9) c\n",
+    "2. a\n\n    b\n9) c\n",
+  ])("keeps the adjacent separator in %j", (input) => {
+    const source = input.replaceAll("\n", newline);
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/block-spacing": "warn" },
+      }),
+    ).toBe(source);
+  });
+
+  it.each(["* a\n    b\n9) c\n", "* a\n  ```\n  b\n  ```\n9) c\n", "* # a\n9) c\n"])(
+    "permits independent spacing in %j",
+    (input) => {
+      const source = input.replaceAll("\n", newline);
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/block-spacing": "warn" },
+        }),
+      ).not.toBe(source);
+    },
+  );
+});
+
 /** Minimal regressions also exercised in the real Obsidian fixture suite. */
 const boundaries = boundaryFixtures
   .filter(({ issue, preserve }) => preserve !== false && ![496, 497, 499, 508].includes(issue))
   .map(({ issue, source, name }) => [issue, source, name] as const);
+
+describe("carried Obsidian boundaries (#582–#584)", () => {
+  it.each([
+    ">\t*a*\n>\n>\n>\t*b*\n",
+    "> \t*a*\n>\n>\n> \t*b*\n",
+    ">\t*a*\n>\n>\n> \t*b*\n",
+    "> >\t*a*\n> >\n> >\n> >\t*b*\n",
+    ">\t*a*\n> \n> \n>\t*b*\n",
+    ">\t*a*\n>\n>\n>\t*b*\n>\n>\n>\t*c*\n",
+  ])("keeps literal blank lines between adjacent Tab-code children (#597): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/blank-lines": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("resumes blank-line and inline preferences after quoted literal code (#597)", () => {
+    expect(checked(">\t*a*\n>\n>\n> Later *safe*.\n")).toBe(">\t*a*\n>\n> Later _safe_.\n");
+    expect(checked(">  \t*a*\n>\n>\n>  \t*b*\n")).toBe(">  \t_a_\n>\n>  \t_b_\n");
+    expect(checked(">\t*a*\n>\n>\n>\t*b*\n\nLater *safe*.\n")).toBe(
+      ">\t*a*\n>\n>\n>\t*b*\n\nLater _safe_.\n",
+    );
+  });
+  it.each([
+    ">\t*c*\n",
+    ">\t* c\n",
+    ">\ttext *c*\n",
+    "> \t* *c*\n",
+    ">\t *c*\n",
+    ">\t# *c* ##\n",
+    ">\t* *c*\n> second *d*\n",
+    "> [!NOTE]\n>\t* *c*\n",
+    "> >\t* *c*\n",
+  ])("retains a quoted block read as literal code after a Tab (#597): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: {
+              "style/emphasis": "warn",
+              "style/list-marker": "warn",
+              "style/heading": "warn",
+              "style/wrap": ["warn", { width: 30 }],
+            },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("keeps ordinary quoted margins and independent blocks editable (#597)", () => {
+    expect(checked(">  \t*c*\n")).toBe(">  \t_c_\n");
+    expect(checked(">    * *c*\n")).toBe("> - _c_\n");
+    expect(checked("2. a\n   + b\n>    * *c*\n")).toBe("2. a\n   - b\n> - _c_\n");
+    expect(checked("2. a\n   + b\n>\t* *c*\n\nLater *safe*.\n")).toBe(
+      "2. a\n   - b\n>\t* *c*\n\nLater _safe_.\n",
+    );
+    expect(
+      format(">\t*c*\n", {
+        config: { extends: [], dialect: "commonmark", rules: { "style/emphasis": "warn" } },
+      }).output,
+    ).toBe(">\t_c_\n");
+  });
+  it.each(["alpha ##\n===\n", "alpha #\n---\n", "alpha\t##\n===\n"])(
+    "retains a Setext title ending in raw closing hashes (#383): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\ufeff"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(input);
+          expect(
+            checked(input, {
+              extends: [],
+              dialect: "obsidian",
+              rules: { "style/heading": "warn" },
+            }),
+          ).toBe(input);
+        }
+    },
+  );
+  it("keeps title text and independent heading forms editable (#383)", () => {
+    expect(checked("*alpha* ##\n===\n\nbeta\n---\n")).toBe("_alpha_ ##\n===\n\n## beta\n");
+    for (const [source, expected] of [
+      ["alpha###\n===\n", "# alpha###\n"],
+      ["alpha \\##\n===\n", "# alpha \\##\n"],
+      ["alpha `##`\n===\n", "# alpha `##`\n"],
+      ["alpha ## tail\n===\n", "# alpha ## tail\n"],
+      ["## alpha ##\n", "## alpha\n"],
+    ] as const)
+      expect(checked(source)).toBe(expected);
+    expect(
+      checked("# alpha \\##\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": ["warn", { style: "setext" }] },
+      }),
+    ).toBe("alpha \\##\n=========\n");
+    for (const dialect of ["commonmark", "github"] as const)
+      expect(
+        format("alpha ##\n===\n", {
+          config: { extends: [], dialect, rules: { "style/heading": "warn" } },
+        }).output,
+      ).toBe("# alpha \\##\n");
+  });
+  it.each([
+    "2. a\n   + b\n>  * c\n",
+    "1. a\n   + b\n>  * c\n",
+    "- a\n  + b\n>  * c\n",
+    "2. a\n   - b\n>  * c\n",
+    "2. a\n   + b\n>  1. c\n",
+    "2. a\n   + b\n\n>  * c\n",
+    "2. a\n   + b\n\n\n>  * c\n",
+  ])("retains quoted-list indentation after a trailing nested list (#596): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/list-indent": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("keeps marker and inline edits in indentation-sensitive lists (#596)", () => {
+    const source = "2. *a*\n   + *b*\n>  * *c*\n";
+    expect(checked(source)).toBe("2. _a_\n   - _b_\n>  - _c_\n");
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-marker": "warn" },
+      }),
+    ).toBe("2. *a*\n   - *b*\n>  - *c*\n");
+  });
+  it.each(["8. a\n99. z\n    + b\n>  * c\n", "9. a\n1. z\n   + b\n>  * c\n"])(
+    "retains number width in the earlier indentation unit (#596): %j",
+    (source) => {
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/ordered-list": ["warn", { numbering: "ordered" }] },
+        }),
+      ).toBe(source);
+    },
+  );
+  it("keeps delimiters and same-width numbering editable in retained units (#596)", () => {
+    const settings: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/ordered-list": ["warn", { numbering: "ordered", delimiter: ")" }] },
+    };
+    expect(checked("8. a\n99. z\n    + b\n>  * c\n", settings)).toBe(
+      "8) a\n99) z\n    + b\n>  * c\n",
+    );
+    expect(checked("2. a\n8. z\n   + b\n>  * c\n", settings)).toBe("2) a\n3) z\n   + b\n>  * c\n");
+  });
+  it.each([{ nestedIndent: 4 }, { orderedSpacesMultiline: 2 }, { bulletSpaces: 3 }])(
+    "retains custom indentation on both participating units (#596): %j",
+    (options) => {
+      const source = "2. a\n   + b\n>  * c\n";
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/list-indent": ["warn", options] },
+        }),
+      ).toBe(source);
+    },
+  );
+  it.each([
+    ["2. a\n   + b\n> * c\n", "2. a\n   + b\n> * c\n"],
+    ["2. a\n   + b\n>   * c\n", "2. a\n   + b\n> * c\n"],
+    ["2. a\n>  * c\n", "2. a\n> * c\n"],
+    [">  * c\n", "> * c\n"],
+    ["2. a\n   + b\n# reset\n>  * c\n", "2. a\n   + b\n# reset\n> * c\n"],
+    ["2. a\n   + b\n> [!NOTE]\n>  * c\n", "2. a\n   + b\n> [!NOTE]\n> * c\n"],
+    ["2. a\n   + b\n> >  * c\n", "2. a\n   + b\n> > * c\n"],
+  ])("keeps measured quote-indent controls editable (#596): %j", (source, expected) => {
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-indent": "warn" },
+      }),
+    ).toBe(expected);
+  });
+  it.each([
+    "%%c%%\nalpha\n---\n",
+    "%%c%%\nalpha\n===\n",
+    "%%one\ntwo%%\nalpha\n---\n",
+    "%%one%%\n%%two%%\nalpha\n---\n",
+    "%%%%\nalpha\n---\n",
+    "%%c%%\nalpha\n=\nbeta\n---\n",
+    "%%c%%\nalpha\n--\nbeta\n---\n",
+  ])("retains Setext text directly after a standalone comment (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, { extends: [], dialect: "obsidian", rules: { "style/heading": "warn" } }),
+        ).toBe(input);
+      }
+  });
+  it("keeps comment-adjacent title text editable and permits independent headings (#383)", () => {
+    expect(checked("%%c%%\n__alpha__\n---\n")).toBe("%%c%%\n**alpha**\n---\n");
+    expect(checked("%%c%%\n\nalpha\n---\n")).toBe("%%c%%\n\n## alpha\n");
+    expect(checked("%%c%%\nalpha\n---\nbeta\n---\n")).toBe("%%c%%\nalpha\n---\n## beta\n");
+    expect(
+      checked("%%c%%\n## alpha\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": ["warn", { style: "setext" }] },
+      }),
+    ).toBe("%%c%%\n## alpha\n");
+  });
+  it("handles a plugin's standalone comment without a source position (#383)", () => {
+    const plugin: Plugin = {
+      name: "unlocated-comment",
+      syntax: {
+        micromark: {},
+        mdast: {
+          transforms: [
+            (tree) => {
+              for (const child of tree.children)
+                if (child.type === "obsidianComment") delete child.position;
+            },
+          ],
+        },
+      },
+    };
+    const result = format("%%c%%\nalpha\n---\n", {
+      plugins: [plugin],
+      config: { extends: [], dialect: "obsidian", rules: { "style/heading": "warn" } },
+    });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+  });
+  it.each([
+    "- a\n> b\n- c\n",
+    "* a\n> b\n* c\n",
+    "- a\n> b\n| c | d |\n| - | - |\n| e | f |\n- g\n",
+    "1) a\n> b\n1. c\n",
+    "1. a\n> b\n1. c\n",
+    "1) a\n> b\n3. c\n",
+  ])("retains list tightness and both units across a bridge: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      const output = checked(input);
+      if (source.includes("|")) {
+        expect(output).toContain("- a");
+        expect(output).toContain(newline + "- g");
+        expect(output).not.toContain(newline + newline + "- g");
+      } else expect(output).toBe(input);
+      for (const rule of ["style/block-spacing", "style/list-marker", "style/ordered-list"])
+        expect(
+          checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+        ).toBe(input);
+    }
+  });
+  it.each([
+    "* a\n> b\n- c\n",
+    "* a\n> b\n\t\n- c\n",
+    "* a\n> b\n| c | d |\n| - | - |\n| e | f |\n\t\n- g\n",
+    "> * a\n> > b\n> - c\n",
+  ])("keeps both bullet markers across a native continuation: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      const output = checked(input);
+      expect(output).toContain("* a");
+      expect(output).toContain(source.includes("- g") ? "- g" : "- c");
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/list-marker": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each([
+    "a\nb\n=\nc\n---\n",
+    "#5\nb\n=\nc\n---\n",
+    "a\n= \nc\n---\n",
+    "a\nb\n--\nc\n---\n",
+    "a\nb\n=\nc\n===\n",
+    "a\nb\n--\n\t\nc\n---\n",
+    "#5\nb\n=\n\t\nc\n---\n",
+  ])("retains an adjacent title in the Reading paragraph: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/heading": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it.each([
+    "a\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) b\n3) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) ``` lang\nalpha ```\n\n\nb\n",
+    "a ``` x\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) ~~~ lang\nalpha\n\n\nb\n",
+    "a\n2) ~~~ lang\nalpha\n\nb\n\n*c*\n",
+    "a\n2) ~~~ lang\nalpha\n~~~\n\n*c*\n",
+  ])("retains the physical gap carried into code: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      expect(checked(input)).toBe(input);
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/blank-lines": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each(["* a\n\n> b\n- c\n", "* a\n> b\n# h\n- c\n"])(
+    "keeps independently separated list markers editable: %j",
+    (source) => {
+      expect(checked(source)).not.toContain("* a");
+    },
+  );
+  it("resumes heading conversion after the native thematic break", () => {
+    expect(checked("a\nb\n=\nc\n---\nd\n---\n")).toBe("a\nb\n=\nc\n---\n## d\n");
+  });
+  it("keeps inline formatting in both retained list units", () => {
+    const output = checked("* *first*\n> *middle*\n- *last*\n");
+    expect(output).toContain("* _first_");
+    expect(output).toContain("> _middle_");
+    expect(output).toContain("- _last_");
+  });
+  it("retains the missed fence suffix while earlier text remains editable", () => {
+    const source =
+      "Before *safe*.\n\na\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n\nLater *outside*.\n";
+    const output = checked(source);
+    expect(output).toBe(source.replace("*safe*", "_safe_"));
+  });
+});
+
+describe("Obsidian display math boundaries (#586, #587)", () => {
+  it("keeps list tightness across display math (#586)", () => {
+    const source = "- a\n$$\nx = y\n$$\n- b\n";
+    expect(checked(source)).toBe(source);
+  });
+  it.each(["- ## h", "- ```\n  a\n  ```"])(
+    "retains both table separators after an item ending in %s (#582)",
+    (prefix) => {
+      const source = `${prefix}\n| b | c |\n| - | - |\n- d\n`;
+      const output = checked(source);
+      expect(output).toContain(`${prefix}\n| b`);
+      expect(output).toContain("\n- d\n");
+      expect(output).not.toContain("\n\n- d");
+      if (prefix.includes("```")) expect(output).toBe(source);
+      else expect(output).toContain("| --- | --- |");
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/block-spacing": "warn" },
+        }),
+      ).toBe(source);
+    },
+  );
+  it.each([
+    "- ~~~\n  a\n  ~~~\n| b | c |\n| - | - |\n- d\n",
+    "- ```js\n  a\n  ```\n| b | c |\n| - | - |\n- d\n",
+    "- ````\n  a\n  ````\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n| b | c |\n| - | - |\n| e | f |\n- d\n",
+    "- p\n  - ```\n    a\n    ```\n| b | c |\n| - | - |\n- d\n",
+  ])("retains literal table source immediately after a list fence (#582): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      // Native probing confirms that fence preferences remain safe while
+      // changing the literal table rows is visible in Live Preview.
+      expect(checked(input)).toBe(input.replaceAll("~~~", "```").replaceAll("````", "```"));
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/table": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each([
+    "-     a\n| b | c |\n| - | - |\n- d\n",
+    "```\na\n```\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n\n| b | c |\n| - | - |\n- d\n",
+  ])("keeps genuine tables editable beside independent code (#582): %j", (source) => {
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/table": "warn" },
+      }),
+    ).toContain("| --- | --- |");
+  });
+  it.each([
+    "- alpha\n$$\nx = y\n$$\n",
+    "1. alpha\n$$\nx = y\n$$\n",
+    "2. alpha\n$$\nx = y\n$$\n",
+    "- ## title\n$$\nx = y\n$$\n",
+    "- ```\n  a\n  ```\n$$\nx = y\n$$\n",
+    "alpha\n$$x = y$$\n",
+    "- alpha\n$$x = y$$\n",
+  ])("keeps the native list containment or display widget: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        for (const rule of ["style/block-spacing", "style/wrap"])
+          expect(
+            checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+          ).toBe(input);
+      }
+  });
+  it.each(["- alpha\n$$\nx = y\n$$\n", "alpha\n$$x = y$$\n"])(
+    "rejects a plugin changing the alternate-view math boundary: %j",
+    (source) => {
+      const offset = source.indexOf("$$");
+      const plugin: Plugin = {
+        name: "split",
+        rules: {
+          math: {
+            kind: "style",
+            description: "Change the math separator",
+            check: () => [
+              {
+                start: offset,
+                message: "Change",
+                edit: source.includes("\n$$\n")
+                  ? { start: offset, end: offset, text: "\n" }
+                  : { start: offset - 1, end: offset, text: " " },
+              },
+            ],
+          },
+        },
+      };
+      const result = format(source, {
+        workspace,
+        plugins: [plugin],
+        config: { extends: [], dialect: "obsidian", rules: { "split/math": "warn" } },
+      });
+      expect(result.output).toBe(source);
+    },
+  );
+  it("allows independent inline and marker formatting before math", () => {
+    expect(checked("* *alpha*\n$$\nx = y\n$$\n")).toBe("- _alpha_\n$$\nx = y\n$$\n");
+    expect(checked("*alpha*\n$$x = y$$\n")).toBe("_alpha_\n$$x = y$$\n");
+  });
+  it("still wraps ordinary inline math and spaces genuinely separated blocks", () => {
+    expect(checked("alpha $$x = y$$\nbeta\n")).toBe("alpha $$x = y$$ beta\n");
+    expect(checked("- alpha\n\n$$\nx = y\n$$\n")).toBe("- alpha\n\n$$\nx = y\n$$\n");
+  });
+});
+
+describe.each(["\n", "\r\n", "\r"])("protected boundary start points with %j (#590)", (newline) => {
+  const source = `- ## *h*${newline}outside${newline}`;
+  function proposal(kind: string) {
+    const at = source.indexOf(newline);
+    const tail = kind === "combined-space" ? " " : kind === "combined-tab" ? "\t" : "";
+    return kind === "before-break"
+      ? { start: at, end: at, text: newline }
+      : kind === "after-break"
+        ? { start: at + newline.length, end: at + newline.length, text: newline }
+        : kind === "unchanged-prefix"
+          ? { start: 0, end: at, text: source.slice(0, at) + newline }
+          : kind.startsWith("combined-")
+            ? { start: 0, end: at, text: `- ## _h_${newline}${tail}` }
+            : kind === "copied-suffix"
+              ? { start: 0, end: source.length, text: source.replace("*h*", `_h_${newline}`) }
+              : { start: 0, end: at, text: kind === "longer-style" ? "- ## _h_ ###" : "- ## _h_" };
+  }
+  function pluginOutput(kind: string) {
+    const plugin: Plugin = {
+      name: "edge",
+      rules: {
+        change: {
+          kind: "style",
+          description: "Change a protected boundary",
+          check: ({ document }) =>
+            document.source !== source
+              ? []
+              : [{ start: 0, message: "Change", edit: proposal(kind) }],
+        },
+      },
+    };
+    const result = format(source, {
+      workspace,
+      plugins: [plugin],
+      config: { extends: [], dialect: "obsidian", rules: { "edge/change": "warn" } },
+    });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+    return result.output;
+  }
+  it.each([
+    "before-break",
+    "after-break",
+    "unchanged-prefix",
+    "combined-style",
+    "combined-space",
+    "combined-tab",
+    "copied-suffix",
+  ])("rejects an unsafe %s separator edit", (kind) => expect(pluginOutput(kind)).toBe(source));
+  it.each(["style", "longer-style"])("allows a safe terminal %s edit", (kind) => {
+    expect(pluginOutput(kind)).toBe(
+      source.replace("*h*", kind === "longer-style" ? "_h_ ###" : "_h_"),
+    );
+  });
+});
 
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
@@ -1171,7 +1732,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567, 584].includes(issue) &&
         !name.startsWith("HTML item coherence:") &&
         ![
           "short reset exposes an unclosed long run in an inline comment",
