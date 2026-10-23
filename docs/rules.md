@@ -750,6 +750,9 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
+- On GitHub after 0.4.0, between dollar display math and an immediately
+  following Setext title. They can form one native heading or continue a
+  list/quote paragraph, so their source stays together.
 - In the Obsidian dialect, after an underlined heading that a view reads as
   paragraph text, such as a multiline level-1 heading, one beginning with a
   reference-like line, or one whose underline has trailing space, extra
@@ -795,6 +798,14 @@ or what a comment applies to:
 - In a block quote, below a list whose last item ends in an empty footnote
   definition, such as `> - [^1]:`. The parser would count the new line of `>` as
   part of the item and read the list as loose.
+
+After 0.4.0, an Obsidian list ending in a paragraph also stays adjacent to a
+parsed tilde opener whose info contains a written backtick. Live Preview reads
+it as paragraph continuation. List markers, padding and safe earlier reflow
+remain eligible; an existing blank and ordinary info strings keep their usual
+spacing behavior. When its parsed closer opens Live Preview code, the opener and
+remaining document stay as written, conservatively retaining later fence
+pairings too.
 
 ## `style/code-fence`
 
@@ -951,6 +962,19 @@ on Forgejo and Gitea when it contains `{`. Below a first line of `---` that no
 line closes, a level-2 underline has at least four `-`, because `---` would
 close it as front matter.
 
+After 0.4.0, GitHub keeps an existing Setext title directly after dollar display
+math. The dollar lines belong to that native heading too, so the complete range
+stays as written. An intervening blank or interrupting block permits heading
+preferences again. Where text below a list or quote ending in math continues
+that native container, the source boundary stays together too.
+
+After 0.4.0, Obsidian also retains the heading form when a title line begins
+directly with math or its only content is an image/embed. ATX and Setext can
+give those widgets different typography or placement. A retained Setext heading
+keeps its complete source; mixed text before math, wrapped math, and images
+beside ordinary title text remain eligible. Independent blocks below the heading
+still get their spacing, inline formatting, and table or list preferences.
+
 ## `style/inline-code`
 
 **Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
@@ -974,9 +998,18 @@ joined line would read differently:
   marker, which holds an Obsidian callout's title.
 - Where the joined span needs a different number of backticks than it has, and
   an earlier run of that many in the same paragraph would pair with them.
-- Where a line inside the span ends with a backslash: where its backticks do not
-  pair, as on GitHub after an unpaired longer run, that backslash is a hard line
-  break. `style/wrap` keeps such a paragraph as written too.
+- Where a line inside the span ends with two spaces or a backslash: where its
+  backticks do not pair, as on GitHub after an unpaired longer run, those
+  markers make a hard line break. `style/wrap` keeps such a paragraph as written
+  too. This conservative check also retains the newline when the backticks do
+  pair.
+
+After 0.4.0, Obsidian also retains a multiline span with one or two backticks
+and the following source in its inline block: Live Preview resets short code at
+the physical newline. Earlier independent inline text and later paragraphs can
+still format. The [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections) describe the
+conservative cases.
 
 Before:
 
@@ -1205,6 +1238,12 @@ has only its leading pipe, can instead begin paragraph text. That row and the
 remaining primary table retain their source and preceding boundary, so adding
 table borders cannot absorb the paragraph or split pipes inside links.
 
+After 0.4.0, a one-column Obsidian table also stays as written unless both its
+header and delimiter have leading and trailing pipes. Live Preview displays the
+other forms as source text. Reading view also accepts matching trailing-only
+pipes; missing final pipes or mismatched leading borders instead continue
+paragraph text, including across a Tab-only line into later literal rows.
+
 Before:
 
 ```markdown
@@ -1252,6 +1291,10 @@ means:
 - With `---`, directly below a paragraph, a link reference definition, or
   display math, which `---` would underline as a heading; GitHub builds display
   math from a paragraph.
+- After 0.4.0, a compact hyphen line already directly below display math also
+  stays when another marker is requested. Spaced `- - -` remains eligible for
+  star or underscore preferences, as does a break separated from the math by a
+  blank line.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
 - At the start of a document, with `---`, which would open front matter if a
@@ -1280,6 +1323,25 @@ when the item's text starts on the next line. Extra spaces and tabs are reduced
 to that one space where safe. Quoted markers and further markers on the same
 physical line keep ordinary trailing-space cleanup, because Live Preview reads
 them as text.
+
+After 0.4.0, blank space after a literal backslash stays as written when
+removing it would turn a continuing prose line into a hard line break. This
+includes spaces and tabs inside paragraphs, headings, lists, and quotes. Blank
+space at the end of a paragraph or file can still be removed; `hardBreak`
+continues to control existing hard line breaks.
+
+Also after 0.4.0, a Tab followed by two or more spaces can mark a hard line
+break even where the primary Markdown reading has a soft line ending. Across
+dialects, that suffix stays exactly as written, including with
+`hardBreak: "backslash"`. Ordinary trailing Tabs and spaces, and those on the
+last content line of a paragraph or heading, can still be removed where they
+have no rendered meaning.
+
+After 0.4.0, Obsidian also keeps the preceding paragraph's separator before a
+Tab-only continuation when it marks a hard break or keeps a backslash literal. A
+Tab that begins before an unquoted paragraph's content column does not continue
+that paragraph merely by advancing past the column. Quoted margins are handled
+conservatively, retaining a possibly removable separator.
 
 With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
 
@@ -1416,6 +1478,21 @@ what it means, that is, when it:
 - would start, in the Obsidian dialect, with `[`, a label, and `]:` on its first
   line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
   styles as a link reference definition.
+
+After 0.4.0, Obsidian wrapping retains the exact terminal separator before a
+Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
+preceding backslash literal. The earlier paragraph text can still wrap. In every
+dialect, paragraphs with a Tab followed by two final spaces before continuing
+text also stay unreflowed: native renderers can read that separator as a hard
+break even when the primary parser reads a soft line ending. Whitespace inside
+code spans otherwise follows their own joining rules. In Obsidian, a short
+multiline code span keeps its whole paragraph unreflowed; see
+[`style/inline-code`](#styleinline-code). Earlier independent inline markup can
+still format.
+
+After 0.4.0, Obsidian also leaves a multiline image description containing
+backticks unreflowed, where joining could turn displayed Live Preview source
+into an embed. Surrounding inline preferences can still be applied.
 
 In the Obsidian dialect, the rule wraps only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). [Forgejo and

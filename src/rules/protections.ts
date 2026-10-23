@@ -1,7 +1,8 @@
 import { walk } from "../syntax/walk.js";
+import type { Paragraph } from "mdast";
 import type { Dialect, Document } from "../core/types.js";
 import { range, startsWithMarker } from "../syntax/parse.js";
-import { countBelow } from "../syntax/source.js";
+import { countBelow, escaped, lineStart } from "../syntax/source.js";
 import { type Range } from "./shared.js";
 import { lineBounds, lineBreak } from "../syntax/source.js";
 
@@ -103,6 +104,45 @@ function calloutTitles(document: Document): Range[] {
   return titles;
 }
 
+/**
+ * A paragraph's terminal separator before a Tab-only physical line that
+ * Obsidian can read as continuation instead of the parser's blank line.
+ * Two final spaces retain a hard break; blank space after an odd literal
+ * backslash keeps it from becoming a hard-break marker. Keep the separator
+ * outside reflow while allowing the preceding paragraph content to wrap.
+ */
+function obsidianTabBreak(paragraph: Paragraph, source: string): Range | undefined {
+  const [start, end] = range(paragraph);
+  let from = end;
+  while (from > start && (source[from - 1] === " " || source[from - 1] === "\t")) from--;
+  if (from === end || (!source.endsWith("  ", end) && !escaped(source, from))) return;
+  let next = end;
+  if (source[next] === "\r") next += source[next + 1] === "\n" ? 2 : 1;
+  else if (source[next] === "\n") next++;
+  else return;
+  const firstLine = lineStart(source, start);
+  let minimum = 0;
+  // A Tab must start at the paragraph's column, not merely advance to it.
+  // Quote markers can consume part of its columns; keep those margins
+  // conservative rather than parsing container prefixes a second time.
+  if (!source.slice(firstLine, start).includes(">"))
+    for (let at = firstLine; at < start; at++) {
+      if (at === 0 && source[at] === "\uFEFF") continue;
+      minimum = source[at] === "\t" ? minimum + 4 - (minimum % 4) : minimum + 1;
+    }
+  let tab = false;
+  let column = 0;
+  for (; next < source.length && source[next] !== "\r" && source[next] !== "\n"; next++) {
+    const character = source[next];
+    if (character === "\t") {
+      if (column >= minimum) tab = true;
+      column += 4 - (column % 4);
+    } else if (character === " " || character === ">") column++;
+    else return;
+  }
+  return tab ? [from, end] : undefined;
+}
+
 /** Inline nodes whose source joined lines cannot change. */
 const obsidianOpaque = new Set(["inlineCode", "inlineMath", "wikiLink", "obsidianHighlight"]);
 
@@ -121,4 +161,12 @@ function misreadTable(text: string): boolean {
 
 /** A GFM table's delimiter row, such as `| --- | :-: |`, after any container markers. */
 const delimiterRow = /^[ \t>]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
-export { giteaPyLine, goldmarkForges, inForgeMath, calloutTitles, obsidianOpaque, misreadTable };
+export {
+  giteaPyLine,
+  goldmarkForges,
+  inForgeMath,
+  calloutTitles,
+  obsidianOpaque,
+  obsidianTabBreak,
+  misreadTable,
+};

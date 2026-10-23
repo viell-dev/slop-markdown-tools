@@ -1,12 +1,14 @@
-import type { List, Nodes, Parents, Root } from "mdast";
+import type { Heading, List, ListItem, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd, range, startsWithMarker } from "./parse.js";
+import { codeFence } from "./fences.js";
 import {
   capturedLineBreak,
   lineBreak as lineEndingPattern,
   lineBreakMatcher,
   lineBreaks,
   escaped,
+  lineStart as startOfLine,
 } from "./source.js";
 
 /**
@@ -29,6 +31,29 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
  * markers it hides the destination too, without that line class (issue #411).
  */
 export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
+
+/** Widgets whose typography or placement can change between ATX and Setext in Live Preview. */
+export function obsidianWidgetHeading(source: string, heading: Heading): boolean {
+  const only = heading.children.length === 1 ? heading.children[0] : undefined;
+  if (
+    only?.type === "image" ||
+    only?.type === "imageReference" ||
+    (only?.type === "wikiLink" && only.embed)
+  )
+    return true;
+  const start = heading.children[0]?.position?.start.offset;
+  if (start === undefined) return false;
+  // Inspect only the first direct math node on each physical line, keeping
+  // prefix scans bounded in a long title with many inline formulas.
+  let mathLine = 0;
+  return heading.children.some((node) => {
+    if (node.type !== "inlineMath" || !node.position || node.position.start.line === mathLine)
+      return false;
+    mathLine = node.position.start.line;
+    const at = node.position.start.offset!;
+    return /^[ \t>]*$/.test(source.slice(Math.max(start, startOfLine(source, at)), at));
+  });
+}
 
 /**
  * Text that the parser read where renderers may read a list, or on Forgejo and
@@ -74,6 +99,12 @@ export interface MisreadLists {
    * run of the same length outside an indented code block, which it closes
    * there, a fenced code block, or a list item. Those blocks are in the set as
    * well, with a table that holds such a run.
+   *
+   * A paired code span with one or two backticks that crosses a physical line
+   * also resets in Live Preview (#565). Its range starts at the opener, or a
+   * containing inline node, and continues through its inline block, since
+   * later primary spans may be out of phase too. Earlier text and independent
+   * blocks remain editable.
    */
   unclosedCode: ReadonlySet<Nodes>;
   /** Either Obsidian view can keep code through EOF after an HTML/code transition (#433, #529). */
@@ -109,6 +140,13 @@ export interface MisreadLists {
    */
   underlines: ReadonlySet<Nodes>;
   /**
+   * Setext headings with a title line beginning directly with math, or whose
+   * only child is an image/embed. Converting them to ATX can change widget
+   * typography or block placement in Live Preview (#383). Keep the whole
+   * heading without treating it as paragraph text for following blocks.
+   */
+  widgetHeadings: ReadonlySet<Nodes>;
+  /**
    * Zero-based physical line indexes of earlier lazy list continuations
    * that supply the final Live Preview heading before an external hyphen
    * break (#554). Narrowing a list item's content column must keep them lazy.
@@ -137,7 +175,10 @@ export interface MisreadLists {
    * where such blocks follow, or a block that a narrower spacing would bring
    * inside, or a list of the same kind, which continues the list with every
    * item whose marker matches, with that list's markers, each from the item's
-   * start to its content, and from the line break before that list.
+   * start to its content, and from the line break before that list. Also the
+   * markers of a list whose escaping HTML region already protects a later
+   * list marker: changing only the earlier markers can split or merge the
+   * native list, including HTML opened inside the earlier item (#399, #428).
    */
   itemHtml: ReadonlySet<Nodes>;
   /**
@@ -192,6 +233,9 @@ export interface MisreadLists {
    * a line that would close the fence, where the parser opens one, so that it
    * pairs the fences after it otherwise (issue #390). It counts as one
    * stretch, from the start of the fence's first line to the document's end.
+   * Also a closed tilde fence whose info has a raw backtick: Live Preview
+   * reads its opener as text, then opens code at the primary closer. Later
+   * fence pairings may disagree, so keep the same EOF suffix (#567).
    */
   openFences: ReadonlySet<Nodes>;
   /**
@@ -210,6 +254,9 @@ export interface MisreadLists {
    * A body row that changes its header's leading-pipe convention, or has
    * only its leading pipe, begins a protected suffix too: adding borders
    * can otherwise absorb native paragraph text into the table (#558).
+   * A one-column table also keeps its source when either header or delimiter
+   * lacks an outer pipe: Live Preview needs both borders, while Reading view
+   * also accepts matching trailing-only borders (#568).
    */
   tableText: ReadonlySet<Nodes>;
   /**
@@ -217,6 +264,10 @@ export interface MisreadLists {
    * (#488, #493–#496, #506, #507), plus an earlier lazy list line's preceding
    * break and margin through its first character or containing inline node
    * where that boundary makes a later final line a Live Preview heading (#554).
+   * On GitHub, contiguous display math and the immediately following Setext
+   * heading form one native heading, so the complete range stays together.
+   * A heading after a container ending in math can instead continue its native
+   * paragraph lazily; retain that complete boundary too (#336).
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -406,6 +457,7 @@ export function misreadLists(document: Document): MisreadLists {
   const unclosedCode = new Set<Nodes>();
   let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
+  const widgetHeadings = new Set<Nodes>();
   const headingLazyLines = new Set<number>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
@@ -417,6 +469,45 @@ export function misreadLists(document: Document): MisreadLists {
   const commentText = new Set<Nodes>();
   const boundaryText = new Set<Nodes>();
   const boundaryLists = new Set<List>();
+  // GitHub builds display math from paragraphs. A Setext underline below
+  // text directly after its closing dollars underlines the whole paragraph,
+  // including the dollar lines (#336). Keep that boundary and its content
+  // together, including consecutive math blocks and blocks inside containers,
+  // or a lazy continuation outside the container ending with that math.
+  if (document.dialect === "github") {
+    const visitMath = (parent: Parents): Nodes | undefined => {
+      let first: Nodes | undefined;
+      let previous: Nodes | undefined;
+      for (const child of parent.children) {
+        const trailing =
+          "children" in child && !leaves.has(child.type) ? visitMath(child) : undefined;
+        const adjacent =
+          previous?.position !== undefined &&
+          child.position !== undefined &&
+          previous.position.end.line === child.position.start.line - 1;
+        if (child.type === "math") {
+          if (!adjacent || !first) first = child;
+        } else {
+          if (
+            first?.position &&
+            adjacent &&
+            child.type === "heading" &&
+            child.position!.end.line > child.position!.start.line
+          )
+            boundaryText.add({
+              ...child,
+              position: { start: first.position.start, end: child.position!.end },
+            });
+          first = trailing;
+        }
+        previous = child;
+      }
+      // The final math paragraph can continue lazily outside its quote or
+      // list item. A physical blank at the container's end stops that carry.
+      return previous?.position?.end.line === parent.position?.end.line ? first : undefined;
+    };
+    visitMath(document.tree);
+  }
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     const quotedLeaves = new Set<Nodes>();
@@ -543,7 +634,7 @@ export function misreadLists(document: Document): MisreadLists {
       )
         definitionCode.add(stretch(next, lineOf(next)));
     });
-    for (let index = 0; index < order.length - 1; index++) {
+    for (let index = 0; index < order.length; index++) {
       const [leaf] = order[index]!;
       if (leaf.type !== "code" || !leaf.position) continue;
       const text = source.slice(leaf.position.start.offset, leaf.position.end.offset);
@@ -555,7 +646,16 @@ export function misreadLists(document: Document): MisreadLists {
         return run !== undefined && run[0] === fence[0] && run.length >= fence.length;
       };
       const lines = text.split(lineEndingPattern);
-      if (lines.length > 1 && closes(lines.at(-1)!)) continue;
+      // Live Preview rejects a raw backtick in tilde-fence info too. Its
+      // primary closer instead opens code, shifting the later pairings (#567).
+      // Use the parsed boundary: a shorter or overindented body run is no closer.
+      if (fence[0] === "~" && lines[0]!.includes("`") && codeFence(source, leaf)?.close) {
+        openFences.add(
+          stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }),
+        );
+        break;
+      }
+      if (index === order.length - 1 || (lines.length > 1 && closes(lines.at(-1)!))) continue;
       // The fence ends before the document does, so its container ended it.
       // Live Preview reads on to a line that closes it, where the parser opens
       // a fence, and pairs the fences after that otherwise, so the rest of the
@@ -684,8 +784,22 @@ export function misreadLists(document: Document): MisreadLists {
     let column: number | undefined;
     /** The end of a list or footnote definition that Reading view read as text, while inside it. */
     let joinedEnd = 0;
+    const oneColumnTable = (leaf: Nodes) =>
+      leaf.type === "table" && leaf.children[0]?.children.length === 1;
+    /** A one-column table that Reading view reads as paragraph text (#359, #398, #568). */
+    const paragraphTable = (leaf: Nodes) => {
+      if (!oneColumnTable(leaf)) return false;
+      const header = lines[leaf.position!.start.line - 1]!;
+      const delimiter = lines[leaf.position!.start.line]!;
+      return (
+        !/\|[ \t]*$/.test(header) ||
+        !/\|[ \t]*$/.test(delimiter) ||
+        (source[leaf.position!.start.offset!] === "|") !== /^[ \t>]*\|/.test(delimiter)
+      );
+    };
     const paragraphLike = (leaf: Nodes) =>
       leaf.type === "paragraph" ||
+      paragraphTable(leaf) ||
       (leaf.type === "heading" &&
         leaf.depth === 1 &&
         leaf.position!.end.line >
@@ -749,10 +863,18 @@ export function misreadLists(document: Document): MisreadLists {
      * the parser does not read as code spans; a backtick in a link's
      * destination or title starts none, but counts in an image's source.
      */
-    const openRuns = (node: Nodes): Run[] => {
+    const openRuns = (node: Nodes, blockEnd: Point, inlineStart?: Point): Run[] => {
       const start = node.position?.start.offset;
       const end = node.position?.end.offset;
       if (start === undefined || end === undefined) return [];
+      if (
+        node.type === "inlineCode" &&
+        node.position!.end.line > node.position!.start.line &&
+        !source.startsWith("```", start)
+      ) {
+        unclosedCode.add(stretch(node, inlineStart ?? node.position!.start, blockEnd));
+        return [];
+      }
       if (
         node.type === "obsidianHighlight" ||
         node.type === "obsidianComment" ||
@@ -763,7 +885,11 @@ export function misreadLists(document: Document): MisreadLists {
       // The parser reads every run that another closes as code, so every one
       // left in text is unclosed.
       if (node.type === "text") return backtickRuns(source, start, end);
-      return "children" in node ? node.children.flatMap(openRuns) : [];
+      return "children" in node
+        ? node.children.flatMap((child) =>
+            openRuns(child, blockEnd, inlineStart ?? child.position?.start),
+          )
+        : [];
     };
     /**
      * The length of a run of three or more backticks whose code Live Preview
@@ -826,7 +952,7 @@ export function misreadLists(document: Document): MisreadLists {
             ? [leaf]
             : [];
       const runs = parts.flatMap((part) => {
-        const open = openRuns(part);
+        const open = openRuns(part, part.position!.end);
         if (open.length > 0) unclosedCode.add(part);
         return open;
       });
@@ -1222,6 +1348,7 @@ export function misreadLists(document: Document): MisreadLists {
       return code;
     };
     const htmlRoots: [Nodes, boolean, number?][] = [];
+    const escapingHtmlEnds = new Map<Nodes, number>();
     const inlineHtml = (node: Nodes) => {
       if (node.type === "html" && /^<[a-z][a-z0-9-]*(?=[\s/>])/i.test(node.value))
         htmlRoots.push([node, false]);
@@ -1254,6 +1381,7 @@ export function misreadLists(document: Document): MisreadLists {
       const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block, rootEnd);
       htmlUntil = until;
       if (block && until <= end) continue;
+      escapingHtmlEnds.set(leaf, until);
       htmlText.add({
         ...leaf,
         position: { ...leaf.position, end: pointAt(until) },
@@ -1308,6 +1436,9 @@ export function misreadLists(document: Document): MisreadLists {
         break;
       }
     }
+    // Items enclosing the current parent; a nested paragraph can leave later
+    // blocks in an outer item even when its immediate item ends there.
+    const enclosingItems: ListItem[] = [];
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
@@ -1333,15 +1464,34 @@ export function misreadLists(document: Document): MisreadLists {
           const definitionText =
             /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
+          const readingParagraph =
+            /[ \t]$/.test(underline) ||
+            columnAt(from + prefix) > columnAt(text) ||
+            (child.depth === 1 && child.position!.end.line > textLine + 1);
+          // ATX can give an unwrapped math widget the line's heading font,
+          // or put a standalone image inside a heading. Keep the source (#383).
+          if (obsidianWidgetHeading(source, child))
+            widgetHeadings.add(stretch(child, lineOf(child)));
           if (
             from > start &&
-            (/[ \t]$/.test(underline) ||
-              /^[ \t>]*-[ \t]*$/.test(underline) ||
-              columnAt(from + prefix) > columnAt(text) ||
-              (child.depth === 1 && child.position!.end.line > textLine + 1) ||
-              definitionText)
-          )
-            underlines.add(breakBefore(child, from, to));
+            (readingParagraph || /^[ \t>]*-[ \t]*$/.test(underline) || definitionText)
+          ) {
+            const boundary = breakBefore(child, from, to);
+            let ending = from;
+            if (source[ending - 1] === "\n") ending--;
+            if (source[ending - 1] === "\r") ending--;
+            let separator = ending;
+            while (source[separator - 1] === " " || source[separator - 1] === "\t") separator--;
+            // Reading view can keep this underline in the paragraph. Retain
+            // a suffix whose cleanup would change its preceding break (#383).
+            if (
+              readingParagraph &&
+              separator < ending &&
+              (source.endsWith("  ", ending) || escaped(source, separator))
+            )
+              boundary.position!.start.offset = separator;
+            underlines.add(boundary);
+          }
         }
         if (child.type === "paragraph") {
           // A line whose content starts with `[`, a label, and `]:` hides its
@@ -1433,23 +1583,36 @@ export function misreadLists(document: Document): MisreadLists {
           for (const [from, to] of later)
             if (/^[ \t>]*(?:=+|-+)[ \t]*$/.test(source.slice(from, to)))
               underlines.add(breakBefore(child, from, to));
-          // A lazy line, left of the item's content, ends the item in Live
-          // Preview for the blocks after it (issue #376).
-          const content = parent.children[0]?.position?.start.offset;
-          if (
-            parent.type === "listItem" &&
-            index < parent.children.length - 1 &&
-            content !== undefined &&
-            later.some(([from, to]) => {
+          // A lazy line, left of an item's content, ends its Live Preview
+          // state for later blocks (#376). Those blocks can belong to an
+          // enclosing item while the immediate inner item ends at this paragraph.
+          if (parent.type === "listItem" && later.length > 0) {
+            let lazyColumn = Infinity;
+            for (const [from, to] of later) {
               let at = from;
               while (at < to && (source[at] === " " || source[at] === "\t" || source[at] === ">"))
                 at++;
-              return columnAt(at) < columnAt(content);
-            })
-          )
-            lazyItems.add(wholeLines(child, parent.children.at(-1)));
+              lazyColumn = Math.min(lazyColumn, columnAt(at));
+            }
+            const retains = (item: ListItem) => {
+              const content = item.children[0]?.position?.start.offset;
+              const last = item.children.at(-1)?.position?.end.offset;
+              return (
+                content !== undefined &&
+                last !== undefined &&
+                last > end &&
+                lazyColumn < columnAt(content)
+              );
+            };
+            const item = enclosingItems.find(retains) ?? (retains(parent) ? parent : undefined);
+            if (item) lazyItems.add(wholeLines(child, item.children.at(-1)));
+          }
         }
-        if ("children" in child && !leaves.has(child.type)) visitLines(child);
+        if ("children" in child && !leaves.has(child.type)) {
+          if (parent.type === "listItem") enclosingItems.push(parent);
+          visitLines(child);
+          if (parent.type === "listItem") enclosingItems.pop();
+        }
       });
     visitLines(document.tree);
     /** The point where the line holding `node`'s start begins, less one: the line break before it. */
@@ -1469,6 +1632,26 @@ export function misreadLists(document: Document): MisreadLists {
           offset: item.children[0]?.position?.start.offset ?? item.position!.end.offset!,
         }),
       );
+    // HTML opened inside a list can outlive the parsed list and keep a
+    // later list marker raw (#428). Changing only the opening list's
+    // markers can then split or merge Reading view's list (#399). Keep
+    // those markers too; a closer before the later list still permits
+    // both lists to format. This reverse pass visits each node once and
+    // propagates the HTML endpoint without rescanning source or lists.
+    let nextListStart = Infinity;
+    const protectEscapingHtmlMarkers = (node: Nodes): number => {
+      const following = nextListStart;
+      let until = escapingHtmlEnds.get(node) ?? 0;
+      if ("children" in node)
+        for (let index = node.children.length - 1; index >= 0; index--)
+          until = Math.max(until, protectEscapingHtmlMarkers(node.children[index]!));
+      if (node.type === "list" && node.position) {
+        if (until > following) for (const marker of markersOf(node)) itemHtml.add(marker);
+        nextListStart = node.position.start.offset!;
+      }
+      return until;
+    };
+    if (escapingHtmlEnds.size) protectEscapingHtmlMarkers(document.tree);
     const visitHtml = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         if ("children" in child && !leaves.has(child.type)) visitHtml(child);
@@ -1619,7 +1802,12 @@ export function misreadLists(document: Document): MisreadLists {
           let at = previous.position!.end.offset!;
           while (source[at - 1] === " " || source[at - 1] === "\t") at--;
           tableText.add(startingAt(leaf, at));
-        } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
+        } else if (
+          paragraphTable(leaf) ||
+          // Reading accepts matching trailing-only borders, but Live Preview
+          // needs both outer pipes on the header and delimiter (#568).
+          (oneColumnTable(leaf) && source[start] !== "|")
+        )
           tableText.add(startingAt(leaf, lineStart(start)));
         else {
           // Keep the physical row convention of the header. Either view ends
@@ -1680,6 +1868,7 @@ export function misreadLists(document: Document): MisreadLists {
     htmlCodeToEnd,
     htmlText,
     underlines,
+    widgetHeadings,
     headingLazyLines,
     lazyItems,
     footnoteText,
@@ -1958,7 +2147,9 @@ function backtickRuns(source: string, start: number, end: number): Run[] {
 
 /**
  * The runs of backticks from `start` to `end` that no later run of the same
- * length there closes, as CommonMark pairs them into code spans.
+ * length there closes. Runs of one or two also remain open when their next
+ * matching run is on another physical line: Live Preview resets short code
+ * there, including inside inline comments and image descriptions (#565).
  */
 function unclosedRuns(source: string, start: number, end: number): Run[] {
   const runs = backtickRuns(source, start, end);
@@ -1972,8 +2163,14 @@ function unclosedRuns(source: string, start: number, end: number): Run[] {
   }
   const open: Run[] = [];
   for (let index = 0; index < runs.length; index++) {
-    if (next[index]! < 0) open.push(runs[index]!);
-    else index = next[index]!;
+    const run = runs[index]!;
+    const close = next[index]!;
+    if (
+      close < 0 ||
+      (run[1] < 3 && lineEndingPattern.test(source.slice(run[0] + run[1], runs[close]![0])))
+    )
+      open.push(run);
+    else index = close;
   }
   return open;
 }

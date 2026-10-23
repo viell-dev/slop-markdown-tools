@@ -1,0 +1,24 @@
+delta _fabric_ 
+  
++ <div> amber 
+ribbon ![anchor](https://example.com/timber.svg) [[basket#pebble]] _candle_ fabric --- saddle
+
++ __fabric__ **fern** saddle *basket juniper* lantern amber delta anchor pebble ![[anchor.png]]
+````js
+const amber = 36;
+````
+
+> >birch ![[cedar.png]]  
+> >ribbon grove __ember__ engine
+> cedar delta
+$$
+x = birch
+$$
+  
+<!-- a comment -->
+lantern -->
+
+[iris](page.md) yonder delta __ribbon__ [[saddle|fabric meadow]]\
+*method amber* [[signal#fabric]] juniper engine cedar walnut
+{% include saddle.html %}
+signal `cedariris` timber glacier __kettle__ ::: iris needle `yondermethod` [^1]

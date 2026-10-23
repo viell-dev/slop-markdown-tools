@@ -1736,6 +1736,7 @@ describe("underlined headings whose text Live Preview styles as a definition", (
     // The text is formatted; only the heading keeps its underline.
     ["[r]: *a* b\n===\n", "[r]: _a_ b\n===\n"],
     ["[r]: a b  \n===\n", "[r]: a b\n===\n"],
+    ["[r]: a b\\ \n===\n", "[r]: a b\\\n===\n"],
     // A backslash, or other text between `]` and `:`, makes Live Preview read
     // a heading.
     ["\\[r]: a b\n===\n", "# \\[r]: a b\n"],
@@ -1810,6 +1811,8 @@ describe("tables that Obsidian reads otherwise", () => {
     "x\n--:\n",
     "x\n:-:\n",
     "| x\n| --\n",
+    // Reading accepts trailing-only pipes, but Live Preview shows source text (#568).
+    "x |\n-- |\n",
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config, workspace })).toBe(source);
   });
@@ -1818,7 +1821,6 @@ describe("tables that Obsidian reads otherwise", () => {
     ["a *b*\n| x |\n| - |\n", "a _b_\n| x |\n| - |\n"],
     ["a\n\n| x | y |\n| - | - |\n", "a\n\n| x   | y   |\n| --- | --- |\n"],
     ["# h\n| x | y |\n| - | - |\n", "# h\n\n| x   | y   |\n| --- | --- |\n"],
-    ["x |\n-- |\n", "| x   |\n| --- |\n"],
     ["x | y\n-|-\nw | z\n", "| x   | y   |\n| --- | --- |\n| w   | z   |\n"],
     // The parser reads this as Obsidian does: text of the block quote.
     ["> a\n| x | y |\n| - | - |\n", "> a | x | y | | - | - |\n"],
@@ -3511,3 +3513,29 @@ describe("line endings", () => {
     expect(format(plain, { config, plugins: [join] }).output).toBe(`> Quoted text.${newline}`);
   });
 });
+
+it.each(["inline", "block", "document"] as const)(
+  "protects the opening HTML item's marker from a plugin's %s edit (#399)",
+  (phase) => {
+    const source = "+ <div> a\nlazy\n\n+ b\n";
+    const plugin: Plugin = {
+      name: "probe",
+      rules: {
+        marker: {
+          kind: "style",
+          phase,
+          description: "Change the first list marker",
+          check: () => [
+            { start: 0, message: "Change marker", edit: { start: 0, end: 1, text: "-" } },
+          ],
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "obsidian", rules: { "probe/marker": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toEqual([]);
+  },
+);

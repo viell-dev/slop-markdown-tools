@@ -58,9 +58,9 @@ const styleRules: Record<string, Rule> = {
         // marker, which holds an Obsidian callout's title.
         if (titles.some(([a, b]) => start >= a && start < b)) return;
         // Where its backticks do not pair, as on GitHub after an unpaired
-        // longer run, a backslash at the end of a line is a hard line break
+        // longer run, two spaces or a backslash at a line end make a hard break
         // (issue #335).
-        if (/\\(?:\r\n|\r|\n)/.test(source.slice(start, end))) return;
+        if (/(?: {2}|\\)(?:\r\n|\r|\n)/.test(source.slice(start, end))) return;
         if (document.dialect === "obsidian") {
           // Obsidian reads highlights and wikilinks only within a line. Once
           // the lines are one, an `==` or `[[` left as text could open one that

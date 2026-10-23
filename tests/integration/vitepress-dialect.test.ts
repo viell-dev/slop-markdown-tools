@@ -260,3 +260,34 @@ it("compares Vue whitespace, attributes, and container boundaries in its guard",
     expect.objectContaining({ rule: "engine/unsafe-format" }),
   );
 });
+
+it.each(["keep", "backslash"] as const)(
+  "keeps actual VitePress mixed-whitespace hard breaks with %s (#562)",
+  async (hardBreak) => {
+    const render = await renderer({});
+    const config: Config = {
+      extends: [],
+      dialect: "vitepress",
+      rules: { "style/trailing-space": ["warn", { hardBreak }] },
+    };
+    for (const [source, output] of [
+      ["a\t  \nb\n", "a\t  \nb\n"],
+      ["a\\\\\t  \nb\n", "a\\\\\t  \nb\n"],
+      ["> - a\t  \n>   b \n", "> - a\t  \n>   b\n"],
+      ["a\t  \nb\n===\n", "a\t  \nb\n===\n"],
+      ["a\t \nb\n", "a\nb\n"],
+      ["a\t  \n", "a\n"],
+    ]) {
+      const result = format(source!, { config, path: "page.md" });
+      expect(
+        result.diagnostics.filter(({ rule }) => rule.startsWith("engine/")),
+        source,
+      ).toEqual([]);
+      expect(result.output, source).toBe(output);
+      expect(format(result.output, { config }).output, source).toBe(output);
+      expect(await render(result.output), source).toBe(await render(source!));
+    }
+    // The two-space suffix requires a real native break, not source-text equality.
+    expect(await render("a\t  \nb\n")).not.toBe(await render("a\nb\n"));
+  },
+);

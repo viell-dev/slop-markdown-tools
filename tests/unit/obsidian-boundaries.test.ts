@@ -29,6 +29,393 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each([
+    "$x$\n---\n",
+    "$x$ $y$\n---\n",
+    "$x$%%note%%\n---\n",
+    "![cedar](cedar.png)\n---\n",
+    "![cedar][img]\n---\n\n[img]: cedar.png\n",
+    "![[cedar.png]]\n---\n",
+  ])(
+    "retains widget title source with isolated heading and whitespace rules (#383): %j",
+    (source) => {
+      for (const rule of ["style/heading", "style/trailing-space", "style/wrap"])
+        for (const newline of ["\n", "\r\n", "\r"])
+          for (const bom of ["", "\uFEFF"]) {
+            const input = bom + source.replaceAll("\n", newline);
+            expect(
+              checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+            ).toBe(input);
+          }
+    },
+  );
+
+  it.each([
+    "# $x$\n",
+    "## $x$ $y$\n",
+    "## $x$%%note%%\n",
+    "## ![cedar](cedar.png)\n",
+    "## ![[cedar.png]]\n",
+  ])("also retains ATX widget titles when Setext is requested (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/heading": ["warn", { style: "setext" }] },
+          }),
+        ).toBe(input);
+      }
+  });
+
+  it.each([
+    ["before $x$ after", "## before $x$ after\n"],
+    ["*$x$*", "## *$x$*\n"],
+    ["![cedar](cedar.png) after", "## ![cedar](cedar.png) after\n"],
+    ["`code`", "## `code`\n"],
+    ["[name](https://example.com)", "## [name](https://example.com)\n"],
+  ])("keeps native-safe heading conversion for %j (#383)", (text, expected) => {
+    expect(
+      checked(text + "\n---\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": "warn" },
+      }),
+    ).toBe(expected);
+  });
+
+  it("keeps a widget title while formatting a later independent paragraph (#383)", () => {
+    expect(checked("$x$\n---\n\nLater *safe*.\n")).toBe("$x$\n---\n\nLater _safe_.\n");
+    expect(checked("![cedar](cedar.png)\n---\n\nLater *safe*.\n")).toBe(
+      "![cedar](cedar.png)\n---\n\nLater _safe_.\n",
+    );
+  });
+
+  it.each([
+    ["Later *safe*.\n", "Later _safe_.\n"],
+    [
+      "| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+      "| a   | **b** |\n| :-- | ----: |\n| c   | d     |\n",
+    ],
+    ["+ *safe*\n", "- _safe_\n"],
+    ["### *safe* ###\n", "### _safe_\n"],
+  ])("formats the block directly after a widget heading (#383): %j", (later, expected) => {
+    for (const title of ["$x$", "![cedar](cedar.png)"])
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const source = `${title}\n---\n${later}`;
+          expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+            bom + `${title}\n---\n\n${expected}`.replaceAll("\n", newline),
+          );
+        }
+  });
+
+  it.each(["$x$\n--- \n", "$x$\n  ---\n", "$x$\nsecond\n===\n"])(
+    "keeps paragraph-state protection when a widget underline is also literal (#383): %j",
+    (title) => {
+      const source = title + "| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+      expect(misreadLists(parse(source, "obsidian")).underlines.size).toBeGreaterThan(0);
+      expect(checked(source)).toBe(source);
+    },
+  );
+
+  it("preserves one-column border combinations and their Reading continuation state (#568)", () => {
+    for (const headerLeading of [false, true])
+      for (const headerTrailing of [false, true])
+        for (const delimiterLeading of [false, true])
+          for (const delimiterTrailing of [false, true]) {
+            const prefix =
+              `${headerLeading ? "| " : ""}basket${headerTrailing ? " |" : ""}\n` +
+              `${delimiterLeading ? "| " : ""}--:${delimiterTrailing ? " |" : ""}\n` +
+              `${headerLeading ? "| " : ""}walnut${headerTrailing ? " |" : ""}\n`;
+            const later = "\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+            const source = prefix + later;
+            const readingTable =
+              headerTrailing && delimiterTrailing && headerLeading === delimiterLeading;
+            const liveTable = readingTable && headerLeading;
+            for (const newline of ["\n", "\r\n", "\r"])
+              for (const bom of ["", "\uFEFF"]) {
+                const input = bom + source.replaceAll("\n", newline);
+                const output = checked(input);
+                if (!readingTable) expect(output).toBe(input);
+                else {
+                  expect(output).toContain("**b**");
+                  if (!liveTable)
+                    expect(output.startsWith(bom + prefix.replaceAll("\n", newline))).toBe(true);
+                }
+              }
+          }
+  });
+
+  it.each(["style/table", "style/strong"])(
+    "keeps Live Preview one-column text with only %s (#568)",
+    (rule) => {
+      const source = "__basket__ |\n--: |\nwalnut |\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it("leaves ordinary bordered and multicolumn tables editable (#568)", () => {
+    expect(checked("| basket |\n| --: |\n| walnut |\n")).toBe(
+      "| basket |\n| -----: |\n| walnut |\n",
+    );
+    expect(checked("a | __b__\n-- | --\nc | d\n")).toContain("**b**");
+  });
+
+  it.each([
+    "~~~ lang `x`\nc\n~~~\n\n*outside*\n",
+    "* a\nb\n~~~ lang `x`\nc\n~~~\n\n*outside*\n",
+    "- ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n",
+    "> ~~~ lang `x`\n> c\n> ~~~\n\n*outside*\n",
+    "> ~~~ lang `x`\n> c\n> ~~~\n>\n> *outside*\n",
+    "  ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n",
+    "~~~~ lang `x`\nc\n~~~~~\n\n*outside*\n",
+    "~~~ lang \\`x\\`\nc\n~~~\n\n*outside*\n",
+    "~~~ lang `x`\nc\n~~~\n\n*inside*\n\n~~~\nraw\n~~~\n\n*after*\n",
+  ])("keeps later source after a primary closer opens Live Preview code (#567): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        const output = checked(input);
+        expect(output).toContain(source.includes("*outside*") ? "*outside*" : "*after*");
+        expect(output).not.toContain("_outside_");
+        expect(output).not.toContain("_inside_");
+        const document = parse(input, "obsidian");
+        expect(
+          [...misreadLists(document).openFences].some(
+            ({ position }) => position!.end.offset === document.source.length,
+          ),
+        ).toBe(true);
+      }
+  });
+
+  it("recognizes a final closed ignored-info fence without a later leaf (#567)", () => {
+    const document = parse("~~~ lang `x`\nc\n~~~\n", "obsidian");
+    expect(misreadLists(document).openFences.size).toBe(1);
+  });
+
+  it.each(["~~~ lang\nc\n~~~\n\n*outside*\n", "~~~ lang &#96;x&#96;\nc\n~~~\n\n*outside*\n"])(
+    "formats the tail of a genuine tilde fence (%j, #567)",
+    (source) => {
+      expect(checked(source)).toContain("_outside_");
+      expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0);
+    },
+  );
+
+  it.each(["~~~~ lang `x`\nc\n~~~\n", "~~~ lang `x`\nc\n    ~~~\n"])(
+    "does not mistake a body run for a closing fence (#567): %j",
+    (source) => expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0),
+  );
+
+  it.each([
+    "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    "basket\n--:\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+  ])("keeps Reading paragraph state after a one-column text table (#398): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+      }
+  });
+
+  it.each(["style/table", "style/strong"])(
+    "retains later literal table rows with only %s (#398)",
+    (rule) => {
+      const source = "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it.each([
+    "basket |\n--: |\nwalnut |\n\t\n",
+    "basket\n--:\nwalnut\n\n",
+    "basket\n--:\nwalnut\n  \n",
+    "basket\n--:\nwalnut\n\t\n# boundary\n\n",
+  ])("permits a later real table's inline preferences after %j (#398)", (prefix) => {
+    const source = prefix + "| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+    expect(
+      checked(source, { extends: [], dialect: "obsidian", rules: { "style/strong": "warn" } }),
+    ).toBe(source.replace("__b__", "**b**"));
+  });
+
+  it("keeps directly adjacent rows in the already protected one-column parse (#398)", () => {
+    const source = "basket\n--:\nwalnut\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+    expect(checked(source)).toBe(source);
+    expect(parse(source, "obsidian").tree.children.map(({ type }) => type)).toEqual(["table"]);
+  });
+
+  it.each([
+    ["before %%`a\n``` b`%%\n\nlater *outside*\n", true],
+    ["before %%`a\n``` b` c```%%\n\nlater *outside*\n", false],
+    ["before %%`a ``` b` c```%%\n\nlater *outside*\n", true],
+  ] as const)(
+    "carries long code after a short-code reset only while unclosed (#565): %j",
+    (source, carries) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(carries ? input : input.replace("*outside*", "_outside_"));
+          const document = parse(input, "obsidian");
+          const later = document.source.lastIndexOf("later");
+          expect(
+            [...misreadLists(document).unclosedCode].some(
+              ({ position }) => position!.start.offset! <= later && later < position!.end.offset!,
+            ),
+          ).toBe(carries);
+        }
+    },
+  );
+
+  it.each([
+    "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n",
+    "before *left* ![```a\nb```][img] and *right* __strong__ tail\n\n[img]: image.png\n",
+  ])(
+    "keeps a long-code image description boundary while surrounding inline text formats (#566): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(
+            checked(input, { extends: [], dialect: "obsidian", rules: { "style/wrap": "warn" } }),
+          ).toBe(input);
+        }
+    },
+  );
+
+  it("formats inline text around an unreflowed multiline code image (#566)", () => {
+    const source = "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n";
+    expect(checked(source)).toBe(
+      "before _left_ ![```a\nb```](image.png) and _right_ **strong** tail\n",
+    );
+    expect(format(source, { config: { extends: ["recommended", "github"] } }).output).toContain(
+      "![```a b```](image.png)",
+    );
+  });
+
+  it.each([
+    "style/wrap",
+    "style/inline-code",
+    "style/emphasis",
+    "style/strong",
+    "style/trailing-space",
+  ])("retains short multiline code and literal suffix with only %s (#565)", (rule) => {
+    const source = "before `a\t  \nb` and *right* __strong__ tail\n";
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { [rule]: "warn" },
+      }),
+    ).toBe(source);
+  });
+
+  it.each(["*before `a\nb` after* and __strong__\n", "[before `a\nb` after](u) and *right*\n"])(
+    "retains containing paired inline markup without partial edits (#565): %j",
+    (source) => expect(checked(source)).toBe(source),
+  );
+
+  it("permits safe prefix formatting and resumes after a blank paragraph (#565)", () => {
+    const source = "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n";
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(
+          input.replace("*left*", "_left_").replace("*outside*", "_outside_"),
+        );
+      }
+  });
+
+  it("bounds the short multiline-code protection to its first containing inline node (#565)", () => {
+    const source = "*left* and **before `a\nb` after** and *right*\n\nLater *outside*.\n";
+    const document = parse(source, "obsidian");
+    const regions = [...misreadLists(document).unclosedCode];
+    expect(
+      regions.map(({ position }) =>
+        document.source.slice(position!.start.offset, position!.end.offset),
+      ),
+    ).toEqual(["**before `a\nb` after** and *right*"]);
+    expect(checked(source)).toBe(
+      source.replace("*left*", "_left_").replace("*outside*", "_outside_"),
+    );
+  });
+
+  it("retains ordinary multiline-code joining in GitHub (#565)", () => {
+    expect(
+      format("before `a\nb` and *right*\n", { config: { extends: ["recommended", "github"] } })
+        .output,
+    ).toBe("before `a b` and _right_\n");
+  });
+
+  it("keeps a long code span's source hard-break marker while joining soft code (#335)", () => {
+    expect(checked("before ```a  \nb``` and *right*\n\nlater *outside*\n")).toBe(
+      "before ```a  \nb``` and _right_\n\nlater _outside_\n",
+    );
+    expect(checked("before ```a\nb``` and *right*\n\nlater *outside*\n")).toBe(
+      "before ```a b``` and _right_\n\nlater _outside_\n",
+    );
+  });
+
+  it.each([
+    "a\\ \n=== \n",
+    "a  \n=== \n",
+    "a\\ \n  ===\n",
+    "a  \n  ===\n",
+    "a\nb  \n===\n",
+    "a\nb\\ \n===\n",
+  ])("retains the terminal separator before a literal underline (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + source.replaceAll("\n", newline),
+        );
+  });
+
+  it("permits earlier inline formatting above a literal underline (#383)", () => {
+    expect(checked("*alpha* beta\\ \n=== \n")).toBe("_alpha_ beta\\ \n=== \n");
+  });
+
+  it("still cleans a proper Setext title's terminal separator (#383)", () => {
+    const settings: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/trailing-space": "warn" },
+    };
+    expect(checked("a\\ \n===\n", settings)).toBe("a\\\n===\n");
+    expect(checked("a  \n===\n", settings)).toBe("a\n===\n");
+  });
+
+  it.each(["+ - a\nb\n  1) c\n", "+ - a\nb\n  1) c\n     d\n", "- a\nb\n  1) c\n"])(
+    "retains lazy text and later blocks in the affected enclosing item (#376): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(input);
+          const document = parse(input, "obsidian");
+          const following = document.source.lastIndexOf("c");
+          expect(
+            [...misreadLists(document).lazyItems].some(
+              ({ position }) => position!.start.offset === 0 && position!.end.offset! > following,
+            ),
+          ).toBe(true);
+        }
+    },
+  );
+
+  it.each(["+ - a\n    b\n  1) c\n", "+ - a\nb\n", "+ - a\nb\n\n1) c\n"])(
+    "permits list reflow without a later affected enclosing block (#376): %j",
+    (source) => {
+      expect(misreadLists(parse(source, "obsidian")).lazyItems.size).toBe(0);
+      expect(checked(source)).not.toBe(source);
+    },
+  );
+
   it.each(
     boundaryFixtures.filter(
       ({ issue, name, preserve }) =>
@@ -784,8 +1171,10 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        !name.startsWith("HTML item coherence:") &&
         ![
+          "short reset exposes an unclosed long run in an inline comment",
           "joined footnote ending in span paragraph",
           "ordinary paragraph with indented HTML",
           "unindented HTML interrupts joined paragraph",
@@ -798,5 +1187,65 @@ describe("Obsidian boundaries read differently by its views", () => {
     expect(
       format("text *\\\n> + *words*\n", { config: { extends: ["recommended", "github"] } }).output,
     ).toContain("> - _words_");
+  });
+});
+
+describe("escaping HTML keeps its originating list markers coherent (#399, #428)", () => {
+  it("keeps an unclosed HTML tail literal and resumes after a real closer", () => {
+    expect(checked("+ <div> a\nlazy\n\n+ b\n\nLater *outside*.\n")).toContain("Later *outside*.");
+    expect(checked("+ <div> a\nlazy\n</div>\n\n+ b\n\nLater *outside*.\n")).toContain(
+      "Later _outside_.",
+    );
+    expect(checked("> + <div> a\n> lazy\n> </div>\n>\n> + b\n\nLater *outside*.\n")).toContain(
+      "Later _outside_.",
+    );
+  });
+  it.each([
+    ["- parent\n  + <div> a\n  lazy\n\n- b\n", "- parent\n  - <div> a\n  lazy\n\n- b\n"],
+    ["1. parent\n   1) <div> a\n   lazy\n\n2. b\n", "1. parent\n   1. <div> a\n   lazy\n\n2. b\n"],
+    [
+      "> - parent\n>   + <div> a\n>   lazy\n>\n> - b\n",
+      "> - parent\n>   - <div> a\n>   lazy\n>\n> - b\n",
+    ],
+  ])("permits the native-safe nested marker edit in %j (#399)", (source, expected) => {
+    expect(checked(source)).toBe(expected);
+  });
+  it.each([
+    "+ <div> a\nlazy\n\n+ b\n",
+    "+ <div> a\nlazy\n\n- b\n",
+    // Retaining the first marker is conservative when both bullets already differ.
+    "+ <div> a\nlazy\n\n* b\n",
+    "+ before\n+ <div> a\nlazy\n\n+ b\n",
+    "2) <div> a\nlazy\n\n3) b\n",
+    "2) <div> a\nlazy\n\n3. b\n",
+    "> + <div> a\n> lazy\n>\n> + b\n",
+    "- parent\n  + <div> a\n  lazy\n\n  + b\n",
+  ])("keeps %j coherent across newline and prefix offsets", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+      }
+  });
+
+  it.each([
+    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "- <div> a\nlazy\n</div>\n\n- b\n"],
+    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> - <div> a\n> lazy\n> </div>\n>\n> - b\n"],
+    ["+ *a*\nlazy\n\n+ b\n", "- _a_ lazy\n\n- b\n"],
+    ["+ *prefix* <div> a\nlazy\n\n+ b\n", "+ _prefix_ <div> a\nlazy\n\n+ b\n"],
+  ])("still permits safe edits to %j", (source, output) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + output.replaceAll("\n", newline),
+        );
+  });
+
+  it("leaves the existing other-dialect marker policy available", () => {
+    const source = "+ <div> a\nlazy\n\n+ b\n";
+    const output = format(source, {
+      config: { extends: [], dialect: "github", rules: { "style/list-marker": "warn" } },
+    }).output;
+    expect(output).toBe("- <div> a\nlazy\n\n- b\n");
   });
 });
