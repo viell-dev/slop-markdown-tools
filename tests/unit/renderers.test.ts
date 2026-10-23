@@ -165,8 +165,21 @@ describe.each(targets)("rendering by $renderer", (target) => {
     },
   );
 
-  it("still wraps outside a code span with mixed trailing whitespace (#562)", () => {
+  it("keeps a code span's possible mixed-whitespace hard break (#335, #562)", () => {
     const source = "before `a\t  \nb` and more plain words follow here\n";
+    const config: Config = {
+      extends: [],
+      dialect: target.config.dialect ?? "github",
+      rules: { "style/wrap": ["warn", { width: 20 }] },
+    };
+    const result = format(source, { config });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+    expect(result.output).toBe(source);
+    expect(normalizeHtml(target.render(result.output))).toBe(normalizeHtml(target.render(source)));
+  });
+
+  it("still wraps outside a code span with a Tab and one final space (#335, #562)", () => {
+    const source = "before `a\t \nb` and more plain words follow here\n";
     const config: Config = {
       extends: [],
       dialect: target.config.dialect ?? "github",

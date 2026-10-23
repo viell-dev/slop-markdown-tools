@@ -959,16 +959,22 @@ describe("style/inline-code", () => {
         github.map((text, i) => (other?.[i] ?? text) !== text),
       );
   });
-  it.each(observed)("joins the code spans of %j as GitHub shows them", (source, github) => {
+  it.each(observed)("preserves the observed code values when joining %j", (source, github) => {
     for (const dialect of dialects.filter((dialect) => dialect !== "vitepress")) {
       // CommonMark has no footnotes.
       if (dialect === "commonmark" && source.includes("[^")) continue;
       const output = formatted(source, only(rule, dialect));
       const spans = codeSpans(output, dialect);
       expect(spans.map(codeSpanText), dialect).toEqual(github);
+      // Native text can retain a hard break where the primary parser pairs
+      // these ticks (#335); joining conservatively keeps both marker forms.
+      const sourceBreak = codeSpans(source, dialect).some((span) =>
+        /(?: {2}|\\)(?:\r\n|\r|\n)/.test(source.slice(...range(span))),
+      );
       // Renderers differ on a lazy line's indentation: GitHub keeps it in the
       // span, and commonmark.js does not.
-      if (dialect === "github")
+      if (sourceBreak) expect(output).toBe(source);
+      else if (dialect === "github")
         expect(spans.every((span) => !/[\r\n]/.test(output.slice(...range(span))))).toBe(true);
       else if (codeSpans(source, dialect).some(lazyIndentation)) expect(output).toBe(source);
     }
