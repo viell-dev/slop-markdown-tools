@@ -280,8 +280,14 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
         (source[start] === "\r" || source[start] === "\n") &&
         source[start - 1] !== "\r" &&
         source[start - 1] !== "\n"
-      )
+      ) {
         boundaryStarts.add(start);
+        // A separator-only range ends immediately after its line break. Keep
+        // insertions there too, without freezing the following marker (#598).
+        const end = range(node)[1];
+        if (end - start <= 2 && /^(?:\r\n?|\n)$/.test(source.slice(start, end)))
+          boundaryStarts.add(end);
+      }
     }
   // Each distinct physical separator has one horizontal margin. These left
   // scans are disjoint, even when several readings protect the same break.

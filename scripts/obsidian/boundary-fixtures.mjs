@@ -1644,4 +1644,26 @@ export const boundaryFixtures = [
     source: ">\t*a*\n>\n>\n>\t*b*\n\nLater *safe*.\n",
     preserve: false,
   },
+  {
+    issue: 598,
+    name: "generated list continuation after a secondary paragraph",
+    source: readFileSync(
+      new URL(
+        "../../tests/fixtures/renderers/obsidian-secondary-list-3922240374.md",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    preserve: false,
+  },
+  ...[
+    ["secondary paragraph before numbered list", "* a\n\n    b\n9) c\n"],
+    ["secondary paragraph before one-start list", "* a\n\t\n    b\n1) c\n"],
+    ["secondary paragraph before bullet list", "* *a*\n\n  b\n+ c\n"],
+    ["indented code before numbered list", "* a\n\n      b\n9) c\n"],
+    ["Tab gap before final indented code", "* a\n\t\n      b\n9) c\n"],
+    ["first-paragraph spacing control", "* a\n    b\n9) c\n"],
+    ["closed-fence spacing control", "* a\n  ```\n  b\n  ```\n9) c\n"],
+    ["heading spacing control", "* # a\n9) c\n"],
+  ].map(([name, source]) => ({ issue: 598, name, source, preserve: false })),
 ];

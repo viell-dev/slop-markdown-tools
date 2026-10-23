@@ -28,6 +28,41 @@ function pluginOutput(source: string, edit: Edit, dialect: Dialect = "obsidian")
   return result.output;
 }
 
+describe.each(["\n", "\r\n", "\r"])(
+  "plugin secondary list separators with %j (#598)",
+  (newline) => {
+    it("keeps the following bullet marker editable", () => {
+      const source = `* a${newline}${newline}  b${newline}+ c${newline}`;
+      const start = source.lastIndexOf("+");
+      expect(pluginOutput(source, { start, end: start + 1, text: "-" })).toBe(
+        source.replace("+", "-"),
+      );
+    });
+    it.each(["* a\n\n    *b*\n9) c\n", "* a\n\n      b\n9) c\n"])(
+      "retains the separator and permits inline text in %j",
+      (input) => {
+        const source = input.replaceAll("\n", newline);
+        const at = source.indexOf(`${newline}9)`);
+        for (const point of [at, at + newline.length])
+          expect(pluginOutput(source, { start: point, end: point, text: newline })).toBe(source);
+        expect(
+          pluginOutput(source, {
+            start: 0,
+            end: source.length,
+            text: source.replace(`${newline}9)`, `${newline}${newline}9)`),
+          }),
+        ).toBe(source);
+        if (source.includes("*b*")) {
+          const start = source.indexOf("*b*");
+          expect(pluginOutput(source, { start, end: start + 3, text: "_b_" })).toBe(
+            source.replace("*b*", "_b_"),
+          );
+        }
+      },
+    );
+  },
+);
+
 describe.each(["\n", "\r\n", "\r"])("separator margins with %j (#590)", (newline) => {
   for (const quoted of [false, true])
     for (const margin of ["", " ", "  ", "\t"]) {

@@ -23,6 +23,40 @@ function checked(source: string, settings = config) {
   return result.output;
 }
 
+describe.each(["\n", "\r\n", "\r"])("secondary list block boundaries with %j (#598)", (newline) => {
+  it.each([
+    "* a\n\n    b\n9) c\n",
+    "* a\n\t\n    b\n1) c\n",
+    "* a\n\n  b\n+ c\n",
+    "* a\n\n      b\n9) c\n",
+    "* a\n\t\n      b\n9) c\n",
+    "2. a\n\n    b\n9) c\n",
+  ])("keeps the adjacent separator in %j", (input) => {
+    const source = input.replaceAll("\n", newline);
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/block-spacing": "warn" },
+      }),
+    ).toBe(source);
+  });
+
+  it.each(["* a\n    b\n9) c\n", "* a\n  ```\n  b\n  ```\n9) c\n", "* # a\n9) c\n"])(
+    "permits independent spacing in %j",
+    (input) => {
+      const source = input.replaceAll("\n", newline);
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/block-spacing": "warn" },
+        }),
+      ).not.toBe(source);
+    },
+  );
+});
+
 /** Minimal regressions also exercised in the real Obsidian fixture suite. */
 const boundaries = boundaryFixtures
   .filter(({ issue, preserve }) => preserve !== false && ![496, 497, 499, 508].includes(issue))

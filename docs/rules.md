@@ -792,6 +792,11 @@ or what a comment applies to:
   `%%` comment: adding a blank can split a native paragraph even when the parser
   reads a separate heading. Inline style edits below the comment remain
   available.
+- After 0.4.0, in the Obsidian dialect, a list immediately after a list's final
+  secondary paragraph or indented code block: a new blank splits Live Preview's
+  paragraph. Markers, numbering and inline styles remain eligible. A sole first
+  paragraph, final heading, closed fence or existing blank permits ordinary
+  spacing.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
   directly below it.
 - In the Obsidian dialect, a block identifier on a line of its own (`^id`)

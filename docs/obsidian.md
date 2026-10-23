@@ -350,6 +350,11 @@ latest installable release:
   list keeps its separator and both participating lists keep their markers and
   indentation, because changing them can alter list tightness or merge runs.
   Safe inline formatting in the following list still applies.
+- After 0.4.0, a list directly after another list's final secondary paragraph or
+  indented code block keeps its separator: a new blank splits text that Live
+  Preview groups together. Numbering, markers and inline styles remain eligible.
+  A sole first paragraph, final heading, closed fence or existing blank still
+  permits independent block spacing.
 - Top-level HTML continued across whitespace-only lines keeps literal quote
   markers and the source below them until a physically empty line, including
   empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading

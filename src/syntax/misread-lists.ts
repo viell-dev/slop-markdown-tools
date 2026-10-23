@@ -32,6 +32,24 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
  */
 export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
 
+/** An adjacent list that Live Preview groups with the preceding item's secondary block. */
+export function continuesListBlock(source: string, before: Nodes, after: Nodes): boolean {
+  if (
+    before.type !== "list" ||
+    after.type !== "list" ||
+    !before.position ||
+    !after.position ||
+    before.position.end.line !== after.position.start.line - 1
+  )
+    return false;
+  const blocks = before.children.at(-1)?.children;
+  const last = blocks?.at(-1);
+  return (
+    (last?.type === "paragraph" && blocks!.length > 1) ||
+    (last?.type === "code" && last.position !== undefined && !codeFence(source, last))
+  );
+}
+
 /** Widgets whose typography or placement can change between ATX and Setext in Live Preview. */
 export function obsidianWidgetHeading(source: string, heading: Heading): boolean {
   const only = heading.children.length === 1 ? heading.children[0] : undefined;
@@ -1282,6 +1300,10 @@ export function misreadLists(document: Document): MisreadLists {
           child.position &&
           previous.position.end.line === child.position.start.line - 1
         ) {
+          // A new blank splits Live Preview's paragraph after a secondary
+          // list paragraph or indented code. Keep only the separator (#598).
+          if (continuesListBlock(source, previous, child))
+            boundaryText.add(stretch(child, previous.position.end, child.position.start));
           // Reading keeps these adjacent blocks in the last item, including
           // after its heading or code. Protect the first separator against
           // plugin edits too, while retaining inline/cell formatting (#582, #586).

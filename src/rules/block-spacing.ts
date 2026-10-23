@@ -3,7 +3,7 @@ import type { Blockquote, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { continuesListBlock, misreadLists } from "../syntax/misread-lists.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { countBelow } from "../syntax/source.js";
@@ -48,6 +48,9 @@ function together(
   const [beforeStart, beforeEnd] = range(before);
   const [afterStart, afterEnd] = range(after);
   if (document.dialect === "obsidian") {
+    // A new blank after a secondary list paragraph or indented code splits
+    // text that Live Preview still groups with the following list (#598).
+    if (continuesListBlock(source, before, after)) return true;
     // Live Preview reads a tilde opener with a written backtick in its info
     // as paragraph text. A new blank would split the list continuation (#567).
     if (

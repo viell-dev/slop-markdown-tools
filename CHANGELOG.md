@@ -40,6 +40,10 @@ prereleases' notes there are longer than their entries here.
   between consecutive such blocks stay as literal code content too. Independent
   blocks and ordinary space-only quote margins still format
   ([#597](https://github.com/viell-dev/slop-markdown-tools/issues/597)).
+- Obsidian keeps the separator before a list directly following another list's
+  final secondary paragraph or indented code block, preserving Live Preview's
+  paragraph grouping while allowing safe inline and marker preferences
+  ([#598](https://github.com/viell-dev/slop-markdown-tools/issues/598)).
 - Obsidian preserves list markers and tightness across quote and table
   continuations, literal table rows after list code fences, adjacent Setext
   titles that Reading view still reads as paragraph text across Tab lines, and
