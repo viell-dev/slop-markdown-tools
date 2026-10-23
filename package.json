@@ -157,7 +157,7 @@
     "eslint": "10.13.0",
     "fast-check": "4.10.2",
     "hast-util-to-html": "9.0.5",
-    "markdown-it-mathjax3": "4.3.2",
+    "markdown-it-mathjax3": "5.2.0",
     "mdast-util-to-hast": "13.2.1",
     "npm-run-all2": "9.0.3",
     "prettier": "3.9.10",
