@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import ts from "typescript";
 import { beforeAll, expect, it } from "vitest";
-import { bundleParser } from "../../scripts/build-parser.mjs";
+import { assertPortableRegions, bundleParser } from "../../scripts/build-parser.mjs";
 import {
   repairParserSource,
   repairReviewedParserSource,
@@ -174,4 +174,50 @@ it("rebuilds reproducibly without touching dist", async () => {
   expect(again.licenses).toBe(bundle.licenses);
   expect(again.declaration).toBe(bundle.declaration);
   expect(again.manifest).toEqual(bundle.manifest);
+});
+
+it("checks emitted region provenance rather than arbitrary source substrings", () => {
+  const labels = new Set(
+    [...bundle.code.matchAll(/^\/\/#region ([^\r\n]+)$/gm)].map((match) => match[1]!),
+  );
+  // This checks the actual production-builder result. Existing graph assertions
+  // independently retain all 78 modules, 76 inputs, transforms and licenses.
+  expect(labels).toContain("\\0rolldown/runtime.js");
+  expect(labels).toContain("mdrefine:edit-map");
+  expect(() => assertPortableRegions(bundle.code, labels)).not.toThrow();
+  const relative = [...labels].find((label) => label.startsWith("node_modules/"))!;
+  expect(relative).toBeDefined();
+  for (const replacement of [
+    "/outside/index.js",
+    "C:/outside/index.js",
+    "C:outside/index.js",
+    "\\\\server\\share\\index.js",
+    "file:///outside/index.js",
+    "../outside/index.js",
+    "node_modules/a/../outside.js",
+    "node_modules/a//index.js",
+    "node_modules\\a\\index.js",
+    "node_modules/not-in-graph/index.js",
+    "mdrefine:unexpected",
+    "\\0rolldown/unreviewed.js",
+  ]) {
+    const changed = bundle.code.replaceAll(`//#region ${relative}\n`, `//#region ${replacement}\n`);
+    expect(changed, replacement).not.toBe(bundle.code);
+    expect(() => assertPortableRegions(changed, labels), replacement).toThrow(
+      /(?:Nonportable|Unexpected) parser region label/,
+    );
+  }
+  for (const marker of ["//#region", "//#region ", "//#regions unexpected"]) {
+    const changed = bundle.code.replaceAll(`//#region ${relative}`, marker);
+    expect(() => assertPortableRegions(changed, labels), marker).toThrow(
+      /(?:Malformed parser region header|Missing parser region label)/,
+    );
+  }
+  expect(() => assertPortableRegions("export {};\n", labels)).toThrow(
+    "Missing parser region headers",
+  );
+  // /code, /src and /build are also legitimate source fragments: no raw
+  // repository-root substring test may classify them as emitted physical paths.
+  const ordinary = `${bundle.code}\n// /code /src /build\nconst unrelated = "/micromark-util-edit-map/";\n`;
+  expect(() => assertPortableRegions(ordinary, labels)).not.toThrow();
 });

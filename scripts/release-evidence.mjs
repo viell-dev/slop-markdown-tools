@@ -12,6 +12,7 @@
 // Actions) with read access to checks.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { realpath } from "node:fs/promises";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { URL, fileURLToPath } from "node:url";
@@ -128,4 +129,15 @@ async function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+async function invokedAsMain() {
+  if (!process.argv[1]) return false;
+  const scriptPath = await realpath(fileURLToPath(import.meta.url));
+  try {
+    return (await realpath(process.argv[1])) === scriptPath;
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
+if (await invokedAsMain()) await main();

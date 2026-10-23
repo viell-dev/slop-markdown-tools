@@ -51,6 +51,41 @@ const provenance = {
 const hash = (text) => createHash("sha256").update(text).digest("hex");
 const slash = (filename) => filename.replaceAll("\\", "/");
 const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+const virtualRegions = new Map([
+  ["mdrefine:entry", "mdrefine:entry"],
+  ["mdrefine:edit-map", "mdrefine:edit-map"],
+  // Rolldown 1.2.14 emits this helper even when it is absent from chunk.modules.
+  ["\0rolldown/runtime.js", "\\0rolldown/runtime.js"],
+]);
+
+/**
+ * Check Rolldown's physical-path output channel against the reviewed graph.
+ * Source URLs, banners and ordinary string contents are not path provenance.
+ * @param {string} code
+ * @param {ReadonlySet<string>} graphLabels
+ */
+export function assertPortableRegions(code, graphLabels) {
+  let regions = 0;
+  for (const match of code.matchAll(/^\/\/#region([^\r\n]*)/gm)) {
+    assert(match[1].startsWith(" "), "Malformed parser region header");
+    const label = match[1].slice(1);
+    assert(label, "Missing parser region label");
+    if (![...virtualRegions.values()].includes(label)) {
+      assert(
+        !path.posix.isAbsolute(label) &&
+          !path.win32.isAbsolute(label) &&
+          !/^[a-z]:/i.test(label) &&
+          !label.includes("\\") &&
+          !label.includes(":") &&
+          label.split("/").every((part) => part && part !== "." && part !== ".."),
+        `Nonportable parser region label: ${label}`,
+      );
+    }
+    assert(graphLabels.has(label), `Unexpected parser region label: ${label}`);
+    regions++;
+  }
+  assert(regions, "Missing parser region headers");
+}
 
 /** @param {string} filename */
 async function packageForFile(filename) {
@@ -85,6 +120,7 @@ async function identifyInput(filename) {
   const root = await packageForFile(filename);
   const relative = slash(path.relative(root.directory, filename));
   assert(relative && !relative.startsWith("../") && !path.isAbsolute(relative));
+  assert(!relative.startsWith("dev/"), "Unexpected development parser input");
   return {
     root,
     input: {
@@ -127,7 +163,7 @@ async function readLicense(root) {
  * @param {{ repositoryRoot?: string }} [options]
  */
 export async function bundleParser(options = {}) {
-  const repositoryRoot = path.resolve(options.repositoryRoot ?? defaultRoot);
+  const repositoryRoot = await realpath(path.resolve(options.repositoryRoot ?? defaultRoot));
   const resolveFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
   const bundlerRoot = await packageForFile(resolveFromRoot.resolve("rolldown"));
   assert.equal(bundlerRoot.metadata.version, "1.2.14", "Review changed parser bundler");
@@ -232,14 +268,40 @@ export async function bundleParser(options = {}) {
 
     const modules = Object.keys(chunk.modules);
     assert(modules.includes("mdrefine:edit-map"));
-    assert(!modules.some((id) => slash(id).includes("/micromark-util-edit-map/")));
-    assert(!modules.some((id) => slash(id).includes("/dev/") || id.startsWith("node:")));
+
+    assert(!modules.some((id) => id.startsWith("node:")));
     assert.equal(modules.length, 78, "Review changed parser module graph");
+    const physicalModules = new Set(modules.filter((id) => path.isAbsolute(id)));
+    for (const id of modules) {
+      assert(
+        physicalModules.has(id) || virtualRegions.has(id),
+        `Unexpected parser virtual module: ${id}`,
+      );
+    }
+    const regionLabels = new Set(virtualRegions.values());
     const roots = new Map();
     /** @type {Map<string, { file: string, sha256: string }>} */
     const inputs = new Map();
-    for (const filename of [...modules.filter((id) => path.isAbsolute(id)), ...redirected.keys()]) {
-      const { root, input } = await identifyInput(filename);
+    for (const filename of [...physicalModules, ...redirected.keys()]) {
+      const canonical = await realpath(filename);
+      const relative = path.relative(repositoryRoot, canonical);
+      assert(
+        relative &&
+          relative !== ".." &&
+          !relative.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relative),
+        "Parser graph input resolves outside the repository root; install its dependencies inside the checkout",
+      );
+      const { root, input } = await identifyInput(canonical);
+      if (physicalModules.has(filename)) {
+        // Redirected EditMap remains a licensed source input, not an emitted module.
+        assert.notEqual(
+          root.metadata.name,
+          "micromark-util-edit-map",
+          "Unadapted EditMap remains in parser graph",
+        );
+        regionLabels.add(slash(relative));
+      }
       const previous = inputs.get(input.file);
       if (previous)
         assert.equal(previous.sha256, input.sha256, `Different sources share ${input.file}`);
@@ -262,7 +324,6 @@ export async function bundleParser(options = {}) {
         id: `${root.metadata.name}@${root.metadata.version}`,
         text: license.text,
       });
-      assert(!chunk.code.includes(root.directory) && !chunk.code.includes(slash(root.directory)));
     }
     packages.sort((a, b) => compare(a.name, b.name) || compare(a.version, b.version));
     const expectedPackages = JSON.parse(
@@ -271,7 +332,7 @@ export async function bundleParser(options = {}) {
     expectedPackages.sort((a, b) => compare(a.name, b.name) || compare(a.version, b.version));
     assert.deepEqual(packages, expectedPackages, "Review changed parser package/license graph");
     assert.equal(packages.length, 34);
-    assert(!chunk.code.includes(repositoryRoot) && !chunk.code.includes(slash(repositoryRoot)));
+    assertPortableRegions(chunk.code, regionLabels);
 
     const localSources = [];
     for (const [file, url] of [
@@ -408,10 +469,11 @@ export async function buildParser(options = {}) {
 
 async function invokedAsMain() {
   if (!process.argv[1]) return false;
+  const scriptPath = await realpath(fileURLToPath(import.meta.url));
   try {
-    return (await realpath(process.argv[1])) === (await realpath(fileURLToPath(import.meta.url)));
+    return (await realpath(process.argv[1])) === scriptPath;
   } catch (error) {
-    if (error.code === "ENOENT") return false;
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
     throw error;
   }
 }
