@@ -6,6 +6,33 @@ import { URL } from "node:url";
 export const boundaryFixtures = [
   ...[
     [
+      "one-column text table before a Tab and later table",
+      "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    ],
+    [
+      "header-only text table before a Tab and later table",
+      "basket\n--:\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    ],
+  ].map(([name, source]) => ({ issue: 398, name, source })),
+  {
+    issue: 398,
+    name: "full generated one-column paragraph-state regression",
+    source: readFileSync(new URL("./fixtures/398-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    [
+      "list continuation before a tilde opener with backticks in its info",
+      "* a\nb\n~~~ lang `x`\nc\n",
+    ],
+    ["single-line list before a tilde opener with backticks in its info", "* a\n~~~ lang `x`\nc\n"],
+    [
+      "full generated tilde-info adjacency regression",
+      readFileSync(new URL("./fixtures/567.txt", import.meta.url), "utf8"),
+    ],
+  ].map(([name, source]) => ({ issue: 567, name, source, preserve: false })),
+  ...[
+    [
       "short reset exposes an unclosed long run in an inline comment",
       "before %%`a\n``` b`%%\n\nlater *outside*\n",
     ],

@@ -690,8 +690,14 @@ export function misreadLists(document: Document): MisreadLists {
     let column: number | undefined;
     /** The end of a list or footnote definition that Reading view read as text, while inside it. */
     let joinedEnd = 0;
+    /** A one-column table that Reading view reads as paragraph text (#359, #398). */
+    const paragraphTable = (leaf: Nodes) =>
+      leaf.type === "table" &&
+      leaf.children[0]?.children.length === 1 &&
+      !/\|[ \t]*$/.test(lines[leaf.position!.start.line - 1]!);
     const paragraphLike = (leaf: Nodes) =>
       leaf.type === "paragraph" ||
+      paragraphTable(leaf) ||
       (leaf.type === "heading" &&
         leaf.depth === 1 &&
         leaf.position!.end.line >
@@ -1668,8 +1674,7 @@ export function misreadLists(document: Document): MisreadLists {
           let at = previous.position!.end.offset!;
           while (source[at - 1] === " " || source[at - 1] === "\t") at--;
           tableText.add(startingAt(leaf, at));
-        } else if (leaf.children[0]?.children.length === 1 && !/\|[ \t]*$/.test(rows[0]!))
-          tableText.add(startingAt(leaf, lineStart(start)));
+        } else if (paragraphTable(leaf)) tableText.add(startingAt(leaf, lineStart(start)));
         else {
           // Keep the physical row convention of the header. Either view ends
           // a bordered table before an unbordered row, or before a leading

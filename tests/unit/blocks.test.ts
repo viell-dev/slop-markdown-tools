@@ -984,6 +984,49 @@ describe("the block and whitespace rules together", () => {
   });
 });
 
+describe("Obsidian tilde info that continues a list paragraph (#567)", () => {
+  const config = only({ "style/block-spacing": "warn" }, "obsidian");
+  it.each([
+    "* a\nb\n~~~ lang `x`\nc\n",
+    "* a\n~~~ lang `x`\nc\n",
+    "* a\nb\n~~~ lang \\`x\\`\nc\n",
+    "* a\nb\n~~~ lang `x\nc\n",
+    "* a\nb\n ~~~ lang `x`\nc\n",
+    "1000. a\nb\n   ~~~ lang `x`\nc\n",
+    "> * a\n> b\n> ~~~ lang `x`\n> c\n",
+  ])("retains physical adjacency for %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(formatted(input, config)).toBe(input);
+        expect(format(input, { config: only({}, "obsidian") }).output).toBe(input);
+      }
+  });
+
+  it.each([
+    "* a\nb\n~~~ lang\nc\n",
+    "* a\nb\n~~~ lang &#96;x&#96;\nc\n",
+    "# heading\n~~~ lang `x`\nc\n",
+  ])("still separates real boundaries in %j", (source) => {
+    expect(formatted(source, config)).toBe(source.replace("\n~~~", "\n\n~~~"));
+  });
+
+  it("keeps an existing blank without creating another", () => {
+    const source = "* a\nb\n\n~~~ lang `x`\nc\n";
+    expect(formatted(source, config)).toBe(source);
+  });
+
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "retains ordinary block spacing in %s",
+    (dialect) => {
+      const source = "* a\nb\n~~~ lang `x`\nc\n";
+      expect(formatted(source, only({ "style/block-spacing": "warn" }, dialect))).toBe(
+        source.replace("\n~~~", "\n\n~~~"),
+      );
+    },
+  );
+});
+
 describe("literal backslashes before trailing blank space (#560)", () => {
   const configured = (dialect: Dialect, hardBreak: "keep" | "backslash") =>
     only({ "style/trailing-space": ["warn", { hardBreak }] }, dialect);

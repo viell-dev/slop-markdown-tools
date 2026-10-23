@@ -48,6 +48,18 @@ function together(
   const [beforeStart, beforeEnd] = range(before);
   const [afterStart, afterEnd] = range(after);
   if (document.dialect === "obsidian") {
+    // Live Preview reads a tilde opener with a written backtick in its info
+    // as paragraph text. A new blank would split the list continuation (#567).
+    if (
+      before.type === "list" &&
+      lastBlock(before).type === "paragraph" &&
+      after.type === "code" &&
+      before.position!.end.line === after.position!.start.line - 1 &&
+      /^~{3,}[^\r\n]*`/.test(
+        source.slice(afterStart, lineBounds(source, afterStart, afterStart)[1]),
+      )
+    )
+      return true;
     // Reading view keeps an adjacent, unindented quote in the last item,
     // although the parser ends the list before it (#437).
     if (before.type === "list" && after.type === "blockquote") return true;

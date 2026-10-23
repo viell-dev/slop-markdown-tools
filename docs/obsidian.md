@@ -197,16 +197,25 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A list's final paragraph stays adjacent to a tilde opener whose info contains
+  a written backtick. Live Preview keeps that source in the paragraph, so a new
+  blank would split its continuation. Marker preferences, indentation and safe
+  earlier wrapping remain available.
+- A one-column table whose header lacks a final pipe keeps Reading paragraph
+  state across a Tab-only continuation. Later literal rows retain their source.
+  A real table, an empty or space-only blank, or an interrupting heading still
+  allows subsequent table formatting.
 - An image description containing backticks stays split across its existing
   lines, where joining could turn displayed Live Preview source into an embed.
   Safe inline formatting before and after it remains available.
 - A code span with one or two backticks that crosses a physical newline keeps
   its source and the rest of its inline block. Live Preview ends short code at
   that newline, so the written closer can start code over later text. Earlier
-  text and later independent paragraphs still format; a paired multiline span
-  with three or more backticks keeps its ordinary formatting behavior. Short
-  spans in an inline comment or image description conservatively keep the whole
-  inline block.
+  independent inline markup and later independent paragraphs still format.
+  Wrapping leaves the paragraph holding that span unreflowed. A paired multiline
+  span with three or more backticks keeps its ordinary formatting behavior.
+  Short spans in an inline comment or image description conservatively keep the
+  whole inline block.
 - A lazy paragraph line also keeps later blocks in an enclosing list item when
   it crosses that item's content margin. Joining or indenting the line would
   otherwise change their nesting in Live Preview. Properly indented

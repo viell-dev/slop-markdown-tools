@@ -22,6 +22,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep a list paragraph adjacent to an Obsidian tilde opener whose info contains
+  backticks, preserving its Live Preview continuation while allowing safe list
+  formatting
+  ([#567](https://github.com/viell-dev/slop-markdown-tools/issues/567)).
+- Retain Reading paragraph state across Tab lines after a one-column table
+  displayed as text, preserving later literal rows while allowing genuine tables
+  to format
+  ([#398](https://github.com/viell-dev/slop-markdown-tools/issues/398)).
 - Keep the physical multiline image description containing backticks in Obsidian
   so wrapping cannot turn displayed source into an embed; safe surrounding
   inline text still formats

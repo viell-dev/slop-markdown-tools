@@ -30,6 +30,45 @@ const boundaries = boundaryFixtures
 
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
+    "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    "basket\n--:\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+  ])("keeps Reading paragraph state after a one-column text table (#398): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+      }
+  });
+
+  it.each(["style/table", "style/strong"])(
+    "retains later literal table rows with only %s (#398)",
+    (rule) => {
+      const source = "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it.each([
+    "basket |\n--: |\nwalnut |\n\t\n",
+    "basket\n--:\nwalnut\n\n",
+    "basket\n--:\nwalnut\n  \n",
+    "basket\n--:\nwalnut\n\t\n# boundary\n\n",
+  ])("permits a later real table's inline preferences after %j (#398)", (prefix) => {
+    const source = prefix + "| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+    expect(
+      checked(source, { extends: [], dialect: "obsidian", rules: { "style/strong": "warn" } }),
+    ).toBe(source.replace("__b__", "**b**"));
+  });
+
+  it("keeps directly adjacent rows in the already protected one-column parse (#398)", () => {
+    const source = "basket\n--:\nwalnut\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+    expect(checked(source)).toBe(source);
+    expect(parse(source, "obsidian").tree.children.map(({ type }) => type)).toEqual(["table"]);
+  });
+
+  it.each([
     ["before %%`a\n``` b`%%\n\nlater *outside*\n", true],
     ["before %%`a\n``` b` c```%%\n\nlater *outside*\n", false],
     ["before %%`a ``` b` c```%%\n\nlater *outside*\n", true],

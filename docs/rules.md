@@ -796,6 +796,12 @@ or what a comment applies to:
   definition, such as `> - [^1]:`. The parser would count the new line of `>` as
   part of the item and read the list as loose.
 
+After 0.4.0, an Obsidian list ending in a paragraph also stays adjacent to a
+parsed tilde opener whose info contains a written backtick. Live Preview reads
+it as paragraph continuation. List markers, padding and safe earlier reflow
+remain eligible; an existing blank and ordinary info strings keep their usual
+spacing behavior.
+
 ## `style/code-fence`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1448,8 +1454,11 @@ Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
 preceding backslash literal. The earlier paragraph text can still wrap. In every
 dialect, paragraphs with a Tab followed by two final spaces before continuing
 text also stay unreflowed: native renderers can read that separator as a hard
-break even when the primary parser reads a soft line ending. Code spans keep
-their own whitespace rules, so wrapping outside them remains available.
+break even when the primary parser reads a soft line ending. Whitespace inside
+code spans otherwise follows their own joining rules. In Obsidian, a short
+multiline code span keeps its whole paragraph unreflowed; see
+[`style/inline-code`](#styleinline-code). Earlier independent inline markup can
+still format.
 
 After 0.4.0, Obsidian also leaves a multiline image description containing
 backticks unreflowed, where joining could turn displayed Live Preview source
