@@ -46,6 +46,7 @@ it("ships the reviewed complete graph and exact correction counts", () => {
     "fromMarkdown",
     "gfm",
     "gfmAutolinkLiteral",
+    "gfmFootnote",
     "gfmStrikethrough",
   ]);
   expect(bundle.manifest.transformCounts).toEqual({
@@ -54,6 +55,8 @@ it("ships the reviewed complete graph and exact correction counts", () => {
     cjk: 1,
     code: 1,
     footnote: 1,
+    footnoteSyntax: 1,
+    labelEnd: 1,
     strike: 1,
     text: 1,
   });
@@ -64,6 +67,8 @@ it("ships the reviewed complete graph and exact correction counts", () => {
     "code",
     "editMap",
     "footnote",
+    "footnoteSyntax",
+    "labelEnd",
     "strike",
     "text",
   ]);
@@ -100,6 +105,21 @@ it("ships the reviewed complete graph and exact correction counts", () => {
   expect(hash(bundle.code)).toBe(bundle.manifest.runtimeSha256);
   expect(hash(bundle.declaration)).toBe(bundle.manifest.declarationSha256);
   expect(hash(bundle.licenses)).toBe(bundle.manifest.licensesSha256);
+});
+
+it("binds the exact five local parser generator sources", async () => {
+  expect(bundle.manifest.localSources.map(({ file }) => file)).toEqual([
+    "scripts/build-parser.mjs",
+    "scripts/parser-patches.mjs",
+    "scripts/parser-labels.mjs",
+    "scripts/parser-packages.json",
+    "src/syntax/parser.generated.d.ts",
+  ]);
+  for (const { file, sha256 } of bundle.manifest.localSources) {
+    if (typeof file !== "string") throw new Error("Non-string local parser source");
+    const bytes = await readFile(new URL(`../../${file}`, import.meta.url));
+    expect(createHash("sha256").update(bytes).digest("hex"), file).toBe(sha256);
+  }
 });
 
 it("packs every complete reviewed license text, rather than headers or SPDX labels", async () => {

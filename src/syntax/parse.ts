@@ -3,6 +3,7 @@ import {
   fromMarkdown,
   gfm,
   gfmAutolinkLiteral,
+  gfmFootnote,
   gfmStrikethrough,
 } from "./parser.generated.js";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
@@ -20,7 +21,6 @@ import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 import type { VitePressOptions } from "../core/types.js";
 import { gfmTable } from "micromark-extension-gfm-table";
 import { gfmTaskListItem } from "micromark-extension-gfm-task-list-item";
-import { gfmFootnote } from "micromark-extension-gfm-footnote";
 import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
 import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import { gfmTaskListItemFromMarkdown } from "mdast-util-gfm-task-list-item";
@@ -329,11 +329,38 @@ export function parse(
   const tree = (withFrontMatter: boolean, withMath = true): Root => {
     const codeSpans = codeSpanRecording();
     const extensions = [codeSpans.syntax];
-    // Syntax plugins can observe intermediate inline events. Retain the original
-    // attention/strike/CJK resolvers for each such parse, including alternate
-    // readings made later. Other parser corrections remain enabled.
-    if (plugins.some((plugin) => plugin.syntax !== undefined))
+    // External syntax may observe/mutate inline history. Keep its existing
+    // attention/strike/CJK fallback and original nonempty label lookup/scan.
+    if (plugins.some((plugin) => plugin.syntax !== undefined)) {
       extensions.push({ disable: { null: ["mdrefineDeferredInline"] } });
+    } else {
+      // #94 trusted-label proof obligations, shared by ALL lazy readings:
+      // (a) Core IDs come only from factoryLabel: bare '[' is rejected and
+      // normalization cannot remove/introduce '[', ']' or backslashes.
+      // factoryLabel escapes only those three characters, so an ID's '['
+      // has an odd preceding backslash run; case mapping creates none of them.
+      // (b) Only the stock footnote-definition writer makes footnote IDs;
+      // these contain no whitespace or unescaped '['/']'.
+      // (c) characterEscape stays enabled in every trusted grammar.
+      // (d) No trusted text construct ends in a backslash immediately before
+      // a label '[' or attempted ']' while a label is open. Literal autolinks
+      // are refused inside it; this depends on #542 having no false negatives.
+      // Hard-break escapes end at a line ending; code/math/HTML/references and
+      // Obsidian literals end on other characters.
+      // (e) Events append, roll back, resolve within a code/math construct, or
+      // replace a label/footnote suffix and end with a new barrier. Retained
+      // prefixes never gain/retype a barrier; resolveAll runs later. This is
+      // what makes positive AND negative prefix caches safe, not guards alone.
+      // Obsidian has no resolvers and CJK only resolveAll; label/footnote
+      // suffix replacement starts at labelLink/labelImage and ends at the new
+      // link/image/gfmFootnoteCall barrier. resolveAllLabelEnd runs last.
+      // New constructs/resolvers/disable entries/definition writers require
+      // re-proving these properties or keeping that grammar off this marker.
+      // Empty-dictionary shortcuts need none of (a)-(e) and run on both paths.
+      extensions.push({
+        disable: { null: ["mdrefineBuiltinLabels", "mdrefineHomogeneousAttention"] },
+      });
+    }
     const mdastExtensions = [labelEndTree, codeSpans.tree];
     if (withFrontMatter && read !== "vitepress") {
       extensions.unshift(frontmatter(["yaml", "toml"]));

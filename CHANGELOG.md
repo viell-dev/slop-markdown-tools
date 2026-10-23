@@ -22,6 +22,16 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Builtin parsers avoid repeated nested-label lookups and batch eligible pairs
+  of long emphasis runs. Obsidian also avoids rescanning the same unfinished
+  wikilink or embed suffix
+  ([#94](https://github.com/viell-dev/slop-markdown-tools/issues/94),
+  [#577](https://github.com/viell-dev/slop-markdown-tools/issues/577)).
+- Focused Obsidian captures record the observed app and renderer versions
+  separately from the requested version, with hashes binding completed evidence
+  to its input and harness
+  ([#580](https://github.com/viell-dev/slop-markdown-tools/issues/580)).
+
 - Release-evidence validation runs through linked checkout paths, and the parser
   builder rejects dependencies resolved outside its checkout consistently across
   platforms while accepting valid checkout directory names

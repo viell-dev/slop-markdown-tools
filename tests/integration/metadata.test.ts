@@ -147,6 +147,7 @@ describe("renderer checks", () => {
     for (const file of [
       "scripts/build-parser.mjs",
       "scripts/parser-patches.mjs",
+      "scripts/parser-labels.mjs",
       "scripts/parser-packages.json",
     ])
       expect(rendering).toContain(file);

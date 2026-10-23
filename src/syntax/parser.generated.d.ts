@@ -2,5 +2,6 @@
 export { fromMarkdown } from "mdast-util-from-markdown";
 export { gfm } from "micromark-extension-gfm";
 export { gfmAutolinkLiteral } from "micromark-extension-gfm-autolink-literal";
+export { gfmFootnote } from "micromark-extension-gfm-footnote";
 export { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 export { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";

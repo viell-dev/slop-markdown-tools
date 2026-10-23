@@ -21,6 +21,7 @@ const expectedExports = [
   "fromMarkdown",
   "gfm",
   "gfmAutolinkLiteral",
+  "gfmFootnote",
   "gfmStrikethrough",
 ];
 const expectedImporters = [
@@ -31,21 +32,26 @@ const expectedImporters = [
 const entrySource = `export { fromMarkdown } from "mdast-util-from-markdown";
 export { gfm } from "micromark-extension-gfm";
 export { gfmAutolinkLiteral } from "micromark-extension-gfm-autolink-literal";
+export { gfmFootnote } from "micromark-extension-gfm-footnote";
 export { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 export { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 `;
 const provenance = {
+  labelEnd:
+    "mdrefine#94: trusted nested-label impossibility proof; empty dictionaries skip serialization on every path",
+  footnoteSyntax:
+    "mdrefine#94: trusted nearest-barrier prefix cache and earlier-closer proof; original nonempty tokenizer for external syntax",
   editMap: "micromark/micromark#249: retain the untouched event prefix",
   footnote: "mdrefine#280: include GFM footnote indentation in list-tail scanning",
-  text: "micromark/micromark#233 and #238: compact adjacent data events",
+  text: "micromark/micromark#233 and #238: compact adjacent data events; register the audited no-extra resolver identity",
   code: "micromark/micromark#238: compact code-span data without changing padding",
   attention:
-    "micromark/micromark#239 walked prefix; local exact-state opener groups and original-resolver compatibility",
+    "micromark/micromark#239 walked prefix; local exact-state opener groups, no-closer cleanup and builtin two-run batching; original-resolver compatibility",
   autolink:
     "micromark-extension-gfm-autolink-literal#14: guard cached jumps by index, token identity, label type and current unbalanced state before jumping; keep the positive cache private in a WeakMap",
   strike:
-    "local walked-prefix and equal-length opener groups; retain original-resolver compatibility",
-  cjk: "retain CJK tokenization and original resolver; share the local fast attention resolver",
+    "local walked-prefix, equal-length opener groups and no-closer cleanup; register the audited resolver identity and retain original-resolver compatibility",
+  cjk: "retain CJK tokenization and original resolver; share the local fast attention resolver and register the audited method identity",
 };
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
@@ -172,6 +178,7 @@ export async function bundleParser(options = {}) {
     "mdast-util-from-markdown",
     "micromark-extension-gfm",
     "micromark-extension-gfm-autolink-literal",
+    "micromark-extension-gfm-footnote",
     "micromark-extension-gfm-strikethrough",
     "micromark-extension-cjk-friendly",
   ]) {
@@ -259,11 +266,13 @@ export async function bundleParser(options = {}) {
       cjk: 1,
       code: 1,
       footnote: 1,
+      footnoteSyntax: 1,
+      labelEnd: 1,
       strike: 1,
       text: 1,
     });
     assert.equal(redirected.size, 1);
-    assert.equal(transformed.size, 7);
+    assert.equal(transformed.size, 9);
     assert.deepEqual(editMapImporters.sort(compare), expectedImporters);
 
     const modules = Object.keys(chunk.modules);
@@ -338,6 +347,7 @@ export async function bundleParser(options = {}) {
     for (const [file, url] of [
       ["scripts/build-parser.mjs", new URL(import.meta.url)],
       ["scripts/parser-patches.mjs", new URL("parser-patches.mjs", import.meta.url)],
+      ["scripts/parser-labels.mjs", new URL("parser-labels.mjs", import.meta.url)],
       ["scripts/parser-packages.json", new URL("parser-packages.json", import.meta.url)],
       [
         "src/syntax/parser.generated.d.ts",

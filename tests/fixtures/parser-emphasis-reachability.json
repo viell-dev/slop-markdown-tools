@@ -1,0 +1,301 @@
+{
+  "expansion": {
+    "run": "marker repeated openingWidth times",
+    "endRun": "same marker repeated closingWidth times",
+    "markers": [
+      "*",
+      "_"
+    ],
+    "defaultWidths": [
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        5,
+        8
+      ]
+    ],
+    "profiles": [
+      "commonmark",
+      "github",
+      "obsidian",
+      "vitepress"
+    ]
+  },
+  "requiredPositiveBoundaryTemplates": [
+    {
+      "name": "exact measured EOF",
+      "source": "{run}a{endRun}"
+    },
+    {
+      "name": "closer before LF",
+      "source": "{run}alpha{endRun}\n"
+    },
+    {
+      "name": "closer before CR",
+      "source": "{run}alpha{endRun}\r"
+    },
+    {
+      "name": "closer before CRLF",
+      "source": "{run}alpha{endRun}\r\n"
+    },
+    {
+      "name": "closer before tab",
+      "source": "{run}alpha{endRun}\t"
+    },
+    {
+      "name": "opener before numeric NUL chunk",
+      "source": "{run}\u0000alpha{endRun}"
+    },
+    {
+      "name": "closer after numeric NUL chunk",
+      "source": "{run}alpha\u0000{endRun}"
+    },
+    {
+      "name": "heading end",
+      "source": "# {run}alpha{endRun}\n"
+    },
+    {
+      "name": "header cell end",
+      "source": "|{run}alpha{endRun}|\n|---|\n",
+      "profiles": [
+        "github",
+        "obsidian",
+        "vitepress"
+      ]
+    },
+    {
+      "name": "body cell end",
+      "source": "|header|\n|---|\n|{run}alpha{endRun}|\n",
+      "profiles": [
+        "github",
+        "obsidian",
+        "vitepress"
+      ]
+    },
+    {
+      "name": "midline",
+      "source": "before {run}alpha{endRun} after\n"
+    },
+    {
+      "name": "quoted line end",
+      "source": "> {run}alpha{endRun}\n"
+    },
+    {
+      "name": "list line end",
+      "source": "- {run}alpha{endRun}\n"
+    },
+    {
+      "name": "multiline interior",
+      "source": "{run}alpha\nbeta{endRun}\n"
+    },
+    {
+      "name": "nonASCII interior",
+      "source": "{run}é漢字😀{endRun}\n"
+    },
+    {
+      "name": "completed code interior",
+      "source": "{run}alpha `beta gamma` omega{endRun}\n"
+    },
+    {
+      "name": "completed link interior",
+      "source": "{run}alpha [beta](https://example.invalid) omega{endRun}\n"
+    },
+    {
+      "name": "completed image interior",
+      "source": "{run}alpha ![beta](image.png) omega{endRun}\n"
+    },
+    {
+      "name": "entity escape interior",
+      "source": "{run}alpha &amp; beta \\! gamma{endRun}\n"
+    }
+  ],
+  "neighborTemplates": [
+    {
+      "name": "intraword equal stars",
+      "source": "a{run}b{endRun}c",
+      "markers": [
+        "*"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          16,
+          16
+        ]
+      ],
+      "expectHit": true
+    },
+    {
+      "name": "two-way initial rule3 block",
+      "source": "a{run}b{endRun}c",
+      "markers": [
+        "*"
+      ],
+      "widths": [
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ]
+      ],
+      "expectHit": false
+    },
+    {
+      "name": "two-way later rule3 block",
+      "source": "a{run}b{endRun}c",
+      "markers": [
+        "*"
+      ],
+      "widths": [
+        [
+          5,
+          6
+        ]
+      ],
+      "expectHit": true
+    },
+    {
+      "name": "intraword underscores are not a pair",
+      "source": "a{run}b{endRun}c",
+      "markers": [
+        "_"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "expectHit": false
+    },
+    {
+      "name": "star closer before NUL is closing",
+      "source": "{run}alpha{endRun}\u0000",
+      "markers": [
+        "*"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "expectHit": true
+    },
+    {
+      "name": "underscore closer before NUL is closing",
+      "source": "{run}alpha{endRun}\u0000",
+      "markers": [
+        "_"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "expectHit": true
+    },
+    {
+      "name": "below batch threshold",
+      "source": "{run}alpha{endRun}",
+      "widths": [
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "expectHit": false
+    },
+    {
+      "name": "different raw markers",
+      "source": "****alpha____",
+      "expectHit": false
+    },
+    {
+      "name": "third raw marker",
+      "source": "****alpha *beta* gamma****",
+      "expectHit": false
+    },
+    {
+      "name": "underscore closer before ASCII word is not closing",
+      "source": "{run}alpha{endRun}z",
+      "markers": [
+        "_"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "expectHit": false
+    },
+    {
+      "name": "star closer before ASCII word is two-way",
+      "source": "{run}alpha{endRun}z",
+      "markers": [
+        "*"
+      ],
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ]
+      ],
+      "expectHit": true
+    }
+  ]
+}

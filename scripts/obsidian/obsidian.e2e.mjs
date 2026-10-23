@@ -3,6 +3,7 @@
 // scripts/obsidian-check.mjs starts, with the repository mounted read-only at /repo, and writes
 // its report to /out. SEED repeats a run's generated documents, COUNT sets how many there are.
 import console from "node:console";
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { browser, expect } from "@wdio/globals";
@@ -1018,6 +1019,32 @@ describe("Obsidian before and after formatting", function () {
 
   it("shows the documents to probe", async function () {
     if (!probe) this.skip();
+    // Observe the running renderer, rather than copying a requested version
+    // into a proof. executeObsidian already provides this real require bridge
+    // to shown(), and the ordinary comparison reads the same apiVersion.
+    const environment = await browser.executeObsidian(({ obsidian, require }) => {
+      const versions = require("node:process").versions;
+      return {
+        obsidian: obsidian.apiVersion,
+        chrome: versions.chrome ?? null,
+        electron: versions.electron ?? null,
+      };
+    });
+    const digest = (value) => createHash("sha256").update(value).digest("hex");
+    const metadata = {
+      schemaVersion: 1,
+      requestedObsidian: process.env.OBSIDIAN_VERSION || "latest",
+      observedObsidian: environment.obsidian,
+      browser: {
+        chrome: environment.chrome,
+        electron: environment.electron,
+      },
+      probeCount: probe.length,
+      sourcePacketSha256: digest(process.env.PROBE),
+      harnessSha256: digest(readFileSync("/check/obsidian.e2e.mjs")),
+      captureSha256: null,
+    };
+    writeFileSync("/out/probe-metadata.json", `${JSON.stringify(metadata, null, 2)}\n`);
     const shownProbes = [];
     for (const [index, source] of probe.entries()) {
       const path = `probes/${index}.md`;
@@ -1035,6 +1062,8 @@ describe("Obsidian before and after formatting", function () {
       );
     }
     writeFileSync("/out/probes.json", `${JSON.stringify(shownProbes, null, 2)}\n`);
+    metadata.captureSha256 = digest(readFileSync("/out/probes.json"));
+    writeFileSync("/out/probe-metadata.json", `${JSON.stringify(metadata, null, 2)}\n`);
   });
 
   it("reduces documents to the lines that show the difference", async function () {

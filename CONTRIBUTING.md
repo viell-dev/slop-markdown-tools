@@ -103,7 +103,7 @@ development, install the parser dependencies inside the checkout; a linked or
 external package store outside that root is rejected. The build tool itself may
 be shared. Checkout directory names are independent of parser package identity.
 
-`scripts/parser-patches.mjs` pins the eight corrected source modules by package,
+`scripts/parser-patches.mjs` pins the ten corrected source modules by package,
 version and SHA-256, with exact source anchors. The builder also checks the
 neutral import/default bundle graph, portable emitted module-region paths, all
 three EditMap redirects and the 34-package license graph in
@@ -119,6 +119,23 @@ EditMap, text/code compaction, footnote-position and autolink repairs. The
 marker is created in the shared tree factory so primary, projected, alternate
 and lazy front-matter readings use the same policy. Rule-only plugins keep the
 optimized resolvers. Preserve both paths when changing the adapter.
+
+Nested-label proofs and footnote-prefix caches are a separate builtin opt-in.
+Any external syntax retains the original nonempty reference lookup and
+potential-footnote tokenizer; empty dictionaries may shortcut on either path.
+The shared factory also selects that policy for lazy plain/GitHub readings. Both
+GFM and VitePress obtain their footnote factory from the generated adapter.
+Before adding a builtin text construct, resolver, disable entry or definition
+writer, re-prove the documented label invariants or leave that grammar off the
+trusted-label marker. Destination cache guards alone do not establish them.
+
+The shared factory also opts builtin grammars into batching a single pair of
+homogeneous emphasis runs. The adapter verifies the actual source, event
+boundaries and registered resolver identities before batching. Unknown or
+reordered pipelines retain the existing matcher. Empty and nonclosing runs avoid
+its scratch arrays. Mixed and multiple raw pairs can still copy their interiors
+repeatedly; external syntax keeps the original resolver and its cost. Recheck
+these predicates when changing a builtin resolver or construct.
 
 The VitePress reading uses markdown-it 14.3.3 with the same plugin generation as
 the pinned VitePress 2 reference, including its parser security fixes. Its
@@ -253,6 +270,11 @@ by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
 report and the screenshots. It fails when the check compared nothing. Every
 week, and in the Release workflow, it runs the fixtures alone (`COUNT=0`).
 
+Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
+the actual app and renderer versions separately from the requested version, with
+hashes of the input, harness and completed capture. Interrupted captures retain
+a null capture hash.
+
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
 machine's user and system Git settings, which would change what Git ignores. A
@@ -336,14 +358,19 @@ all four.
   documents format differently.
 - **The bundled parser preserves the pinned modules' readings, apart from its
   listed corrections.** `parser-inline`, `parser-autolink`, `parser-identity`,
-  `parser-generated`, `parser-build`, and `parser-work` check complete
-  positioned trees, observer compatibility, token identity, source guards,
-  provenance and deterministic work. `parser-writer.test.ts` checks actual
-  output, concurrent builders, unchanged timestamps and recovery. Every pull
-  request. These checks do not prove native-host behavior or compatibility with
-  arbitrary event-history rewrites by external extensions. Deeply nested
-  wrappers still copy their interiors; syntax plugins retain the original
-  attention/strike resolvers and their cost. The [dependency
+  `parser-labels`, `parser-emphasis-identity`, `parser-generated`,
+  `parser-build`, and `parser-work` check complete positioned trees, observer
+  compatibility, token identity, source guards, provenance and deterministic
+  work. `parser-writer.test.ts` checks actual output, concurrent builders,
+  unchanged timestamps and recovery. Every pull request.
+  `parser-emphasis-production` checks actual compiled-product batch calls in an
+  isolated V8 coverage session, including lazy readings and four
+  missing-registration mutants. `obsidian-openers` bounds failed literal-suffix
+  scans; `obsidian-probe-metadata` checks complete and interrupted capture
+  bookkeeping. These checks do not prove native-host behavior or compatibility
+  with arbitrary event-history rewrites by external extensions. Mixed and
+  multiple raw emphasis pairs can still copy their interiors; syntax plugins
+  retain the original attention/strike resolvers and their cost. The [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) lists
   the corrections and remaining limits.
 - **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
@@ -380,22 +407,23 @@ all four.
 The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
 `src/syntax/`, `src/index.ts`, `package.json`, the lockfile,
 `scripts/build-parser.mjs`, `scripts/parser-patches.mjs`,
-`scripts/parser-packages.json`, `scripts/rendering.mjs`, and each check's own
-files, as the `pull_request` paths of `rendering.yml` and `obsidian.yml` list
-them. Link the runs in the pull request. Run the checks by hand on a branch
-whose change could alter what a renderer shows from another path. A difference
-fails the check; investigate it and record it in an issue rather than running
-the check again until it passes. While confirmed differences are open, runs with
-random documents can fail on them again: reduce the run's documents, with
-`REDUCE` for the Obsidian check, and compare them with the open issues before
-filing another. The fix of such a difference adds its reduced document to
-`scripts/obsidian/fixtures.mjs` or a unit test, so the fixed documents that
-releases compare grow from what the random ones find. A fixed document that
-shows a difference blocks releases until it is fixed or, in the Rendering check,
-listed with its issue; the Obsidian fixtures have no such list, because each
-records a defect that was fixed. When a new Obsidian release makes a fixture
-differ, as the weekly run is there to find, that is a new defect: the tool
-adapts to the release's reading, with an issue, before the next release.
+`scripts/parser-labels.mjs`, `scripts/parser-packages.json`,
+`scripts/rendering.mjs`, and each check's own files, as the `pull_request` paths
+of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
+request. Run the checks by hand on a branch whose change could alter what a
+renderer shows from another path. A difference fails the check; investigate it
+and record it in an issue rather than running the check again until it passes.
+While confirmed differences are open, runs with random documents can fail on
+them again: reduce the run's documents, with `REDUCE` for the Obsidian check,
+and compare them with the open issues before filing another. The fix of such a
+difference adds its reduced document to `scripts/obsidian/fixtures.mjs` or a
+unit test, so the fixed documents that releases compare grow from what the
+random ones find. A fixed document that shows a difference blocks releases until
+it is fixed or, in the Rendering check, listed with its issue; the Obsidian
+fixtures have no such list, because each records a defect that was fixed. When a
+new Obsidian release makes a fixture differ, as the weekly run is there to find,
+that is a new defect: the tool adapts to the release's reading, with an issue,
+before the next release.
 
 ## Benchmarks
 

@@ -22,6 +22,7 @@ on:
       - package-lock.json
       - scripts/build-parser.mjs
       - scripts/parser-patches.mjs
+      - scripts/parser-labels.mjs
       - scripts/parser-packages.json
       - scripts/rendering.mjs
       - scripts/github-rendering.mjs
