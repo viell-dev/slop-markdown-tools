@@ -436,16 +436,19 @@ describe("GitHub source-verified code normalization (#515)", () => {
       finalLineValue.replace("needle", "missing"),
       finalLineValue.replaceAll("\n", "\n\n"),
     ]) {
-      expect(normalize(finalLineHighlight(body), source)).not.toBe(canonical);
+      expect(normalize(finalLineHighlight(body + "\n"), source)).not.toBe(canonical);
     }
     const leading = "\n" + value;
-    expect(normalize(finalLineHighlight(finalLineValue), finalLineSource(leading))).not.toBe(
+    expect(normalize(finalLineHighlight(finalLineValue + "\n"), finalLineSource(leading))).not.toBe(
       normalize(finalLinePlain(leading + "\n"), finalLineSource(leading)),
     );
     for (const spaces of ["  ", "\t", " \t  "]) {
       const whitespaceLine = finalLineValue + "\n" + spaces + "\n\n";
       const whitespaceSource = finalLineSource(whitespaceLine);
       expect(normalize(finalLineHighlight(finalLineValue), whitespaceSource)).not.toBe(
+        normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
+      );
+      expect(normalize(finalLineHighlight(finalLineValue + "\n\n"), whitespaceSource)).not.toBe(
         normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
       );
       // Only the observed single-LF omission retains eligibility here.

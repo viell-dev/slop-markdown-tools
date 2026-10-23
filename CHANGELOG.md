@@ -22,6 +22,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian keeps the boundary after standalone comments so that heading/list
+  spacing cannot split a native paragraph. Following inline style edits remain
+  available
+  ([#357](https://github.com/viell-dev/slop-markdown-tools/issues/357)).
+- Setext titles directly after standalone Obsidian comments keep their
+  underlines where conversion would turn Reading-view paragraph text into a
+  heading ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
 - Obsidian preserves list markers and tightness across quote and table
   continuations, literal table rows after list code fences, adjacent Setext
   titles that Reading view still reads as paragraph text across Tab lines, and

@@ -30,6 +30,36 @@ const boundaries = boundaryFixtures
 
 describe("carried Obsidian boundaries (#582–#584)", () => {
   it.each([
+    "%%c%%\nalpha\n---\n",
+    "%%c%%\nalpha\n===\n",
+    "%%one\ntwo%%\nalpha\n---\n",
+    "%%one%%\n%%two%%\nalpha\n---\n",
+    "%%%%\nalpha\n---\n",
+    "%%c%%\nalpha\n=\nbeta\n---\n",
+    "%%c%%\nalpha\n--\nbeta\n---\n",
+  ])("retains Setext text directly after a standalone comment (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, { extends: [], dialect: "obsidian", rules: { "style/heading": "warn" } }),
+        ).toBe(input);
+      }
+  });
+  it("keeps comment-adjacent title text editable and permits independent headings (#383)", () => {
+    expect(checked("%%c%%\n__alpha__\n---\n")).toBe("%%c%%\n**alpha**\n---\n");
+    expect(checked("%%c%%\n\nalpha\n---\n")).toBe("%%c%%\n\n## alpha\n");
+    expect(checked("%%c%%\nalpha\n---\nbeta\n---\n")).toBe("%%c%%\nalpha\n---\n## beta\n");
+    expect(
+      checked("%%c%%\n## alpha\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": ["warn", { style: "setext" }] },
+      }),
+    ).toBe("%%c%%\n## alpha\n");
+  });
+  it.each([
     "- a\n> b\n- c\n",
     "* a\n> b\n* c\n",
     "- a\n> b\n| c | d |\n| - | - |\n| e | f |\n- g\n",

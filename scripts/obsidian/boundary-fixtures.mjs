@@ -1502,4 +1502,33 @@ export const boundaryFixtures = [
       "[^1]: * anchor *basket ember* with enough words to wrap over several continuation lines in the definition\n",
     preserve: false,
   },
+  {
+    issue: 357,
+    name: "generated standalone comment before multiline Setext title",
+    source: readFileSync(
+      new URL(
+        "../../tests/fixtures/renderers/obsidian-comment-setext-3693217873.md",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    preserve: false,
+  },
+  {
+    issue: 383,
+    name: "single-line Setext directly after standalone comment",
+    source: "%%c%%\nalpha\n---\n",
+  },
+  ...[
+    "%%c%%\nalpha\nbeta\n===\n",
+    "%%one\n\ntwo%%\nalpha\nbeta\n---\n",
+    "%%one%%\n%%two%%\nalpha\nbeta\n---\n",
+    "%%%%\nalpha\nbeta\n---\n",
+    "%%c%%\n__alpha__\nbeta\n---\n",
+  ].map((source, index) => ({
+    issue: 357,
+    name: `standalone comment boundary ${index}`,
+    source,
+    preserve: source !== "%%c%%\n__alpha__\nbeta\n---\n",
+  })),
 ];

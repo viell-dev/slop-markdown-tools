@@ -82,6 +82,50 @@ describe("style/block-spacing", () => {
     );
     return output;
   }
+  describe("standalone Obsidian comment boundaries (#357)", () => {
+    it.each([
+      "%%c%%\nalpha\n---\n",
+      "%%c%%\nalpha\nbeta\n---\n",
+      "%%c%%\nalpha\nbeta\n===\n",
+      "%%c%%\n# alpha\n",
+      "%%c%%\n- alpha\n",
+      "%%one\ntwo%%\nalpha\nbeta\n---\n",
+      "%%one\n\ntwo%%\nalpha\nbeta\n---\n",
+      "%%one%%\n%%two%%\nalpha\nbeta\n---\n",
+      "%%%%\nalpha\nbeta\n---\n",
+    ])("keeps the following boundary in %j", (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const mark of ["", "\uFEFF"]) {
+          const input = mark + source.replaceAll("\n", newline);
+          expect(spaced(input, "obsidian")).toBe(input);
+        }
+    });
+    it("still separates a preceding heading", () => {
+      expect(spaced("# heading\n%%c%%\nalpha\nbeta\n---\n", "obsidian")).toBe(
+        "# heading\n\n%%c%%\nalpha\nbeta\n---\n",
+      );
+    });
+    it.each(["%%c%%\n\nalpha\nbeta\n---\n", "%%c%%\n\n# alpha\n", "%%c%%\n\n- alpha\n"])(
+      "keeps an existing blank in %j",
+      (source) => {
+        expect(spaced(source, "obsidian")).toBe(source);
+      },
+    );
+    it("allows inline style edits in the following block", () => {
+      const source = "%%c%%\n__alpha__\nbeta\n---\n";
+      expect(
+        formatted(
+          source,
+          only({ "style/block-spacing": "warn", "style/strong": "warn" }, "obsidian"),
+        ),
+      ).toBe("%%c%%\n**alpha**\nbeta\n---\n");
+    });
+    it("retains ordinary heading spacing and the other dialects", () => {
+      expect(spaced("alpha\n# heading\n", "obsidian")).toBe("alpha\n\n# heading\n");
+      for (const dialect of ["commonmark", "github"] as const)
+        expect(spaced("%%c%%\n# heading\n", dialect)).toBe("%%c%%\n\n# heading\n");
+    });
+  });
   it.each([
     [
       "# Setup\nInstall the package.\n- Run the command.\n",

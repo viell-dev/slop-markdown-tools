@@ -768,7 +768,8 @@ export function misreadLists(document: Document): MisreadLists {
     };
     // Compute Reading paragraph/title state before Tab continuation needs it.
     // Only adjacent siblings carry it; a blank or a hyphen thematic break ends
-    // the chain. Widget-only protection does not seed a paragraph (#583).
+    // the chain. An adjacent standalone comment shares the native paragraph
+    // (#383); widget-only protection does not seed one (#583).
     const readingParagraphHeadings = new Set<Heading>();
     const continuedTitleHeadings = new Set<Heading>();
     const classifySetextReadings = (parent: Parents) =>
@@ -784,8 +785,8 @@ export function misreadLists(document: Document): MisreadLists {
           const textLine = child.children[0]?.position?.start.line ?? child.position!.start.line;
           const previous = parent.children[index - 1];
           const continuedTitle =
-            previous?.type === "heading" &&
-            readingParagraphHeadings.has(previous) &&
+            (previous?.type === "obsidianComment" ||
+              (previous?.type === "heading" && readingParagraphHeadings.has(previous))) &&
             previous.position!.end.line === child.position!.start.line - 1;
           if (continuedTitle) continuedTitleHeadings.add(child);
           const literalUnderline = child.depth === 1 || /^-{1,2}$/.test(underline.slice(prefix));

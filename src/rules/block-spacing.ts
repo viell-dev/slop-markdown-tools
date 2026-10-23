@@ -96,6 +96,9 @@ function together(
   // Other tools, too, read a comment as applying to the line below it, and
   // `mdtools-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
+  // Obsidian can keep a standalone comment in the following paragraph even
+  // when the parser ends its block. Retain that next boundary (#357).
+  if (document.dialect === "obsidian" && before.type === "obsidianComment") return true;
   if (directiveLines.has(after.position!.start.line - 1)) return true;
   // The line that opens a callout or alert stays with the body below it.
   if (

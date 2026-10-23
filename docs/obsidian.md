@@ -298,6 +298,11 @@ latest installable release:
   allow later Markdown to format.
 - A leading inline comment stays with the next wrapping atom so that it cannot
   become a standalone comment block. Later words still wrap normally.
+- After 0.4.0, a standalone `%%` comment keeps its following boundary. A new
+  blank can split a native paragraph, including before text the parser reads as
+  a Setext heading. Such a directly adjacent title also retains its underline
+  where conversion would change Reading view. Existing blanks and following
+  inline style edits remain available.
 - A possible comment whose leading `%%` and first closer cross a blank line
   stays unreflowed. Moving text after the closer could otherwise turn literal
   paragraphs into a comment block. This also applies at widths where the old

@@ -783,6 +783,10 @@ or what a comment applies to:
   the blank line into the code, although the parser does not.
 - A heading or list directly below an HTML comment or below a
   `mdtools-disable-next-line` directive, which apply to the line below them.
+  After 0.4.0, the Obsidian dialect also retains the boundary after a standalone
+  `%%` comment: adding a blank can split a native paragraph even when the parser
+  reads a separate heading. Inline style edits below the comment remain
+  available.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
   directly below it.
 - In the Obsidian dialect, a block identifier on a line of its own (`^id`)
@@ -986,6 +990,10 @@ give those widgets different typography or placement. A retained Setext heading
 keeps its complete source; mixed text before math, wrapped math, and images
 beside ordinary title text remain eligible. Independent blocks below the heading
 still get their spacing, inline formatting, and table or list preferences.
+
+After 0.4.0, a Setext title directly after a standalone Obsidian comment keeps
+its underline where Reading view treats it as paragraph text. Inline title
+formatting remains available, and a real blank permits heading conversion.
 
 ## `style/inline-code`
 
