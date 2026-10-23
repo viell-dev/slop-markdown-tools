@@ -750,9 +750,9 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
-- On GitHub after 0.4.0, between contiguous dollar display math and an
-  immediately following Setext title. GitHub reads the dollar lines and title as
-  one heading, so their source stays together.
+- On GitHub after 0.4.0, between dollar display math and an immediately
+  following Setext title. They can form one native heading or continue a
+  list/quote paragraph, so their source stays together.
 - In the Obsidian dialect, after an underlined heading that a view reads as
   paragraph text, such as a multiline level-1 heading, one beginning with a
   reference-like line, or one whose underline has trailing space, extra
@@ -965,7 +965,8 @@ close it as front matter.
 After 0.4.0, GitHub keeps an existing Setext title directly after dollar display
 math. The dollar lines belong to that native heading too, so the complete range
 stays as written. An intervening blank or interrupting block permits heading
-preferences again.
+preferences again. Where text below a list or quote ending in math continues
+that native container, the source boundary stays together too.
 
 After 0.4.0, Obsidian also retains the heading form when a title line begins
 directly with math or its only content is an image/embed. ATX and Setext can
@@ -1288,6 +1289,10 @@ means:
 - With `---`, directly below a paragraph, a link reference definition, or
   display math, which `---` would underline as a heading; GitHub builds display
   math from a paragraph.
+- After 0.4.0, a compact hyphen line already directly below display math also
+  stays when another marker is requested. Spaced `- - -` remains eligible for
+  star or underscore preferences, as does a break separated from the math by a
+  blank line.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
 - At the start of a document, with `---`, which would open front matter if a

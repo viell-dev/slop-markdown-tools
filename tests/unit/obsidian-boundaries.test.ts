@@ -1162,7 +1162,8 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![399, 488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        !name.startsWith("HTML item coherence:") &&
         ![
           "short reset exposes an unclosed long run in an inline comment",
           "joined footnote ending in span paragraph",
@@ -1186,6 +1187,19 @@ describe("escaping HTML keeps its originating list markers coherent (#399, #428)
     expect(checked("+ <div> a\nlazy\n</div>\n\n+ b\n\nLater *outside*.\n")).toContain(
       "Later _outside_.",
     );
+    expect(checked("> + <div> a\n> lazy\n> </div>\n>\n> + b\n\nLater *outside*.\n")).toContain(
+      "Later _outside_.",
+    );
+  });
+  it.each([
+    ["- parent\n  + <div> a\n  lazy\n\n- b\n", "- parent\n  - <div> a\n  lazy\n\n- b\n"],
+    ["1. parent\n   1) <div> a\n   lazy\n\n2. b\n", "1. parent\n   1. <div> a\n   lazy\n\n2. b\n"],
+    [
+      "> - parent\n>   + <div> a\n>   lazy\n>\n> - b\n",
+      "> - parent\n>   - <div> a\n>   lazy\n>\n> - b\n",
+    ],
+  ])("permits the native-safe nested marker edit in %j (#399)", (source, expected) => {
+    expect(checked(source)).toBe(expected);
   });
   it.each([
     "+ <div> a\nlazy\n\n+ b\n",

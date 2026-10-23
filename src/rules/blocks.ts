@@ -319,19 +319,21 @@ const thematicBreak: Rule = {
       const items = new RegExp(`[ \\t${marker[0] === "-" ? "\\-" : marker[0]}]*$`);
       const prefix = source.slice(lineStart(source, start), start);
       if (items.exec(prefix)![0].includes(marker[0]!)) return;
-      if (marker === "---") {
-        // Directly below a paragraph or a link reference definition, `---`
-        // would underline it as a heading, and so it would display math,
-        // which GitHub builds from a paragraph (issue #336). In Obsidian,
-        // it can take the last table row out of Live Preview's table too.
-        // The reverse direction and the literal row are range-protected.
+      if (marker === "---" || /^-{3,}$/.test(source.slice(start, end))) {
+        // A new `---` can underline the paragraph or definition above it.
+        // Directly below display math, compact hyphens already do so on
+        // GitHub: keep that boundary in both directions (#336). Spaced
+        // hyphens can still change to another non-hyphen marker. Obsidian
+        // also retains a table's final row as a heading; its literal source
+        // and the reverse paragraph direction are range-protected.
         const above = index && parent ? lastBlock(parent.children[index - 1]!) : undefined;
         if (
           above &&
-          (above.type === "paragraph" ||
-            above.type === "definition" ||
-            above.type === "math" ||
-            (document.dialect === "obsidian" && above.type === "table")) &&
+          (above.type === "math" ||
+            (marker === "---" &&
+              (above.type === "paragraph" ||
+                above.type === "definition" ||
+                (document.dialect === "obsidian" && above.type === "table")))) &&
           above.position?.end.line === node.position!.start.line - 1
         )
           return;

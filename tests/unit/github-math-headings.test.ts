@@ -21,8 +21,8 @@ function checked(source: string, config: Config) {
   return result.output;
 }
 
-describe("GitHub math paragraphs continued into Setext headings (#336)", () => {
-  // Both actual GitHub Markdown API modes underline the dollar lines too.
+describe("GitHub boundaries beside display math (#336)", () => {
+  // Both API modes require these math/title source boundaries to stay together.
   it.each([
     "$$\nx\n$$\nTitle\n---\n",
     "$$\nx\n$$\nTitle\n===\n",
@@ -32,7 +32,12 @@ describe("GitHub math paragraphs continued into Setext headings (#336)", () => {
     "> $$\n> x\n> $$\n> Title\n> ---\n",
     "- $$\n  x\n  $$\n  Title\n  ---\n",
     "$$\na\n$$\n$$\nb\n$$\nTitle\n---\n",
-  ])("retains the joined heading in %j", (source) => {
+    "$$\nx\n$$\n#5\n---\n",
+    "$$\nx\n$$\n#5\n===\n",
+    "> $$\n> x\n> $$\nTitle\n---\n",
+    "> $$\n> x\n> $$\nTitle\n===\n",
+    "- $$\n  x\n  $$\nTitle\n---\n",
+  ])("retains the native boundary in %j", (source) => {
     for (const newline of ["\n", "\r\n", "\r"]) {
       for (const bom of ["", "\uFEFF"]) {
         const input = bom + source.replaceAll("\n", newline);

@@ -178,6 +178,29 @@ describe("style/thematic-break", () => {
       );
     },
   );
+  it.each(dialects.filter((dialect) => dialect !== "commonmark"))(
+    "keeps compact hyphens below math for non-hyphen markers in %s (#336)",
+    (dialect) => {
+      for (const marker of ["***", "___"])
+        for (const source of [
+          "$$\nx = 1\n$$\n---\n",
+          "$$\nx = 1\n$$\n   ----- \t\n",
+          "> $$\n> x = 1\n> $$\n> ---\n",
+          "- $$\n  x = 1\n  $$\n  ---\n",
+        ])
+          kept(source, only({ "style/thematic-break": ["warn", { marker }] }, dialect));
+      kept(
+        "***\n\n$$\nx = 1\n$$\n---\n",
+        only({ "style/thematic-break": ["warn", { marker: "consistent" }] }, dialect),
+      );
+      expect(formatted("$$\nx = 1\n$$\n- - -\n", only(stars, dialect))).toBe(
+        "$$\nx = 1\n$$\n***\n",
+      );
+      expect(formatted("$$\nx = 1\n$$\n\n---\n", only(stars, dialect))).toBe(
+        "$$\nx = 1\n$$\n\n***\n",
+      );
+    },
+  );
   it("leaves `* ***` and `- ---` lines alone for the marker that would join them", () => {
     kept("Text\n\n* ---\n", only(stars));
     kept("Text\n\n- ***\n", only(rule));

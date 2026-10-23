@@ -265,7 +265,9 @@ export interface MisreadLists {
    * break and margin through its first character or containing inline node
    * where that boundary makes a later final line a Live Preview heading (#554).
    * On GitHub, contiguous display math and the immediately following Setext
-   * heading form one native heading, so the complete range stays together (#336).
+   * heading form one native heading, so the complete range stays together.
+   * A heading after a container ending in math can instead continue its native
+   * paragraph lazily; retain that complete boundary too (#336).
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -470,35 +472,39 @@ export function misreadLists(document: Document): MisreadLists {
   // GitHub builds display math from paragraphs. A Setext underline below
   // text directly after its closing dollars underlines the whole paragraph,
   // including the dollar lines (#336). Keep that boundary and its content
-  // together, including consecutive math blocks and blocks inside containers.
+  // together, including consecutive math blocks and blocks inside containers,
+  // or a lazy continuation outside the container ending with that math.
   if (document.dialect === "github") {
-    const visitMath = (parent: Parents) => {
+    const visitMath = (parent: Parents): Nodes | undefined => {
       let first: Nodes | undefined;
       let previous: Nodes | undefined;
       for (const child of parent.children) {
+        const trailing =
+          "children" in child && !leaves.has(child.type) ? visitMath(child) : undefined;
         const adjacent =
           previous?.position !== undefined &&
           child.position !== undefined &&
           previous.position.end.line === child.position.start.line - 1;
         if (child.type === "math") {
-          if (!adjacent || previous?.type !== "math") first = child;
+          if (!adjacent || !first) first = child;
         } else {
           if (
             first?.position &&
             adjacent &&
-            previous?.type === "math" &&
             child.type === "heading" &&
-            source[child.position!.start.offset!] !== "#"
+            child.position!.end.line > child.position!.start.line
           )
             boundaryText.add({
               ...child,
               position: { start: first.position.start, end: child.position!.end },
             });
-          first = undefined;
+          first = trailing;
         }
-        if ("children" in child && !leaves.has(child.type)) visitMath(child);
         previous = child;
       }
+      // The final math paragraph can continue lazily outside its quote or
+      // list item. A physical blank at the container's end stops that carry.
+      return previous?.position?.end.line === parent.position?.end.line ? first : undefined;
     };
     visitMath(document.tree);
   }

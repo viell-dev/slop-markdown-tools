@@ -22,9 +22,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Retain GitHub's combined heading when a Setext title directly follows dollar
-  display math, preserving its dollar lines and title through heading, spacing
-  and wrap changes
+- Preserve GitHub's heading and lazy paragraph boundaries beside dollar display
+  math, including compact hyphen lines and Setext titles. Keep thematic-marker,
+  heading, spacing and wrap changes from splitting those native boundaries
   ([#336](https://github.com/viell-dev/slop-markdown-tools/issues/336)).
 - Keep Obsidian list markers consistent when HTML leaves one parsed list and
   protects a later list's markers, so formatting cannot split one Reading-view
