@@ -101,6 +101,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
     // same portable bytes as the original checkout.
     const oracle = await expectedArtifacts(source);
     expect(oracle).toEqual(expected);
+    expect(await expectedArtifacts(linked)).toEqual(expected);
     const output = execFileSync(process.execPath, [path.join(linked, "scripts/build-parser.mjs")], {
       cwd: linked,
       encoding: "utf8",
@@ -109,6 +110,18 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
     });
     expect(output).toContain("Parser adapter ready (4 artifacts changed).");
     await completeArtifacts(path.join(source, "dist/syntax"), oracle);
+  });
+
+  it("rejects a parser graph physically outside its checkout before writing artifacts", async () => {
+    const root = await fixture({
+      "package.json": await readFile(path.join(repository, "package.json"), "utf8"),
+    });
+    await linkDirectory(path.join(repository, "node_modules"), path.join(root, "node_modules"));
+    const previousEntries = (await readdir(root)).sort();
+    await expect(buildParser({ repositoryRoot: root })).rejects.toThrow(
+      "Parser graph input resolves outside the repository root",
+    );
+    expect((await readdir(root)).sort()).toEqual(previousEntries);
   });
 
   it("retains all unchanged bytes and deliberately old timestamps", async () => {

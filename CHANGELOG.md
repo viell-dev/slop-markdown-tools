@@ -22,6 +22,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Release-evidence validation runs through linked checkout paths, and the parser
+  builder rejects dependencies resolved outside its checkout consistently across
+  platforms
+  ([#574](https://github.com/viell-dev/slop-markdown-tools/issues/574),
+  [#575](https://github.com/viell-dev/slop-markdown-tools/issues/575)).
+
 - Parsing uses a portable internal adapter to reduce repeated copying and
   searching on documents with many containers, inline constructs or unfinished
   labels. Syntax plugins retain the original attention/strikethrough event

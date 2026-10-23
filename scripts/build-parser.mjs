@@ -127,7 +127,7 @@ async function readLicense(root) {
  * @param {{ repositoryRoot?: string }} [options]
  */
 export async function bundleParser(options = {}) {
-  const repositoryRoot = path.resolve(options.repositoryRoot ?? defaultRoot);
+  const repositoryRoot = await realpath(path.resolve(options.repositoryRoot ?? defaultRoot));
   const resolveFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
   const bundlerRoot = await packageForFile(resolveFromRoot.resolve("rolldown"));
   assert.equal(bundlerRoot.metadata.version, "1.2.14", "Review changed parser bundler");
@@ -239,6 +239,14 @@ export async function bundleParser(options = {}) {
     /** @type {Map<string, { file: string, sha256: string }>} */
     const inputs = new Map();
     for (const filename of [...modules.filter((id) => path.isAbsolute(id)), ...redirected.keys()]) {
+      const relative = path.relative(repositoryRoot, await realpath(filename));
+      assert(
+        relative &&
+          relative !== ".." &&
+          !relative.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relative),
+        "Parser graph input resolves outside the repository root; install its dependencies inside the checkout",
+      );
       const { root, input } = await identifyInput(filename);
       const previous = inputs.get(input.file);
       if (previous)

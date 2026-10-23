@@ -1,8 +1,10 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { evaluate, requiredChecks } from "../../scripts/release-evidence.mjs";
-import { repository } from "./support.js";
+import { fixture, linkDirectory, repository } from "./support.js";
 
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
 const required = requiredChecks(
@@ -79,4 +81,80 @@ describe("release evidence", () => {
     runs.push({ ...run(required[0]!.name, "completed", "success"), app: { id: 1 } });
     expect(evaluate(runs, required).state).toBe("pending");
   });
+});
+
+async function copiedEvidenceScript() {
+  const root = await fixture({
+    "source/scripts/release-evidence.mjs": read("scripts/release-evidence.mjs"),
+    "source/import-host.mjs": "// Synthetic existing import host.\n",
+  });
+  const source = path.join(root, "source");
+  const linked = path.join(root, "linked");
+  await linkDirectory(source, linked);
+  return { root, source, linked };
+}
+
+describe("release-evidence command entry (#574)", { concurrent: false }, () => {
+  it.each([
+    ["normal absolute", false, false],
+    ["linked absolute", true, false],
+    ["normal relative", false, true],
+    ["linked relative", true, true],
+  ] as const)("rejects an invalid commit through %s", async (_name, useLink, relative) => {
+    const { root, source, linked } = await copiedEvidenceScript();
+    const checkout = useLink ? linked : source;
+    const script = relative
+      ? path.join("scripts", "release-evidence.mjs")
+      : path.join(checkout, "scripts", "release-evidence.mjs");
+    for (const args of [[], ["not-a-commit"]]) {
+      const result = spawnSync(process.execPath, [script, ...args], {
+        cwd: relative ? checkout : root,
+        encoding: "utf8",
+        timeout: 5000,
+        windowsHide: true,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.signal).toBeNull();
+      expect(result.status).toBe(2);
+      expect(result.stdout).toBe("");
+      expect(result.stderr.replaceAll("\r\n", "\n")).toBe(
+        "Usage: node scripts/release-evidence.mjs COMMIT (a full SHA)\n",
+      );
+    }
+  });
+
+  it.each(["absent", "missing", "different existing"] as const)(
+    "imports without running the CLI with an %s host argv path",
+    async (host) => {
+      const { root, source, linked } = await copiedEvidenceScript();
+      for (const checkout of [source, linked]) {
+        const script = path.join(checkout, "scripts", "release-evidence.mjs");
+        const hostPath =
+          host === "different existing"
+            ? path.join(checkout, "import-host.mjs")
+            : path.join(root, "missing-host.mjs");
+        // Only the child process's argv changes. A nonexistent import host is
+        // valid for eval/embedded callers; it must not suppress a normal import.
+        const argv =
+          host === "absent"
+            ? "delete process.argv[1];"
+            : `process.argv[1] = ${JSON.stringify(hostPath)};`;
+        const code = `${argv}
+process.argv[2] = "not-a-commit";
+const module = await import(${JSON.stringify(pathToFileURL(script).href)});
+process.stdout.write([typeof module.evaluate, typeof module.requiredChecks].join("|") + "\\n");`;
+        const result = spawnSync(process.execPath, ["--input-type=module", "--eval", code], {
+          cwd: root,
+          encoding: "utf8",
+          timeout: 5000,
+          windowsHide: true,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status).toBe(0);
+        expect(result.stdout).toBe("function|function\n");
+        expect(result.stderr).toBe("");
+      }
+    },
+  );
 });
