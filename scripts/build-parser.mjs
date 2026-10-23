@@ -85,6 +85,7 @@ async function identifyInput(filename) {
   const root = await packageForFile(filename);
   const relative = slash(path.relative(root.directory, filename));
   assert(relative && !relative.startsWith("../") && !path.isAbsolute(relative));
+  assert(!relative.startsWith("dev/"), "Unexpected development parser input");
   return {
     root,
     input: {
@@ -233,7 +234,7 @@ export async function bundleParser(options = {}) {
     const modules = Object.keys(chunk.modules);
     assert(modules.includes("mdrefine:edit-map"));
     assert(!modules.some((id) => slash(id).includes("/micromark-util-edit-map/")));
-    assert(!modules.some((id) => slash(id).includes("/dev/") || id.startsWith("node:")));
+    assert(!modules.some((id) => id.startsWith("node:")));
     assert.equal(modules.length, 78, "Review changed parser module graph");
     const roots = new Map();
     /** @type {Map<string, { file: string, sha256: string }>} */
@@ -416,10 +417,11 @@ export async function buildParser(options = {}) {
 
 async function invokedAsMain() {
   if (!process.argv[1]) return false;
+  const scriptPath = await realpath(fileURLToPath(import.meta.url));
   try {
-    return (await realpath(process.argv[1])) === (await realpath(fileURLToPath(import.meta.url)));
+    return (await realpath(process.argv[1])) === scriptPath;
   } catch (error) {
-    if (error.code === "ENOENT") return false;
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
     throw error;
   }
 }

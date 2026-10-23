@@ -123,8 +123,8 @@ describe("release-evidence command entry (#574)", { concurrent: false }, () => {
     }
   });
 
-  it.each(["absent", "missing", "different existing"] as const)(
-    "imports without running the CLI with an %s host argv path",
+  it.each(["absent", "missing", "non-directory", "different existing"] as const)(
+    "imports without running the CLI when the host argv path is %s",
     async (host) => {
       const { root, source, linked } = await copiedEvidenceScript();
       for (const checkout of [source, linked]) {
@@ -132,7 +132,9 @@ describe("release-evidence command entry (#574)", { concurrent: false }, () => {
         const hostPath =
           host === "different existing"
             ? path.join(checkout, "import-host.mjs")
-            : path.join(root, "missing-host.mjs");
+            : host === "non-directory"
+              ? path.join(checkout, "import-host.mjs", "child")
+              : path.join(root, "missing-host.mjs");
         // Only the child process's argv changes. A nonexistent import host is
         // valid for eval/embedded callers; it must not suppress a normal import.
         const argv =

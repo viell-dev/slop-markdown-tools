@@ -1,8 +1,9 @@
 import { Buffer } from "node:buffer";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, rm, rmdir, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildParser, bundleParser } from "../../scripts/build-parser.mjs";
 import { fixture, linkDirectory, repository } from "./support.js";
@@ -64,12 +65,13 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       "scripts/parser-packages.json",
       "src/syntax/parser.generated.d.ts",
     ])
-      files[`source/${name}`] = await readFile(path.join(repository, name), "utf8");
+      files[`dev/source/${name}`] = await readFile(path.join(repository, name), "utf8");
     const root = await fixture(files);
-    const source = path.join(root, "source");
-    // Keep the small parser dependency graph inside this checkout. Linking it
-    // outside the build root can produce absolute region paths on CI, which
-    // the builder correctly rejects. Only the build tool stays shared.
+    const source = path.join(root, "dev/source");
+    // A dev ancestor is a legitimate checkout location, not a development
+    // module inside a parser package. The graph must stay inside the checkout;
+    // canonical containment rejects outside inputs on every platform. Only
+    // the build tool stays shared.
     const packages = JSON.parse(
       await readFile(path.join(repository, "scripts/parser-packages.json"), "utf8"),
     ) as { name: string }[];
@@ -110,6 +112,41 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
     });
     expect(output).toContain("Parser adapter ready (4 artifacts changed).");
     await completeArtifacts(path.join(source, "dist/syntax"), oracle);
+
+    for (const checkout of [source, linked]) {
+      const code = `process.argv[1] = ${JSON.stringify(path.join(checkout, "package.json", "child"))};
+const module = await import(${JSON.stringify(pathToFileURL(path.join(checkout, "scripts/build-parser.mjs")).href)});
+process.stdout.write(typeof module.buildParser);`;
+      const imported = spawnSync(process.execPath, ["--input-type=module", "--eval", code], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 5000,
+        windowsHide: true,
+      });
+      expect(imported.error).toBeUndefined();
+      expect(imported.signal).toBeNull();
+      expect(imported.status).toBe(0);
+      expect(imported.stdout).toBe("function");
+      expect(imported.stderr).toBe("");
+    }
+
+    // A package's actual dev entry is different from the checkout's ancestor.
+    // Redirect an unadapted entry inside this owned copy, retaining its exact
+    // source bytes, package version and license. It must still be rejected.
+    const packageRoot = path.join(source, "node_modules/micromark-extension-gfm");
+    const packageFile = path.join(packageRoot, "package.json");
+    const metadata = JSON.parse(await readFile(packageFile, "utf8")) as { exports: string };
+    await mkdir(path.join(packageRoot, "dev"));
+    await cp(path.join(packageRoot, "index.js"), path.join(packageRoot, "dev/index.js"));
+    metadata.exports = "./dev/index.js";
+    await writeFile(packageFile, JSON.stringify(metadata));
+    await expect(
+      buildParser({
+        repositoryRoot: source,
+        outputDirectory: path.join(root, "development-output"),
+      }),
+    ).rejects.toThrow("Unexpected development parser input");
+    expect(await readdir(root)).not.toContain("development-output");
   });
 
   it("rejects a parser graph physically outside its checkout before writing artifacts", async () => {
