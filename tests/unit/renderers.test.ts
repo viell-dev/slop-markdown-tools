@@ -420,7 +420,7 @@ describe("GitHub source-verified code normalization (#515)", () => {
       finalLineValue.slice(0, -1), // one of the three final spaces
       finalLineValue.trimEnd(),
       finalLineValue.replace("needle", "missing"),
-      finalLineValue.replace("\n", "\n\n"),
+      finalLineValue.replaceAll("\n", "\n\n"),
     ]) {
       expect(normalize(finalLineHighlight(body), source)).not.toBe(canonical);
     }
