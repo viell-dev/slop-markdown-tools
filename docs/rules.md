@@ -963,7 +963,8 @@ After 0.4.0, Obsidian also retains the heading form when a title line begins
 directly with math or its only content is an image/embed. ATX and Setext can
 give those widgets different typography or placement. A retained Setext heading
 keeps its complete source; mixed text before math, wrapped math, and images
-beside ordinary title text remain eligible, as do later independent paragraphs.
+beside ordinary title text remain eligible. Independent blocks below the heading
+still get their spacing, inline formatting, and table or list preferences.
 
 ## `style/inline-code`
 

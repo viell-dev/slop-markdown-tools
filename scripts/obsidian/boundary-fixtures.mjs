@@ -28,6 +28,19 @@ export const boundaryFixtures = [
     ["wrapped math permits heading and emphasis preferences", "*$x$*\n---\n"],
     ["text after an image permits heading preferences", "![cedar](cedar.png) after\n---\n"],
   ].map(([name, source]) => ({ issue: 383, name, source, preserve: false })),
+  ...["$x$", "![cedar](cedar.png)"].flatMap((title) =>
+    [
+      ["paragraph", "Later *safe*.\n"],
+      ["table", "| a | __b__ |\n| :-- | --: |\n| c | d |\n"],
+      ["list", "+ *safe*\n"],
+      ["heading", "### *safe* ###\n"],
+    ].map(([kind, later]) => ({
+      issue: 383,
+      name: `widget title leaves an adjacent ${kind} editable: ${title}`,
+      source: `${title}\n---\n${later}`,
+      preserve: false,
+    })),
+  ),
   ...[
     ["trailing-only one-column borders remain Live Preview text", "basket |\n--: |\nwalnut |\n"],
     ["one-column delimiter without its final border", "basket |\n--:\nwalnut |\n"],

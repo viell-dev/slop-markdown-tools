@@ -93,6 +93,34 @@ describe("Obsidian boundaries read differently by its views", () => {
     );
   });
 
+  it.each([
+    ["Later *safe*.\n", "Later _safe_.\n"],
+    [
+      "| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+      "| a   | **b** |\n| :-- | ----: |\n| c   | d     |\n",
+    ],
+    ["+ *safe*\n", "- _safe_\n"],
+    ["### *safe* ###\n", "### _safe_\n"],
+  ])("formats the block directly after a widget heading (#383): %j", (later, expected) => {
+    for (const title of ["$x$", "![cedar](cedar.png)"])
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const source = `${title}\n---\n${later}`;
+          expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+            bom + `${title}\n---\n\n${expected}`.replaceAll("\n", newline),
+          );
+        }
+  });
+
+  it.each(["$x$\n--- \n", "$x$\n  ---\n", "$x$\nsecond\n===\n"])(
+    "keeps paragraph-state protection when a widget underline is also literal (#383): %j",
+    (title) => {
+      const source = title + "| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+      expect(misreadLists(parse(source, "obsidian")).underlines.size).toBeGreaterThan(0);
+      expect(checked(source)).toBe(source);
+    },
+  );
+
   it("preserves one-column border combinations and their Reading continuation state (#568)", () => {
     for (const headerLeading of [false, true])
       for (const headerTrailing of [false, true])

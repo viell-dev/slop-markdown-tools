@@ -137,11 +137,15 @@ export interface MisreadLists {
    * or later continuation after an earlier lazy line. Its range runs from
    * the prior break through the underline, including any inline node that
    * crosses that break, preserving the physical heading line (#554).
-   * A Setext title line beginning directly with math, or a heading whose only
-   * child is an image/embed, keeps the whole heading: converting it to ATX can
-   * change widget typography or block placement in Live Preview (#383).
    */
   underlines: ReadonlySet<Nodes>;
+  /**
+   * Setext headings with a title line beginning directly with math, or whose
+   * only child is an image/embed. Converting them to ATX can change widget
+   * typography or block placement in Live Preview (#383). Keep the whole
+   * heading without treating it as paragraph text for following blocks.
+   */
+  widgetHeadings: ReadonlySet<Nodes>;
   /**
    * Zero-based physical line indexes of earlier lazy list continuations
    * that supply the final Live Preview heading before an external hyphen
@@ -446,6 +450,7 @@ export function misreadLists(document: Document): MisreadLists {
   const unclosedCode = new Set<Nodes>();
   let htmlCodeToEnd = false;
   const underlines = new Set<Nodes>();
+  const widgetHeadings = new Set<Nodes>();
   const headingLazyLines = new Set<number>();
   const lazyItems = new Set<Nodes>();
   const footnoteText = new Set<Nodes>();
@@ -1417,8 +1422,9 @@ export function misreadLists(document: Document): MisreadLists {
             (child.depth === 1 && child.position!.end.line > textLine + 1);
           // ATX can give an unwrapped math widget the line's heading font,
           // or put a standalone image inside a heading. Keep the source (#383).
-          if (obsidianWidgetHeading(source, child)) underlines.add(stretch(child, lineOf(child)));
-          else if (
+          if (obsidianWidgetHeading(source, child))
+            widgetHeadings.add(stretch(child, lineOf(child)));
+          if (
             from > start &&
             (readingParagraph || /^[ \t>]*-[ \t]*$/.test(underline) || definitionText)
           ) {
@@ -1794,6 +1800,7 @@ export function misreadLists(document: Document): MisreadLists {
     htmlCodeToEnd,
     htmlText,
     underlines,
+    widgetHeadings,
     headingLazyLines,
     lazyItems,
     footnoteText,
