@@ -7,6 +7,12 @@ export const boundaryFixtures = [
   { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n" },
   { issue: 582, name: "same-marker quote tightness", source: "- a\n> b\n- c\n" },
   { issue: 590, name: "quote-only line keeps native list tightness", source: "- a\n> b\n>\n- c\n" },
+  {
+    issue: 590,
+    name: "ordinary greater-than text at a table boundary",
+    source: "- ## h\n| b | c |\n| - | - |\n| e | f>\n- g\n",
+    preserve: false,
+  },
   { issue: 582, name: "same-star quote tightness", source: "* a\n> b\n* c\n" },
   {
     issue: 582,

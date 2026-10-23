@@ -360,11 +360,14 @@ describe("GitHub source-verified code normalization (#515)", () => {
     },
   );
 
-  // A contract test over suffix removal, not a claim that every combination below
-  // was returned by the service. The actual js2/js3 captures omit exactly one LF.
+  // Keep exact values and the observed one-LF omission. Blank-only collapse
+  // is tested separately; nonempty multi-LF omissions remain unequal.
   it.each(
     [0, 1, 2, 3].flatMap((sourceLFs) =>
-      Array.from({ length: sourceLFs + 1 }, (_, renderedLFs) => ({ sourceLFs, renderedLFs })),
+      Array.from({ length: sourceLFs + 1 }, (_, renderedLFs) => ({
+        sourceLFs,
+        renderedLFs,
+      })).filter(({ renderedLFs }) => renderedLFs >= sourceLFs - 1),
     ),
   )(
     "keeps all $sourceLFs source LFs when a highlight retains $renderedLFs (#515)",
@@ -388,11 +391,14 @@ describe("GitHub source-verified code normalization (#515)", () => {
     }
   });
 
-  it("retains source blank-line counts even when highlighted bytes agree (#515)", () => {
-    const response = finalLineHighlight(finalLineValue);
+  it("retains source blank-line counts for the observed highlighting shapes (#515)", () => {
     const canonical = [0, 1, 2, 3].map((count) =>
-      normalize(response, finalLineSource(finalLineValue + "\n".repeat(count))),
+      normalize(
+        finalLineHighlight(finalLineValue + "\n".repeat(Math.max(0, count - 1))),
+        finalLineSource(finalLineValue + "\n".repeat(count)),
+      ),
     );
+    // The first two source values have identical highlighted bytes.
     expect(new Set(canonical).size).toBe(canonical.length);
     expect(normalize(finalLineHighlight(""), finalLineSource(""))).not.toBe(
       normalize(finalLineHighlight(""), finalLineSource("\n\n")),
@@ -408,6 +414,14 @@ describe("GitHub source-verified code normalization (#515)", () => {
     }
     expect(normalize(finalLineHighlight(value + "\n\n"), source)).not.toBe(canonical);
     expect(normalize(finalLinePlain(value + "\n\n"), source)).not.toBe(canonical);
+  });
+
+  it("declines unobserved multi-LF omissions from nonempty highlights (#515)", () => {
+    const value = finalLineValue + "\n\n\n";
+    const source = finalLineSource(value);
+    const canonical = normalize(finalLinePlain(value + "\n"), source);
+    for (const body of [finalLineValue, finalLineValue + "\n"])
+      expect(normalize(finalLineHighlight(body), source)).not.toBe(canonical);
   });
 
   it("keeps all non-LF bytes and leading/interior newlines exact (#515)", () => {
@@ -434,10 +448,13 @@ describe("GitHub source-verified code normalization (#515)", () => {
       expect(normalize(finalLineHighlight(finalLineValue), whitespaceSource)).not.toBe(
         normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
       );
-      // Omit LFs while retaining the whitespace-bearing line: still eligible.
-      expect(normalize(finalLineHighlight(finalLineValue + "\n" + spaces), whitespaceSource)).toBe(
-        normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
-      );
+      // Only the observed single-LF omission retains eligibility here.
+      expect(
+        normalize(finalLineHighlight(finalLineValue + "\n" + spaces), whitespaceSource),
+      ).not.toBe(normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource));
+      expect(
+        normalize(finalLineHighlight(finalLineValue + "\n" + spaces + "\n"), whitespaceSource),
+      ).toBe(normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource));
     }
   });
 

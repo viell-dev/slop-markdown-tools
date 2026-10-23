@@ -286,10 +286,23 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   // Each distinct physical separator has one horizontal margin. These left
   // scans are disjoint, even when several readings protect the same break.
   const boundaryMargins: [number, number][] = [];
+  const quoteMarkers: [number, number][] = [];
   for (const start of [...boundaryStarts].sort((a, b) => a - b)) {
     let left = start;
     while (left > 0 && (source[left - 1] === " " || source[left - 1] === "\t")) left--;
     boundaryMargins.push([left, start]);
+    if (source[left - 1] === ">") {
+      let first = left - 1;
+      while (first > 0 && " \t>".includes(source[first - 1]!)) first--;
+      if (first === 0 || source[first - 1] === "\r" || source[first - 1] === "\n") {
+        // Keep physical quote-only markers, with their preceding line break,
+        // while leaving trailing horizontal cleanup eligible (#590).
+        let before = first;
+        if (source[before - 1] === "\n") before--;
+        if (source[before - 1] === "\r") before--;
+        quoteMarkers.push([before, left]);
+      }
+    }
   }
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
@@ -320,7 +333,9 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.boundaryText,
     ]),
     (node) => range(node),
-  ).sort((a, b) => a[0] - b[0])) {
+  )
+    .concat(quoteMarkers)
+    .sort((a, b) => a[0] - b[0])) {
     const last = blocks.at(-1);
     if (last && start < last[1]) last[1] = Math.max(last[1], end);
     else blocks.push([start, end]);
@@ -338,8 +353,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   const trailingBreaks = (value: string, from: number, to: number): string => {
     let start = to;
     while (start > from && "\r\n \t>".includes(value[start - 1]!)) start--;
-    // Removing a quote-only marker makes a real blank and can loosen a list.
-    return value.slice(start, to).replace(/[ \t]/g, "");
+    return value.slice(start, to).replace(/[ \t>]/g, "");
   };
   const boundaryAt = (point: number) => {
     // A point between CR and LF reaches that same physical separator. This

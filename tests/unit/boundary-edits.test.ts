@@ -113,9 +113,36 @@ describe.each(["\n", "\r\n", "\r"])("quote-only boundary lines with %j (#590)", 
     const source = `- a${newline}> b${newline}>${margin}${newline}- c${newline}`;
     const start = source.lastIndexOf(`>${margin}${newline}`);
     expect(pluginOutput(source, { start, end: start + 1, text: "" })).toBe(source);
+    expect(pluginOutput(source, { start, end: start + 1, text: " " })).toBe(source);
     expect(pluginOutput(source, { start, end: start + 1 + margin.length, text: "" })).toBe(source);
+    expect(
+      pluginOutput(source, {
+        start: 0,
+        end: source.length,
+        text: source.slice(0, start) + source.slice(start + 1),
+      }),
+    ).toBe(source);
     expect(
       pluginOutput(source, { start: start + 1, end: start + 1 + margin.length, text: "" }),
     ).toBe(source.slice(0, start + 1) + source.slice(start + 1 + margin.length));
+  });
+
+  it("handles a quote-only first line without freezing the document start", () => {
+    const source = `>${newline}2. a${newline}`;
+    expect(pluginOutput(source, { start: 0, end: 1, text: "" })).toBe(source);
+    expect(pluginOutput(source, { start: 0, end: 0, text: newline })).toBe(newline + source);
+  });
+
+  it.each(["f>", "f>>", "f >", "f> "])("keeps ordinary terminal %j editable", (cell) => {
+    const source = `- ## h${newline}| b | c |${newline}| - | - |${newline}| e | ${cell}${newline}- g${newline}`;
+    const options = {
+      workspace,
+      config: { extends: [], dialect: "obsidian", rules: { "style/table": "warn" } },
+    } as const;
+    const result = format(source, options);
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+    expect(result.output).not.toBe(source);
+    expect(result.output).toContain(`| --- | --- |${newline}`);
+    expect(format(result.output, options).output).toBe(result.output);
   });
 });

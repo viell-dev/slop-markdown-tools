@@ -371,12 +371,11 @@ export function normalizeGithubHtml(html, mode, tree) {
       // must be escaped. Otherwise normalizing could conceal rendered HTML.
       if (/[<>]/.test(content)) return whole;
       const value = decodeHTML(content).replace(/\r\n?/g, "\n");
-      // A highlighted response may omit an LF-only suffix (#515).
+      // Highlighting drops one final LF, or empties blank-only code (#515).
       // Canonicalize from the complete source value, keeping its blank lines.
       const omittedFinalLines =
         highlighted !== undefined &&
-        node.value.startsWith(value) &&
-        /^\n+$/.test(node.value.slice(value.length));
+        (node.value === value + "\n" || (value === "" && /^\n+$/.test(node.value)));
       if (value !== node.value && value !== node.value + "\n" && !omittedFinalLines) return whole;
       return `<pre data-source-language="${escapeAttribute(node.lang ?? "")}" data-source-meta="${escapeAttribute(node.meta ?? "")}"><code>${escapeText(node.value)}</code></pre>`;
     });
