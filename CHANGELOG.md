@@ -22,10 +22,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Parsing uses a portable internal adapter that corrects repeated event copying,
-  inline text/code compaction, delimiter searches and unbalanced-label autolink
-  scans. Syntax plugins retain the original attention/strikethrough event
-  behavior, and GFM footnote list items have valid source ranges
+- Parsing uses a portable internal adapter to reduce repeated copying and
+  searching on documents with many containers, inline constructs or unfinished
+  labels. Syntax plugins retain the original attention/strikethrough event
+  behavior. GFM footnote list items have valid source ranges and read correctly
+  as loose or tight
   ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300),
   [#151](https://github.com/viell-dev/slop-markdown-tools/issues/151),
   [#240](https://github.com/viell-dev/slop-markdown-tools/issues/240),

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, realpath, rename, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
@@ -406,7 +406,17 @@ export async function buildParser(options = {}) {
   return { outputDirectory, changed, manifest: result.manifest };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+async function invokedAsMain() {
+  if (!process.argv[1]) return false;
+  try {
+    return (await realpath(process.argv[1])) === (await realpath(fileURLToPath(import.meta.url)));
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+if (await invokedAsMain()) {
   buildParser().then(
     ({ changed }) =>
       process.stdout.write(`Parser adapter ready (${changed.length} artifacts changed).\n`),

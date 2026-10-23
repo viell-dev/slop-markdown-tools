@@ -73,10 +73,10 @@ function nodeCounts(document: Document): Map<string, number> {
   return counts;
 }
 
-// Draft sizes: calibrate once when the shared performance environment is idle.
-// The deterministic unit checks already prove the old algorithms fail. Never
-// weaken this existing <10 bound in response to an unexplained timing failure.
-it.each(cases)("parses $name with proportional growth", (test) => {
+// Broad catastrophic-growth bounds at these sizes: some original algorithms
+// also pass. The deterministic unit work gates are the defect regressions.
+// Never weaken this <10 bound after an unexplained timing failure.
+it.each(cases)("parses $name within the catastrophic-growth bound", (test) => {
   expect(
     scaling(
       test.sizes,

@@ -330,6 +330,18 @@ all four.
   tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
   Every pull request. The benchmark's output hash shows whether the benchmark
   documents format differently.
+- **The bundled parser preserves the pinned modules' readings, apart from its
+  listed corrections.** `parser-inline`, `parser-autolink`, `parser-identity`,
+  `parser-generated`, `parser-build`, and `parser-work` check complete
+  positioned trees, observer compatibility, token identity, source guards,
+  provenance and deterministic work. `parser-writer.test.ts` checks actual
+  output, concurrent writes, unchanged timestamps and recovery. Every pull
+  request. These checks do not prove native-host behavior or compatibility with
+  arbitrary event-history rewrites by external extensions. Deeply nested
+  wrappers still copy their interiors; syntax plugins retain the original
+  attention/strike resolvers and their cost. The [dependency
+  overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) lists
+  the corrections and remaining limits.
 - **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
   `cli-encoding.test.ts`, and `selection.test.ts`, which compares the files a
   run selects with Git's own decisions, on Linux and on Windows, which covers
@@ -345,8 +357,12 @@ all four.
 - **Cost grows with the input as expected.** `tests/performance/` compares
   growth and checks that memory is released; `large-inputs.test.ts` formats
   documents beyond the engine's argument limits, each in its own process. Every
-  pull request. The Benchmark workflow's reference timings run for changes to
-  `benchmarks/` and by hand, and the benchmark page documents the known limits.
+  pull request. The parser's deterministic unit work gates fail on the original
+  algorithms; its public timing checks are broad catastrophic-growth bounds, and
+  some original algorithms pass them at the selected sizes. Timing alone does
+  not establish that a parser defect is fixed. The Benchmark workflow's
+  reference timings run for changes to `benchmarks/` and by hand, and the
+  benchmark page documents the known limits.
 - **Public descriptions agree with the package.** `docs.test.ts`,
   `benchmarks.test.ts`, and `metadata.test.ts` on every pull request;
   `npm run check:live` for GitHub's settings, the newest release, npm, and the

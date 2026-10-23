@@ -18,6 +18,20 @@ import {
 
 const sources = inlineSources(examples);
 
+it.each(["commonmark", "github", "obsidian", "forgejo", "gitea", "vitepress"] as const)(
+  "keeps public fast/empty-syntax-plugin positioned readings equal in %s",
+  (dialect) => {
+    const plugin: Plugin = {
+      name: "empty-syntax",
+      syntax: { micromark: {}, mdast: {} },
+    };
+    for (const source of sources)
+      expect(parse(source, dialect).tree, JSON.stringify(source)).toEqual(
+        parse(source, dialect, "compatibility.md", [plugin]).tree,
+      );
+  },
+);
+
 // This group calls actual generated factories via bundleParser(), not public parse().
 it.each(["commonmark", "gfm", "cjk"])(
   "keeps complete generated-parser AST/positions and AST-derived HTML in %s",

@@ -95,7 +95,7 @@ export function inlineSources(specifications) {
     let source = "";
     for (let token = 0; token < 20; token++) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      source += parts[seed % parts.length];
+      source += parts[(seed >>> 16) % parts.length];
     }
     sources.add(source);
   }

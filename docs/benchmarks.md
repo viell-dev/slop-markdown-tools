@@ -225,8 +225,10 @@ thousands of files.
   inline opener searches and unbalanced-label autolink scans. Syntax plugins
   retain the original attention/strikethrough resolvers for event compatibility,
   so that part of the former cost can remain with a syntax plugin. These
-  corrections cover the reproduced workloads, not every possible large
-  paragraph.
+  corrections cover repeated reference pairs and the measured inline families,
+  not every possible large paragraph. Deeply nested bracket labels remain
+  separate work in
+  [#94](https://github.com/viell-dev/slop-markdown-tools/issues/94).
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
   1.8 in every absolute time, while the "compared with parsing" ratios and the
