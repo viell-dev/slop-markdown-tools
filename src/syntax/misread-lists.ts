@@ -275,7 +275,9 @@ export interface MisreadLists {
    * A quoted block opened after a Tab immediately after `>` or `> ` keeps its
    * whole physical source too: Reading view can read literal code where the
    * primary parser reads a list, heading or inline text (#597). Same-block
-   * continuations stay together; later independent blocks remain editable.
+   * continuations stay together, as do quoted blank rows between consecutive
+   * such children: Reading view keeps them inside one code block. Later
+   * independent blocks remain editable.
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -1601,16 +1603,31 @@ export function misreadLists(document: Document): MisreadLists {
     // Items enclosing the current parent; a nested paragraph can leave later
     // blocks in an outer item even when its immediate item ends there.
     const enclosingItems: ListItem[] = [];
-    const visitLines = (parent: Parents) =>
+    const visitLines = (parent: Parents) => {
+      let quotedCode: Nodes | undefined;
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
         const end = child.position?.end.offset;
-        if (start === undefined || end === undefined) return;
+        if (start === undefined || end === undefined) {
+          quotedCode = undefined;
+          return;
+        }
         if (parent.type === "blockquote") {
           const prefix = source.slice(lineAround(start)[0], start);
           const marker = prefix.lastIndexOf(">");
-          if (marker >= 0 && /^ ?\t[ \t]*$/.test(prefix.slice(marker + 1)))
-            boundaryText.add(wholeLines(child));
+          if (marker >= 0 && /^ ?\t[ \t]*$/.test(prefix.slice(marker + 1))) {
+            // Adjacent primary children can be one native code block. Scan
+            // only their disjoint gap, then let the range union join the runs;
+            // repeated blank quote rows are literal code content too (#597).
+            const first =
+              quotedCode?.position &&
+              quotedCode.position.end.offset! <= start &&
+              /^[ \t>\r\n]*$/.test(source.slice(quotedCode.position.end.offset, start))
+                ? quotedCode
+                : child;
+            boundaryText.add(wholeLines(first, child));
+            quotedCode = child;
+          } else quotedCode = undefined;
         }
         if (isSetextHeading(child)) {
           // The underline: blank space after it, or before it beyond the
@@ -1825,6 +1842,7 @@ export function misreadLists(document: Document): MisreadLists {
           if (parent.type === "listItem") enclosingItems.pop();
         }
       });
+    };
     visitLines(document.tree);
     /** The point where the line holding `node`'s start begins, less one: the line break before it. */
     const breakBeforeLine = (node: Nodes): Point => ({

@@ -30,6 +30,34 @@ const boundaries = boundaryFixtures
 
 describe("carried Obsidian boundaries (#582–#584)", () => {
   it.each([
+    ">\t*a*\n>\n>\n>\t*b*\n",
+    "> \t*a*\n>\n>\n> \t*b*\n",
+    ">\t*a*\n>\n>\n> \t*b*\n",
+    "> >\t*a*\n> >\n> >\n> >\t*b*\n",
+    ">\t*a*\n> \n> \n>\t*b*\n",
+    ">\t*a*\n>\n>\n>\t*b*\n>\n>\n>\t*c*\n",
+  ])("keeps literal blank lines between adjacent Tab-code children (#597): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/blank-lines": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("resumes blank-line and inline preferences after quoted literal code (#597)", () => {
+    expect(checked(">\t*a*\n>\n>\n> Later *safe*.\n")).toBe(">\t*a*\n>\n> Later _safe_.\n");
+    expect(checked(">  \t*a*\n>\n>\n>  \t*b*\n")).toBe(">  \t_a_\n>\n>  \t_b_\n");
+    expect(checked(">\t*a*\n>\n>\n>\t*b*\n\nLater *safe*.\n")).toBe(
+      ">\t*a*\n>\n>\n>\t*b*\n\nLater _safe_.\n",
+    );
+  });
+  it.each([
     ">\t*c*\n",
     ">\t* c\n",
     ">\ttext *c*\n",

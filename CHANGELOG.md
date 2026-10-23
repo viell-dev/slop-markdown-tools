@@ -36,7 +36,8 @@ prereleases' notes there are longer than their entries here.
   delimiter preferences and inline styles remain available
   ([#596](https://github.com/viell-dev/slop-markdown-tools/issues/596)).
 - Quoted blocks opened after a Tab keep their literal source where Reading view
-  reads code instead of the parsed list, heading or paragraph. Independent
+  reads code instead of the parsed list, heading or paragraph. Blank quote rows
+  between consecutive such blocks stay as literal code content too. Independent
   blocks and ordinary space-only quote margins still format
   ([#597](https://github.com/viell-dev/slop-markdown-tools/issues/597)).
 - Obsidian preserves list markers and tightness across quote and table

@@ -1618,4 +1618,30 @@ export const boundaryFixtures = [
     source: "%%c%%\nalpha\n---\nbeta\n---\n",
     preserve: false,
   },
+  {
+    issue: 597,
+    name: "literal blank quote lines between Tab-code children",
+    source: ">\t*a*\n>\n>\n>\t*b*\n",
+  },
+  {
+    issue: 597,
+    name: "nested Tab-code children keep their quoted blank lines",
+    source: "> >\t*a*\n> >\n> >\n> >\t*b*\n",
+  },
+  {
+    issue: 597,
+    name: "Tab-code children keep space-only quote gaps",
+    source: ">\t*a*\n> \n> \n>\t*b*\n",
+  },
+  {
+    issue: 597,
+    name: "consecutive Tab-code children retain both gaps",
+    source: ">\t*a*\n>\n>\n>\t*b*\n>\n>\n>\t*c*\n",
+  },
+  {
+    issue: 597,
+    name: "literal quoted gaps permit independent root formatting",
+    source: ">\t*a*\n>\n>\n>\t*b*\n\nLater *safe*.\n",
+    preserve: false,
+  },
 ];

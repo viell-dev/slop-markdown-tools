@@ -714,6 +714,11 @@ number changes what the document means:
   the parser counts them toward: there it reads a list as loose when two or more
   follow and as tight when one does.
 
+After 0.4.0, Obsidian also keeps blank quote rows between consecutive blocks
+opened by a Tab directly after `>` or `> `. Reading view reads those blocks and
+their intervening blank rows as one literal code block. A later ordinary quoted
+paragraph still permits blank-line cleanup and inline preferences.
+
 ## `style/block-spacing`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
