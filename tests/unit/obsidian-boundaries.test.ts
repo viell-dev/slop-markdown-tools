@@ -28,6 +28,86 @@ const boundaries = boundaryFixtures
   .filter(({ issue, preserve }) => preserve !== false && ![496, 497, 499, 508].includes(issue))
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
+describe("carried Obsidian boundaries (#582–#584)", () => {
+  it.each([
+    "* a\n> b\n- c\n",
+    "* a\n> b\n\t\n- c\n",
+    "* a\n> b\n| c | d |\n| - | - |\n| e | f |\n\t\n- g\n",
+    "> * a\n> > b\n> - c\n",
+  ])("keeps both bullet markers across a native continuation: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      const output = checked(input);
+      expect(output).toContain("* a");
+      expect(output).toContain(source.includes("- g") ? "- g" : "- c");
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/list-marker": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each([
+    "a\nb\n=\nc\n---\n",
+    "#5\nb\n=\nc\n---\n",
+    "a\n= \nc\n---\n",
+    "a\nb\n--\nc\n---\n",
+    "a\nb\n=\nc\n===\n",
+  ])("retains an adjacent title in the Reading paragraph: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/heading": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it.each([
+    "a\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) b\n3) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+  ])("retains the physical gap carried into code: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      expect(checked(input)).toBe(input);
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/blank-lines": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each(["* a\n\n> b\n- c\n", "* a\n> b\n# h\n- c\n"])(
+    "keeps independently separated list markers editable: %j",
+    (source) => {
+      expect(checked(source)).not.toContain("* a");
+    },
+  );
+  it("resumes heading conversion after the native thematic break", () => {
+    expect(checked("a\nb\n=\nc\n---\nd\n---\n")).toBe("a\nb\n=\nc\n---\n## d\n");
+  });
+  it("keeps inline formatting in both retained list units", () => {
+    const output = checked("* *first*\n> *middle*\n- *last*\n");
+    expect(output).toContain("* _first_");
+    expect(output).toContain("> _middle_");
+    expect(output).toContain("- _last_");
+  });
+  it("retains the missed fence suffix while earlier text remains editable", () => {
+    const source =
+      "Before *safe*.\n\na\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n\nLater *outside*.\n";
+    const output = checked(source);
+    expect(output).toBe(source.replace("*safe*", "_safe_"));
+  });
+});
+
 describe("Obsidian boundaries read differently by its views", () => {
   it.each([
     "$x$\n---\n",
@@ -1171,7 +1251,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567, 584].includes(issue) &&
         !name.startsWith("HTML item coherence:") &&
         ![
           "short reset exposes an unclosed long run in an inline comment",

@@ -4,6 +4,32 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n", preserve: false },
+  { issue: 582, name: "quoted bullet bridge", source: "> * a\n> > b\n> - c\n" },
+  { issue: 583, name: "adjacent Setext title in Reading paragraph", source: "a\nb\n=\nc\n---\n" },
+  {
+    issue: 583,
+    name: "short hyphen underline before adjacent title",
+    source: "a\nb\n--\nc\n---\n",
+  },
+  { issue: 583, name: "hash-prefixed Setext paragraph", source: "#5\nb\n=\nc\n---\n" },
+  {
+    issue: 583,
+    name: "thematic break resets heading state",
+    source: "a\nb\n=\nc\n---\nd\n---\n",
+    preserve: false,
+  },
+  {
+    issue: 584,
+    name: "blank gap in a paragraph's list fence",
+    source: "a\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+  },
+  ...[582, 583, 584].map((issue) => ({
+    issue,
+    name: `carried boundary generated regression #${issue}`,
+    source: readFileSync(new URL(`./fixtures/${issue}.txt`, import.meta.url), "utf8"),
+    preserve: false,
+  })),
   ...[
     {
       issue: 399,

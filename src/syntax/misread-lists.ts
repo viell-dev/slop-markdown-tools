@@ -104,7 +104,9 @@ export interface MisreadLists {
    * also resets in Live Preview (#565). Its range starts at the opener, or a
    * containing inline node, and continues through its inline block, since
    * later primary spans may be out of phase too. Earlier text and independent
-   * blocks remain editable.
+   * blocks remain editable. A fence on a list line that the primary parse
+   * reads as paragraph text retains the suffix through EOF (#584), as a
+   * fence opened inside a parsed container does (#390).
    */
   unclosedCode: ReadonlySet<Nodes>;
   /** Either Obsidian view can keep code through EOF after an HTML/code transition (#433, #529). */
@@ -129,7 +131,8 @@ export interface MisreadLists {
    * it beyond the heading's text, and Live Preview a lone `-` (issue #383);
    * level-1 headings with more than one text line, or headings beginning with
    * a reference-like line, also after indentation or quote markers (#397,
-   * #434); and paragraphs in a block quote or list item
+   * #434), plus an adjacent Setext title that continues that Reading paragraph
+   * (#583); and paragraphs in a block quote or list item
    * with a lazy line of `=` or `-`, which Reading view reads as an underline
    * (issue #377). Each counts from the line break before the underline to the
    * end of its line. Also the final text line before a compact hyphen break
@@ -272,7 +275,8 @@ export interface MisreadLists {
   boundaryText: ReadonlySet<Nodes>;
   /**
    * Lists whose markers and indentation affect continuations outside their
-   * parsed container, including a lazy paragraph after a heading (#513, #543).
+   * parsed container, including a lazy paragraph after a heading (#513, #543)
+   * or bullet lists joined through a quote or table (#582).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -958,6 +962,20 @@ export function misreadLists(document: Document): MisreadLists {
       });
       const long = runs.find(([, length]) => length >= 3);
       if (long === undefined) continue;
+      // Obsidian can open a real list-item fence where the primary parse
+      // still has one paragraph. Its unindented suffix and blank gaps stay
+      // code, and later primary fences can pair differently (#390, #584).
+      // Ordinary inline runs keep their existing, narrower carry behavior.
+      if (
+        text.has(leaf) &&
+        /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+$/.test(source.slice(lineStart(long[0]), long[0])) &&
+        !source.slice(long[0] + long[1], lineBreak(source, long[0])).includes("`")
+      ) {
+        openFences.add(
+          stretch(leaf, lineOf(leaf), { ...leaf.position!.end, offset: source.length }),
+        );
+        break;
+      }
       // Live Preview shows the rest of a table as code from such a run.
       if (leaf.type === "table") unclosedCode.add(leaf);
       const after = backtickRuns(source, long[0] + long[1], end);
@@ -1134,8 +1152,35 @@ export function misreadLists(document: Document): MisreadLists {
       }
     };
     const visitBoundaries = (parent: Parents) => {
+      let bullet: List | undefined;
+      let bridge = false;
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
+        // Reading keeps an immediately following quote or table inside the
+        // earlier bullet item. A later bullet list can then join it across
+        // that region, even with blank lines after the bridge (#582). Keep
+        // both structural units; their inline content remains editable.
+        if (child.type === "list" && !child.ordered) {
+          if (bullet && bridge) {
+            boundaryLists.add(bullet);
+            boundaryLists.add(child);
+          }
+          bullet = child;
+          bridge = false;
+        } else if (
+          bullet &&
+          child.position !== undefined &&
+          (child.type === "blockquote" || child.type === "table") &&
+          (bridge ||
+            (previous?.position !== undefined &&
+              previous.position.end.offset! <= child.position.start.offset! &&
+              previous.position.end.line >= child.position.start.line - 1))
+        )
+          bridge = true;
+        else {
+          bullet = undefined;
+          bridge = false;
+        }
         if (
           previous?.position &&
           child.position &&
@@ -1439,12 +1484,19 @@ export function misreadLists(document: Document): MisreadLists {
     // Items enclosing the current parent; a nested paragraph can leave later
     // blocks in an outer item even when its immediate item ends there.
     const enclosingItems: ListItem[] = [];
+    // Original headings whose underline Reading still reads as paragraph
+    // text. A following hyphen thematic break ends this state (#583).
+    const readingParagraphHeadings = new Set<Heading>();
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
         const end = child.position?.end.offset;
         if (start === undefined || end === undefined) return;
-        if (child.type === "heading" && source[start] !== "#") {
+        if (
+          child.type === "heading" &&
+          child.position!.end.line >
+            (child.children.at(-1)?.position?.end.line ?? child.position!.start.line)
+        ) {
           // The underline: blank space after it, or before it beyond the
           // heading's text, makes Reading view read text, and a lone `-` makes
           // Live Preview read text (issue #383). It stays on its own line, as
@@ -1464,17 +1516,27 @@ export function misreadLists(document: Document): MisreadLists {
           const definitionText =
             /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
+          const previous = parent.children[index - 1];
+          const continuedTitle =
+            previous?.type === "heading" &&
+            readingParagraphHeadings.has(previous) &&
+            previous.position!.end.line === child.position!.start.line - 1;
+          const literalUnderline = child.depth === 1 || /^-{1,2}$/.test(underline.slice(prefix));
           const readingParagraph =
             /[ \t]$/.test(underline) ||
             columnAt(from + prefix) > columnAt(text) ||
-            (child.depth === 1 && child.position!.end.line > textLine + 1);
+            (literalUnderline && (child.position!.end.line > textLine + 1 || continuedTitle));
+          if (readingParagraph) readingParagraphHeadings.add(child);
           // ATX can give an unwrapped math widget the line's heading font,
           // or put a standalone image inside a heading. Keep the source (#383).
           if (obsidianWidgetHeading(source, child))
             widgetHeadings.add(stretch(child, lineOf(child)));
           if (
             from > start &&
-            (readingParagraph || /^[ \t>]*-[ \t]*$/.test(underline) || definitionText)
+            (readingParagraph ||
+              continuedTitle ||
+              /^[ \t>]*-[ \t]*$/.test(underline) ||
+              definitionText)
           ) {
             const boundary = breakBefore(child, from, to);
             let ending = from;

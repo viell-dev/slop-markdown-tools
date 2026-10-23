@@ -22,6 +22,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Obsidian preserves list markers across quote and table continuations, adjacent
+  Setext titles that Reading view still reads as paragraph text, and blank lines
+  inside list fences missed by the primary parse
+  ([#582](https://github.com/viell-dev/slop-markdown-tools/issues/582),
+  [#583](https://github.com/viell-dev/slop-markdown-tools/issues/583),
+  [#584](https://github.com/viell-dev/slop-markdown-tools/issues/584)).
+
 - Release-evidence validation runs through linked checkout paths, and the parser
   builder rejects dependencies resolved outside its checkout consistently across
   platforms while accepting valid checkout directory names
