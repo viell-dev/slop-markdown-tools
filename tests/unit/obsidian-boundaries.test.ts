@@ -219,20 +219,21 @@ describe("Obsidian display math boundaries (#586, #587)", () => {
   });
 });
 
-describe("protected boundary start points (#590)", () => {
-  const source = "- ## *h*\noutside\n";
+describe.each(["\n", "\r\n", "\r"])("protected boundary start points with %j (#590)", (newline) => {
+  const source = `- ## *h*${newline}outside${newline}`;
   function proposal(kind: string) {
-    const at = source.indexOf("\n");
+    const at = source.indexOf(newline);
+    const tail = kind === "combined-space" ? " " : kind === "combined-tab" ? "\t" : "";
     return kind === "before-break"
-      ? { start: at, end: at, text: "\n" }
+      ? { start: at, end: at, text: newline }
       : kind === "after-break"
-        ? { start: at + 1, end: at + 1, text: "\n" }
+        ? { start: at + newline.length, end: at + newline.length, text: newline }
         : kind === "unchanged-prefix"
-          ? { start: 0, end: at, text: source.slice(0, at) + "\n" }
-          : kind === "combined-style"
-            ? { start: 0, end: at, text: "- ## _h_\n" }
+          ? { start: 0, end: at, text: source.slice(0, at) + newline }
+          : kind.startsWith("combined-")
+            ? { start: 0, end: at, text: `- ## _h_${newline}${tail}` }
             : kind === "copied-suffix"
-              ? { start: 0, end: source.length, text: source.replace("*h*", "_h_\n") }
+              ? { start: 0, end: source.length, text: source.replace("*h*", `_h_${newline}`) }
               : { start: 0, end: at, text: kind === "longer-style" ? "- ## _h_ ###" : "- ## _h_" };
   }
   function pluginOutput(kind: string) {
@@ -257,10 +258,15 @@ describe("protected boundary start points (#590)", () => {
     expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
     return result.output;
   }
-  it.each(["before-break", "after-break", "unchanged-prefix", "combined-style", "copied-suffix"])(
-    "rejects an unsafe %s separator edit",
-    (kind) => expect(pluginOutput(kind)).toBe(source),
-  );
+  it.each([
+    "before-break",
+    "after-break",
+    "unchanged-prefix",
+    "combined-style",
+    "combined-space",
+    "combined-tab",
+    "copied-suffix",
+  ])("rejects an unsafe %s separator edit", (kind) => expect(pluginOutput(kind)).toBe(source));
   it.each(["style", "longer-style"])("allows a safe terminal %s edit", (kind) => {
     expect(pluginOutput(kind)).toBe(
       source.replace("*h*", kind === "longer-style" ? "_h_ ###" : "_h_"),

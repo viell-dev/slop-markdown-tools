@@ -315,13 +315,13 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   }
   if (!blocks.length) return () => false;
   const { source } = document;
-  // Inspect only the changed portion's trailing line-ending bytes. Terminal
-  // inline substitutions still end outside the protected boundary, while
-  // appending a break there changes that boundary even with other edits.
+  // Inspect line endings in the changed portion's trailing blank margin.
+  // A space or Tab after a new break still splits the boundary (#590).
+  // Terminal inline substitutions without new breaks remain eligible.
   const trailingBreaks = (value: string, from: number, to: number): string => {
     let start = to;
-    while (start > from && (value[start - 1] === "\r" || value[start - 1] === "\n")) start--;
-    return value.slice(start, to);
+    while (start > from && "\r\n \t".includes(value[start - 1]!)) start--;
+    return value.slice(start, to).replace(/[ \t]/g, "");
   };
   const within = (from: number, to: number) => {
     let low = 0;

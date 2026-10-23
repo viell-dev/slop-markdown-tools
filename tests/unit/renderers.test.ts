@@ -430,7 +430,7 @@ describe("GitHub source-verified code normalization (#515)", () => {
       '<math-renderer id="VALUE">$x^2$</math-renderer>',
       "<pre><code>VALUE\n</code></pre>",
       "<p><code>VALUE</code></p>",
-      '<pre><code>&lt;math-renderer data-run-id="VALUE"&gt;$x^2  it("normalizes generated math response IDs while retaining its content (#523)", () => {lt;/math-renderer&gt;</code></pre>',
+      '<pre><code>&lt;math-renderer data-run-id="VALUE"&gt;$x^2$&lt;/math-renderer&gt;</code></pre>',
     ])
       expect(normalize(template.replaceAll("VALUE", a), input)).not.toBe(
         normalize(template.replaceAll("VALUE", b), input),
