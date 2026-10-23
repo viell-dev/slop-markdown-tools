@@ -422,6 +422,12 @@ target whose renderer-dependent anchor information is incomplete. It does not
 claim the fragment is missing; verified headings or explicit HTML IDs remain
 checkable.
 
+After 0.4.0, GitHub file fragments also follow the native Markdown reading of
+dollar-math source. Heading IDs can include dollar-delimited lines above a
+Setext title, and inline markup or HTML inside such source can supply anchors
+too. Duplicate numbering uses that complete reading after the YAML front matter
+choice; the formatter's math reading stays the same.
+
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on
 the website, and is not checked either.

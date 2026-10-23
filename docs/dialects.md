@@ -139,6 +139,13 @@ readings; other fragments are reported as not fully checked. This target
 selection does not change the formatter's front matter safety readings or the
 CommonMark fallback.
 
+After 0.4.0, GitHub file checks also collect anchors from dollar-math source as
+ordinary Markdown. A Setext underline can include the dollar lines in its
+heading, inline emphasis can affect the heading ID, and HTML anchors or headings
+inside those lines can remain reachable. Duplicate IDs follow this complete file
+reading. The alternative is made lazily after the front matter choice;
+formatting and other dialects keep their existing math readings.
+
 | Dialect                    | Anchor of a heading                                                                                                                                      | Matched                                     |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | GitHub, CommonMark         | Rendered text, lowercased; punctuation other than `-` and `_` deleted; spaces become `-`; repeated anchors get `-1`, `-2`                                | Ignoring case                               |

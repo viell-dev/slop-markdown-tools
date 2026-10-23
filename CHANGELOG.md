@@ -22,6 +22,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub file-fragment checks include native headings and HTML anchors in
+  dollar-math source, with complete Setext title text and correct duplicate
+  numbering. The target reading is lazy and preserves the YAML selection and
+  formatter's math behavior
+  ([#570](https://github.com/viell-dev/slop-markdown-tools/issues/570)).
 - GitHub repository-file fragment checks follow YAML preprocessing: mappings and
   YAML error displays render the body after front matter, while ordinary
   non-mappings remain Markdown. Unsettled YAML classes retain only anchors

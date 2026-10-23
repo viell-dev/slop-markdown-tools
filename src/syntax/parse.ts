@@ -196,6 +196,26 @@ export function frontMatterReading(tree: Root): Root | undefined {
  * with it.
  */
 const tomlReadings = new WeakMap<Root, () => Root>();
+/** Lazy target-anchor readings without GitHub's formatter dollar-math extension (#570). */
+const githubFileReadings = new WeakMap<Root, () => Root>();
+function hasTargetMath(tree: Root): boolean {
+  const stack: Nodes[] = [tree];
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (node.type === "math" || node.type === "inlineMath") return true;
+    if ("children" in node) for (const child of node.children) stack.push(child);
+  }
+  return false;
+}
+/**
+ * The selected tree read without dollar math for GitHub file anchors. Keep its
+ * front-matter route and positions; cache the alternative only when requested.
+ * Trees without math and trees of other dialects retain their identity. This
+ * reading is separate from the formatter's otherReading and plainReading.
+ */
+export function githubFileReading(tree: Root): Root {
+  return githubFileReadings.get(tree)?.() ?? tree;
+}
 /** All parser-created front-matter roots, including alternate candidates. */
 const plainReadings = new WeakMap<Root, () => Root>();
 /**
@@ -304,7 +324,7 @@ export function parse(
           vitepress,
         })
       : undefined;
-  const tree = (withFrontMatter: boolean): Root => {
+  const tree = (withFrontMatter: boolean, withMath = true): Root => {
     const codeSpans = codeSpanRecording();
     const extensions = [codeSpans.syntax];
     const mdastExtensions = [labelEndTree, codeSpans.tree];
@@ -336,8 +356,12 @@ export function parse(
     } else if (read !== "commonmark") {
       // Obsidian marks strikethrough with two tildes only; `~a~` is text there
       // (issue #319).
-      extensions.push(gfm({ singleTilde: read !== "obsidian" }), math(mathConditions[read]));
-      mdastExtensions.push(...gfmTree, mathFromMarkdown());
+      extensions.push(gfm({ singleTilde: read !== "obsidian" }));
+      mdastExtensions.push(...gfmTree);
+      if (withMath) {
+        extensions.push(math(mathConditions[read]));
+        mdastExtensions.push(mathFromMarkdown());
+      }
     }
     if (read === "obsidian") {
       extensions.push(obsidianSyntax);
@@ -349,7 +373,15 @@ export function parse(
         mdastExtensions.push(plugin.syntax.mdast);
       }
     }
-    return fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
+    const parsed = fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
+    if (read === "github" && withMath) {
+      let reading: Root | undefined;
+      githubFileReadings.set(parsed, () => {
+        if (!reading) reading = hasTargetMath(parsed) ? tree(withFrontMatter, false) : parsed;
+        return reading;
+      });
+    }
+    return parsed;
   };
   const result = tree(!unclosedFrontMatter(source));
   if (projection) {

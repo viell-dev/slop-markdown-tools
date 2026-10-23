@@ -1,6 +1,7 @@
 import { isAlias, isMap, isPair, isScalar, isSeq, parseDocument } from "yaml";
 import type { Document } from "../core/types.js";
-import { frontMatterReading, plainReading } from "../syntax/parse.js";
+import type { Root } from "mdast";
+import { frontMatterReading, githubFileReading, plainReading } from "../syntax/parse.js";
 import { githubAnchors } from "./anchors.js";
 import type { GithubAnchors } from "./anchors.js";
 
@@ -63,16 +64,16 @@ export function githubFileAnchors(
   markdown = githubAnchors(document),
   originalSource = document.source,
 ): GithubAnchors {
+  const collect = (selected: Root) => {
+    const reading = githubFileReading(selected);
+    return reading === document.tree ? markdown : githubAnchors({ ...document, tree: reading });
+  };
   const candidate =
     document.tree.children[0]?.type === "yaml" ? document.tree : frontMatterReading(document.tree);
   const matter = candidate?.children[0];
-  if (!candidate || matter?.type !== "yaml") return markdown;
-  const withMatter = () =>
-    candidate === document.tree ? markdown : githubAnchors({ ...document, tree: candidate });
-  const withoutMatter = () => {
-    const plain = plainReading(candidate);
-    return plain === document.tree ? markdown : githubAnchors({ ...document, tree: plain });
-  };
+  if (!candidate || matter?.type !== "yaml") return collect(document.tree);
+  const withMatter = () => collect(candidate);
+  const withoutMatter = () => collect(plainReading(candidate));
   // The immutable matrix confirms byte-zero --- fences, horizontal trailing
   // whitespace and LF/CRLF; a BOM or leading blank leaves ordinary Markdown.
   if (!/^---[ \t]*(?:\r\n|\n|\r)/.test(originalSource)) return withoutMatter();
