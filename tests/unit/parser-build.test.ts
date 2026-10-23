@@ -1,0 +1,177 @@
+import { createHash } from "node:crypto";
+import { readFile, readdir } from "node:fs/promises";
+import { createRequire } from "node:module";
+import path from "node:path";
+import ts from "typescript";
+import { beforeAll, expect, it } from "vitest";
+import { bundleParser } from "../../scripts/build-parser.mjs";
+import {
+  repairParserSource,
+  repairReviewedParserSource,
+  sourceGuards,
+} from "../../scripts/parser-patches.mjs";
+import { readReviewedSource } from "../parser-module-probes.mjs";
+
+let bundle: Awaited<ReturnType<typeof bundleParser>>;
+beforeAll(async () => {
+  bundle = await bundleParser();
+});
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+
+it("rejects changed dependency identities, source bytes and missing anchors", async () => {
+  for (const kind of Object.keys(sourceGuards)) {
+    const { source, metadata } = await readReviewedSource(kind);
+    expect(() => repairReviewedParserSource(kind, source, metadata)).not.toThrow();
+    expect(() =>
+      repairReviewedParserSource(kind, source, { ...metadata, name: "changed" }),
+    ).toThrow();
+    expect(() =>
+      repairReviewedParserSource(kind, source, { ...metadata, version: "999.0.0" }),
+    ).toThrow();
+    expect(() => repairReviewedParserSource(kind, `${source}\n`, metadata)).toThrow();
+  }
+  const { source } = await readReviewedSource("editMap");
+  const anchor = "    vecs.push(events.slice());\n    events.length = 0;\n";
+  expect(() => repairParserSource("editMap", source.replace(anchor, ""))).toThrow();
+  expect(() => repairParserSource("editMap", source.replace(anchor, anchor + anchor))).toThrow();
+});
+
+it("ships the reviewed complete graph and exact correction counts", () => {
+  expect(bundle.manifest.resolution).toEqual({
+    platform: "neutral",
+    conditions: ["import", "default"],
+  });
+  expect(bundle.manifest.exports).toEqual([
+    "cjkFriendlyExtension",
+    "fromMarkdown",
+    "gfm",
+    "gfmAutolinkLiteral",
+    "gfmStrikethrough",
+  ]);
+  expect(bundle.manifest.transformCounts).toEqual({
+    attention: 1,
+    autolink: 1,
+    cjk: 1,
+    code: 1,
+    footnote: 1,
+    strike: 1,
+    text: 1,
+  });
+  expect(bundle.manifest.patches.map((entry) => entry.kind).sort()).toEqual([
+    "attention",
+    "autolink",
+    "cjk",
+    "code",
+    "editMap",
+    "footnote",
+    "strike",
+    "text",
+  ]);
+  expect(bundle.manifest.editMapImporters).toEqual([
+    "micromark-core-commonmark/lib/setext-underline.js",
+    "micromark/lib/initialize/document.js",
+    "micromark/lib/initialize/text.js",
+  ]);
+  expect(bundle.manifest.moduleCount).toBe(78);
+  expect(bundle.manifest.inputs).toHaveLength(76);
+  for (const { file } of bundle.manifest.inputs) {
+    expect(path.posix.isAbsolute(file) || path.win32.isAbsolute(file)).toBe(false);
+    expect(file).not.toContain("\\");
+    expect(file).not.toContain("/dev/");
+  }
+  const ast = ts.createSourceFile(
+    "parser.generated.js",
+    bundle.code,
+    ts.ScriptTarget.ES2023,
+    true,
+    ts.ScriptKind.JS,
+  );
+  let imports = 0;
+  let dynamicImports = 0;
+  const inspect = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) imports++;
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword)
+      dynamicImports++;
+    ts.forEachChild(node, inspect);
+  };
+  inspect(ast);
+  expect(imports).toBe(0);
+  expect(dynamicImports).toBe(0);
+  expect(hash(bundle.code)).toBe(bundle.manifest.runtimeSha256);
+  expect(hash(bundle.declaration)).toBe(bundle.manifest.declarationSha256);
+  expect(hash(bundle.licenses)).toBe(bundle.manifest.licensesSha256);
+});
+
+it("packs every complete reviewed license text, rather than headers or SPDX labels", async () => {
+  interface LicensedPackage {
+    name: string;
+    version: string;
+    licenseSha256: string;
+  }
+  const expected = JSON.parse(
+    await readFile(new URL("../../scripts/parser-packages.json", import.meta.url), "utf8"),
+  ) as LicensedPackage[];
+  expected.sort((a, b) => {
+    const left = `${a.name}@${a.version}`;
+    const right = `${b.name}@${b.version}`;
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+  const marker = (entry: LicensedPackage) =>
+    `------------------------------------------------------------------------\n${entry.name}@${entry.version}\n------------------------------------------------------------------------\n\n`;
+  expect(expected).toHaveLength(34);
+  expected.forEach((entry, index) => {
+    const prefix = marker(entry);
+    const at = bundle.licenses.indexOf(prefix);
+    expect(at).toBeGreaterThanOrEqual(0);
+    const end =
+      index + 1 < expected.length
+        ? bundle.licenses.indexOf(marker(expected[index + 1]!), at + prefix.length)
+        : bundle.licenses.length;
+    expect(end).toBeGreaterThan(at + prefix.length);
+    let text = bundle.licenses.slice(at + prefix.length, end);
+    if (index + 1 < expected.length) text = text.slice(0, -1); // presentation separator between sections
+    // The aggregate adds one final LF only when an upstream file has none.
+    expect([hash(text), hash(text.endsWith("\n") ? text.slice(0, -1) : text)]).toContain(
+      entry.licenseSha256,
+    );
+  });
+});
+
+it("records actual uppercase license filenames and unchanged raw provenance", async () => {
+  // Resolve the utility from its declaring package, including under strict pnpm.
+  const fromCjk = createRequire(
+    createRequire(import.meta.url).resolve("micromark-extension-cjk-friendly/package.json"),
+  );
+  for (const expected of [
+    {
+      name: "micromark-extension-cjk-friendly",
+      version: "2.0.2",
+      licenseFile: "LICENSE",
+      licenseSha256: "ba752b39ec76e0887ed1b66d3eb4507d41dd3cff41be66d475d556e15d6a9520",
+    },
+    {
+      name: "micromark-extension-cjk-friendly-util",
+      version: "3.0.1",
+      licenseFile: "LICENSE",
+      licenseSha256: "e4078c730a92cb9c2803a46b6f288a26bf196433e2b009e90ef4789217b49907",
+    },
+  ]) {
+    const directory = path.dirname(fromCjk.resolve(expected.name + "/package.json"));
+    // Directory entries are the case-sensitive oracle even on Windows, where
+    // reading the wrong-case path would otherwise succeed.
+    expect(await readdir(directory)).toContain(expected.licenseFile);
+    const bytes = await readFile(path.join(directory, expected.licenseFile));
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(expected.licenseSha256);
+    expect(bundle.manifest.packages.find(({ name }) => name === expected.name)).toMatchObject(
+      expected,
+    );
+  }
+});
+
+it("rebuilds reproducibly without touching dist", async () => {
+  const again = await bundleParser();
+  expect(again.code).toBe(bundle.code);
+  expect(again.licenses).toBe(bundle.licenses);
+  expect(again.declaration).toBe(bundle.declaration);
+  expect(again.manifest).toEqual(bundle.manifest);
+});

@@ -22,6 +22,16 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Parsing uses a portable internal adapter that corrects repeated event copying,
+  inline text/code compaction, delimiter searches and unbalanced-label autolink
+  scans. Syntax plugins retain the original attention/strikethrough event
+  behavior, and GFM footnote list items have valid source ranges
+  ([#300](https://github.com/viell-dev/slop-markdown-tools/issues/300),
+  [#151](https://github.com/viell-dev/slop-markdown-tools/issues/151),
+  [#240](https://github.com/viell-dev/slop-markdown-tools/issues/240),
+  [#280](https://github.com/viell-dev/slop-markdown-tools/issues/280),
+  [#542](https://github.com/viell-dev/slop-markdown-tools/issues/542)).
+
 - GitHub file-fragment checks include native headings and HTML anchors in
   dollar-math source, with complete Setext title text and correct duplicate
   numbering. The target reading is lazy and preserves the YAML selection and

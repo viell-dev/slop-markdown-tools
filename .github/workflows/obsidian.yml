@@ -19,6 +19,9 @@ on:
       - src/index.ts
       - package.json
       - package-lock.json
+      - scripts/build-parser.mjs
+      - scripts/parser-patches.mjs
+      - scripts/parser-packages.json
       - scripts/rendering.mjs
       - scripts/obsidian-check.mjs
       - scripts/obsidian/**

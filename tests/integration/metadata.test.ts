@@ -144,6 +144,12 @@ describe("renderer checks", () => {
     const rendering = paths(".github/workflows/rendering.yml");
     const obsidian = paths(".github/workflows/obsidian.yml");
     expect(rendering.filter((file) => !own(file))).toEqual(obsidian.filter((file) => !own(file)));
+    for (const file of [
+      "scripts/build-parser.mjs",
+      "scripts/parser-patches.mjs",
+      "scripts/parser-packages.json",
+    ])
+      expect(rendering).toContain(file);
     expect(rendering).toContain(".github/workflows/rendering.yml");
     expect(obsidian).toContain(".github/workflows/obsidian.yml");
   });
