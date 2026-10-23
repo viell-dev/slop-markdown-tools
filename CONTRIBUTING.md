@@ -117,25 +117,31 @@ Any external `plugin.syntax` adds a per-parser compatibility marker. It selects
 the original attention, strikethrough and CJK resolvers while retaining the
 EditMap, text/code compaction, footnote-position and autolink repairs. The
 marker is created in the shared tree factory so primary, projected, alternate
-and lazy front-matter readings use the same policy. Rule-only plugins keep the
-optimized resolvers. Preserve both paths when changing the adapter.
+and lazy front-matter readings use the same policy. Those original resolver
+costs can remain with syntax plugins. Rule-only plugins keep the builtin
+optimized resolver path. Preserve both paths when changing the adapter.
 
 Nested-label proofs and footnote-prefix caches are a separate builtin opt-in.
 Any external syntax retains the original nonempty reference lookup and
 potential-footnote tokenizer; empty dictionaries may shortcut on either path.
 The shared factory also selects that policy for lazy plain/GitHub readings. Both
 GFM and VitePress obtain their footnote factory from the generated adapter.
-Before adding a builtin text construct, resolver, disable entry or definition
-writer, re-prove the documented label invariants or leave that grammar off the
-trusted-label marker. Destination cache guards alone do not establish them.
+`parser.defined` and an initialized `parser.gfmFootnotes` are upstream arrays of
+normalized identifier strings. Keep them as arrays when extending definitions;
+objects that only provide `includes` or other array-like methods are
+unsupported. Before adding a builtin text construct, resolver, disable entry or
+definition writer, re-prove the documented label invariants or leave that
+grammar off the trusted-label marker. Destination cache guards alone do not
+establish them.
 
 The shared factory also opts builtin grammars into batching a single pair of
 homogeneous emphasis runs. The adapter verifies the actual source, event
-boundaries and registered resolver identities before batching. Unknown or
-reordered pipelines retain the existing matcher. Empty and nonclosing runs avoid
-its scratch arrays. Mixed and multiple raw pairs can still copy their interiors
-repeatedly; external syntax keeps the original resolver and its cost. Recheck
-these predicates when changing a builtin resolver or construct.
+boundaries and registered resolver identities before batching. Unknown resolver
+identities or a missing final text resolver retain the existing matcher. On the
+builtin path, empty and nonclosing runs avoid its scratch arrays. Mixed and
+multiple raw pairs can still copy their interiors repeatedly. External syntax
+retains the original resolver and its cost, including its nonclosing-run path.
+Recheck these predicates when changing a builtin resolver or construct.
 
 The VitePress reading uses markdown-it 14.3.3 with the same plugin generation as
 the pinned VitePress 2 reference, including its parser security fixes. Its
@@ -272,8 +278,10 @@ week, and in the Release workflow, it runs the fixtures alone (`COUNT=0`).
 
 Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
 the actual app and renderer versions separately from the requested version, with
-hashes of the input, harness and completed capture. Interrupted captures retain
-a null capture hash.
+hashes of the input, executed spec file (`specSha256`), and completed capture.
+The spec hash covers `obsidian.e2e.mjs`; it does not hash the Docker image or
+the complete harness configuration. Interrupted captures retain a null capture
+hash.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the

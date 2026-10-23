@@ -222,13 +222,18 @@ thousands of files.
   seconds to parse, while one of 35 kB took a fraction of a second ([issue
   #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
   Unreleased builds correct the known repeated text/code event compaction,
-  inline opener searches and unbalanced-label autolink scans. Syntax plugins
-  retain the original attention/strikethrough resolvers for event compatibility,
-  so that part of the former cost can remain with a syntax plugin. These
-  corrections cover repeated reference pairs and the measured inline families,
-  not every possible large paragraph. Deeply nested bracket labels and emphasis
-  remain separate work in
-  [#94](https://github.com/viell-dev/slop-markdown-tools/issues/94).
+  inline opener searches and unbalanced-label autolink scans. Builtin grammars
+  also avoid repeated lookups and scans for proven nested bracket labels and
+  batch eligible single pairs of homogeneous emphasis runs
+  ([#94](https://github.com/viell-dev/slop-markdown-tools/issues/94)). Failed
+  Obsidian wikilink and embed openers reuse the scanned part of their line
+  ([#577](https://github.com/viell-dev/slop-markdown-tools/issues/577)). Mixed
+  or multiple raw emphasis pairs can still copy their interiors repeatedly.
+  Syntax plugins retain the original attention, strikethrough and CJK resolvers
+  and nonempty reference/footnote paths, with their costs; the shared EditMap,
+  text/code compaction, position and autolink repairs still apply. These
+  corrections cover the checked families, not every possible large paragraph;
+  they do not replace this page's historical throughput or memory measurements.
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
   1.8 in every absolute time, while the "compared with parsing" ratios and the

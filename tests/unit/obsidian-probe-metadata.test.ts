@@ -117,7 +117,7 @@ it("binds probe evidence to observed renderer metadata and the completed capture
     browser: { chrome: "observed-chrome", electron: "observed-electron" },
     probeCount: probe.sources.length,
     sourcePacketSha256: digest(probe.packet),
-    harnessSha256: digest(harness),
+    specSha256: digest(harness),
     captureSha256: digest(probe.files.get("/out/probes.json")!),
   });
   expect(JSON.parse(probe.files.get("/out/probes.json")!)).toEqual(

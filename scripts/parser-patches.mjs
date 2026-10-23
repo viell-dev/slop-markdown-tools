@@ -308,7 +308,7 @@ function repair(kind, source) {
     const start = source.indexOf("    let index = -1;", at);
     const end = source.indexOf("    return extraResolver", start);
     assert(at >= 0 && start > at && end > start);
-    return extendTextRegistryV2(source.slice(0, start) + compactText + source.slice(end));
+    return registerTextResolverIdentity(source.slice(0, start) + compactText + source.slice(end));
   }
   if (kind === "code")
     return section(
@@ -322,10 +322,11 @@ function repair(kind, source) {
     assert(at > 0 && source.indexOf("function ", at + 10) === -1);
     return source.slice(0, at) + guardedAutolink;
   }
-  if (kind === "attention") return extendAttentionV2(rewriteAttention(source), attentionV2Source);
-  if (kind === "strike") return extendStrikeV2(rewriteStrike(source), strikeNoCloserSource);
+  if (kind === "attention")
+    return addAttentionFastPaths(rewriteAttention(source), attentionFastPathsSource);
+  if (kind === "strike") return addStrikeNoCloserPath(rewriteStrike(source), strikeNoCloserSource);
   if (kind === "cjk")
-    return extendCjkRegistryV2(
+    return registerCjkResolverIdentity(
       'import { mdrefineResolveAttention } from "mdrefine:core-attention";\n' +
         once(
           source,
@@ -359,7 +360,7 @@ export function repairReviewedParserSource(kind, source, metadata) {
 export { specs as sourceGuards, repair as repairParserSource };
 
 // Exact two-run batching and no-closer cleanup; source guards above stay unchanged.
-const attentionV2Source = String.raw`
+const attentionFastPathsSource = String.raw`
 function mdrefineHandleAttentionFast(events, context) {
   const batch = context.parser.constructs.disable.null.includes("mdrefineHomogeneousAttention");
   let hasSequence = false;
@@ -622,7 +623,7 @@ function mdrefineHandleStrikeNoCloser(events) {
   return true;
 }
 `;
-function extendAttentionV2(corrected, attentionV2Source) {
+function addAttentionFastPaths(corrected, attentionFastPathsSource) {
   // Preserve wrapper precedence: DeferredInline -> Original before any new
   // scan or cleanup; raw generated callers keep the current matching path.
   corrected = once(
@@ -630,10 +631,10 @@ function extendAttentionV2(corrected, attentionV2Source) {
     "function resolveAllAttentionFast(events, context) {",
     "function resolveAllAttentionFast(events, context) {\n  if (mdrefineHandleAttentionFast(events, context)) return events;",
   );
-  return corrected + "\n" + attentionV2Source;
+  return corrected + "\n" + attentionFastPathsSource;
 }
 
-function extendStrikeV2(corrected, strikeNoCloserSource) {
+function addStrikeNoCloserPath(corrected, strikeNoCloserSource) {
   corrected = once(
     corrected,
     "function resolveAllStrikethroughFast(events, context) {",
@@ -647,7 +648,7 @@ function extendStrikeV2(corrected, strikeNoCloserSource) {
   return registryImport + corrected + "\n" + strikeNoCloserSource;
 }
 
-function extendTextRegistryV2(corrected) {
+function registerTextResolverIdentity(corrected) {
   // Only the EXPORTED no-extra resolver. Do not mark initializer text/string
   // callbacks, which can carry resolveAllLineSuffixes.
   return (
@@ -660,7 +661,7 @@ function extendTextRegistryV2(corrected) {
   );
 }
 
-function extendCjkRegistryV2(corrected) {
+function registerCjkResolverIdentity(corrected) {
   corrected = once(
     corrected,
     'import { mdrefineResolveAttention } from "mdrefine:core-attention";',

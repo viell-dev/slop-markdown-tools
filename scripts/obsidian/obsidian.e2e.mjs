@@ -1041,7 +1041,7 @@ describe("Obsidian before and after formatting", function () {
       },
       probeCount: probe.length,
       sourcePacketSha256: digest(process.env.PROBE),
-      harnessSha256: digest(readFileSync("/check/obsidian.e2e.mjs")),
+      specSha256: digest(readFileSync("/check/obsidian.e2e.mjs")),
       captureSha256: null,
     };
     writeFileSync("/out/probe-metadata.json", `${JSON.stringify(metadata, null, 2)}\n`);

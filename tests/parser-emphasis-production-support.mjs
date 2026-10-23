@@ -411,7 +411,7 @@ export async function runCoverageChild(request) {
         env,
         encoding: "utf8",
         windowsHide: true,
-        timeout: 120000,
+        timeout: 25000,
         maxBuffer: 32 * 1024 * 1024,
       },
       (error, stdout, stderr) => {

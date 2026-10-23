@@ -121,9 +121,111 @@
     {
       "name": "entity escape interior",
       "source": "{run}alpha &amp; beta \\! gamma{endRun}\n"
+    },
+    {
+      "name": "emphasis inside link label",
+      "source": "[{run}alpha{endRun}](u)",
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "emphasis inside image label",
+      "source": "![{run}alpha{endRun}](u)",
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "emphasis inside strikethrough",
+      "source": "~~{run}alpha{endRun}~~",
+      "widths": [
+        [
+          4,
+          4
+        ]
+      ],
+      "profiles": [
+        "github",
+        "obsidian",
+        "vitepress"
+      ]
+    },
+    {
+      "name": "unequal underscore emphasis inside strikethrough",
+      "source": "~~{run}alpha{endRun}~~",
+      "markers": ["_"],
+      "widths": [
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ]
+      ],
+      "profiles": [
+        "github",
+        "obsidian",
+        "vitepress"
+      ]
+    },
+    {
+      "name": "label emphasis beside nonempty footnote dictionary",
+      "source": "[{run}alpha{endRun}](u) ![^n]\n\n[^n]: note\n",
+      "widths": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ]
+      ],
+      "profiles": [
+        "github",
+        "obsidian",
+        "vitepress"
+      ]
     }
   ],
   "neighborTemplates": [
+    {
+      "name": "literal unequal stars inside strikethrough",
+      "source": "~~{run}alpha{endRun}~~",
+      "markers": ["*"],
+      "widths": [[4, 5], [5, 4]],
+      "profiles": ["github", "obsidian", "vitepress"],
+      "expectHit": false
+    },
     {
       "name": "intraword equal stars",
       "source": "a{run}b{endRun}c",

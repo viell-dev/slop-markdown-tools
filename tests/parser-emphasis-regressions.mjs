@@ -594,6 +594,14 @@ export function emphasisSources() {
     ]) {
       const left = marker.repeat(a),
         right = marker.repeat(b);
+      const pair = left + "x" + right;
+      for (const source of [
+        `[${pair}](u)`,
+        `![${pair}](u)`,
+        `~~${pair}~~`,
+        `[${pair}](u) ![^n]\n\n[^n]: note\n`,
+      ])
+        sources.add(source);
       for (const text of [
         "x",
         "é漢😀",

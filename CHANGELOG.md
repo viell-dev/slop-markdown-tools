@@ -29,7 +29,7 @@ prereleases' notes there are longer than their entries here.
   [#577](https://github.com/viell-dev/slop-markdown-tools/issues/577)).
 - Focused Obsidian captures record the observed app and renderer versions
   separately from the requested version, with hashes binding completed evidence
-  to its input and harness
+  to its input and executed spec
   ([#580](https://github.com/viell-dev/slop-markdown-tools/issues/580)).
 
 - Release-evidence validation runs through linked checkout paths, and the parser
