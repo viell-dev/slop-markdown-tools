@@ -29,6 +29,70 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it.each([
+    "$x$\n---\n",
+    "$x$ $y$\n---\n",
+    "$x$%%note%%\n---\n",
+    "![cedar](cedar.png)\n---\n",
+    "![cedar][img]\n---\n\n[img]: cedar.png\n",
+    "![[cedar.png]]\n---\n",
+  ])(
+    "retains widget title source with isolated heading and whitespace rules (#383): %j",
+    (source) => {
+      for (const rule of ["style/heading", "style/trailing-space", "style/wrap"])
+        for (const newline of ["\n", "\r\n", "\r"])
+          for (const bom of ["", "\uFEFF"]) {
+            const input = bom + source.replaceAll("\n", newline);
+            expect(
+              checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+            ).toBe(input);
+          }
+    },
+  );
+
+  it.each([
+    "# $x$\n",
+    "## $x$ $y$\n",
+    "## $x$%%note%%\n",
+    "## ![cedar](cedar.png)\n",
+    "## ![[cedar.png]]\n",
+  ])("also retains ATX widget titles when Setext is requested (#383): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/heading": ["warn", { style: "setext" }] },
+          }),
+        ).toBe(input);
+      }
+  });
+
+  it.each([
+    ["before $x$ after", "## before $x$ after\n"],
+    ["*$x$*", "## *$x$*\n"],
+    ["![cedar](cedar.png) after", "## ![cedar](cedar.png) after\n"],
+    ["`code`", "## `code`\n"],
+    ["[name](https://example.com)", "## [name](https://example.com)\n"],
+  ])("keeps native-safe heading conversion for %j (#383)", (text, expected) => {
+    expect(
+      checked(text + "\n---\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": "warn" },
+      }),
+    ).toBe(expected);
+  });
+
+  it("keeps a widget title while formatting a later independent paragraph (#383)", () => {
+    expect(checked("$x$\n---\n\nLater *safe*.\n")).toBe("$x$\n---\n\nLater _safe_.\n");
+    expect(checked("![cedar](cedar.png)\n---\n\nLater *safe*.\n")).toBe(
+      "![cedar](cedar.png)\n---\n\nLater _safe_.\n",
+    );
+  });
+
   it("preserves one-column border combinations and their Reading continuation state (#568)", () => {
     for (const headerLeading of [false, true])
       for (const headerTrailing of [false, true])

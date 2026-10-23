@@ -233,6 +233,12 @@ latest installable release:
   retains its preceding separator when removing it would create or remove a hard
   break. Earlier inline text still formats. An underline treated as text only by
   Live Preview does not need this extra separator protection.
+- A Setext title line beginning directly with math, or a title containing only
+  an image/embed, keeps its whole source. Converting it to ATX can change the
+  math widget's inherited font or move a standalone image into the heading. The
+  inverse conversion keeps those ATX forms too. Mixed text before math, wrapped
+  math, and images beside ordinary title text still allow heading preferences;
+  independent later paragraphs still format.
 - A Tab followed by two or more final spaces keeps its hard break while the text
   continues, even when the primary Markdown parser reads a soft line ending.
   Ordinary trailing whitespace can still be cleaned where it has no rendered

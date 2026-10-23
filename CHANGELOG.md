@@ -52,7 +52,11 @@ prereleases' notes there are longer than their entries here.
   ([#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
 - Retain the separator before an uncertain Obsidian Setext underline when
   trimming it would create or remove a Reading-view hard break
-  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
+  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)). Also
+  retain heading forms around unwrapped leading math and sole image/embed
+  titles, preserving Live Preview typography and placement. The host comparison
+  now checks inherited math typography too
+  ([#569](https://github.com/viell-dev/slop-markdown-tools/issues/569)).
 - Preserve the spaces or tabs after a literal backslash when trimming them would
   create a hard line break, avoiding a guarded trailing-space refusal
   ([#560](https://github.com/viell-dev/slop-markdown-tools/issues/560)).

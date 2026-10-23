@@ -1,4 +1,4 @@
-import type { List, ListItem, Nodes, Parents, Root } from "mdast";
+import type { Heading, List, ListItem, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd, range, startsWithMarker } from "./parse.js";
 import { codeFence } from "./fences.js";
@@ -8,6 +8,7 @@ import {
   lineBreakMatcher,
   lineBreaks,
   escaped,
+  lineStart as startOfLine,
 } from "./source.js";
 
 /**
@@ -30,6 +31,29 @@ export const descriptionLine = /^[ \t>]*:[ \t]/m;
  * markers it hides the destination too, without that line class (issue #411).
  */
 export const definitionLike = /^\[(?:\\.|[^\\\]])*\]:/;
+
+/** Widgets whose typography or placement can change between ATX and Setext in Live Preview. */
+export function obsidianWidgetHeading(source: string, heading: Heading): boolean {
+  const only = heading.children.length === 1 ? heading.children[0] : undefined;
+  if (
+    only?.type === "image" ||
+    only?.type === "imageReference" ||
+    (only?.type === "wikiLink" && only.embed)
+  )
+    return true;
+  const start = heading.children[0]?.position?.start.offset;
+  if (start === undefined) return false;
+  // Inspect only the first direct math node on each physical line, keeping
+  // prefix scans bounded in a long title with many inline formulas.
+  let mathLine = 0;
+  return heading.children.some((node) => {
+    if (node.type !== "inlineMath" || !node.position || node.position.start.line === mathLine)
+      return false;
+    mathLine = node.position.start.line;
+    const at = node.position.start.offset!;
+    return /^[ \t>]*$/.test(source.slice(Math.max(start, startOfLine(source, at)), at));
+  });
+}
 
 /**
  * Text that the parser read where renderers may read a list, or on Forgejo and
@@ -113,6 +137,9 @@ export interface MisreadLists {
    * or later continuation after an earlier lazy line. Its range runs from
    * the prior break through the underline, including any inline node that
    * crosses that break, preserving the physical heading line (#554).
+   * A Setext title line beginning directly with math, or a heading whose only
+   * child is an image/embed, keeps the whole heading: converting it to ATX can
+   * change widget typography or block placement in Live Preview (#383).
    */
   underlines: ReadonlySet<Nodes>;
   /**
@@ -1388,7 +1415,10 @@ export function misreadLists(document: Document): MisreadLists {
             /[ \t]$/.test(underline) ||
             columnAt(from + prefix) > columnAt(text) ||
             (child.depth === 1 && child.position!.end.line > textLine + 1);
-          if (
+          // ATX can give an unwrapped math widget the line's heading font,
+          // or put a standalone image inside a heading. Keep the source (#383).
+          if (obsidianWidgetHeading(source, child)) underlines.add(stretch(child, lineOf(child)));
+          else if (
             from > start &&
             (readingParagraph || /^[ \t>]*-[ \t]*$/.test(underline) || definitionText)
           ) {

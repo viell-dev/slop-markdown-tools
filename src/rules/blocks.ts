@@ -11,7 +11,7 @@ import {
   startsWithMarker,
   unclosedFrontMatter,
 } from "../syntax/parse.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { misreadLists, obsidianWidgetHeading } from "../syntax/misread-lists.js";
 import { walk } from "../syntax/walk.js";
 import {
   escaped,
@@ -197,6 +197,7 @@ export function underlineEdit(document: Document, node: Heading): Edit | undefin
     if (!/^[ \t]*$/.test(source.slice(above, lineEnd(source, above)))) return undefined;
   }
   const text = source.slice(range(first)[0], range(last)[1]);
+  if (document.dialect === "obsidian" && obsidianWidgetHeading(source, node)) return undefined;
   if (notParagraph.test(text) || text.endsWith("\\")) return undefined;
   if ((document.dialect === "forgejo" || document.dialect === "gitea") && text.includes("{"))
     return undefined;

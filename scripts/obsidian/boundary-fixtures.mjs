@@ -5,6 +5,30 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   ...[
+    ["sole math keeps its Setext typography", "$x^2$\n---\n"],
+    ["sole math keeps its level-one underline", "$x$\n===\n"],
+    ["leading math widgets keep their inherited font", "$x$ $y$\n---\n"],
+    ["leading math keeps its font before a comment", "$x$%%note%%\n---\n"],
+    ["adjacent permissive math stays in its native title form", "$x$$y$\n---\n"],
+    ["sole image keeps its standalone placement", "![cedar](cedar.png)\n---\n"],
+    [
+      "sole reference image keeps its standalone placement",
+      "![cedar][img]\n---\n\n[img]: cedar.png\n",
+    ],
+    ["sole wikilink embed keeps its standalone placement", "![[cedar.png]]\n---\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source })),
+  {
+    issue: 383,
+    name: "full generated widget-only Setext regression",
+    source: readFileSync(new URL("./fixtures/383-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    ["text before math permits heading preferences", "before $x$ after\n---\n"],
+    ["wrapped math permits heading and emphasis preferences", "*$x$*\n---\n"],
+    ["text after an image permits heading preferences", "![cedar](cedar.png) after\n---\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source, preserve: false })),
+  ...[
     ["trailing-only one-column borders remain Live Preview text", "basket |\n--: |\nwalnut |\n"],
     ["one-column delimiter without its final border", "basket |\n--:\nwalnut |\n"],
     [
