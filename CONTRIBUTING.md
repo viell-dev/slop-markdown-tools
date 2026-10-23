@@ -128,8 +128,8 @@ broken or compromised release to be found. Security updates are not delayed.
 
 The unit, performance, and integration suites run in that order. Performance
 files run one at a time, apart from coverage and the processes that integration
-tests start. Integration runs use at most four workers, or the machine's
-available parallelism when it has fewer.
+tests start. Unit and integration runs each use at most four workers, or the
+machine's available parallelism when it has fewer.
 
 `test:coverage` uses V8 coverage and writes an HTML report and
 `coverage-summary.json` to `coverage/unit/`. It includes every production
