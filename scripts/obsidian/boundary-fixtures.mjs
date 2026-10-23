@@ -5,6 +5,20 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   ...[
+    ["trailing-only one-column borders remain Live Preview text", "basket |\n--: |\nwalnut |\n"],
+    ["one-column delimiter without its final border", "basket |\n--:\nwalnut |\n"],
+    [
+      "one-column header and delimiter with different leading borders",
+      "| basket |\n--: |\n| walnut |\n",
+    ],
+  ].map(([name, source]) => ({ issue: 568, name, source })),
+  {
+    issue: 568,
+    name: "Live Preview text table leaves an independent real table editable",
+    source: "basket |\n--: |\nwalnut |\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    preserve: false,
+  },
+  ...[
     [
       "one-column text table before a Tab and later table",
       "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
@@ -31,6 +45,11 @@ export const boundaryFixtures = [
       readFileSync(new URL("./fixtures/567.txt", import.meta.url), "utf8"),
     ],
   ].map(([name, source]) => ({ issue: 567, name, source, preserve: false })),
+  ...[
+    ["ignored tilde info makes its closer open later code", "~~~ lang `x`\nc\n~~~\n\n*outside*\n"],
+    ["ignored tilde info carries code beyond a list", "- ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n"],
+    ["ignored tilde info carries code beyond a quote", "> ~~~ lang `x`\n> c\n> ~~~\n\n*outside*\n"],
+  ].map(([name, source]) => ({ issue: 567, name, source })),
   ...[
     [
       "short reset exposes an unclosed long run in an inline comment",

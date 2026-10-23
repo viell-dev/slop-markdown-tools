@@ -29,6 +29,96 @@ const boundaries = boundaryFixtures
   .map(({ issue, source, name }) => [issue, source, name] as const);
 
 describe("Obsidian boundaries read differently by its views", () => {
+  it("preserves one-column border combinations and their Reading continuation state (#568)", () => {
+    for (const headerLeading of [false, true])
+      for (const headerTrailing of [false, true])
+        for (const delimiterLeading of [false, true])
+          for (const delimiterTrailing of [false, true]) {
+            const prefix =
+              `${headerLeading ? "| " : ""}basket${headerTrailing ? " |" : ""}\n` +
+              `${delimiterLeading ? "| " : ""}--:${delimiterTrailing ? " |" : ""}\n` +
+              `${headerLeading ? "| " : ""}walnut${headerTrailing ? " |" : ""}\n`;
+            const later = "\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n";
+            const source = prefix + later;
+            const readingTable =
+              headerTrailing && delimiterTrailing && headerLeading === delimiterLeading;
+            const liveTable = readingTable && headerLeading;
+            for (const newline of ["\n", "\r\n", "\r"])
+              for (const bom of ["", "\uFEFF"]) {
+                const input = bom + source.replaceAll("\n", newline);
+                const output = checked(input);
+                if (!readingTable) expect(output).toBe(input);
+                else {
+                  expect(output).toContain("**b**");
+                  if (!liveTable)
+                    expect(output.startsWith(bom + prefix.replaceAll("\n", newline))).toBe(true);
+                }
+              }
+          }
+  });
+
+  it.each(["style/table", "style/strong"])(
+    "keeps Live Preview one-column text with only %s (#568)",
+    (rule) => {
+      const source = "__basket__ |\n--: |\nwalnut |\n";
+      expect(checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } })).toBe(
+        source,
+      );
+    },
+  );
+
+  it("leaves ordinary bordered and multicolumn tables editable (#568)", () => {
+    expect(checked("| basket |\n| --: |\n| walnut |\n")).toBe(
+      "| basket |\n| -----: |\n| walnut |\n",
+    );
+    expect(checked("a | __b__\n-- | --\nc | d\n")).toContain("**b**");
+  });
+
+  it.each([
+    "~~~ lang `x`\nc\n~~~\n\n*outside*\n",
+    "* a\nb\n~~~ lang `x`\nc\n~~~\n\n*outside*\n",
+    "- ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n",
+    "> ~~~ lang `x`\n> c\n> ~~~\n\n*outside*\n",
+    "> ~~~ lang `x`\n> c\n> ~~~\n>\n> *outside*\n",
+    "  ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n",
+    "~~~~ lang `x`\nc\n~~~~~\n\n*outside*\n",
+    "~~~ lang \\`x\\`\nc\n~~~\n\n*outside*\n",
+    "~~~ lang `x`\nc\n~~~\n\n*inside*\n\n~~~\nraw\n~~~\n\n*after*\n",
+  ])("keeps later source after a primary closer opens Live Preview code (#567): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        const output = checked(input);
+        expect(output).toContain(source.includes("*outside*") ? "*outside*" : "*after*");
+        expect(output).not.toContain("_outside_");
+        expect(output).not.toContain("_inside_");
+        const document = parse(input, "obsidian");
+        expect(
+          [...misreadLists(document).openFences].some(
+            ({ position }) => position!.end.offset === document.source.length,
+          ),
+        ).toBe(true);
+      }
+  });
+
+  it("recognizes a final closed ignored-info fence without a later leaf (#567)", () => {
+    const document = parse("~~~ lang `x`\nc\n~~~\n", "obsidian");
+    expect(misreadLists(document).openFences.size).toBe(1);
+  });
+
+  it.each(["~~~ lang\nc\n~~~\n\n*outside*\n", "~~~ lang &#96;x&#96;\nc\n~~~\n\n*outside*\n"])(
+    "formats the tail of a genuine tilde fence (%j, #567)",
+    (source) => {
+      expect(checked(source)).toContain("_outside_");
+      expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0);
+    },
+  );
+
+  it.each(["~~~~ lang `x`\nc\n~~~\n", "~~~ lang `x`\nc\n    ~~~\n"])(
+    "does not mistake a body run for a closing fence (#567): %j",
+    (source) => expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0),
+  );
+
   it.each([
     "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
     "basket\n--:\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
@@ -980,7 +1070,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
         ![
           "short reset exposes an unclosed long run in an inline comment",
           "joined footnote ending in span paragraph",

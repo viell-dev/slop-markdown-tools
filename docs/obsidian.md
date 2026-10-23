@@ -200,10 +200,15 @@ latest installable release:
 - A list's final paragraph stays adjacent to a tilde opener whose info contains
   a written backtick. Live Preview keeps that source in the paragraph, so a new
   blank would split its continuation. Marker preferences, indentation and safe
-  earlier wrapping remain available.
-- A one-column table whose header lacks a final pipe keeps Reading paragraph
-  state across a Tab-only continuation. Later literal rows retain their source.
-  A real table, an empty or space-only blank, or an interrupting heading still
+  earlier wrapping remain available. When the primary closing fence instead
+  opens Live Preview code, its source and the rest of the document stay as
+  written. This conservatively retains later fence pairings too.
+- A one-column table keeps its source unless its header and delimiter both have
+  leading and trailing pipes, as Live Preview needs those borders for a table
+  widget. Reading view also accepts matching trailing-only borders. Missing
+  final pipes or mismatched leading borders keep Reading paragraph state across
+  a Tab-only continuation, so later literal rows retain their source. A real
+  Reading table, an empty or space-only blank, or an interrupting heading still
   allows subsequent table formatting.
 - An image description containing backticks stays split across its existing
   lines, where joining could turn displayed Live Preview source into an embed.

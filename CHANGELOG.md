@@ -22,9 +22,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep one-column Obsidian table source when missing header or delimiter borders
+  would turn Live Preview text into a table widget, and carry Reading paragraph
+  state across Tab lines when those borders do not form a real table
+  ([#568](https://github.com/viell-dev/slop-markdown-tools/issues/568)).
 - Keep a list paragraph adjacent to an Obsidian tilde opener whose info contains
   backticks, preserving its Live Preview continuation while allowing safe list
-  formatting
+  formatting. When its primary closer opens Live Preview code, conservatively
+  preserve the remaining source because later fences can pair differently
   ([#567](https://github.com/viell-dev/slop-markdown-tools/issues/567)).
 - Retain Reading paragraph state across Tab lines after a one-column table
   displayed as text, preserving later literal rows while allowing genuine tables

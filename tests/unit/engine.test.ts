@@ -1811,6 +1811,8 @@ describe("tables that Obsidian reads otherwise", () => {
     "x\n--:\n",
     "x\n:-:\n",
     "| x\n| --\n",
+    // Reading accepts trailing-only pipes, but Live Preview shows source text (#568).
+    "x |\n-- |\n",
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config, workspace })).toBe(source);
   });
@@ -1819,7 +1821,6 @@ describe("tables that Obsidian reads otherwise", () => {
     ["a *b*\n| x |\n| - |\n", "a _b_\n| x |\n| - |\n"],
     ["a\n\n| x | y |\n| - | - |\n", "a\n\n| x   | y   |\n| --- | --- |\n"],
     ["# h\n| x | y |\n| - | - |\n", "# h\n\n| x   | y   |\n| --- | --- |\n"],
-    ["x |\n-- |\n", "| x   |\n| --- |\n"],
     ["x | y\n-|-\nw | z\n", "| x   | y   |\n| --- | --- |\n| w   | z   |\n"],
     // The parser reads this as Obsidian does: text of the block quote.
     ["> a\n| x | y |\n| - | - |\n", "> a | x | y | | - | - |\n"],

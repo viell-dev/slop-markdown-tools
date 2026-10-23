@@ -800,7 +800,9 @@ After 0.4.0, an Obsidian list ending in a paragraph also stays adjacent to a
 parsed tilde opener whose info contains a written backtick. Live Preview reads
 it as paragraph continuation. List markers, padding and safe earlier reflow
 remain eligible; an existing blank and ordinary info strings keep their usual
-spacing behavior.
+spacing behavior. When its parsed closer opens Live Preview code, the opener and
+remaining document stay as written, conservatively retaining later fence
+pairings too.
 
 ## `style/code-fence`
 
@@ -1217,6 +1219,12 @@ In Obsidian, a body row that changes its header's leading-pipe convention, or
 has only its leading pipe, can instead begin paragraph text. That row and the
 remaining primary table retain their source and preceding boundary, so adding
 table borders cannot absorb the paragraph or split pipes inside links.
+
+After 0.4.0, a one-column Obsidian table also stays as written unless both its
+header and delimiter have leading and trailing pipes. Live Preview displays the
+other forms as source text. Reading view also accepts matching trailing-only
+pipes; missing final pipes or mismatched leading borders instead continue
+paragraph text, including across a Tab-only line into later literal rows.
 
 Before:
 

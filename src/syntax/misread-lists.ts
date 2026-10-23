@@ -1,6 +1,7 @@
 import type { List, ListItem, Nodes, Parents, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { labelEnd, range, startsWithMarker } from "./parse.js";
+import { codeFence } from "./fences.js";
 import {
   capturedLineBreak,
   lineBreak as lineEndingPattern,
@@ -198,6 +199,9 @@ export interface MisreadLists {
    * a line that would close the fence, where the parser opens one, so that it
    * pairs the fences after it otherwise (issue #390). It counts as one
    * stretch, from the start of the fence's first line to the document's end.
+   * Also a closed tilde fence whose info has a raw backtick: Live Preview
+   * reads its opener as text, then opens code at the primary closer. Later
+   * fence pairings may disagree, so keep the same EOF suffix (#567).
    */
   openFences: ReadonlySet<Nodes>;
   /**
@@ -216,6 +220,9 @@ export interface MisreadLists {
    * A body row that changes its header's leading-pipe convention, or has
    * only its leading pipe, begins a protected suffix too: adding borders
    * can otherwise absorb native paragraph text into the table (#558).
+   * A one-column table also keeps its source when either header or delimiter
+   * lacks an outer pipe: Live Preview needs both borders, while Reading view
+   * also accepts matching trailing-only borders (#568).
    */
   tableText: ReadonlySet<Nodes>;
   /**
@@ -549,7 +556,7 @@ export function misreadLists(document: Document): MisreadLists {
       )
         definitionCode.add(stretch(next, lineOf(next)));
     });
-    for (let index = 0; index < order.length - 1; index++) {
+    for (let index = 0; index < order.length; index++) {
       const [leaf] = order[index]!;
       if (leaf.type !== "code" || !leaf.position) continue;
       const text = source.slice(leaf.position.start.offset, leaf.position.end.offset);
@@ -561,7 +568,16 @@ export function misreadLists(document: Document): MisreadLists {
         return run !== undefined && run[0] === fence[0] && run.length >= fence.length;
       };
       const lines = text.split(lineEndingPattern);
-      if (lines.length > 1 && closes(lines.at(-1)!)) continue;
+      // Live Preview rejects a raw backtick in tilde-fence info too. Its
+      // primary closer instead opens code, shifting the later pairings (#567).
+      // Use the parsed boundary: a shorter or overindented body run is no closer.
+      if (fence[0] === "~" && lines[0]!.includes("`") && codeFence(source, leaf)?.close) {
+        openFences.add(
+          stretch(leaf, lineOf(leaf), { ...leaf.position.end, offset: source.length }),
+        );
+        break;
+      }
+      if (index === order.length - 1 || (lines.length > 1 && closes(lines.at(-1)!))) continue;
       // The fence ends before the document does, so its container ended it.
       // Live Preview reads on to a line that closes it, where the parser opens
       // a fence, and pairs the fences after that otherwise, so the rest of the
@@ -690,11 +706,19 @@ export function misreadLists(document: Document): MisreadLists {
     let column: number | undefined;
     /** The end of a list or footnote definition that Reading view read as text, while inside it. */
     let joinedEnd = 0;
-    /** A one-column table that Reading view reads as paragraph text (#359, #398). */
-    const paragraphTable = (leaf: Nodes) =>
-      leaf.type === "table" &&
-      leaf.children[0]?.children.length === 1 &&
-      !/\|[ \t]*$/.test(lines[leaf.position!.start.line - 1]!);
+    const oneColumnTable = (leaf: Nodes) =>
+      leaf.type === "table" && leaf.children[0]?.children.length === 1;
+    /** A one-column table that Reading view reads as paragraph text (#359, #398, #568). */
+    const paragraphTable = (leaf: Nodes) => {
+      if (!oneColumnTable(leaf)) return false;
+      const header = lines[leaf.position!.start.line - 1]!;
+      const delimiter = lines[leaf.position!.start.line]!;
+      return (
+        !/\|[ \t]*$/.test(header) ||
+        !/\|[ \t]*$/.test(delimiter) ||
+        (source[leaf.position!.start.offset!] === "|") !== /^[ \t>]*\|/.test(delimiter)
+      );
+    };
     const paragraphLike = (leaf: Nodes) =>
       leaf.type === "paragraph" ||
       paragraphTable(leaf) ||
@@ -1674,7 +1698,13 @@ export function misreadLists(document: Document): MisreadLists {
           let at = previous.position!.end.offset!;
           while (source[at - 1] === " " || source[at - 1] === "\t") at--;
           tableText.add(startingAt(leaf, at));
-        } else if (paragraphTable(leaf)) tableText.add(startingAt(leaf, lineStart(start)));
+        } else if (
+          paragraphTable(leaf) ||
+          // Reading accepts matching trailing-only borders, but Live Preview
+          // needs both outer pipes on the header and delimiter (#568).
+          (oneColumnTable(leaf) && source[start] !== "|")
+        )
+          tableText.add(startingAt(leaf, lineStart(start)));
         else {
           // Keep the physical row convention of the header. Either view ends
           // a bordered table before an unbordered row, or before a leading
