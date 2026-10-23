@@ -4,7 +4,19 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
-  { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n", preserve: false },
+  { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n" },
+  { issue: 582, name: "same-marker quote tightness", source: "- a\n> b\n- c\n" },
+  { issue: 582, name: "same-star quote tightness", source: "* a\n> b\n* c\n" },
+  {
+    issue: 582,
+    name: "same-marker quote and table tightness",
+    source: "- a\n> b\n| c | d |\n| - | - |\n| e | f |\n- g\n",
+    preserve: false,
+  },
+  { issue: 582, name: "ordered quote bridge", source: "1) a\n> b\n1. c\n" },
+  { issue: 582, name: "matching ordered quote tightness", source: "1. a\n> b\n1. c\n" },
+  { issue: 582, name: "non-one ordered quote successor", source: "1) a\n> b\n3. c\n" },
+  { issue: 582, name: "Tab before quote control", source: "* a\n\t\n> b\n- c\n", preserve: false },
   { issue: 582, name: "quoted bullet bridge", source: "> * a\n> > b\n> - c\n" },
   { issue: 583, name: "adjacent Setext title in Reading paragraph", source: "a\nb\n=\nc\n---\n" },
   {
@@ -13,6 +25,8 @@ export const boundaryFixtures = [
     source: "a\nb\n--\nc\n---\n",
   },
   { issue: 583, name: "hash-prefixed Setext paragraph", source: "#5\nb\n=\nc\n---\n" },
+  { issue: 583, name: "short Setext paragraph across Tab", source: "a\nb\n--\n\t\nc\n---\n" },
+  { issue: 583, name: "hash Setext paragraph across Tab", source: "#5\nb\n=\n\t\nc\n---\n" },
   {
     issue: 583,
     name: "thematic break resets heading state",
@@ -23,6 +37,69 @@ export const boundaryFixtures = [
     issue: 584,
     name: "blank gap in a paragraph's list fence",
     source: "a\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+  },
+  { issue: 584, name: "paired multiline list fence", source: "a\n2) ``` lang\nalpha ```\n\n\nb\n" },
+  {
+    issue: 584,
+    name: "earlier backtick run before list fence",
+    source: "a ``` x\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+  },
+  {
+    issue: 584,
+    name: "ordinary inline blank cleanup control",
+    source: "a ``` b\n\n\n\nc *d*\n",
+    preserve: false,
+  },
+  {
+    issue: 584,
+    name: "backtick fence info control",
+    source: "a\n2) ``` lang `x`\nalpha\n\n\nb\n",
+    preserve: false,
+  },
+  {
+    issue: 584,
+    name: "same-line paired run control",
+    source: "a\n2) ```code``` x\n\n\nb\n",
+    preserve: false,
+  },
+  {
+    issue: 584,
+    name: "escaped list fence marker control",
+    source: "a\n2\\) ``` lang\nalpha\n\n\nb\n",
+    preserve: false,
+  },
+  ...[
+    ["bullet math containment", "- alpha\n$$\nx = y\n$$\n"],
+    ["ordered math containment", "1. alpha\n$$\nx = y\n$$\n"],
+    ["non-one math containment", "2. alpha\n$$\nx = y\n$$\n"],
+    ["math after item heading", "- ## title\n$$\nx = y\n$$\n"],
+    ["math after item code", "- ```\n  a\n  ```\n$$\nx = y\n$$\n"],
+  ].map(([name, source]) => ({ issue: 586, name, source })),
+  {
+    issue: 586,
+    name: "safe marker and inline formatting before math",
+    source: "* *alpha*\n$$\nx = y\n$$\n",
+    preserve: false,
+  },
+  {
+    issue: 586,
+    name: "full generated math containment regression",
+    source: readFileSync(new URL("./fixtures/586.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  { issue: 587, name: "standalone one-line display math", source: "alpha\n$$x = y$$\n" },
+  { issue: 587, name: "standalone one-line list math", source: "- alpha\n$$x = y$$\n" },
+  {
+    issue: 587,
+    name: "safe inline edits before display widget",
+    source: "*alpha*\n$$x = y$$\n",
+    preserve: false,
+  },
+  {
+    issue: 587,
+    name: "ordinary inline math wrap control",
+    source: "alpha $$x = y$$\nbeta\n",
+    preserve: false,
   },
   ...[582, 583, 584].map((issue) => ({
     issue,

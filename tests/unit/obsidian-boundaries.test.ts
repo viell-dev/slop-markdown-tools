@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createWorkspace, format, parse, semanticFingerprint } from "../../src/index.js";
-import type { Config } from "../../src/index.js";
+import type { Config, Plugin } from "../../src/index.js";
 import { boundaryFixtures } from "../../scripts/obsidian/boundary-fixtures.mjs";
 import { misreadLists } from "../../src/syntax/misread-lists.js";
 
@@ -30,6 +30,28 @@ const boundaries = boundaryFixtures
 
 describe("carried Obsidian boundaries (#582–#584)", () => {
   it.each([
+    "- a\n> b\n- c\n",
+    "* a\n> b\n* c\n",
+    "- a\n> b\n| c | d |\n| - | - |\n| e | f |\n- g\n",
+    "1) a\n> b\n1. c\n",
+    "1. a\n> b\n1. c\n",
+    "1) a\n> b\n3. c\n",
+  ])("retains list tightness and both units across a bridge: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      const output = checked(input);
+      if (source.includes("|")) {
+        expect(output).toContain("- a");
+        expect(output).toContain(newline + "- g");
+        expect(output).not.toContain(newline + newline + "- g");
+      } else expect(output).toBe(input);
+      for (const rule of ["style/block-spacing", "style/list-marker", "style/ordered-list"])
+        expect(
+          checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+        ).toBe(input);
+    }
+  });
+  it.each([
     "* a\n> b\n- c\n",
     "* a\n> b\n\t\n- c\n",
     "* a\n> b\n| c | d |\n| - | - |\n| e | f |\n\t\n- g\n",
@@ -55,6 +77,8 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
     "a\n= \nc\n---\n",
     "a\nb\n--\nc\n---\n",
     "a\nb\n=\nc\n===\n",
+    "a\nb\n--\n\t\nc\n---\n",
+    "#5\nb\n=\n\t\nc\n---\n",
   ])("retains an adjacent title in the Reading paragraph: %j", (source) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", "\ufeff"]) {
@@ -72,6 +96,8 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
   it.each([
     "a\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
     "a\n2) b\n3) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) ``` lang\nalpha ```\n\n\nb\n",
+    "a ``` x\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
   ])("retains the physical gap carried into code: %j", (source) => {
     for (const newline of ["\n", "\r\n", "\r"]) {
       const input = source.replaceAll("\n", newline);
@@ -105,6 +131,66 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
       "Before *safe*.\n\na\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n\nLater *outside*.\n";
     const output = checked(source);
     expect(output).toBe(source.replace("*safe*", "_safe_"));
+  });
+});
+
+describe("Obsidian display math boundaries (#586, #587)", () => {
+  it.each([
+    "- alpha\n$$\nx = y\n$$\n",
+    "1. alpha\n$$\nx = y\n$$\n",
+    "2. alpha\n$$\nx = y\n$$\n",
+    "- ## title\n$$\nx = y\n$$\n",
+    "- ```\n  a\n  ```\n$$\nx = y\n$$\n",
+    "alpha\n$$x = y$$\n",
+    "- alpha\n$$x = y$$\n",
+  ])("keeps the native list containment or display widget: %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+        for (const rule of ["style/block-spacing", "style/wrap"])
+          expect(
+            checked(input, { extends: [], dialect: "obsidian", rules: { [rule]: "warn" } }),
+          ).toBe(input);
+      }
+  });
+  it.each(["- alpha\n$$\nx = y\n$$\n", "alpha\n$$x = y$$\n"])(
+    "rejects a plugin changing the alternate-view math boundary: %j",
+    (source) => {
+      const offset = source.indexOf("$$");
+      const plugin: Plugin = {
+        name: "split",
+        rules: {
+          math: {
+            kind: "style",
+            description: "Change the math separator",
+            check: () => [
+              {
+                start: offset,
+                message: "Change",
+                edit: source.includes("\n$$\n")
+                  ? { start: offset, end: offset, text: "\n" }
+                  : { start: offset - 1, end: offset, text: " " },
+              },
+            ],
+          },
+        },
+      };
+      const result = format(source, {
+        workspace,
+        plugins: [plugin],
+        config: { extends: [], dialect: "obsidian", rules: { "split/math": "warn" } },
+      });
+      expect(result.output).toBe(source);
+    },
+  );
+  it("allows independent inline and marker formatting before math", () => {
+    expect(checked("* *alpha*\n$$\nx = y\n$$\n")).toBe("- _alpha_\n$$\nx = y\n$$\n");
+    expect(checked("*alpha*\n$$x = y$$\n")).toBe("_alpha_\n$$x = y$$\n");
+  });
+  it("still wraps ordinary inline math and spaces genuinely separated blocks", () => {
+    expect(checked("alpha $$x = y$$\nbeta\n")).toBe("alpha $$x = y$$ beta\n");
+    expect(checked("- alpha\n\n$$\nx = y\n$$\n")).toBe("- alpha\n\n$$\nx = y\n$$\n");
   });
 });
 

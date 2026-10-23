@@ -104,9 +104,7 @@ export interface MisreadLists {
    * also resets in Live Preview (#565). Its range starts at the opener, or a
    * containing inline node, and continues through its inline block, since
    * later primary spans may be out of phase too. Earlier text and independent
-   * blocks remain editable. A fence on a list line that the primary parse
-   * reads as paragraph text retains the suffix through EOF (#584), as a
-   * fence opened inside a parsed container does (#390).
+   * blocks remain editable.
    */
   unclosedCode: ReadonlySet<Nodes>;
   /** Either Obsidian view can keep code through EOF after an HTML/code transition (#433, #529). */
@@ -239,6 +237,9 @@ export interface MisreadLists {
    * Also a closed tilde fence whose info has a raw backtick: Live Preview
    * reads its opener as text, then opens code at the primary closer. Later
    * fence pairings may disagree, so keep the same EOF suffix (#567).
+   * A fence on a list line that the primary parse reads as paragraph text
+   * retains the suffix too, including physical blank gaps, even when inline
+   * pairing hides that opener (#584).
    */
   openFences: ReadonlySet<Nodes>;
   /**
@@ -276,7 +277,7 @@ export interface MisreadLists {
   /**
    * Lists whose markers and indentation affect continuations outside their
    * parsed container, including a lazy paragraph after a heading (#513, #543)
-   * or bullet lists joined through a quote or table (#582).
+   * or lists joined through a quote or table (#582).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -349,14 +350,18 @@ export function misreadLists(document: Document): MisreadLists {
     }
     return column;
   };
+  /** Whether a primary heading has a physical underline after its inline title. */
+  const isSetextHeading = (node: Nodes): node is Heading =>
+    node.type === "heading" &&
+    node.position !== undefined &&
+    node.position.end.line > (node.children.at(-1)?.position?.end.line ?? node.position.start.line);
   /** Where a paragraph's or an underlined heading's text starts. */
   const textStart = (node: Nodes): number | undefined => {
     const start = node.position?.start.offset;
     if (start === undefined || node.position?.end.offset === undefined) return undefined;
     if (node.type === "paragraph") return start;
     // An underlined heading below link reference definitions starts at them.
-    if (node.type === "heading" && source[start] !== "#")
-      return node.children[0]?.position?.start.offset ?? start;
+    if (isSetextHeading(node)) return node.children[0]?.position?.start.offset ?? start;
     return undefined;
   };
   /**
@@ -753,6 +758,47 @@ export function misreadLists(document: Document): MisreadLists {
       }
       return false;
     };
+    /** The offsets where the line holding `offset` starts and ends. */
+    const lineAround = (offset: number): [number, number] => {
+      let start = offset;
+      while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r") start--;
+      let end = offset;
+      while (end < source.length && source[end] !== "\n" && source[end] !== "\r") end++;
+      return [start, end];
+    };
+    // Compute Reading paragraph/title state before Tab continuation needs it.
+    // Only adjacent siblings carry it; a blank or a hyphen thematic break ends
+    // the chain. Widget-only protection does not seed a paragraph (#583).
+    const readingParagraphHeadings = new Set<Heading>();
+    const continuedTitleHeadings = new Set<Heading>();
+    const classifySetextReadings = (parent: Parents) =>
+      parent.children.forEach((child, index) => {
+        const start = child.position?.start.offset;
+        const end = child.position?.end.offset;
+        if (isSetextHeading(child) && start !== undefined && end !== undefined) {
+          const [from, to] = lineAround(end);
+          const underline = source.slice(from, to);
+          const prefix = /^[ \t>]*/.exec(underline)![0].length;
+          const text = textStart(child) ?? start;
+          // A heading's range can overlap definitions preceding its own title.
+          const textLine = child.children[0]?.position?.start.line ?? child.position!.start.line;
+          const previous = parent.children[index - 1];
+          const continuedTitle =
+            previous?.type === "heading" &&
+            readingParagraphHeadings.has(previous) &&
+            previous.position!.end.line === child.position!.start.line - 1;
+          if (continuedTitle) continuedTitleHeadings.add(child);
+          const literalUnderline = child.depth === 1 || /^-{1,2}$/.test(underline.slice(prefix));
+          if (
+            /[ \t]$/.test(underline) ||
+            columnAt(from + prefix) > columnAt(text) ||
+            (literalUnderline && (child.position!.end.line > textLine + 1 || continuedTitle))
+          )
+            readingParagraphHeadings.add(child);
+        }
+        if ("children" in child && !leaves.has(child.type)) classifySetextReadings(child);
+      });
+    classifySetextReadings(document.tree);
     /**
      * Whether `leaf` starts a block that interrupts a paragraph in Reading
      * view: a block quote, a bullet list, a numbered list that starts at 1, a
@@ -768,7 +814,7 @@ export function misreadLists(document: Document): MisreadLists {
       const start = leaf.position!.start.offset!;
       switch (leaf.type) {
         case "heading":
-          return source[start] === "#";
+          return !isSetextHeading(leaf);
         case "thematicBreak":
         case "math":
           return true;
@@ -804,11 +850,7 @@ export function misreadLists(document: Document): MisreadLists {
     const paragraphLike = (leaf: Nodes) =>
       leaf.type === "paragraph" ||
       paragraphTable(leaf) ||
-      (leaf.type === "heading" &&
-        leaf.depth === 1 &&
-        leaf.position!.end.line >
-          (leaf.children[0]?.position?.start.line ?? leaf.position!.start.line) + 1 &&
-        source[leaf.position!.start.offset!] !== "#");
+      (leaf.type === "heading" && readingParagraphHeadings.has(leaf));
     order.forEach(([leaf], index) => {
       const previous = order[index - 1]?.[0];
       const start = leaf.position?.start.offset;
@@ -895,6 +937,16 @@ export function misreadLists(document: Document): MisreadLists {
           )
         : [];
     };
+    /** A physical list-item fence hidden inside a block already read as list text. */
+    const physicalListFence = (leaf: Nodes): boolean => {
+      if (!text.has(leaf) || !leaf.position) return false;
+      // Read each eligible leaf's physical rows once, before inline parsing
+      // can pair the opener with an earlier or later raw backtick run (#584).
+      for (let number = leaf.position.start.line; number <= leaf.position.end.line; number++)
+        if (/^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+`{3,}[^`]*$/.test(lines[number - 1] ?? ""))
+          return true;
+      return false;
+    };
     /**
      * The length of a run of three or more backticks whose code Live Preview
      * carries into the blocks below, up to a block with a run of the same
@@ -910,6 +962,14 @@ export function misreadLists(document: Document): MisreadLists {
       const start = leaf.position?.start.offset;
       const end = leaf.position?.end.offset;
       if (start === undefined || end === undefined) continue;
+      if (physicalListFence(leaf)) {
+        // A real native fence changes subsequent pairing, so retain the
+        // existing conservative source-to-EOF policy (#390, #584).
+        openFences.add(
+          stretch(leaf, lineOf(leaf), { ...leaf.position!.end, offset: source.length }),
+        );
+        break;
+      }
       if (carry !== undefined) {
         const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
         if (
@@ -962,20 +1022,6 @@ export function misreadLists(document: Document): MisreadLists {
       });
       const long = runs.find(([, length]) => length >= 3);
       if (long === undefined) continue;
-      // Obsidian can open a real list-item fence where the primary parse
-      // still has one paragraph. Its unindented suffix and blank gaps stay
-      // code, and later primary fences can pair differently (#390, #584).
-      // Ordinary inline runs keep their existing, narrower carry behavior.
-      if (
-        text.has(leaf) &&
-        /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+$/.test(source.slice(lineStart(long[0]), long[0])) &&
-        !source.slice(long[0] + long[1], lineBreak(source, long[0])).includes("`")
-      ) {
-        openFences.add(
-          stretch(leaf, lineOf(leaf), { ...leaf.position!.end, offset: source.length }),
-        );
-        break;
-      }
       // Live Preview shows the rest of a table as code from such a run.
       if (leaf.type === "table") unclosedCode.add(leaf);
       const after = backtickRuns(source, long[0] + long[1], end);
@@ -983,14 +1029,6 @@ export function misreadLists(document: Document): MisreadLists {
       carry = close < 0 ? long[1] : carried(source, after.slice(close + 1));
       carryInQuote = quotedLeaves.has(leaf);
     }
-    /** The offsets where the line holding `offset` starts and ends. */
-    const lineAround = (offset: number): [number, number] => {
-      let start = offset;
-      while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r") start--;
-      let end = offset;
-      while (end < source.length && source[end] !== "\n" && source[end] !== "\r") end++;
-      return [start, end];
-    };
     /** Where each line from `start` to `end` after the first starts and ends. */
     const laterLines = (start: number, end: number): [number, number][] => {
       const found: [number, number][] = [];
@@ -1152,23 +1190,42 @@ export function misreadLists(document: Document): MisreadLists {
       }
     };
     const visitBoundaries = (parent: Parents) => {
-      let bullet: List | undefined;
+      let list: List | undefined;
       let bridge = false;
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
         // Reading keeps an immediately following quote or table inside the
-        // earlier bullet item. A later bullet list can then join it across
+        // earlier item. A later list can then join it across
         // that region, even with blank lines after the bridge (#582). Keep
         // both structural units; their inline content remains editable.
-        if (child.type === "list" && !child.ordered) {
-          if (bullet && bridge) {
-            boundaryLists.add(bullet);
+        if (child.type === "list") {
+          if (list && bridge) {
+            boundaryLists.add(list);
             boundaryLists.add(child);
+            if (
+              previous?.position &&
+              child.position &&
+              previous.position.end.line === child.position.start.line - 1
+            ) {
+              // A new blank makes even a same-marker list loose. Include the
+              // next marker so insertion at its line start is protected too.
+              const marker = listMarker.exec(
+                source.slice(child.position.start.offset, child.position.start.offset! + 11),
+              );
+              const length = marker?.[0].length ?? 1;
+              boundaryText.add(
+                stretch(child, previous.position.end, {
+                  ...child.position.start,
+                  offset: child.position.start.offset! + length,
+                  column: child.position.start.column + length,
+                }),
+              );
+            }
           }
-          bullet = child;
+          list = child;
           bridge = false;
         } else if (
-          bullet &&
+          list &&
           child.position !== undefined &&
           (child.type === "blockquote" || child.type === "table") &&
           (bridge ||
@@ -1178,7 +1235,7 @@ export function misreadLists(document: Document): MisreadLists {
         )
           bridge = true;
         else {
-          bullet = undefined;
+          list = undefined;
           bridge = false;
         }
         if (
@@ -1186,6 +1243,17 @@ export function misreadLists(document: Document): MisreadLists {
           child.position &&
           previous.position.end.line === child.position.start.line - 1
         ) {
+          // Reading keeps adjacent unindented display math in the last item,
+          // including after a heading or code block. Retain just its separator
+          // and opener so independent list formatting stays available (#586).
+          if (previous.type === "list" && child.type === "math")
+            boundaryText.add(
+              stretch(child, previous.position.end, {
+                ...child.position.start,
+                offset: child.position.start.offset! + 2,
+                column: child.position.start.column + 2,
+              }),
+            );
           // A compact hyphen break can underline the last physical row in
           // Live Preview, where the parser and Reading view keep a table.
           // Its pipes and padding display as heading text, so keep that
@@ -1484,29 +1552,19 @@ export function misreadLists(document: Document): MisreadLists {
     // Items enclosing the current parent; a nested paragraph can leave later
     // blocks in an outer item even when its immediate item ends there.
     const enclosingItems: ListItem[] = [];
-    // Original headings whose underline Reading still reads as paragraph
-    // text. A following hyphen thematic break ends this state (#583).
-    const readingParagraphHeadings = new Set<Heading>();
     const visitLines = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         const start = child.position?.start.offset;
         const end = child.position?.end.offset;
         if (start === undefined || end === undefined) return;
-        if (
-          child.type === "heading" &&
-          child.position!.end.line >
-            (child.children.at(-1)?.position?.end.line ?? child.position!.start.line)
-        ) {
+        if (isSetextHeading(child)) {
           // The underline: blank space after it, or before it beyond the
           // heading's text, makes Reading view read text, and a lone `-` makes
           // Live Preview read text (issue #383). It stays on its own line, as
           // written.
           const [from, to] = lineAround(end);
           const underline = source.slice(from, to);
-          const prefix = /^[ \t>]*/.exec(underline)![0].length;
           const text = textStart(child) ?? start;
-          // The heading's own start can overlap preceding definitions.
-          const textLine = child.children[0]?.position?.start.line ?? child.position!.start.line;
           // A reference-like first line can make Live Preview read a one-line
           // heading's underline as text, also after indentation/quote markers.
           // Reading view reads multiline level-1 headings as paragraph text,
@@ -1516,17 +1574,8 @@ export function misreadLists(document: Document): MisreadLists {
           const definitionText =
             /^[ \t>]*$/.test(source.slice(textFrom, text)) &&
             definitionLike.test(source.slice(text, textTo));
-          const previous = parent.children[index - 1];
-          const continuedTitle =
-            previous?.type === "heading" &&
-            readingParagraphHeadings.has(previous) &&
-            previous.position!.end.line === child.position!.start.line - 1;
-          const literalUnderline = child.depth === 1 || /^-{1,2}$/.test(underline.slice(prefix));
-          const readingParagraph =
-            /[ \t]$/.test(underline) ||
-            columnAt(from + prefix) > columnAt(text) ||
-            (literalUnderline && (child.position!.end.line > textLine + 1 || continuedTitle));
-          if (readingParagraph) readingParagraphHeadings.add(child);
+          const continuedTitle = continuedTitleHeadings.has(child);
+          const readingParagraph = readingParagraphHeadings.has(child);
           // ATX can give an unwrapped math widget the line's heading font,
           // or put a standalone image inside a heading. Keep the source (#383).
           if (obsidianWidgetHeading(source, child))
@@ -1556,6 +1605,51 @@ export function misreadLists(document: Document): MisreadLists {
           }
         }
         if (child.type === "paragraph") {
+          // A standalone double-dollar formula is a display widget in Live
+          // Preview even when the primary tree calls it inline math. Its line
+          // and adjacent breaks must survive joining by rules/plugins (#587).
+          let mathLine = 0;
+          for (const inline of child.children) {
+            if (
+              inline.type !== "inlineMath" ||
+              !inline.position ||
+              inline.position.start.line === mathLine
+            )
+              continue;
+            mathLine = inline.position.start.line;
+            const from = inline.position.start.offset!;
+            const to = inline.position.end.offset!;
+            if (
+              !source.startsWith("$$", from) ||
+              inline.position.start.line !== inline.position.end.line
+            )
+              continue;
+            const [lineFrom, lineTo] = lineAround(from);
+            if (
+              !/^[ \t>]*$/.test(source.slice(lineFrom, from)) ||
+              !/^[ \t]*$/.test(source.slice(to, lineTo))
+            )
+              continue;
+            let before = lineFrom;
+            if (source[before - 1] === "\n") before--;
+            if (source[before - 1] === "\r") before--;
+            boundaryText.add(
+              stretch(
+                inline,
+                {
+                  ...inline.position.start,
+                  offset: before,
+                },
+                {
+                  ...inline.position.end,
+                  offset: Math.min(
+                    source.length,
+                    lineTo + (source.startsWith("\r\n", lineTo) ? 2 : 1),
+                  ),
+                },
+              ),
+            );
+          }
           // A line whose content starts with `[`, a label, and `]:` hides its
           // destination, including after indentation and quote markers, with the
           // lines above and below it as text, where the parser reads more of

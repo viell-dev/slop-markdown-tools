@@ -63,6 +63,14 @@ function together(
     // Reading view keeps an adjacent, unindented quote in the last item,
     // although the parser ends the list before it (#437).
     if (before.type === "list" && after.type === "blockquote") return true;
+    // Reading keeps adjacent display math inside the last item, including
+    // after its heading or code block (#586).
+    if (
+      before.type === "list" &&
+      after.type === "math" &&
+      before.position!.end.line === after.position!.start.line - 1
+    )
+      return true;
     // Reading view takes text directly below an empty marker into its item
     // (#438). Keep both boundaries of a lone marker, including after a table
     // that Live Preview reads as paragraph text.

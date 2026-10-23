@@ -22,12 +22,17 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Obsidian preserves list markers across quote and table continuations, adjacent
-  Setext titles that Reading view still reads as paragraph text, and blank lines
-  inside list fences missed by the primary parse
+- Obsidian preserves list markers and tightness across quote and table
+  continuations, adjacent Setext titles that Reading view still reads as
+  paragraph text across Tab lines, and blank lines inside physical list fences
+  hidden by the primary inline parse
   ([#582](https://github.com/viell-dev/slop-markdown-tools/issues/582),
   [#583](https://github.com/viell-dev/slop-markdown-tools/issues/583),
   [#584](https://github.com/viell-dev/slop-markdown-tools/issues/584)).
+- Obsidian keeps adjacent display math inside its final list item and retains
+  standalone one-line display widgets when wrapping
+  ([#586](https://github.com/viell-dev/slop-markdown-tools/issues/586),
+  [#587](https://github.com/viell-dev/slop-markdown-tools/issues/587)).
 
 - Release-evidence validation runs through linked checkout paths, and the parser
   builder rejects dependencies resolved outside its checkout consistently across
