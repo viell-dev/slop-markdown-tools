@@ -28,7 +28,17 @@ prereleases' notes there are longer than their entries here.
   ([#357](https://github.com/viell-dev/slop-markdown-tools/issues/357)).
 - Setext titles directly after standalone Obsidian comments keep their
   underlines, since conversion can turn Reading-view paragraph text into a
-  heading ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
+  heading. Titles ending in whitespace-separated raw `#` runs also keep their
+  Setext form, preserving Live Preview's title text
+  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)).
+- Obsidian keeps list indentation and number width where a preceding nested list
+  affects the painted bullet of a following quoted list. Same-width numbering,
+  delimiter preferences and inline styles remain available
+  ([#596](https://github.com/viell-dev/slop-markdown-tools/issues/596)).
+- Quoted blocks opened after a Tab keep their literal source where Reading view
+  reads code instead of the parsed list, heading or paragraph. Independent
+  blocks and ordinary space-only quote margins still format
+  ([#597](https://github.com/viell-dev/slop-markdown-tools/issues/597)).
 - Obsidian preserves list markers and tightness across quote and table
   continuations, literal table rows after list code fences, adjacent Setext
   titles that Reading view still reads as paragraph text across Tab lines, and

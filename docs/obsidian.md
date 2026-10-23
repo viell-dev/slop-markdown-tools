@@ -276,6 +276,20 @@ latest installable release:
   retains its preceding separator when removing it would create or remove a hard
   break. Earlier inline text still formats. An underline treated as text only by
   Live Preview does not need this extra separator protection.
+- A Setext title ending in a raw `#` run after whitespace keeps its heading
+  form. Escaping that run during ATX conversion can reveal hashes in Live
+  Preview. Inline title styles remain available; tight, already escaped,
+  code-span and nonterminal hashes still allow heading preferences.
+- A list at document level that ends in a nested list, followed by a quoted list
+  opening with exactly two spaces after `>`, keeps both indentation units under
+  `style/list-indent`. Blank lines alone do not reset this relationship.
+  Numbering also retains the existing digit width; same-width numbers,
+  delimiters and inline styles remain editable. An intervening block restores
+  ordinary indentation preferences.
+- A quoted block opened after a Tab in the quote margin keeps its physical
+  source and same-block continuations. Reading view can read code where the
+  primary parser reads a list, heading or paragraph. Later independent blocks
+  and margins containing only spaces still format.
 - A Setext title line beginning directly with math, or a title containing only
   an image/embed, keeps its whole source. Converting it to ATX can change the
   math widget's inherited font or move a standalone image into the heading. The

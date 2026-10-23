@@ -30,6 +30,173 @@ const boundaries = boundaryFixtures
 
 describe("carried Obsidian boundaries (#582–#584)", () => {
   it.each([
+    ">\t*c*\n",
+    ">\t* c\n",
+    ">\ttext *c*\n",
+    "> \t* *c*\n",
+    ">  \t*c*\n",
+    ">\t *c*\n",
+    ">\t# *c* ##\n",
+    ">\t* *c*\n> second *d*\n",
+    "> [!NOTE]\n>\t* *c*\n",
+    "> >\t* *c*\n",
+  ])("retains a quoted block read as literal code after a Tab (#597): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: {
+              "style/emphasis": "warn",
+              "style/list-marker": "warn",
+              "style/heading": "warn",
+              "style/wrap": ["warn", { width: 30 }],
+            },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("keeps ordinary quoted margins and independent blocks editable (#597)", () => {
+    expect(checked(">    * *c*\n")).toBe("> - _c_\n");
+    expect(checked("2. a\n   + b\n>    * *c*\n")).toBe("2. a\n   - b\n> - _c_\n");
+    expect(checked("2. a\n   + b\n>\t* *c*\n\nLater *safe*.\n")).toBe(
+      "2. a\n   - b\n>\t* *c*\n\nLater _safe_.\n",
+    );
+    expect(
+      format(">\t*c*\n", {
+        config: { extends: [], dialect: "commonmark", rules: { "style/emphasis": "warn" } },
+      }).output,
+    ).toBe(">\t_c_\n");
+  });
+  it.each(["alpha ##\n===\n", "alpha #\n---\n", "alpha\t##\n===\n"])(
+    "retains a Setext title ending in raw closing hashes (#383): %j",
+    (source) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\ufeff"]) {
+          const input = bom + source.replaceAll("\n", newline);
+          expect(checked(input)).toBe(input);
+          expect(
+            checked(input, {
+              extends: [],
+              dialect: "obsidian",
+              rules: { "style/heading": "warn" },
+            }),
+          ).toBe(input);
+        }
+    },
+  );
+  it("keeps title text and independent heading forms editable (#383)", () => {
+    expect(checked("*alpha* ##\n===\n\nbeta\n---\n")).toBe("_alpha_ ##\n===\n\n## beta\n");
+    for (const [source, expected] of [
+      ["alpha###\n===\n", "# alpha###\n"],
+      ["alpha \\##\n===\n", "# alpha \\##\n"],
+      ["alpha `##`\n===\n", "# alpha `##`\n"],
+      ["alpha ## tail\n===\n", "# alpha ## tail\n"],
+      ["## alpha ##\n", "## alpha\n"],
+    ] as const)
+      expect(checked(source)).toBe(expected);
+    expect(
+      checked("# alpha \\##\n", {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/heading": ["warn", { style: "setext" }] },
+      }),
+    ).toBe("alpha \\##\n=========\n");
+    for (const dialect of ["commonmark", "github"] as const)
+      expect(
+        format("alpha ##\n===\n", {
+          config: { extends: [], dialect, rules: { "style/heading": "warn" } },
+        }).output,
+      ).toBe("# alpha \\##\n");
+  });
+  it.each([
+    "2. a\n   + b\n>  * c\n",
+    "1. a\n   + b\n>  * c\n",
+    "- a\n  + b\n>  * c\n",
+    "2. a\n   - b\n>  * c\n",
+    "2. a\n   + b\n>  1. c\n",
+    "2. a\n   + b\n\n>  * c\n",
+    "2. a\n   + b\n\n\n>  * c\n",
+  ])("retains quoted-list indentation after a trailing nested list (#596): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\ufeff"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(
+          checked(input, {
+            extends: [],
+            dialect: "obsidian",
+            rules: { "style/list-indent": "warn" },
+          }),
+        ).toBe(input);
+      }
+  });
+  it("keeps marker and inline edits in indentation-sensitive lists (#596)", () => {
+    const source = "2. *a*\n   + *b*\n>  * *c*\n";
+    expect(checked(source)).toBe("2. _a_\n   - _b_\n>  - _c_\n");
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-marker": "warn" },
+      }),
+    ).toBe("2. *a*\n   - *b*\n>  - *c*\n");
+  });
+  it.each(["8. a\n99. z\n    + b\n>  * c\n", "9. a\n1. z\n   + b\n>  * c\n"])(
+    "retains number width in the earlier indentation unit (#596): %j",
+    (source) => {
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/ordered-list": ["warn", { numbering: "ordered" }] },
+        }),
+      ).toBe(source);
+    },
+  );
+  it("keeps delimiters and same-width numbering editable in retained units (#596)", () => {
+    const settings: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/ordered-list": ["warn", { numbering: "ordered", delimiter: ")" }] },
+    };
+    expect(checked("8. a\n99. z\n    + b\n>  * c\n", settings)).toBe(
+      "8) a\n99) z\n    + b\n>  * c\n",
+    );
+    expect(checked("2. a\n8. z\n   + b\n>  * c\n", settings)).toBe("2) a\n3) z\n   + b\n>  * c\n");
+  });
+  it.each([{ nestedIndent: 4 }, { orderedSpacesMultiline: 2 }, { bulletSpaces: 3 }])(
+    "retains custom indentation on both participating units (#596): %j",
+    (options) => {
+      const source = "2. a\n   + b\n>  * c\n";
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/list-indent": ["warn", options] },
+        }),
+      ).toBe(source);
+    },
+  );
+  it.each([
+    ["2. a\n   + b\n> * c\n", "2. a\n   + b\n> * c\n"],
+    ["2. a\n   + b\n>   * c\n", "2. a\n   + b\n> * c\n"],
+    ["2. a\n>  * c\n", "2. a\n> * c\n"],
+    [">  * c\n", "> * c\n"],
+    ["2. a\n   + b\n# reset\n>  * c\n", "2. a\n   + b\n# reset\n> * c\n"],
+    ["2. a\n   + b\n> [!NOTE]\n>  * c\n", "2. a\n   + b\n> [!NOTE]\n> * c\n"],
+    ["2. a\n   + b\n> >  * c\n", "2. a\n   + b\n> > * c\n"],
+  ])("keeps measured quote-indent controls editable (#596): %j", (source, expected) => {
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/list-indent": "warn" },
+      }),
+    ).toBe(expected);
+  });
+  it.each([
     "%%c%%\nalpha\n---\n",
     "%%c%%\nalpha\n===\n",
     "%%one\ntwo%%\nalpha\n---\n",

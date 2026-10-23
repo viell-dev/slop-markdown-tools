@@ -960,12 +960,16 @@ After:
 ```
 
 A trailing run of `#` in the text of an underlined heading is escaped, so that
-it is not taken for a closing sequence. Underlined headings of more than one
-line, those inside lists or block quotes, and one directly below TOML front
-matter, whose lines renderers without TOML front matter read as part of the
-heading, are left as written. On Forgejo and Gitea, a closing sequence after an
-attribute block such as `{#id}` stays, because Gitea before 1.26 reads the block
-only when the sequence follows it.
+it is not taken for a closing sequence. After 0.4.0, Obsidian keeps such a title
+in Setext form instead: the escaped ATX form can reveal hashes in Live Preview.
+Inline title formatting remains available. Tight, already escaped, code-span and
+nonterminal hashes still allow conversion.
+
+Underlined headings of more than one line, those inside lists or block quotes,
+and one directly below TOML front matter, whose lines renderers without TOML
+front matter read as part of the heading, are left as written. On Forgejo and
+Gitea, a closing sequence after an attribute block such as `{#id}` stays,
+because Gitea before 1.26 reads the block only when the sequence follows it.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not
@@ -1125,6 +1129,20 @@ These are left as written:
   works](design.md#safety-model)). `style/list-marker` and `style/ordered-list`
   keep their markers too.
 
+After 0.4.0, Obsidian also keeps the indentation of a document-level list that
+ends in a nested list, and of the opening list in the following quote when its
+marker has exactly two spaces after `>`. Live Preview carries the earlier
+indentation into that quoted list, even across blank lines; changing it can
+remove a painted bullet. An intervening block restores ordinary indentation
+preferences. This exception applies to `style/list-indent`; safe marker and
+inline styles remain available. [`style/ordered-list`](#styleordered-list) also
+keeps the number width in those units, while allowing same-width numbering and
+delimiter changes.
+
+Quoted blocks opened after a Tab have separate literal-source protection; see
+[Obsidian's unreleased boundaries](obsidian.md#unreleased-boundary-protections).
+Ordinary space-only quoted margins remain eligible for list indentation.
+
 ## `style/list-marker`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1198,6 +1216,11 @@ the numbers are written with leading zeros, as in `01.`, or would need more than
 nine digits. A list directly below TOML front matter that does not start at 1,
 or whose first item starts with a blank line, keeps its delimiter and numbers,
 as for `style/list-indent`.
+
+After 0.4.0, Obsidian also keeps digit widths where a trailing nested list
+controls a following quoted list's indentation, as described for
+[`style/list-indent`](#stylelist-indent). Same-width numbering and delimiter
+preferences remain available.
 
 Before:
 

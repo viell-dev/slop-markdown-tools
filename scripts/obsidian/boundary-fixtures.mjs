@@ -1531,4 +1531,90 @@ export const boundaryFixtures = [
     source,
     preserve: source !== "%%c%%\n__alpha__\nbeta\n---\n",
   })),
+  {
+    issue: 383,
+    name: "generated Setext title with terminal raw hashes",
+    source: readFileSync(
+      new URL(
+        "../../tests/fixtures/renderers/obsidian-terminal-hashes-3194585963.md",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    preserve: false,
+  },
+  {
+    issue: 596,
+    name: "generated nested-list indentation before a quoted list",
+    source: readFileSync(
+      new URL(
+        "../../tests/fixtures/renderers/obsidian-quote-indent-3729668566.md",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    preserve: false,
+  },
+  {
+    issue: 383,
+    name: "Setext title keeps terminal raw hashes",
+    source: "alpha ##\n===\n",
+  },
+  {
+    issue: 383,
+    name: "retained hash title permits inline styling",
+    source: "*alpha* ##\n===\n",
+    preserve: false,
+  },
+  {
+    issue: 596,
+    name: "two-space quoted list after a trailing nested list",
+    source: "2. a\n   + b\n>  * c\n",
+    preserve: false,
+  },
+  {
+    issue: 596,
+    name: "retained quote-list indentation permits marker and inline styling",
+    source: "2. *a*\n   + *b*\n>  * *c*\n",
+    preserve: false,
+  },
+  {
+    issue: 596,
+    name: "number-width shrink preserves following quoted indentation",
+    source: "8. a\n99. z\n    - b\n>  - c\n",
+  },
+  {
+    issue: 597,
+    name: "Tab-opened quote keeps literal marker and emphasis",
+    source: ">\t* *c*\n",
+  },
+  {
+    issue: 597,
+    name: "Tab after two quote-margin spaces keeps literal emphasis",
+    source: ">  \t*c*\n",
+  },
+  {
+    issue: 597,
+    name: "Tab-opened quote permits independent recovery",
+    source: "2. a\n   + b\n>\t* *c*\n\nLater *safe*.\n",
+    preserve: false,
+  },
+  {
+    issue: 597,
+    name: "Tab-opened quote permits later quoted paragraph formatting",
+    source: ">\t*c*\n>\n> Later *safe*.\n",
+    preserve: false,
+  },
+  {
+    issue: 597,
+    name: "four-space quoted margin remains editable",
+    source: "2. a\n   + b\n>    * *c*\n",
+    preserve: false,
+  },
+  {
+    issue: 383,
+    name: "comment paragraph resets at a thematic break",
+    source: "%%c%%\nalpha\n---\nbeta\n---\n",
+    preserve: false,
+  },
 ];

@@ -272,6 +272,10 @@ export interface MisreadLists {
    * heading form one native heading, so the complete range stays together.
    * A heading after a container ending in math can instead continue its native
    * paragraph lazily; retain that complete boundary too (#336).
+   * A quoted block opened after a Tab in its quote margin keeps its
+   * whole physical source too: Reading view can read literal code where the
+   * primary parser reads a list, heading or inline text (#597). Same-block
+   * continuations stay together; later independent blocks remain editable.
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -281,6 +285,14 @@ export interface MisreadLists {
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
+  /**
+   * A root list ending in a nested list, and a following quote's opening list
+   * after exactly two spaces. Live Preview carries the former indentation
+   * into the latter, even across blank lines: removing one space can remove
+   * its painted bullet (#596). Number-width changes move that indentation too;
+   * same-width numbering, delimiters, markers and inline preferences remain safe.
+   */
+  indentLists: ReadonlySet<List>;
 }
 
 /** Leaf blocks: their children, if they have any, are not blocks. */
@@ -478,6 +490,7 @@ export function misreadLists(document: Document): MisreadLists {
   const commentText = new Set<Nodes>();
   const boundaryText = new Set<Nodes>();
   const boundaryLists = new Set<List>();
+  const indentLists = new Set<List>();
   // GitHub builds display math from paragraphs. A Setext underline below
   // text directly after its closing dollars underlines the whole paragraph,
   // including the dollar lines (#336). Keep that boundary and its content
@@ -1198,6 +1211,26 @@ export function misreadLists(document: Document): MisreadLists {
       let bridge = false;
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
+        // This native indentation relationship survives empty source rows,
+        // but not another intervening block. Hold both atomic indentation
+        // units while leaving their marker-only preferences available (#596).
+        if (
+          parent.type === "root" &&
+          previous?.type === "list" &&
+          previous.children.at(-1)?.children.at(-1)?.type === "list" &&
+          child.type === "blockquote" &&
+          child.position
+        ) {
+          const first = child.children[0];
+          if (
+            first?.type === "list" &&
+            first.position?.start.line === child.position.start.line &&
+            source.slice(child.position.start.offset, first.position.start.offset) === ">  "
+          ) {
+            indentLists.add(previous);
+            indentLists.add(first);
+          }
+        }
         // Reading keeps an immediately following quote, table or display math
         // inside the earlier item. A later list can join it across that region,
         // even with blank lines after the bridge (#582, #586). Keep both
@@ -1573,6 +1606,12 @@ export function misreadLists(document: Document): MisreadLists {
         const start = child.position?.start.offset;
         const end = child.position?.end.offset;
         if (start === undefined || end === undefined) return;
+        if (parent.type === "blockquote") {
+          const prefix = source.slice(lineAround(start)[0], start);
+          const marker = prefix.lastIndexOf(">");
+          if (marker >= 0 && /^[ \t]*\t[ \t]*$/.test(prefix.slice(marker + 1)))
+            boundaryText.add(wholeLines(child));
+        }
         if (isSetextHeading(child)) {
           // The underline: blank space after it, or before it beyond the
           // heading's text, makes Reading view read text, and a lone `-` makes
@@ -2053,6 +2092,7 @@ export function misreadLists(document: Document): MisreadLists {
     commentText,
     boundaryText,
     boundaryLists,
+    indentLists,
   };
   found.set(document.tree, result);
   return result;
