@@ -793,11 +793,11 @@ function readWords(
         // indentation below a task item's checkbox, which the parser
         // keeps. A lazy line, which keeps them, is not supported above.
         if (joining === "description" && /(?: {2}|\\)$/.test(last)) failure = "hard line break";
-        // In a code span, a backslash before the line ending is a hard
+        // In a code span, two spaces or a backslash before a line end make a hard
         // break wherever the backticks do not pair, as on GitHub after an
         // unpaired longer run (issue #335).
-        if (joining === "code" && last.endsWith("\\"))
-          failure = "backslash at a line end in a code span";
+        if (joining === "code" && /(?: {2}|\\)$/.test(last))
+          failure = "hard line break in a code span";
         const trimmed = line.replace(/^[ \t]+/, "");
         lineAt += line.length - trimmed.length;
         line = trimmed;

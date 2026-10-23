@@ -196,8 +196,12 @@ export const boundaryFixtures = [
       "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n",
     ],
     [
-      "paired long multiline code still reflows",
+      "paired long code keeps a source hard-break marker conservatively",
       "before ```a  \nb``` and *right*\n\nlater *outside*\n",
+    ],
+    [
+      "paired long multiline code with a soft newline still reflows",
+      "before ```a\nb``` and *right*\n\nlater *outside*\n",
     ],
     ["code closed before a soft newline still reflows", "before `a  `\nb and *right*\n"],
     [

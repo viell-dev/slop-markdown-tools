@@ -100,6 +100,15 @@ describe("GitHub boundaries beside display math (#336)", () => {
     );
   });
 
+  it("allows a heading after a blank line inside the math's quote", () => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const source = bom + "> $$\n> x\n> $$\n>\nTitle\n---\n".replaceAll("\n", newline);
+        const expected = bom + "> $$\n> x\n> $$\n>\n## Title\n".replaceAll("\n", newline);
+        expect(checked(source, recommended)).toBe(expected);
+      }
+  });
+
   it.each(["#", "##"])("keeps direct %s after math when Setext is requested", (marker) => {
     const source = `$$\nx\n$$\n${marker} Title\n`;
     expect(

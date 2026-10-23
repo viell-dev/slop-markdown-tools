@@ -998,9 +998,11 @@ joined line would read differently:
   marker, which holds an Obsidian callout's title.
 - Where the joined span needs a different number of backticks than it has, and
   an earlier run of that many in the same paragraph would pair with them.
-- Where a line inside the span ends with a backslash: where its backticks do not
-  pair, as on GitHub after an unpaired longer run, that backslash is a hard line
-  break. `style/wrap` keeps such a paragraph as written too.
+- Where a line inside the span ends with two spaces or a backslash: where its
+  backticks do not pair, as on GitHub after an unpaired longer run, those
+  markers make a hard line break. `style/wrap` keeps such a paragraph as written
+  too. This conservative check also retains the newline when the backticks do
+  pair.
 
 After 0.4.0, Obsidian also retains a multiline span with one or two backticks
 and the following source in its inline block: Live Preview resets short code at

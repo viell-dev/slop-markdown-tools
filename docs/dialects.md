@@ -99,8 +99,8 @@ title immediately below it as one source range. GitHub's underline can include
 the dollar lines in that heading. A real blank before the title or an
 interrupting block permits ordinary formatting again
 ([#336](https://github.com/viell-dev/slop-markdown-tools/issues/336)). The same
-protection retains text that GitHub continues inside a list or quote after its
-display math, even when the text omits the container's markers.
+protection retains such a title when GitHub continues it inside a list or quote
+after its display math, even when the title omits the container's markers.
 
 Where a renderer is stricter, the tool still protects the text: a formula with
 emphasis inside, which GitHub does not render, and one that runs over a line

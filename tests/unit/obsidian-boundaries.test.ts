@@ -352,6 +352,15 @@ describe("Obsidian boundaries read differently by its views", () => {
     ).toBe("before `a b` and _right_\n");
   });
 
+  it("keeps a long code span's source hard-break marker while joining soft code (#335)", () => {
+    expect(checked("before ```a  \nb``` and *right*\n\nlater *outside*\n")).toBe(
+      "before ```a  \nb``` and _right_\n\nlater _outside_\n",
+    );
+    expect(checked("before ```a\nb``` and *right*\n\nlater *outside*\n")).toBe(
+      "before ```a b``` and _right_\n\nlater _outside_\n",
+    );
+  });
+
   it.each([
     "a\\ \n=== \n",
     "a  \n=== \n",

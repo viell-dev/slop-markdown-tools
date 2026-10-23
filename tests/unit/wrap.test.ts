@@ -1,4 +1,5 @@
 import fc from "fast-check";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createWorkspace,
@@ -1952,5 +1953,58 @@ describe("terminal separators before Obsidian Tab-only continuations (#563)", ()
     ["1000. alpha  \n\t\t\n# c\n", "1000. alpha\n\t\t\n# c\n"],
   ])("still trims an ordinary terminal separator in %j", (source, output) => {
     expect(verify(source, config, workspace).output).toBe(output);
+  });
+});
+
+describe("code-span source hard breaks (#335)", () => {
+  const configs: Config[] = [
+    { extends: ["recommended", "github"], dialect: "github" },
+    { extends: [], dialect: "github", rules: { "style/wrap": ["warn", { width: 80 }] } },
+    { extends: [], dialect: "github", rules: { "style/inline-code": "warn" } },
+  ];
+
+  it("retains the generated 1169742916/7 boundary while formatting independent source", () => {
+    const source = readFileSync(
+      new URL("../fixtures/renderers/github-code-hardbreak-1169742916.md", import.meta.url),
+      "utf8",
+    );
+    const expected = readFileSync(
+      new URL(
+        "../fixtures/renderers/github-code-hardbreak-1169742916.expected.md",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(verify(source, configs[0]!).output).toBe(expected);
+    expect(expected).not.toBe(source);
+  });
+
+  it.each(["  ", "   ", "\t  ", "\\"])("keeps %j before a physical code-span newline", (ending) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        for (const config of configs) {
+          const source = `${bom}A \`\` run, \`one\` and \`two${ending}${newline}three\` end.${newline}`;
+          expect(verify(source, config).output).toBe(source);
+          expect(format(source, { config: { extends: [], dialect: "github" } }).output).toBe(
+            source,
+          );
+        }
+  });
+
+  it("keeps the source boundary under quote and ordered-item prefixes", () => {
+    const source = "> > 1. A `` run, `one` and `two  \n> >    three` end.\n";
+    for (const config of configs) expect(verify(source, config).output).toBe(source);
+  });
+
+  it("retains two-space code source conservatively even without an unmatched longer run", () => {
+    const source = "A `two  \nthree` end.\n";
+    for (const config of configs) expect(verify(source, config).output).toBe(source);
+  });
+
+  it.each([
+    ["A `two\nthree` end.\n", "A `two three` end.\n"],
+    ["A `` run, `one` and `two \nthree` end.\n", "A `` run, `one` and `two  three` end.\n"],
+  ])("still joins an ordinary soft code boundary in %j", (source, output) => {
+    for (const config of configs) expect(verify(source, config).output).toBe(output);
   });
 });

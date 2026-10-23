@@ -22,6 +22,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep two-space hard breaks inside locally paired multiline code spans, which
+  GitHub can display as literal text after an unmatched longer backtick run.
+  Both wrapping and inline-code joining retain the physical boundary
+  ([#335](https://github.com/viell-dev/slop-markdown-tools/issues/335)).
 - Preserve GitHub's heading and lazy paragraph boundaries beside dollar display
   math, including compact hyphen lines and Setext titles. Keep thematic-marker,
   heading, spacing and wrap changes from splitting those native boundaries
