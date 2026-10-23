@@ -422,8 +422,9 @@ it helps.
   machine.
 - The Vitest projects run unit tests, performance checks, then integration tests
   (`sequence.groupOrder`). Performance files run serially, outside unit
-  coverage; integration workers are capped at four so CLI subprocesses do not
-  overwhelm a runner. Keep these boundaries when adding checks.
+  coverage; unit and integration workers are capped at four so CPU-heavy
+  properties and CLI subprocesses do not overwhelm a runner. Keep these
+  boundaries when adding checks.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for

@@ -1,0 +1,340 @@
+{
+  "repository": "viell-dev/slop-markdown-tools",
+  "observedOn": "2026-10-23",
+  "method": "GitHub Contents API application/vnd.github.html+json; source bytes independently verified against the same immutable commit",
+  "cases": [
+    {
+      "file": "minimal.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "f049b2e17c5cdd04f03116d7fa42c5d94c5a3456bf9e80127f39a6cfe0a8ab64",
+      "blobSha": "31f383a0cc755d76ed604a73cf079c26b1f4257c",
+      "generatedIds": [
+        "xtitle"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "3221879aaa21efe9fec4c4fcc3ffec9e7a028c1e9bf9f6756010dbb509b8b0b8"
+    },
+    {
+      "file": "later-primary-title.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "5c69c3b80187078a19018b55f55b1f657caf054e2827cc4f03fa38d9db0f20d4",
+      "blobSha": "6410932d01ed9993e26bd26c3bb17187cee37625",
+      "generatedIds": [
+        "xtitle",
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "6b53d01c3c5cf0df92e57b64a484b2dec4819ad424b27a36242ca5503b39a4ac"
+    },
+    {
+      "file": "later-native-title.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "b216e5c6a5b1ca0bb82ba83486514dbfe7c534cfb07801a81b526a053cb45315",
+      "blobSha": "d8ea4ac6bb0af1117d7636a6448b2c9890102604",
+      "generatedIds": [
+        "xtitle",
+        "xtitle-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "107ad5718505699365fe26425c5812be36bce12b88adff16c38138cbd0647cf2"
+    },
+    {
+      "file": "mixed-inline.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "3a64d32ac6adea4d36533fbe3e4a905c89c5683b408196615d05970a4281dd93",
+      "blobSha": "601ea6f026102720f9bf46cd8def33ca4acf15f8",
+      "generatedIds": [
+        "math-x_1-end",
+        "math-x-end",
+        "xtitle",
+        "math-x_1-end-1",
+        "math-x-end-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "0021ec443cac4c4d119bff5d06f0556698b729009f154a230ec2e06298a7ec07"
+    },
+    {
+      "file": "mixed-display.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "a65b45a0fdb2f9310bfb1aa297a0fae3e8f1ed29012a3fc44712c24ec3cdd655",
+      "blobSha": "1a4f08ff83b3068a3ac6055a2a9f52924014349c",
+      "generatedIds": [
+        "ordinary",
+        "xtitle",
+        "ordinary-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "716505ef21880ab9b81af0ffbe3794f5185bf49ddb8581733fac57c64c2a6914"
+    },
+    {
+      "file": "mixed-math-html.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "df2e10a9eb03af76c92c85c80bcf749863ee457a5c7152cccc38d10a0eea5b6c",
+      "blobSha": "04468df5cd53c71d8f7c3f2825dc423f9f4cad2b",
+      "generatedIds": [
+        "xtitle",
+        "after"
+      ],
+      "explicitIds": [
+        "formula-id",
+        "real-id"
+      ],
+      "htmlSha256": "d6fd24a16781ebcb9389fe350514b56558b46beaa9341237f6b4a8d09f59dbd1"
+    },
+    {
+      "file": "mixed-math-reference.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "d6c4a1298236daed0ec36f46ccb8595eba8a85c48087e1e5befe1931ca4e857e",
+      "blobSha": "3770d6b117a81051d8dcce84a50af20022da0aa9",
+      "generatedIds": [
+        "reference",
+        "xtitle"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "582fd7acf3f201baffa8769836a0a26191a54cb9f0e6cdeb48377e2259e90f99"
+    },
+    {
+      "file": "yaml-mapping.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "129c79ce9fc2885e4fcae4b9f56715fcf218a90072064cb77c4c6adbd279fe07",
+      "blobSha": "63790d4c043759e9286ad2dd537b54c8fb35b423",
+      "generatedIds": [
+        "xtitle",
+        "math-x_1-end"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "2e85c62bf5afe9deac1b58eebed649f37134cf8720c28a1c580303f4de16ceaa"
+    },
+    {
+      "file": "yaml-plain-scalar.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "92ec1c2484d9141506965554caac63ada5fc69bf91c4c43a1c0e6664aab3f181",
+      "blobSha": "896dbaac804cdfefa38d52679313a1a0ea26fb98",
+      "generatedIds": [
+        "x",
+        "xtitle",
+        "math-x_1-end"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "d4496bd92fbf4c9986b25d21c76b203ce5bb9b57a25eeff97e1044928cf8baa5"
+    },
+    {
+      "file": "separating-blank.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "40e7d7a2163156e91dc72e1d74c0680b8846d4c64b436b612e1708e73e8a5b48",
+      "blobSha": "516c695ab2ecef9092206a3f32f89eb9c9ce133a",
+      "generatedIds": [
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "8e882684fbd5b07839822b74e494d0301223260e6aa1606deaaff5e7ccd4126c"
+    },
+    {
+      "file": "atx-interruption.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "a0a1b0d3c8cb8e0bcf7106d51b9efa26ea783c81c21209a99528ee29bc02e952",
+      "blobSha": "ec53310a794d9985d101b2643a350927b9d1f6a6",
+      "generatedIds": [
+        "barrier",
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "11826a96caf866392fe4906dffd7ba76216d7e88781ba2e796798bbf46544a75"
+    },
+    {
+      "file": "containers.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "769e7891de1b393e2b826febe07e14cf9b4a87bbe92c9f44e3281a4f4a748d7d",
+      "blobSha": "168d54d6a70b02e0374728c57b6c8f3a8a1804c0",
+      "generatedIds": [
+        "xtitle",
+        "xtitle-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "072004c32a226acf22e9b997350021598e832cceeb1e636133c8169a06341ee3"
+    },
+    {
+      "file": "consecutive.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "1b69e23f2155e493c1b9dbf639eb0308d67eeb72e42a09db7d660ced0b052250",
+      "blobSha": "1412fdd26936a22ae17df8216e6da2e2a1581d19",
+      "generatedIds": [
+        "abtitle"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "fb69468bb06f1335b0841807a83efbae9f8fae3a1d2f018af3131dea45f44b1a"
+    },
+    {
+      "file": "r6-hash-five-h2.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "c4f871ca271019265aa4dbb780a35b597c674729769df524758357907cfaf7cd",
+      "blobSha": "4fd909ac27235696db63f731cf61236ae0d7e40f",
+      "generatedIds": [
+        "x5"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "2ba1504a654fa22fc431eda8a0f409464403450667a8f6da71d4eb6d42cb0d44"
+    },
+    {
+      "file": "r6-hash-five-h1.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "f5c79c6ca04f6ef3b9fa5ee2995c9735b0031fa601ea18cf3d5afd3204bc6b92",
+      "blobSha": "337e99203a4418859a30ebab0bdeb93cdfe0f517",
+      "generatedIds": [
+        "x5"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "f2a42acd7fdafab22514d8ab541a6e8d50bb760dfc5aab72ed34d32a75fde011"
+    },
+    {
+      "file": "r6-lazy-quote-h2.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "b706f193ee209f28049efb1699e6b13c1cf3f2e149a3a59fe49ca0ddbef8df42",
+      "blobSha": "eb0b1a21238eac094ad45d71329a6aac471e8457",
+      "generatedIds": [],
+      "explicitIds": [],
+      "htmlSha256": "e0caeb584dca5ca749230a307059e515a9f36b5813072006d683ec58bfdb4e78"
+    },
+    {
+      "file": "r6-lazy-quote-h1.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "553b86fe2bb97013fa646a9f5b4dfd9fce06ed55c280ff5e14b0ded35cdcca0e",
+      "blobSha": "cfa00b4d894b88e6ed8bca670717f70f93943aee",
+      "generatedIds": [],
+      "explicitIds": [],
+      "htmlSha256": "88742b1f124199cb9543c53d96a0cdf8cea0025bcc1cd581fa1533dcfd0efc17"
+    },
+    {
+      "file": "r6-lazy-list-h2.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "9e10fb1917374d2f20d9267fdda5bb0185966cffdb548a42bdc990393c9cb517",
+      "blobSha": "adeed4038ede17fa2540f26cc05b646a7bed0f7d",
+      "generatedIds": [],
+      "explicitIds": [],
+      "htmlSha256": "d26f0088c8027aa0460cd4ceff3ab6b942fefc8e5ace2431ca8d700a3f2d37da"
+    },
+    {
+      "file": "r6-lazy-list-h1.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "fcd645a153c96c7a6f929f02f36bb7b286a62760964d3ec088ee552cda45c517",
+      "blobSha": "824be7ca0f4b3a2f870519305fcdfc3a30a94d77",
+      "generatedIds": [],
+      "explicitIds": [],
+      "htmlSha256": "c9045fd9b5a7463f0912aaf5ca4b18271d34264f5592168fc3841231d2d034f8"
+    },
+    {
+      "file": "r6-quote-internal-ending-blank.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "aaa17404f47461b8c17fa3bdd665c272ed7c769112d67607332aa484e4c979e9",
+      "blobSha": "924eab4922ae207dc3f616add4c96879c94ad045",
+      "generatedIds": [
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "4e71141843bca0a3685c82223bec983c22791c188635c571f50e42f9985b265c"
+    },
+    {
+      "file": "r6-quote-external-blank.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "352282cd1801ee11fe1cd689f2cb1f052d84383c27b563e9d057d069fa24bccf",
+      "blobSha": "1d73719b889f6dca4eb5f46bc028a45b36f2c70b",
+      "generatedIds": [
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "dd7504899b148f616cd47d9a6fb54d20e474d02d1b5025cce20abd1b55c122d2"
+    },
+    {
+      "file": "r6-list-internal-ending-blank.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "f4aa91d2d7d91e056df1343431c9f8b38e4ea9c8570be5bf795b73bf6fc65e55",
+      "blobSha": "ac724dd534af3bb489f0360dcd55f1be06ed3592",
+      "generatedIds": [
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "9c7ac2f04d3f9433e9e0d13f3db546e16a2c0c246317ab0860cd5a71128bcfc9"
+    },
+    {
+      "file": "r6-list-external-blank.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "0e17308a34abe436720dc46da7dee60cb8e2e8dc58825c2d2f4f7cd3f172d0ed",
+      "blobSha": "f109b818eda17d66ef2b12f5c48eaa884821d37f",
+      "generatedIds": [
+        "title"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "e24af7da2370be2d2fbe65bc16963eea4cc56b23ebdd8b0c16323023600eb784"
+    },
+    {
+      "file": "r6-quote-blank-inside-math.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "1b3af5a63b2041cfedf8f965616a398674c74fdf523af8df8fcd89c18b7aeea0",
+      "blobSha": "6934838e0988aea86e72705923e52f449c61a78e",
+      "generatedIds": [],
+      "explicitIds": [],
+      "htmlSha256": "e92cedee62118dbdc528f42131727c83a1aa13dba73a5cb1e374e6f87e1d9f3e"
+    },
+    {
+      "file": "r6-actual-atx-control.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "5337f78d34b7eb427a64fe8966d7c3e0f3d86c18a7e255b2743e162ffb63ec72",
+      "blobSha": "6b94dd70f05c3cf5d3395d0fa4f6c78905aa21c1",
+      "generatedIds": [
+        "5"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "06a5635e056683717ae096e8d9b6fde3c7b9e59a81ac9af76a38104efccdca7e"
+    },
+    {
+      "file": "math-internal-headings.md",
+      "commit": "94eaf702d5aa389d1b3dc06a7e6eb24163725ef8",
+      "sourceSha256": "3950f64b2a0235401eb29cdc24c8f3a54c1482c50bc2e13944f64583618ffa3e",
+      "blobSha": "10d3d35511c00165ed24830c5432a0a4a49d3679",
+      "generatedIds": [
+        "hidden",
+        "xtitle",
+        "hidden-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "4ebe9a7b4f788b318b3b18c6387212938d42d88f21e3954ff60df609a306f926"
+    },
+    {
+      "file": "standalone-inline.md",
+      "commit": "34cd07750e7290cd555d1921e4358f951e64bbcf",
+      "sourceSha256": "2e58fe165893420e59c8881e17430f828c3e7d89ab35faacc3b628a37a827e3b",
+      "blobSha": "3a09c8ec0bf1fe717fcaf67efc5bf967e606f6fe",
+      "generatedIds": [
+        "math-x-end",
+        "math-x_1-end"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "b5853d94434e27fc4d7c46613d510aa0307553b9d385bf9f80ced6f30842976a"
+    },
+    {
+      "file": "standalone-math-html.md",
+      "commit": "34cd07750e7290cd555d1921e4358f951e64bbcf",
+      "sourceSha256": "ae79b745483ec72b5ce5689f29ccb5bccebcc1a9b3baf4805ad390935a10e40b",
+      "blobSha": "5b52d88f2ec9a7f00260f07b1f96801fa21f2d8d",
+      "generatedIds": [
+        "after"
+      ],
+      "explicitIds": [
+        "formula-id"
+      ],
+      "htmlSha256": "e268bc179a019400b7b7df812ca23795621fd4c672ce13ecaf36ffdc94ae1831"
+    },
+    {
+      "file": "standalone-math-headings.md",
+      "commit": "34cd07750e7290cd555d1921e4358f951e64bbcf",
+      "sourceSha256": "8d09d8677e97763252c3809c4e2b292eae60db6941ba31f4fcb4a44fc86c29f3",
+      "blobSha": "54af7d888c3c9415fea9985ba72376ee4311c90b",
+      "generatedIds": [
+        "hidden",
+        "hidden-1"
+      ],
+      "explicitIds": [],
+      "htmlSha256": "2021d5dfda05ec555e7a36895d31c5a0c9e7ab0d15ccb03bb5d47c827f622bd1"
+    }
+  ]
+}

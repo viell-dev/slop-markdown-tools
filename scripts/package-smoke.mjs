@@ -89,6 +89,25 @@ async function checkInstalled(project) {
       ),
       `${"=".repeat(67)}\n--- a/note.md\n+++ b/note.md\n@@ -1,1 +1,1 @@\n-before\n+after\n`,
     );
+    const workspaceLoad =
+      mode === "module"
+        ? `import { createWorkspace } from ${named()};`
+        : `const { createWorkspace } = require(${named()});`;
+    const target = "---\ntitle: |\n  ```js\n---\n# Body\n";
+    assert.equal(
+      runNode(
+        [
+          `--input-type=${mode}`,
+          "-e",
+          `${workspaceLoad}
+const workspace = createWorkspace({"Target.md": ${JSON.stringify(target)}});
+process.stdout.write(JSON.stringify(["github", "commonmark"].map(dialect =>
+  workspace.resolve("From.md", "Target.md#body", dialect).fragmentExists)));`,
+        ],
+        project,
+      ),
+      "[true,false]",
+    );
   }
   assert.equal(
     runNode(

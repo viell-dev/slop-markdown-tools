@@ -13,9 +13,9 @@ const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
 
 /**
- * Elements whose content HTML reads as text and that no renderer shows as an
- * element: GitHub's tagfilter shows these tags as text, Forgejo removes them,
- * and Gitea shows them as text or removes them. `<plaintext>` has no end.
+ * Elements whose unfiltered content HTML reads as text. Renderer-specific
+ * escaping belongs in htmlView(), before browser tokenization. Forgejo/Gitea
+ * retain this default handling; `<plaintext>` has no end.
  */
 const rawText = new Set([
   "iframe",
@@ -28,6 +28,30 @@ const rawText = new Set([
   "title",
   "xmp",
 ]);
+
+/** How a renderer serializes raw HTML before the browser reads it. */
+export interface HtmlViewOptions {
+  /** GFM escapes these tag starts, exposing their content as ordinary HTML. */
+  tagfilter?: "github";
+  /** Flow HTML filters every matching start; inline HTML filters one raw node. */
+  flow?: boolean;
+}
+
+// Flow HTML is serialized with a final newline, even at source EOF. Keep
+// that boundary in the filter without adding text bytes to the source view.
+const githubTagfilterStart = String.raw`<(\/?)(iframe|noembed|noframes|plaintext|script|style|title|textarea|xmp)`;
+const githubFlowTagfilter = new RegExp(
+  githubTagfilterStart + String.raw`(?=[\t\n\f\r >]|/>|$)`,
+  "gi",
+);
+const githubInlineTagfilter = new RegExp(
+  "^" + githubTagfilterStart + String.raw`(?=[\t\n\f\r >]|/>)`,
+  "i",
+);
+// Raw flow can contain spellings outside the inline HTML grammar. GitHub
+// suppresses child headings for these, but its API modes differ in HTML.
+// Decline exact anchors instead of treating their contents as ordinary tags.
+const githubUnsupportedRawText = new RegExp(githubTagfilterStart + String.raw`(?:/(?!>)|\v)`, "i");
 
 /** A tag that becomes an element, or the text between tags. */
 type HtmlToken =
@@ -141,6 +165,13 @@ function decodeReferences(text: string): string {
   );
 }
 
+/** Rendered text, with character references decoded once within each text token. */
+function htmlText(tokens: HtmlToken[]): string {
+  let text = "";
+  for (const token of tokens) if (token.name === undefined) text += decodeReferences(token.text);
+  return text;
+}
+
 const headingTag = /^h[1-6]$/;
 
 /**
@@ -155,12 +186,12 @@ function htmlHeadings(tokens: HtmlToken[], closeAtEnd = false): { text: string; 
   const headings: { text: string; hasId: boolean }[] = [];
   let open: { text: string; hasId: boolean } | undefined;
   const close = () => {
-    if (open) headings.push({ text: decodeReferences(open.text), hasId: open.hasId });
+    if (open) headings.push({ text: open.text, hasId: open.hasId });
     open = undefined;
   };
   for (const token of tokens) {
     if (token.name === undefined) {
-      if (open) open.text += token.text;
+      if (open) open.text += decodeReferences(token.text);
     } else if (headingTag.test(token.name)) {
       close();
       if (!token.close)
@@ -181,10 +212,42 @@ function htmlHeadings(tokens: HtmlToken[], closeAtEnd = false): { text: string; 
  * written around the text that the renderers put between them, with the text's
  * own `<` and `&` escaped so that only real tags are read.
  */
-function htmlView(node: Nodes): string {
-  if (node.type === "html") return node.value;
+function htmlView(node: Nodes, options: HtmlViewOptions = {}): string {
+  if (node.type === "html")
+    return options.tagfilter === "github"
+      ? node.value.replace(options.flow ? githubFlowTagfilter : githubInlineTagfilter, "&lt;$1$2")
+      : node.value;
   if (node.type === "break") return "\n";
-  if ("children" in node) return node.children.map(htmlView).join("");
+  if ("children" in node)
+    return node.children.map((child) => htmlView(child, { ...options, flow: false })).join("");
   return textContent(node).replaceAll("&", "&amp;").replaceAll("<", "&lt;");
 }
-export { htmlTokens, htmlAnchors, htmlHeadings, htmlView };
+
+/** Whether a raw HTML node is serialized as flow rather than inline HTML. */
+function htmlFlow(node: Nodes, parent?: Nodes): boolean {
+  return (
+    node.type === "html" &&
+    (parent?.type === "root" ||
+      parent?.type === "blockquote" ||
+      parent?.type === "listItem" ||
+      parent?.type === "footnoteDefinition")
+  );
+}
+
+/**
+ * Escaping an inline filtered tag can expose markup inside its old attributes.
+ * Raw-flow slash/VT spellings also have unsupported sanitizer behavior. Do not
+ * guess anchors for either case or filter the assembled view a second time.
+ */
+function htmlViewUncertain(node: Nodes, options: HtmlViewOptions = {}): boolean {
+  if (options.tagfilter !== "github") return false;
+  if (node.type === "html")
+    return options.flow
+      ? githubUnsupportedRawText.test(node.value)
+      : githubInlineTagfilter.test(node.value) && node.value.indexOf("<", 1) >= 0;
+  return (
+    "children" in node &&
+    node.children.some((child) => htmlViewUncertain(child, { ...options, flow: false }))
+  );
+}
+export { htmlTokens, htmlAnchors, htmlHeadings, htmlText, htmlView, htmlFlow, htmlViewUncertain };

@@ -23,6 +23,8 @@ export default defineConfig({
           name: "unit",
           include: ["tests/unit/**/*.test.ts"],
           testTimeout: 15000,
+          // CPU-heavy properties must not compete with one worker per core.
+          maxWorkers: Math.min(4, availableParallelism()),
           sequence: { groupOrder: 0 },
         },
       },

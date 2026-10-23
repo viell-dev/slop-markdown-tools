@@ -2447,15 +2447,22 @@ describe("anchors from HTML in the document", () => {
     "indented-code",
     "fenced",
     "getting-started-1",
-    // Raw-text elements are shown as text or removed; nothing in them is an element.
+    // The outer filtered tags have no IDs; their content is checked separately.
     "ghost",
-    "script-text",
-    "textarea-text",
     "style-ghost",
   ])("does not resolve #%s anywhere", (fragment) => {
     for (const dialect of [...github, "obsidian"] as const)
       expect(resolves(fragment, dialect)).toBe(false);
   });
+  it.each(["script-text", "textarea-text"])(
+    "resolves #%s inside GitHub's filtered outer tags only",
+    (fragment) => {
+      expect(resolves(fragment, "github")).toBe(true);
+      expect(resolves(fragment, "commonmark")).toBe(true);
+      for (const dialect of ["forgejo", "gitea", "obsidian"] as const)
+        expect(resolves(fragment, dialect)).toBe(false);
+    },
+  );
   it("matches case-insensitively on GitHub only", () => {
     expect(resolves("mixedid", "github")).toBe(true);
     expect(resolves("MIXEDID", "github")).toBe(true);
@@ -2565,6 +2572,18 @@ describe("fragment case on GitHub", () => {
 });
 
 describe("anchors of headings written as HTML", () => {
+  it("keeps entity decoding inside each Gitea HTML text token", () => {
+    // Source-backed in Gitea 1.26.0 and 28.2.0: getNodeText concatenates
+    // parsed TextNode.Data before CleanValue filters it, without unescaping again.
+    // https://github.com/go-gitea/gitea/blob/v1.26.0/modules/markup/html_node.go#L33
+    const split = createWorkspace({ "Note.md": "<h2>&#<em></em>65;</h2>\n" });
+    const whole = createWorkspace({ "Note.md": "<h2>&#65;</h2>\n" });
+    expect(split.resolve("Doc.md", "Note.md#65", "gitea").fragmentExists).toBe(true);
+    expect(split.resolve("Doc.md", "Note.md#a", "gitea").fragmentExists).toBe(false);
+    expect(whole.resolve("Doc.md", "Note.md#a", "gitea").fragmentExists).toBe(true);
+    expect(whole.resolve("Doc.md", "Note.md#65", "gitea").fragmentExists).toBe(false);
+    expect(split.resolve("Doc.md", "Note.md#65", "forgejo").fragmentExists).toBe(false);
+  });
   it("still omits an unclosed HTML heading on Gitea", () => {
     const workspace = createWorkspace({ "Note.md": "<h2>Unclosed\n" });
     expect(workspace.resolve("Doc.md", "Note.md#unclosed", "gitea").fragmentExists).toBe(false);
@@ -2624,9 +2643,9 @@ describe("anchors of headings written as HTML", () => {
     ["with-emphasis-and-h2codeh2", true, true],
     ["café-é-é", true, true],
     ["commented", false, false],
-    // Raw-text elements are shown as text or removed, so nothing in them is a heading.
-    ["scripted", false, false],
-    ["typed", false, false],
+    // GitHub filters the outer tags and still parses the enclosed headings.
+    ["scripted", true, false],
+    ["typed", true, false],
     ["declared", true, true],
     ["in-code", false, false],
     ["fenced", false, false],

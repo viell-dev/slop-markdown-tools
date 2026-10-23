@@ -1,0 +1,147 @@
+{
+  "fixtureCommit": "c83b12b28abf8728a3b5a243b6adfa504196cbed",
+  "renderer": "GitHub Contents API application/vnd.github.html",
+  "observation": "Actual DOM IDs/error/body contexts; no inferred Symbol/Time class policy",
+  "cases": [
+    {
+      "name": "plain-symbol",
+      "file": "plain-symbol.md",
+      "sourceSha256": "e1752042e7787731023e49ff6d62fbb8f7fc38d07c8428e8fa3a99d082f5f9ce",
+      "htmlSha256": "6206f9973f51212b2606d6b7aa0d7760606ffbda1ad0b6d7f3e031c600cda155",
+      "generatedIds": [
+        "intro",
+        "body-plain-symbol",
+        "body-plain-symbol-1",
+        "body-plain-symbol-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "errorTexts": [],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "quoted-symbol",
+      "file": "quoted-symbol.md",
+      "sourceSha256": "46ac78252bbc03df2be0fdf29fd594f151d4c8092e4da5e65b66dfff62d911e4",
+      "htmlSha256": "27429971e537f6f7405bdd8ea1e010660376f122e3c9f673fd1689c41e526691",
+      "generatedIds": [
+        "intro",
+        "body-quoted-symbol",
+        "body-quoted-symbol-1",
+        "body-quoted-symbol-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "errorTexts": [],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "plain-time",
+      "file": "plain-time.md",
+      "sourceSha256": "4adc6ad6ebce8afb0ac63c4b20093c96a019d2a1e8ea4f48a4e9aaf95e597e5a",
+      "htmlSha256": "2aad0556397ace5a1bd2b6c2bc1bfaed2169c438e37f0702f5557f32f50793e6",
+      "generatedIds": [
+        "2001-12-14-215943-0530",
+        "body-plain-time",
+        "body-plain-time-1",
+        "body-plain-time-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "errorTexts": [],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "quoted-time",
+      "file": "quoted-time.md",
+      "sourceSha256": "c11d37f3210e1a3753c01df863dbe86894bd98f15074c825b683f63629096d85",
+      "htmlSha256": "33ae9e9b19565d827ab78ec92702035769545ec7f28ce0fc6dee9dedf4243379",
+      "generatedIds": [
+        "2001-12-14-215943-0530",
+        "body-quoted-time",
+        "body-quoted-time-1",
+        "body-quoted-time-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "plain",
+      "metadata": "none",
+      "errorTexts": [],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "invalid-flow-scalar",
+      "file": "invalid-flow-scalar.md",
+      "sourceSha256": "7aa48315b78d3d0fa1908d98eb390f1aee8ae2700063e773dc3c3c0e1fc59a39",
+      "htmlSha256": "2c04d4e9d37111278aa01fafdbead7e166325622ad79dfe5acc2ba8bb9555c7d",
+      "generatedIds": [
+        "body-invalid-flow-scalar",
+        "body-invalid-flow-scalar-1",
+        "body-invalid-flow-scalar-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "errorTexts": [
+        "Error in user YAML: (<unknown>): did not find expected node content while parsing a flow node at line 2 column 1"
+      ],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    },
+    {
+      "name": "invalid-quoted-scalar",
+      "file": "invalid-quoted-scalar.md",
+      "sourceSha256": "24175b5d68ef22ff29200870edf88d267f19cd6179dfdef5f9590c3431354db9",
+      "htmlSha256": "0c492eb69c59a9d7151bcf9daf39a8d6645bfb1370151c62942d0d4dd7e1efa4",
+      "generatedIds": [
+        "body-invalid-quoted-scalar",
+        "body-invalid-quoted-scalar-1",
+        "body-invalid-quoted-scalar-1-1"
+      ],
+      "explicitIds": [],
+      "reading": "metadata",
+      "metadata": "error",
+      "errorTexts": [
+        "Error in user YAML: (<unknown>): found unexpected end of stream while scanning a quoted scalar at line 1 column 1"
+      ],
+      "bodyMarkerContexts": [
+        {
+          "element": "p",
+          "inParagraph": true,
+          "inPreformatted": false
+        }
+      ]
+    }
+  ]
+}

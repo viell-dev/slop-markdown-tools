@@ -1,3 +1,5 @@
+import { isMap, isPair, isSeq, parseDocument } from "yaml";
+import { frontMatterReading, plainReading } from "../../src/syntax/parse.js";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
 import type { Nodes } from "mdast";
@@ -5,6 +7,10 @@ import { expect, it, vi } from "vitest";
 import { createWorkspace } from "../../src/index.js";
 import type { Dialect, Document } from "../../src/index.js";
 import { headingAttributes } from "../../src/workspace/heading-attributes.js";
+vi.mock("yaml", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("yaml")>();
+  return { ...actual, parseDocument: vi.fn(actual.parseDocument) };
+});
 vi.mock("../../src/workspace/heading-attributes.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/workspace/heading-attributes.js")>();
   return { ...actual, headingAttributes: vi.fn(actual.headingAttributes) };
@@ -163,3 +169,64 @@ it("does not keep a target's text alive through its anchors", async () => {
   // The anchors are still there.
   expect(index.resolve("Doc.md", "Wide 0.md#missing", "github").fragmentExists).toBe(false);
 }, 60_000);
+
+it("keeps paired file anchors without either Markdown reading or the YAML AST", async () => {
+  const held: WeakRef<object>[] = [];
+  const reads = [
+    vi.fn(() => "---\ntitle: |\n  ```js\n---\n# Body\n"),
+    vi.fn(() => "---\n2001-12-15\n---\n# 2001-12-15\n\n# 2001-12-15-1\n"),
+  ];
+  const index = createWorkspace({ "Selected.md": reads[0]!, "Unsettled.md": reads[1]! });
+  const check = () => {
+    expect(index.resolve("From.md", "Selected.md#body", "github").fragmentExists).toBe(true);
+    expect(index.resolve("From.md", "Selected.md#body", "commonmark").fragmentExists).toBe(false);
+    expect(index.resolve("From.md", "Unsettled.md#2001-12-15", "github").fragmentExists).toBe(true);
+    expect(index.resolve("From.md", "Unsettled.md#missing", "github").fragmentIncomplete).toBe(
+      true,
+    );
+  };
+  parses.watch = (document) => {
+    held.push(new WeakRef(document));
+    const candidate = frontMatterReading(document.tree) ?? document.tree;
+    const pending: Nodes[] = [document.tree, candidate, plainReading(candidate)];
+    const seen = new Set<Nodes>();
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (seen.has(node)) continue;
+      seen.add(node);
+      held.push(new WeakRef(node));
+      if ("children" in node) for (const child of node.children) pending.push(child);
+    }
+  };
+  try {
+    check();
+    // Keep returned ASTs out of this async function's resumable locals.
+    const recordYamlResults = (): void => {
+      for (const result of vi.mocked(parseDocument).mock.results) {
+        if (result.type !== "return") continue;
+        held.push(new WeakRef(result.value));
+        const pending: unknown[] = [result.value.contents];
+        while (pending.length) {
+          const node = pending.pop();
+          if (node === null || typeof node !== "object") continue;
+          held.push(new WeakRef(node));
+          if (isPair(node)) pending.push(node.key, node.value);
+          else if (isMap(node) || isSeq(node)) for (const item of node.items) pending.push(item);
+        }
+      }
+    };
+    recordYamlResults();
+    expect(held.length).toBeGreaterThan(0);
+    // Mocks' result logs themselves retain their arguments/AST results.
+    vi.mocked(parseDocument).mockClear();
+    vi.mocked(headingAttributes).mockClear();
+    await collectGarbage();
+    expect(held.filter((value) => value.deref() !== undefined)).toEqual([]);
+    check();
+    expect(reads.every((read) => read.mock.calls.length === 1)).toBe(true);
+    expect(parseDocument).not.toHaveBeenCalled();
+  } finally {
+    parses.watch = undefined;
+    vi.mocked(parseDocument).mockClear();
+  }
+});

@@ -22,6 +22,24 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub file-fragment checks include native headings and HTML anchors in
+  dollar-math source, with complete Setext title text and correct duplicate
+  numbering. The target reading is lazy and preserves the YAML selection and
+  formatter's math behavior
+  ([#570](https://github.com/viell-dev/slop-markdown-tools/issues/570)).
+- GitHub repository-file fragment checks follow YAML preprocessing: mappings and
+  YAML error displays render the body after front matter, while ordinary
+  non-mappings remain Markdown. Unsettled YAML classes retain only anchors
+  shared by both readings, with incomplete checks reported explicitly
+  ([#540](https://github.com/viell-dev/slop-markdown-tools/issues/540)).
+- GitHub fragment checks and the CommonMark fallback include headings and
+  explicit IDs inside tagfiltered HTML, whose outer tags render as text.
+  Unsupported inline attributes and raw-text tag spellings remain incomplete
+  instead of producing guessed missing fragments
+  ([#541](https://github.com/viell-dev/slop-markdown-tools/issues/541)).
+- Raw HTML heading fragments retain literal character-reference text split by
+  tags or comments, including the numbering of later duplicate headings
+  ([#552](https://github.com/viell-dev/slop-markdown-tools/issues/552)).
 - Keep two-space hard breaks inside locally paired multiline code spans, which
   GitHub can display as literal text after an unmatched longer backtick run.
   Both wrapping and inline-code joining retain the physical boundary

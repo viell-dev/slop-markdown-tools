@@ -1,0 +1,70 @@
+[
+  {
+    "name": "flow-split-named-collisions",
+    "source": "<h2>Named &am<span></span>p;</h2>\n\n## Named &amp;amp;\n\n## Named &amp;amp;-1\n",
+    "generatedIds": [
+      "named-amp",
+      "named-amp-1",
+      "named-amp-1-1"
+    ]
+  },
+  {
+    "name": "flow-split-decimal",
+    "source": "<h2>Decimal &#9<span></span>7;</h2>\n\n## Decimal 7\n",
+    "generatedIds": [
+      "decimal-7",
+      "decimal-7-1"
+    ]
+  },
+  {
+    "name": "flow-split-hex",
+    "source": "<h2>Hex &#x6<em></em>1;</h2>\n\n## Hex 1\n",
+    "generatedIds": [
+      "hex-1",
+      "hex-1-1"
+    ]
+  },
+  {
+    "name": "flow-complete-once-control",
+    "source": "<h2>Complete &amp;<span> word</span> &copy; &amp;amp; &#65; &#x42;</h2>\n\n## Complete &amp; word &copy; &amp;amp; &#65; &#x42;\n",
+    "generatedIds": [
+      "complete--word--amp-a-b",
+      "complete--word--amp-a-b-1"
+    ]
+  },
+  {
+    "name": "flow-split-comment",
+    "source": "<h2>Comment &am<!-- boundary -->p;</h2>\n\n## Comment &amp;amp;\n",
+    "generatedIds": [
+      "comment-amp",
+      "comment-amp-1"
+    ]
+  },
+  {
+    "name": "paragraph-inline-split",
+    "source": "Lead <h2>Inline &am<span></span>p;</h2> tail\n\n## Inline &amp;amp;\n",
+    "generatedIds": [
+      "inline-amp",
+      "inline-amp-1"
+    ]
+  },
+  {
+    "name": "gfm-cell-split",
+    "source": "| <h2>Header &am<span></span>p;</h2> | control |\n| --- | --- |\n| <h2>Body &#9<span></span>7;</h2> | <h2>Complete &amp;</h2> |\n\n## Header &amp;amp;\n\n## Body 7\n",
+    "generatedIds": [
+      "header-amp",
+      "body-97",
+      "complete-",
+      "header-amp-1",
+      "body-7"
+    ]
+  },
+  {
+    "name": "markdown-heading-split-control",
+    "source": "## Mark &am<span></span>p; &copy;\n\n## Mark &amp;amp; &copy;\n",
+    "generatedIds": [
+      "mark-amp-",
+      "mark-amp--1"
+    ]
+  }
+]

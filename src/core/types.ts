@@ -126,7 +126,7 @@ export interface LinkResolution {
    * a fragment.
    */
   fragmentExists?: boolean;
-  /** The target was read, but structural HTML makes generated heading anchors uncertain. */
+  /** The target was read, but its renderer's fragment targets are not fully known. */
   fragmentIncomplete?: true;
   /**
    * What could not be read and limits the result. With status `unreadable` it
