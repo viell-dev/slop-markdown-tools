@@ -4,6 +4,11 @@
 synthetic documents. This page explains what is measured, records reference
 results, and says how good they are.
 
+The figures below precede the unreleased internal parser adapter. They remain
+reference measurements for that earlier implementation; the adapter's focused
+regression checks establish repaired work growth without replacing these
+throughput or memory measurements.
+
 ## In short
 
 - **Checking a whole workspace takes seconds.** From the command line, 500 pages
@@ -155,12 +160,12 @@ the same HTML as 4.0.2 while showing that growth; the issue records the version
 matrix, profiling, and reproduction ([issue
 #300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
 
-Both linting and formatting parse the whole document, so either can be affected
-by this limit. No general source-level workaround is applied: the parser still
-needs the complete document for its references and container structure. Where
-the content permits it, keeping independent sections in separate documents
-limits the size of each parse. This limit is tracked pending an upstream fix;
-the existing output-preservation checks remain in place.
+Both linting and formatting parse the whole document, so either is affected in
+the measured implementation. Unreleased builds bundle a reviewed EditMap
+correction that retains the untouched event prefix instead of copying it at
+every transition. They still parse complete documents for references and
+container structure. Exact AST, event-identity and work-growth checks cover the
+correction; the tables above have not been remeasured with it.
 
 While a document is parsed, the parser holds a list of every token it found,
 many times larger than the text. These are the smallest heap limits
@@ -216,6 +221,14 @@ thousands of files.
   made only of bracketed references such as `[a][b]` took from 1 to more than 30
   seconds to parse, while one of 35 kB took a fraction of a second ([issue
   #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
+  Unreleased builds correct the known repeated text/code event compaction,
+  inline opener searches and unbalanced-label autolink scans. Syntax plugins
+  retain the original attention/strikethrough resolvers for event compatibility,
+  so that part of the former cost can remain with a syntax plugin. These
+  corrections cover repeated reference pairs and the measured inline families,
+  not every possible large paragraph. Deeply nested bracket labels and emphasis
+  remain separate work in
+  [#94](https://github.com/viell-dev/slop-markdown-tools/issues/94).
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
   1.8 in every absolute time, while the "compared with parsing" ratios and the

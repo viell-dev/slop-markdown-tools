@@ -180,8 +180,8 @@ function analyze(document: Document): Analysis {
       }
       const firstLine = child.position!.start.line - 1;
       let lastLine = child.position!.end.line - 1;
-      // A list item in a footnote definition can end past the next item's
-      // start; a block ends before the next one starts.
+      // Defensively bound blocks by their siblings and containers, including
+      // positions supplied by external mdast extensions.
       const next = children[index + 1];
       if (next && located(next)) lastLine = Math.min(lastLine, next.position!.start.line - 2);
       if (parent) lastLine = Math.min(lastLine, containers.get(parent)!.last);

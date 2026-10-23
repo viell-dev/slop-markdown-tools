@@ -212,6 +212,10 @@ try {
   for (const required of [
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/syntax/parser.generated.js",
+    "dist/syntax/parser.generated.d.ts",
+    "dist/syntax/parser.generated.manifest.json",
+    "dist/syntax/parser.generated.LICENSES.txt",
     "dist/node.js",
     "dist/node.d.ts",
     "dist/cli/main.js",

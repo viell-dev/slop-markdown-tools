@@ -1,7 +1,12 @@
-import { fromMarkdown } from "mdast-util-from-markdown";
+import {
+  cjkFriendlyExtension,
+  fromMarkdown,
+  gfm,
+  gfmAutolinkLiteral,
+  gfmStrikethrough,
+} from "./parser.generated.js";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 import type { Extension as SyntaxExtension } from "micromark-util-types";
-import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
@@ -13,12 +18,9 @@ import { math } from "./math.js";
 import type { MathConditions } from "./math.js";
 import { obsidianSyntax, obsidianTree } from "./obsidian.js";
 import type { VitePressOptions } from "../core/types.js";
-import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 import { gfmTable } from "micromark-extension-gfm-table";
-import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 import { gfmTaskListItem } from "micromark-extension-gfm-task-list-item";
 import { gfmFootnote } from "micromark-extension-gfm-footnote";
-import { gfmAutolinkLiteral } from "micromark-extension-gfm-autolink-literal";
 import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
 import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import { gfmTaskListItemFromMarkdown } from "mdast-util-gfm-task-list-item";
@@ -327,6 +329,11 @@ export function parse(
   const tree = (withFrontMatter: boolean, withMath = true): Root => {
     const codeSpans = codeSpanRecording();
     const extensions = [codeSpans.syntax];
+    // Syntax plugins can observe intermediate inline events. Retain the original
+    // attention/strike/CJK resolvers for each such parse, including alternate
+    // readings made later. Other parser corrections remain enabled.
+    if (plugins.some((plugin) => plugin.syntax !== undefined))
+      extensions.push({ disable: { null: ["mdrefineDeferredInline"] } });
     const mdastExtensions = [labelEndTree, codeSpans.tree];
     if (withFrontMatter && read !== "vitepress") {
       extensions.unshift(frontmatter(["yaml", "toml"]));

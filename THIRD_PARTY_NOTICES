@@ -4,6 +4,22 @@ the LICENSE file.
 
 ------------------------------------------------------------------------
 
+Internal Markdown parser adapter
+
+dist/syntax/parser.generated.js bundles the Markdown parser and selected GFM
+and CJK extension factories. It includes adaptations to micromark-util-edit-map,
+mdast-util-from-markdown, micromark, micromark-core-commonmark,
+micromark-extension-gfm-autolink-literal,
+micromark-extension-gfm-strikethrough, and micromark-extension-cjk-friendly.
+
+The complete MIT license texts and copyright notices for all 34 bundled
+packages are included in dist/syntax/parser.generated.LICENSES.txt. The adjacent
+parser.generated.manifest.json identifies their exact versions, source and
+license hashes, and the local corrections' provenance. Those full license
+texts apply to the bundled and adapted code and accompany every distribution.
+
+------------------------------------------------------------------------
+
 micromark-extension-math 3.1.0
 https://github.com/micromark/micromark-extension-math
 

@@ -356,13 +356,13 @@ it helps.
   `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdtools` command at
   `dist/cli/main.js`. The names differ on purpose: package `mdrefine`, command
   `mdtools`, configuration `mdtools.config.*`.
-- `src/syntax/` parses with micromark and mdast and holds the Obsidian
-  extensions; `src/config/` resolves presets, schemas, overrides, and plugins;
-  `src/core/` runs rules, suppressions, and the edit engine; `src/rules/` holds
-  the built-in rules; `src/workspace/` resolves link targets and handles
-  discovery, reading as UTF-8, and writes; `src/cli/` connects them. The main
-  entry never touches the filesystem. `mdrefine/node` exposes
-  `src/workspace/discovery.ts`, which the CLI uses for discovery and
+- `src/syntax/` parses with micromark and mdast through the generated internal
+  adapter and holds the Obsidian extensions; `src/config/` resolves presets,
+  schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the
+  edit engine; `src/rules/` holds the built-in rules; `src/workspace/` resolves
+  link targets and handles discovery, reading as UTF-8, and writes; `src/cli/`
+  connects them. The main entry never touches the filesystem. `mdrefine/node`
+  exposes `src/workspace/discovery.ts`, which the CLI uses for discovery and
   per-document options, so change the two together.
 - Shared rule helpers belong in `src/rules/shared.ts`, renderer-specific edit
   protections in `protections.ts`, and source-line primitives in
@@ -370,6 +370,12 @@ it helps.
   Workspace HTML, anchor collection, target indexing, and link resolution are
   separate modules behind `src/workspace/index.ts`; keep its public entry
   stable.
+- `scripts/build-parser.mjs` builds the portable parser adapter before
+  TypeScript compilation and Vitest. `parser-patches.mjs` guards each corrected
+  dependency source; `parser-packages.json` pins the complete graph's license
+  identities. Keep all four generated distribution artifacts together. See
+  [CONTRIBUTING.md](./CONTRIBUTING.md#what-the-checks-prove) for the
+  verification map and its limits.
 - `src/code/` is the Node host for configured code tools. Keep execution out of
   ordinary rules and the portable entry. Its internal fingerprint path permits
   only selected code values and must cover alternative readings; the ordinary
