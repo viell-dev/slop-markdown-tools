@@ -1590,8 +1590,9 @@ export const boundaryFixtures = [
   },
   {
     issue: 597,
-    name: "Tab after two quote-margin spaces keeps literal emphasis",
+    name: "Tab after two quote-margin spaces permits inline styling",
     source: ">  \t*c*\n",
+    preserve: false,
   },
   {
     issue: 597,

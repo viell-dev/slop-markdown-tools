@@ -34,7 +34,6 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
     ">\t* c\n",
     ">\ttext *c*\n",
     "> \t* *c*\n",
-    ">  \t*c*\n",
     ">\t *c*\n",
     ">\t# *c* ##\n",
     ">\t* *c*\n> second *d*\n",
@@ -59,6 +58,7 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
       }
   });
   it("keeps ordinary quoted margins and independent blocks editable (#597)", () => {
+    expect(checked(">  \t*c*\n")).toBe(">  \t_c_\n");
     expect(checked(">    * *c*\n")).toBe("> - _c_\n");
     expect(checked("2. a\n   + b\n>    * *c*\n")).toBe("2. a\n   - b\n> - _c_\n");
     expect(checked("2. a\n   + b\n>\t* *c*\n\nLater *safe*.\n")).toBe(

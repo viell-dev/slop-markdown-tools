@@ -286,10 +286,11 @@ latest installable release:
   Numbering also retains the existing digit width; same-width numbers,
   delimiters and inline styles remain editable. An intervening block restores
   ordinary indentation preferences.
-- A quoted block opened after a Tab in the quote margin keeps its physical
-  source and same-block continuations. Reading view can read code where the
-  primary parser reads a list, heading or paragraph. Later independent blocks
-  and margins containing only spaces still format.
+- A quoted block opened by a Tab directly after `>`, or after `>` and one space,
+  keeps its physical source and same-block continuations. Reading view can read
+  code where the primary parser reads a list, heading or paragraph. Later
+  independent blocks, space-only margins, and two spaces before the Tab still
+  allow formatting.
 - A Setext title line beginning directly with math, or a title containing only
   an image/embed, keeps its whole source. Converting it to ATX can change the
   math widget's inherited font or move a standalone image into the heading. The

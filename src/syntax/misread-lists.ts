@@ -272,7 +272,7 @@ export interface MisreadLists {
    * heading form one native heading, so the complete range stays together.
    * A heading after a container ending in math can instead continue its native
    * paragraph lazily; retain that complete boundary too (#336).
-   * A quoted block opened after a Tab in its quote margin keeps its
+   * A quoted block opened after a Tab immediately after `>` or `> ` keeps its
    * whole physical source too: Reading view can read literal code where the
    * primary parser reads a list, heading or inline text (#597). Same-block
    * continuations stay together; later independent blocks remain editable.
@@ -1609,7 +1609,7 @@ export function misreadLists(document: Document): MisreadLists {
         if (parent.type === "blockquote") {
           const prefix = source.slice(lineAround(start)[0], start);
           const marker = prefix.lastIndexOf(">");
-          if (marker >= 0 && /^[ \t]*\t[ \t]*$/.test(prefix.slice(marker + 1)))
+          if (marker >= 0 && /^ ?\t[ \t]*$/.test(prefix.slice(marker + 1)))
             boundaryText.add(wholeLines(child));
         }
         if (isSetextHeading(child)) {
