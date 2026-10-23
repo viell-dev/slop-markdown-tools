@@ -941,9 +941,12 @@ export function misreadLists(document: Document): MisreadLists {
     const physicalListFence = (leaf: Nodes): boolean => {
       if (!text.has(leaf) || !leaf.position) return false;
       // Read each eligible leaf's physical rows once, before inline parsing
-      // can pair the opener with an earlier or later raw backtick run (#584).
+      // can pair raw backticks (#584). Tilde info with a raw backtick remains
+      // paragraph text in Live Preview, so it does not start this fence state.
       for (let number = leaf.position.start.line; number <= leaf.position.end.line; number++)
-        if (/^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+`{3,}[^`]*$/.test(lines[number - 1] ?? ""))
+        if (
+          /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+(?:`{3,}|~{3,})[^`]*$/.test(lines[number - 1] ?? "")
+        )
           return true;
       return false;
     };
@@ -1194,10 +1197,10 @@ export function misreadLists(document: Document): MisreadLists {
       let bridge = false;
       parent.children.forEach((child, index) => {
         const previous = parent.children[index - 1];
-        // Reading keeps an immediately following quote or table inside the
-        // earlier item. A later list can then join it across
-        // that region, even with blank lines after the bridge (#582). Keep
-        // both structural units; their inline content remains editable.
+        // Reading keeps an immediately following quote, table or display math
+        // inside the earlier item. A later list can join it across that region,
+        // even with blank lines after the bridge (#582, #586). Keep both
+        // structural units; their inline content remains editable.
         if (child.type === "list") {
           if (list && bridge) {
             boundaryLists.add(list);
@@ -1227,7 +1230,7 @@ export function misreadLists(document: Document): MisreadLists {
         } else if (
           list &&
           child.position !== undefined &&
-          (child.type === "blockquote" || child.type === "table") &&
+          (child.type === "blockquote" || child.type === "table" || child.type === "math") &&
           (bridge ||
             (previous?.position !== undefined &&
               previous.position.end.offset! <= child.position.start.offset! &&
@@ -1243,15 +1246,18 @@ export function misreadLists(document: Document): MisreadLists {
           child.position &&
           previous.position.end.line === child.position.start.line - 1
         ) {
-          // Reading keeps adjacent unindented display math in the last item,
-          // including after a heading or code block. Retain just its separator
-          // and opener so independent list formatting stays available (#586).
-          if (previous.type === "list" && child.type === "math")
+          // Reading keeps these adjacent blocks in the last item, including
+          // after its heading or code. Protect the first separator against
+          // plugin edits too, while retaining inline/cell formatting (#582, #586).
+          if (
+            previous.type === "list" &&
+            (child.type === "blockquote" || child.type === "table" || child.type === "math")
+          )
             boundaryText.add(
               stretch(child, previous.position.end, {
                 ...child.position.start,
-                offset: child.position.start.offset! + 2,
-                column: child.position.start.column + 2,
+                offset: child.position.start.offset! + (child.type === "math" ? 2 : 1),
+                column: child.position.start.column + (child.type === "math" ? 2 : 1),
               }),
             );
           // A compact hyphen break can underline the last physical row in

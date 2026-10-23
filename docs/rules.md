@@ -813,6 +813,12 @@ spacing behavior. When its parsed closer opens Live Preview code, the opener and
 remaining document stay as written, conservatively retaining later fence
 pairings too.
 
+After 0.4.0, Obsidian also retains both separators when a quote, table or
+display formula connects list items. Display math immediately below the final
+item stays inside it, including after a heading or code block; a table after
+those blocks also stays adjacent. See the [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections).
+
 ## `style/code-fence`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1495,6 +1501,12 @@ code spans otherwise follows their own joining rules. In Obsidian, a short
 multiline code span keeps its whole paragraph unreflowed; see
 [`style/inline-code`](#styleinline-code). Earlier independent inline markup can
 still format.
+
+After 0.4.0, Obsidian also keeps a standalone one-line `$$…$$` formula on its
+physical line, with the adjacent separators, when joining would change Live
+Preview's display widget. Math already beside ordinary prose still wraps; see
+the [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections).
 
 After 0.4.0, Obsidian also leaves a multiline image description containing
 backticks unreflowed, where joining could turn displayed Live Preview source

@@ -267,6 +267,11 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ? otherReading(document.tree)
       : undefined;
   if (plain) readings.push(misreadLists({ ...document, tree: plain }));
+  // Only boundaryText has an explicit protected insertion point at its
+  // original start. Keep other block-edge semantics unchanged (#590).
+  const boundaryStarts = new Set(
+    readings.flatMap((misread) => Array.from(misread.boundaryText, (node) => range(node)[0])),
+  );
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
   let githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
@@ -310,6 +315,14 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   }
   if (!blocks.length) return () => false;
   const { source } = document;
+  // Inspect only the changed portion's trailing line-ending bytes. Terminal
+  // inline substitutions still end outside the protected boundary, while
+  // appending a break there changes that boundary even with other edits.
+  const trailingBreaks = (value: string, from: number, to: number): string => {
+    let start = to;
+    while (start > from && (value[start - 1] === "\r" || value[start - 1] === "\n")) start--;
+    return value.slice(start, to);
+  };
   const within = (from: number, to: number) => {
     let low = 0;
     let high = blocks.length;
@@ -329,7 +342,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       edit.text
     )
       return true;
-    if (!within(edit.start, edit.end)) return false;
+    if (!within(edit.start, edit.end) && !boundaryStarts.has(edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
     const { text } = edit;
     if (before === text) return false;
@@ -338,7 +351,15 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     while (prefix < shorter && before[prefix] === text[prefix]) prefix++;
     let suffix = 0;
     while (suffix < shorter - prefix && before.at(-1 - suffix) === text.at(-1 - suffix)) suffix++;
-    return within(edit.start + prefix, edit.end - suffix);
+    const from = edit.start + prefix;
+    const to = edit.end - suffix;
+    if (
+      boundaryStarts.has(to) &&
+      trailingBreaks(before, prefix, before.length - suffix) !==
+        trailingBreaks(text, prefix, text.length - suffix)
+    )
+      return true;
+    return within(from, to) || (from === to && boundaryStarts.has(from));
   };
 }
 /**

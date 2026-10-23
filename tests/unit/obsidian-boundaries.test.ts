@@ -98,6 +98,9 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
     "a\n2) b\n3) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
     "a\n2) ``` lang\nalpha ```\n\n\nb\n",
     "a ``` x\n2) ``` lang\nalpha\n\n\n``` text\nbeta\n```\n",
+    "a\n2) ~~~ lang\nalpha\n\n\nb\n",
+    "a\n2) ~~~ lang\nalpha\n\nb\n\n*c*\n",
+    "a\n2) ~~~ lang\nalpha\n~~~\n\n*c*\n",
   ])("retains the physical gap carried into code: %j", (source) => {
     for (const newline of ["\n", "\r\n", "\r"]) {
       const input = source.replaceAll("\n", newline);
@@ -135,6 +138,28 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
 });
 
 describe("Obsidian display math boundaries (#586, #587)", () => {
+  it("keeps list tightness across display math (#586)", () => {
+    const source = "- a\n$$\nx = y\n$$\n- b\n";
+    expect(checked(source)).toBe(source);
+  });
+  it.each(["- ## h", "- ```\n  a\n  ```"])(
+    "retains both table separators after an item ending in %s (#582)",
+    (prefix) => {
+      const source = `${prefix}\n| b | c |\n| - | - |\n- d\n`;
+      const output = checked(source);
+      expect(output).toContain(`${prefix}\n| b`);
+      expect(output).toContain("\n- d\n");
+      expect(output).not.toContain("\n\n- d");
+      expect(output).toContain("| --- | --- |");
+      expect(
+        checked(source, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/block-spacing": "warn" },
+        }),
+      ).toBe(source);
+    },
+  );
   it.each([
     "- alpha\n$$\nx = y\n$$\n",
     "1. alpha\n$$\nx = y\n$$\n",
@@ -191,6 +216,55 @@ describe("Obsidian display math boundaries (#586, #587)", () => {
   it("still wraps ordinary inline math and spaces genuinely separated blocks", () => {
     expect(checked("alpha $$x = y$$\nbeta\n")).toBe("alpha $$x = y$$ beta\n");
     expect(checked("- alpha\n\n$$\nx = y\n$$\n")).toBe("- alpha\n\n$$\nx = y\n$$\n");
+  });
+});
+
+describe("protected boundary start points (#590)", () => {
+  const source = "- ## *h*\noutside\n";
+  function proposal(kind: string) {
+    const at = source.indexOf("\n");
+    return kind === "before-break"
+      ? { start: at, end: at, text: "\n" }
+      : kind === "after-break"
+        ? { start: at + 1, end: at + 1, text: "\n" }
+        : kind === "unchanged-prefix"
+          ? { start: 0, end: at, text: source.slice(0, at) + "\n" }
+          : kind === "combined-style"
+            ? { start: 0, end: at, text: "- ## _h_\n" }
+            : kind === "copied-suffix"
+              ? { start: 0, end: source.length, text: source.replace("*h*", "_h_\n") }
+              : { start: 0, end: at, text: kind === "longer-style" ? "- ## _h_ ###" : "- ## _h_" };
+  }
+  function pluginOutput(kind: string) {
+    const plugin: Plugin = {
+      name: "edge",
+      rules: {
+        change: {
+          kind: "style",
+          description: "Change a protected boundary",
+          check: ({ document }) =>
+            document.source !== source
+              ? []
+              : [{ start: 0, message: "Change", edit: proposal(kind) }],
+        },
+      },
+    };
+    const result = format(source, {
+      workspace,
+      plugins: [plugin],
+      config: { extends: [], dialect: "obsidian", rules: { "edge/change": "warn" } },
+    });
+    expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+    return result.output;
+  }
+  it.each(["before-break", "after-break", "unchanged-prefix", "combined-style", "copied-suffix"])(
+    "rejects an unsafe %s separator edit",
+    (kind) => expect(pluginOutput(kind)).toBe(source),
+  );
+  it.each(["style", "longer-style"])("allows a safe terminal %s edit", (kind) => {
+    expect(pluginOutput(kind)).toBe(
+      source.replace("*h*", kind === "longer-style" ? "_h_ ###" : "_h_"),
+    );
   });
 });
 

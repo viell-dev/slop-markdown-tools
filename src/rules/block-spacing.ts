@@ -63,11 +63,12 @@ function together(
     // Reading view keeps an adjacent, unindented quote in the last item,
     // although the parser ends the list before it (#437).
     if (before.type === "list" && after.type === "blockquote") return true;
-    // Reading keeps adjacent display math inside the last item, including
-    // after its heading or code block (#586).
+    // Reading keeps an adjacent table or display math inside the last item,
+    // including after its heading or code block (#582, #586). Retain the first
+    // separator without freezing table cells or the math body.
     if (
       before.type === "list" &&
-      after.type === "math" &&
+      (after.type === "table" || after.type === "math") &&
       before.position!.end.line === after.position!.start.line - 1
     )
       return true;

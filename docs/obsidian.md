@@ -197,30 +197,37 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
-- Lists connected through an adjacent quote or table keep both original marker
-  and indentation units. Their adjacent separating boundary stays too: adding a
-  blank can make a native list loose even when the markers match. This applies
-  to ordered and bullet lists; safe inline formatting remains available. A real
-  blank before the quote or an intervening block ends this relationship.
+- Lists connected through an adjacent quote, table or display formula keep both
+  original marker and indentation units. Their adjacent separating boundary
+  stays too: adding a blank can make a native list loose even when the markers
+  match. This applies to ordered and bullet lists; safe inline formatting
+  remains available outside existing whole-list protections for lazy
+  continuations. A real blank before the quote or an intervening block ends this
+  relationship.
 - A Setext title that Reading view continues as paragraph text retains an
   immediately following title, including across a Tab-only continuation. Literal
   `#5` title text is handled as Setext. A proper hyphen thematic break ends this
   paragraph state, so later independent headings can still convert.
-- A physical list-item backtick fence hidden inside a primary paragraph keeps
-  that paragraph and the remaining source through end of file. This includes
-  blank gaps, paired multiline spans and earlier backtick runs that hide the
-  opener from the primary inline parse. Later text conservatively stays
+- A physical list-item backtick or tilde fence hidden inside a primary paragraph
+  keeps that paragraph and the remaining source through end of file. This
+  includes blank gaps, paired multiline spans and earlier backtick runs that
+  hide the opener from the primary inline parse. Later text conservatively stays
   unformatted because the views can pair later fences differently; earlier
   independent text still formats. Ordinary inline backticks, escaped list
   markers and backticks in fence info keep their previous behavior.
 - Display math immediately below a list keeps its separating boundary. Reading
   view keeps the formula inside the final item even after a heading or code
-  block, and inserting a blank would move it outside. Independent inline and
-  marker formatting remains available; genuinely separated math stays separate.
+  block, and inserting a blank would move it outside. The separator before an
+  adjacent table also stays when the final item ends with a heading or code.
+  Independent inline and marker formatting remains available; genuinely
+  separated math stays separate.
 - A standalone one-line `$$…$$` formula keeps its physical line and adjacent
   separators when the primary parser reads inline math. Joining it into prose
   would turn Live Preview's display widget into inline math. Safe independent
   inline changes remain available, and math already beside prose still wraps.
+- Plugin edits cannot insert a blank at the first byte of a protected separator,
+  including by copying the preceding text into a replacement. Safe inline
+  replacements that end at that separator remain available.
 - A list whose HTML continues outside its parsed item keeps its markers when
   that HTML already protects a later list's marker. Changing only the earlier
   bullet could split one Reading-view list into two. When the HTML closes before

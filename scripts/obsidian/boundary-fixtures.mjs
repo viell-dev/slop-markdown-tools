@@ -18,6 +18,12 @@ export const boundaryFixtures = [
   { issue: 582, name: "non-one ordered quote successor", source: "1) a\n> b\n3. c\n" },
   { issue: 582, name: "Tab before quote control", source: "* a\n\t\n> b\n- c\n", preserve: false },
   { issue: 582, name: "quoted bullet bridge", source: "> * a\n> > b\n> - c\n" },
+  ...["- ## h", "- ```\n  a\n  ```"].map((prefix, index) => ({
+    issue: 582,
+    name: `table directly after a heading or code item ${index}`,
+    source: `${prefix}\n| b | c |\n| - | - |\n- d\n`,
+    preserve: false,
+  })),
   { issue: 583, name: "adjacent Setext title in Reading paragraph", source: "a\nb\n=\nc\n---\n" },
   {
     issue: 583,
@@ -50,6 +56,16 @@ export const boundaryFixtures = [
     source: "a ``` b\n\n\n\nc *d*\n",
     preserve: false,
   },
+  ...[
+    "a\n2) ~~~ lang\nalpha\n\n\nb\n",
+    "a\n2) ~~~ lang\nalpha\n\nb\n\n*c*\n",
+    "a\n2) ~~~ lang\nalpha\n~~~\n\n*c*\n",
+  ].map((source, index) => ({ issue: 584, name: `physical tilde list fence ${index}`, source })),
+  ...[
+    ["tilde info backtick control", "a\n2) ~~~ lang `tick`\nalpha\n\n\nb\n"],
+    ["repeated marker fence control", "a\n- 2) ``` lang\nalpha\n\n\nb\n"],
+  ].map(([name, source]) => ({ issue: 584, name, source, preserve: false })),
+  { issue: 583, name: "lone hyphen heading control", source: "a\n-\nc\n---\n", preserve: false },
   {
     issue: 584,
     name: "backtick fence info control",
@@ -74,6 +90,7 @@ export const boundaryFixtures = [
     ["non-one math containment", "2. alpha\n$$\nx = y\n$$\n"],
     ["math after item heading", "- ## title\n$$\nx = y\n$$\n"],
     ["math after item code", "- ```\n  a\n  ```\n$$\nx = y\n$$\n"],
+    ["math between tight list items", "- a\n$$\nx = y\n$$\n- b\n"],
   ].map(([name, source]) => ({ issue: 586, name, source })),
   {
     issue: 586,
@@ -99,6 +116,12 @@ export const boundaryFixtures = [
     issue: 587,
     name: "ordinary inline math wrap control",
     source: "alpha $$x = y$$\nbeta\n",
+    preserve: false,
+  },
+  {
+    issue: 589,
+    name: "inline math wrap on a list marker",
+    source: "- $$x = y$$\n  beta\n",
     preserve: false,
   },
   ...[582, 583, 584].map((issue) => ({

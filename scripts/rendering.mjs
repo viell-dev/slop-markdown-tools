@@ -335,6 +335,7 @@ export function normalizeGithubHtml(html, mode, tree) {
   let rawFootnotes = false;
   let math = false;
   let rawMath = false;
+  let rawHtmlDollars = false;
   /** @param {import("mdast").Nodes} node */
   const visit = (node) => {
     if (node.type === "code") codes.push(node);
@@ -348,7 +349,8 @@ export function normalizeGithubHtml(html, mode, tree) {
     if (node.type === "html" && /<\/?pre(?:[\s>])/i.test(node.value)) rawPre = true;
     if (node.type === "html" && /\bdata-(?:footnotes|run-id)\b|user-content-fn/.test(node.value))
       rawFootnotes = true;
-    if (node.type === "html" && /<\/?math-renderer\b|\bdata-run-id\b/.test(node.value))
+    if (node.type === "html" && node.value.includes("$")) rawHtmlDollars = true;
+    if (node.type === "html" && /<\/?math-renderer\b|\bdata-run-id\b/i.test(node.value))
       rawMath = true;
     if ("children" in node) node.children.forEach(visit);
   };
@@ -409,7 +411,10 @@ export function normalizeGithubHtml(html, mode, tree) {
     tag.replace(/ (data-run-id|id|href)="([^"]*)"/g, (attribute, name, value) => {
       if (name === "data-run-id")
         return (footnoteSection(tag) && ids.has(value)) ||
-          (math && !rawMath && /^<math-renderer\b/.test(tag) && /^[0-9a-f]{32}$/.test(value))
+          ((math || rawHtmlDollars) &&
+            !rawMath &&
+            /^<math-renderer(?=[\s>])/.test(tag) &&
+            /^[0-9a-f]{32}$/.test(value))
           ? ' data-run-id="ID"'
           : attribute;
       const id = /^((?:#)?user-content-fn(?:ref)?-[^"\s]+-)([0-9a-f]{32})$/.exec(value);

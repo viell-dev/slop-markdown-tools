@@ -33,6 +33,15 @@ prereleases' notes there are longer than their entries here.
   standalone one-line display widgets when wrapping
   ([#586](https://github.com/viell-dev/slop-markdown-tools/issues/586),
   [#587](https://github.com/viell-dev/slop-markdown-tools/issues/587)).
+- Protected separator starts also reject plugin insertions and replacements that
+  add a blank before the existing line break, while safe terminal inline edits
+  remain available
+  ([#590](https://github.com/viell-dev/slop-markdown-tools/issues/590)).
+- Rendering comparisons account for generated GitHub math response IDs inside
+  raw HTML and invisible Reading-view whitespace beside Obsidian display math,
+  retaining authored attributes, formula content and visible inline spacing
+  ([#588](https://github.com/viell-dev/slop-markdown-tools/issues/588),
+  [#589](https://github.com/viell-dev/slop-markdown-tools/issues/589)).
 
 - Release-evidence validation runs through linked checkout paths, and the parser
   builder rejects dependencies resolved outside its checkout consistently across

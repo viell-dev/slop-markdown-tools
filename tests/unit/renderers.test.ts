@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { Nodes } from "mdast";
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
@@ -361,6 +362,112 @@ describe("GitHub source-verified code normalization (#515)", () => {
     );
     expect(normalize(html(a), input)).not.toBe(normalize(html(a).replace("other", b), input));
     expect(normalize(html(a), html(a))).not.toBe(normalize(html(b), html(b)));
+  });
+
+  const rawHtmlMathFixture = (name: string) =>
+    readFileSync(
+      new URL(`../fixtures/renderers/github-raw-html-math/${name}`, import.meta.url),
+      "utf8",
+    );
+
+  it("normalizes the captured generated math ID inside raw HTML (#588)", () => {
+    const input = rawHtmlMathFixture("before.md");
+    const output = rawHtmlMathFixture("after-gfm.md");
+    const before = rawHtmlMathFixture("before-gfm.html");
+    const after = rawHtmlMathFixture("after-gfm.html");
+    // This is the real missed eligibility path, not an ordinary primary math node.
+    const pending: Nodes[] = [parse(input, "github").tree];
+    const kinds: string[] = [];
+    while (pending.length) {
+      const node = pending.pop()!;
+      kinds.push(node.type);
+      if ("children" in node) pending.push(...node.children);
+    }
+    expect(kinds).toContain("html");
+    expect(kinds).not.toContain("math");
+    expect(kinds).not.toContain("inlineMath");
+    expect(before).not.toBe(after);
+    expect(normalize(before, input)).toBe(normalize(after, output));
+    // The other actual API mode was equal already; preserve that control.
+    expect(rawHtmlMathFixture("before-markdown.html")).toBe(
+      rawHtmlMathFixture("after-markdown.html"),
+    );
+    expect(
+      normalizeGithubHtml(
+        rawHtmlMathFixture("before-markdown.html"),
+        "markdown",
+        parse(input, "github").tree,
+      ),
+    ).toBe(
+      normalizeGithubHtml(
+        rawHtmlMathFixture("after-markdown.html"),
+        "markdown",
+        parse(output, "github").tree,
+      ),
+    );
+  });
+
+  it("keeps raw-HTML math content, class and ordinary IDs significant (#523, #588)", () => {
+    const input = rawHtmlMathFixture("before.md");
+    const response = rawHtmlMathFixture("before-gfm.html");
+    expect(response).toContain("$x^2$");
+    expect(response).toContain('class="js-inline-math"');
+    for (const other of [
+      response.replace("$x^2$", "$x^3$"),
+      response.replace('class="js-inline-math"', 'class="js-display-math"'),
+      response.replace('style="display: inline-block"', 'style="display: block"'),
+    ]) {
+      expect(other).not.toBe(response);
+      expect(normalize(response, input)).not.toBe(normalize(other, input));
+    }
+    const a = "a".repeat(32),
+      b = "b".repeat(32);
+    for (const template of [
+      "<p>VALUE</p>",
+      '<p id="VALUE">same</p>',
+      '<p data-run-id="VALUE">same</p>',
+      '<a href="https://example.com/VALUE">same</a>',
+      '<math-renderer id="VALUE">$x^2$</math-renderer>',
+      "<pre><code>VALUE\n</code></pre>",
+      "<p><code>VALUE</code></p>",
+      '<pre><code>&lt;math-renderer data-run-id="VALUE"&gt;$x^2  it("normalizes generated math response IDs while retaining its content (#523)", () => {lt;/math-renderer&gt;</code></pre>',
+    ])
+      expect(normalize(template.replaceAll("VALUE", a), input)).not.toBe(
+        normalize(template.replaceAll("VALUE", b), input),
+      );
+  });
+
+  it("rejects authored math/ID lookalikes regardless of source HTML case (#523, #588)", () => {
+    const response = rawHtmlMathFixture("before-gfm.html");
+    const other = response.replace(/data-run-id="[0-9a-f]{32}"/, `data-run-id="${"b".repeat(32)}"`);
+    expect(other).not.toBe(response);
+    const rawInput = "<div>\n$x^2$\n</div>\n";
+    for (const authored of [
+      "<math-renderer>authored</math-renderer>",
+      "<MATH-RENDERER>authored</MATH-RENDERER>",
+      '<div data-run-id="authored">text</div>',
+      '<DIV DATA-RUN-ID="authored">text</DIV>',
+    ]) {
+      const input = rawInput + "\n" + authored + "\n";
+      expect(normalize(response, input)).not.toBe(normalize(other, input));
+    }
+  });
+
+  it("requires source evidence and the exact generated math element/attribute (#588)", () => {
+    const a = "a".repeat(32),
+      b = "b".repeat(32);
+    const response = (tag: string, id: string) => `<${tag} data-run-id="${id}">$x^2$</${tag}>`;
+    // A response-shaped string alone is not permission to erase an ID.
+    expect(normalize(response("math-renderer", a), "<div>ordinary</div>\n")).not.toBe(
+      normalize(response("math-renderer", b), "<div>ordinary</div>\n"),
+    );
+    const input = "<div>\n$x^2$\n</div>\n";
+    for (const tag of ["p", "math-renderer-extra", "math-renderer:extra"])
+      expect(normalize(response(tag, a), input)).not.toBe(normalize(response(tag, b), input));
+    for (const id of ["short", "a".repeat(31), "a".repeat(33), "A".repeat(32)])
+      expect(normalize(response("math-renderer", id), input)).not.toBe(
+        normalize(response("math-renderer", b), input),
+      );
   });
 
   it("normalizes generated math response IDs while retaining its content (#523)", () => {
