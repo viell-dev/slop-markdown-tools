@@ -65,11 +65,15 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       "scripts/parser-packages.json",
       "src/syntax/parser.generated.d.ts",
     ])
-      files[`dev/source/${name}`] = await readFile(path.join(repository, name), "utf8");
+      files[`dev/micromark-util-edit-map/source/${name}`] = await readFile(
+        path.join(repository, name),
+        "utf8",
+      );
     const root = await fixture(files);
-    const source = path.join(root, "dev/source");
-    // A dev ancestor is a legitimate checkout location, not a development
-    // module inside a parser package. The graph must stay inside the checkout;
+    const source = path.join(root, "dev/micromark-util-edit-map/source");
+    // Checkout ancestors named dev or micromark-util-edit-map are legitimate;
+    // they do not identify a development entry or an unadapted EditMap module.
+    // The graph must stay inside the checkout;
     // canonical containment rejects outside inputs on every platform. Only
     // the build tool stays shared.
     const packages = JSON.parse(
