@@ -5,6 +5,73 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   ...[
+    {
+      issue: 399,
+      name: "HTML item coherence: same plus bullets",
+      source: "+ <div> a\nlazy\n\n+ b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: different hyphen bullet",
+      source: "+ <div> a\nlazy\n\n- b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: ordered delimiter",
+      source: "2) <div> a\nlazy\n\n3) b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: different ordered delimiters",
+      source: "2) <div> a\nlazy\n\n3. b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: quote parent",
+      source: "> + <div> a\n> lazy\n>\n> + b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: list parent",
+      source: "- parent\n  + <div> a\n  lazy\n\n  + b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: prior item in first parsed list",
+      source: "+ before\n+ <div> a\nlazy\n\n+ b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: closed HTML permits both markers",
+      source: "+ <div> a\nlazy\n</div>\n\n+ b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: closed HTML under quote",
+      source: "> + <div> a\n> lazy\n> </div>\n>\n> + b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: ordinary lazy paragraph",
+      source: "+ *a*\nlazy\n\n+ b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: prefix emphasis stays available",
+      source: "+ *prefix* <div> a\nlazy\n\n+ b\n",
+      preserve: false,
+    },
+  ],
+  {
+    issue: 399,
+    name: "full generated HTML/list marker regression",
+    source: readFileSync(new URL("./fixtures/399-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
     ["sole math keeps its Setext typography", "$x^2$\n---\n"],
     ["sole math keeps its level-one underline", "$x$\n===\n"],
     ["leading math widgets keep their inherited font", "$x$ $y$\n---\n"],

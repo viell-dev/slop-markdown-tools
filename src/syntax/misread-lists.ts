@@ -175,7 +175,10 @@ export interface MisreadLists {
    * where such blocks follow, or a block that a narrower spacing would bring
    * inside, or a list of the same kind, which continues the list with every
    * item whose marker matches, with that list's markers, each from the item's
-   * start to its content, and from the line break before that list.
+   * start to its content, and from the line break before that list. Also the
+   * markers of a list whose escaping HTML region already protects a later
+   * list marker: changing only the earlier markers can split or merge the
+   * native list, including HTML opened inside the earlier item (#399, #428).
    */
   itemHtml: ReadonlySet<Nodes>;
   /**
@@ -261,6 +264,8 @@ export interface MisreadLists {
    * (#488, #493–#496, #506, #507), plus an earlier lazy list line's preceding
    * break and margin through its first character or containing inline node
    * where that boundary makes a later final line a Live Preview heading (#554).
+   * On GitHub, contiguous display math and the immediately following Setext
+   * heading form one native heading, so the complete range stays together (#336).
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -462,6 +467,41 @@ export function misreadLists(document: Document): MisreadLists {
   const commentText = new Set<Nodes>();
   const boundaryText = new Set<Nodes>();
   const boundaryLists = new Set<List>();
+  // GitHub builds display math from paragraphs. A Setext underline below
+  // text directly after its closing dollars underlines the whole paragraph,
+  // including the dollar lines (#336). Keep that boundary and its content
+  // together, including consecutive math blocks and blocks inside containers.
+  if (document.dialect === "github") {
+    const visitMath = (parent: Parents) => {
+      let first: Nodes | undefined;
+      let previous: Nodes | undefined;
+      for (const child of parent.children) {
+        const adjacent =
+          previous?.position !== undefined &&
+          child.position !== undefined &&
+          previous.position.end.line === child.position.start.line - 1;
+        if (child.type === "math") {
+          if (!adjacent || previous?.type !== "math") first = child;
+        } else {
+          if (
+            first?.position &&
+            adjacent &&
+            previous?.type === "math" &&
+            child.type === "heading" &&
+            source[child.position!.start.offset!] !== "#"
+          )
+            boundaryText.add({
+              ...child,
+              position: { start: first.position.start, end: child.position!.end },
+            });
+          first = undefined;
+        }
+        if ("children" in child && !leaves.has(child.type)) visitMath(child);
+        previous = child;
+      }
+    };
+    visitMath(document.tree);
+  }
   if (document.dialect === "obsidian") {
     const containerHtml = new Set<Nodes>();
     const quotedLeaves = new Set<Nodes>();
@@ -1302,6 +1342,7 @@ export function misreadLists(document: Document): MisreadLists {
       return code;
     };
     const htmlRoots: [Nodes, boolean, number?][] = [];
+    const escapingHtmlEnds = new Map<Nodes, number>();
     const inlineHtml = (node: Nodes) => {
       if (node.type === "html" && /^<[a-z][a-z0-9-]*(?=[\s/>])/i.test(node.value))
         htmlRoots.push([node, false]);
@@ -1334,6 +1375,7 @@ export function misreadLists(document: Document): MisreadLists {
       const until = obsidianHtmlEnd(source, start, htmlCodeEnd, block, rootEnd);
       htmlUntil = until;
       if (block && until <= end) continue;
+      escapingHtmlEnds.set(leaf, until);
       htmlText.add({
         ...leaf,
         position: { ...leaf.position, end: pointAt(until) },
@@ -1584,6 +1626,26 @@ export function misreadLists(document: Document): MisreadLists {
           offset: item.children[0]?.position?.start.offset ?? item.position!.end.offset!,
         }),
       );
+    // HTML opened inside a list can outlive the parsed list and keep a
+    // later list marker raw (#428). Changing only the opening list's
+    // markers can then split or merge Reading view's list (#399). Keep
+    // those markers too; a closer before the later list still permits
+    // both lists to format. This reverse pass visits each node once and
+    // propagates the HTML endpoint without rescanning source or lists.
+    let nextListStart = Infinity;
+    const protectEscapingHtmlMarkers = (node: Nodes): number => {
+      const following = nextListStart;
+      let until = escapingHtmlEnds.get(node) ?? 0;
+      if ("children" in node)
+        for (let index = node.children.length - 1; index >= 0; index--)
+          until = Math.max(until, protectEscapingHtmlMarkers(node.children[index]!));
+      if (node.type === "list" && node.position) {
+        if (until > following) for (const marker of markersOf(node)) itemHtml.add(marker);
+        nextListStart = node.position.start.offset!;
+      }
+      return until;
+    };
+    if (escapingHtmlEnds.size) protectEscapingHtmlMarkers(document.tree);
     const visitHtml = (parent: Parents) =>
       parent.children.forEach((child, index) => {
         if ("children" in child && !leaves.has(child.type)) visitHtml(child);

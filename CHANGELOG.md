@@ -22,6 +22,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Retain GitHub's combined heading when a Setext title directly follows dollar
+  display math, preserving its dollar lines and title through heading, spacing
+  and wrap changes
+  ([#336](https://github.com/viell-dev/slop-markdown-tools/issues/336)).
+- Keep Obsidian list markers consistent when HTML leaves one parsed list and
+  protects a later list's markers, so formatting cannot split one Reading-view
+  list by changing only its earlier bullet
+  ([#399](https://github.com/viell-dev/slop-markdown-tools/issues/399)).
 - Keep one-column Obsidian table source when missing header or delimiter borders
   would turn Live Preview text into a table widget, and carry Reading paragraph
   state across Tab lines when those borders do not form a real table

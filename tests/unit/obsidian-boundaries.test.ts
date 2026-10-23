@@ -1162,7 +1162,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
+        ![399, 488, 494, 519, 524, 529, 548, 556, 567].includes(issue) &&
         ![
           "short reset exposes an unclosed long run in an inline comment",
           "joined footnote ending in span paragraph",
@@ -1177,5 +1177,52 @@ describe("Obsidian boundaries read differently by its views", () => {
     expect(
       format("text *\\\n> + *words*\n", { config: { extends: ["recommended", "github"] } }).output,
     ).toContain("> - _words_");
+  });
+});
+
+describe("escaping HTML keeps its originating list markers coherent (#399, #428)", () => {
+  it("keeps an unclosed HTML tail literal and resumes after a real closer", () => {
+    expect(checked("+ <div> a\nlazy\n\n+ b\n\nLater *outside*.\n")).toContain("Later *outside*.");
+    expect(checked("+ <div> a\nlazy\n</div>\n\n+ b\n\nLater *outside*.\n")).toContain(
+      "Later _outside_.",
+    );
+  });
+  it.each([
+    "+ <div> a\nlazy\n\n+ b\n",
+    "+ <div> a\nlazy\n\n- b\n",
+    // Retaining the first marker is conservative when both bullets already differ.
+    "+ <div> a\nlazy\n\n* b\n",
+    "+ before\n+ <div> a\nlazy\n\n+ b\n",
+    "2) <div> a\nlazy\n\n3) b\n",
+    "2) <div> a\nlazy\n\n3. b\n",
+    "> + <div> a\n> lazy\n>\n> + b\n",
+    "- parent\n  + <div> a\n  lazy\n\n  + b\n",
+  ])("keeps %j coherent across newline and prefix offsets", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(checked(input)).toBe(input);
+      }
+  });
+
+  it.each([
+    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "- <div> a\nlazy\n</div>\n\n- b\n"],
+    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> - <div> a\n> lazy\n> </div>\n>\n> - b\n"],
+    ["+ *a*\nlazy\n\n+ b\n", "- _a_ lazy\n\n- b\n"],
+    ["+ *prefix* <div> a\nlazy\n\n+ b\n", "+ _prefix_ <div> a\nlazy\n\n+ b\n"],
+  ])("still permits safe edits to %j", (source, output) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"])
+        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+          bom + output.replaceAll("\n", newline),
+        );
+  });
+
+  it("leaves the existing other-dialect marker policy available", () => {
+    const source = "+ <div> a\nlazy\n\n+ b\n";
+    const output = format(source, {
+      config: { extends: [], dialect: "github", rules: { "style/list-marker": "warn" } },
+    }).output;
+    expect(output).toBe("- <div> a\nlazy\n\n- b\n");
   });
 });

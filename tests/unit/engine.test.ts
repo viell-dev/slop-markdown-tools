@@ -3513,3 +3513,29 @@ describe("line endings", () => {
     expect(format(plain, { config, plugins: [join] }).output).toBe(`> Quoted text.${newline}`);
   });
 });
+
+it.each(["inline", "block", "document"] as const)(
+  "protects the opening HTML item's marker from a plugin's %s edit (#399)",
+  (phase) => {
+    const source = "+ <div> a\nlazy\n\n+ b\n";
+    const plugin: Plugin = {
+      name: "probe",
+      rules: {
+        marker: {
+          kind: "style",
+          phase,
+          description: "Change the first list marker",
+          check: () => [
+            { start: 0, message: "Change marker", edit: { start: 0, end: 1, text: "-" } },
+          ],
+        },
+      },
+    };
+    const result = format(source, {
+      config: { extends: [], dialect: "obsidian", rules: { "probe/marker": "warn" } },
+      plugins: [plugin],
+    });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics).toEqual([]);
+  },
+);

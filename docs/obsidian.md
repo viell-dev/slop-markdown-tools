@@ -197,6 +197,10 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A list whose HTML continues outside its parsed item keeps its markers when
+  that HTML already protects a later list's marker. Changing only the earlier
+  bullet could split one Reading-view list into two. When the HTML closes before
+  the later marker, both lists can still format normally.
 - A list's final paragraph stays adjacent to a tilde opener whose info contains
   a written backtick. Live Preview keeps that source in the paragraph, so a new
   blank would split its continuation. Marker preferences, indentation and safe

@@ -750,6 +750,9 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
+- On GitHub after 0.4.0, between contiguous dollar display math and an
+  immediately following Setext title. GitHub reads the dollar lines and title as
+  one heading, so their source stays together.
 - In the Obsidian dialect, after an underlined heading that a view reads as
   paragraph text, such as a multiline level-1 heading, one beginning with a
   reference-like line, or one whose underline has trailing space, extra
@@ -958,6 +961,11 @@ which `---` below it could make a table, or when it ends with a backslash, and
 on Forgejo and Gitea when it contains `{`. Below a first line of `---` that no
 line closes, a level-2 underline has at least four `-`, because `---` would
 close it as front matter.
+
+After 0.4.0, GitHub keeps an existing Setext title directly after dollar display
+math. The dollar lines belong to that native heading too, so the complete range
+stays as written. An intervening blank or interrupting block permits heading
+preferences again.
 
 After 0.4.0, Obsidian also retains the heading form when a title line begins
 directly with math or its only content is an image/embed. ATX and Setext can
