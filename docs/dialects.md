@@ -94,6 +94,14 @@ never restyled, and no line is broken inside it.
   dollar display math can interrupt a paragraph and close on the same line; a
   `math` code fence is ordinary code there.
 
+After 0.4.0, GitHub also retains contiguous dollar display math and a Setext
+title immediately below it as one source range. GitHub's underline can include
+the dollar lines in that heading. A real blank before the title or an
+interrupting block permits ordinary formatting again
+([#336](https://github.com/viell-dev/slop-markdown-tools/issues/336)). The same
+protection retains such a title when GitHub continues it inside a list or quote
+after its display math, even when the title omits the container's markers.
+
 Where a renderer is stricter, the tool still protects the text: a formula with
 emphasis inside, which GitHub does not render, and one that runs over a line
 break, which Forgejo, Gitea, and Obsidian's Live Preview do not render. Where

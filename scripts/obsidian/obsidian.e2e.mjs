@@ -108,9 +108,16 @@ async function shown(path, text) {
             continue;
           }
           if (child.nodeType !== Node.ELEMENT_NODE || child.matches(ui)) continue;
-          if (child.matches(".math"))
-            out.push([`${classes} math`, child.querySelector("[data-latex]")?.dataset.latex ?? ""]);
-          else if (child.matches(embeds)) out.push([`${classes} embed`, embedText(child)]);
+          if (child.matches(".math")) {
+            // A widget can sit outside Setext's styled text spans. Its inherited
+            // typography can change while its LaTeX and captured classes agree.
+            const font = globalThis.getComputedStyle(child);
+            const typography = `font-size=${font.fontSize} font-weight=${font.fontWeight} line-height=${font.lineHeight}`;
+            out.push([
+              `${classes} math ${typography}`,
+              child.querySelector("[data-latex]")?.dataset.latex ?? "",
+            ]);
+          } else if (child.matches(embeds)) out.push([`${classes} embed`, embedText(child)]);
           else if (child.matches("input[type=checkbox]"))
             out.push([`${classes} checkbox`, child.checked ? "x" : " "]);
           else {
@@ -844,6 +851,35 @@ describe("Obsidian before and after formatting", function () {
     expect(normalized[0]).toHaveLength(2);
     for (const changed of normalized.slice(3, 7)) expect(normalized[0]).not.toEqual(changed);
     expect(normalized[7]).not.toEqual(normalized[8]);
+  });
+
+  it("retains inherited math typography across heading forms (#383, #569)", async function () {
+    if (probe || reduce) this.skip();
+    const cases = [
+      ["sole math", "$x$\n---\n", "## $x$\n", false],
+      ["two leading widgets", "$x$ $y$\n---\n", "## $x$ $y$\n", false],
+      ["leading math before a comment", "$x$%%note%%\n---\n", "## $x$%%note%%\n", false],
+      ["text before math", "before $x$ after\n---\n", "## before $x$ after\n", true],
+      ["wrapped math", "*$x$*\n---\n", "## _$x$_\n", true],
+    ];
+    const views = new Map();
+    for (const [index, source] of [...new Set(cases.flatMap(([, a, b]) => [a, b]))].entries()) {
+      const path = `controls/math-typography-${index}.md`;
+      await obsidianPage.write(path, source);
+      views.set(source, await shown(path, source));
+    }
+    for (const [name, source, paired, equal] of cases) {
+      const before = views.get(source),
+        after = views.get(paired);
+      expect({ name, reading: cleanHtml(before.reading) }).toEqual({
+        name,
+        reading: cleanHtml(after.reading),
+      });
+      const same =
+        JSON.stringify(livePreview(globalThis.structuredClone(before.lines))) ===
+        JSON.stringify(livePreview(globalThis.structuredClone(after.lines)));
+      expect({ name, same }).toEqual({ name, same: equal });
+    }
   });
 
   it("normalizes styled Setext markers while retaining real heading content (#544)", async function () {

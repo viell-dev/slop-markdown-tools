@@ -178,6 +178,29 @@ describe("style/thematic-break", () => {
       );
     },
   );
+  it.each(dialects.filter((dialect) => dialect !== "commonmark"))(
+    "keeps compact hyphens below math for non-hyphen markers in %s (#336)",
+    (dialect) => {
+      for (const marker of ["***", "___"])
+        for (const source of [
+          "$$\nx = 1\n$$\n---\n",
+          "$$\nx = 1\n$$\n   ----- \t\n",
+          "> $$\n> x = 1\n> $$\n> ---\n",
+          "- $$\n  x = 1\n  $$\n  ---\n",
+        ])
+          kept(source, only({ "style/thematic-break": ["warn", { marker }] }, dialect));
+      kept(
+        "***\n\n$$\nx = 1\n$$\n---\n",
+        only({ "style/thematic-break": ["warn", { marker: "consistent" }] }, dialect),
+      );
+      expect(formatted("$$\nx = 1\n$$\n- - -\n", only(stars, dialect))).toBe(
+        "$$\nx = 1\n$$\n***\n",
+      );
+      expect(formatted("$$\nx = 1\n$$\n\n---\n", only(stars, dialect))).toBe(
+        "$$\nx = 1\n$$\n\n***\n",
+      );
+    },
+  );
   it("leaves `* ***` and `- ---` lines alone for the marker that would join them", () => {
     kept("Text\n\n* ---\n", only(stars));
     kept("Text\n\n- ***\n", only(rule));
@@ -300,7 +323,6 @@ describe("style/trailing-space", () => {
     ["Text \nmore\t\nend \t \n", "Text\nmore\nend\n"],
     ["Text  \n", "Text\n"],
     ["Text  \n\nMore\n", "Text\n\nMore\n"],
-    ["Text\t  \nmore\n", "Text\nmore\n"],
     ["# Title  \n", "# Title\n"],
     ["Title  \n===  \n", "Title\n===\n"],
     ["> Text \n>  \n> more\n", "> Text\n>\n> more\n"],
@@ -323,6 +345,7 @@ describe("style/trailing-space", () => {
   });
   it.each([
     // A hard line break written as spaces stays exactly as written.
+    ["Text\t  \nmore\n"],
     ["One  \ntwo\n"],
     ["One     \ntwo\n"],
     ["> One  \n> two\n"],
@@ -982,4 +1005,221 @@ describe("the block and whitespace rules together", () => {
       { numRuns: 400, seed: 20261017 },
     );
   });
+});
+
+describe("Obsidian tilde info that continues a list paragraph (#567)", () => {
+  const config = only({ "style/block-spacing": "warn" }, "obsidian");
+  it.each([
+    "* a\nb\n~~~ lang `x`\nc\n",
+    "* a\n~~~ lang `x`\nc\n",
+    "* a\nb\n~~~ lang \\`x\\`\nc\n",
+    "* a\nb\n~~~ lang `x\nc\n",
+    "* a\nb\n ~~~ lang `x`\nc\n",
+    "1000. a\nb\n   ~~~ lang `x`\nc\n",
+    "> * a\n> b\n> ~~~ lang `x`\n> c\n",
+  ])("retains physical adjacency for %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"])
+      for (const bom of ["", "\uFEFF"]) {
+        const input = bom + source.replaceAll("\n", newline);
+        expect(formatted(input, config)).toBe(input);
+        expect(format(input, { config: only({}, "obsidian") }).output).toBe(input);
+      }
+  });
+
+  it.each([
+    "* a\nb\n~~~ lang\nc\n",
+    "* a\nb\n~~~ lang &#96;x&#96;\nc\n",
+    "# heading\n~~~ lang `x`\nc\n",
+  ])("still separates real boundaries in %j", (source) => {
+    expect(formatted(source, config)).toBe(source.replace("\n~~~", "\n\n~~~"));
+  });
+
+  it("keeps an existing blank without creating another", () => {
+    const source = "* a\nb\n\n~~~ lang `x`\nc\n";
+    expect(formatted(source, config)).toBe(source);
+  });
+
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "retains ordinary block spacing in %s",
+    (dialect) => {
+      const source = "* a\nb\n~~~ lang `x`\nc\n";
+      expect(formatted(source, only({ "style/block-spacing": "warn" }, dialect))).toBe(
+        source.replace("\n~~~", "\n\n~~~"),
+      );
+    },
+  );
+});
+
+describe("literal backslashes before trailing blank space (#560)", () => {
+  const configured = (dialect: Dialect, hardBreak: "keep" | "backslash") =>
+    only({ "style/trailing-space": ["warn", { hardBreak }] }, dialect);
+
+  it.each(dialects)("keeps the exact separating suffix in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const source of [
+        "a\\ \nb\n",
+        "a\\\t\nb\n",
+        "a\\ \t\nb\n",
+        "a\\\t \nb\n",
+        "a\\\t\t\nb\n",
+        "a\\  \t\nb\n",
+        "a\\\t  \nb\n",
+        "a\\\t\t  \nb\n",
+        "a\\\\\\ \nb\n",
+        "*a\\ \nb*\n",
+        "[a\\ \nb](url)\n",
+        "a\\ \nb\n===\n",
+      ])
+        kept(source, configured(dialect, hardBreak));
+  });
+
+  it.each(dialects)("still trims safe prose in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const [source, output] of [
+        ["a\\\\ \nb\n", "a\\\\\nb\n"],
+        ["a\\\\\\\\\t\nb\n", "a\\\\\\\\\nb\n"],
+        ["a\\ \n", "a\\\n"],
+        ["a\\ ", "a\\"],
+        ["a\\ \n\nb \n", "a\\\n\nb\n"],
+        ["a\\ \n# b \n", "a\\\n# b\n"],
+        ["# a\\ \nb\n", "# a\\\nb\n"],
+        ["- a\\ \n  - b\n", "- a\\\n  - b\n"],
+        ["a \nb\t\n", "a\nb\n"],
+      ])
+        expect(formatted(source!, configured(dialect, hardBreak))).toBe(output);
+  });
+
+  it.each(dialects)("distinguishes a Setext title's final content line in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      expect(formatted("a\\ \n=== \n", configured(dialect, hardBreak))).toBe(
+        dialect === "obsidian" ? "a\\ \n=== \n" : "a\\\n===\n",
+      );
+  });
+
+  it.each(dialects)("keeps container offsets and line endings in %s", (dialect) => {
+    for (const hardBreak of ["keep", "backslash"] as const)
+      for (const eol of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"])
+          for (const [source, output] of [
+            ["- a\\\t\n  b \n", "- a\\\t\n  b\n"],
+            ["> a\\\t\n> b \n", "> a\\\t\n> b\n"],
+            ["- a\\\\ \n  b \n", "- a\\\\\n  b\n"],
+            ["> a\\\\ \n> b \n", "> a\\\\\n> b\n"],
+          ])
+            expect(
+              formatted(bom + source!.replaceAll("\n", eol), configured(dialect, hardBreak)),
+            ).toBe(bom + output!.replaceAll("\n", eol));
+  });
+
+  it.each(dialects)("retains existing hard-break choices in %s", (dialect) => {
+    expect(formatted("a  \nb \n", configured(dialect, "keep"))).toBe("a  \nb\n");
+    expect(formatted("a  \nb \n", configured(dialect, "backslash"))).toBe("a\\\nb\n");
+    kept("a\\  \nb\n", configured(dialect, "keep"));
+    kept("a\\  \nb\n", configured(dialect, "backslash"));
+    expect(formatted("a\\\nb \n", configured(dialect, "backslash"))).toBe("a\\\nb\n");
+  });
+});
+
+describe("mixed-whitespace hard breaks (#562)", () => {
+  const configured = (hardBreak: "keep" | "backslash") =>
+    only({ "style/trailing-space": ["warn", { hardBreak }] }, "vitepress");
+
+  it.each(["keep", "backslash"] as const)("retains the ambiguous suffix with %s", (mode) => {
+    for (const source of [
+      "a\t  \nb\n",
+      "a\t\t  \nb\n",
+      "a \t   \nb\n",
+      "a\\\t  \nb\n",
+      "a\\\\\t  \nb\n",
+      "a\\\\\\\\\t  \nb\n",
+      "a\t  \nb\n===\n",
+      "*a\t  \nb*\n",
+      "[a\t  \nb](url)\n",
+    ])
+      kept(source, configured(mode));
+  });
+
+  it.each(["keep", "backslash"] as const)("still trims other lines with %s", (mode) => {
+    for (const [source, output] of [
+      ["- a\t  \n  b \n", "- a\t  \n  b\n"],
+      ["> a\t  \n> b \n", "> a\t  \n> b\n"],
+      ["> - a\t  \n>   b \n", "> - a\t  \n>   b\n"],
+      ["a\t\nb\n", "a\nb\n"],
+      ["a\t \nb\n", "a\nb\n"],
+      ["a\t  \t\nb\n", "a\nb\n"],
+      ["a\t  \n", "a\n"],
+      ["a\t  ", "a"],
+      ["a\t  \n\nb \n", "a\n\nb\n"],
+      ["a\t  \n# b \n", "a\n# b\n"],
+      ["# a\t  \nb\n", "# a\nb\n"],
+      ["a\t  \n===\n", "a\n===\n"],
+    ])
+      expect(formatted(source!, configured(mode))).toBe(output);
+  });
+
+  it.each(["\n", "\r\n", "\r"])("keeps offsets and BOMs with %j endings", (eol) => {
+    for (const bom of ["", "\uFEFF"])
+      for (const mode of ["keep", "backslash"] as const) {
+        for (const source of ["a\t  \nb\n", "a\\\\\t  \nb\n"])
+          kept(bom + source.replaceAll("\n", eol), configured(mode));
+        expect(formatted(bom + "> - a\t  \n>   b \n".replaceAll("\n", eol), configured(mode))).toBe(
+          bom + "> - a\t  \n>   b\n".replaceAll("\n", eol),
+        );
+      }
+  });
+
+  it.each(dialects)("retains mixed-whitespace hard breaks in %s", (dialect) => {
+    for (const mode of ["keep", "backslash"] as const) {
+      const config = only({ "style/trailing-space": ["warn", { hardBreak: mode }] }, dialect);
+      kept("a\t  \nb\n", config);
+      kept("a\\\\\t  \nb\n", config);
+    }
+  });
+
+  it("retains the native-reading guard and existing hard-break modes", () => {
+    expect(semanticFingerprint(parse("a\t  \nb\n", "vitepress"))).not.toBe(
+      semanticFingerprint(parse("a\nb\n", "vitepress")),
+    );
+    expect(formatted("a  \nb\n", configured("keep"))).toBe("a  \nb\n");
+    expect(formatted("a  \nb\n", configured("backslash"))).toBe("a\\\nb\n");
+  });
+});
+
+describe("terminal separators before Obsidian Tab-only continuations (#563)", () => {
+  it.each(["keep", "backslash"] as const)("retains required separators with %s", (hardBreak) => {
+    const config = only({ "style/trailing-space": ["warn", { hardBreak }] }, "obsidian");
+    for (const source of [
+      "a  \n\t\n# c\n",
+      "a   \n\t\n# c\n",
+      "a   \n\t\n",
+      "a\\ \n\t\n# c\n",
+      "a\\\t\n\t\n# c\n",
+      "> alpha   \n>\t\n\n# tail\n",
+      "- alpha   \n  \t\n\n# tail\n",
+    ])
+      for (const eol of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) kept(bom + source.replaceAll("\n", eol), config);
+  });
+
+  it.each([
+    ["a \n\t\n# c\n", "a\n\t\n# c\n"],
+    ["a\\\\ \n\t\n# c\n", "a\\\\\n\t\n# c\n"],
+    ["a\\ \n\n# c\n", "a\\\n\n# c\n"],
+    ["a   \n \n# c\n", "a\n\n# c\n"],
+    ["# a   \n\t\n# c\n", "# a\n\t\n# c\n"],
+    ["- alpha  \n\t\n# c\n", "- alpha\n\t\n# c\n"],
+    ["-    alpha  \n\t\n# c\n", "-    alpha\n\t\n# c\n"],
+    ["1000. alpha  \n\t\t\n# c\n", "1000. alpha\n\t\t\n# c\n"],
+  ])("retains ordinary cleanup for %j", (source, output) => {
+    expect(formatted(source, only({ "style/trailing-space": "warn" }, "obsidian"))).toBe(output);
+  });
+
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "retains terminal cleanup in %s",
+    (dialect) => {
+      expect(formatted("a   \n\t\n# c\n", only({ "style/trailing-space": "warn" }, dialect))).toBe(
+        "a\n\n# c\n",
+      );
+    },
+  );
 });

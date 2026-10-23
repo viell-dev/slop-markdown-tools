@@ -35,6 +35,60 @@ prereleases' notes there are longer than their entries here.
 - Raw HTML heading fragments retain literal character-reference text split by
   tags or comments, including the numbering of later duplicate headings
   ([#552](https://github.com/viell-dev/slop-markdown-tools/issues/552)).
+- Keep two-space hard breaks inside locally paired multiline code spans, which
+  GitHub can display as literal text after an unmatched longer backtick run.
+  Both wrapping and inline-code joining retain the physical boundary
+  ([#335](https://github.com/viell-dev/slop-markdown-tools/issues/335)).
+- Preserve GitHub's heading and lazy paragraph boundaries beside dollar display
+  math, including compact hyphen lines and Setext titles. Keep thematic-marker,
+  heading, spacing and wrap changes from splitting those native boundaries
+  ([#336](https://github.com/viell-dev/slop-markdown-tools/issues/336)).
+- Keep Obsidian list markers consistent when HTML leaves one parsed list and
+  protects a later list's markers, so formatting cannot split one Reading-view
+  list by changing only its earlier bullet
+  ([#399](https://github.com/viell-dev/slop-markdown-tools/issues/399)).
+- Keep one-column Obsidian table source when missing header or delimiter borders
+  would turn Live Preview text into a table widget, and carry Reading paragraph
+  state across Tab lines when those borders do not form a real table
+  ([#568](https://github.com/viell-dev/slop-markdown-tools/issues/568)).
+- Keep a list paragraph adjacent to an Obsidian tilde opener whose info contains
+  backticks, preserving its Live Preview continuation while allowing safe list
+  formatting. When its primary closer opens Live Preview code, conservatively
+  preserve the remaining source because later fences can pair differently
+  ([#567](https://github.com/viell-dev/slop-markdown-tools/issues/567)).
+- Retain Reading paragraph state across Tab lines after a one-column table
+  displayed as text, preserving later literal rows while allowing genuine tables
+  to format
+  ([#398](https://github.com/viell-dev/slop-markdown-tools/issues/398)).
+- Keep the physical multiline image description containing backticks in Obsidian
+  so wrapping cannot turn displayed source into an embed; safe surrounding
+  inline text still formats
+  ([#566](https://github.com/viell-dev/slop-markdown-tools/issues/566)).
+- Retain short multiline Obsidian code spans and their following inline source
+  when Live Preview resets code styling at the physical newline. Earlier text
+  and later independent paragraphs can still format
+  ([#565](https://github.com/viell-dev/slop-markdown-tools/issues/565)).
+- Keep the terminal separator before an Obsidian Tab-only paragraph
+  continuation, preserving hard breaks and literal backslashes while allowing
+  earlier wrapping and safe whitespace cleanup
+  ([#563](https://github.com/viell-dev/slop-markdown-tools/issues/563)).
+- Preserve lazy paragraph lines that determine the Live Preview nesting of later
+  blocks in an enclosing list item
+  ([#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
+- Retain the separator before an uncertain Obsidian Setext underline when
+  trimming it would create or remove a Reading-view hard break
+  ([#383](https://github.com/viell-dev/slop-markdown-tools/issues/383)). Also
+  retain heading forms around unwrapped leading math and sole image/embed
+  titles, preserving Live Preview typography and placement. The host comparison
+  now checks inherited math typography too
+  ([#569](https://github.com/viell-dev/slop-markdown-tools/issues/569)).
+- Preserve the spaces or tabs after a literal backslash when trimming them would
+  create a hard line break, avoiding a guarded trailing-space refusal
+  ([#560](https://github.com/viell-dev/slop-markdown-tools/issues/560)).
+- Keep hard breaks written as a Tab followed by two spaces, preventing silent
+  break loss or guarded cleanup refusals while preserving ordinary
+  trailing-space cleanup
+  ([#562](https://github.com/viell-dev/slop-markdown-tools/issues/562)).
 - Obsidian wrapping retains possible comments that cross a blank line, avoiding
   an unsafe-format refusal when wrapping would put their closer alone on a line
   ([#559](https://github.com/viell-dev/slop-markdown-tools/issues/559)).

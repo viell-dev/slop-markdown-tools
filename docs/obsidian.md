@@ -197,6 +197,56 @@ line or a block that interrupts a paragraph still starts a block of its own.
 The following additions are on the development branch and are not yet in the
 latest installable release:
 
+- A list whose HTML continues outside its parsed item keeps its markers when
+  that HTML already protects a later list's marker. Changing only the earlier
+  bullet could split one Reading-view list into two. When the HTML closes before
+  the later marker, both lists can still format normally.
+- A list's final paragraph stays adjacent to a tilde opener whose info contains
+  a written backtick. Live Preview keeps that source in the paragraph, so a new
+  blank would split its continuation. Marker preferences, indentation and safe
+  earlier wrapping remain available. When the primary closing fence instead
+  opens Live Preview code, its source and the rest of the document stay as
+  written. This conservatively retains later fence pairings too.
+- A one-column table keeps its source unless its header and delimiter both have
+  leading and trailing pipes, as Live Preview needs those borders for a table
+  widget. Reading view also accepts matching trailing-only borders. Missing
+  final pipes or mismatched leading borders keep Reading paragraph state across
+  a Tab-only continuation, so later literal rows retain their source. A real
+  Reading table, an empty or space-only blank, or an interrupting heading still
+  allows subsequent table formatting.
+- An image description containing backticks stays split across its existing
+  lines, where joining could turn displayed Live Preview source into an embed.
+  Safe inline formatting before and after it remains available.
+- A code span with one or two backticks that crosses a physical newline keeps
+  its source and the rest of its inline block. Live Preview ends short code at
+  that newline, so the written closer can start code over later text. Earlier
+  independent inline markup and later independent paragraphs still format.
+  Wrapping leaves the paragraph holding that span unreflowed. A paired multiline
+  span with three or more backticks keeps its ordinary formatting behavior.
+  Short spans in an inline comment or image description conservatively keep the
+  whole inline block.
+- A lazy paragraph line also keeps later blocks in an enclosing list item when
+  it crosses that item's content margin. Joining or indenting the line would
+  otherwise change their nesting in Live Preview. Properly indented
+  continuations and terminal lazy paragraphs still format.
+- Before a Tab-only paragraph continuation, wrapping and trailing-space cleanup
+  retain the preceding separator when it marks a hard break or keeps a backslash
+  literal. Earlier text can still wrap. Quoted margins are handled
+  conservatively, retaining a possibly removable separator.
+- An uncertain Setext underline that Reading view keeps in a paragraph also
+  retains its preceding separator when removing it would create or remove a hard
+  break. Earlier inline text still formats. An underline treated as text only by
+  Live Preview does not need this extra separator protection.
+- A Setext title line beginning directly with math, or a title containing only
+  an image/embed, keeps its whole source. Converting it to ATX can change the
+  math widget's inherited font or move a standalone image into the heading. The
+  inverse conversion keeps those ATX forms too. Mixed text before math, wrapped
+  math, and images beside ordinary title text still allow heading preferences;
+  independent blocks below the heading still get their spacing and formatting.
+- A Tab followed by two or more final spaces keeps its hard break while the text
+  continues, even when the primary Markdown parser reads a soft line ending.
+  Ordinary trailing whitespace can still be cleaned where it has no rendered
+  meaning.
 - A table keeps the source from a body row that changes its header's
   leading-pipe convention, or has only its leading pipe. Both views can end the
   table there while the primary parser keeps another row. Adding border pipes

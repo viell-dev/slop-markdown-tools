@@ -1,0 +1,44 @@
+<!-- a comment -->
+ember -->
+
+
+```sh
+const valley = 83;
+  saddle(valley)   
+
+```
+  
+>  + birch candle _yonder_ signal *cedar anchor* iris birch valley **pebble** *kettle candle* www.example.com www.example.com &copy; fern fabric __engine__ pebble walnut
+>    9) timber grove ember [method meadow](#section) juniper __fern__ <span>amber</span> ribbon &copy; *basket juniper* anchor yonder _walnut_ needle
+>
+>    10) signal ~~timber~~ ![[birch.png]] `zephyrfern` `cedargrove` valley signal  
+>        candle pebble
+>
+>    11) candle [[juniper|signal cedar]] `signal  birch` candle __glacier__ *ember valley* ember ribbon\
+>        `saddle candle` [zephyr](https://example.com/a) __harbor__ ribbon meadow **anchor** ~~timber~~ quarry iris [[orchard]] [![yonder](https://img.example.com/badge/pebble-harbor.svg)](https://example.com/engine) __fabric__
+>
+>    12) saddle **zephyr** lantern
+>  + valley _orchard_
+>  + walnut _quarry_ timber orchard grove *kettle quarry* juniper yonder ==fern grove== method saddle _timber_ amber pebble zephyr fabric *kettle harbor* _iris_ `fern walnut` kettle orchard valley
+>  + [fern](#section) kettle https://example.com/fabric fabric grove amber harbor ~~signal~~ https://example.com/valley www.example.com `basket  amber` ember _ribbon_ iris **kettle** basket walnut birch basket fern __ember__
+>    + birch cedar basket
+>    + yonder candle __grove__ harbor glacier *birch quarry* iris\
+>      *** __ember__ ``` timber delta needle [![zephyr](https://img.example.com/badge/needle-yonder.svg)](https://example.com/cedar) **meadow** fabric fabric zephyr candle
+>      * [ ] ==delta engine== quarry `pebble method` [^1] fabric
+>      delta saddle cedar _needle_ grove ember orchard _birch_ saddle harbor ==candle harbor== *kettle anchor*
+>      * glacier ==method signal== glacier engine *pebble anchor* fabric orchard ribbon timber
+  
+candle needle walnut iris 
+amber saddle method **anchor** engine
+    const fabric = 73;
+      valley(ribbon)   
+	
+#### ember ![[basket.png]] ~~~ www.example.com fern 2) pebble valley ember
+  
+~~~md
+const meadow = 27;
+  needle(delta)   
+
+~~~
+
+---

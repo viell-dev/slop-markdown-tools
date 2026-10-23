@@ -283,6 +283,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.unclosedCode,
       ...misread.htmlText,
       ...misread.underlines,
+      ...misread.widgetHeadings,
       ...misread.lazyItems,
       ...misread.footnoteText,
       ...misread.definitionCode,

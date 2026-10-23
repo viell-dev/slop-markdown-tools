@@ -11,10 +11,18 @@ import {
   startsWithMarker,
   unclosedFrontMatter,
 } from "../syntax/parse.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { misreadLists, obsidianWidgetHeading } from "../syntax/misread-lists.js";
 import { walk } from "../syntax/walk.js";
-import { lineBreak, lineBreaks, lineEnd, lineEnding, lineStart } from "../syntax/source.js";
+import {
+  escaped,
+  lineBreak,
+  lineBreaks,
+  lineEnd,
+  lineEnding,
+  lineStart,
+} from "../syntax/source.js";
 import { optionsSchema as schema } from "./shared.js";
+import { obsidianTabBreak } from "./protections.js";
 
 /** A physical line: where it starts, where its content ends, and where the next line starts. */
 interface Line {
@@ -189,6 +197,7 @@ export function underlineEdit(document: Document, node: Heading): Edit | undefin
     if (!/^[ \t]*$/.test(source.slice(above, lineEnd(source, above)))) return undefined;
   }
   const text = source.slice(range(first)[0], range(last)[1]);
+  if (document.dialect === "obsidian" && obsidianWidgetHeading(source, node)) return undefined;
   if (notParagraph.test(text) || text.endsWith("\\")) return undefined;
   if ((document.dialect === "forgejo" || document.dialect === "gitea") && text.includes("{"))
     return undefined;
@@ -310,19 +319,21 @@ const thematicBreak: Rule = {
       const items = new RegExp(`[ \\t${marker[0] === "-" ? "\\-" : marker[0]}]*$`);
       const prefix = source.slice(lineStart(source, start), start);
       if (items.exec(prefix)![0].includes(marker[0]!)) return;
-      if (marker === "---") {
-        // Directly below a paragraph or a link reference definition, `---`
-        // would underline it as a heading, and so it would display math,
-        // which GitHub builds from a paragraph (issue #336). In Obsidian,
-        // it can take the last table row out of Live Preview's table too.
-        // The reverse direction and the literal row are range-protected.
+      if (marker === "---" || /^-{3,}$/.test(source.slice(start, end))) {
+        // A new `---` can underline the paragraph or definition above it.
+        // Directly below display math, compact hyphens already do so on
+        // GitHub: keep that boundary in both directions (#336). Spaced
+        // hyphens can still change to another non-hyphen marker. Obsidian
+        // also retains a table's final row as a heading; its literal source
+        // and the reverse paragraph direction are range-protected.
         const above = index && parent ? lastBlock(parent.children[index - 1]!) : undefined;
         if (
           above &&
-          (above.type === "paragraph" ||
-            above.type === "definition" ||
-            above.type === "math" ||
-            (document.dialect === "obsidian" && above.type === "table")) &&
+          (above.type === "math" ||
+            (marker === "---" &&
+              (above.type === "paragraph" ||
+                above.type === "definition" ||
+                (document.dialect === "obsidian" && above.type === "table")))) &&
           above.position?.end.line === node.position!.start.line - 1
         )
           return;
@@ -486,6 +497,7 @@ const trailingSpace: Rule = {
      */
     const breaks: { start: number; end: number; block: [number, number]; marker: boolean }[] = [];
     const links: [number, number][] = [];
+    const proseBlocks: [number, number][] = [];
     let block: [number, number] = [0, 0];
     let marker = false;
     walk(document.tree, (node, _, parent) => {
@@ -497,6 +509,12 @@ const trailingSpace: Rule = {
       const [start, end] = range(node);
       if (node.type === "paragraph" || node.type === "heading") {
         block = [start, end];
+        if (document.dialect === "obsidian" && node.type === "paragraph") {
+          const tabBreak = obsidianTabBreak(node, source);
+          if (tabBreak) kept.push(tabBreak);
+        }
+        // The final inline child excludes a Setext underline or ATX closer.
+        proseBlocks.push([start, node.children.at(-1)?.position?.end.offset ?? end]);
         const written = source.slice(start, end);
         marker =
           node.type === "paragraph"
@@ -535,6 +553,7 @@ const trailingSpace: Rule = {
     const ranges = merged(kept);
     let next = 0;
     let following = 0;
+    let proseBlock = 0;
     let link = 0;
     /**
      * Whether a backslash in place of the blank space of a hard line break,
@@ -578,6 +597,17 @@ const trailingSpace: Rule = {
         document.dialect === "obsidian" &&
         /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+$/.test(source.slice(line.start, end));
       if (!hard) {
+        while (proseBlock < proseBlocks.length && proseBlocks[proseBlock]![1] <= start)
+          proseBlock++;
+        const continues =
+          proseBlock < proseBlocks.length &&
+          proseBlocks[proseBlock]![0] <= start &&
+          line.next < proseBlocks[proseBlock]![1];
+        // Trimming would expose an odd literal backslash to the newline.
+        // Two final spaces after a Tab can still mark a native hard break,
+        // even when the primary tree reads a soft line ending. Keep either
+        // separator exactly as written while the prose block continues.
+        if (continues && (escaped(source, start) || source.endsWith("  ", end))) continue;
         const text = emptyMarker ? " " : "";
         if (source.slice(start, end) === text) continue;
         findings.push({

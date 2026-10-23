@@ -6,6 +6,279 @@ import { URL } from "node:url";
 export const boundaryFixtures = [
   ...[
     {
+      issue: 399,
+      name: "HTML item coherence: same plus bullets",
+      source: "+ <div> a\nlazy\n\n+ b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: different hyphen bullet",
+      source: "+ <div> a\nlazy\n\n- b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: ordered delimiter",
+      source: "2) <div> a\nlazy\n\n3) b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: different ordered delimiters",
+      source: "2) <div> a\nlazy\n\n3. b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: quote parent",
+      source: "> + <div> a\n> lazy\n>\n> + b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: list parent",
+      source: "- parent\n  + <div> a\n  lazy\n\n  + b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: prior item in first parsed list",
+      source: "+ before\n+ <div> a\nlazy\n\n+ b\n",
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: closed HTML permits both markers",
+      source: "+ <div> a\nlazy\n</div>\n\n+ b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: closed HTML under quote",
+      source: "> + <div> a\n> lazy\n> </div>\n>\n> + b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: ordinary lazy paragraph",
+      source: "+ *a*\nlazy\n\n+ b\n",
+      preserve: false,
+    },
+    {
+      issue: 399,
+      name: "HTML item coherence: prefix emphasis stays available",
+      source: "+ *prefix* <div> a\nlazy\n\n+ b\n",
+      preserve: false,
+    },
+  ],
+  {
+    issue: 399,
+    name: "full generated HTML/list marker regression",
+    source: readFileSync(new URL("./fixtures/399-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    ["sole math keeps its Setext typography", "$x^2$\n---\n"],
+    ["sole math keeps its level-one underline", "$x$\n===\n"],
+    ["leading math widgets keep their inherited font", "$x$ $y$\n---\n"],
+    ["leading math keeps its font before a comment", "$x$%%note%%\n---\n"],
+    ["adjacent permissive math stays in its native title form", "$x$$y$\n---\n"],
+    ["sole image keeps its standalone placement", "![cedar](cedar.png)\n---\n"],
+    [
+      "sole reference image keeps its standalone placement",
+      "![cedar][img]\n---\n\n[img]: cedar.png\n",
+    ],
+    ["sole wikilink embed keeps its standalone placement", "![[cedar.png]]\n---\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source })),
+  {
+    issue: 383,
+    name: "full generated widget-only Setext regression",
+    source: readFileSync(new URL("./fixtures/383-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    ["text before math permits heading preferences", "before $x$ after\n---\n"],
+    ["wrapped math permits heading and emphasis preferences", "*$x$*\n---\n"],
+    ["text after an image permits heading preferences", "![cedar](cedar.png) after\n---\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source, preserve: false })),
+  ...["$x$", "![cedar](cedar.png)"].flatMap((title) =>
+    [
+      ["paragraph", "Later *safe*.\n"],
+      ["table", "| a | __b__ |\n| :-- | --: |\n| c | d |\n"],
+      ["list", "+ *safe*\n"],
+      ["heading", "### *safe* ###\n"],
+    ].map(([kind, later]) => ({
+      issue: 383,
+      name: `widget title leaves an adjacent ${kind} editable: ${title}`,
+      source: `${title}\n---\n${later}`,
+      preserve: false,
+    })),
+  ),
+  ...[
+    ["trailing-only one-column borders remain Live Preview text", "basket |\n--: |\nwalnut |\n"],
+    ["one-column delimiter without its final border", "basket |\n--:\nwalnut |\n"],
+    [
+      "one-column header and delimiter with different leading borders",
+      "| basket |\n--: |\n| walnut |\n",
+    ],
+  ].map(([name, source]) => ({ issue: 568, name, source })),
+  {
+    issue: 568,
+    name: "Live Preview text table leaves an independent real table editable",
+    source: "basket |\n--: |\nwalnut |\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    preserve: false,
+  },
+  ...[
+    [
+      "one-column text table before a Tab and later table",
+      "basket\n--:\nwalnut\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    ],
+    [
+      "header-only text table before a Tab and later table",
+      "basket\n--:\n\t\n| a | __b__ |\n| :-- | --: |\n| c | d |\n",
+    ],
+  ].map(([name, source]) => ({ issue: 398, name, source })),
+  {
+    issue: 398,
+    name: "full generated one-column paragraph-state regression",
+    source: readFileSync(new URL("./fixtures/398-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    [
+      "list continuation before a tilde opener with backticks in its info",
+      "* a\nb\n~~~ lang `x`\nc\n",
+    ],
+    ["single-line list before a tilde opener with backticks in its info", "* a\n~~~ lang `x`\nc\n"],
+    [
+      "full generated tilde-info adjacency regression",
+      readFileSync(new URL("./fixtures/567.txt", import.meta.url), "utf8"),
+    ],
+  ].map(([name, source]) => ({ issue: 567, name, source, preserve: false })),
+  ...[
+    ["ignored tilde info makes its closer open later code", "~~~ lang `x`\nc\n~~~\n\n*outside*\n"],
+    ["ignored tilde info carries code beyond a list", "- ~~~ lang `x`\n  c\n  ~~~\n\n*outside*\n"],
+    ["ignored tilde info carries code beyond a quote", "> ~~~ lang `x`\n> c\n> ~~~\n\n*outside*\n"],
+  ].map(([name, source]) => ({ issue: 567, name, source })),
+  ...[
+    [
+      "short reset exposes an unclosed long run in an inline comment",
+      "before %%`a\n``` b`%%\n\nlater *outside*\n",
+    ],
+    [
+      "mixed whitespace inside a short multiline code span",
+      "before `a\t  \nb` and more plain words follow here\n",
+    ],
+    ["short code resets at a bare newline", "before `a\nb` and *right*\n"],
+    [
+      "two-backtick multiline code keeps its literal suffix",
+      "before ``a  \nb`` and *right* __strong__ tail\n",
+    ],
+    [
+      "later paired spans remain out of phase",
+      "before `a  \nb` and *right* ` recovered ` and *after*\n",
+    ],
+    [
+      "backslash newline in a short span keeps literal suffix",
+      "before `a\\\nb` and *right* __strong__ tail\n",
+    ],
+    ["containing emphasis keeps both delimiters", "*before `a\nb` after* and __strong__\n"],
+    [
+      "short code inside a multiline inline comment",
+      "before *left* %%`a\nb`%% and *right* __strong__ tail\n",
+    ],
+    [
+      "short code inside a multiline image description",
+      "before *left* ![``a\nb``](image.png) and *right* __strong__ tail\n",
+    ],
+  ].map(([name, source]) => ({ issue: 565, name, source })),
+  ...[
+    [
+      "short reset permits a later paired long run to recover",
+      "before %%`a\n``` b` c```%%\n\nlater *outside*\n",
+    ],
+    [
+      "safe prefix and independent paragraph around a short code span",
+      "before *left* `a  \nb` and *right* __strong__ tail\n\nLater *outside*.\n",
+    ],
+    [
+      "paired long code keeps a source hard-break marker conservatively",
+      "before ```a  \nb``` and *right*\n\nlater *outside*\n",
+    ],
+    [
+      "paired long multiline code with a soft newline still reflows",
+      "before ```a\nb``` and *right*\n\nlater *outside*\n",
+    ],
+    ["code closed before a soft newline still reflows", "before `a  `\nb and *right*\n"],
+    [
+      "paired long code in a multiline inline comment",
+      "before *left* %%```a\nb```%% and *right* __strong__ tail\n",
+    ],
+  ].map(([name, source]) => ({ issue: 565, name, source, preserve: false })),
+  {
+    issue: 566,
+    name: "long code in an image description keeps source while surrounding text formats",
+    source: "before *left* ![```a\nb```](image.png) and *right* __strong__ tail\n",
+    preserve: false,
+  },
+  {
+    issue: 566,
+    name: "long code in a reference image retains its description boundary",
+    source: "before *left* ![```a\nb```][img] and *right* __strong__ tail\n\n[img]: image.png\n",
+    preserve: false,
+  },
+  ...[
+    ["Tab followed by two spaces before continuing text", "a\t  \nb\n"],
+    ["even backslashes before a mixed-whitespace hard break", "a\\\\\t  \nb\n"],
+  ].map(([name, source]) => ({ issue: 562, name, source })),
+  {
+    issue: 563,
+    name: "terminal spaces before a Tab-only paragraph continuation",
+    source: "a\n    b   \n\t\n# c\n",
+    preserve: false,
+  },
+  {
+    issue: 563,
+    name: "literal backslash separator before a Tab-only continuation",
+    source: "*alpha* beta\\ \n\t\n# tail\n",
+    preserve: false,
+  },
+  {
+    issue: 563,
+    name: "full generated terminal-break regression",
+    source: readFileSync(new URL("./fixtures/563.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  {
+    issue: 376,
+    name: "full generated enclosing-list continuation regression",
+    source: readFileSync(new URL("./fixtures/376-followup.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    ["literal backslash before a spaced underline", "a\\ \n=== \n"],
+    ["hard break before a spaced underline", "a  \n=== \n"],
+    ["literal backslash before an indented underline", "a\\ \n  ===\n"],
+    ["hard break before an indented underline", "a  \n  ===\n"],
+    ["multiline level-one title with a native hard break", "a\nb  \n===\n"],
+    ["multiline level-one title with a literal backslash", "a\nb\\ \n===\n"],
+  ].map(([name, source]) => ({ issue: 383, name, source })),
+  ...[
+    ["nested lazy paragraph before an enclosing ordered list", "+ - a\nb\n  1) c\n"],
+    [
+      "nested lazy paragraph before an enclosing ordered continuation",
+      "+ - a\nb\n  1) c\n     d\n",
+    ],
+    ["direct lazy paragraph before its ordered list", "- a\nb\n  1) c\n"],
+  ].map(([name, source]) => ({ issue: 376, name, source })),
+  {
+    issue: 376,
+    name: "fully indented inner continuation permits enclosing list reflow",
+    source: "+ - a\n    b\n  1) c\n",
+    preserve: false,
+  },
+  {
+    issue: 560,
+    name: "literal backslash before a continuing line in the full generated document",
+    source: readFileSync(new URL("./fixtures/560.txt", import.meta.url), "utf8"),
+    preserve: false,
+  },
+  ...[
+    {
       name: "multiline inline comment with blank line",
       source: "%%one\n\ntwo%% aaaaaaaaaaaaaaaaaaaa tail words follow here\n",
     },

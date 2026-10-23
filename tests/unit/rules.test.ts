@@ -843,7 +843,7 @@ describe("style/inline-code", () => {
     }
   });
   it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
-    "drops the indentation of the next line when it joins a code span in the %s dialect",
+    "handles multiline code indentation in the %s dialect",
     (dialect) => {
       // CommonMark strips it from a paragraph's lines before it reads the span,
       // and GitHub shows `npm run build`; the parser keeps it in the span.
@@ -854,7 +854,9 @@ describe("style/inline-code", () => {
         ["- Run `npm run\n     build` now.\n", "- Run `npm run build` now.\n"],
         ["- [ ] Run `npm run\n      build` now.\n", "- [ ] Run `npm run build` now.\n"],
       ] as const)
-        expect(formatted(source, only(rule, dialect))).toBe(output);
+        expect(formatted(source, only(rule, dialect))).toBe(
+          dialect === "obsidian" ? source : output,
+        );
     },
   );
   it("compares code spans without the indentation after their line endings", () => {
@@ -957,26 +959,39 @@ describe("style/inline-code", () => {
         github.map((text, i) => (other?.[i] ?? text) !== text),
       );
   });
-  it.each(observed)("joins the code spans of %j as GitHub shows them", (source, github) => {
+  it.each(observed)("preserves the observed code values when joining %j", (source, github) => {
     for (const dialect of dialects.filter((dialect) => dialect !== "vitepress")) {
       // CommonMark has no footnotes.
       if (dialect === "commonmark" && source.includes("[^")) continue;
       const output = formatted(source, only(rule, dialect));
       const spans = codeSpans(output, dialect);
       expect(spans.map(codeSpanText), dialect).toEqual(github);
+      // Native text can retain a hard break where the primary parser pairs
+      // these ticks (#335); joining conservatively keeps both marker forms.
+      const sourceBreak = codeSpans(source, dialect).some((span) =>
+        /(?: {2}|\\)(?:\r\n|\r|\n)/.test(source.slice(...range(span))),
+      );
       // Renderers differ on a lazy line's indentation: GitHub keeps it in the
       // span, and commonmark.js does not.
-      if (dialect === "github")
+      if (sourceBreak) expect(output).toBe(source);
+      else if (dialect === "github")
         expect(spans.every((span) => !/[\r\n]/.test(output.slice(...range(span))))).toBe(true);
       else if (codeSpans(source, dialect).some(lazyIndentation)) expect(output).toBe(source);
     }
   });
-  it("still joins code spans beside a single `==` or below a callout's title", () => {
-    expect(formatted("An == sign and `code\nspan` here.\n", only(rule, "obsidian"))).toBe(
+  it("retains short code beside a single `==` or below a callout's title (#565)", () => {
+    for (const source of [
+      "An == sign and `code\nspan` here.\n",
+      "> [!note] Title\n> Body `code\n> span` here.\n",
+    ])
+      expect(formatted(source, only(rule, "obsidian"))).toBe(source);
+  });
+  it("still joins long code beside a single `==` or below a callout's title (#565)", () => {
+    expect(formatted("An == sign and ```code\nspan``` here.\n", only(rule, "obsidian"))).toBe(
       "An == sign and `code span` here.\n",
     );
     expect(
-      formatted("> [!note] Title\n> Body `code\n> span` here.\n", only(rule, "obsidian")),
+      formatted("> [!note] Title\n> Body ```code\n> span``` here.\n", only(rule, "obsidian")),
     ).toBe("> [!note] Title\n> Body `code span` here.\n");
   });
   it.each([
@@ -990,12 +1005,12 @@ describe("style/inline-code", () => {
   it.each([
     ["Ticks ``code\nspan`` and a ` after.\n", "Ticks `code span` and a ` after.\n"],
     ["`a` and `b\nc` here.\n", "`a` and `b c` here.\n"],
-  ])("still joins %j", (source, output) => {
-    // In Obsidian, a backtick that nothing closes keeps its paragraph as
-    // written, since Live Preview shows the text after it as code (#362).
+  ])("formats %j while retaining Obsidian's physical code lines", (source, output) => {
+    // Live Preview keeps unmatched backticks and resets short multiline
+    // spans, so either Obsidian paragraph stays as written (#362, #565).
     for (const dialect of dialects)
       expect(formatted(source, only(rule, dialect)), dialect).toBe(
-        dialect === "obsidian" && source.includes(" ` ") ? source : output,
+        dialect === "obsidian" ? source : output,
       );
   });
 });
