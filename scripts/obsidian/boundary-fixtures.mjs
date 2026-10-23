@@ -22,6 +22,33 @@ export const boundaryFixtures = [
     issue: 582,
     name: `table directly after a heading or code item ${index}`,
     source: `${prefix}\n| b | c |\n| - | - |\n- d\n`,
+    preserve: prefix.includes("```"),
+  })),
+  ...[
+    "- ~~~\n  a\n  ~~~\n| b | c |\n| - | - |\n- d\n",
+    "- ```js\n  a\n  ```\n| b | c |\n| - | - |\n- d\n",
+    "- ````\n  a\n  ````\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n| b | c |\n| - | - |\n| e | f |\n- d\n",
+  ].map((source, index) => ({
+    issue: 582,
+    name: `literal table after list code ${index}`,
+    source,
+    preserve: !source.startsWith("- ~~~") && !source.startsWith("- ````"),
+  })),
+  ...[
+    "-     a\n| b | c |\n| - | - |\n- d\n",
+    "```\na\n```\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n\n| b | c |\n| - | - |\n- d\n",
+  ].map((source, index) => ({
+    issue: 582,
+    name: `genuine table beside code control ${index}`,
+    source,
+    preserve: false,
+  })),
+  ...["x\n- [ ] \n  b\n", "x\n\n\n- [ ] \n  b\n"].map((source, index) => ({
+    issue: 590,
+    name: `ordinary spacing before whole-line protection ${index}`,
+    source,
     preserve: false,
   })),
   { issue: 583, name: "adjacent Setext title in Reading paragraph", source: "a\nb\n=\nc\n---\n" },

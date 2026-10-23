@@ -277,7 +277,7 @@ export interface MisreadLists {
   /**
    * Lists whose markers and indentation affect continuations outside their
    * parsed container, including a lazy paragraph after a heading (#513, #543)
-   * or lists joined through a quote or table (#582).
+   * or lists joined through a quote, table or display formula (#582, #586).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -1260,6 +1260,14 @@ export function misreadLists(document: Document): MisreadLists {
                 column: child.position.start.column + (child.type === "math" ? 2 : 1),
               }),
             );
+          // Live Preview keeps an immediately following table's rows as
+          // literal text after a list item's closing code fence (#582).
+          // A heading, indented code, root fence or real blank still allows
+          // ordinary table formatting.
+          if (previous.type === "list" && child.type === "table") {
+            const last = previous.children.at(-1)?.children.at(-1);
+            if (last?.type === "code" && codeFence(source, last)?.close) tableText.add(child);
+          }
           // A compact hyphen break can underline the last physical row in
           // Live Preview, where the parser and Reading view keep a table.
           // Its pipes and padding display as heading text, so keep that

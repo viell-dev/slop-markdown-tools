@@ -150,7 +150,8 @@ describe("Obsidian display math boundaries (#586, #587)", () => {
       expect(output).toContain(`${prefix}\n| b`);
       expect(output).toContain("\n- d\n");
       expect(output).not.toContain("\n\n- d");
-      expect(output).toContain("| --- | --- |");
+      if (prefix.includes("```")) expect(output).toBe(source);
+      else expect(output).toContain("| --- | --- |");
       expect(
         checked(source, {
           extends: [],
@@ -160,6 +161,39 @@ describe("Obsidian display math boundaries (#586, #587)", () => {
       ).toBe(source);
     },
   );
+  it.each([
+    "- ~~~\n  a\n  ~~~\n| b | c |\n| - | - |\n- d\n",
+    "- ```js\n  a\n  ```\n| b | c |\n| - | - |\n- d\n",
+    "- ````\n  a\n  ````\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n| b | c |\n| - | - |\n| e | f |\n- d\n",
+  ])("retains literal table source immediately after a list fence (#582): %j", (source) => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const input = source.replaceAll("\n", newline);
+      // Native probing confirms that fence preferences remain safe while
+      // changing the literal table rows is visible in Live Preview.
+      expect(checked(input)).toBe(input.replaceAll("~~~", "```").replaceAll("````", "```"));
+      expect(
+        checked(input, {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/table": "warn" },
+        }),
+      ).toBe(input);
+    }
+  });
+  it.each([
+    "-     a\n| b | c |\n| - | - |\n- d\n",
+    "```\na\n```\n| b | c |\n| - | - |\n- d\n",
+    "- ```\n  a\n  ```\n\n| b | c |\n| - | - |\n- d\n",
+  ])("keeps genuine tables editable beside independent code (#582): %j", (source) => {
+    expect(
+      checked(source, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { "style/table": "warn" },
+      }),
+    ).toContain("| --- | --- |");
+  });
   it.each([
     "- alpha\n$$\nx = y\n$$\n",
     "1. alpha\n$$\nx = y\n$$\n",

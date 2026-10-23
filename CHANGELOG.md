@@ -23,9 +23,9 @@ prereleases' notes there are longer than their entries here.
 ### Fixed
 
 - Obsidian preserves list markers and tightness across quote and table
-  continuations, adjacent Setext titles that Reading view still reads as
-  paragraph text across Tab lines, and blank lines inside physical list fences
-  hidden by the primary inline parse
+  continuations, literal table rows after list code fences, adjacent Setext
+  titles that Reading view still reads as paragraph text across Tab lines, and
+  blank lines inside physical list fences hidden by the primary inline parse
   ([#582](https://github.com/viell-dev/slop-markdown-tools/issues/582),
   [#583](https://github.com/viell-dev/slop-markdown-tools/issues/583),
   [#584](https://github.com/viell-dev/slop-markdown-tools/issues/584)).

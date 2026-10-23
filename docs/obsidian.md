@@ -203,7 +203,9 @@ latest installable release:
   match. This applies to ordered and bullet lists; safe inline formatting
   remains available outside existing whole-list protections for lazy
   continuations. A real blank before the quote or an intervening block ends this
-  relationship.
+  relationship. A structural indentation edit crossing a protected separator
+  conservatively keeps its whole unit; independent inline changes remain
+  available.
 - A Setext title that Reading view continues as paragraph text retains an
   immediately following title, including across a Tab-only continuation. Literal
   `#5` title text is handled as Setext. A proper hyphen thematic break ends this
@@ -221,13 +223,17 @@ latest installable release:
   adjacent table also stays when the final item ends with a heading or code.
   Independent inline and marker formatting remains available; genuinely
   separated math stays separate.
+- Table rows immediately after a list item's closing code fence keep their
+  literal source, which Live Preview displays as text. A preceding heading,
+  indented code, a root fence or a separating blank still permits table padding.
 - A standalone one-line `$$…$$` formula keeps its physical line and adjacent
   separators when the primary parser reads inline math. Joining it into prose
   would turn Live Preview's display widget into inline math. Safe independent
   inline changes remain available, and math already beside prose still wraps.
-- Plugin edits cannot insert a blank at the first byte of a protected separator,
-  including by copying the preceding text into a replacement. Safe inline
-  replacements that end at that separator remain available.
+- Plugin edits cannot insert a blank at a protected separator or before its
+  existing trailing spaces, including by copying source into a replacement or
+  writing a quoted blank line. Safe inline replacements and ordinary spacing
+  before a protected whole line remain available.
 - A list whose HTML continues outside its parsed item keeps its markers when
   that HTML already protects a later list's marker. Changing only the earlier
   bullet could split one Reading-view list into two. When the HTML closes before

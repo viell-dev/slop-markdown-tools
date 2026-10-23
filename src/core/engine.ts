@@ -267,11 +267,30 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ? otherReading(document.tree)
       : undefined;
   if (plain) readings.push(misreadLists({ ...document, tree: plain }));
-  // Only boundaryText has an explicit protected insertion point at its
-  // original start. Keep other block-edge semantics unchanged (#590).
-  const boundaryStarts = new Set(
-    readings.flatMap((misread) => Array.from(misread.boundaryText, (node) => range(node)[0])),
-  );
+  const { source } = document;
+  // Only explicit separators have protected insertion points. A whole-line
+  // boundaryText range still uses the ordinary strict block edges (#590).
+  const boundaryStarts = new Set<number>();
+  for (const misread of readings)
+    for (const node of misread.boundaryText) {
+      let start = range(node)[0];
+      if (source[start] === "\n" && source[start - 1] === "\r") start--;
+      if (
+        start > 0 &&
+        (source[start] === "\r" || source[start] === "\n") &&
+        source[start - 1] !== "\r" &&
+        source[start - 1] !== "\n"
+      )
+        boundaryStarts.add(start);
+    }
+  // Each distinct physical separator has one horizontal margin. These left
+  // scans are disjoint, even when several readings protect the same break.
+  const boundaryMargins: [number, number][] = [];
+  for (const start of [...boundaryStarts].sort((a, b) => a - b)) {
+    let left = start;
+    while (left > 0 && (source[left - 1] === " " || source[left - 1] === "\t")) left--;
+    boundaryMargins.push([left, start]);
+  }
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
   let githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
@@ -314,14 +333,26 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     else blocks.push([githubLimit, document.source.length]);
   }
   if (!blocks.length) return () => false;
-  const { source } = document;
-  // Inspect line endings in the changed portion's trailing blank margin.
-  // A space or Tab after a new break still splits the boundary (#590).
-  // Terminal inline substitutions without new breaks remain eligible.
+  // Existing source spaces can survive as a common suffix after a new break.
+  // A replacement's quote-only blank margin has the same effect (#590).
   const trailingBreaks = (value: string, from: number, to: number): string => {
     let start = to;
-    while (start > from && "\r\n \t".includes(value[start - 1]!)) start--;
-    return value.slice(start, to).replace(/[ \t]/g, "");
+    while (start > from && "\r\n \t>".includes(value[start - 1]!)) start--;
+    return value.slice(start, to).replace(/[ \t>]/g, "");
+  };
+  const boundaryAt = (point: number) => {
+    // A point between CR and LF reaches that same physical separator. This
+    // also retains protection when a producer's original start was the LF.
+    if (source[point] === "\n" && source[point - 1] === "\r") point--;
+    let low = 0;
+    let high = boundaryMargins.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (boundaryMargins[middle]![1] < point) low = middle + 1;
+      else high = middle;
+    }
+    const margin = boundaryMargins[low];
+    return margin !== undefined && margin[0] <= point;
   };
   const within = (from: number, to: number) => {
     let low = 0;
@@ -342,7 +373,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       edit.text
     )
       return true;
-    if (!within(edit.start, edit.end) && !boundaryStarts.has(edit.end)) return false;
+    if (!within(edit.start, edit.end) && !boundaryAt(edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
     const { text } = edit;
     if (before === text) return false;
@@ -354,12 +385,12 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     const from = edit.start + prefix;
     const to = edit.end - suffix;
     if (
-      boundaryStarts.has(to) &&
+      boundaryAt(to) &&
       trailingBreaks(before, prefix, before.length - suffix) !==
         trailingBreaks(text, prefix, text.length - suffix)
     )
       return true;
-    return within(from, to) || (from === to && boundaryStarts.has(from));
+    return within(from, to) || (from === to && boundaryAt(from));
   };
 }
 /**

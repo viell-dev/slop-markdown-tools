@@ -1256,6 +1256,10 @@ other forms as source text. Reading view also accepts matching trailing-only
 pipes; missing final pipes or mismatched leading borders instead continue
 paragraph text, including across a Tab-only line into later literal rows.
 
+After 0.4.0, a table immediately after a list item's closing code fence also
+keeps its literal rows: Live Preview shows them as source text. A table after a
+heading, indented code, a root fence or a real blank still formats.
+
 Before:
 
 ```markdown
