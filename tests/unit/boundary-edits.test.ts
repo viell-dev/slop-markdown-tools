@@ -107,3 +107,15 @@ describe("CRLF separator normalization from earlier guards (#530, #554, #590)", 
     },
   );
 });
+
+describe.each(["\n", "\r\n", "\r"])("quote-only boundary lines with %j (#590)", (newline) => {
+  it.each(["", " ", "\t"])("retains the quote marker before margin %j", (margin) => {
+    const source = `- a${newline}> b${newline}>${margin}${newline}- c${newline}`;
+    const start = source.lastIndexOf(`>${margin}${newline}`);
+    expect(pluginOutput(source, { start, end: start + 1, text: "" })).toBe(source);
+    expect(pluginOutput(source, { start, end: start + 1 + margin.length, text: "" })).toBe(source);
+    expect(
+      pluginOutput(source, { start: start + 1, end: start + 1 + margin.length, text: "" }),
+    ).toBe(source.slice(0, start + 1) + source.slice(start + 1 + margin.length));
+  });
+});

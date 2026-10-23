@@ -1,6 +1,13 @@
 import { isMap, isPair, isSeq, parseDocument } from "yaml";
 import { frontMatterReading, plainReading } from "../../src/syntax/parse.js";
-import { setFlagsFromString } from "node:v8";
+import { mkdirSync, writeFileSync } from "node:fs";
+import {
+  getHeapCodeStatistics,
+  getHeapSpaceStatistics,
+  getHeapStatistics,
+  setFlagsFromString,
+  writeHeapSnapshot,
+} from "node:v8";
 import { runInNewContext } from "node:vm";
 import type { Nodes } from "mdast";
 import { expect, it, vi } from "vitest";
@@ -41,6 +48,61 @@ async function collectGarbage(): Promise<void> {
   // A synchronous collection may retain stale stack pointers. V8's async
   // collector runs as a separate task with no JavaScript heap pointers there.
   await gc({ type: "major", execution: "async" });
+}
+
+/** Failure evidence for #413; receives no workspace, document, source or WeakRef. */
+function retainedTextFailure(
+  before: number,
+  held: number,
+  smallest: number,
+  references: number,
+): void {
+  try {
+    const directory = `artifacts/workspace-memory/${process.pid}`;
+    // The measured delta is already fixed. Do not dereference the observations
+    // or copy a mock's arguments/results before taking this heap snapshot.
+    const report = {
+      issue: 413,
+      stage: "after-fixed-measurement",
+      runtime: {
+        node: process.version,
+        v8: process.versions.v8,
+        platform: process.platform,
+        architecture: process.arch,
+        pid: process.pid,
+      },
+      run: { id: process.env.GITHUB_RUN_ID ?? null, sha: process.env.GITHUB_SHA ?? null },
+      sample: { before, after: before + held, held, smallest, allowance: smallest / 3, references },
+      mocks: {
+        yaml: {
+          calls: vi.mocked(parseDocument).mock.calls.length,
+          results: vi.mocked(parseDocument).mock.results.length,
+        },
+        headingAttributes: {
+          calls: vi.mocked(headingAttributes).mock.calls.length,
+          results: vi.mocked(headingAttributes).mock.results.length,
+        },
+      },
+      memory: process.memoryUsage(),
+      heap: getHeapStatistics(),
+      code: getHeapCodeStatistics(),
+      spaces: getHeapSpaceStatistics(),
+    };
+    const json = JSON.stringify(report, null, 2) + "\n";
+    mkdirSync(directory, { recursive: true });
+    // Retain numeric evidence even if snapshot generation fails or exhausts
+    // the worker. A successful snapshot is a separate file, not a JSON claim.
+    writeFileSync(`${directory}/report.json`, json, "utf8");
+    // Full heaps can contain process credentials. Only capture one in an
+    // explicitly isolated synthetic environment; CI uploads numeric JSON only.
+    if (process.env.MDREFINE_MEMORY_HEAP_SNAPSHOT === "1")
+      writeHeapSnapshot(`${directory}/heap.heapsnapshot`);
+    // Console interception/stack formatting can itself run regular expressions.
+    console.error("Retained-text failure diagnostics (#413):", json);
+  } catch (error) {
+    // Diagnostic I/O must not replace the original retained-text assertion.
+    console.error("Could not capture retained-text failure (#413):", String(error));
+  }
 }
 
 it("keeps a target's anchors without its parsed document", async () => {
@@ -161,6 +223,7 @@ it("does not keep a target's text alive through its anchors", async () => {
     parses.watch = undefined;
   }
   const held = (await settle()) - before;
+  if (!(held < smallest / 3)) retainedTextFailure(before, held, smallest, documents.length);
   expect(documents.length).toBeGreaterThan(0);
   expect(documents.filter((document) => document.deref() !== undefined)).toEqual([]);
   // The anchors alone are a few kilobytes. Any one kind of them that kept its

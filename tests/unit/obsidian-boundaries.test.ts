@@ -166,6 +166,7 @@ describe("Obsidian display math boundaries (#586, #587)", () => {
     "- ```js\n  a\n  ```\n| b | c |\n| - | - |\n- d\n",
     "- ````\n  a\n  ````\n| b | c |\n| - | - |\n- d\n",
     "- ```\n  a\n  ```\n| b | c |\n| - | - |\n| e | f |\n- d\n",
+    "- p\n  - ```\n    a\n    ```\n| b | c |\n| - | - |\n- d\n",
   ])("retains literal table source immediately after a list fence (#582): %j", (source) => {
     for (const newline of ["\n", "\r\n", "\r"]) {
       const input = source.replaceAll("\n", newline);

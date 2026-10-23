@@ -1265,7 +1265,8 @@ export function misreadLists(document: Document): MisreadLists {
           // A heading, indented code, root fence or real blank still allows
           // ordinary table formatting.
           if (previous.type === "list" && child.type === "table") {
-            const last = previous.children.at(-1)?.children.at(-1);
+            let last: Nodes | undefined = previous.children.at(-1)?.children.at(-1);
+            while (last?.type === "list") last = last.children.at(-1)?.children.at(-1);
             if (last?.type === "code" && codeFence(source, last)?.close) tableText.add(child);
           }
           // A compact hyphen break can underline the last physical row in

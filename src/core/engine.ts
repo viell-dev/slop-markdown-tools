@@ -338,7 +338,8 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
   const trailingBreaks = (value: string, from: number, to: number): string => {
     let start = to;
     while (start > from && "\r\n \t>".includes(value[start - 1]!)) start--;
-    return value.slice(start, to).replace(/[ \t>]/g, "");
+    // Removing a quote-only marker makes a real blank and can loosen a list.
+    return value.slice(start, to).replace(/[ \t]/g, "");
   };
   const boundaryAt = (point: number) => {
     // A point between CR and LF reaches that same physical separator. This

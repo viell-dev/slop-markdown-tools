@@ -223,9 +223,10 @@ latest installable release:
   adjacent table also stays when the final item ends with a heading or code.
   Independent inline and marker formatting remains available; genuinely
   separated math stays separate.
-- Table rows immediately after a list item's closing code fence keep their
-  literal source, which Live Preview displays as text. A preceding heading,
-  indented code, a root fence or a separating blank still permits table padding.
+- Table rows immediately after a list item's closing code fence, including a
+  fence in its final nested list, keep their literal source, which Live Preview
+  displays as text. A preceding heading, indented code, a root fence or a
+  separating blank still permits table padding.
 - A standalone one-line `$$…$$` formula keeps its physical line and adjacent
   separators when the primary parser reads inline math. Joining it into prose
   would turn Live Preview's display widget into inline math. Safe independent
@@ -233,7 +234,8 @@ latest installable release:
 - Plugin edits cannot insert a blank at a protected separator or before its
   existing trailing spaces, including by copying source into a replacement or
   writing a quoted blank line. Safe inline replacements and ordinary spacing
-  before a protected whole line remain available.
+  before a protected whole line remain available. Removing a quote-only marker
+  is also rejected when it would create a real blank at that separator.
 - A list whose HTML continues outside its parsed item keeps its markers when
   that HTML already protects a later list's marker. Changing only the earlier
   bullet could split one Reading-view list into two. When the HTML closes before

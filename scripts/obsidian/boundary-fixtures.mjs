@@ -6,6 +6,7 @@ import { URL } from "node:url";
 export const boundaryFixtures = [
   { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n" },
   { issue: 582, name: "same-marker quote tightness", source: "- a\n> b\n- c\n" },
+  { issue: 590, name: "quote-only line keeps native list tightness", source: "- a\n> b\n>\n- c\n" },
   { issue: 582, name: "same-star quote tightness", source: "* a\n> b\n* c\n" },
   {
     issue: 582,
@@ -29,6 +30,7 @@ export const boundaryFixtures = [
     "- ```js\n  a\n  ```\n| b | c |\n| - | - |\n- d\n",
     "- ````\n  a\n  ````\n| b | c |\n| - | - |\n- d\n",
     "- ```\n  a\n  ```\n| b | c |\n| - | - |\n| e | f |\n- d\n",
+    "- p\n  - ```\n    a\n    ```\n| b | c |\n| - | - |\n- d\n",
   ].map((source, index) => ({
     issue: 582,
     name: `literal table after list code ${index}`,

@@ -284,6 +284,175 @@ describe("GitHub source-verified code normalization (#515)", () => {
   const normalize = (html: string, input = source) =>
     normalizeGithubHtml(html, "gfm", parse(input, "github").tree);
 
+  const highlightFinalFixture = (name: string) =>
+    readFileSync(
+      new URL(`../fixtures/renderers/github-highlight-final-lines/${name}`, import.meta.url),
+      "utf8",
+    );
+
+  const finalLineValue = "const lantern = 73;\n  needle(birch)   ";
+  const finalLineSource = (value: string) => "```js\n" + value + "\n```\n";
+  const finalLineHighlight = (body: string) =>
+    `<div class="highlight highlight-source-js"><pre>${body}</pre></div>`;
+  const finalLinePlain = (body: string, language = "js") =>
+    `<pre lang="${language}"><code>${body}</code></pre>`;
+
+  it("accepts the retained full response with an omitted JS terminal LF (#515)", () => {
+    const before = highlightFinalFixture("before-markdown.html");
+    const after = highlightFinalFixture("after-markdown.html");
+    const source = highlightFinalFixture("before.md");
+    const output = highlightFinalFixture("after-markdown.md");
+    expect(before).not.toBe(after);
+    expect(before).toContain('class="highlight highlight-source-js"');
+    expect(before).toContain("   </pre></div>");
+    expect(normalizeGithubHtml(before, "markdown", parse(source, "github").tree)).toBe(
+      normalizeGithubHtml(after, "markdown", parse(output, "github").tree),
+    );
+    expect(normalize(highlightFinalFixture("before-gfm.html"), source)).toBe(
+      normalize(highlightFinalFixture("after-gfm.html"), output),
+    );
+  });
+
+  // Actual eight GitHub markdown-mode responses captured by root on 2026-10-23.
+  // The response body and source/value are bound by the frozen v2 provenance.
+  const finalLineCapture = JSON.parse(highlightFinalFixture("api-round5.json")) as {
+    observedAt: string;
+    rows: Array<{
+      name: string;
+      source: string;
+      value: string;
+      html: string;
+      decoded: string;
+      highlighted: boolean;
+    }>;
+  };
+  it("retains the complete eight-response calibration catalog (#515)", () => {
+    expect(finalLineCapture.rows.map(({ name }) => name)).toEqual([
+      "js-finalLF0",
+      "js-finalLF1",
+      "js-finalLF2",
+      "js-finalLF3",
+      "js-empty",
+      "js-blank-only",
+      "js-whitespace-only-last-line",
+      "text-finalLF1-control",
+    ]);
+  });
+
+  it.each(finalLineCapture.rows)(
+    "canonicalizes the actual $name response from its complete source value (#515)",
+    ({ name, source, value, html, highlighted }) => {
+      const saved = highlightFinalFixture(`observed-api/${name}.html`);
+      expect(saved).toBe(html);
+      expect(saved.includes('class="highlight')).toBe(highlighted);
+      const tree = parse(source, "github").tree;
+      const language = highlighted ? "js" : "text";
+      expect(tree.children[0]).toMatchObject({ type: "code", value, lang: language });
+      const normalized = normalizeGithubHtml(saved, "markdown", tree);
+      expect(normalized).toBe(
+        normalizeGithubHtml(finalLinePlain(value + "\n", language), "markdown", tree),
+      );
+      // These retained fixture values contain no HTML metacharacters. This direct
+      // check prevents two accidentally unnormalized responses comparing equal.
+      expect(normalized).toContain(
+        `<pre data-source-language="${language}" data-source-meta=""><code>${value}</code></pre>`,
+      );
+    },
+  );
+
+  // A contract test over suffix removal, not a claim that every combination below
+  // was returned by the service. The actual js2/js3 captures omit exactly one LF.
+  it.each(
+    [0, 1, 2, 3].flatMap((sourceLFs) =>
+      Array.from({ length: sourceLFs + 1 }, (_, renderedLFs) => ({ sourceLFs, renderedLFs })),
+    ),
+  )(
+    "keeps all $sourceLFs source LFs when a highlight retains $renderedLFs (#515)",
+    ({ sourceLFs, renderedLFs }) => {
+      const value = finalLineValue + "\n".repeat(sourceLFs);
+      const source = finalLineSource(value);
+      expect(parse(source, "github").tree.children[0]).toMatchObject({ type: "code", value });
+      expect(normalize(finalLineHighlight(finalLineValue + "\n".repeat(renderedLFs)), source)).toBe(
+        normalize(finalLinePlain(value + "\n"), source),
+      );
+    },
+  );
+
+  it("uses capture presence for the actual empty/blank-only highlighted responses (#515)", () => {
+    for (const value of ["", "\n\n"]) {
+      const source = finalLineSource(value);
+      expect(parse(source, "github").tree.children[0]).toMatchObject({ type: "code", value });
+      expect(normalize(finalLineHighlight(""), source)).toBe(
+        normalize(finalLinePlain(value + "\n"), source),
+      );
+    }
+  });
+
+  it("retains source blank-line counts even when highlighted bytes agree (#515)", () => {
+    const response = finalLineHighlight(finalLineValue);
+    const canonical = [0, 1, 2, 3].map((count) =>
+      normalize(response, finalLineSource(finalLineValue + "\n".repeat(count))),
+    );
+    expect(new Set(canonical).size).toBe(canonical.length);
+    expect(normalize(finalLineHighlight(""), finalLineSource(""))).not.toBe(
+      normalize(finalLineHighlight(""), finalLineSource("\n\n")),
+    );
+  });
+
+  it("keeps plain omissions and extra response LFs outside the new allowance (#515)", () => {
+    const value = finalLineValue + "\n\n";
+    const source = finalLineSource(value);
+    const canonical = normalize(finalLinePlain(value + "\n"), source);
+    for (const body of [finalLineValue, finalLineValue + "\n"]) {
+      expect(normalize(finalLinePlain(body), source)).not.toBe(canonical);
+    }
+    expect(normalize(finalLineHighlight(value + "\n\n"), source)).not.toBe(canonical);
+    expect(normalize(finalLinePlain(value + "\n\n"), source)).not.toBe(canonical);
+  });
+
+  it("keeps all non-LF bytes and leading/interior newlines exact (#515)", () => {
+    const value = finalLineValue + "\n\n";
+    const source = finalLineSource(value);
+    const canonical = normalize(finalLinePlain(value + "\n"), source);
+    for (const body of [
+      finalLineValue.replace("73", "74"),
+      finalLineValue.replace("  needle", " needle"),
+      finalLineValue.slice(0, -1), // one of the three final spaces
+      finalLineValue.trimEnd(),
+      finalLineValue.replace("needle", "missing"),
+      finalLineValue.replace("\n", "\n\n"),
+    ]) {
+      expect(normalize(finalLineHighlight(body), source)).not.toBe(canonical);
+    }
+    const leading = "\n" + value;
+    expect(normalize(finalLineHighlight(finalLineValue), finalLineSource(leading))).not.toBe(
+      normalize(finalLinePlain(leading + "\n"), finalLineSource(leading)),
+    );
+    for (const spaces of ["  ", "\t", " \t  "]) {
+      const whitespaceLine = finalLineValue + "\n" + spaces + "\n\n";
+      const whitespaceSource = finalLineSource(whitespaceLine);
+      expect(normalize(finalLineHighlight(finalLineValue), whitespaceSource)).not.toBe(
+        normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
+      );
+      // Omit LFs while retaining the whitespace-bearing line: still eligible.
+      expect(normalize(finalLineHighlight(finalLineValue + "\n" + spaces), whitespaceSource)).toBe(
+        normalize(finalLinePlain(whitespaceLine + "\n"), whitespaceSource),
+      );
+    }
+  });
+
+  it("retains escaping, wrapper-count and raw-pre gates for shortened highlights (#515)", () => {
+    const value = finalLineValue + "\n\n";
+    const source = finalLineSource(value);
+    const canonical = normalize(finalLinePlain(value + "\n"), source);
+    expect(normalize(finalLineHighlight(finalLineValue + "<b>"), source)).not.toBe(canonical);
+    expect(normalize(finalLineHighlight(finalLineValue).repeat(2), source)).not.toBe(canonical);
+    const raw = "<pre>" + value + "</pre>\n";
+    expect(normalize(finalLineHighlight(finalLineValue), raw)).not.toBe(
+      normalize(finalLinePlain(value + "\n"), raw),
+    );
+  });
+
   it("accepts the retained highlighting and final-line variation for unchanged source", () => {
     expect(normalize(highlighted)).toBe(normalize(fallback, source.replaceAll("~~~", "```")));
   });
