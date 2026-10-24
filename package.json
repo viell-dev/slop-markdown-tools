@@ -108,7 +108,7 @@
     "@mdit-vue/plugin-component": "3.0.2",
     "@mdit/plugin-attrs": "1.1.1",
     "@mdit/plugin-container": "1.0.2",
-    "@mdit/plugin-emoji": "1.1.1",
+    "@mdit/plugin-emoji": "1.2.2",
     "@mdit/plugin-footnote": "1.0.2",
     "@mdit/plugin-tasklist": "1.0.2",
     "@types/mdast": "4.0.4",
