@@ -10,8 +10,7 @@ filenames and suppression comments while retaining all previous `mdtools` forms
 as deprecated aliases. It included the conservative Obsidian boundary policy and
 visible held-edit findings. These scoped changes are an explicit exception to
 the usual patch-release policy. Version 0.5.0 removes all old naming forms;
-follow the [CLI migration steps](cli.md#earlier-names) before upgrading. The
-0.5.0 changes on this branch are unreleased.
+follow the [CLI migration steps](cli.md#earlier-names) before upgrading.
 
 ## What a version number covers
 

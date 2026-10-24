@@ -8,7 +8,7 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## 0.5.0 - Unreleased
+## 0.5.0 - 2026-10-24
 
 ### Changed
 
@@ -25,6 +25,10 @@ prereleases' notes there are longer than their entries here.
   ([#601](https://github.com/viell-dev/slop-markdown-tools/issues/601)).
 
 ### Fixed
+
+- Update the indirect `fast-uri` dependency to 3.1.9 for its URI parsing and
+  normalization security fixes, and the Docker-only Obsidian check's
+  `serialize-javascript` override to 7.1.3 for its serialization security fix.
 
 - Memory checks settle V8's collectible roots and compilation caches before
   sampling, rather than assuming a regular major collection has released all

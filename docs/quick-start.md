@@ -2,10 +2,8 @@
 
 ## Install
 
-This branch documents **unreleased 0.5.0**. The [published
-guide](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
-describes installable 0.4.1. Use the pinned command below after publication, and
-complete the [naming migration](cli.md#earlier-names) before upgrading.
+When upgrading from 0.4.x, complete the [naming migration](cli.md#earlier-names)
+before installing 0.5.0.
 
 mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:

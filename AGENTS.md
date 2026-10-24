@@ -384,9 +384,8 @@ it helps.
 - TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
   `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
   `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
-  comments use `mdrefine-*`. The unreleased 0.5.0 branch removes the legacy
-  command, config discovery names, comments and transitional notice from 0.4.x.
-  Keep this release PR draft and unmerged until the owner authorizes promotion.
+  comments use `mdrefine-*`. Version 0.5.0 removes the legacy command, config
+  discovery names, comments and transitional notice from 0.4.x.
 - `src/syntax/` parses with micromark and mdast through the generated internal
   adapter and holds the Obsidian extensions; `src/config/` resolves presets,
   schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the
