@@ -19,13 +19,9 @@ export interface LoadedConfig {
   file?: string;
 }
 /** The names of the configuration files that the search finds; one directory may hold one. */
-const configFiles = [
-  "mdtools.config.jsonc",
-  "mdtools.config.json",
-  "mdtools.config.mjs",
-  "mdtools.config.js",
-  "mdtools.config.cjs",
-];
+const configFiles = ["mdrefine", "mdtools"].flatMap((prefix) =>
+  ["jsonc", "json", "mjs", "js", "cjs"].map((extension) => `${prefix}.config.${extension}`),
+);
 /**
  * Whether Node.js loads `file` as JavaScript. A `.js` file is an ES module or
  * CommonJS as Node.js decides from the nearest `package.json`; either way,
@@ -92,7 +88,7 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
         );
       }
       if (found.length > 1)
-        throw new Error(`Multiple mdtools configuration files in ${directory}. Use --config.`);
+        throw new Error(`Multiple mdrefine configuration files in ${directory}. Use --config.`);
       if (found.length) {
         file = found[0];
         break;

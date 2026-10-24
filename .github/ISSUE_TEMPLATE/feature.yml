@@ -43,14 +43,14 @@ body:
     attributes:
       label: Proposed behavior
       description: >-
-        What mdtools should report or change. A short example before and after helps; use four
+        What mdrefine should report or change. A short example before and after helps; use four
         backticks around Markdown that contains code fences.
     validations:
       required: true
   - type: textarea
     id: fit
     attributes:
-      label: Why it belongs in mdtools
+      label: Why it belongs in mdrefine
       description: >-
         Why a Markdown linter and formatter should do this, rather than a plugin or another tool.
         Name another tool that does it, if you know one.

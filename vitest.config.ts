@@ -7,7 +7,7 @@ import { buildParser } from "./scripts/build-parser.mjs";
 // Discovery applies the global excludes file of Git's settings, which differ
 // between machines, so the integration tests run with none: no user or system
 // settings, and a configuration folder with nothing in it.
-const noGitSettings = path.join(tmpdir(), "mdtools-tests-no-git-settings");
+const noGitSettings = path.join(tmpdir(), "mdrefine-tests-no-git-settings");
 
 export default defineConfig(async (): Promise<ViteUserConfig> => {
   await buildParser({ repositoryRoot: import.meta.dirname });

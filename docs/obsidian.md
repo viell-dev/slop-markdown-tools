@@ -6,7 +6,7 @@ them.
 
 ## Configure the vault
 
-Create `mdtools.config.jsonc` at the vault's root, next to `.obsidian/`:
+Create `mdrefine.config.jsonc` at the vault's root, next to `.obsidian/`:
 
 ```jsonc
 {
@@ -19,8 +19,8 @@ Run the commands from the vault's root, or pass it with `--root`, so that links
 are resolved across the whole vault:
 
 ```sh
-npx mdtools lint --root "/path/to/vault"
-npx mdtools format --root "/path/to/vault" --diff
+npx mdrefine lint --root "/path/to/vault"
+npx mdrefine format --root "/path/to/vault" --diff
 ```
 
 Without a configuration file, the notes are still read in the Obsidian dialect,
@@ -54,9 +54,9 @@ title that is too long is reported by `reportUnbreakable`.
 
 ## Where Obsidian reads Markdown its own way
 
-### Unreleased: visible boundary refusals
+### Visible boundary refusals
 
-The next 0.4.x release applies one conservative policy before the existing
+Version 0.4.1 applies one conservative policy before the existing
 renderer-specific protections. Structural rules keep an adjacent paragraph and
 list, block quote, HTML block, table, fence, or definition together when there
 is no blank line between them. They also keep lazy continuation margins, a Tab
@@ -213,10 +213,9 @@ paragraph text: a table or footnote definition directly below its closing fence
 is more of that text in Obsidian, so it stays as written. A separating blank
 line or a block that interrupts a paragraph still starts a block of its own.
 
-### Unreleased boundary protections
+### Boundary protections since 0.4.1
 
-The following additions are on the development branch and are not yet in the
-latest installable release:
+Version 0.4.1 adds these protections:
 
 - Lists connected through an adjacent quote, table or display formula keep both
   original marker and indentation units. Their adjacent separating boundary

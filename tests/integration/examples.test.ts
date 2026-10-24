@@ -284,7 +284,7 @@ describe("automation", () => {
   it("summarize-report.mjs keeps severities apart and knows a write from a preview", async () => {
     // An override makes the same rule an error in one folder and a warning elsewhere.
     const root = await fixture({
-      "mdtools.config.jsonc": `{
+      "mdrefine.config.jsonc": `{
         "overrides": [{ "files": ["strict/**"], "rules": { "style/emphasis": "error" } }],
       }`,
       "a.md": "An *emphasized* word.\n",
@@ -307,7 +307,7 @@ describe("automation", () => {
   });
   it("github-actions.yml runs commands that pass on clean documents and fail otherwise", async () => {
     const workflow = await readFile(path.join(examples, "automation/github-actions.yml"), "utf8");
-    const commands = [...workflow.matchAll(/^\s*- run: npx --no-install mdtools (.+)$/gm)].map(
+    const commands = [...workflow.matchAll(/^\s*- run: npx --no-install mdrefine (.+)$/gm)].map(
       (match) => match[1]!.split(" "),
     );
     expect(commands).toEqual([

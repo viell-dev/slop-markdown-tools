@@ -18,8 +18,8 @@ body:
     attributes:
       label: Version and command
       description:
-        The mdtools version (`mdtools --version`), Node.js version, operating system, and the exact
-        command.
+        The mdrefine version (`mdrefine --version`), Node.js version, operating system, and the
+        exact command.
     validations:
       required: true
   - type: dropdown
@@ -62,7 +62,7 @@ body:
     id: actual
     attributes:
       label: Actual output or messages
-      description: What mdtools printed or wrote, between the fences below.
+      description: What mdrefine printed or wrote, between the fences below.
       value: |
         ````text
 

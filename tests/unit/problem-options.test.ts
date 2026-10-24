@@ -215,7 +215,7 @@ describe("code language policy", () => {
 it("preserves suppression and range selection with configured rules", () => {
   const rule = "structure/duplicate-heading";
   const source =
-    "# First\n\n## Repeated\n\n# Second\n\n<!-- mdtools-disable-next-line structure/duplicate-heading -->\n## Repeated\n\n# Repeated\n";
+    "# First\n\n## Repeated\n\n# Second\n\n<!-- mdrefine-disable-next-line structure/duplicate-heading -->\n## Repeated\n\n# Repeated\n";
   const options = settings(rule, { siblingsOnly: false });
   expect(lint(source, options)).toMatchObject([{ line: 10 }]);
   expect(lint(source, { ...options, ranges: [{ start: 0, end: 7 }] })).toEqual([]);

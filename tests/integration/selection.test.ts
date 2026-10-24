@@ -241,9 +241,9 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
       gitInit(main);
       git(main, [
         "-c",
-        "user.name=mdtools",
+        "user.name=mdrefine",
         "-c",
-        "user.email=mdtools@example.invalid",
+        "user.email=mdrefine@example.invalid",
         "commit",
         "-q",
         "--allow-empty",
@@ -378,14 +378,14 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
     const checked = run(root, ["lint", "--root", "generated"]);
     expect(checked.status, checked.stderr).toBe(0);
     expect(checked.stderr).toContain(
-      'mdtools: warning: Skipped ignored workspace root: generated (matched by "generated/" in .gitignore). Its files are not processed.\n',
+      'mdrefine: warning: Skipped ignored workspace root: generated (matched by "generated/" in .gitignore). Its files are not processed.\n',
     );
     expect(run(generated, ["lint", "--root", "."]).stderr).toContain(
-      'mdtools: warning: Skipped ignored workspace root: . (matched by "generated/" in ../.gitignore)',
+      'mdrefine: warning: Skipped ignored workspace root: . (matched by "generated/" in ../.gitignore)',
     );
     // No path named the root, and none of its files is processed, so --no-warn-ignored keeps it.
     expect(run(generated, ["lint", "--root", ".", "--no-warn-ignored"]).stderr).toContain(
-      "mdtools: warning: Skipped ignored workspace root: .",
+      "mdrefine: warning: Skipped ignored workspace root: .",
     );
     // Stdin selects no file from disk, so the root's warning does not apply to
     // it (issue #314), and a path that --stdin-filepath gives it there is
@@ -399,7 +399,7 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
       expect.objectContaining({
         status: 0,
         stderr:
-          'mdtools: warning: Skipped ignored input: a.md (in the workspace root, which is matched by "generated/" in ../.gitignore). It is not processed.\n',
+          'mdrefine: warning: Skipped ignored input: a.md (in the workspace root, which is matched by "generated/" in ../.gitignore). It is not processed.\n',
       }),
     );
     // A named input says where the rule matched, from the root.
@@ -460,7 +460,7 @@ describe("Git's ignore rules at the workspace's boundaries", () => {
 
 describe("named inputs", () => {
   const files = {
-    "mdtools.config.json": JSON.stringify({
+    "mdrefine.config.json": JSON.stringify({
       extends: ["recommended", "github"],
       ignore: ["drafts/**"],
     }),
@@ -518,7 +518,7 @@ describe("named inputs", () => {
     const checked = run(root, ["lint", "guide.md", ...named]);
     expect(checked.status, checked.stderr).toBe(0);
     const note = (name: string, reason: string, folder = false) =>
-      `mdtools: warning: Skipped ignored input: ${name} (${reason}). ${folder ? "Its files are" : "It is"} not processed.\n`;
+      `mdrefine: warning: Skipped ignored input: ${name} (${reason}). ${folder ? "Its files are" : "It is"} not processed.\n`;
     expect(checked.stderr).toBe(
       note("drafts/draft.md", `matched by the configuration's ignore pattern "drafts/**"`) +
         note("generated", `matched by "generated/" in .gitignore`, true) +
@@ -559,7 +559,7 @@ describe("named inputs", () => {
     });
     const named = ["generated/out.md", "skip.md", "drafts/draft.md", "node_modules", "vendor"];
     const settings =
-      "mdtools: warning: Skipped unusable settings file: vault/.obsidian/app.json (not valid JSON). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.\n";
+      "mdrefine: warning: Skipped unusable settings file: vault/.obsidian/app.json (not valid JSON). Obsidian's strictLineBreaks setting is not verified for that vault, so its documents are not reflowed.\n";
     const emphasis = (column: number) =>
       `notes.txt:3:${column}: warn style/emphasis: Use "_" for emphasis.\n`;
     const lint = ["lint", "--max-warnings", "0", "notes.txt", ...named];
@@ -611,7 +611,7 @@ describe("named inputs", () => {
     const discovery = await discoverWorkspace({
       root,
       inputs: [],
-      config: parseConfig(files["mdtools.config.json"]),
+      config: parseConfig(files["mdrefine.config.json"]),
       documents: Object.fromEntries([
         ...cases.map(([name]) => [name, text] as const),
         ["new.md", text] as const,
@@ -622,7 +622,7 @@ describe("named inputs", () => {
       cases.map(([name, why]) => [name, "IGNORED", message(name, why)]),
     );
     // The command line leaves such a document out in the same way.
-    const warning = `mdtools: warning: ${message("skip.md", cases[5][1])}\n`;
+    const warning = `mdrefine: warning: ${message("skip.md", cases[5][1])}\n`;
     const named = ["--stdin-filepath", "skip.md"];
     const linted = run(root, ["lint", "-", "--max-warnings", "0", ...named], text);
     expect([linted.status, linted.stderr]).toEqual([0, warning]);
@@ -665,7 +665,7 @@ describe("named inputs", () => {
 
 describe("input patterns", () => {
   const files = {
-    "mdtools.config.json": '{"ignore":["docs/drafts/**"]}',
+    "mdrefine.config.json": '{"ignore":["docs/drafts/**"]}',
     ".gitignore": "generated/\n",
     "docs/a.md": "A.\n",
     "docs/sub/b.md": "B.\n",
@@ -685,7 +685,7 @@ describe("input patterns", () => {
   const fails = (root: string, args: string[], message: string) => {
     const checked = run(root, ["lint", ...args]);
     expect(checked.status, args.join(" ")).toBe(2);
-    expect(checked.stderr, args.join(" ")).toBe(`mdtools: ${message}\n`);
+    expect(checked.stderr, args.join(" ")).toBe(`mdrefine: ${message}\n`);
   };
 
   it("select the documents that discovery finds and that they match", async () => {
@@ -740,7 +740,7 @@ describe("input patterns", () => {
 
 describe("link targets in folders that discovery does not enter", () => {
   const files = {
-    "mdtools.config.json": '{"extends":["recommended","github"]}',
+    "mdrefine.config.json": '{"extends":["recommended","github"]}',
     "index.md": [
       "[Guide](dist/guide.md#guide), [report](docs/coverage/report.md),",
       "[package](node_modules/package/readme.md), [folder](dist/),",
@@ -815,7 +815,7 @@ describe("link targets in folders that discovery does not enter", () => {
       "index.md: Missing local target: dist/.",
     ]);
     await writeFile(
-      path.join(root, "mdtools.config.json"),
+      path.join(root, "mdrefine.config.json"),
       '{"extends":["recommended","github"],"resolve":{"gitIgnored":true}}',
     );
     expect(findings(run(root, ["lint", "--json", "index.md"]).stdout)).toEqual([]);

@@ -12,7 +12,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
   const skippedMessage = (directory: string, detail = "") =>
     `Skipped unreadable directory: ${directory} (EACCES: permission denied${detail}). Its files are not processed, and links into it cannot be checked.`;
   const warning = (directory: string, detail = "") =>
-    `mdtools: warning: ${skippedMessage(directory, detail)}\n`;
+    `mdrefine: warning: ${skippedMessage(directory, detail)}\n`;
   const files = { "note.md": "A *note*.\n", "locked/inner.md": "*inner*\n" };
   it("skips the directory with one warning and processes everything else", async () => {
     const root = await fixture(files);
@@ -91,7 +91,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
         "1 file(s) linted; 2 error(s), 0 warning(s).\n",
     );
     // The finding has the rule's severity, so a warning does not fail the run.
-    const config = path.join(root, "mdtools.config.json");
+    const config = path.join(root, "mdrefine.config.json");
     await writeFile(config, '{"extends":[],"rules":{"links/valid":"warn"}}');
     const warned = run(root, ["lint", "--json"]);
     expect(warned.status, warned.stderr).toBe(0);
@@ -103,7 +103,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
   });
   it("does not call an Obsidian note missing that may be in the directory", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"extends":[],"dialect":"obsidian","rules":{"links/valid":"error"}}',
+      "mdrefine.config.json": '{"extends":[],"dialect":"obsidian","rules":{"links/valid":"error"}}',
       "Home.md": "[[Diary]], [[Known]], [[./Diary]], and [[Locked/Diary|there]].\n",
       "Notes/Known.md": "A note.\n",
       "locked/Diary.md": "A note.\n",
@@ -133,7 +133,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       expect(result.status, command.join(" ")).toBe(2);
       expect(result.stdout).toBe("");
       expect(result.stderr).toBe(
-        "mdtools: Input cannot be read: locked (EACCES: permission denied)\n",
+        "mdrefine: Input cannot be read: locked (EACCES: permission denied)\n",
       );
     }
     // Nothing is written when one of the inputs cannot be read.
@@ -141,13 +141,13 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const inside = run(root, ["lint", "locked/inner.md"]);
     expect(inside.status).toBe(2);
     expect(inside.stderr).toBe(
-      "mdtools: Input cannot be read: locked/inner.md (EACCES: permission denied)\n",
+      "mdrefine: Input cannot be read: locked/inner.md (EACCES: permission denied)\n",
     );
     // An excluded path in it cannot be told from a link to a file that should be left out.
     const excluded = run(root, ["format", "--write", "--exclude", "locked/inner.md"]);
     expect(excluded.status).toBe(2);
     expect(excluded.stderr).toBe(
-      "mdtools: Excluded path cannot be read: locked/inner.md (EACCES: permission denied)\n",
+      "mdrefine: Excluded path cannot be read: locked/inner.md (EACCES: permission denied)\n",
     );
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
   });
@@ -175,7 +175,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     expect(inside.status).toBe(2);
     if (mode === 0o111)
       expect(inside.stderr).toBe(
-        "mdtools: Input cannot be read: locked/inner.md (EACCES: permission denied for locked)\n",
+        "mdrefine: Input cannot be read: locked/inner.md (EACCES: permission denied for locked)\n",
       );
   });
   it("skips each unreadable directory once, wherever it is, and nothing below it", async () => {
@@ -196,7 +196,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
   it("keeps `ignore` and `--exclude` from pruning discovery, unlike `.gitignore`", async () => {
     const root = await fixture({
       ...files,
-      "mdtools.config.json": '{"ignore":["locked/**"]}',
+      "mdrefine.config.json": '{"ignore":["locked/**"]}',
       "note.md": "[in](locked/inner.md)\n",
     });
     await restrict(path.join(root, "locked"));
@@ -215,7 +215,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     );
     // Unless it is indexed on request, which needs to read it.
     await writeFile(
-      path.join(root, "mdtools.config.json"),
+      path.join(root, "mdrefine.config.json"),
       '{"resolve":{"gitIgnored":true,"nestedRepositories":true}}',
     );
     const indexed = run(root, ["lint"]);
@@ -248,7 +248,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const named = run(root, ["lint", "sub/a.md"]);
     expect(named.status).toBe(2);
     expect(named.stderr).toBe(
-      "mdtools: Input cannot be read: sub/a.md (EACCES: permission denied for sub/.gitignore)\n",
+      "mdrefine: Input cannot be read: sub/a.md (EACCES: permission denied for sub/.gitignore)\n",
     );
   });
   it("fails when the workspace root itself may not be read", async () => {
@@ -258,7 +258,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const ignoreRules = run(ignoring, ["format", "--write"]);
     expect(ignoreRules.status).toBe(2);
     expect(ignoreRules.stderr).toBe(
-      `mdtools: Workspace root cannot be read: ${ignoring} (EACCES: permission denied for .gitignore)\n`,
+      `mdrefine: Workspace root cannot be read: ${ignoring} (EACCES: permission denied for .gitignore)\n`,
     );
     expect(await readFile(path.join(ignoring, "note.md"), "utf8")).toBe(tree["note.md"]);
     const unlisted = await fixture(tree);
@@ -266,7 +266,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const listing = run(unlisted, ["lint"]);
     expect(listing.status).toBe(2);
     expect(listing.stderr).toBe(
-      `mdtools: Workspace root cannot be read: ${unlisted} (EACCES: permission denied)\n`,
+      `mdrefine: Workspace root cannot be read: ${unlisted} (EACCES: permission denied)\n`,
     );
     const closed = await fixture(tree);
     await restrict(closed);
@@ -282,7 +282,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
       const searching = run(path.dirname(closed), command);
       expect(searching.status).toBe(2);
       expect(searching.stderr).toBe(
-        `mdtools: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
+        `mdrefine: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
       );
     }
     // A directory that is not named as the root, such as the one the tool runs in,
@@ -291,23 +291,23 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     await expect(loadConfig(closed)).rejects.toThrow(
       `Cannot look for a configuration file in ${closed} (EACCES: permission denied)`,
     );
-    const elsewhere = await fixture({ "mdtools.config.json": "{}" });
+    const elsewhere = await fixture({ "mdrefine.config.json": "{}" });
     const configured = run(elsewhere, [
       "lint",
       "--config",
-      "mdtools.config.json",
+      "mdrefine.config.json",
       "--root",
       closed,
     ]);
     expect(configured.status).toBe(2);
     expect(configured.stderr).toBe(
-      `mdtools: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
+      `mdrefine: Workspace root cannot be read: ${closed} (EACCES: permission denied)\n`,
     );
   });
   it("stops when it cannot tell whether a named document is in a vault", async () => {
     const root = await fixture({ "note.md": "A note.\n", "closed/note.md": "A note.\n" });
     await restrict(path.join(root, "closed"));
-    const message = `mdtools: Cannot tell whether ${path.join(root, "closed/note.md")} is inside an Obsidian vault (EACCES: permission denied)\n`;
+    const message = `mdrefine: Cannot tell whether ${path.join(root, "closed/note.md")} is inside an Obsidian vault (EACCES: permission denied)\n`;
     // The run itself skips the directory, with a warning; these two name a document in it.
     expect(run(root, ["lint"]).status).toBe(0);
     const explained = run(root, ["config", "explain", "closed/note.md"]);
@@ -327,13 +327,13 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const stopped = run(linked, ["format", "--write"]);
     expect(stopped.status).toBe(2);
     expect(stopped.stderr).toBe(
-      `mdtools: Cannot tell whether ${path.join(linked, "notes")} is an Obsidian vault (EACCES: permission denied)\n`,
+      `mdrefine: Cannot tell whether ${path.join(linked, "notes")} is an Obsidian vault (EACCES: permission denied)\n`,
     );
   });
   it("treats Obsidian settings that may not be read as unverified", async () => {
     const paragraph = `${"A long line of prose in a vault. ".repeat(4).trim()}\n`;
     const root = await fixture({
-      "mdtools.config.json": '{"extends":["recommended","obsidian"]}',
+      "mdrefine.config.json": '{"extends":["recommended","obsidian"]}',
       ".obsidian/app.json": '{"strictLineBreaks":true}',
       "Note.md": paragraph,
     });
@@ -344,7 +344,7 @@ describe.skipIf(!canRestrict)("directories that may not be read", () => {
     const applied = run(root, ["format", "--write"]);
     expect(applied.status, applied.stderr).toBe(0);
     expect(applied.stderr).toBe(
-      `mdtools: warning: ${message}\n` +
+      `mdrefine: warning: ${message}\n` +
         "Note.md:1:1: warn obsidian/strict-line-breaks: Obsidian's \"Strict line breaks\" setting is not known to be on, so paragraphs are not reflowed. Turn it on in the vault's settings, which keep it in .obsidian/app.json; a program that calls the library passes strictLineBreaks to createWorkspace.\n" +
         "1 file(s) processed; 0 written.\n",
     );
@@ -375,20 +375,20 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
   it("stops for a configuration file that may not be read, and names it", async () => {
     const root = await fixture({
       ...files,
-      "mdtools.config.json": "{}",
+      "mdrefine.config.json": "{}",
       "other.mjs": "export default {};\n",
     });
-    await restrict(path.join(root, "mdtools.config.json"));
+    await restrict(path.join(root, "mdrefine.config.json"));
     await restrict(path.join(root, "other.mjs"));
     const found = run(root, ["format", "--write"]);
     expect(found.status).toBe(2);
     expect(found.stderr).toBe(
-      `mdtools: Configuration file cannot be read: ${path.join(root, "mdtools.config.json")} (EACCES: permission denied)\n`,
+      `mdrefine: Configuration file cannot be read: ${path.join(root, "mdrefine.config.json")} (EACCES: permission denied)\n`,
     );
     const named = run(root, ["lint", "--config", "other.mjs"]);
     expect(named.status).toBe(2);
     expect(named.stderr).toBe(
-      "mdtools: Configuration file cannot be read: other.mjs (EACCES: permission denied)\n",
+      "mdrefine: Configuration file cannot be read: other.mjs (EACCES: permission denied)\n",
     );
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(files["note.md"]);
   });
@@ -500,7 +500,7 @@ describe.skipIf(!canRestrict)("files that may not be read", () => {
 // cannot express, such as a directory that can be listed but not entered.
 describe.skipIf(process.platform !== "win32")("paths that may not be read on Windows", () => {
   const refused = "EPERM: operation not permitted";
-  const skipped = `mdtools: warning: Skipped unreadable directory: locked (${refused}). Its files are not processed, and links into it cannot be checked.\n`;
+  const skipped = `mdrefine: warning: Skipped unreadable directory: locked (${refused}). Its files are not processed, and links into it cannot be checked.\n`;
   const unchecked =
     "linking.md:1:5: error links/valid: Fragment could not be checked: secret.md#section (cannot read secret.md).\n" +
     "linking.md:1:42: error links/valid: Local target could not be checked: locked/inner.md#part (no readable match; cannot read locked).\n";
@@ -525,7 +525,12 @@ describe.skipIf(process.platform !== "win32")("paths that may not be read on Win
         "2 file(s) linted; 3 error(s), 2 warning(s); 1 could not be read.\n",
     );
     expect(parseReport(run(root, ["lint", "--json"]).stdout).skipped).toEqual([
-      { path: "locked", type: "directory", code: "EPERM", message: skipped.slice(18, -1) },
+      {
+        path: "locked",
+        type: "directory",
+        code: "EPERM",
+        message: skipped.slice("mdrefine: warning: ".length, -1),
+      },
     ]);
     // The other documents are written while a selected document cannot be read.
     const applied = run(root, ["format", "--write"]);
@@ -540,13 +545,13 @@ describe.skipIf(process.platform !== "win32")("paths that may not be read on Win
     const inside = run(root, ["lint", "locked/inner.md"]);
     expect(inside.status).toBe(2);
     expect(inside.stderr).toBe(
-      `mdtools: Input cannot be read: locked/inner.md (${refused} for locked)\n`,
+      `mdrefine: Input cannot be read: locked/inner.md (${refused} for locked)\n`,
     );
   });
   it("treats Obsidian settings that may not be read as unverified", async () => {
     const paragraph = `${"A long line of prose in a vault. ".repeat(4).trim()}\n`;
     const root = await fixture({
-      "mdtools.config.json": '{"extends":["recommended","obsidian"]}',
+      "mdrefine.config.json": '{"extends":["recommended","obsidian"]}',
       ".obsidian/app.json": '{"strictLineBreaks":true}',
       "Note.md": paragraph,
     });
@@ -555,21 +560,21 @@ describe.skipIf(process.platform !== "win32")("paths that may not be read on Win
     const applied = run(root, ["format", "--write"]);
     expect(applied.status, applied.stderr).toBe(0);
     expect(applied.stderr).toContain(
-      `mdtools: warning: Skipped unreadable settings file: .obsidian/app.json (${refused}).`,
+      `mdrefine: warning: Skipped unreadable settings file: .obsidian/app.json (${refused}).`,
     );
     expect(await readFile(path.join(root, "Note.md"), "utf8")).toBe(paragraph);
   });
   it("stops for a configuration file that may not be read, and names it", async () => {
-    const root = await fixture({ "note.md": "A *note*.\n", "mdtools.config.json": "{}" });
-    denyRead(path.join(root, "mdtools.config.json"));
+    const root = await fixture({ "note.md": "A *note*.\n", "mdrefine.config.json": "{}" });
+    denyRead(path.join(root, "mdrefine.config.json"));
     const found = run(root, ["format", "--write"]);
     expect(found.status).toBe(2);
     expect(found.stderr).toBe(
-      `mdtools: Configuration file cannot be read: ${path.join(root, "mdtools.config.json")} (${refused})\n`,
+      `mdrefine: Configuration file cannot be read: ${path.join(root, "mdrefine.config.json")} (${refused})\n`,
     );
-    const named = run(root, ["lint", "--config", "mdtools.config.json"]);
+    const named = run(root, ["lint", "--config", "mdrefine.config.json"]);
     expect(named.stderr).toBe(
-      `mdtools: Configuration file cannot be read: mdtools.config.json (${refused})\n`,
+      `mdrefine: Configuration file cannot be read: mdrefine.config.json (${refused})\n`,
     );
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A *note*.\n");
   });

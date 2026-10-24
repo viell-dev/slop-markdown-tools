@@ -9,8 +9,8 @@ import { lint } from "../../../dist/index.js";
 import { discoverWorkspace } from "../../../dist/node.js";
 
 const scenario = process.argv[2];
-const root = await mkdtemp(path.join(tmpdir(), "mdtools-skipped-case-"));
-const outside = await mkdtemp(path.join(tmpdir(), "mdtools-outside-case-"));
+const root = await mkdtemp(path.join(tmpdir(), "mdrefine-skipped-case-"));
+const outside = await mkdtemp(path.join(tmpdir(), "mdrefine-outside-case-"));
 const config = { extends: [], dialect: "obsidian", rules: { "links/valid": "error" } };
 const write = async (name, text = "# Target\n") => {
   await mkdir(path.dirname(path.join(root, name)), { recursive: true });
@@ -59,7 +59,7 @@ try {
     assert.equal(resolve(workspace, "dist/nested/missing.md").status, "missing");
     // Searching by name still covers indexed files only.
     assert.equal(resolve(workspace, "Leaf").status, "missing");
-    await write("mdtools.config.json", JSON.stringify(config));
+    await write("mdrefine.config.json", JSON.stringify(config));
     const cli = fileURLToPath(new URL("../../../dist/cli/main.js", import.meta.url));
     const checked = spawnSync(process.execPath, [cli, "lint", "note.md", "--json"], {
       cwd: root,

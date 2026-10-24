@@ -1,6 +1,6 @@
-// Summarize the JSON report of `mdtools lint --json` or `mdtools format --json`.
+// Summarize the JSON report of `mdrefine lint --json` or `mdrefine format --json`.
 //
-//   npx --no-install mdtools lint --json | node summarize-report.mjs
+//   npx --no-install mdrefine lint --json | node summarize-report.mjs
 //
 // The report is one object: { version, mode, files, written }, with a `skipped`
 // list when the run left out a path it was not permitted to read. Each file has

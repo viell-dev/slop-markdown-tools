@@ -112,7 +112,7 @@ describe("links/undefined-reference", () => {
   });
   it("respects suppression comments", () => {
     const source = [
-      "<!-- mdtools-disable-next-line links/undefined-reference -->",
+      "<!-- mdrefine-disable-next-line links/undefined-reference -->",
       "[a][b]",
       "",
       "[c][d]",

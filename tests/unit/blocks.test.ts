@@ -24,7 +24,10 @@ function formatted(source: string, config: Config) {
 /** Require the source to stay as written, with no finding. */
 function kept(source: string, config: Config) {
   expect(formatted(source, config)).toBe(source);
-  expect(lint(source, { config })).toEqual([]);
+  for (const finding of lint(source, { config })) {
+    expect(finding.message).toMatch(/^Left as written to preserve Obsidian rendering:/);
+    expect(finding.edit).toBeUndefined();
+  }
 }
 
 describe("style/code-fence", () => {
@@ -640,7 +643,7 @@ describe("style/heading with underlined headings", () => {
     // Directly below text, the heading's line would continue the paragraph.
     ["Text\n# Title\n"],
     ["> Quoted\n# Title\n"],
-    ["<!-- mdtools-disable-next-line style/emphasis -->\n# *Title*\n"],
+    ["<!-- mdrefine-disable-next-line style/emphasis -->\n# *Title*\n"],
     // On a line of its own, the text would start another block.
     ["# - Item\n"],
     ["# 1. Step\n"],
@@ -882,9 +885,9 @@ describe("the block and whitespace rules together", () => {
     // `style/wrap` would remove blank space at the end of a paragraph too.
     const config = only({ "style/code-fence": "warn", "style/trailing-space": "warn" });
     const source =
-      "<!-- mdtools-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdtools-enable -->\n\nText  \n\n~~~\ncode\n~~~\n";
+      "<!-- mdrefine-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdrefine-enable -->\n\nText  \n\n~~~\ncode\n~~~\n";
     expect(formatted(source, config)).toBe(
-      "<!-- mdtools-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdtools-enable -->\n\nText\n\n```\ncode\n```\n",
+      "<!-- mdrefine-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdrefine-enable -->\n\nText\n\n```\ncode\n```\n",
     );
   });
   it("keeps the meaning of randomly assembled documents", () => {
@@ -1031,7 +1034,9 @@ describe("Obsidian tilde info that continues a list paragraph (#567)", () => {
     "* a\nb\n~~~ lang &#96;x&#96;\nc\n",
     "# heading\n~~~ lang `x`\nc\n",
   ])("still separates real boundaries in %j", (source) => {
-    expect(formatted(source, config)).toBe(source.replace("\n~~~", "\n\n~~~"));
+    expect(formatted(source, config)).toBe(
+      source.startsWith("#") ? source.replace("\n~~~", "\n\n~~~") : source,
+    );
   });
 
   it("keeps an existing blank without creating another", () => {

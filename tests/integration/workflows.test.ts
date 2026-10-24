@@ -20,7 +20,7 @@ const hasGit = spawnSync("git", ["--version"]).status === 0;
 
 describe("a repository with an embedded vault", () => {
   const files = {
-    "mdtools.config.jsonc": `{
+    "mdrefine.config.jsonc": `{
       "extends": ["recommended", "github"],
       "overrides": [{ "files": ["vault/**"], "dialect": "obsidian", "rules": { "obsidian/callout-marker": "warn" } }],
     }`,
@@ -49,7 +49,7 @@ describe("a repository with an embedded vault", () => {
     const note =
       "A [[Target|note]], [a path](../Other/Target.md), [[README]], and [the project](../../../README.md).\n";
     const tree = {
-      "mdtools.config.jsonc": '{ "rules": { "links/path": ["warn", { "style": "root" }] } }',
+      "mdrefine.config.jsonc": '{ "rules": { "links/path": ["warn", { "style": "root" }] } }',
       "README.md": "# Project\n\nSee [the vault](docs/vault/Home.md).\n",
       "docs/vault/.obsidian/app.json": "{}",
       "docs/vault/Home.md": "# Home\n",
@@ -61,7 +61,7 @@ describe("a repository with an embedded vault", () => {
     // What `links/valid` says about the vault's notes, with paths from the vault's folder.
     const invalid = (root: string, ...flags: string[]) =>
       report(
-        run(root, ["lint", "--json", "--config", "mdtools.config.jsonc", ...flags]).stdout,
+        run(root, ["lint", "--json", "--config", "mdrefine.config.jsonc", ...flags]).stdout,
       ).files.flatMap((file) =>
         file.diagnostics
           .filter((item) => item.rule === "links/valid")
@@ -80,7 +80,7 @@ describe("a repository with an embedded vault", () => {
     // Formatting writes the same paths either way: from the vault's folder.
     const alone = await fixture(tree);
     run(whole, ["format", "--write"]);
-    run(alone, ["format", "--write", "--config", "mdtools.config.jsonc", "--root", "docs/vault"]);
+    run(alone, ["format", "--write", "--config", "mdrefine.config.jsonc", "--root", "docs/vault"]);
     for (const root of [whole, alone])
       expect(await readFile(path.join(root, "docs/vault/Folder/Note.md"), "utf8")).toBe(formatted);
     // The repository's own document still links into the vault from the outside.
@@ -109,7 +109,7 @@ describe("line endings and file names", () => {
     const source =
       "# Title\r\n\r\nA *small* paragraph that is long enough to need wrapping at the default width of eighty columns.\r\n\r\n| a | b |\r\n|---|---|\r\n| long cell | c |\r\n";
     const root = await fixture({
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "github"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "github"] }',
       "note.md": source,
     });
     const applied = run(root, ["format", "--write", "--json"]);
@@ -128,7 +128,7 @@ describe("line endings and file names", () => {
     // Windows PowerShell 5.1 writes the mark with `Set-Content -Encoding UTF8`.
     const mark = String.fromCharCode(0xfeff);
     const root = await fixture({
-      "mdtools.config.json": `${mark}{ "extends": ["recommended", "github"] }\n`,
+      "mdrefine.config.json": `${mark}{ "extends": ["recommended", "github"] }\n`,
       "note.md": `${mark}# Title\n\nA *small* paragraph.\n`,
     });
     const linted = run(root, ["lint"]);
@@ -150,14 +150,14 @@ describe("line endings and file names", () => {
     expect(explained.status, explained.stderr).toBe(0);
     expect(parseExplanation(explained.stdout).effective.dialect).toBe("gitea");
     // The mark does not hide other errors, and their columns count after it.
-    await writeFile(path.join(root, "mdtools.config.json"), `${mark}{ "dialect": }\n`);
+    await writeFile(path.join(root, "mdrefine.config.json"), `${mark}{ "dialect": }\n`);
     expect(run(root, ["lint"]).stderr).toBe(
-      `mdtools: Invalid JSON configuration in ${path.join(root, "mdtools.config.json")} at line 1, column 14: a value is expected\n`,
+      `mdrefine: Invalid JSON configuration in ${path.join(root, "mdrefine.config.json")} at line 1, column 14: a value is expected\n`,
     );
   });
   it("resolves and rewrites links to files with spaces and non-ASCII names", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": `{
+      "mdrefine.config.jsonc": `{
         "extends": ["recommended", "github"],
         "rules": { "links/path": ["warn", { "style": "relative", "leadingDot": true }] },
       }`,
@@ -184,7 +184,7 @@ describe("line endings and file names", () => {
 
 describe("selecting files", () => {
   const files = {
-    "mdtools.config.jsonc": '{ "extends": ["recommended", "github"] }',
+    "mdrefine.config.jsonc": '{ "extends": ["recommended", "github"] }',
     "README.md": "# Project\n\nSee the [guide](docs/guide.md).\n",
     "docs/guide.md": "# Guide\n\nBack to the [project](../README.md#project), *really*.\n",
     "docs/other.md": "An *unselected* file.\n",
@@ -306,7 +306,7 @@ describe("reports for scripts and agents", () => {
         : `Paragraph ${n} stays.\n`,
     );
     const files = {
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "github"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "github"] }',
       "long.md": `# Long\n\n${paragraphs.join("\n")}`,
       "crlf.md":
         "# Title\r\n\r\nA *small* paragraph that is long enough to need wrapping at the default width of eighty columns.\r\n",
@@ -394,7 +394,7 @@ describe("plugins named in a configuration", () => {
     ],
   ])("loads a plugin package that declares %s", async (_label, name, fields, code) => {
     const root = await fixture({
-      "mdtools.config.json": config(name),
+      "mdrefine.config.json": config(name),
       ...installed(name, fields, { "index.js": code }),
       "note.md": "A note.\n",
     });
@@ -408,7 +408,7 @@ describe("plugins named in a configuration", () => {
     "loads what an import finds in a package that also has a require entry: %j",
     async (entries) => {
       const root = await fixture({
-        "mdtools.config.json": config("sample-plugin"),
+        "mdrefine.config.json": config("sample-plugin"),
         ...installed(
           "sample-plugin",
           { exports: { ".": entries } },
@@ -460,7 +460,7 @@ describe("plugins named in a configuration", () => {
     "loads a plugin named by a package subpath: %s",
     async (_label, specifier, name, fields, files) => {
       const root = await fixture({
-        "mdtools.config.json": config(specifier),
+        "mdrefine.config.json": config(specifier),
         ...installed(name, fields, files),
         "note.md": "A note.\n",
       });
@@ -469,7 +469,7 @@ describe("plugins named in a configuration", () => {
   );
   it("looks a package up from the configuration file, not from the workspace root", async () => {
     const root = await fixture({
-      "settings/mdtools.config.json": config("sample-plugin"),
+      "settings/mdrefine.config.json": config("sample-plugin"),
       ...installed("sample-plugin", { main: "index.js" }, { "index.js": cjs("From the root") }),
       ...installed(
         "sample-plugin",
@@ -479,13 +479,13 @@ describe("plugins named in a configuration", () => {
       ),
       "note.md": "A note.\n",
     });
-    const checked = run(root, ["lint", "--config", "settings/mdtools.config.json", "--root", "."]);
+    const checked = run(root, ["lint", "--config", "settings/mdrefine.config.json", "--root", "."]);
     expect(reported(checked)).toBe("From beside the configuration");
   });
   it("loads a plugin named by a relative path, taking the path literally", async () => {
     // As a URL, "%20" would mean a space and "#" would start a fragment.
     const root = await fixture({
-      "mdtools.config.json": config("./local rules/100%20 #1.mjs"),
+      "mdrefine.config.json": config("./local rules/100%20 #1.mjs"),
       "local rules/100%20 #1.mjs": esm(),
       "note.md": "A note.\n",
     });
@@ -494,7 +494,7 @@ describe("plugins named in a configuration", () => {
   it("loads a plugin named by an absolute path", async () => {
     const root = await fixture({ "rules.mjs": esm(), "note.md": "A note.\n" });
     // On Windows this path has a drive letter and backslashes.
-    await writeFile(path.join(root, "mdtools.config.json"), config(path.join(root, "rules.mjs")));
+    await writeFile(path.join(root, "mdrefine.config.json"), config(path.join(root, "rules.mjs")));
     expect(reported(run(root, ["lint"]))).toBe("Loaded");
   });
 
@@ -509,12 +509,12 @@ describe("plugins named in a configuration", () => {
   ) => {
     const root = await fixture({ ...files, "note.md": "A note.\n" });
     // Naming the file makes its path in the message the one written here on every platform.
-    const file = path.join(root, "mdtools.config.json");
+    const file = path.join(root, "mdrefine.config.json");
     await writeFile(file, config(specifier));
     const checked = run(root, ["lint", "--config", file]);
     expect(checked.status).toBe(2);
     expect(checked.stdout).toBe("");
-    const prefix = `mdtools: ${start} "${specifier}" named in ${file}: `;
+    const prefix = `mdrefine: ${start} "${specifier}" named in ${file}: `;
     expect(checked.stderr.slice(0, prefix.length)).toBe(prefix);
     return checked.stderr.slice(prefix.length);
   };
@@ -526,7 +526,7 @@ describe("plugins named in a configuration", () => {
   });
   it("says that no file is there when a plugin named by path does not exist", async () => {
     const root = await fixture({ "rules/index.mjs": esm(), "note.md": "A note.\n" });
-    const file = path.join(root, "mdtools.config.json");
+    const file = path.join(root, "mdrefine.config.json");
     // Nothing of that name, a folder, and an absolute path below a folder that is not there.
     // The reason must not end with the tool's own location, as Node.js's reason does.
     for (const [specifier, target] of [
@@ -538,7 +538,7 @@ describe("plugins named in a configuration", () => {
       const checked = run(root, ["lint", "--config", file]);
       expect(checked.status).toBe(2);
       expect(checked.stderr).toBe(
-        `mdtools: Cannot load plugin "${specifier}" named in ${file}: no file at ${path.join(root, target)}\n`,
+        `mdrefine: Cannot load plugin "${specifier}" named in ${file}: no file at ${path.join(root, target)}\n`,
       );
     }
     // A file that is there and imports something missing keeps Node.js's reason.
@@ -565,7 +565,7 @@ describe("plugins named in a configuration", () => {
     "looks a package up with the conditions Node.js was started with: %s",
     async (_, options, environment, expected) => {
       const root = await fixture({
-        "mdtools.config.json": config("sample-plugin"),
+        "mdrefine.config.json": config("sample-plugin"),
         ...installed(
           "sample-plugin",
           {
@@ -675,7 +675,7 @@ describe("plugins named in a configuration", () => {
 describe("commands that must not write", () => {
   it("leave every file untouched, and a write leaves nothing but the formatted files", async () => {
     const files = {
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "github"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "github"] }',
       "a.md": "A *note*.\n",
       "nested/b.md": "- [X] done\n",
       "nested/data.json": "{}\n",

@@ -4,9 +4,9 @@
 synthetic documents. This page explains what is measured, records reference
 results, and says how good they are.
 
-The figures below precede the unreleased internal parser adapter. They remain
-reference measurements for that earlier implementation; the adapter's focused
-regression checks establish repaired work growth without replacing these
+The figures below precede the internal parser adapter introduced in 0.4.1. They
+remain reference measurements for that earlier implementation; the adapter's
+focused regression checks establish repaired work growth without replacing these
 throughput or memory measurements.
 
 ## In short
@@ -47,8 +47,8 @@ that the default rules replace, and unaligned tables. That is the worst case;
 formatting the result again is the best case, and both are measured. Each time
 is the median of five runs after one untimed warm-up run. The library
 measurements call the package and touch no files; the command-line measurements
-start `mdtools` as a process on files on disk, so they include start-up, finding
-and reading files, and printing.
+start `mdrefine` as a process on files on disk, so they include start-up,
+finding and reading files, and printing.
 
 ## Reference results
 
@@ -161,10 +161,10 @@ matrix, profiling, and reproduction ([issue
 #300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
 
 Both linting and formatting parse the whole document, so either is affected in
-the measured implementation. Unreleased builds bundle a reviewed EditMap
-correction that retains the untouched event prefix instead of copying it at
-every transition. They still parse complete documents for references and
-container structure. Exact AST, event-identity and work-growth checks cover the
+the measured implementation. Version 0.4.1 bundles a reviewed EditMap correction
+that retains the untouched event prefix instead of copying it at every
+transition. They still parse complete documents for references and container
+structure. Exact AST, event-identity and work-growth checks cover the
 correction; the tables above have not been remeasured with it.
 
 While a document is parsed, the parser holds a list of every token it found,
@@ -220,11 +220,11 @@ thousands of files.
   brackets are the worst case, in every dialect: a single paragraph of 70 kB
   made only of bracketed references such as `[a][b]` took from 1 to more than 30
   seconds to parse, while one of 35 kB took a fraction of a second ([issue
-  #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)).
-  Unreleased builds correct the known repeated text/code event compaction,
-  inline opener searches and unbalanced-label autolink scans. Builtin grammars
-  also avoid repeated lookups and scans for proven nested bracket labels and
-  batch eligible single pairs of homogeneous emphasis runs
+  #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)). Version
+  0.4.1 corrects the known repeated text/code event compaction, inline opener
+  searches and unbalanced-label autolink scans. Builtin grammars also avoid
+  repeated lookups and scans for proven nested bracket labels and batch eligible
+  single pairs of homogeneous emphasis runs
   ([#94](https://github.com/viell-dev/slop-markdown-tools/issues/94)). Failed
   Obsidian wikilink and embed openers reuse the scanned part of their line
   ([#577](https://github.com/viell-dev/slop-markdown-tools/issues/577)). Mixed

@@ -1,7 +1,7 @@
 // A plugin with one problem rule and one style rule.
 //
 // Problem rules report findings and never change a document. Style rules may
-// attach an edit, which `mdtools format` applies after checking that the
+// attach an edit, which `mdrefine format` applies after checking that the
 // document still means the same thing.
 
 /** Visit `node` and everything below it. */

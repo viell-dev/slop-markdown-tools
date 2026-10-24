@@ -134,7 +134,7 @@ async function library(group, corpus, { reference = false } = {}) {
 
 /** Put a corpus on disk and run CLI processes on it, as a user or a CI job does. */
 async function onDisk(corpus, use) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "mdtools-benchmark-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "mdrefine-benchmark-"));
   const memoryFile = path.join(root, ".peak-memory");
   const write = async (files) => {
     for (const [name, source] of Object.entries(files)) {
@@ -153,7 +153,7 @@ async function onDisk(corpus, use) {
       env: { ...process.env, MDTOOLS_BENCHMARK_MEMORY: memoryFile },
     });
     if (result.status !== 0)
-      throw new Error(`mdtools ${args.join(" ")} exited with ${result.status}.`);
+      throw new Error(`mdrefine ${args.join(" ")} exited with ${result.status}.`);
   };
   /** The most memory one more run of the command holds, including Node.js itself. */
   const peakMemory = async (args, options) => {
@@ -164,7 +164,7 @@ async function onDisk(corpus, use) {
     // The .git directory marks the workspace boundary, as it does in a real checkout.
     await write({
       ".git/HEAD": "ref: refs/heads/main\n",
-      "mdtools.config.json": JSON.stringify(corpus.config),
+      "mdrefine.config.json": JSON.stringify(corpus.config),
       ...corpus.extraFiles,
     });
     await use({ write, run, peakMemory });

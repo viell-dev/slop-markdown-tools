@@ -6,8 +6,8 @@ Two commands check a workspace without writing anything. Each fails with exit
 code `1` when it finds something, and with `2` when it cannot do its job:
 
 ```sh
-npx mdtools lint --max-warnings 0
-npx mdtools format --check
+npx mdrefine lint --max-warnings 0
+npx mdrefine format --check
 ```
 
 The [examples](examples.md#automate-checks) include a complete GitHub Actions
@@ -32,8 +32,8 @@ it runs, and adds what the commands changed to the commit, configure it in
 {
   "lint-staged": {
     "*.{md,markdown}": [
-      "mdtools format --write --no-warn-ignored",
-      "mdtools lint --max-warnings 0 --no-warn-ignored"
+      "mdrefine format --write --no-warn-ignored",
+      "mdrefine lint --max-warnings 0 --no-warn-ignored"
     ]
   }
 }
@@ -46,7 +46,7 @@ the commit adds or changes:
 ```sh
 #!/bin/sh
 git diff --cached --name-only -z --diff-filter=ACMR -- '*.md' '*.markdown' |
-  xargs -0 -r npx mdtools lint --max-warnings 0 --no-warn-ignored --
+  xargs -0 -r npx mdrefine lint --max-warnings 0 --no-warn-ignored --
 ```
 
 In both, `--no-warn-ignored` leaves out the
@@ -61,12 +61,12 @@ is on disk, including changes that are not staged.
 
 There is no editor extension or language server. An editor that can format a
 buffer through an external command can run
-`npx mdtools format - --stdin-filepath path/of/the/file.md`, which reads the
+`npx mdrefine format - --stdin-filepath path/of/the/file.md`, which reads the
 buffer from stdin and prints the formatted text; the path gives the buffer its
 file's configuration, dialect, and link targets. Exit code `1` means that
 findings remain, and the output is still the formatted text; with `2`, keep the
 buffer as it was.
-`npx mdtools lint - --stdin-filepath path/of/the/file.md --json` returns the
+`npx mdrefine lint - --stdin-filepath path/of/the/file.md --json` returns the
 findings with their positions. An editor that formats a selection can use the
 library's [`ranges`](api.md#part-of-a-document). An editor that reads JSON
 Schemas completes and checks the configuration file with the package's
@@ -124,7 +124,7 @@ yet", keep the other tool for that check.
 | Inline HTML, bare URLs; MD033, MD034                                             | None yet                                                                                              |
 | Hard tabs; MD010                                                                 | None yet                                                                                              |
 | Formatting the code inside code blocks                                           | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                |
-| `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdtools-disable -->`](configuration.md#suppression-comments)                                   |
+| `<!-- prettier-ignore -->`, `<!-- markdownlint-disable -->`                      | [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments)                                  |
 | Custom rules                                                                     | [Plugins](plugins.md)                                                                                 |
 
 Prettier keeps line breaks by default (`proseWrap: "preserve"`), while

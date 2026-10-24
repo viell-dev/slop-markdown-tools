@@ -204,7 +204,7 @@ describe("style/block-spacing", () => {
     ["```\ncode\n```\nText\n"],
     // Comments, callouts, and lines the parser reads differently below text.
     ["<!-- note -->\n# H\n"],
-    ["<!-- mdtools-disable-next-line style/emphasis -->\n- *A*\n"],
+    ["<!-- mdrefine-disable-next-line style/emphasis -->\n- *A*\n"],
     ["> [!NOTE]\n> - Item\n"],
     ["> [!tip] Title\n> # H\n"],
     ["> \\[!NOTE]\n> - Item\n"],
@@ -264,7 +264,7 @@ describe("style/block-spacing", () => {
     // inline text, so Obsidian keeps those internal boundaries (#436).
     expect(spaced("> # H\n> Text\n> - A\n- B\n## I\n", dialect)).toBe(
       dialect === "obsidian"
-        ? "> # H\n> Text\n> - A\n\n- B\n\n## I\n"
+        ? "> # H\n> Text\n> - A\n- B\n\n## I\n"
         : "> # H\n>\n> Text\n>\n> - A\n\n- B\n\n## I\n",
     );
   });
@@ -461,7 +461,7 @@ describe("style/block-spacing", () => {
         }
   });
   it.each([
-    ["a <b>b</b>\n\nc\n1. d\n", "a <b>b</b>\n\nc\n\n1. d\n"],
+    ["a <b>b</b>\n\nc\n1. d\n", "a <b>b</b>\n\nc\n1. d\n"],
     ["- a ``` b\n# c\n", "- a ``` b\n\n# c\n"],
     ["<div>\na\n</div>\n\n1. b\n# c\n", "<div>\na\n</div>\n\n1. b\n\n# c\n"],
     ["- a\n\n> b\n", "- a\n\n> b\n"],
@@ -522,17 +522,17 @@ describe("style/block-spacing", () => {
   it("honours suppression comments", () => {
     const config = only({ "style/block-spacing": "warn", "style/emphasis": "warn" }, "github");
     const region =
-      "<!-- mdtools-disable style/block-spacing -->\n\n# H\nText\n\n<!-- mdtools-enable style/block-spacing -->\n\n# I\nText\n";
+      "<!-- mdrefine-disable style/block-spacing -->\n\n# H\nText\n\n<!-- mdrefine-enable style/block-spacing -->\n\n# I\nText\n";
     expect(formatted(region, config)).toBe(region.replace("# I\n", "# I\n\n"));
-    const next = "<!-- mdtools-disable-next-line style/block-spacing -->\n# H\nText\n";
+    const next = "<!-- mdrefine-disable-next-line style/block-spacing -->\n# H\nText\n";
     expect(formatted(next, config)).toBe(next);
     expect(lint(next, { config })).toEqual([]);
     // A blank line would move the target of a directive for another rule.
-    const other = "<!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\nText *change*\n";
+    const other = "<!-- mdrefine-disable-next-line style/emphasis -->\n# *Keep*\nText *change*\n";
     expect(formatted(other, config)).toBe(
-      "<!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\n\nText _change_\n",
+      "<!-- mdrefine-disable-next-line style/emphasis -->\n# *Keep*\n\nText _change_\n",
     );
-    const inline = "Text <!-- mdtools-disable-next-line style/emphasis -->\n# *Keep*\n";
+    const inline = "Text <!-- mdrefine-disable-next-line style/emphasis -->\n# *Keep*\n";
     expect(formatted(inline, config)).toBe(inline);
   });
   it("formats together with the other block rules", () => {
@@ -1723,20 +1723,20 @@ describe("engine edits and fingerprints", () => {
 describe("suppression directives at the end of a document", () => {
   const config = only({ "style/emphasis": "warn" });
   it("suppresses a final line without a trailing newline", () => {
-    expect(formatted("<!-- mdtools-disable-next-line style/emphasis -->\n*keep*", config)).toBe(
-      "<!-- mdtools-disable-next-line style/emphasis -->\n*keep*",
+    expect(formatted("<!-- mdrefine-disable-next-line style/emphasis -->\n*keep*", config)).toBe(
+      "<!-- mdrefine-disable-next-line style/emphasis -->\n*keep*",
     );
   });
   it("ignores a next-line directive that has no next line", () => {
-    expect(formatted("*change*\n<!-- mdtools-disable-next-line style/emphasis -->", config)).toBe(
-      "_change_\n<!-- mdtools-disable-next-line style/emphasis -->",
+    expect(formatted("*change*\n<!-- mdrefine-disable-next-line style/emphasis -->", config)).toBe(
+      "_change_\n<!-- mdrefine-disable-next-line style/emphasis -->",
     );
   });
 });
 
 describe("next-line suppression with each line ending", () => {
   const config = only({ "style/emphasis": "warn" });
-  const directive = "<!-- mdtools-disable-next-line style/emphasis -->";
+  const directive = "<!-- mdrefine-disable-next-line style/emphasis -->";
   it.each([
     ["LF", "\n"],
     ["CRLF", "\r\n"],

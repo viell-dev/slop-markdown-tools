@@ -94,7 +94,7 @@ export async function linkDirectory(target: string, file: string): Promise<void>
  * only in Developer Mode or with administrator rights.
  */
 export const canSymlink = await (async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "mdtools-link-"));
+  const root = await mkdtemp(path.join(tmpdir(), "mdrefine-link-"));
   try {
     await symlink(path.join(root, "target"), path.join(root, "link"), "file");
     return true;
@@ -109,7 +109,7 @@ export const canSymlink = await (async () => {
  * is removed after the current test.
  */
 export async function fixture(files: Record<string, string | Uint8Array>): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
+  const root = await mkdtemp(path.join(tmpdir(), "mdrefine-test-"));
   temporary.push(root);
   // Keep discovery inside the fixture even when the host's temp directory is a repository.
   await mkdir(path.join(root, ".git"));
@@ -121,7 +121,7 @@ export async function fixture(files: Record<string, string | Uint8Array>): Promi
 }
 /** Copy a directory of the repository to a temporary location that tests may write to. */
 export async function copyOf(directory: string): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "mdtools-test-"));
+  const root = await mkdtemp(path.join(tmpdir(), "mdrefine-test-"));
   temporary.push(root);
   await cp(path.join(repository, directory), root, { recursive: true });
   return root;

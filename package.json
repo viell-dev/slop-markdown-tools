@@ -1,6 +1,6 @@
 {
   "name": "mdrefine",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, Obsidian, and VitePress",
   "keywords": [
     "markdown",
@@ -33,7 +33,8 @@
     "node": ">=22.12.0"
   },
   "bin": {
-    "mdtools": "dist/cli/main.js"
+    "mdrefine": "dist/cli/main.js",
+    "mdtools": "dist/cli/mdtools.js"
   },
   "publishConfig": {
     "access": "public",
@@ -96,6 +97,8 @@
     "prebenchmark": "npm run build",
     "check:obsidian": "run-s build check:obsidian:run",
     "check:obsidian:run": "node scripts/obsidian-check.mjs",
+    "check:forges": "run-s build check:forges:run",
+    "check:forges:run": "node scripts/forge-rendering.mjs",
     "check:live": "node scripts/check-live.mjs",
     "release:prepare": "run-s check release:pack",
     "release:pack": "node scripts/package-smoke.mjs --retain",

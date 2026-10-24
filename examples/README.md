@@ -7,12 +7,12 @@ example, so what is here matches what the tool does.
 
 Run the commands below from a built checkout (`npm ci && npm run build`). In a
 project that installs the package, the same files are under
-`node_modules/mdrefine/examples/`, and `npx mdtools` replaces
+`node_modules/mdrefine/examples/`, and `npx mdrefine` replaces
 `node dist/cli/main.js`.
 
 ## Starting configurations
 
-Copy one to the root of your documents as `mdtools.config.jsonc`.
+Copy one to the root of your documents as `mdrefine.config.jsonc`.
 
 | File                               | For                                             |
 | ---------------------------------- | ----------------------------------------------- |

@@ -5,7 +5,7 @@ on:
       version:
         description: Exact version in package.json (without a v prefix)
         required: true
-        default: 0.4.0
+        default: 0.4.1
       publish:
         description: Publish to npm and create a GitHub release (see RELEASING.md)
         type: boolean
@@ -50,8 +50,13 @@ jobs:
     with:
       profile: realistic
       seed: none
+  forges:
+    uses: ./.github/workflows/forges.yml
+    with:
+      profile: realistic
+      seed: none
   prepare:
-    needs: [ci, rendering, obsidian]
+    needs: [ci, rendering, obsidian, forges]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

@@ -66,7 +66,7 @@ it.each(cases)("preserves CLI reports and exit status for a %s (#457)", async (_
     "a.md": "First *word*.\n",
     "b.md": "Second *word*.\n",
     "plugin.mjs": `export default ${plugin(check)};`,
-    "mdtools.config.mjs":
+    "mdrefine.config.mjs":
       'export default { extends: [], plugins: ["./plugin.mjs"], rules: { "local/invalid": "error", "style/emphasis": "warn" } };',
   });
   for (const command of ["lint", "format"]) {

@@ -8,9 +8,24 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.4.1 - 2026-10-24
 
 ### Changed
+
+- Forgejo and Gitea gain automated before/after comparisons against pinned
+  official disposable hosts, with realistic fixed-seed corpora and actual
+  repository-file heading/fragment controls. PR and release gates use these
+  checks; weekly adversarial discovery remains separate
+  ([#486](https://github.com/viell-dev/slop-markdown-tools/issues/486)).
+
+- The command, configuration filenames, suppression comments, temporary-file
+  prefixes, examples and current documentation now use `mdrefine`. The old
+  `mdtools` command, config names and comments remain compatible but deprecated
+  throughout 0.4.x and will all be removed in 0.5.0. Rename config files and
+  replace comment prefixes manually; formatting does not migrate them. One CLI
+  migration notice per run does not count against `--max-warnings`
+  ([#600](https://github.com/viell-dev/slop-markdown-tools/issues/600),
+  [#601](https://github.com/viell-dev/slop-markdown-tools/issues/601)).
 
 - Obsidian structural rules conservatively keep ambiguous block boundaries as
   written. Proposed style edits held by native-rendering protection now report
@@ -24,12 +39,13 @@ prereleases' notes there are longer than their entries here.
   review now use bounded scope and proportional verification
   ([#603](https://github.com/viell-dev/slop-markdown-tools/issues/603)).
 - A release is published only after CI has passed on its exact commit and
-  GitHub's and Obsidian's rendering of fixed documents is unchanged by
-  formatting at that commit. Pull requests that change parsing, rules, presets,
-  or dependencies run both renderer comparisons. The documentation site records
-  the release and commit it was built from in `version.json`, and the current
-  release's site can be corrected from a `site-VERSION` branch without a new
-  version ([#485](https://github.com/viell-dev/slop-markdown-tools/issues/485)).
+  GitHub, Obsidian, Forgejo and Gitea rendering of fixed documents is unchanged
+  by formatting at that commit. Pull requests that change parsing, rules,
+  presets, or dependencies run the renderer comparisons. The documentation site
+  records the release and commit it was built from in `version.json`, and the
+  current release's site can be corrected from a `site-VERSION` branch without a
+  new version
+  ([#485](https://github.com/viell-dev/slop-markdown-tools/issues/485)).
 
 ### Fixed
 

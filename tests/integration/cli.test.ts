@@ -12,7 +12,7 @@ describe("CLI", () => {
       const source = "# Setup\nInstall the package.\n- Run the command.\n";
       const root = await fixture({
         "note.md": source,
-        ...(config ? { "mdtools.config.json": JSON.stringify(config) } : {}),
+        ...(config ? { "mdrefine.config.json": JSON.stringify(config) } : {}),
       });
       const explained = run(root, ["config", "explain", "note.md"]);
       expect(explained.status, explained.stderr).toBe(0);
@@ -35,7 +35,7 @@ describe("CLI", () => {
       expect(run(root, ["format", "--check", "."]).status).toBe(0);
       await writeFile(path.join(root, "note.md"), source);
       await writeFile(
-        path.join(root, "mdtools.config.json"),
+        path.join(root, "mdrefine.config.json"),
         JSON.stringify({ ...config, rules: { "style/block-spacing": "off" } }),
       );
       expect(run(root, ["lint", "--max-warnings", "0", "."]).status).toBe(0);
@@ -65,7 +65,7 @@ describe("CLI", () => {
   });
   it("accepts the Forgejo dialect and its Codeberg alias", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "codeberg"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "codeberg"] }',
       "note.md": "# Test.0.1\n\n[link](#test-0-1)\n\nTerm\n: Definition\n",
     });
     const checked = run(root, ["lint", "--json", "."]);
@@ -79,7 +79,7 @@ describe("CLI", () => {
   });
   it("accepts the Gitea dialect", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "gitea"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "gitea"] }',
       "note.md": "# Test.0.1\n\n[link](#test01)\n\nTerm\n: Definition\n\nSee __init__.py.\n",
     });
     const checked = run(root, ["lint", "--json", "."]);
@@ -91,7 +91,7 @@ describe("CLI", () => {
   });
   it("loads JSONC, applies path overrides, and explains configuration", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc":
+      "mdrefine.config.jsonc":
         '{ // comment\n "rules": {"style/emphasis": "off"}, "overrides": [{"files": ["vault/**"], "dialect": "obsidian"}], }',
       "vault/a.md": "*keep*\n",
     });
@@ -102,7 +102,7 @@ describe("CLI", () => {
   });
   it("loads a custom JavaScript rule and preset", async () => {
     const root = await fixture({
-      "mdtools.config.mjs":
+      "mdrefine.config.mjs":
         'export default {extends:["local/recommended"],plugins:["./plugin.mjs"]};',
       "plugin.mjs":
         'export default {name:"local",presets:{recommended:{rules:{"local/report":"error"}}},rules:{report:{kind:"problem",description:"Example",check:()=>[{start:0,message:"Custom diagnostic"}]}}};',
@@ -121,7 +121,7 @@ describe("CLI", () => {
   });
   it("honors ignore patterns without removing ignored documents from the link index", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"ignore":["copied/**"]}',
+      "mdrefine.config.json": '{"ignore":["copied/**"]}',
       "note.md": "[copy](copied/file.md)\n",
       "copied/file.md": "*copied*\n",
       ".gitignore": "generated/\n",
@@ -139,7 +139,7 @@ describe("CLI", () => {
     // .gitignore files and input patterns ignore case on Windows and macOS; a configuration,
     // which every system shares, selects the same files everywhere.
     const root = await fixture({
-      "mdtools.config.json": JSON.stringify({
+      "mdrefine.config.json": JSON.stringify({
         ignore: ["drafts/**", "skip/**"],
         overrides: [{ files: ["notes/**", "other/**"], rules: { "style/emphasis": "off" } }],
       }),
@@ -164,7 +164,7 @@ describe("CLI", () => {
   });
   it("indexes ignored and nested targets only when opted in, without selecting them", async () => {
     const root = await fixture({
-      "mdtools.config.json": JSON.stringify({
+      "mdrefine.config.json": JSON.stringify({
         extends: ["recommended", "obsidian"],
         resolve: { gitIgnored: true, nestedRepositories: true },
       }),
@@ -208,7 +208,7 @@ describe("CLI", () => {
   });
   it("checks Obsidian settings and resolves block references on disk", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"extends":["recommended","obsidian"]}',
+      "mdrefine.config.json": '{"extends":["recommended","obsidian"]}',
       ".obsidian/app.json": '{"strictLineBreaks":true}',
       "note.md": "[[target#^id]]\n",
       "target.md": "A block. ^id\n",
@@ -220,7 +220,7 @@ describe("CLI", () => {
       "> [!info]- A callout title that must remain entirely on its original physical line\n";
     const source = `${header}> A body line that is long enough to be reflowed by the wrapper, so it should wrap.\n`;
     const root = await fixture({
-      "mdtools.config.json": JSON.stringify({
+      "mdrefine.config.json": JSON.stringify({
         extends: ["recommended", "obsidian"],
         rules: {
           "style/wrap": ["warn", { width: 60, reportUnreflowed: true, reportUnbreakable: true }],
@@ -245,7 +245,7 @@ describe("CLI", () => {
   });
   it("writes the other documents, and the checked result of one, when a rule's edits are refused", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/bad":"warn"}}',
+      "mdrefine.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/bad":"warn"}}',
       "plugin.mjs":
         'export default {name:"local",rules:{bad:{kind:"style",description:"Bad",check:({document})=>document.source.startsWith("bad")?[{start:0,message:"Bad",edit:{start:0,end:3,text:"different"}}]:[]}}};',
       "a.md": "*fine*\n",
@@ -267,7 +267,7 @@ describe("CLI", () => {
     // asserts that the state belongs to an item.
     const source = "-\n[x] item\n";
     const root = await fixture({
-      "mdtools.config.json": '{"dialect":"github","rules":{"style/block-spacing":"warn"}}',
+      "mdrefine.config.json": '{"dialect":"github","rules":{"style/block-spacing":"warn"}}',
       "a.md": source,
     });
     const written = run(root, ["format", "--write", "a.md"]);
@@ -279,7 +279,7 @@ describe("CLI", () => {
   });
   it("reports a rule that fails for its file and writes every changed document", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/fragile":"warn"}}',
+      "mdrefine.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/fragile":"warn"}}',
       "plugin.mjs":
         'export default {name:"local",rules:{fragile:{kind:"problem",description:"Fragile",check:({document})=>{if(document.source.includes("boom"))throw new Error("boom");return[{start:0,message:"Checked"}];}}}};',
       "a.md": "boom *word*\n",
@@ -309,7 +309,7 @@ describe("CLI", () => {
   });
   it("stops at a plugin rule that does not have the shape of a rule", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/case":"warn"}}',
+      "mdrefine.config.json": '{"plugins":["./plugin.mjs"],"rules":{"local/case":"warn"}}',
       "plugin.mjs":
         'export default {name:"local",rules:{case:{kind:"style",phase:"Inline",description:"Case",check:()=>[{start:0,message:"Case",edit:{start:0,end:1,text:"T"}}]}}};',
       "a.md": "text\n",
@@ -317,7 +317,7 @@ describe("CLI", () => {
     const checked = run(root, ["format", "--check", "."]);
     expect(checked.status).toBe(2);
     expect(checked.stderr).toBe(
-      'mdtools: Invalid rule local/case: its phase is "Inline", not "inline", "block", or "document".\n',
+      'mdrefine: Invalid rule local/case: its phase is "Inline", not "inline", "block", or "document".\n',
     );
   });
   it("applies literal exclusions without removing link targets", async () => {
@@ -358,15 +358,17 @@ describe("CLI", () => {
   });
   it("refuses ambiguous configuration files unless one is chosen explicitly", async () => {
     const root = await fixture({
-      "mdtools.config.json": '{"rules":{"style/emphasis":"off"}}',
-      "mdtools.config.jsonc": '{"rules":{"style/emphasis":"warn"}}',
+      "mdrefine.config.json": '{"rules":{"style/emphasis":"off"}}',
+      "mdrefine.config.jsonc": '{"rules":{"style/emphasis":"warn"}}',
       "note.md": "*keep*\n",
     });
     const ambiguous = run(root, ["format", "--check", "."]);
     expect(ambiguous.status).toBe(2);
-    expect(ambiguous.stderr).toContain("Multiple mdtools configuration files");
-    expect(run(root, ["format", "--check", "--config", "mdtools.config.json", "."]).status).toBe(0);
-    expect(run(root, ["format", "--check", "--config", "mdtools.config.jsonc", "."]).status).toBe(
+    expect(ambiguous.stderr).toContain("Multiple mdrefine configuration files");
+    expect(run(root, ["format", "--check", "--config", "mdrefine.config.json", "."]).status).toBe(
+      0,
+    );
+    expect(run(root, ["format", "--check", "--config", "mdrefine.config.jsonc", "."]).status).toBe(
       1,
     );
   });

@@ -19,6 +19,7 @@ import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
 import { unifiedDiff } from "./diff.js";
+import { warnLegacyConfig, warnLegacyDirectives } from "./deprecations.js";
 import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
@@ -42,14 +43,14 @@ const manifest = JSON.parse(
 ) as { version: string };
 // Subcommands inherit these settings, so they come before the commands.
 const program = new Command()
-  .name("mdtools")
+  .name("mdrefine")
   .description("Lint and format Markdown with explicit dialects and configurable rules.")
   .version(manifest.version, "-V, --version", "Print the version")
   .helpOption("-h, --help", "Print help for the command")
   .helpCommand("help [command]", "Print help for a command")
   // Commander starts its messages with "error: ", the tool with its name.
   .configureOutput({
-    outputError: (text, write) => write(`mdtools: ${text.replace(/^error: /, "")}`),
+    outputError: (text, write) => write(`mdrefine: ${text.replace(/^error: /, "")}`),
   })
   // Throw instead of exiting, so that a usage error can end with code 2.
   .exitOverride();
@@ -122,6 +123,7 @@ async function workspace(flags: Flags) {
   // configuration file in the root, with a message about a file the user never named.
   if (flags.root !== undefined) await checkRoot(flags.root);
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
+  warnLegacyConfig(loaded.file);
   return {
     ...loaded,
     root: path.resolve(flags.root ?? loaded.root),
@@ -172,7 +174,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   if (flags.fix)
     throw new Error(
       mode === "lint"
-        ? "unknown option '--fix': lint never changes files; 'mdtools format --write' applies the fixes."
+        ? "unknown option '--fix': lint never changes files; 'mdrefine format --write' applies the fixes."
         : "unknown option '--fix': format writes its changes with --write.",
     );
   if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
@@ -250,6 +252,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       });
       continue;
     }
+    warnLegacyDirectives(source, options);
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
       const result = await formatWithCode(source, { ...options, cwd: discovery.root });
@@ -338,7 +341,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     // A caller that passes every changed file can leave out those about ignored ones.
     for (const item of discovery.skipped)
       if (flags.warnIgnored !== false || !isIgnoredInput(item))
-        process.stderr.write(`mdtools: warning: ${skippedMessage(item, shown)}\n`);
+        process.stderr.write(`mdrefine: warning: ${skippedMessage(item, shown)}\n`);
     // An ignored document from stdin comes back unchanged, as in Prettier, so
     // that an editor that replaces its text with the output loses nothing.
     if (stdin && mode === "format" && !flags.check && !flags.diff)
@@ -438,7 +441,9 @@ program
   .option(...configOption)
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {
-    const { plugins } = await loadConfig(path.resolve("."), flags.config);
+    const loaded = await loadConfig(path.resolve("."), flags.config);
+    warnLegacyConfig(loaded.file);
+    const { plugins } = loaded;
     const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
       id,
       kind: rule.kind,
@@ -460,7 +465,7 @@ try {
   // as in ESLint and Prettier, so that it does not pass for findings.
   if (error instanceof CommanderError) process.exitCode = error.exitCode === 0 ? 0 : 2;
   else {
-    process.stderr.write(`mdtools: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(`mdrefine: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
   }
 }

@@ -833,7 +833,7 @@ describe("directories that could not be read", () => {
     );
   });
   it("can be suppressed like any other finding", () => {
-    const source = "<!-- mdtools-disable-next-line links/valid -->\n[in](locked/file.md)\n";
+    const source = "<!-- mdrefine-disable-next-line links/valid -->\n[in](locked/file.md)\n";
     expect(lint(source, { path: "Doc.md", config: valid("github"), workspace })).toEqual([]);
   });
   it.each([

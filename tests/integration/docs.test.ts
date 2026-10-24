@@ -133,7 +133,7 @@ describe("configuration schema", () => {
   it("accepts the repository's configuration files on its own, and is shipped", () => {
     const validate = new Ajv({ allErrors: true }).compile(published);
     const files = [
-      "mdtools.config.jsonc",
+      "mdrefine.config.jsonc",
       ...readdirSync(path.join(repository, "examples"), { recursive: true, encoding: "utf8" })
         .filter((name) => name.endsWith(".jsonc"))
         .map((name) => `examples/${name.split(path.sep).join("/")}`),

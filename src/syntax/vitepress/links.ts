@@ -25,7 +25,7 @@ function collect(document: Document): Bypassed {
       if (raw) {
         // Let the same attrs parser decide whether these bytes belong to the
         // link and set target/download; words inside quoted values are data.
-        const tokens = readVitePress(`[x](/mdtools-placeholder)${raw}`, document.vitepress);
+        const tokens = readVitePress(`[x](/mdrefine-placeholder)${raw}`, document.vitepress);
         ignored = tokens.some((token) =>
           token.children?.some(
             (child) =>

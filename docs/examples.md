@@ -8,13 +8,13 @@ this page with the tool.
 
 The commands run from the root of a [built
 checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up).
-With the installed package, use `npx mdtools` in place of
+With the installed package, use `npx mdrefine` in place of
 `node dist/cli/main.js`.
 
 ## Start from a configuration
 
 Copy one of five starting configurations to the root of your documents as
-`mdtools.config.jsonc`:
+`mdrefine.config.jsonc`:
 
 - [`examples/github.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/github.jsonc)
   for repositories rendered by GitHub.
@@ -36,7 +36,7 @@ Each wraps prose at 80 columns and chooses a link style; see
 `before/` as someone might write them, and `after/` exactly as `format --write`
 leaves them. The configuration adds a rule that no preset enables:
 
-[`examples/workspaces/repository-docs/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/before/mdtools.config.jsonc):
+[`examples/workspaces/repository-docs/before/mdrefine.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/repository-docs/before/mdrefine.config.jsonc):
 
 ```jsonc
 {
@@ -154,7 +154,7 @@ examples/workspaces/repository-docs/after/README.md:13:1: error links/valid: Mis
 whose `app.json` sets `"strictLineBreaks": true`, which [wrapping
 needs](obsidian.md#enable-wrapping).
 
-[`examples/workspaces/obsidian-vault/before/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/before/mdtools.config.jsonc):
+[`examples/workspaces/obsidian-vault/before/mdrefine.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/workspaces/obsidian-vault/before/mdrefine.config.jsonc):
 
 ```jsonc
 {
@@ -249,7 +249,7 @@ leaves underlined headings alone. [Plugins](plugins.md) describes the contract.
 // A plugin with one problem rule and one style rule.
 //
 // Problem rules report findings and never change a document. Style rules may
-// attach an edit, which `mdtools format` applies after checking that the
+// attach an edit, which `mdrefine format` applies after checking that the
 // document still means the same thing.
 
 /** Visit `node` and everything below it. */
@@ -339,7 +339,7 @@ export default {
 The configuration loads the plugin, enables its preset, and sets one rule's
 options:
 
-[`examples/plugin/mdtools.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/mdtools.config.jsonc):
+[`examples/plugin/mdrefine.config.jsonc`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/plugin/mdrefine.config.jsonc):
 
 ```jsonc
 {
@@ -421,7 +421,7 @@ import { format } from "mdrefine";
 const source = "A *short* note with __strong__ words and no final newline.";
 
 // Without `config`, the recommended preset applies and the GitHub dialect is
-// assumed. Pass the same object you would write in mdtools.config.jsonc to
+// assumed. Pass the same object you would write in mdrefine.config.jsonc to
 // choose a dialect or change rules.
 const result = format(source, {
   config: {
@@ -572,7 +572,7 @@ Forgejo:
 # Check Markdown on every pull request.
 #
 # Copy to .github/workflows/markdown.yml in a repository that lists mdrefine in
-# its devDependencies and has an mdtools.config.jsonc at its root.
+# its devDependencies and has an mdrefine.config.jsonc at its root.
 name: Markdown
 on:
   pull_request:
@@ -589,9 +589,9 @@ jobs:
           cache: npm
       - run: npm ci
       # Fails on any diagnostic, including warnings.
-      - run: npx --no-install mdtools lint --max-warnings 0
+      - run: npx --no-install mdrefine lint --max-warnings 0
       # Fails if any file is not formatted; never writes.
-      - run: npx --no-install mdtools format --check
+      - run: npx --no-install mdrefine format --check
 ```
 
 The script

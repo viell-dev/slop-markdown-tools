@@ -184,6 +184,15 @@ On GitHub, Forgejo, and Gitea, more fragments are valid:
 
 ## Forgejo and Gitea
 
+Version 0.4.1 adds automated comparisons against disposable Forgejo 17.0.0 and
+Gitea 28.2.0 instances. Authored fixtures and realistic documents at fixed seeds
+are checked through their file-rendering APIs; actual repository file pages also
+check heading IDs, explicit targets and fragment links, including headings
+inside definition descriptions. The evidence covers those host versions and
+default rendering settings. Custom hard-break or math settings, themes and
+browser math layout need separate validation. Weekly adversarial generation
+discovers limits without becoming a release gate.
+
 Both render GitHub Markdown and more. The tool parses their documents as GitHub
 Markdown and protects the rest:
 

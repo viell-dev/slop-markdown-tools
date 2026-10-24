@@ -278,15 +278,15 @@ describe("style/list-indent", () => {
     ).toBe("- a %%note\n  more%% [[Page]]\n\n  %%\n  block\n  %%\n");
   });
   it("leaves a list that a suppression comment reaches as written", () => {
-    const region = "<!-- mdtools-disable style/list-indent -->\n\n-   a\n-   b\n";
+    const region = "<!-- mdrefine-disable style/list-indent -->\n\n-   a\n-   b\n";
     expect(formatted(region, config)).toBe(region);
-    const inside = "-   a\n\n    <!-- mdtools-disable-next-line style/list-indent -->\n    b\n";
+    const inside = "-   a\n\n    <!-- mdrefine-disable-next-line style/list-indent -->\n    b\n";
     expect(formatted(inside, config)).toBe(inside);
     expect(lint(inside, { config })).toEqual([]);
     // The comment ends the list above it; the list below it is another one.
     expect(
-      formatted("-   a\n<!-- mdtools-disable-next-line style/list-indent -->\n-   b\n", config),
-    ).toBe("- a\n<!-- mdtools-disable-next-line style/list-indent -->\n-   b\n");
+      formatted("-   a\n<!-- mdrefine-disable-next-line style/list-indent -->\n-   b\n", config),
+    ).toBe("- a\n<!-- mdrefine-disable-next-line style/list-indent -->\n-   b\n");
   });
 });
 
@@ -349,7 +349,9 @@ describe("the list rules together", () => {
       expect(formatted("Text\n> 2. a\n>\n> Text\n>\n> * b\n", only(rules, dialect))).toBe(
         "Text\n> 2. a\n>\n> Text\n>\n> - b\n",
       );
-      expect(formatted("Text\n* 2. Step\n", only(rules, dialect))).toBe("Text\n- 2. Step\n");
+      expect(formatted("Text\n* 2. Step\n", only(rules, dialect))).toBe(
+        dialect === "obsidian" ? "Text\n* 2. Step\n" : "Text\n- 2. Step\n",
+      );
     },
   );
   it("format nested lists in one run, also with wrapping", () => {

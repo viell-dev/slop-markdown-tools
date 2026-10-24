@@ -7,27 +7,49 @@ const config: Config = {
   rules: { "style/emphasis": "warn", "style/strong": "warn" },
 };
 
+it.each([
+  ["mdrefine", "mdrefine"],
+  ["mdtools", "mdtools"],
+  ["mdtools", "mdrefine"],
+  ["mdrefine", "mdtools"],
+])("shares suppression state between %s disable and %s enable", (disable, enable) => {
+  const source = `<!-- ${disable}-disable -->\n\n*one*\n\n<!-- ${enable}-enable -->\n\n*two*\n`;
+  expect(format(source, { config }).output).toBe(source.replace("*two*", "_two_"));
+  const next = `Text <!-- ${disable}-disable-next-line style/emphasis -->\n# *one*\n`;
+  const settings: Config = {
+    extends: [],
+    rules: {
+      "style/emphasis": "error",
+      "style/block-spacing": "warn",
+    },
+  };
+  const result = format(next, { config: settings });
+  expect(result.output).toBe(next);
+  expect(result.diagnostics).toEqual([]);
+  expect(format(result.output, { config: settings }).output).toBe(result.output);
+});
+
 it.each(["\n", "\r\n", "\r"])(
   "applies named and all-rule transitions in source order with %j (#456)",
   (newline) => {
     const sections = [
       ["Before *one* and __two__.", "Before _one_ and **two**."],
-      ["<!-- mdtools-disable -->"],
+      ["<!-- mdrefine-disable -->"],
       ["A *one* and __two__."],
-      ["<!-- mdtools-enable style/emphasis -->"],
+      ["<!-- mdrefine-enable style/emphasis -->"],
       ["B *one* and __two__.", "B _one_ and __two__."],
-      ["<!-- mdtools-disable style/emphasis -->"],
+      ["<!-- mdrefine-disable style/emphasis -->"],
       ["C *one* and __two__."],
-      ["<!-- mdtools-enable -->"],
+      ["<!-- mdrefine-enable -->"],
       ["D *one* and __two__.", "D _one_ and **two**."],
-      ["<!-- mdtools-disable -->"],
+      ["<!-- mdrefine-disable -->"],
       ["E *one* and __two__."],
-      ["<!-- mdtools-enable style/emphasis, style/strong -->"],
+      ["<!-- mdrefine-enable style/emphasis, style/strong -->"],
       ["F *one* and __two__.", "F _one_ and **two**."],
-      ["<!-- mdtools-disable -->"],
+      ["<!-- mdrefine-disable -->"],
       ["G *one* and __two__."],
-      ["<!-- mdtools-enable style/emphasis -->"],
-      ["<!-- mdtools-enable style/emphasis -->"],
+      ["<!-- mdrefine-enable style/emphasis -->"],
+      ["<!-- mdrefine-enable style/emphasis -->"],
       ["H *one* and __two__.", "H _one_ and __two__."],
     ];
     const source = sections.map(([before]) => before).join(newline + newline) + newline;
@@ -49,15 +71,15 @@ it.each(["\n", "\r\n", "\r"])(
 
 it("keeps next-line suppression independent of region enables", () => {
   const source = [
-    "<!-- mdtools-disable -->",
-    "<!-- mdtools-enable style/emphasis -->",
-    "<!-- mdtools-disable-next-line -->",
+    "<!-- mdrefine-disable -->",
+    "<!-- mdrefine-enable style/emphasis -->",
+    "<!-- mdrefine-disable-next-line -->",
     "A *one* and __two__.",
     "",
     "B *one* and __two__.",
     "",
-    "<!-- mdtools-enable -->",
-    "<!-- mdtools-disable-next-line style/emphasis -->",
+    "<!-- mdrefine-enable -->",
+    "<!-- mdrefine-disable-next-line style/emphasis -->",
     "C *one* and __two__.",
     "",
     "D *one* and __two__.",
@@ -73,7 +95,7 @@ it("keeps next-line suppression independent of region enables", () => {
 });
 
 it("does not enable a rule disabled by configuration", () => {
-  const source = "<!-- mdtools-disable -->\n\n<!-- mdtools-enable -->\n\n*one* __two__\n";
+  const source = "<!-- mdrefine-disable -->\n\n<!-- mdrefine-enable -->\n\n*one* __two__\n";
   const options = {
     config: { ...config, rules: { ...config.rules, "style/emphasis": "off" as const } },
   };
@@ -83,7 +105,7 @@ it("does not enable a rule disabled by configuration", () => {
 
 it("still suppresses an edit that reaches across a disabled region", () => {
   const source =
-    "<!-- mdtools-disable -->\n\n*one*\n\n<!-- mdtools-enable local/span -->\n\n*two*\n";
+    "<!-- mdrefine-disable -->\n\n*one*\n\n<!-- mdrefine-enable local/span -->\n\n*two*\n";
   const plugin: Plugin = {
     name: "local",
     rules: {

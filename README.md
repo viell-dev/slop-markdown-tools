@@ -39,7 +39,7 @@ Weather Station collects *temperature*, *humidity*, and *pressure* readings from
 | Temperature | °C |
 ```
 
-`npx mdtools format --write` with the `recommended` and `github` presets turns
+`npx mdrefine format --write` with the `recommended` and `github` presets turns
 it into:
 
 ```markdown
@@ -56,15 +56,14 @@ a sensor board.
 
 ## Install
 
-mdrefine needs Node.js 22.12 or newer. The package is `mdrefine`, and its
-command is `mdtools`:
+mdrefine needs Node.js 22.12 or newer:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.4.0
-npx mdtools lint
-npx mdtools format --diff
-npx mdtools format --write
-npx mdtools format --check
+npm install --save-dev --save-exact mdrefine@0.4.1
+npx mdrefine lint
+npx mdrefine format --diff
+npx mdrefine format --write
+npx mdrefine format --check
 ```
 
 `lint` reports and never writes. `format` shows a diff, writes with `--write`,
@@ -72,7 +71,7 @@ and with `--check` fails when a document would change.
 
 ## Configure
 
-`mdtools.config.jsonc` at the root of the documents:
+`mdrefine.config.jsonc` at the root of the documents:
 
 ```jsonc
 {
