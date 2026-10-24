@@ -320,7 +320,7 @@ describe("filesystem safeguards", () => {
     await linkDirectory(path.join(root, "folder"), path.join(root, "linked"));
     const named = run(root, ["lint", "linked"]);
     expect(named.status).toBe(2);
-    expect(named.stderr).toBe("mdtools: Refusing symbolic-link input: linked\n");
+    expect(named.stderr).toBe("mdrefine: Refusing symbolic-link input: linked\n");
     expect((await discover(root, [], [])).selected).toEqual(["folder/target.md"]);
     // A path through the link names the file that the link leads to.
     const through = run(root, ["lint", "--json", path.join("linked", "target.md")]);

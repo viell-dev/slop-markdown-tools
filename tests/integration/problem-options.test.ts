@@ -20,7 +20,7 @@ it("uses configured problem rules identically in the API, CLI and path overrides
   const source =
     "Preamble.\n\n## Page\n\n### Setup\n\n## Other\n\n#### Setup\n\n```JS metadata\nx\n```\n";
   const root = await fixture({
-    "mdtools.config.json": JSON.stringify(config),
+    "mdrefine.config.json": JSON.stringify(config),
     "note.md": source,
     "allowed/note.md": source,
   });
@@ -47,7 +47,7 @@ it("lets custom front-matter titles satisfy initial-heading and single-title tog
       "structure/single-title": ["error", { frontMatterTitle: "^page_name:" }],
     },
   };
-  const root = await fixture({ "mdtools.config.json": JSON.stringify(config) });
+  const root = await fixture({ "mdrefine.config.json": JSON.stringify(config) });
   const source = "---\npage_name: Example\n---\n\n## Section\n";
   const result = run(
     root,
@@ -63,7 +63,7 @@ it("lets custom front-matter titles satisfy initial-heading and single-title tog
 it("reports an invalid title pattern as a configuration error without writing", async () => {
   const source = "# Page\n";
   const root = await fixture({
-    "mdtools.config.json": JSON.stringify({
+    "mdrefine.config.json": JSON.stringify({
       extends: [],
       rules: { "structure/initial-heading": ["error", { frontMatterTitle: "[" }] },
     }),

@@ -187,7 +187,7 @@ it("uses a nested repository's own rules without scanning unrelated nested paths
 it("keeps ignored stdin text unchanged in formatting and reporting modes", async () => {
   const root = await fixture({
     ".gitignore": "*.md\n",
-    "mdtools.config.json": '{"extends":[],"rules":{"style/emphasis":"warn"}}',
+    "mdrefine.config.json": '{"extends":[],"rules":{"style/emphasis":"warn"}}',
   });
   const before = await snapshot(root);
   const filepath = ["-", "--stdin-filepath", "new/sub/note.md"];

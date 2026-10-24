@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, copyFile, readFile, writeFile, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -14,7 +14,7 @@ assert(npm, "Run this check through npm run test:package.");
  * repository's cache, so nothing is installed globally.
  */
 const pnpm = "pnpm@12.14.0";
-const directory = await mkdtemp(path.join(tmpdir(), "mdtools-package-"));
+const directory = await mkdtemp(path.join(tmpdir(), "mdrefine-package-"));
 const repository = process.cwd();
 const cache = path.join(repository, ".npm-cache");
 const manifest = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
@@ -132,7 +132,7 @@ process.stdout.write([format("A *small* note.\\n").output.trim(), typeof discove
       ],
       project,
     ),
-    `A _small_ note.|function|function|mdtools configuration|${manifest.version}`,
+    `A _small_ note.|function|function|mdrefine configuration|${manifest.version}`,
   );
   // The filesystem entry discovers the consumer's own documents.
   await writeFile(path.join(project, "note.md"), "A *small* note.\n");
@@ -172,11 +172,19 @@ process.stdout.write(result.output);`,
     `${fence}js\nconst x = 1;\n${fence}\n`,
   );
   // The command finds its own dependencies from where it is installed.
-  const command = path.join(project, "node_modules", manifest.name, manifest.bin.mdtools);
+  const command = path.join(project, "node_modules", manifest.name, manifest.bin.mdrefine);
   assert.equal(
     runNode([command, "format", "-", "--root", project], project, "A *small* note.\n"),
     "A _small_ note.\n",
   );
+  const legacy = spawnSync(
+    process.execPath,
+    [path.join(project, "node_modules", manifest.name, manifest.bin.mdtools), "--version"],
+    { cwd: project, encoding: "utf8" },
+  );
+  assert.equal(legacy.status, 0, legacy.stderr);
+  assert.equal(legacy.stdout.trim(), manifest.version);
+  assert.match(legacy.stderr, /mdtools names are deprecated.*0\.5\.0/);
   await writeFile(path.join(project, "consumer.mts"), consumerModule);
   await writeFile(path.join(project, "consumer.cts"), consumerCommonJs);
   execFileSync(
@@ -241,7 +249,7 @@ try {
   await mkdir(hoisted);
   await writeFile(
     path.join(hoisted, "package.json"),
-    JSON.stringify({ private: true, type: "module", scripts: { cli: "mdtools" } }),
+    JSON.stringify({ private: true, type: "module", scripts: { cli: "mdrefine" } }),
   );
   runNpm(
     ["install", tarball, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
@@ -250,15 +258,24 @@ try {
   const installed = path.join(hoisted, "node_modules", manifest.name);
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.equal(metadata.version, manifest.version);
-  assert.equal(metadata.bin.mdtools, "dist/cli/main.js");
+  assert.equal(metadata.bin.mdrefine, "dist/cli/main.js");
+  assert.equal(metadata.bin.mdtools, "dist/cli/mdtools.js");
   assert(
-    (await readFile(path.join(installed, metadata.bin.mdtools), "utf8")).startsWith(
+    (await readFile(path.join(installed, metadata.bin.mdrefine), "utf8")).startsWith(
       "#!/usr/bin/env node\n",
     ),
   );
   // npm scripts exercise the actual installed .bin shim on Windows and POSIX.
   assert.equal(
     runNpm(["run", "--silent", "cli", "--", "--version"], hoisted).trim(),
+    manifest.version,
+  );
+  assert.equal(
+    runNpm(["exec", "--no", "--", "mdrefine", "--version"], hoisted).trim(),
+    manifest.version,
+  );
+  assert.equal(
+    runNpm(["exec", "--no", "--", "mdtools", "--version"], hoisted).trim(),
     manifest.version,
   );
   assert.equal(
@@ -309,6 +326,47 @@ try {
     strict,
   );
   await checkInstalled(strict);
+
+  // Exercise the naming transition as an upgrade from the last old-name release.
+  // Both installed shims and an unchanged legacy configuration must keep working.
+  const upgrade = path.join(directory, "upgrade");
+  await mkdir(upgrade);
+  await writeFile(path.join(upgrade, "package.json"), JSON.stringify({ private: true }));
+  runNpm(
+    ["install", "mdrefine@0.4.0", "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
+    upgrade,
+  );
+  assert.equal(runNpm(["exec", "--no", "--", "mdtools", "--version"], upgrade).trim(), "0.4.0");
+  runNpm(
+    ["install", tarball, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
+    upgrade,
+  );
+  for (const command of ["mdrefine", "mdtools"])
+    assert.equal(
+      runNpm(["exec", "--no", "--", command, "--version"], upgrade).trim(),
+      manifest.version,
+    );
+  await writeFile(
+    path.join(upgrade, "mdtools.config.json"),
+    JSON.stringify({ extends: [], rules: { "style/emphasis": "off" } }),
+  );
+  await writeFile(path.join(upgrade, "note.md"), "A *legacy* note.\n");
+  runNpm(
+    [
+      "exec",
+      "--no",
+      "--",
+      "mdrefine",
+      "format",
+      "--check",
+      "--max-warnings",
+      "0",
+      "--root",
+      upgrade,
+      "note.md",
+    ],
+    upgrade,
+  );
 
   if (process.argv.includes("--retain")) {
     const artifacts = path.join(repository, "artifacts");

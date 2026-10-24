@@ -6,15 +6,14 @@ mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.4.0
-npx --no-install mdtools --help
+npm install --save-dev --save-exact mdrefine@0.4.1
+npx --no-install mdrefine --help
 ```
 
-The package is `mdrefine`; its command is `mdtools`. `npx` runs the command from
-the project, and `--no-install` stops it from downloading a package when the
-project has none; the examples below leave it out. The exact version lets you
-choose when a release that formats differently reaches your documents; see
-[versions](versions.md).
+`npx` runs the `mdrefine` command from the project, and `--no-install` stops it
+from downloading a package when the project has none; the examples below leave
+it out. The exact version lets you choose when a release that formats
+differently reaches your documents; see [versions](versions.md).
 
 ## Lint
 
@@ -22,7 +21,7 @@ Run the commands from the root of your documents, or point them there with
 `--root`:
 
 ```sh
-npx mdtools lint
+npx mdrefine lint
 ```
 
 `lint` reports what the enabled rules find and never changes a file. Without
@@ -35,9 +34,9 @@ scripts can read, or `--max-warnings 0` to fail on warnings too.
 ## Preview and write
 
 ```sh
-npx mdtools format --diff
-npx mdtools format --write
-npx mdtools format --check
+npx mdrefine format --diff
+npx mdrefine format --write
+npx mdrefine format --check
 ```
 
 `--diff` prints what formatting would change, and is also what `format` does
@@ -49,7 +48,7 @@ need a person, such as a broken link.
 
 ## Choose a preset and a dialect
 
-Create `mdtools.config.jsonc` at the root of your documents:
+Create `mdrefine.config.jsonc` at the root of your documents:
 
 ```jsonc
 {

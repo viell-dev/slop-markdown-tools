@@ -203,7 +203,7 @@ it("respects suppression regions and widened range scope", async () => {
   expect(scoped.scope).toEqual([
     { start: source.lastIndexOf(fence + "js") - 1, end: scoped.output.length },
   ]);
-  const disabled = `<!-- mdtools-disable ${"engine/code-formatter"} -->\n\n${block()}\n<!-- mdtools-enable engine/code-formatter -->\n\n${block("last")}`;
+  const disabled = `<!-- mdrefine-disable ${"engine/code-formatter"} -->\n\n${block()}\n<!-- mdrefine-enable engine/code-formatter -->\n\n${block("last")}`;
   expect((await formatWithCode(disabled, { cwd: root, config: config() })).output).toBe(
     disabled.replace("last", "formatted"),
   );
@@ -214,7 +214,7 @@ it("matches CLI preview, check, JSON, stdin, and writes", async () => {
   const { root, config } = await setup();
   const source = block();
   await writeFile(path.join(root, "note.md"), source);
-  await writeFile(path.join(root, "mdtools.config.json"), JSON.stringify(config()));
+  await writeFile(path.join(root, "mdrefine.config.json"), JSON.stringify(config()));
   const expected = await formatWithCode(source, { cwd: root, path: "note.md", config: config() });
   const checked = run(root, ["format", "--check", "--json", "note.md"]);
   expect(checked.status, checked.stderr).toBe(1);
@@ -261,7 +261,7 @@ it("preserves separately chosen fence lengths when fence styling is disabled", a
 
 it("keeps fence runs whose style rule is suppressed while formatting their code", async () => {
   const { root, config } = await setup();
-  const source = `<!-- mdtools-disable style/code-fence -->\n\n${fence}\`\`\`js\nold\n${fence}\`\`\`\`\`\n`;
+  const source = `<!-- mdrefine-disable style/code-fence -->\n\n${fence}\`\`\`js\nold\n${fence}\`\`\`\`\`\n`;
   const result = await formatWithCode(source, {
     cwd: root,
     config: { ...config(), extends: ["recommended"] },

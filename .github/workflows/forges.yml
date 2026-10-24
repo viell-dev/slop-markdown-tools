@@ -1,0 +1,83 @@
+name: Forges
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  pull_request:
+    paths:
+      - src/config/**
+      - src/core/**
+      - src/rules/**
+      - src/syntax/**
+      - src/index.ts
+      - package.json
+      - package-lock.json
+      - scripts/build-parser.mjs
+      - scripts/parser-patches.mjs
+      - scripts/parser-labels.mjs
+      - scripts/parser-packages.json
+      - scripts/rendering.mjs
+      - scripts/renderer-*.mjs
+      - scripts/renderer-known-differences.json
+      - scripts/forge-*.mjs
+      - scripts/forge-images.json
+      - .github/workflows/forges.yml
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Realistic regression gate or adversarial discovery
+        type: choice
+        options: [adversarial, realistic]
+        default: adversarial
+      seed:
+        description: Seed or none; adversarial is random when empty, realistic uses fixed seeds
+        required: false
+  workflow_call:
+    inputs:
+      profile:
+        type: string
+        default: realistic
+      seed:
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: forges-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Compare official disposable hosts
+        env:
+          PROFILE:
+            ${{ github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic' }}
+          SEED: ${{ inputs.seed }}
+        run: node scripts/forge-rendering.mjs
+      - name: Validate deterministic gate evidence
+        if: ${{ github.event_name == 'pull_request' || github.workflow == 'Release' }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
+          import { validateForgeEvidence } from './scripts/forge-evidence.mjs';
+          const report = JSON.parse(readFileSync('artifacts/forge-rendering/report.json', 'utf8'));
+          validateRendererEvidence(report);
+          validateForgeEvidence(report);
+          JS
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: forges
+          path: artifacts/forge-rendering/
+          if-no-files-found: error

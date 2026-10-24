@@ -133,9 +133,9 @@ const strings = { type: "array", items: { type: "string" } };
  */
 export const configSchema: JsonSchemaObject = deepFreeze({
   $schema: "http://json-schema.org/draft-07/schema#",
-  title: "mdtools configuration",
+  title: "mdrefine configuration",
   description:
-    "Configuration of the mdtools command of mdrefine: https://viell-dev.github.io/slop-markdown-tools/configuration.html",
+    "Configuration of the mdrefine command of mdrefine: https://viell-dev.github.io/slop-markdown-tools/configuration.html",
   type: "object",
   additionalProperties: false,
   properties: {

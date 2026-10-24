@@ -86,7 +86,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(run(root, ["format", "-"], source).stdout).toBe(source);
     const preset = await vault(undefined, {
       "Callout.md": source,
-      "mdtools.config.jsonc": '{ "extends": ["recommended", "obsidian"] }',
+      "mdrefine.config.jsonc": '{ "extends": ["recommended", "obsidian"] }',
     });
     expect(run(preset, ["format", "-"], source).stdout).toBe("> [!tip] Title\n> Text.\n");
   });
@@ -100,7 +100,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
       // Gitea joins the lines too, and keeps a `[[...]]` shortlink on one line.
       ['{ "overrides": [{ "files": ["Note.md"], "dialect": "gitea" }] }', "gitea", reflowed],
     ] as const) {
-      const configured = await vault(undefined, { "mdtools.config.jsonc": config });
+      const configured = await vault(undefined, { "mdrefine.config.jsonc": config });
       expect(dialect(configured, "Note.md"), config).toBe(expected);
       expect(
         run(configured, ["format", "-", "--stdin-filepath", "Note.md"], note).stdout,
@@ -110,7 +110,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     // A configuration that names no dialect leaves the vault's in place, also for
     // the files that an override naming another dialect does not match.
     const unnamed = await vault(undefined, {
-      "mdtools.config.jsonc":
+      "mdrefine.config.jsonc":
         '{ "rules": { "style/emphasis": "off" }, "overrides": [{ "files": ["docs/**"], "dialect": "github" }] }',
       "docs/page.md": "A page.\n",
     });
@@ -148,11 +148,11 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(await readFile(path.join(root, "vault/Note.md"), "utf8")).toBe(note);
     expect(await readFile(path.join(root, "vault/Folder/Deep.md"), "utf8")).toBe(note);
     // A dialect that the configuration names still takes the vault's place.
-    const named = await fixture({ ...tree, "mdtools.config.jsonc": '{ "dialect": "github" }' });
+    const named = await fixture({ ...tree, "mdrefine.config.jsonc": '{ "dialect": "github" }' });
     expect(dialect(named, "vault/Note.md")).toBe("github");
     const overridden = await fixture({
       ...tree,
-      "mdtools.config.jsonc": '{ "overrides": [{ "files": ["vault/**"], "dialect": "gitea" }] }',
+      "mdrefine.config.jsonc": '{ "overrides": [{ "files": ["vault/**"], "dialect": "gitea" }] }',
     });
     expect(dialect(overridden, "vault/Note.md")).toBe("gitea");
   });
@@ -160,7 +160,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     const root = await fixture({
       // Links are resolved within the whole workspace, where the notes of one vault
       // can match a link in another, so link checking is left out of this test.
-      "mdtools.config.jsonc": '{ "rules": { "links/valid": "off" } }',
+      "mdrefine.config.jsonc": '{ "rules": { "links/valid": "off" } }',
       "strict/.obsidian/app.json": '{"strictLineBreaks":true}',
       "strict/Note.md": note,
       "loose/.obsidian/app.json": '{"strictLineBreaks":false}',
@@ -201,7 +201,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     expect(run(root, ["format", "--root", "vault/Folder", "-"], note).stdout).toBe(note);
     const configured = await fixture({
       ...tree,
-      "vault/Folder/mdtools.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
+      "vault/Folder/mdrefine.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
     });
     const inside = path.join(configured, "vault/Folder");
     expect(parseExplanation(run(inside, ["config", "explain", "Note.md"]).stdout)).toMatchObject({
@@ -224,7 +224,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     const index = "See [the deep note](Sub/Note.md) and [[Sub/Note|again]] and [[Elsewhere]].\n";
     const tree = {
       "vault/.obsidian/app.json": "{}",
-      "vault/mdtools.config.jsonc":
+      "vault/mdrefine.config.jsonc":
         '{ "extends": ["recommended", "obsidian"], "rules": { "obsidian/strict-line-breaks": "off", "links/path": ["warn", { "style": "shortest" }] } }',
       "vault/Note.md": "# Top\n",
       "vault/Elsewhere.md": "# Elsewhere\n",
@@ -321,7 +321,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
   ])("treats a settings file that is %s as unverified", async (_, settings, reason) => {
     const paragraph = `${"A long line of prose in a vault. ".repeat(4).trim()}\n`;
     const root = await fixture({
-      "mdtools.config.json": '{"extends":["recommended","obsidian"]}',
+      "mdrefine.config.json": '{"extends":["recommended","obsidian"]}',
       ".obsidian/app.json": settings,
       "Note.md": paragraph,
     });
@@ -329,7 +329,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     const applied = run(root, ["format", "--write"]);
     expect(applied.status, applied.stderr).toBe(0);
     expect(applied.stderr).toBe(
-      `mdtools: warning: ${message}\n` +
+      `mdrefine: warning: ${message}\n` +
         "Note.md:1:1: warn obsidian/strict-line-breaks: Obsidian's \"Strict line breaks\" setting is not known to be on, so paragraphs are not reflowed. Turn it on in the vault's settings, which keep it in .obsidian/app.json; a program that calls the library passes strictLineBreaks to createWorkspace.\n" +
         "1 file(s) processed; 0 written.\n",
     );
@@ -361,7 +361,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     const above = run(root, ["lint", "--root", "docs/vault/Folder"]);
     expect(above.status, above.stderr).toBe(0);
     expect(above.stderr).toBe(
-      `mdtools: warning: ${text("docs/vault/.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
+      `mdrefine: warning: ${text("docs/vault/.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
     const report = run(root, ["lint", "--root", "docs/vault/Folder", "--json"]);
     expect(parseReport(report.stdout).skipped).toMatchObject([
@@ -369,7 +369,7 @@ describe("in an Obsidian vault, without a named dialect", () => {
     ]);
     const inside = run(path.join(root, "docs/vault/Folder"), ["lint"]);
     expect(inside.stderr).toBe(
-      `mdtools: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
+      `mdrefine: warning: ${text("../.obsidian/app.json")}\n1 file(s) linted; 0 error(s), 0 warning(s).\n`,
     );
   });
   it("recognizes a vault whose settings folder is a link to a shared one", async () => {

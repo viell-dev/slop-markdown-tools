@@ -1,7 +1,7 @@
 # Check Markdown on every pull request.
 #
 # Copy to .github/workflows/markdown.yml in a repository that lists mdrefine in
-# its devDependencies and has an mdtools.config.jsonc at its root.
+# its devDependencies and has an mdrefine.config.jsonc at its root.
 name: Markdown
 on:
   pull_request:
@@ -18,6 +18,6 @@ jobs:
           cache: npm
       - run: npm ci
       # Fails on any diagnostic, including warnings.
-      - run: npx --no-install mdtools lint --max-warnings 0
+      - run: npx --no-install mdrefine lint --max-warnings 0
       # Fails if any file is not formatted; never writes.
-      - run: npx --no-install mdtools format --check
+      - run: npx --no-install mdrefine format --check

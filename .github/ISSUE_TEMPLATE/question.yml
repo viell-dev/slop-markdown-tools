@@ -1,5 +1,5 @@
 name: Question
-description: Ask how mdtools works or how to use it, after checking the documentation
+description: Ask how mdrefine works or how to use it, after checking the documentation
 labels: ["Type: Question"]
 body:
   - type: textarea

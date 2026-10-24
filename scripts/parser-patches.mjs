@@ -2,8 +2,21 @@
 // Adapted dependency code retains its upstream MIT notices in the generated license artifact.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { repairLabelEnd, repairFootnoteSyntax } from "./parser-labels.mjs";
 
 const specs = {
+  labelEnd: {
+    name: "micromark-core-commonmark",
+    version: "2.0.4",
+    relative: "lib/label-end.js",
+    hash: "055ac0d7f62144011730fbd5bf81ee6f4cb40bdd8428b44d2f0febd3f1ea4364",
+  },
+  footnoteSyntax: {
+    name: "micromark-extension-gfm-footnote",
+    version: "2.1.0",
+    relative: "lib/syntax.js",
+    hash: "5fd8d63fcbb9918a0f7b92f2ba6adea3845e9cbf7f1e74ee239f4d018943ef6b",
+  },
   editMap: {
     name: "micromark-util-edit-map",
     version: "1.0.0",
@@ -280,6 +293,8 @@ function rewriteStrike(source) {
 }
 /** @param {string} kind @param {string} source @returns {string} */
 function repair(kind, source) {
+  if (kind === "labelEnd") return repairLabelEnd(source);
+  if (kind === "footnoteSyntax") return repairFootnoteSyntax(source);
   if (kind === "editMap")
     return once(source, "    vecs.push(events.slice());\n    events.length = 0;\n", "");
   if (kind === "footnote")
@@ -293,7 +308,7 @@ function repair(kind, source) {
     const start = source.indexOf("    let index = -1;", at);
     const end = source.indexOf("    return extraResolver", start);
     assert(at >= 0 && start > at && end > start);
-    return source.slice(0, start) + compactText + source.slice(end);
+    return registerTextResolverIdentity(source.slice(0, start) + compactText + source.slice(end));
   }
   if (kind === "code")
     return section(
@@ -307,16 +322,17 @@ function repair(kind, source) {
     assert(at > 0 && source.indexOf("function ", at + 10) === -1);
     return source.slice(0, at) + guardedAutolink;
   }
-  if (kind === "attention") return rewriteAttention(source);
-  if (kind === "strike") return rewriteStrike(source);
+  if (kind === "attention")
+    return addAttentionFastPaths(rewriteAttention(source), attentionFastPathsSource);
+  if (kind === "strike") return addStrikeNoCloserPath(rewriteStrike(source), strikeNoCloserSource);
   if (kind === "cjk")
-    return (
+    return registerCjkResolverIdentity(
       'import { mdrefineResolveAttention } from "mdrefine:core-attention";\n' +
-      once(
-        source,
-        "resolveAll: resolveAllAttention,",
-        'resolveAll(events, context) { return context.parser.constructs.disable.null.includes("mdrefineDeferredInline") ? resolveAllAttention(events, context) : mdrefineResolveAttention(events, context); },',
-      )
+        once(
+          source,
+          "resolveAll: resolveAllAttention,",
+          'resolveAll(events, context) { return context.parser.constructs.disable.null.includes("mdrefineDeferredInline") ? resolveAllAttention(events, context) : mdrefineResolveAttention(events, context); },',
+        ),
     );
   throw new Error(`Unknown repair ${kind}`);
 }
@@ -342,3 +358,319 @@ export function repairReviewedParserSource(kind, source, metadata) {
 }
 
 export { specs as sourceGuards, repair as repairParserSource };
+
+// Exact two-run batching and no-closer cleanup; source guards above stay unchanged.
+const attentionFastPathsSource = String.raw`
+function mdrefineHandleAttentionFast(events, context) {
+  const batch = context.parser.constructs.disable.null.includes("mdrefineHomogeneousAttention");
+  let hasSequence = false;
+  let hasCloser = false;
+  let shape = batch;
+  let sequenceEvents = 0;
+  let open = -1;
+  let close = -1;
+  // One shared pre-scan: no-closer detection and the potential batch shape.
+  // In particular, a nested call with no raw sequences returns after this scan,
+  // without a registry Set, scratch array, or a second event traversal.
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    if (event[1].type !== "attentionSequence") continue;
+    hasSequence = true;
+    sequenceEvents++;
+    if (event[0] === "enter" && event[1]._close) {
+      hasCloser = true;
+      // Without batch opt-in, finding a real closer is enough to hand off to
+      // the existing matching algorithm; the pre-scan need not finish.
+      if (!batch) return false;
+    }
+    if (!shape) continue;
+    if (event[0] === "exit") {
+      if (index !== open + 1 && index !== close + 1) shape = false;
+      continue;
+    }
+    if (
+      event[0] !== "enter" ||
+      events[index + 1]?.[0] !== "exit" ||
+      events[index + 1][1] !== event[1] ||
+      event[2] !== context ||
+      events[index + 1][2] !== context
+    ) {
+      shape = false;
+      continue;
+    }
+    if (open < 0) open = index;
+    else if (close < 0) close = index;
+    else shape = false;
+  }
+  if (!hasCloser) {
+    if (hasSequence) {
+      // Exact original cleanup. Do not clear flags or replace any tuple,
+      // token, point, or the array. A closing exit without an entering closer
+      // cannot match in either the stock or existing Fast walk.
+      let index = -1;
+      while (++index < events.length) {
+        if (events[index][1].type === "attentionSequence") {
+          events[index][1].type = "data";
+        }
+      }
+    }
+    return true;
+  }
+  if (!shape || sequenceEvents !== 4 || open < 0 || close <= open + 2) return false;
+  return mdrefineResolveHomogeneousAttention(events, context, open, close);
+}
+
+function mdrefineResolveHomogeneousAttention(events, context, open, close) {
+  const opening = events[open][1];
+  const closing = events[close][1];
+  if (!opening._open || !closing._close) return false;
+  const openingSize = opening.end.offset - opening.start.offset;
+  const closingSize = closing.end.offset - closing.start.offset;
+  if (
+    !Number.isSafeInteger(openingSize) ||
+    !Number.isSafeInteger(closingSize) ||
+    Math.min(openingSize, closingSize) < 4 ||
+    opening.end.offset > closing.start.offset
+  ) return false;
+  // Validate actual source, not artificial same-chunk endpoint coordinates.
+  // A legitimate run ending at EOF/EOL/tab/NUL can have _bufferIndex === -1.
+  // Stock's exact movePoint arithmetic below must remain unchanged even when
+  // it produces unusual _bufferIndex values at such a boundary.
+  const left = context.sliceSerialize(opening);
+  const right = context.sliceSerialize(closing);
+  const marker = left.charCodeAt(0);
+  if (left.length !== openingSize || right.length !== closingSize || (marker !== 42 && marker !== 95)) return false;
+  for (let index = 0; index < left.length; index++) if (left.charCodeAt(index) !== marker) return false;
+  for (let index = 0; index < right.length; index++) if (right.charCodeAt(index) !== marker) return false;
+  // Simulate only stock's two-candidate grammar before any mutation. It may
+  // consume unequal/two-way runs and may stop with both runs still present.
+  // No other raw candidate exists that could change this matcher choice.
+  let remainingOpening = openingSize;
+  let remainingClosing = closingSize;
+  let layerCount = 0;
+  while (remainingOpening && remainingClosing) {
+    if (
+      (opening._close || closing._open) &&
+      remainingClosing % 3 &&
+      (remainingOpening + remainingClosing) % 3 === 0
+    ) break;
+    const use = remainingOpening > 1 && remainingClosing > 1 ? 2 : 1;
+    remainingOpening -= use;
+    remainingClosing -= use;
+    layerCount++;
+  }
+  // In particular, a first-layer rule-of-three block declines before any
+  // mutation/callback. Tiny reductions keep the existing matcher as well.
+  if (layerCount < 2) return false;
+  if (
+    !mdrefineBalancedAttentionEvents(events, 0, open) ||
+    !mdrefineBalancedAttentionEvents(events, open + 2, close) ||
+    !mdrefineBalancedAttentionEvents(events, close + 2, events.length)
+  ) return false;
+  // All shape/source checks precede the registry allocation and any mutation.
+  const insideSpan = context.parser.constructs.insideSpan.null;
+  if (!mdrefineKnownHomogeneousPipeline(insideSpan)) return false;
+
+  const layers = [];
+  let currentOpening = openingSize;
+  let currentClosing = closingSize;
+  let interior;
+  for (let layer = 0; layer < layerCount; layer++) {
+    const use = currentOpening > 1 && currentClosing > 1 ? 2 : 1;
+    const start = { ...opening.end };
+    const end = { ...closing.start };
+    movePoint(start, -use);
+    movePoint(end, use);
+    const openingSequence = {
+      type: use > 1 ? "strongSequence" : "emphasisSequence",
+      start,
+      end: { ...opening.end },
+    };
+    const closingSequence = {
+      type: use > 1 ? "strongSequence" : "emphasisSequence",
+      start: { ...closing.start },
+      end,
+    };
+    const text = {
+      type: use > 1 ? "strongText" : "emphasisText",
+      start: { ...opening.end },
+      end: { ...closing.start },
+    };
+    const group = {
+      type: use > 1 ? "strong" : "emphasis",
+      start: { ...openingSequence.start },
+      end: { ...closingSequence.end },
+    };
+    opening.end = { ...openingSequence.start };
+    closing.start = { ...closingSequence.end };
+    if (interior === undefined) {
+      // One real call at stock's first reduction point, with the same input
+      // tuples and original-run endpoint mutations already visible.
+      // This call's actual cost is R(interior), not assumed linear.
+      interior = resolveAll(insideSpan, events.slice(open + 2, close), context);
+    }
+    layers.push({ openingSequence, closingSequence, text, group });
+    currentOpening -= use;
+    currentClosing -= use;
+  }
+  const output = [];
+  if (remainingOpening) {
+    // Stock retains the original token but creates fresh leftover tuples on
+    // every reduction. Reusing events[open]/events[open+1] would be inexact.
+    output.push(["enter", opening, context], ["exit", opening, context]);
+  }
+  for (let index = layers.length - 1; index >= 0; index--) {
+    const layer = layers[index];
+    output.push(
+      ["enter", layer.group, context],
+      ["enter", layer.openingSequence, context],
+      ["exit", layer.openingSequence, context],
+      ["enter", layer.text, context],
+    );
+  }
+  for (const event of interior) output.push(event);
+  for (const layer of layers) {
+    output.push(
+      ["exit", layer.text, context],
+      ["enter", layer.closingSequence, context],
+      ["exit", layer.closingSequence, context],
+      ["exit", layer.group, context],
+    );
+  }
+  if (remainingClosing) output.push(["enter", closing, context], ["exit", closing, context]);
+  mdrefineReplaceAttentionRegion(events, open, close + 2, output);
+  // The original walk has no further raw candidate to match, then performs
+  // its final left-to-right cleanup. Fully consumed tokens remain raw off-array.
+  if (remainingOpening) opening.type = "data";
+  if (remainingClosing) closing.type = "data";
+  return true;
+}
+
+// Preserve the supplied array and every surviving event tuple. The real first
+// interior pass may compact enough events to make delta negative: choose the
+// non-overlapping move direction from the actual final sizes. No splice,
+// chunked insertion, or unbounded argument/array spread is used.
+function mdrefineReplaceAttentionRegion(events, from, to, output) {
+  const oldLength = events.length;
+  const delta = output.length - (to - from);
+  if (delta > 0) {
+    events.length = oldLength + delta;
+    for (let index = oldLength - 1; index >= to; index--) {
+      events[index + delta] = events[index];
+    }
+  } else if (delta < 0) {
+    for (let index = to; index < oldLength; index++) {
+      events[index + delta] = events[index];
+    }
+  }
+  for (let index = 0; index < output.length; index++) events[from + index] = output[index];
+  events.length = oldLength + delta;
+}
+
+// Exact audited function identities; no token properties or public caches.
+const mdrefineHomogeneousResolverRoles = new WeakMap();
+export function mdrefineRegisterHomogeneousResolver(resolve, role) {
+  mdrefineHomogeneousResolverRoles.set(resolve, role);
+  return resolve;
+}
+mdrefineRegisterHomogeneousResolver(resolveAllAttention, "attention");
+
+function mdrefineKnownHomogeneousPipeline(constructs) {
+  if (!Array.isArray(constructs)) return false;
+  const seen = new Set();
+  let lastRole;
+  for (const construct of constructs) {
+    const resolve = construct.resolveAll;
+    // Same function-identity deduplication as micromark-util-resolve-all.
+    if (!resolve || seen.has(resolve)) continue;
+    seen.add(resolve);
+    const role = mdrefineHomogeneousResolverRoles.get(resolve);
+    if (role === undefined) return false;
+    lastRole = role;
+  }
+  return lastRole === "text";
+}
+
+function mdrefineBalancedAttentionEvents(events, from, to) {
+  const stack = [];
+  for (let index = from; index < to; index++) {
+    const [phase, token] = events[index];
+    if (phase === "enter") stack.push(token);
+    else if (phase !== "exit" || stack.pop() !== token) return false;
+  }
+  return stack.length === 0;
+}
+`;
+const strikeNoCloserSource = String.raw`
+function mdrefineHandleStrikeNoCloser(events) {
+  let hasSequence = false;
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    if (event[1].type !== "strikethroughSequenceTemporary") continue;
+    hasSequence = true;
+    // This is the stock matcher gate, not any '_close' field on any token.
+    if (event[0] === "enter" && event[1]._close) return false;
+  }
+  if (hasSequence) {
+    // Exact original cleanup; no flags, points, tokens or tuples are replaced.
+    let index = -1;
+    while (++index < events.length) {
+      if (events[index][1].type === "strikethroughSequenceTemporary") {
+        events[index][1].type = "data";
+      }
+    }
+  }
+  return true;
+}
+`;
+function addAttentionFastPaths(corrected, attentionFastPathsSource) {
+  // Preserve wrapper precedence: DeferredInline -> Original before any new
+  // scan or cleanup; raw generated callers keep the current matching path.
+  corrected = once(
+    corrected,
+    "function resolveAllAttentionFast(events, context) {",
+    "function resolveAllAttentionFast(events, context) {\n  if (mdrefineHandleAttentionFast(events, context)) return events;",
+  );
+  return corrected + "\n" + attentionFastPathsSource;
+}
+
+function addStrikeNoCloserPath(corrected, strikeNoCloserSource) {
+  corrected = once(
+    corrected,
+    "function resolveAllStrikethroughFast(events, context) {",
+    "function resolveAllStrikethroughFast(events, context) {\n    if (mdrefineHandleStrikeNoCloser(events)) return events;",
+  );
+  corrected = once(
+    corrected,
+    "    resolveAll: resolveAllStrikethrough\n",
+    '    resolveAll: mdrefineRegisterHomogeneousResolver(resolveAllStrikethrough, "strike")\n',
+  );
+  return registryImport + corrected + "\n" + strikeNoCloserSource;
+}
+
+function registerTextResolverIdentity(corrected) {
+  // Only the EXPORTED no-extra resolver. Do not mark initializer text/string
+  // callbacks, which can carry resolveAllLineSuffixes.
+  return (
+    registryImport +
+    once(
+      corrected,
+      "  resolveAll: createResolver()\n",
+      '  resolveAll: mdrefineRegisterHomogeneousResolver(createResolver(), "text")\n',
+    )
+  );
+}
+
+function registerCjkResolverIdentity(corrected) {
+  corrected = once(
+    corrected,
+    'import { mdrefineResolveAttention } from "mdrefine:core-attention";',
+    'import { mdrefineResolveAttention, mdrefineRegisterHomogeneousResolver } from "mdrefine:core-attention";',
+  );
+  // Kept after initialization; register the actual corrected method identity,
+  // retaining its original-resolver branch for external syntax plugins.
+  return corrected + '\nmdrefineRegisterHomogeneousResolver(attention.resolveAll, "attention");\n';
+}
+
+const registryImport =
+  'import { mdrefineRegisterHomogeneousResolver } from "mdrefine:core-attention";\n';

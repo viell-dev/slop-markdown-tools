@@ -700,9 +700,7 @@ describe("a first line that opens no front matter", () => {
         ["---\nText\n> *quote*\n", "---\nText\n> _quote_\n"],
         ["---\ntitle: a\n1) One\n", "---\ntitle: a\n\n1. One\n"],
       ] as const)
-        expect(formatted(source, preset(dialect))).toBe(
-          dialect === "obsidian" && source.startsWith("---") ? source : output,
-        );
+        expect(formatted(source, preset(dialect))).toBe(dialect === "obsidian" ? source : output);
     },
   );
   it.each(frontMatterDialects)(
@@ -1139,7 +1137,13 @@ describe("text that the parser read in place of a list", () => {
       "Text\n* -\n* b\n",
     ]) {
       expect(formatted(source, options), JSON.stringify(source)).toBe(source);
-      expect(lint(source, options), JSON.stringify(source)).toEqual([]);
+      expect(
+        lint(source, options).filter(
+          ({ message, edit }) =>
+            dialect !== "obsidian" || !message.startsWith("Left as written") || edit !== undefined,
+        ),
+        JSON.stringify(source),
+      ).toEqual([]);
     }
     // The text after them is formatted as before.
     expect(formatted("Text\n> 2. *a*\n\n*b*\n", options)).toBe("Text\n> 2. *a*\n\n_b_\n");
@@ -1556,10 +1560,10 @@ describe("list items that Live Preview ends at a lazy line", () => {
   it.each([
     // Without a lazy line, or without blocks after it in the item.
     ["2. a\n   b\n\n    c *d*\n", "2. a b\n\n    c _d_\n"],
-    ["- a *x*\nb\n", "- a _x_ b\n"],
-    ["- a\nb\n- c *d*\n", "- a b\n- c _d_\n"],
+    ["- a *x*\nb\n", "- a _x_\nb\n"],
+    ["- a\nb\n- c *d*\n", "- a\nb\n- c _d_\n"],
     // A lazy line in a block quote changes nothing that Live Preview shows.
-    ["> a\nb\n\n> c *d*\n", "> a b\n\n> c _d_\n"],
+    ["> a\nb\n\n> c *d*\n", "> a\nb\n\n> c _d_\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config, workspace })).toBe(output);
   });
@@ -1778,7 +1782,7 @@ describe("blocks that Obsidian reads into a fence that a list item leaves open",
     expect(formatted(source, { config })).toBe(source);
   });
   it.each([
-    ["- ```\n  a\n  ```\nb *c*\n", "- ```\n  a\n  ```\n\nb _c_\n"],
+    ["- ```\n  a\n  ```\nb *c*\n", "- ```\n  a\n  ```\nb _c_\n"],
     ["a *b*\n\n- ```\nc\n", "a _b_\n\n- ```\nc\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config })).toBe(output);
@@ -1823,7 +1827,7 @@ describe("tables that Obsidian reads otherwise", () => {
     ["# h\n| x | y |\n| - | - |\n", "# h\n\n| x   | y   |\n| --- | --- |\n"],
     ["x | y\n-|-\nw | z\n", "| x   | y   |\n| --- | --- |\n| w   | z   |\n"],
     // The parser reads this as Obsidian does: text of the block quote.
-    ["> a\n| x | y |\n| - | - |\n", "> a | x | y | | - | - |\n"],
+    ["> a\n| x | y |\n| - | - |\n", "> a\n| x | y |\n| - | - |\n"],
   ])("still formats %j", (source, output) => {
     expect(formatted(source, { config, workspace })).toBe(output);
   });
@@ -2689,7 +2693,7 @@ describe("processing selected ranges", () => {
     );
   });
   it("keeps suppressions and the whole-document safety check", () => {
-    const source = "<!-- mdtools-disable-next-line style/emphasis -->\nA *b*.\n\nC *d*.\n";
+    const source = "<!-- mdrefine-disable-next-line style/emphasis -->\nA *b*.\n\nC *d*.\n";
     expect(format(source, { ...emphasis, ranges: [at(source, "A", 1)] }).output).toBe(source);
     const unsafe: Plugin = {
       name: "unsafe",
@@ -2829,12 +2833,12 @@ describe("configuration and plugins", () => {
   });
   it("supports region and next-line suppressions without interpreting code examples", () => {
     const source =
-      "<!-- mdtools-disable style/emphasis -->\n\n*keep*\n\n<!-- mdtools-enable style/emphasis -->\n\n*change*\n\n<!-- mdtools-disable-next-line style/emphasis -->\n*also keep*\n";
+      "<!-- mdrefine-disable style/emphasis -->\n\n*keep*\n\n<!-- mdrefine-enable style/emphasis -->\n\n*change*\n\n<!-- mdrefine-disable-next-line style/emphasis -->\n*also keep*\n";
     const output = formatted(source);
     expect(output).toContain("*keep*");
     expect(output).toContain("_change_");
     expect(output).toContain("*also keep*");
-    const code = "```md\n<!-- mdtools-disable -->\n```\n\n*change*\n";
+    const code = "```md\n<!-- mdrefine-disable -->\n```\n\n*change*\n";
     expect(formatted(code)).toContain("_change_");
   });
   it("supports defaults, overrides, and explicit empty presets", () => {
@@ -3536,6 +3540,13 @@ it.each(["inline", "block", "document"] as const)(
       plugins: [plugin],
     });
     expect(result.output).toBe(source);
-    expect(result.diagnostics).toEqual([]);
+    expect(result.diagnostics).toMatchObject([
+      {
+        rule: "probe/marker",
+        severity: "warn",
+        message: "Left as written to preserve Obsidian rendering: Change marker",
+      },
+    ]);
+    expect(result.diagnostics[0]!.edit).toBeUndefined();
   },
 );

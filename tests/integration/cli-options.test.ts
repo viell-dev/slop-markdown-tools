@@ -8,21 +8,21 @@ describe("the command line", () => {
     const root = await fixture({ "note.md": "A note.\n" });
     // Up to 0.2.0-rc.2 these ended with code 1, the code for findings.
     for (const [args, message] of [
-      [["lint", "--bogus"], "mdtools: unknown option '--bogus'\n"],
-      [["lnt"], "mdtools: unknown command 'lnt'\n(Did you mean lint?)\n"],
-      [["lint", "--config"], "mdtools: option '--config <file>' argument missing\n"],
-      [["config", "explain"], "mdtools: missing required argument 'file'\n"],
+      [["lint", "--bogus"], "mdrefine: unknown option '--bogus'\n"],
+      [["lnt"], "mdrefine: unknown command 'lnt'\n(Did you mean lint?)\n"],
+      [["lint", "--config"], "mdrefine: option '--config <file>' argument missing\n"],
+      [["config", "explain"], "mdrefine: missing required argument 'file'\n"],
       [
         ["rules", "extra"],
-        "mdtools: too many arguments for 'rules'. Expected 0 arguments but got 1: extra.\n",
+        "mdrefine: too many arguments for 'rules'. Expected 0 arguments but got 1: extra.\n",
       ],
       [
         ["format", "--dialect", "gitlab"],
-        "mdtools: option '--dialect <dialect>' argument 'gitlab' is invalid. The dialects are commonmark, github, forgejo (alias: codeberg), gitea, obsidian, vitepress.\n",
+        "mdrefine: option '--dialect <dialect>' argument 'gitlab' is invalid. The dialects are commonmark, github, forgejo (alias: codeberg), gitea, obsidian, vitepress.\n",
       ],
       [
         ["format", "--check", "--write"],
-        "mdtools: Choose only one of --check, --diff, and --write.\n",
+        "mdrefine: Choose only one of --check, --diff, and --write.\n",
       ],
     ] as const) {
       const result = run(root, [...args]);
@@ -35,7 +35,7 @@ describe("the command line", () => {
       const result = run(root, args);
       expect(result.status, args.join(" ")).toBe(2);
       expect(result.stdout, args.join(" ")).toBe("");
-      expect(result.stderr, args.join(" ")).toMatch(/^Usage: mdtools /);
+      expect(result.stderr, args.join(" ")).toMatch(/^Usage: mdrefine /);
     }
     for (const args of [["--help"], ["help"], ["help", "lint"], ["lint", "--help"], ["-V"]]) {
       const result = run(root, args);
@@ -49,12 +49,12 @@ describe("the command line", () => {
     const linted = run(root, ["lint", "--fix"]);
     expect(linted.status).toBe(2);
     expect(linted.stderr).toBe(
-      "mdtools: unknown option '--fix': lint never changes files; 'mdtools format --write' applies the fixes.\n",
+      "mdrefine: unknown option '--fix': lint never changes files; 'mdrefine format --write' applies the fixes.\n",
     );
     const formatted = run(root, ["format", "--fix"]);
     expect(formatted.status).toBe(2);
     expect(formatted.stderr).toBe(
-      "mdtools: unknown option '--fix': format writes its changes with --write.\n",
+      "mdrefine: unknown option '--fix': format writes its changes with --write.\n",
     );
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A *note*.\n");
     // It is no option, so the help does not list it.
@@ -142,9 +142,9 @@ describe("the command line", () => {
     const linted = run(path.join(root, "docs"), ["lint", ...inputs]);
     expect(linted.status, linted.stderr).toBe(0);
     expect(linted.stderr).toBe(
-      `mdtools: warning: ${ignored("drafts/a.md", 'in drafts, which "docs/drafts/" in ../.gitignore matches')}\n` +
-        `mdtools: warning: ${settings("vault/.obsidian/app.json")}\n` +
-        `mdtools: warning: ${ignored("vendor/inner.md", "in vendor, a nested repository")}\n` +
+      `mdrefine: warning: ${ignored("drafts/a.md", 'in drafts, which "docs/drafts/" in ../.gitignore matches')}\n` +
+        `mdrefine: warning: ${settings("vault/.obsidian/app.json")}\n` +
+        `mdrefine: warning: ${ignored("vendor/inner.md", "in vendor, a nested repository")}\n` +
         "1 file(s) linted; 0 error(s), 0 warning(s).\n",
     );
     // The JSON report, like the library, names them from the root.
@@ -190,7 +190,7 @@ describe("the command line", () => {
           ? "EPERM: operation not permitted"
           : "EACCES: permission denied";
       const unreadable = (directory: string, detail = "") =>
-        `mdtools: warning: Skipped unreadable directory: ${directory} (${refused}${detail}). Its files are not processed, and links into it cannot be checked.\n`;
+        `mdrefine: warning: Skipped unreadable directory: ${directory} (${refused}${detail}). Its files are not processed, and links into it cannot be checked.\n`;
       const linted = run(path.join(root, "docs"), ["lint"]);
       expect(linted.status, linted.stderr).toBe(0);
       expect(linted.stderr).toBe(
@@ -200,8 +200,11 @@ describe("the command line", () => {
       );
       const report = parseReport(run(path.join(root, "docs"), ["lint", "--json"]).stdout);
       expect(report.skipped!.map((item: { message: string }) => item.message)).toEqual([
-        unreadable("docs/closed").slice(18, -1),
-        unreadable("docs/open", " for docs/open/.gitignore").slice(18, -1),
+        unreadable("docs/closed").slice("mdrefine: warning: ".length, -1),
+        unreadable("docs/open", " for docs/open/.gitignore").slice(
+          "mdrefine: warning: ".length,
+          -1,
+        ),
       ]);
     },
   );
@@ -225,7 +228,7 @@ describe("the command line", () => {
       "A.\n",
     );
     expect(outside.status).toBe(2);
-    expect(outside.stderr).toBe("mdtools: --stdin-filepath must be within the workspace.\n");
+    expect(outside.stderr).toBe("mdrefine: --stdin-filepath must be within the workspace.\n");
   });
   it("names the files that format --check would change, before the summary", async () => {
     const root = await fixture({
@@ -272,7 +275,7 @@ describe("the command line", () => {
   });
   it("applies --dialect to a frozen configuration without changing it", async () => {
     const root = await fixture({
-      "mdtools.config.mjs":
+      "mdrefine.config.mjs":
         'export default Object.freeze({ rules: Object.freeze({ "style/emphasis": "off" }) });',
       "note.md": "A *note*.\n",
     });
@@ -288,7 +291,7 @@ describe("the command line", () => {
   });
   it("explains a document of the workspace by its path, and no other", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": '{ "overrides": [{ "files": ["notes/**"], "dialect": "gitea" }] }',
+      "mdrefine.config.jsonc": '{ "overrides": [{ "files": ["notes/**"], "dialect": "gitea" }] }',
       "notes/a.md": "A note.\n",
       "other/b.md": "B note.\n",
     });
@@ -298,7 +301,7 @@ describe("the command line", () => {
     const result = parseExplanation(explained.stdout);
     expect(Object.keys(result)).toEqual(["root", "config", "path", "effective"]);
     expect(result).toMatchObject({
-      config: path.join(result.root, "mdtools.config.jsonc"),
+      config: path.join(result.root, "mdrefine.config.jsonc"),
       path: "notes/a.md",
       effective: { dialect: "gitea" },
     });
@@ -318,12 +321,12 @@ describe("the command line", () => {
       const outside = explain(root, ...args);
       expect(outside.status, args.join(" ")).toBe(2);
       expect(outside.stdout).toBe("");
-      expect(outside.stderr).toBe(`mdtools: Input is outside the workspace: ${args[0]}\n`);
+      expect(outside.stderr).toBe(`mdrefine: Input is outside the workspace: ${args[0]}\n`);
     }
   });
   it("lists the rules of the configuration's plugins, also as JSON", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": '{ "plugins": ["./plugin.mjs"] }',
+      "mdrefine.config.jsonc": '{ "plugins": ["./plugin.mjs"] }',
       "plugin.mjs":
         'export default { name: "local", rules: { report: { kind: "problem", description: "Reports\\n\\teverything.", check: () => [] } } };',
       "other/settings.json": "{}",

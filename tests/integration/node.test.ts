@@ -9,7 +9,7 @@ import { fixture, run, tree } from "./support.js";
 const config: Config = { extends: ["recommended", "github"], ignore: ["drafts/**"] };
 const note = `${"A long line of prose in a vault. ".repeat(4).trim()}\nAnd *more*.\n`;
 const files = {
-  "mdtools.config.json": JSON.stringify(config),
+  "mdrefine.config.json": JSON.stringify(config),
   ".gitignore": "generated/\n",
   "docs/guide.md": "# Guide\n\nSee [the reference](reference.md#section) and *more*.\n",
   "docs/reference.md": "# Reference\n\n## Section\n\nText.\n",
@@ -26,7 +26,7 @@ const files = {
 it("exports the same unified diff that the CLI prints for a changed document", async () => {
   const source = "A *small* note.\n";
   const root = await fixture({
-    "mdtools.config.json": JSON.stringify(config),
+    "mdrefine.config.json": JSON.stringify(config),
     "note.md": source,
   });
   const printed = run(root, ["format", "--diff", "note.md"]);

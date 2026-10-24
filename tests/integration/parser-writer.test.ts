@@ -62,6 +62,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       "package.json",
       "scripts/build-parser.mjs",
       "scripts/parser-patches.mjs",
+      "scripts/parser-labels.mjs",
       "scripts/parser-packages.json",
       "src/syntax/parser.generated.d.ts",
     ])

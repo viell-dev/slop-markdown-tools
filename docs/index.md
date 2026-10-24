@@ -26,10 +26,10 @@ markdownlint and Prettier, for Markdown documents.
 of their checks have a rule here so far.
 
 ```sh
-npx mdtools lint
-npx mdtools format --diff
-npx mdtools format --write
-npx mdtools format --check
+npx mdrefine lint
+npx mdrefine format --diff
+npx mdrefine format --write
+npx mdrefine format --check
 ```
 
 [Get started](quick-start.md), browse the [rules](rules.md), or see

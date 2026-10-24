@@ -6,7 +6,7 @@ them.
 
 ## Configure the vault
 
-Create `mdtools.config.jsonc` at the vault's root, next to `.obsidian/`:
+Create `mdrefine.config.jsonc` at the vault's root, next to `.obsidian/`:
 
 ```jsonc
 {
@@ -19,8 +19,8 @@ Run the commands from the vault's root, or pass it with `--root`, so that links
 are resolved across the whole vault:
 
 ```sh
-npx mdtools lint --root "/path/to/vault"
-npx mdtools format --root "/path/to/vault" --diff
+npx mdrefine lint --root "/path/to/vault"
+npx mdrefine format --root "/path/to/vault" --diff
 ```
 
 Without a configuration file, the notes are still read in the Obsidian dialect,
@@ -53,6 +53,30 @@ are not consistent, or inline syntax that runs from the title into the body. A
 title that is too long is reported by `reportUnbreakable`.
 
 ## Where Obsidian reads Markdown its own way
+
+### Visible boundary refusals
+
+Version 0.4.1 applies one conservative policy before the existing
+renderer-specific protections. Structural rules keep an adjacent paragraph and
+list, block quote, HTML block, table, fence, or definition together when there
+is no blank line between them. They also keep lazy continuation margins, a Tab
+after a container marker, and non-one ordered markers directly below text.
+Properly indented nested blocks and a callout's explicit title/body boundary
+remain eligible. Ordinary ATX headings beside paragraphs still get spacing. Text
+already protected as literal block HTML does not seed a Markdown continuation
+boundary; otherwise holding only one list marker could split a list whose
+markers are safe to change together.
+
+When a proposed style edit is held by this policy or an existing native
+protection, `lint` and `format` report
+`Left as written to preserve Obsidian rendering` under the original rule ID and
+its configured severity, without an edit. Suppression comments still apply. A
+held warning counts toward `--max-warnings`; set the rule to `error` to make it
+fail the check directly. Safe independent edits still apply. This does not
+create findings where a rule does not propose an edit, and it does not guarantee
+every unusual source form renders identically in both Obsidian views.
+
+### Existing protections
 
 Obsidian's Reading view and Live Preview read some Markdown otherwise than
 CommonMark, and otherwise than each other. Where formatting would change what a
@@ -192,10 +216,9 @@ paragraph text: a table or footnote definition directly below its closing fence
 is more of that text in Obsidian, so it stays as written. A separating blank
 line or a block that interrupts a paragraph still starts a block of its own.
 
-### Unreleased boundary protections
+### Boundary protections since 0.4.1
 
-The following additions are on the development branch and are not yet in the
-latest installable release:
+Version 0.4.1 adds these protections:
 
 - Lists connected through an adjacent quote, table or display formula keep both
   original marker and indentation units. Their adjacent separating boundary

@@ -97,7 +97,7 @@ function together(
   // blank line, and so would an unclosed code fence there on the renderers.
   if (takesLines(before) || endsInOpenFence(source, before)) return true;
   // Other tools, too, read a comment as applying to the line below it, and
-  // `mdtools-disable-next-line` does: a blank line would take that line's place.
+  // `mdrefine-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
   // Obsidian can keep a standalone comment in the following paragraph even
   // when the parser ends its block. Retain that next boundary (#357).
@@ -221,7 +221,7 @@ const blockSpacing: Rule = {
       return block !== undefined && block[0] <= from && to < block[1];
     };
     const directiveLines = new Set<number>();
-    if (source.includes("mdtools-"))
+    if (source.includes("mdrefine-") || source.includes("mdtools-"))
       walk(document.tree, "html", (node) => {
         if (directive(node.value)?.kind === "disable-next-line")
           directiveLines.add(node.position!.end.line);

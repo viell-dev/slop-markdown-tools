@@ -1,7 +1,27 @@
 # Command line
 
-The command is `mdtools`; with the package installed in a project, run it as
-`npx mdtools`.
+The command is `mdrefine`; with the package installed in a project, run it as
+`npx mdrefine`.
+
+## Earlier names
+
+The 0.4.x naming transition keeps the deprecated `mdtools` command, all
+`mdtools.config.*` filenames, and `mdtools-disable`,
+`mdtools-disable-next-line`, and `mdtools-enable` comments working. Replace each
+prefix with `mdrefine`; all old forms will be removed in 0.5.0. Formatting does
+not rename configuration files or rewrite suppression comments automatically.
+
+The CLI prints one migration notice on stderr per run when an old command,
+configuration name, or actual suppression comment is used. It is separate from
+document findings, JSON reports, and `--max-warnings`, so it does not change a
+clean check's exit code. Code examples mentioning old comments do not trigger
+the notice. The library remains silent.
+
+Use `npx mdrefine`, or `npx --package=mdrefine mdtools` when deliberately using
+the old command without an installation. `npx mdtools` without a local
+installation can fetch an unrelated package.
+
+## Commands
 
 | Command                 | What it does                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -12,8 +32,8 @@ The command is `mdtools`; with the package installed in a project, run it as
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
 Help and the version are printed on stdout, with exit code `0`. Without a
-command, `mdtools` prints the help on stderr and exits with code `2`, as it does
-for every mistake on the command line, such as an unknown option.
+command, `mdrefine` prints the help on stderr and exits with code `2`, as it
+does for every mistake on the command line, such as an unknown option.
 
 `rules` prints one line per rule: its ID, kind, and description, separated by
 tabs. It looks for the configuration from the current directory, as `lint` does,
@@ -109,7 +129,7 @@ hooks](integrations.md#git-hooks).
 With `-` as its only path, a command reads one document from stdin:
 
 ```sh
-npx mdtools format - --stdin-filepath notes/example.md < input.md > output.md
+npx mdrefine format - --stdin-filepath notes/example.md < input.md > output.md
 ```
 
 `--stdin-filepath` gives the document's path, which decides its configuration,
@@ -125,7 +145,7 @@ or nothing with `--check`; it cannot be combined with `--write`. `lint -` prints
 its findings. Neither prints a summary line. Stdin must be [UTF-8
 text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
 anything else stops the command with exit code `2` and a message such as
-`mdtools: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
+`mdrefine: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
 
 The redirection above, in a POSIX shell or in `cmd`, passes the bytes unchanged.
 PowerShell has no `<` operator, and text that it pipes into a program gains a
@@ -135,7 +155,7 @@ UTF-16, which the tool refuses to read. In PowerShell, run the redirection
 through `cmd`:
 
 ```powershell
-cmd /c "npx mdtools format - --stdin-filepath notes/example.md < input.md > output.md"
+cmd /c "npx mdrefine format - --stdin-filepath notes/example.md < input.md > output.md"
 ```
 
 ## Output
@@ -157,10 +177,10 @@ after the findings. A run over files ends with one summary line on stderr:
 Both add `; 1 could not be read` when a selected document [could not be
 read](#files-that-cannot-be-read-or-written), and `format --write` adds
 `; 1 could not be written`. Warnings about the run itself, such as a skipped
-directory, are printed as `mdtools: warning: …`, with paths from the current
+directory, are printed as `mdrefine: warning: …`, with paths from the current
 directory as well, and an error that stops the run, a mistake on the command
-line included, as `mdtools: …`. These lines are for people; a script should read
-the JSON report and the exit code.
+line included, as `mdrefine: …`. These lines are for people; a script should
+read the JSON report and the exit code.
 
 ### JSON report
 
@@ -311,5 +331,5 @@ is being written. The file can then be left incomplete, with part of the new
 content and part of the old, and a later run cannot repair it; keep documents
 that matter in version control or a backup. A program that reads the file at
 that moment can see it half written too. A crash during the trial write can
-leave the trial file behind; it is named `.mdtools-` followed by a random name
+leave the trial file behind; it is named `.mdrefine-` followed by a random name
 and `.tmp`, holds no document text, and can be deleted.

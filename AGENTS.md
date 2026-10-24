@@ -258,7 +258,7 @@ changed code or a concrete evidence gap warrants it.
 
 The narrowed renderer work, including general protections and visible skipped
 style findings, belongs to 0.4.x. The mdrefine naming migration introduces and
-deprecates names in 0.4.x; removing all mdtools compatibility forms belongs to
+deprecates names in 0.4.x; removing all mdrefine compatibility forms belongs to
 the 0.5.0 release PR.
 
 ## Project scope
@@ -382,9 +382,11 @@ it helps.
 ## Technical map
 
 - TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
-  `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdtools` command at
-  `dist/cli/main.js`. The names differ on purpose: package `mdrefine`, command
-  `mdtools`, configuration `mdtools.config.*`.
+  `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
+  `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
+  comments use `mdrefine-*`. All `mdtools` forms remain deprecated compatibility
+  aliases in 0.4.x and are removed together in the 0.5.0 release PR. The legacy
+  command has its own wrapper so Windows npm shims reliably emit the notice.
 - `src/syntax/` parses with micromark and mdast through the generated internal
   adapter and holds the Obsidian extensions; `src/config/` resolves presets,
   schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the
@@ -473,9 +475,9 @@ it helps.
 Follow [RELEASING.md](./RELEASING.md). Agents publish a release once it is
 ready, without asking: the owner authorized every release on 2026-10-18. A
 release is ready when its PR has merged after its review; the Release workflow
-then publishes only if CI passed on the commit it releases and GitHub's and
-Obsidian's rendering of the fixed documents agree before and after formatting at
-that commit. Never rerun publication for an existing version or tag, and never
-store an npm token in GitHub. For each release, check the GitHub publication
-settings, the workflow's result, and the registry provenance; the npm settings
-are the maintainer's to check when they change.
+then publishes only if CI passed on the commit it releases and GitHub, Obsidian,
+Forgejo and Gitea agree before and after formatting of the fixed realistic
+corpora at that commit. Never rerun publication for an existing version or tag,
+and never store an npm token in GitHub. For each release, check the GitHub
+publication settings, the workflow's result, and the registry provenance; the
+npm settings are the maintainer's to check when they change.

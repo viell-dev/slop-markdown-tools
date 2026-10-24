@@ -49,7 +49,7 @@ it("reports missing commands with exit 2 and still writes safe edits to both fil
     ]),
     extends: ["recommended"],
   };
-  await writeFile(path.join(root, "mdtools.config.json"), JSON.stringify(configured));
+  await writeFile(path.join(root, "mdrefine.config.json"), JSON.stringify(configured));
   await writeFile(path.join(root, "bad.md"), "A *word*.\n\n" + block());
   await writeFile(path.join(root, "good.md"), block("old", "rs"));
   const result = run(root, ["format", "--write", "--json", "bad.md", "good.md"]);
@@ -88,7 +88,7 @@ it("terminates the formatter's child process on a timeout", async () => {
 
 it("keeps a document changed during the formatter run instead of overwriting it", async () => {
   const { root, config } = await setup("rewrite");
-  await writeFile(path.join(root, "mdtools.config.json"), JSON.stringify(config()));
+  await writeFile(path.join(root, "mdrefine.config.json"), JSON.stringify(config()));
   await writeFile(path.join(root, "note.md"), block());
   const result = run(root, ["format", "--write", "--json", "note.md"]);
   expect(result.status).toBe(2);

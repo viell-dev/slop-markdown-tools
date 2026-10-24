@@ -6,8 +6,8 @@ file, the `recommended` preset applies and the dialect is
 
 ## Configuration files
 
-The file is named `mdtools.config.jsonc`, `mdtools.config.json`,
-`mdtools.config.mjs`, `mdtools.config.js`, or `mdtools.config.cjs`. The CLI
+The file is named `mdrefine.config.jsonc`, `mdrefine.config.json`,
+`mdrefine.config.mjs`, `mdrefine.config.js`, or `mdrefine.config.cjs`. The CLI
 looks for it in the directory given with `--root`, or else the current
 directory, and then in each directory above, up to the first one that is a Git
 repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or the
@@ -17,6 +17,24 @@ the workspace root unless `--root` names another; without a configuration file,
 it is the repository or vault where the search stopped, or else the current
 directory. Configuration files do not cascade: a file in a subdirectory is not
 merged with one above it.
+
+### Earlier names
+
+During 0.4.x, `mdtools.config.jsonc`, `.json`, `.mjs`, `.js`, and `.cjs` remain
+deprecated aliases of the corresponding `mdrefine.config.*` names. Rename the
+file rather than keeping both: two configuration files in one directory remain
+an error even when their prefixes differ. Explicit `--config` selection still
+works. Both names use the same JSON Schema; editor filename associations can
+include both prefixes during migration.
+
+The old `mdtools-disable`, `mdtools-disable-next-line`, and `mdtools-enable`
+comments also remain accepted, including mixed prefixes: `mdrefine-enable`
+re-enables what `mdtools-disable` turned off. Replace their prefixes manually;
+formatting leaves existing comments intact. All deprecated forms are removed in
+0.5.0. The CLI's [migration notice](cli.md#earlier-names) does not count as a
+document warning.
+
+### File contents
 
 JSONC allows comments and trailing commas. A JSON or JSONC file may start with a
 byte order mark, and a syntax error in one is reported with its line and column.
@@ -193,8 +211,8 @@ Optional entry settings:
 
 An array replaces inherited formatter entries; `false` disables them. Both forms
 work in presets and overrides. A suppression such as
-`<!-- mdtools-disable engine/code-formatter -->`, a suppression for all rules,
-or `mdtools-disable-next-line` before the opening fence skips a block.
+`<!-- mdrefine-disable engine/code-formatter -->`, a suppression for all rules,
+or `mdrefine-disable-next-line` before the opening fence skips a block.
 
 Markdown is formatted first, then selected code blocks in document order.
 Container prefixes, metadata, the document's line endings, and safe fence
@@ -286,21 +304,21 @@ that cannot be loaded stops the command with exit code `2`.
 ## Suppression comments
 
 ```markdown
-<!-- mdtools-disable style/wrap -->
+<!-- mdrefine-disable style/wrap -->
 
 Keep the wrapping in this region.
 
-<!-- mdtools-enable style/wrap -->
+<!-- mdrefine-enable style/wrap -->
 
-<!-- mdtools-disable-next-line style/emphasis -->
+<!-- mdrefine-disable-next-line style/emphasis -->
 Keep *this* delimiter.
 ```
 
-`mdtools-disable` turns rules off from the comment on, and `mdtools-enable`
+`mdrefine-disable` turns rules off from the comment on, and `mdrefine-enable`
 turns them on again; without rule names, they apply to every rule. A named
 enable also removes that rule's suppression after an all-rule disable, leaving
 other rules suppressed. It does not enable a rule that the configuration turns
-off. `mdtools-disable-next-line` applies to the next line only, even when it is
+off. `mdrefine-disable-next-line` applies to the next line only, even when it is
 blank, so place it directly above the line. A suppressed rule reports nothing
 there and changes nothing that touches the region, so a paragraph that crosses
 into it is left as written. A directive inside code is code, not a directive.
@@ -315,7 +333,7 @@ match it. The document need not exist, but like an input of `lint` it must lie
 inside the workspace.
 
 ```sh
-npx mdtools config explain notes/example.md
+npx mdrefine config explain notes/example.md
 ```
 
 It reads `--config`, `--root`, and `--dialect`, before or after `explain`.

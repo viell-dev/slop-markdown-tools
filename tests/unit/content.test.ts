@@ -136,7 +136,7 @@ describe("content rules in presets", () => {
   });
   it("respect suppression comments", () => {
     const source =
-      "<!-- mdtools-disable-next-line content/image-alt -->\n![](a.png)\n\n![](b.png)\n";
+      "<!-- mdrefine-disable-next-line content/image-alt -->\n![](a.png)\n\n![](b.png)\n";
     expect(check(source, "content/image-alt").map((item) => item.line)).toEqual([4]);
   });
 });

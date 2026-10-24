@@ -8,7 +8,7 @@ describe("paths and configuration files that cannot be used", () => {
     const result = run(root, args);
     expect(result.status, args.join(" ")).toBe(2);
     expect(result.stdout, args.join(" ")).toBe("");
-    expect(result.stderr, args.join(" ")).toBe(`mdtools: ${message}\n`);
+    expect(result.stderr, args.join(" ")).toBe(`mdrefine: ${message}\n`);
   };
   it("says what is wrong with a workspace root, an input, and a configuration file", async () => {
     const root = await fixture({ "note.md": "A note.\n", "folder/other.md": "Text.\n" });
@@ -54,12 +54,15 @@ describe("paths and configuration files that cannot be used", () => {
     }
   });
   it("names the configuration file whose content is at fault", async () => {
-    const cut = await fixture({ "mdtools.config.json": '{ "rules": ', "sub/note.md": "A note.\n" });
+    const cut = await fixture({
+      "mdrefine.config.json": '{ "rules": ',
+      "sub/note.md": "A note.\n",
+    });
     // Found by searching upward, the file is named with its full path.
     fails(
       path.join(cut, "sub"),
       ["lint"],
-      `Invalid JSON configuration in ${path.join(cut, "mdtools.config.json")} at line 1, column 12: a value is expected`,
+      `Invalid JSON configuration in ${path.join(cut, "mdrefine.config.json")} at line 1, column 12: a value is expected`,
     );
     const wrong = await fixture({
       "odd.jsonc": '{ "rules": 5 }',
@@ -78,7 +81,7 @@ describe("paths and configuration files that cannot be used", () => {
       'Invalid configuration in odd.jsonc: "rules" must be an object of rule IDs and their settings, not 5',
     );
     const script = await fixture({
-      "mdtools.config.mjs": "export default {\n",
+      "mdrefine.config.mjs": "export default {\n",
       "wrong.mjs": "export default { rules: 5 };\n",
       "throws.mjs": 'throw new Error("no settings today");\n',
       "note.md": "A note.\n",
@@ -87,7 +90,7 @@ describe("paths and configuration files that cannot be used", () => {
     expect(broken.status).toBe(2);
     expect(broken.stderr).toMatch(
       new RegExp(
-        `^mdtools: Cannot load configuration file ${path.join(script, "mdtools.config.mjs").replaceAll("\\", "\\\\")}: .+\\n$`,
+        `^mdrefine: Cannot load configuration file ${path.join(script, "mdrefine.config.mjs").replaceAll("\\", "\\\\")}: .+\\n$`,
       ),
     );
     fails(
@@ -126,23 +129,23 @@ describe("paths and configuration files that cannot be used", () => {
     );
     // A folder with the name of a configuration file is found, and is not one.
     const folder = await fixture({ "note.md": "A note.\n" });
-    await mkdir(path.join(folder, "mdtools.config.jsonc"));
+    await mkdir(path.join(folder, "mdrefine.config.jsonc"));
     fails(
       folder,
       ["lint"],
-      `Configuration file is not a file: ${path.join(folder, "mdtools.config.jsonc")}`,
+      `Configuration file is not a file: ${path.join(folder, "mdrefine.config.jsonc")}`,
     );
   });
   it("finds JavaScript configuration files and loads them as Node.js reads them", async () => {
     const esm = 'export default { rules: { "style/emphasis": "off" } };\n';
     const cjs = 'module.exports = { rules: { "style/emphasis": "off" } };\n';
     for (const files of [
-      { "mdtools.config.js": esm },
-      { "mdtools.config.js": cjs },
-      { "mdtools.config.js": esm, "package.json": '{ "type": "module" }' },
-      { "mdtools.config.js": cjs, "package.json": '{ "type": "commonjs" }' },
-      { "mdtools.config.cjs": cjs, "package.json": '{ "type": "module" }' },
-      { "sub/mdtools.config.cjs": cjs },
+      { "mdrefine.config.js": esm },
+      { "mdrefine.config.js": cjs },
+      { "mdrefine.config.js": esm, "package.json": '{ "type": "module" }' },
+      { "mdrefine.config.js": cjs, "package.json": '{ "type": "commonjs" }' },
+      { "mdrefine.config.cjs": cjs, "package.json": '{ "type": "module" }' },
+      { "sub/mdrefine.config.cjs": cjs },
     ]) {
       const root = await fixture({ ...files, "sub/note.md": "*keep*\n" });
       // Found from the documents' folder or above it, the file turns emphasis off.
@@ -150,8 +153,8 @@ describe("paths and configuration files that cannot be used", () => {
       expect(checked.stderr, JSON.stringify(files)).toBe("1 file(s) processed; 0 would change.\n");
       expect(checked.status).toBe(0);
     }
-    const both = await fixture({ "mdtools.config.js": esm, "mdtools.config.cjs": cjs });
-    fails(both, ["lint"], `Multiple mdtools configuration files in ${both}. Use --config.`);
+    const both = await fixture({ "mdrefine.config.js": esm, "mdrefine.config.cjs": cjs });
+    fails(both, ["lint"], `Multiple mdrefine configuration files in ${both}. Use --config.`);
     // Named explicitly, any of the three extensions is JavaScript.
     const named = await fixture({ "settings.cjs": cjs, "note.md": "*keep*\n" });
     expect(run(named, ["format", "--check", "--config", "settings.cjs"]).status).toBe(0);

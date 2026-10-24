@@ -34,14 +34,26 @@ surrounding Markdown must keep its meaning. Ordinary Markdown formatting and its
 fingerprint still compare code values exactly; the code tool is responsible for
 its programming-language semantics.
 
+Since 0.4.1, Obsidian's structural rules also apply a general conservative
+[boundary policy](obsidian.md#visible-boundary-refusals). Held style edits
+produce a finding under their original rule and severity. Existing renderer
+protections remain; a new difference is fixed only for plausibly authored
+CommonMark or documented dialect syntax that changes visible content. Exotic
+generated cases are recorded as limits and reconsidered when a real document
+demonstrates their impact. Fixed realistic corpora and regression fixtures gate
+delivery; adversarial generation is discovery only. These checks provide
+evidence for their inputs, not a complete specification of either closed-source
+Obsidian renderer.
+
 The comparison is only as good as the parser's reading:
 
 - It compares syntax trees, and does not run GitHub's, Forgejo's, Gitea's, or
   Obsidian's renderer. To find documents that renderers read otherwise than the
   parser, the tests format generated documents and CommonMark's examples and
   compare the HTML of commonmark.js and markdown-it before and after. A workflow
-  does the same with GitHub's renderer, and another compares Obsidian's Live
-  Preview and Reading view, with Obsidian running in Docker, for every change to
+  does the same with GitHub's renderer, another compares Obsidian's Live Preview
+  and Reading view, and the Forges workflow compares disposable Forgejo and
+  Gitea instances, including repository file anchors. They run for changes to
   parsing or formatting, every week, and before each release. Each difference
   found is tracked as an issue.
 - The VitePress dialect also compares a synchronous markdown-it reading,

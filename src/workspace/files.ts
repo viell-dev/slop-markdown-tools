@@ -1014,7 +1014,7 @@ function changedOnDisk(file: string, when: string): ReplacementRefused {
  * then makes the write itself fail, and the file's content is written back.
  */
 async function trialWrite(folder: string, size: number): Promise<void> {
-  const trial = path.join(folder, `.mdtools-${randomUUID()}.tmp`);
+  const trial = path.join(folder, `.mdrefine-${randomUUID()}.tmp`);
   const handle = await open(trial, "wx", 0o600);
   try {
     await handle.writeFile(randomBytes(size));

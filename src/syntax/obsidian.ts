@@ -1,5 +1,5 @@
 import type { Literal } from "mdast";
-import type { Extension, State, Tokenizer } from "micromark-util-types";
+import type { Extension, State, TokenizeContext, Tokenizer } from "micromark-util-types";
 import type { Extension as TreeExtension } from "mdast-util-from-markdown";
 
 /** An Obsidian wikilink, `[[target|label]]`, or embed, `![[target]]`, in the Obsidian dialect. */
@@ -49,8 +49,14 @@ declare module "micromark-util-types" {
   }
 }
 
+// Each text tokenizer keeps its own immutable source offsets. The extension
+// is shared across parses, so a single global range would suppress unrelated
+// documents. Failed scans retain no source, events or tree through this key.
+const barrenWiki = new WeakMap<TokenizeContext, [from: number, to: number]>();
+
 /** A tokenizer, not a pre-parse replacement: code, escapes, and fenced blocks stay opaque. */
 const tokenize: Tokenizer = function (effects, ok, nok) {
+  const opened = this.now().offset;
   let opening = "";
   let closing = "";
   let index = 0;
@@ -59,6 +65,10 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
   const start: State = (code) => {
     opening = code === 33 ? "![[" : code === 91 ? "[[" : code === 37 ? "%%" : "==";
     closing = opening.endsWith("[[") ? "]]" : opening;
+    if (opening.endsWith("[[")) {
+      const barren = barrenWiki.get(this);
+      if (barren && opened >= barren[0] && opened < barren[1]) return nok(code);
+    }
     effects.enter("obsidianLiteral");
     effects.enter("obsidianCommentData");
     return open(code);
@@ -70,8 +80,12 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
     return index === opening.length ? body : open;
   };
   const body: State = (code) => {
-    if (code === null || (opening !== "%%" && code < 0 && code !== -1 && code !== -2))
+    if (code === null || (opening !== "%%" && code < 0 && code !== -1 && code !== -2)) {
+      // Only a scan that found no closing pair proves the later suffix
+      // barren. Empty closed literals such as `[[]]` fail elsewhere.
+      if (opening.endsWith("[[")) barrenWiki.set(this, [opened, this.now().offset]);
       return nok(code);
+    }
     if (code < -2) {
       // Micromark subtokenizes each physical line separately. Expose every
       // line ending so a multiline inline comment can span more than two chunks.

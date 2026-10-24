@@ -215,7 +215,7 @@ fields: the semantic comparison looks at every field except `position` and
 `data`. Syntax that a parser reads as plain text is not safe to format merely
 for that; test the extension's meaning and its source preservation.
 
-Unreleased builds retain the original attention and strikethrough resolvers,
+Version 0.4.1 retains the original attention and strikethrough resolvers,
 including CJK emphasis, when any syntax plugin is present. This preserves the
 intermediate inline events that a custom tokenizer or resolver can observe; the
 other parser corrections still apply. Rule-only plugins keep the optimized

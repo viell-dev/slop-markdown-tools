@@ -45,6 +45,12 @@ weekly/manual discovery and never gates release. Each discovery since the last
 release receives an issue and is fixed within scope or recorded as a limit;
 publication does not wait for adversarial discovery to stop producing cases.
 
+The Forges workflow additionally validates both pinned host identities and
+nonzero actual repository-file comparisons with `validateForgeEvidence()`. Its
+file-mode API corpus and repository anchor controls must pass alongside GitHub
+and both Obsidian views. Custom forge settings and browser math layout remain
+outside that evidence.
+
 ## Prepare without publishing
 
 From a clean checkout with Node.js 24 and npm 10 or newer:
@@ -118,12 +124,10 @@ any failure publishes nothing:
   requires and unit coverage (`scripts/release-evidence.mjs`). It waits up to 40
   minutes for CI that is still running, so it can be dispatched right after the
   merge.
-- The Rendering and Obsidian workflows find no difference in GitHub's or
-  Obsidian's rendering before and after formatting at that commit. A release
-  compares only fixed documents, the Rendering check's fixed seeds and the
-  Obsidian check's fixtures, so that its result depends only on the commit and
-  the renderers; the random documents of the pull request runs look for new
-  differences, which get issues.
+- The Rendering, Obsidian and Forges workflows find no difference before and
+  after formatting at that commit. Each compares its regression fixtures and
+  realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
+  file views. Fresh adversarial documents remain discovery, outside the gate.
 - The version and its tag are unused.
 
 The workflow then builds and checks the package again, verifies the artifact's

@@ -46,7 +46,7 @@ describe("without a named dialect", () => {
     // A configuration that names no dialect is read the same way.
     const configured = await fixture({
       ...files,
-      "mdtools.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
+      "mdrefine.config.jsonc": '{ "rules": { "style/emphasis": "off" } }',
     });
     expect(dialect(configured, "outer-pipes.md")).toBe("github");
     expect(run(configured, ["format", "--check"]).status).toBe(0);
@@ -88,7 +88,7 @@ describe("without a named dialect", () => {
     const configured = await fixture({
       ...files,
       "outer-pipes.md": table,
-      "mdtools.config.jsonc": '{ "dialect": "commonmark" }',
+      "mdrefine.config.jsonc": '{ "dialect": "commonmark" }',
     });
     expect(dialect(configured, "outer-pipes.md")).toBe("commonmark");
     expect(run(configured, ["format", "-"], table).stdout).toBe(joined);
@@ -99,7 +99,7 @@ describe("without a named dialect", () => {
   });
   it("leaves the choice to a preset or an override that names a dialect", async () => {
     const root = await fixture({
-      "mdtools.config.jsonc": `{
+      "mdrefine.config.jsonc": `{
         "extends": ["recommended", "forgejo"],
         "overrides": [{ "files": ["plain/**"], "dialect": "commonmark" }],
       }`,

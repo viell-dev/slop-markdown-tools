@@ -8,7 +8,7 @@ same afterwards, and never in text that the parser reads where renderers read a
 list; see [how it works](design.md#safety-model).
 
 Enable and configure rules under `rules` in the
-[configuration](configuration.md#rules-and-severity). `npx mdtools rules` lists
+[configuration](configuration.md#rules-and-severity). `npx mdrefine rules` lists
 the built-in rules and those of the configuration's [plugins](plugins.md).
 
 🎨 marks a style rule, whose findings `format` fixes, and 🔍 a problem rule,
@@ -787,7 +787,7 @@ or what a comment applies to:
   last item ends in a fenced code block without its closing fence: renderers put
   the blank line into the code, although the parser does not.
 - A heading or list directly below an HTML comment or below a
-  `mdtools-disable-next-line` directive, which apply to the line below them.
+  `mdrefine-disable-next-line` directive, which apply to the line below them.
   After 0.4.0, the Obsidian dialect also retains the boundary after a standalone
   `%%` comment: adding a blank can split a native paragraph even when the parser
   reads a separate heading. Inline style edits below the comment remain
@@ -830,8 +830,8 @@ pairings too.
 After 0.4.0, Obsidian also retains both separators when a quote, table or
 display formula connects list items. Display math immediately below the final
 item stays inside it, including after a heading or code block; a table after
-those blocks also stays adjacent. See the [unreleased boundary
-protections](obsidian.md#unreleased-boundary-protections).
+those blocks also stays adjacent. See the [boundary
+protections](obsidian.md#boundary-protections-since-041).
 
 ## `style/code-fence`
 
@@ -1042,8 +1042,8 @@ joined line would read differently:
 After 0.4.0, Obsidian also retains a multiline span with one or two backticks
 and the following source in its inline block: Live Preview resets short code at
 the physical newline. Earlier independent inline text and later paragraphs can
-still format. The [unreleased boundary
-protections](obsidian.md#unreleased-boundary-protections) describe the
+still format. The [boundary
+protections](obsidian.md#boundary-protections-since-041) describe the
 conservative cases.
 
 Before:
@@ -1150,7 +1150,7 @@ keeps the number width in those units, while allowing same-width numbering and
 delimiter changes.
 
 Quoted blocks opened after a Tab have separate literal-source protection; see
-[Obsidian's unreleased boundaries](obsidian.md#unreleased-boundary-protections).
+[Obsidian's boundary protections](obsidian.md#boundary-protections-since-041).
 Ordinary space-only quoted margins remain eligible for list indentation.
 
 ## `style/list-marker`
@@ -1551,8 +1551,7 @@ still format.
 After 0.4.0, Obsidian also keeps a standalone one-line `$$…$$` formula on its
 physical line, with the adjacent separators, when joining would change Live
 Preview's display widget. Math already beside ordinary prose still wraps; see
-the [unreleased boundary
-protections](obsidian.md#unreleased-boundary-protections).
+the [boundary protections](obsidian.md#boundary-protections-since-041).
 
 After 0.4.0, Obsidian also leaves a multiline image description containing
 backticks unreflowed, where joining could turn displayed Live Preview source

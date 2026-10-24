@@ -1,0 +1,12 @@
+[
+  {
+    "name": "forgejo",
+    "version": "17.0.0",
+    "image": "codeberg.org/forgejo/forgejo:17.0.0@sha256:06d38310de496a10186d952bdad5ca764c153c8023ede8dfa0944c79a1dc5412"
+  },
+  {
+    "name": "gitea",
+    "version": "28.2.0",
+    "image": "docker.gitea.com/gitea:28.2.0@sha256:30777c91280d973fa02be48b1ade735bd6859e8f6f7af3b4444d519437852504"
+  }
+]

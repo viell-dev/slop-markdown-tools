@@ -116,7 +116,7 @@ describe.each(["\n", "\r\n", "\r"])("separator margins with %j (#590)", (newline
   });
 
   it.each([
-    ["obsidian", "style/block-spacing", "x\n- [ ] \n  b\n", "x\n\n- [ ] \n  b\n"],
+    ["obsidian", "style/block-spacing", "x\n- [ ] \n  b\n", "x\n- [ ] \n  b\n"],
     ["obsidian", "style/blank-lines", "x\n\n\n- [ ] \n  b\n", "x\n\n- [ ] \n  b\n"],
     ["github", "style/block-spacing", "# h\n$$\na\n$$\nb\n---\n", "# h\n\n$$\na\n$$\nb\n---\n"],
   ] as const)(
@@ -127,6 +127,12 @@ describe.each(["\n", "\r\n", "\r"])("separator margins with %j (#590)", (newline
       const result = format(source, options);
       expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
       expect(result.output).toBe(output.replaceAll("\n", newline));
+      if (input === output)
+        expect(
+          result.diagnostics.some(
+            (d) => d.rule === rule && d.message.startsWith("Left as written"),
+          ),
+        ).toBe(true);
       expect(format(result.output, options).output).toBe(result.output);
     },
   );

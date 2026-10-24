@@ -89,7 +89,7 @@ describe("documents that are not UTF-8 text", () => {
         const piped = run(root, [command, "-"], files[name as (typeof odd)[number]]);
         expect(piped.status, name).toBe(2);
         expect(piped.stdout).toBe("");
-        expect(piped.stderr).toBe(`mdtools: stdin is not UTF-8 text (${reason})\n`);
+        expect(piped.stderr).toBe(`mdrefine: stdin is not UTF-8 text (${reason})\n`);
       }
     const mark = Buffer.from([0xef, 0xbb, 0xbf]);
     const marked = run(root, ["format", "-"], Buffer.concat([mark, Buffer.from("A *b*.\n")]));

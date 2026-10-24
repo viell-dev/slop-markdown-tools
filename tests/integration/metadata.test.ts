@@ -112,11 +112,14 @@ describe("release workflow", () => {
     );
     expect(input?.[1]).toBe(pkg.version);
   });
-  it("runs both renderer checks before it prepares the package", () => {
+  it("runs every renderer check before it prepares the package", () => {
     const release = read(".github/workflows/release.yml");
     expect(release).toContain("uses: ./.github/workflows/rendering.yml\n");
     expect(release).toContain("uses: ./.github/workflows/obsidian.yml\n");
-    expect(release).toContain("needs: [ci, rendering, obsidian]\n");
+    expect(release).toContain("needs: [ci, rendering, obsidian, forges]\n");
+    expect(release).toContain(
+      "uses: ./.github/workflows/forges.yml\n    with:\n      profile: realistic\n      seed: none\n",
+    );
     // Fixed documents only, so that the result depends on the commit rather than a random seed.
     expect(release).toContain(
       "uses: ./.github/workflows/rendering.yml\n    with:\n      profile: realistic\n      seed: none\n",
@@ -139,14 +142,19 @@ describe("renderer checks", () => {
   };
   /** Whether a path is one check's own file rather than a renderer-sensitive one. */
   const own = (file: string) =>
-    /^(?:scripts\/github-rendering\.mjs|scripts\/obsidian.*|\.github\/workflows\/.*)$/.test(file);
+    /^(?:scripts\/github-rendering\.mjs|scripts\/obsidian.*|scripts\/forge-.*|\.github\/workflows\/.*)$/.test(
+      file,
+    );
   it("run for the same renderer-sensitive paths, apart from their own files", () => {
     const rendering = paths(".github/workflows/rendering.yml");
     const obsidian = paths(".github/workflows/obsidian.yml");
+    const forges = paths(".github/workflows/forges.yml");
     expect(rendering.filter((file) => !own(file))).toEqual(obsidian.filter((file) => !own(file)));
+    expect(rendering.filter((file) => !own(file))).toEqual(forges.filter((file) => !own(file)));
     for (const file of [
       "scripts/build-parser.mjs",
       "scripts/parser-patches.mjs",
+      "scripts/parser-labels.mjs",
       "scripts/parser-packages.json",
     ])
       expect(rendering).toContain(file);
@@ -154,11 +162,19 @@ describe("renderer checks", () => {
     expect(obsidian).toContain(".github/workflows/obsidian.yml");
   });
   it("can be called from the Release workflow", () => {
-    for (const file of [".github/workflows/rendering.yml", ".github/workflows/obsidian.yml"])
+    for (const file of [
+      ".github/workflows/rendering.yml",
+      ".github/workflows/obsidian.yml",
+      ".github/workflows/forges.yml",
+    ])
       expect(read(file), file).toMatch(/\n {2}workflow_call:\n/);
   });
   it("uses fixed realistic gates and reserves adversarial sampling for discovery", () => {
-    for (const file of [".github/workflows/rendering.yml", ".github/workflows/obsidian.yml"]) {
+    for (const file of [
+      ".github/workflows/rendering.yml",
+      ".github/workflows/obsidian.yml",
+      ".github/workflows/forges.yml",
+    ]) {
       const workflow = read(file);
       expect(workflow).toContain(
         "github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic'",

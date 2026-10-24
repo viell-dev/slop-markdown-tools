@@ -27,6 +27,7 @@ import { headingAnchorSource, headingAttributeSource } from "../workspace/headin
 import { githubAnchors } from "../workspace/anchors.js";
 import { githubHeadingLimit } from "../workspace/github-heading-source.js";
 import { misreadLists } from "../syntax/misread-lists.js";
+import { ambiguousObsidianEdit } from "../syntax/obsidian-boundaries.js";
 import { walk } from "../syntax/walk.js";
 import { lineBreak, lineStarts } from "../syntax/source.js";
 import { suppressions } from "./directives.js";
@@ -510,13 +511,22 @@ function inspect(
       );
       continue;
     }
-    for (const finding of findings)
+    for (const finding of findings) {
+      if (suppressed(name, finding) || protectedVitePress(document, name, finding)) continue;
       if (
-        !suppressed(name, finding) &&
-        !protectedVitePress(document, name, finding) &&
-        !(finding.edit && misread(finding.edit))
-      )
-        result.push(diagnostic(starts, name, enabled.severity, finding));
+        finding.edit &&
+        (ambiguousObsidianEdit(document, name, finding.edit) || misread(finding.edit))
+      ) {
+        if (document.dialect === "obsidian" && rule.kind === "style") {
+          const retained = { ...finding };
+          delete retained.edit;
+          retained.message = `Left as written to preserve Obsidian rendering: ${finding.message}`;
+          result.push(diagnostic(starts, name, enabled.severity, retained));
+        }
+        continue;
+      }
+      result.push(diagnostic(starts, name, enabled.severity, finding));
+    }
   }
   return result.sort(sortDiagnostics);
 }
