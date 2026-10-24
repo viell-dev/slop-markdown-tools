@@ -3,8 +3,8 @@ name: Obsidian
 # dialect and compares what Obsidian's Live Preview and Reading view show before and after, with
 # Obsidian running in Docker (scripts/obsidian-check.mjs). It runs for pull requests that change
 # how documents are read or formatted, by hand, from the Release workflow for the commit that it
-# releases, and every week with the fixtures alone, so that a new Obsidian release is tested
-# within a week. A difference fails the run; report.json and the screenshots of the first
+# releases, with realistic fixed-seed documents and the fixtures. Weekly/manual adversarial
+# discovery reports new differences separately. report.json and screenshots of the first
 # differences are in the run's obsidian artifact. The paths below are the Rendering workflow's,
 # with the check's own files; keep the two lists alike.
 on:
@@ -23,22 +23,32 @@ on:
       - scripts/parser-patches.mjs
       - scripts/parser-packages.json
       - scripts/rendering.mjs
+      - scripts/renderer-*.mjs
+      - scripts/renderer-known-differences.json
       - scripts/obsidian-check.mjs
       - scripts/obsidian/**
       - .github/workflows/obsidian.yml
   workflow_dispatch:
     inputs:
+      profile:
+        description: Realistic regression gate or adversarial discovery
+        type: choice
+        options: [adversarial, realistic]
+        default: adversarial
       seed:
-        description: The seed of the generated documents (a whole number); random when empty
+        description: Seed or none; adversarial is random when empty, realistic uses fixed seeds
         required: false
       count:
-        description: How many documents to generate (100 when empty)
+        description: Documents per seed (realistic 10, adversarial 100 when empty)
         required: false
       obsidian-version:
         description: The Obsidian version to test (latest when empty)
         required: false
   workflow_call:
     inputs:
+      profile:
+        type: string
+        default: realistic
       seed:
         type: string
         required: false
@@ -70,10 +80,20 @@ jobs:
       - run: npm ci
       - name: Compare
         env:
+          PROFILE:
+            ${{ github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic' }}
           SEED: ${{ inputs.seed }}
-          COUNT: ${{ github.event_name == 'schedule' && '0' || inputs.count }}
+          COUNT: ${{ inputs.count }}
           OBSIDIAN_VERSION: ${{ inputs.obsidian-version }}
         run: npm run check:obsidian
+      - name: Validate deterministic gate evidence
+        if: ${{ github.event_name == 'pull_request' || github.workflow == 'Release' }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
+          validateRendererEvidence(JSON.parse(readFileSync('artifacts/obsidian/report.json', 'utf8')));
+          JS
       # Fails too when the check compared nothing, so that a run that skipped its work cannot
       # pass for one that found no difference.
       - if: ${{ !cancelled() }}
@@ -88,8 +108,8 @@ jobs:
           }
           const report = JSON.parse(readFileSync(file, 'utf8'));
           console.log(`## Obsidian ${report.obsidian}, before and after formatting\n`);
-          console.log(`Seed **${report.seed}**, ${report.count} generated documents and the fixtures, at widths ${report.widths.join(' and ')}: ${report.compared} compared, ${report.differences.length} shown differently.`);
-          console.log(`\nRepeat with \`SEED=${report.seed} COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} npm run check:obsidian\`.`);
+          console.log(`Profile **${report.profile}**, seeds **${report.seeds.join(',')}**, ${report.count} documents per seed and the fixtures, at widths ${report.widths.join(' and ')}: ${report.compared} compared, ${report.unexpected.length} new view differences, ${report.known.length} known, ${report.stale.length} stale.`);
+          console.log(`\nRepeat with \`PROFILE=${report.profile} SEEDS=${report.seeds.join(',')} SEED=none COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} npm run check:obsidian\`.`);
           if (!(report.compared > 0)) process.exit(1);
           JS
       - if: ${{ !cancelled() }}

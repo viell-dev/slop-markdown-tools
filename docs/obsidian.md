@@ -477,6 +477,13 @@ image size in their label. [`links/path`](rules.md#linkspath) and
 
 ## Review the result
 
+After 0.4.0, maintenance uses existing regressions and realistic documents at
+fixed seeds in both Obsidian views. Adversarial generated cases are a separate
+discovery queue. Meaningful rendering changes in plausible authored syntax get
+fixes; exotic constructions and stray-marker styling can remain documented
+limits. A report from real use can reopen those limits. The check does not claim
+to model every interaction between Obsidian's two renderers.
+
 Preview with `--diff` before `--write`, and look at complex notes in Obsidian
 afterwards, especially with community plugins whose syntax the tool does not
 know. The link resolver does not reproduce every behavior of Obsidian's, and

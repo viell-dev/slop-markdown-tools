@@ -28,11 +28,22 @@ On a branch, in one pull request:
    maintainers (`npm view NAME time maintainers`).
 5. Run the checks below, push, and wait for CI.
 
-The pull request normally gets an independent review by a model with stronger
-reasoning, of everything since the previous release, as AGENTS.md describes: the
+The release normally gets one independent review of the coherent change range
+since the previous release, reusing earlier coverage and focusing on unreviewed
+or materially changed code. Routine PRs use author review and tests; optional
+cases and wording do not create another review round. The review considers the
 changes, unresolved defects, the evidence, compatibility, packaging,
 documentation, and installation. Merge it like any other pull request. Merging
 publishes nothing and leaves the documentation site as it is.
+
+Renderer gates use existing fixtures and the realistic profile at fixed seeds
+1–5 at the release commit. Their JSON reports must name that profile and seeds,
+compare nonzero generated documents, and contain no unexpected, known or stale
+differences. `validateRendererEvidence()` in `scripts/release-evidence.mjs`
+checks this independently of a runner's exit status. Adversarial generation is
+weekly/manual discovery and never gates release. Each discovery since the last
+release receives an issue and is fixed within scope or recorded as a limit;
+publication does not wait for adversarial discovery to stop producing cases.
 
 ## Prepare without publishing
 

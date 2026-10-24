@@ -208,10 +208,11 @@ that, the maintainer decides whether a separate agent with fresh context reviews
 it, by its sensitivity, complexity, effect, and uncertainty, and records the
 choice:
 
-- Changes to the semantic guard, the edit engine, parsing, file writes,
-  packaging, the release or Pages workflows, or repository settings usually
-  warrant an independent review; a small diff can too. Ordinary, well-understood
-  changes can rest on the author's review.
+- Ordinary, well-understood changes use author review and relevant checks. A
+  substantial parser, engine, file-write, packaging or publication change can
+  get one independent review over its coherent change range, shared with the
+  release review where practical. Do not repeat review for every small PR or
+  re-review unchanged code merely because another commit was added.
 - A release PR normally gets an in-depth independent review by a model with
   stronger reasoning suited to the work, of the changes since the previous
   release, unresolved defects, the evidence, compatibility, packaging,
@@ -220,7 +221,8 @@ choice:
 - The same model or provider may review; prefer a different provider for
   important releases and particularly sensitive work. Name the reviewed commit
   and scope. Address every finding; a material fix or a disputed finding gets a
-  follow-up review that includes what changed since.
+  focused follow-up review of the unresolved material finding and affected
+  changes. Optional cases and wording nits do not start another review round.
 - The review apps described below supplement these reviews and do not replace
   them; their quotas do not decide whether a change was reviewed enough.
 
@@ -231,6 +233,33 @@ map of [what the checks prove](./CONTRIBUTING.md#what-the-checks-prove) says
 which checks back which promise and when the expensive ones run. Investigate a
 failing or intermittent check and fix the product or the check; do not rerun it
 until it passes, and do not widen a limit without understanding the failure.
+
+## Bounded renderer work
+
+PR and release gates use authored fixtures and the realistic generator profile
+at fixed seeds. Weekly/manual adversarial discovery is a separate triage queue,
+never a merge or release gate. Keep discoveries issue-linked; exact known
+source/output/view pairs are replayed, and stale entries fail. Offline tests
+bind entries to current formatter output without needing Docker.
+
+Before implementing a discovered difference, decide whether plausible authored
+CommonMark or documented dialect syntax loses meaningful rendered content or
+structure. Fix those cases. Record exotic constructions and stray-marker styling
+as limits in the design/dialect guides; close them as not planned with
+`Status: Won't Do`, reopenable with a report from real use. New findings go
+through the general boundary policy before adding a specific protection.
+
+Keep existing fixes and fixtures. Consolidate specific guards only when a
+general rule demonstrably replaces them. Finish when the agreed deterministic
+gates pass and discovered cases have a disposition. Do not expand a PR for
+unrelated optional cases, or try to exhaust adversarial seeds. Use focused local
+checks while editing and required final CI; repeat expensive checks only when
+changed code or a concrete evidence gap warrants it.
+
+The narrowed renderer work, including general protections and visible skipped
+style findings, belongs to 0.4.x. The mdrefine naming migration introduces and
+deprecates names in 0.4.x; removing all mdtools compatibility forms belongs to
+the 0.5.0 release PR.
 
 ## Project scope
 

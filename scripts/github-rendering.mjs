@@ -2,10 +2,9 @@
 //
 //   node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]
 //
-// Each run seed stands for --documents documents, generated as scripts/rendering.mjs describes
-// with all of GitHub's syntax. The fixed seeds are followed by one new seed, random unless
-// --seed names it, or none with `--seed none`, as the Release workflow runs it so that its result
-// depends only on the commit; the report names the seed, so that a finding can be reproduced.
+// Defaults to authored fixtures and the realistic profile at fixed seeds 1–5. Explicit
+// --profile adversarial selects fresh-seed weekly/manual discovery, never a merge/release gate.
+// Reports include the profile and actual seeds so every observation can be reproduced.
 // Each document is formatted with the presets recommended and github, and a document that
 // formatting changes is rendered before and after by GitHub's Markdown API in two modes:
 //
@@ -16,9 +15,9 @@
 //   the comparison counts as a space.
 //
 // The HTML is compared after normalizeHtml, without the random ID that GitHub writes into each
-// response. A document that renders differently and that KNOWN does not list fails the run, and
-// so does a listed document of the fixed seeds that renders alike, because what its entry
-// tracks may be fixed, and so does a run in which formatting changed no document, which compared
+// response. Realistic differences always fail. Adversarial differences can be listed with an
+// issue in renderer-known-differences.json; known sources are replayed and stale entries fail.
+// So does a run in which formatting changed no document, which compared
 // nothing. Each document that renders differently is written to DIR (default
 // artifacts/github-rendering) as before.md, after-MODE.md, and the HTML of both. The report, in
 // Markdown, goes to standard output.
@@ -30,45 +29,33 @@
 // week, and by hand with `gh workflow run rendering.yml`.
 import { Buffer } from "node:buffer";
 import { spawn, spawnSync } from "node:child_process";
-import { randomInt } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { format, parse } from "../dist/index.js";
 import { documentSeed, generateDocument, normalizeGithubHtml } from "./rendering.mjs";
-
-/**
- * Documents of the fixed seeds that render differently, with the issue that tracks each. The
- * documents of a seed change with the generator and with formatting; check the entries again
- * when either changes. The comment after an entry is a smaller input that shows the difference.
- */
-const known = [];
+import { rendererSettings } from "./renderer-settings.mjs";
+import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
+import { githubFixtures } from "./renderer-fixtures.mjs";
 
 const usage =
-  "Usage: node scripts/github-rendering.mjs [--seeds 1,2,3,4,5] [--seed N|none] [--documents 25] [--out DIR]\n";
+  "Usage: node scripts/github-rendering.mjs [--profile realistic|adversarial] [--seeds 1,2,3,4,5] [--seed N|none|random] [--documents 25] [--out DIR]\n";
 /** The run's settings from its arguments. */
 function settings(argv) {
-  const result = {
-    seeds: [1, 2, 3, 4, 5],
-    seed: randomInt(1, 2 ** 32),
-    documents: 25,
-    out: path.join("artifacts", "github-rendering"),
-  };
-  const number = (text) => {
-    if (!/^\d{1,10}$/.test(text ?? "") || Number(text) >= 2 ** 32) throw new Error(usage);
-    return Number(text);
-  };
+  const values = { COUNT: "25" };
+  let out = path.join("artifacts", "github-rendering");
   for (let index = 0; index < argv.length; index += 2) {
     const [name, value] = [argv[index], argv[index + 1]];
     if (value === undefined) throw new Error(usage);
-    if (name === "--seeds") result.seeds = value === "" ? [] : value.split(",").map(number);
-    else if (name === "--seed") result.seed = value === "none" ? undefined : number(value);
-    else if (name === "--documents") result.documents = number(value);
-    else if (name === "--out" && value !== "") result.out = value;
+    if (name === "--profile") values.PROFILE = value;
+    else if (name === "--seeds") values.SEEDS = value;
+    else if (name === "--seed") values.SEED = value;
+    else if (name === "--documents") values.COUNT = value;
+    else if (name === "--out" && value !== "") out = value;
     else throw new Error(usage);
   }
-  return result;
+  return { ...rendererSettings(values), out };
 }
 
 /** `gh api markdown` with `body`: its exit status and output. */
@@ -167,27 +154,37 @@ try {
   process.stderr.write(error.message);
   process.exit(2);
 }
-const runSeeds = options.seed === undefined ? options.seeds : [...options.seeds, options.seed];
 const results = [];
-for (const seed of runSeeds)
-  for (let index = 0; index < options.documents; index++) {
-    const source = generateDocument(documentSeed(seed, index), "github");
-    results.push({ seed, index, source, modes: await renderings(source) });
+const cases = githubFixtures.map(({ name, source }) => ({ name: `fixture-${name}`, source }));
+for (const seed of options.seeds)
+  for (let index = 0; index < options.count; index++) {
+    const source = generateDocument(documentSeed(seed, index), "github", options.profile);
+    cases.push({ name: `generated-${seed}-${index}`, source });
   }
+if (options.profile === "adversarial")
+  knownSources("github").forEach((source, index) => cases.push({ name: `known-${index}`, source }));
+for (const { name, source } of cases)
+  results.push({ name, source, modes: await renderings(source) });
 
-const name = (item) => `${item.seed}/${item.index}`;
+const name = (item) => item.name;
 const differing = results.filter((result) => result.modes.some((mode) => mode.differs));
-const listed = new Map(known.map((entry) => [name(entry), entry]));
-const unexpected = differing.filter((result) => !listed.has(name(result)));
-const stale = known.filter(
-  (entry) =>
-    options.seeds.includes(entry.seed) &&
-    entry.index < options.documents &&
-    !differing.some((result) => name(result) === name(entry)),
+const { unexpected, known, stale } = classifyDifferences(
+  "github",
+  options.profile,
+  differing.flatMap((result) =>
+    result.modes
+      .filter((mode) => mode.differs)
+      .map((mode) => ({
+        name: result.name,
+        source: result.source,
+        output: mode.output,
+        view: mode.mode,
+      })),
+  ),
 );
 rmSync(options.out, { recursive: true, force: true });
 for (const result of differing) {
-  const folder = path.join(options.out, `${result.seed}-${result.index}`);
+  const folder = path.join(options.out, result.name);
   mkdirSync(folder, { recursive: true });
   writeFileSync(path.join(folder, "before.md"), result.source);
   for (const { mode, output, before, after } of result.modes) {
@@ -198,26 +195,43 @@ for (const result of differing) {
 }
 
 const changed = results.filter((result) => result.modes.length > 0).length;
+mkdirSync(options.out, { recursive: true });
+writeFileSync(
+  path.join(options.out, "report.json"),
+  JSON.stringify(
+    {
+      renderer: "github",
+      profile: options.profile,
+      seeds: options.seeds,
+      count: options.count,
+      compared: changed,
+      unexpected,
+      known,
+      stale,
+    },
+    null,
+    2,
+  ) + "\n",
+);
 const lines = [
   "## GitHub's rendering before and after formatting",
   "",
-  `Seeds ${options.seeds.join(", ") || "(none)"} and ${options.seed === undefined ? "no new seed" : `the new seed **${options.seed}**`}, ${options.documents} documents each: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently, ${differing.length - unexpected.length} of them known.`,
+  `Profile **${options.profile}**, seeds ${options.seeds.join(", ") || "(none)"}, ${options.count} documents per seed plus fixtures: ${results.length} documents, ${changed} changed by formatting, ${differing.length} rendered differently; ${known.length} known view differences.`,
   "",
   "Reproduce with:",
   "",
   "```sh",
-  `node scripts/github-rendering.mjs --seeds "${options.seeds.join(",")}" --seed ${options.seed ?? "none"} --documents ${options.documents}`,
+  `node scripts/github-rendering.mjs --profile ${options.profile} --seeds "${options.seeds.join(",")}" --seed none --documents ${options.count}`,
   "```",
 ];
 if (unexpected.length || stale.length || !changed) lines.push("");
 if (!changed) lines.push("- Formatting changed no document, so nothing was compared.");
 for (const result of unexpected) {
-  const modeNames = result.modes.filter((mode) => mode.differs).map((mode) => mode.mode);
-  lines.push(`- Document ${name(result)} renders differently in mode ${modeNames.join(" and ")}.`);
+  lines.push(`- Document ${name(result)} renders differently in mode ${result.view}.`);
 }
 for (const entry of stale)
   lines.push(
-    `- Document ${name(entry)} renders alike now; check issue ${entry.issue} and remove its entry.`,
+    `- A known ${entry.view} difference is stale; check issue ${entry.issue} and remove its entry.`,
   );
 process.stdout.write(lines.join("\n") + "\n");
 process.exit(unexpected.length || stale.length || !changed ? 1 : 0);
