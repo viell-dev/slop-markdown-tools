@@ -8,6 +8,17 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Changed
+
+- Dependency automation also defers the markdown-it 15 lines of
+  `@mdit/plugin-container`, `@mdit/plugin-emoji` and `@mdit/plugin-tasklist`
+  assessed in [#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),
+  [#610](https://github.com/viell-dev/slop-markdown-tools/pull/610) and
+  [#611](https://github.com/viell-dev/slop-markdown-tools/pull/611), under the
+  same reconsideration conditions as the earlier deferrals.
+
 ## 0.5.0 - 2026-10-24
 
 ### Changed

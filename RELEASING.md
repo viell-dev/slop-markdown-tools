@@ -7,6 +7,12 @@ for every release on 2026-10-18. The configured trusted publisher and the
 versions, tags, and release assets are never replaced: a correction gets a new
 version.
 
+Dependency updates alone are not a reason to release. Once merged, they ship
+with the next release that fixes a defect or adds a feature. The exception is a
+security fix in a dependency that installed packages use: publish it in a patch
+release without waiting. Updates of development-only dependencies never need a
+release of their own.
+
 ## Prepare the release pull request
 
 On a branch, in one pull request:
