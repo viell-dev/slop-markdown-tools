@@ -714,6 +714,11 @@ number changes what the document means:
   the parser counts them toward: there it reads a list as loose when two or more
   follow and as tight when one does.
 
+After 0.4.0, Obsidian also keeps blank quote rows between consecutive blocks
+opened by a Tab directly after `>` or `> `. Reading view reads those blocks and
+their intervening blank rows as one literal code block. A later ordinary quoted
+paragraph still permits blank-line cleanup and inline preferences.
+
 ## `style/block-spacing`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -783,6 +788,15 @@ or what a comment applies to:
   the blank line into the code, although the parser does not.
 - A heading or list directly below an HTML comment or below a
   `mdtools-disable-next-line` directive, which apply to the line below them.
+  After 0.4.0, the Obsidian dialect also retains the boundary after a standalone
+  `%%` comment: adding a blank can split a native paragraph even when the parser
+  reads a separate heading. Inline style edits below the comment remain
+  available.
+- After 0.4.0, in the Obsidian dialect, a list immediately after a list's final
+  secondary paragraph or indented code block: a new blank splits Live Preview's
+  paragraph. Markers, numbering and inline styles remain eligible. A sole first
+  paragraph, final heading, closed fence or existing blank permits ordinary
+  spacing.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
   directly below it.
 - In the Obsidian dialect, a block identifier on a line of its own (`^id`)
@@ -812,6 +826,12 @@ remain eligible; an existing blank and ordinary info strings keep their usual
 spacing behavior. When its parsed closer opens Live Preview code, the opener and
 remaining document stay as written, conservatively retaining later fence
 pairings too.
+
+After 0.4.0, Obsidian also retains both separators when a quote, table or
+display formula connects list items. Display math immediately below the final
+item stays inside it, including after a heading or code block; a table after
+those blocks also stays adjacent. See the [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections).
 
 ## `style/code-fence`
 
@@ -950,12 +970,16 @@ After:
 ```
 
 A trailing run of `#` in the text of an underlined heading is escaped, so that
-it is not taken for a closing sequence. Underlined headings of more than one
-line, those inside lists or block quotes, and one directly below TOML front
-matter, whose lines renderers without TOML front matter read as part of the
-heading, are left as written. On Forgejo and Gitea, a closing sequence after an
-attribute block such as `{#id}` stays, because Gitea before 1.26 reads the block
-only when the sequence follows it.
+it is not taken for a closing sequence. After 0.4.0, Obsidian keeps such a title
+in Setext form instead: the escaped ATX form can reveal hashes in Live Preview.
+Inline title formatting remains available. Tight, already escaped, code-span and
+nonterminal hashes still allow conversion.
+
+Underlined headings of more than one line, those inside lists or block quotes,
+and one directly below TOML front matter, whose lines renderers without TOML
+front matter read as part of the heading, are left as written. On Forgejo and
+Gitea, a closing sequence after an attribute block such as `{#id}` stays,
+because Gitea before 1.26 reads the block only when the sequence follows it.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not
@@ -980,6 +1004,11 @@ give those widgets different typography or placement. A retained Setext heading
 keeps its complete source; mixed text before math, wrapped math, and images
 beside ordinary title text remain eligible. Independent blocks below the heading
 still get their spacing, inline formatting, and table or list preferences.
+
+After 0.4.0, a Setext title directly after a standalone Obsidian comment keeps
+its underline, since conversion can turn Reading-view paragraph text into a
+heading. Inline title formatting remains available, and a real blank permits
+heading conversion.
 
 ## `style/inline-code`
 
@@ -1110,6 +1139,20 @@ These are left as written:
   works](design.md#safety-model)). `style/list-marker` and `style/ordered-list`
   keep their markers too.
 
+After 0.4.0, Obsidian also keeps the indentation of a document-level list that
+ends in a nested list, and of the opening list in the following quote when its
+marker has exactly two spaces after `>`. Live Preview carries the earlier
+indentation into that quoted list, even across blank lines; changing it can
+remove a painted bullet. An intervening block restores ordinary indentation
+preferences. This exception applies to `style/list-indent`; safe marker and
+inline styles remain available. [`style/ordered-list`](#styleordered-list) also
+keeps the number width in those units, while allowing same-width numbering and
+delimiter changes.
+
+Quoted blocks opened after a Tab have separate literal-source protection; see
+[Obsidian's unreleased boundaries](obsidian.md#unreleased-boundary-protections).
+Ordinary space-only quoted margins remain eligible for list indentation.
+
 ## `style/list-marker`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1184,6 +1227,11 @@ nine digits. A list directly below TOML front matter that does not start at 1,
 or whose first item starts with a blank line, keeps its delimiter and numbers,
 as for `style/list-indent`.
 
+After 0.4.0, Obsidian also keeps digit widths where a trailing nested list
+controls a following quoted list's indentation, as described for
+[`style/list-indent`](#stylelist-indent). Same-width numbering and delimiter
+preferences remain available.
+
 Before:
 
 ```markdown
@@ -1249,6 +1297,10 @@ header and delimiter have leading and trailing pipes. Live Preview displays the
 other forms as source text. Reading view also accepts matching trailing-only
 pipes; missing final pipes or mismatched leading borders instead continue
 paragraph text, including across a Tab-only line into later literal rows.
+
+After 0.4.0, a table immediately after a list item's closing code fence also
+keeps its literal rows: Live Preview shows them as source text. A table after a
+heading, indented code, a root fence or a real blank still formats.
 
 Before:
 
@@ -1495,6 +1547,12 @@ code spans otherwise follows their own joining rules. In Obsidian, a short
 multiline code span keeps its whole paragraph unreflowed; see
 [`style/inline-code`](#styleinline-code). Earlier independent inline markup can
 still format.
+
+After 0.4.0, Obsidian also keeps a standalone one-line `$$…$$` formula on its
+physical line, with the adjacent separators, when joining would change Live
+Preview's display widget. Math already beside ordinary prose still wraps; see
+the [unreleased boundary
+protections](obsidian.md#unreleased-boundary-protections).
 
 After 0.4.0, Obsidian also leaves a multiline image description containing
 backticks unreflowed, where joining could turn displayed Live Preview source

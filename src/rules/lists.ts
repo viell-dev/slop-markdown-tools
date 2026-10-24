@@ -859,9 +859,11 @@ const orderedList: Rule = {
     }
     const other = preferred === "." ? ")" : ".";
     const numbering = String((options.numbering as string | undefined) ?? "auto");
+    const { indentLists } = misreadLists(document);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;
+      const retainIndent = unit.lists.some(({ node }) => indentLists.has(node));
       const delimiter = new Map<ListGroup, string>();
       for (const run of unit.runs)
         if (run[0]!.node.ordered)
@@ -884,7 +886,11 @@ const orderedList: Rule = {
           const readable = [...changes.keys()].every(
             (item) => !structuralTab(source, item.markerEnd, analysis.lines[item.first]!.end),
           );
-          if (!readable || !feasible(analysis, list, changes, "end", minimum, "stay")) {
+          if (
+            retainIndent ||
+            !readable ||
+            !feasible(analysis, list, changes, "end", minimum, "stay")
+          ) {
             numbers = digits;
             changes.clear();
           }
@@ -939,9 +945,10 @@ const listIndent: Rule = {
       ordered: [ordered, Number(options.orderedSpacesMultiline ?? ordered)],
     };
     const nested = options.nestedIndent === undefined ? undefined : Number(options.nestedIndent);
+    const { indentLists } = misreadLists(document);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
-      if (!unit.valid) continue;
+      if (!unit.valid || unit.lists.some(({ node }) => indentLists.has(node))) continue;
       const ops: Op[] = [];
       const delta = new Map<Item, number>();
       // The columns from each item's marker to its text once the rule is done,

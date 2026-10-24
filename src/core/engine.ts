@@ -267,6 +267,49 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ? otherReading(document.tree)
       : undefined;
   if (plain) readings.push(misreadLists({ ...document, tree: plain }));
+  const { source } = document;
+  // Only explicit separators have protected insertion points. A whole-line
+  // boundaryText range still uses the ordinary strict block edges (#590).
+  const boundaryStarts = new Set<number>();
+  for (const misread of readings)
+    for (const node of misread.boundaryText) {
+      let start = range(node)[0];
+      if (source[start] === "\n" && source[start - 1] === "\r") start--;
+      if (
+        start > 0 &&
+        (source[start] === "\r" || source[start] === "\n") &&
+        source[start - 1] !== "\r" &&
+        source[start - 1] !== "\n"
+      ) {
+        boundaryStarts.add(start);
+        // A separator-only range ends immediately after its line break. Keep
+        // insertions there too, without freezing the following marker (#598).
+        const end = range(node)[1];
+        if (end - start <= 2 && /^(?:\r\n?|\n)$/.test(source.slice(start, end)))
+          boundaryStarts.add(end);
+      }
+    }
+  // Each distinct physical separator has one horizontal margin. These left
+  // scans are disjoint, even when several readings protect the same break.
+  const boundaryMargins: [number, number][] = [];
+  const quoteMarkers: [number, number][] = [];
+  for (const start of [...boundaryStarts].sort((a, b) => a - b)) {
+    let left = start;
+    while (left > 0 && (source[left - 1] === " " || source[left - 1] === "\t")) left--;
+    boundaryMargins.push([left, start]);
+    if (source[left - 1] === ">") {
+      let first = left - 1;
+      while (first > 0 && " \t>".includes(source[first - 1]!)) first--;
+      if (first === 0 || source[first - 1] === "\r" || source[first - 1] === "\n") {
+        // Keep physical quote-only markers, with their preceding line break,
+        // while leaving trailing horizontal cleanup eligible (#590).
+        let before = first;
+        if (source[before - 1] === "\n") before--;
+        if (source[before - 1] === "\r") before--;
+        quoteMarkers.push([before, left]);
+      }
+    }
+  }
   // The blocks can hold one another; their union, in order, is searched in O(log n).
   const blocks: [number, number][] = [];
   let githubLimit = document.dialect === "github" ? githubHeadingLimit(document) : undefined;
@@ -296,7 +339,9 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       ...misread.boundaryText,
     ]),
     (node) => range(node),
-  ).sort((a, b) => a[0] - b[0])) {
+  )
+    .concat(quoteMarkers)
+    .sort((a, b) => a[0] - b[0])) {
     const last = blocks.at(-1);
     if (last && start < last[1]) last[1] = Math.max(last[1], end);
     else blocks.push([start, end]);
@@ -309,7 +354,27 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     else blocks.push([githubLimit, document.source.length]);
   }
   if (!blocks.length) return () => false;
-  const { source } = document;
+  // Existing source spaces can survive as a common suffix after a new break.
+  // A replacement's quote-only blank margin has the same effect (#590).
+  const trailingBreaks = (value: string, from: number, to: number): string => {
+    let start = to;
+    while (start > from && "\r\n \t>".includes(value[start - 1]!)) start--;
+    return value.slice(start, to).replace(/[ \t>]/g, "");
+  };
+  const boundaryAt = (point: number) => {
+    // A point between CR and LF reaches that same physical separator. This
+    // also retains protection when a producer's original start was the LF.
+    if (source[point] === "\n" && source[point - 1] === "\r") point--;
+    let low = 0;
+    let high = boundaryMargins.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (boundaryMargins[middle]![1] < point) low = middle + 1;
+      else high = middle;
+    }
+    const margin = boundaryMargins[low];
+    return margin !== undefined && margin[0] <= point;
+  };
   const within = (from: number, to: number) => {
     let low = 0;
     let high = blocks.length;
@@ -329,7 +394,7 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
       edit.text
     )
       return true;
-    if (!within(edit.start, edit.end)) return false;
+    if (!within(edit.start, edit.end) && !boundaryAt(edit.end)) return false;
     const before = source.slice(edit.start, edit.end);
     const { text } = edit;
     if (before === text) return false;
@@ -338,7 +403,15 @@ function misreadEdits(document: Document): (edit: Edit) => boolean {
     while (prefix < shorter && before[prefix] === text[prefix]) prefix++;
     let suffix = 0;
     while (suffix < shorter - prefix && before.at(-1 - suffix) === text.at(-1 - suffix)) suffix++;
-    return within(edit.start + prefix, edit.end - suffix);
+    const from = edit.start + prefix;
+    const to = edit.end - suffix;
+    if (
+      boundaryAt(to) &&
+      trailingBreaks(before, prefix, before.length - suffix) !==
+        trailingBreaks(text, prefix, text.length - suffix)
+    )
+      return true;
+    return within(from, to) || (from === to && boundaryAt(from));
   };
 }
 /**

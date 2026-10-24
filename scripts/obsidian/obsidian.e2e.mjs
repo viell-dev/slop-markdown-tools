@@ -84,6 +84,28 @@ async function shown(path, text) {
           continue;
         paragraph.replaceWith(...paragraph.childNodes);
       }
+      // A generated display-math child is block-level even when its loaded
+      // wrapper is a span. Adjacent collapsible ASCII margins show nothing
+      // (#589); the mandatory real Reading-layout control checks that premise.
+      for (const math of container.querySelectorAll(".math.math-block.is-loaded")) {
+        if (math.closest("pre, code, textarea, [style]")) continue;
+        const block = math.querySelector(
+          ':scope > mjx-container.MathJax[jax="CHTML"][display="true"]',
+        );
+        if (
+          !block ||
+          math.childNodes.length !== 1 ||
+          (block.style.display && block.style.display !== "block") ||
+          !block.querySelector(':scope > mjx-math[display="true"][data-latex]')
+        )
+          continue;
+        const before = math.previousSibling;
+        const after = math.nextSibling;
+        if (before?.nodeType === Node.TEXT_NODE)
+          before.data = before.data.replace(/[ \t\r\n\f]+$/, "");
+        if (after?.nodeType === Node.TEXT_NODE)
+          after.data = after.data.replace(/^[ \t\r\n\f]+/, "");
+      }
       const reading = container.innerHTML;
       component.unload();
 
@@ -993,6 +1015,148 @@ describe("Obsidian before and after formatting", function () {
     expect(cleanHtml(views[0].reading)).toEqual(cleanHtml(views[1].reading));
     expect(cleanHtml(views[2].reading)).not.toEqual(cleanHtml(views[1].reading));
     expect(livePreview(views[3].lines)).not.toEqual(livePreview(views[4].lines));
+  });
+
+  it("checks invisible block-math margins against real Reading layout (#589)", async function () {
+    if (probe || reduce) this.skip();
+    const sources = {
+      prose: "alpha $$x = y$$\nbeta\n",
+      joined: "alpha $$x = y$$ beta\n",
+      marker: "- $$x = y$$\n  beta\n",
+      markerJoined: "- $$x = y$$ beta\n",
+      tight: "alpha$$x = y$$beta\n",
+      word: "gamma $$x = y$$ beta\n",
+      content: "alpha $$x = z$$ beta\n",
+      inline: "alpha $x = y$ beta\n",
+      inlineTight: "alpha $x = y$beta\n",
+    };
+    const records = {};
+    for (const [name, source] of Object.entries(sources)) {
+      const path = `controls/block-math-${name}.md`;
+      await obsidianPage.write(path, source);
+      const view = await shown(path, source);
+      let layout;
+      try {
+        layout = await browser.executeObsidian(
+          ({ app, obsidian }, path, styleMutant) => {
+            const leaf = app.workspace.getLeaf(false);
+            if (leaf.view.file?.path !== path) throw new Error("Wrong Reading control note");
+            const root = leaf.view.containerEl.querySelector(".markdown-preview-sizer");
+            if (!root?.isConnected) throw new Error("Real Reading pane is missing");
+            const measure = () => {
+              const origin = root.getBoundingClientRect();
+              const rectangle = (rect) => ({
+                left: rect.left - origin.left,
+                top: rect.top - origin.top,
+                width: rect.width,
+                height: rect.height,
+              });
+              const words = [];
+              const walker = document.createTreeWalker(root, globalThis.NodeFilter.SHOW_TEXT);
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (node.parentElement.closest(".math")) continue;
+                for (const match of node.textContent.matchAll(/\b(?:alpha|beta|gamma)\b/g)) {
+                  const range = document.createRange();
+                  range.setStart(node, match.index);
+                  range.setEnd(node, match.index + match[0].length);
+                  words.push({
+                    text: match[0],
+                    rectangle: rectangle(range.getBoundingClientRect()),
+                  });
+                }
+              }
+              const maths = [...root.querySelectorAll(".math.is-loaded")].map((math) => ({
+                block: math.classList.contains("math-block"),
+                display: globalThis.getComputedStyle(math).display,
+                rectangle: rectangle(math.getBoundingClientRect()),
+                children: [...math.querySelectorAll(":scope > mjx-container")].map((child) => ({
+                  writtenDisplay: child.getAttribute("display"),
+                  display: globalThis.getComputedStyle(child).display,
+                  rectangle: rectangle(child.getBoundingClientRect()),
+                })),
+              }));
+              return { apiVersion: obsidian.apiVersion, words, maths };
+            };
+            const initial = measure();
+            let mutant = null;
+            if (styleMutant) {
+              const child = root.querySelector(
+                '.math.math-block.is-loaded > mjx-container[display="true"]',
+              );
+              if (!child) throw new Error("Loaded generated block-math child is missing");
+              const style = child.getAttribute("style");
+              try {
+                // Actual native CSS mutation, not a fabricated Node geometry object.
+                child.style.setProperty("display", "inline", "important");
+                mutant = measure();
+              } finally {
+                if (style === null) child.removeAttribute("style");
+                else child.setAttribute("style", style);
+              }
+            }
+            return { initial, mutant, restored: measure() };
+          },
+          path,
+          name === "prose",
+        );
+      } catch (error) {
+        records[name] = { source, ...view, error: String(error) };
+        writeFileSync("/out/block-math-controls.json", `${JSON.stringify(records, null, 2)}\n`);
+        throw error;
+      }
+      records[name] = { source, ...view, layout };
+      writeFileSync("/out/block-math-controls.json", `${JSON.stringify(records, null, 2)}\n`);
+    }
+    const reading = (name) => cleanHtml(records[name].reading);
+    const geometry = (name) => records[name].layout.initial;
+    const requireBlock = (layout) => {
+      expect(layout.maths).toHaveLength(1);
+      expect(layout.maths[0].block).toBe(true);
+      expect(layout.maths[0].children).toHaveLength(1);
+      expect(layout.maths[0].children[0].writtenDisplay).toBe("true");
+      expect(layout.maths[0].children[0].display).toBe("block");
+    };
+    for (const name of ["prose", "joined", "marker", "markerJoined", "tight", "word", "content"])
+      requireBlock(geometry(name));
+    // A changed default style fails the normal requirement above; prove the
+    // same requirement also rejects an actual, restored native style mutation.
+    expect(records.prose.layout.mutant).not.toBeNull();
+    expect(() => requireBlock(records.prose.layout.mutant)).toThrow();
+    expect(records.prose.layout.restored).toEqual(geometry("prose"));
+    for (const [before, after] of [
+      ["prose", "joined"],
+      ["marker", "markerJoined"],
+    ]) {
+      expect(geometry(before)).toEqual(geometry(after));
+      expect(reading(before)).toBe(reading(after));
+      expect(records[before].rawReading).not.toBe(records[after].rawReading);
+      expect(livePreview(globalThis.structuredClone(records[before].lines))).toEqual(
+        livePreview(globalThis.structuredClone(records[after].lines)),
+      );
+    }
+    // Reading's child is block-level; Live Preview's inline widget still
+    // distinguishes deliberately removed visible spaces. Keep that check.
+    expect(geometry("joined")).toEqual(geometry("tight"));
+    expect(reading("joined")).toBe(reading("tight"));
+    expect(livePreview(globalThis.structuredClone(records.joined.lines))).not.toEqual(
+      livePreview(globalThis.structuredClone(records.tight.lines)),
+    );
+    expect(reading("joined")).not.toBe(reading("word"));
+    expect(reading("joined")).not.toBe(reading("content"));
+    for (const name of ["inline", "inlineTight"]) {
+      expect(geometry(name).maths).toHaveLength(1);
+      expect(geometry(name).maths[0].block).toBe(false);
+      expect(geometry(name).maths[0].children[0].display).not.toBe("block");
+    }
+    const beta = (name) => {
+      const found = geometry(name).words.filter(({ text }) => text === "beta");
+      expect(found).toHaveLength(1);
+      return found[0].rectangle;
+    };
+    expect(beta("inline").top).toBe(beta("inlineTight").top);
+    expect(beta("inline").left).not.toBe(beta("inlineTight").left);
+    expect(reading("inline")).not.toBe(reading("inlineTight"));
   });
 
   it("normalizes lone list paragraphs while retaining paragraph boundaries (#528)", async function () {

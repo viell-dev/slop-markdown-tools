@@ -3,7 +3,7 @@ import type { Blockquote, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { continuesListBlock, misreadLists } from "../syntax/misread-lists.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { countBelow } from "../syntax/source.js";
@@ -48,6 +48,9 @@ function together(
   const [beforeStart, beforeEnd] = range(before);
   const [afterStart, afterEnd] = range(after);
   if (document.dialect === "obsidian") {
+    // A new blank after a secondary list paragraph or indented code splits
+    // text that Live Preview still groups with the following list (#598).
+    if (continuesListBlock(source, before, after)) return true;
     // Live Preview reads a tilde opener with a written backtick in its info
     // as paragraph text. A new blank would split the list continuation (#567).
     if (
@@ -63,6 +66,15 @@ function together(
     // Reading view keeps an adjacent, unindented quote in the last item,
     // although the parser ends the list before it (#437).
     if (before.type === "list" && after.type === "blockquote") return true;
+    // Reading keeps an adjacent table or display math inside the last item,
+    // including after its heading or code block (#582, #586). Retain the first
+    // separator without freezing table cells or the math body.
+    if (
+      before.type === "list" &&
+      (after.type === "table" || after.type === "math") &&
+      before.position!.end.line === after.position!.start.line - 1
+    )
+      return true;
     // Reading view takes text directly below an empty marker into its item
     // (#438). Keep both boundaries of a lone marker, including after a table
     // that Live Preview reads as paragraph text.
@@ -87,6 +99,9 @@ function together(
   // Other tools, too, read a comment as applying to the line below it, and
   // `mdtools-disable-next-line` does: a blank line would take that line's place.
   if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim())) return true;
+  // Obsidian can keep a standalone comment in the following paragraph even
+  // when the parser ends its block. Retain that next boundary (#357).
+  if (document.dialect === "obsidian" && before.type === "obsidianComment") return true;
   if (directiveLines.has(after.position!.start.line - 1)) return true;
   // The line that opens a callout or alert stays with the body below it.
   if (

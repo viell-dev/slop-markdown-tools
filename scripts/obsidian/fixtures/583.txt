@@ -1,0 +1,48 @@
+signal __zephyr__\
+juniper needle _walnut_ signal candle birch quarry ~~glacier~~ timber amber kettle [^1] fabric
+=
+signal fern _glacier_ *meadow engine* ^[needle engine] timber kettle
+-----
+_ribbon_
+:--
+needle candle
+https://example.com/ribbon
+
++ ~~basket~~ signal valley `methodfabric` ~~birch~~ candle signal ![yonder](https://example.com/saddle.svg) zephyr __ribbon__ needle grove orchard ~fabric~ saddle
+  + iris _valley_ saddle harbor *yonder meadow* ==needle pebble== [yonder quarry](<a b.md>) _kettle_ fern   
+    ^[yonder engine] grove __valley__ iris [![anchor](https://img.example.com/badge/signal-timber.svg)](https://example.com/fabric) meadow ~~iris~~ <span>delta</span>
+  + cedar engine lantern needle *signal kettle* *pebble kettle* ~~pebble~~ [a]: saddle &copy;
+  + [X] quarry <span>anchor</span> needle quarry iris [[amber#ribbon]] pebble ![[fern.png]] *grove timber* glacier
+  + #glacier timber `methodfern` anchor *engine orchard* grove timber ==quarry lantern== cedar
+    - iris *ribbon engine* signal %%basket walnut%% *delta fern* `basket yonder`
+    - [x] engine fern [[anchor]] anchor **anchor**
+    - %%glacier kettle%% ember __saddle__ timber   
+    meadow [[meadow|pebble amber]] quarry amber _signal_ 10. timber method orchard ==glacier ribbon== __grove__ method
+    - birch yonder cedar orchard valley
++ anchor birch
++ grove walnut | _ember_ **quarry** meadow needle candle 
+  ~anchor~ engine *delta candle* **fabric** _ember_
++ [X] ~meadow~ basket  
+basket ember __delta__ pebble ![ember](https://example.com/orchard.svg) fabric
+  - [X] __signal__ lantern ember | `anchor  amber` **saddle** _fabric_ __yonder__ <span>zephyr</span> <span>ember</span>
+
+  - ribbon timber __lantern__ method birch saddle zephyr __ember__ __timber__ *needle signal* kettle harbor [harbor](https://example.com/a) fern pebble yonder fern ~fern~ ==kettle orchard== harbor [[lantern]] quarry\
+    \ yonder ember zephyr anchor harbor
+
+    * engine fern
+    * needle lantern ribbon\
+      engine walnut ~~engine~~ walnut **zephyr** juniper candle *harbor candle* meadow pebble [[zephyr]] candle birch needle `basketbasket` ribbon orchard
+    * timber lantern `juniper valley` delta **candle** `enginesignal` grove &copy; __fern__ __glacier__ __basket__ zephyr
+
+````md
+const candle = 22;
+  valley(walnut)   
+
+````
+	
+___
+
+[ref]: https://example.com/lantern
+	
+[candle](<a b.md>) fern `yonder  quarry` quarry 
+pebble harbor ribbon fabric cedar timber method 
