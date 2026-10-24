@@ -430,13 +430,14 @@ all four.
 The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
 `src/syntax/`, `src/index.ts`, `package.json`, the lockfile,
 `scripts/build-parser.mjs`, `scripts/parser-patches.mjs`,
-`scripts/parser-labels.mjs`, `scripts/parser-packages.json`, `scripts/rendering.mjs`, and each check's own
-files, as the `pull_request` paths of `rendering.yml` and `obsidian.yml` list
-them. Link the runs in the pull request. Run the checks by hand on a branch
-whose change could alter what a renderer shows from another path. A difference
-fails the check; investigate it and record it in an issue rather than running
-the check again until it passes. A realistic or existing regression-fixture
-difference blocks its gate. Adversarial discovery instead uses the scope rule in
+`scripts/parser-labels.mjs`, `scripts/parser-packages.json`,
+`scripts/rendering.mjs`, and each check's own files, as the `pull_request` paths
+of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
+request. Run the checks by hand on a branch whose change could alter what a
+renderer shows from another path. A difference fails the check; investigate it
+and record it in an issue rather than running the check again until it passes. A
+realistic or existing regression-fixture difference blocks its gate. Adversarial
+discovery instead uses the scope rule in
 [AGENTS.md](AGENTS.md#bounded-renderer-work): fix meaningful changes on
 plausible authored input, and document other cases as limits. A report from real
 use can reopen a limit. Reuse an issue for variants of the same cause.
