@@ -29,6 +29,10 @@ prereleases' notes there are longer than their entries here.
 - Update the indirect `fast-uri` dependency to 3.1.9 for its URI parsing and
   normalization security fixes, and the Docker-only Obsidian check's
   `serialize-javascript` override to 7.1.3 for its serialization security fix.
+  The repository lockfile does not ship: existing installations can retain an
+  older indirect version. Run `npm update fast-uri` in the consuming project,
+  then use `npm ls fast-uri` to verify every resolved copy is 3.1.9 or a newer
+  compatible patched release.
 
 - Memory checks settle V8's collectible roots and compilation caches before
   sampling, rather than assuming a regular major collection has released all
