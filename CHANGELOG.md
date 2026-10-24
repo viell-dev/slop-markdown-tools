@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Obsidian structural rules conservatively keep ambiguous block boundaries as
+  written. Proposed style edits held by native-rendering protection now report
+  the original rule and severity instead of disappearing silently; safe
+  independent formatting remains available
+  ([#603](https://github.com/viell-dev/slop-markdown-tools/issues/603)).
+
 - A release is published only after CI has passed on its exact commit and
   GitHub's and Obsidian's rendering of fixed documents is unchanged by
   formatting at that commit. Pull requests that change parsing, rules, presets,

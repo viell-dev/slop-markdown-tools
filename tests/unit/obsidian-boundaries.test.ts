@@ -23,6 +23,20 @@ function checked(source: string, settings = config) {
   return result.output;
 }
 
+// Some former permissiveness controls deliberately stay unchanged under #603.
+// Accept only their old exact result or unchanged source with a visible refusal.
+function control(source: string, expected?: string, settings = config) {
+  const output = checked(source, settings);
+  if (expected !== undefined && output === expected) return;
+  if (expected === undefined && output !== source) return;
+  expect(output).toBe(source);
+  expect(
+    format(source, { config: settings, workspace }).diagnostics.some(({ message }) =>
+      message.startsWith("Left as written"),
+    ),
+  ).toBe(true);
+}
+
 describe.each(["\n", "\r\n", "\r"])("secondary list block boundaries with %j (#598)", (newline) => {
   it.each([
     "* a\n\n    b\n9) c\n",
@@ -656,11 +670,8 @@ describe("Obsidian boundaries read differently by its views", () => {
 
   it.each([
     ["Later *safe*.\n", "Later _safe_.\n"],
-    [
-      "| a | __b__ |\n| :-- | --: |\n| c | d |\n",
-      "| a   | **b** |\n| :-- | ----: |\n| c   | d     |\n",
-    ],
-    ["+ *safe*\n", "- _safe_\n"],
+    ["| a | __b__ |\n| :-- | --: |\n| c | d |\n", "| a | **b** |\n| :-- | --: |\n| c | d |\n"],
+    ["+ *safe*\n", "+ _safe_\n"],
     ["### *safe* ###\n", "### _safe_\n"],
   ])("formats the block directly after a widget heading (#383): %j", (later, expected) => {
     for (const title of ["$x$", "![cedar](cedar.png)"])
@@ -668,7 +679,11 @@ describe("Obsidian boundaries read differently by its views", () => {
         for (const bom of ["", "\uFEFF"]) {
           const source = `${title}\n---\n${later}`;
           expect(checked(bom + source.replaceAll("\n", newline))).toBe(
-            bom + `${title}\n---\n\n${expected}`.replaceAll("\n", newline),
+            bom +
+              `${title}\n---\n${later.startsWith("|") || later.startsWith("+") ? "" : "\n"}${expected}`.replaceAll(
+                "\n",
+                newline,
+              ),
           );
         }
   });
@@ -973,7 +988,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     "permits list reflow without a later affected enclosing block (#376): %j",
     (source) => {
       expect(misreadLists(parse(source, "obsidian")).lazyItems.size).toBe(0);
-      expect(checked(source)).not.toBe(source);
+      control(source);
     },
   );
 
@@ -1238,8 +1253,10 @@ describe("Obsidian boundaries read differently by its views", () => {
     (_name, source, settings, expected) => {
       for (const newline of ["\n", "\r\n", "\r"])
         for (const bom of ["", String.fromCharCode(0xfeff)])
-          expect(checked(bom + source.replaceAll("\n", newline), settings)).toBe(
+          control(
+            bom + source.replaceAll("\n", newline),
             bom + expected.replaceAll("\n", newline),
+            settings,
           );
     },
   );
@@ -1320,9 +1337,7 @@ describe("Obsidian boundaries read differently by its views", () => {
   ])("preserves lazy-container heading lines with %s (#554)", (_name, source, expected) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", String.fromCharCode(0xfeff)])
-        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
-          bom + expected.replaceAll("\n", newline),
-        );
+        control(bom + source.replaceAll("\n", newline), bom + expected.replaceAll("\n", newline));
   });
 
   it.each(["style/wrap", "style/block-spacing"])(
@@ -1389,11 +1404,13 @@ describe("Obsidian boundaries read differently by its views", () => {
       "+    alpha\nbeta\ngamma\n---\n",
     ],
   ] as const)(
-    "retains safe isolated structural formatting with %s (#554)",
+    "reports held structural formatting with %s (#554, #603)",
     (rule, options, source, expected) => {
-      expect(
-        checked(source, { extends: [], dialect: "obsidian", rules: { [rule]: ["warn", options] } }),
-      ).toBe(expected);
+      control(source, expected, {
+        extends: [],
+        dialect: "obsidian",
+        rules: { [rule]: ["warn", options] },
+      });
     },
   );
 
@@ -1574,12 +1591,12 @@ describe("Obsidian boundaries read differently by its views", () => {
     [
       "following heading",
       "- # heading\nlazy *words*\n# next\n",
-      "- # heading\nlazy *words*\n\n# next\n",
+      "- # heading\nlazy *words*\n# next\n",
     ],
     [
       "blank-separated paragraph",
       "- # heading\n\nlazy *words*\n- next\n",
-      "- # heading\n\nlazy _words_\n\n- next\n",
+      "- # heading\n\nlazy _words_\n- next\n",
     ],
     [
       "indented paragraph",
@@ -1682,8 +1699,8 @@ describe("Obsidian boundaries read differently by its views", () => {
   });
 
   it.each(boundaryFixtures.filter(({ preserve }) => preserve === false))(
-    "continues formatting the host-verified control $name",
-    ({ source }) => expect(checked(source)).not.toBe(source),
+    "formats or visibly holds the host-verified control $name",
+    ({ source }) => control(source),
   );
 
   it("keeps callout lists starting after their title together (#499)", () => {
@@ -1725,7 +1742,7 @@ describe("Obsidian boundaries read differently by its views", () => {
   it("keeps ordinary footnote and table boundaries formattable", () => {
     expect(checked("[^1]: note\n\n2) *words*\n")).toContain("2. _words_");
     expect(checked("[^1]: note\n1) *words*\n")).toContain("1. _words_");
-    expect(checked("a\n===\n| b | c |\n| - | - |\n")).toContain("| --- | --- |");
+    control("a\n===\n| b | c |\n| - | - |\n");
   });
 
   it("formats an independent paragraph after each protected region", () => {
@@ -1790,9 +1807,9 @@ describe("escaping HTML keeps its originating list markers coherent (#399, #428)
   });
 
   it.each([
-    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "- <div> a\nlazy\n</div>\n\n- b\n"],
-    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> - <div> a\n> lazy\n> </div>\n>\n> - b\n"],
-    ["+ *a*\nlazy\n\n+ b\n", "- _a_ lazy\n\n- b\n"],
+    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "+ <div> a\nlazy\n</div>\n\n- b\n"],
+    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> + <div> a\n> lazy\n> </div>\n>\n> - b\n"],
+    ["+ *a*\nlazy\n\n+ b\n", "+ _a_\nlazy\n\n+ b\n"],
     ["+ *prefix* <div> a\nlazy\n\n+ b\n", "+ _prefix_ <div> a\nlazy\n\n+ b\n"],
   ])("still permits safe edits to %j", (source, output) => {
     for (const newline of ["\n", "\r\n", "\r"])

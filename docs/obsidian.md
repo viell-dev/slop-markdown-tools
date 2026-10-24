@@ -54,6 +54,27 @@ title that is too long is reported by `reportUnbreakable`.
 
 ## Where Obsidian reads Markdown its own way
 
+### Unreleased: visible boundary refusals
+
+The next 0.4.x release applies one conservative policy before the existing
+renderer-specific protections. Structural rules keep an adjacent paragraph and
+list, block quote, HTML block, table, fence, or definition together when there
+is no blank line between them. They also keep lazy continuation margins, a Tab
+after a container marker, and non-one ordered markers directly below text.
+Properly indented nested blocks and a callout's explicit title/body boundary
+remain eligible. Ordinary ATX headings beside paragraphs still get spacing.
+
+When a proposed style edit is held by this policy or an existing native
+protection, `lint` and `format` report
+`Left as written to preserve Obsidian rendering` under the original rule ID and
+its configured severity, without an edit. Suppression comments still apply. A
+held warning counts toward `--max-warnings`; set the rule to `error` to make it
+fail the check directly. Safe independent edits still apply. This does not
+create findings where a rule does not propose an edit, and it does not guarantee
+every unusual source form renders identically in both Obsidian views.
+
+### Existing protections
+
 Obsidian's Reading view and Live Preview read some Markdown otherwise than
 CommonMark, and otherwise than each other. Where formatting would change what a
 note shows there, the tool keeps the text as written:
