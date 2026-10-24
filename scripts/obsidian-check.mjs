@@ -35,7 +35,15 @@ mkdirSync(output, { recursive: true });
 // The container writes as its own user, which on Linux need not own the checkout, as on a
 // GitHub-hosted runner.
 chmodSync(output, 0o777);
-const environment = ["SEED", "COUNT", "OBSIDIAN_VERSION", "REDUCE", "PROBE"].flatMap((name) =>
+const environment = [
+  "PROFILE",
+  "SEEDS",
+  "SEED",
+  "COUNT",
+  "OBSIDIAN_VERSION",
+  "REDUCE",
+  "PROBE",
+].flatMap((name) =>
   // Docker reads a named variable from its inherited environment. Large PROBE batches must
   // not become process arguments, which Windows limits to about 32,000 characters.
   process.env[name] ? ["--env", name] : [],

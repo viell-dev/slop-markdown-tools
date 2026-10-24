@@ -29,8 +29,10 @@ function random(seed) {
  * is `github` with Obsidian's wikilinks, embeds, highlights, comments, tags, and inline
  * footnotes in place of the runs of emphasis markers, which Obsidian pairs in ways of its own
  * (scripts/obsidian-check.mjs).
- * @typedef {"commonmark" | "gfm" | "github" | "obsidian"} Syntax
+ * @typedef {"commonmark" | "gfm" | "github" | "obsidian" | "forgejo" | "gitea"} Syntax
  */
+
+/** @typedef {"realistic" | "adversarial"} Profile */
 
 const words =
   "amber birch cedar delta ember fern grove harbor iris juniper kettle lantern meadow needle orchard pebble quarry ribbon saddle timber valley walnut yonder zephyr signal method anchor basket candle engine fabric glacier".split(
@@ -68,7 +70,7 @@ const hazards = [
 ];
 
 /** One document's writer, from its seed. */
-function writer(seed, syntax) {
+function writer(seed, syntax, profile) {
   const next = random(seed);
   const below = (count) => next() % count;
   const chance = (percent) => below(100) < percent;
@@ -76,7 +78,8 @@ function writer(seed, syntax) {
   const word = () => pick(words);
   const gfm = syntax !== "commonmark";
   const obsidian = syntax === "obsidian";
-  const github = syntax === "github" || obsidian;
+  const github = syntax === "github" || obsidian || syntax === "forgejo" || syntax === "gitea";
+  const realistic = profile === "realistic";
   // markdown-it reads runs of three or more tildes as strikethrough, which GitHub does not.
   const tildes = (text) => (syntax === "gfm" ? text.replace(/~{3,}/g, "~~") : text);
 
@@ -145,10 +148,16 @@ function writer(seed, syntax) {
     if (roll < 17) return `**${word()}**`;
     if (roll < 22) return `\`${word()}${pick(["", " ", "  "])}${word()}\``;
     if (roll < 27) return link();
-    if (roll < 31) return pick(hazards);
-    if (roll < 36) return markers();
+    if (roll < 31) return realistic ? word() : pick(hazards);
+    if (roll < 36) return realistic ? word() : markers();
     if (roll < 38 && gfm) return `~~${word()}~~`;
-    if (roll < 40 && github) return pick([`~${word()}~`, "$x^2$", "www.example.com", "[^1]"]);
+    if (roll < 40 && github)
+      return pick([
+        realistic ? `~~${word()}~~` : `~${word()}~`,
+        "$x^2$",
+        "www.example.com",
+        "[^1]",
+      ]);
     if (roll < 41) return "<span>" + word() + "</span>";
     if (roll < 42) return "&copy;";
     return word();
@@ -172,19 +181,19 @@ function writer(seed, syntax) {
     const ordered = chance(35);
     const bullet = pick(["-", "*", "+"]);
     const delimiter = pick([".", ")"]);
-    const start = pick([1, 1, 1, 2, 9]);
+    const start = realistic ? 1 : pick([1, 1, 1, 2, 9]);
     const loose = chance(30);
     const lines = [];
     const items = 1 + below(4);
     for (let index = 0; index < items; index++) {
       let marker = ordered ? `${start + index}${delimiter}` : bullet;
-      if (ordered && chance(15)) marker = `${start}${delimiter}`;
+      if (ordered && !realistic && chance(15)) marker = `${start}${delimiter}`;
       if (github && !ordered && chance(25)) marker += pick([" [ ]", " [x]", " [X]"]);
       const width = marker.replace(/ \[.\]$/, "").length + 1;
       const body = prose(1 + below(2));
       lines.push(
         `${marker} ${body[0]}`,
-        ...indent(body.slice(1), chance(70) ? " ".repeat(width) : ""),
+        ...indent(body.slice(1), realistic || chance(70) ? " ".repeat(width) : ""),
       );
       if (depth < 2 && chance(25)) {
         if (loose) lines.push("");
@@ -199,9 +208,10 @@ function writer(seed, syntax) {
     const columns = 1 + below(3);
     const cell = () => tildes(chance(70) ? inline() : `${word()} ${word()}`).replaceAll("|", "\\|");
     // markdown-it needs a pipe in the delimiter row, which GitHub does not.
-    const outer = chance(70) || (syntax === "gfm" && columns === 1);
+    const outer = realistic || chance(70) || (syntax === "gfm" && columns === 1);
     const row = (cells) => (outer ? `| ${cells.join(" | ")} |` : cells.join(" | "));
-    const align = () => pick(["---", ":--", "--:", ":-:", "-"]);
+    const align = () =>
+      pick(realistic ? ["---", ":---", "---:", ":---:"] : ["---", ":--", "--:", ":-:", "-"]);
     const rows = [row(Array.from({ length: columns }, cell))];
     rows.push(row(Array.from({ length: columns }, align)));
     for (let index = below(3); index >= 0; index--)
@@ -213,14 +223,19 @@ function writer(seed, syntax) {
     const lines = [];
     if (github && chance(40)) {
       const kind = pick(["NOTE", "TIP", "WARNING", "note", "Important", "CAUTION"]);
-      lines.push(pick([`[!${kind}]`, `\\[!${kind}]`, `&#91;!${kind}]`, `[!${kind}] ${word()}`]));
+      lines.push(
+        realistic
+          ? `[!${kind}]`
+          : pick([`[!${kind}]`, `\\[!${kind}]`, `&#91;!${kind}]`, `[!${kind}] ${word()}`]),
+      );
+      if (realistic) lines.push("");
     }
     const body = depth < 1 && chance(25) ? quote(depth + 1) : chance(30) ? list() : prose();
     lines.push(...body);
-    const prefix = pick(["> ", ">", ">  "]);
-    const quoted = lines.map((line) => (line ? prefix + line : ">"));
+    const prefix = realistic ? "> " : pick(["> ", ">", ">  "]);
+    const quoted = lines.map((line) => (line ? prefix + line : realistic ? "> " : ">"));
     // A lazy continuation line.
-    if (chance(15)) quoted.push(word() + " " + word());
+    if (!realistic && chance(15)) quoted.push(word() + " " + word());
     return quoted;
   }
   /** A fenced or indented code block. */
@@ -229,26 +244,42 @@ function writer(seed, syntax) {
     const info = pick(["", "js", "sh", "md", " text"]);
     const body = [`const ${word()} = ${below(100)};`, `  ${word()}(${word()})   `, ""];
     if (chance(20)) return indent(body.slice(0, 2), "    ");
-    return [fence + info, ...body.slice(0, 1 + below(3)), fence.slice(0, chance(90) ? 4 : 3)];
+    return [
+      fence + info,
+      ...body.slice(0, 1 + below(3)),
+      realistic ? fence : fence.slice(0, chance(90) ? 4 : 3),
+    ];
   }
   /** One block. */
   function block() {
     const roll = below(100);
     if (roll < 8) return [`${"#".repeat(1 + below(4))} ${prose(1)[0]}${pick(["", " #", " ##"])}`];
-    if (roll < 12) return [...prose(1 + below(2)), pick(["===", "---", "=", "-----"])];
+    if (roll < 12)
+      return [
+        ...prose(realistic ? 1 : 1 + below(2)),
+        pick(realistic ? ["===", "---"] : ["===", "---", "=", "-----"]),
+      ];
     if (roll < 26) return prose();
-    if (roll < 36) return obsidian ? prose() : Array.from({ length: 1 + below(3) }, markerLine);
+    if (roll < 36)
+      return obsidian || realistic ? prose() : Array.from({ length: 1 + below(3) }, markerLine);
     if (roll < 48) return list();
     if (roll < 52) return [pick(["***", "___", "- - -", "---", "* * *", "_____"])];
     if (roll < 59) return code();
     if (roll < 65) return gfm ? table() : table().concat(prose(1));
     if (roll < 74) return quote();
-    if (roll < 78) return [pick(["<!-- a comment -->", "<!--", "<!-- multi"]), word() + " -->"];
-    if (roll < 81) return ["<div>", ...prose(1), "</div>"];
-    if (roll < 84) return [`::: ${word()}`, ...prose(1), ":::"];
-    if (roll < 87) return [`{% include ${word()}.html %}`, ...prose(1)];
-    if (roll < 90) return [`[ref]: https://example.com/${word()}${chance(30) ? ' "Title"' : ""}`];
-    if (roll < 93 && github) return [`[^1]: ${prose(1)[0]}`, ...indent(prose(1), "    ")];
+    if (roll < 78)
+      return realistic
+        ? ["<!-- A useful comment. -->"]
+        : [pick(["<!-- a comment -->", "<!--", "<!-- multi"]), word() + " -->"];
+    if (roll < 81) return ["<div>", ...(realistic ? ["Plain HTML content."] : prose(1)), "</div>"];
+    if (roll < 84) return realistic ? prose() : [`::: ${word()}`, ...prose(1), ":::"];
+    if (roll < 87) return realistic ? prose() : [`{% include ${word()}.html %}`, ...prose(1)];
+    if (roll < 90)
+      return realistic
+        ? prose(1)
+        : [`[ref]: https://example.com/${word()}${chance(30) ? ' "Title"' : ""}`];
+    if (roll < 93 && github)
+      return realistic ? prose(1) : [`[^1]: ${prose(1)[0]}`, ...indent(prose(1), "    ")];
     if (roll < 95 && github) return ["$$", "x = " + word(), "$$"];
     return [link() + " " + prose(1)[0]];
   }
@@ -263,19 +294,30 @@ const separators = ["\n", "\n\n", "\n\n", "\n\n", "\n\n\n", "\n  \n", "\n\t\n"];
  * some documents.
  * @param {number} seed
  * @param {Syntax} syntax
+ * @param {Profile} [profile] Explicitly realistic for renderer gates; legacy callers retain adversarial seeds.
  * @returns {string}
  */
-export function generateDocument(seed, syntax) {
-  const { below, chance, pick, block } = writer(seed, syntax);
+export function generateDocument(seed, syntax, profile = "adversarial") {
+  if (profile !== "realistic" && profile !== "adversarial")
+    throw new Error(`Unknown generator profile: ${profile}`);
+  const realistic = profile === "realistic";
+  const { below, chance, pick, block } = writer(seed, syntax, profile);
   let source = "";
-  if (chance(15)) {
-    source += pick(["---\ntitle: A title\n---\n", "+++\ntitle = 1\n+++\n", "---\n---\n"]);
-    source += pick(["", "\n"]);
+  if ((!realistic || syntax === "obsidian") && chance(15)) {
+    source += realistic
+      ? "---\ntitle: A title\n---\n"
+      : pick(["---\ntitle: A title\n---\n", "+++\ntitle = 1\n+++\n", "---\n---\n"]);
+    source += realistic ? "\n" : pick(["", "\n"]);
   }
   const count = 4 + below(6);
   for (let index = 0; index < count; index++) {
-    if (index > 0) source += pick(separators);
+    if (index > 0) source += realistic ? "\n\n" : pick(separators);
     source += block().join("\n");
+  }
+  if (realistic) {
+    if (source.includes("[ref]")) source += "\n\n[ref]: https://example.com/reference";
+    if (source.includes("[^1]")) source += "\n\n[^1]: A helpful note about this example.";
+    return source + "\n";
   }
   return source + pick(["\n", "\n", "", "\n\n"]);
 }

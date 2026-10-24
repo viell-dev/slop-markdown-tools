@@ -119,10 +119,10 @@ describe("release workflow", () => {
     expect(release).toContain("needs: [ci, rendering, obsidian]\n");
     // Fixed documents only, so that the result depends on the commit rather than a random seed.
     expect(release).toContain(
-      "uses: ./.github/workflows/rendering.yml\n    with:\n      seed: none\n",
+      "uses: ./.github/workflows/rendering.yml\n    with:\n      profile: realistic\n      seed: none\n",
     );
     expect(release).toContain(
-      'uses: ./.github/workflows/obsidian.yml\n    with:\n      count: "0"\n',
+      "uses: ./.github/workflows/obsidian.yml\n    with:\n      profile: realistic\n      seed: none\n",
     );
   });
 });
@@ -156,6 +156,16 @@ describe("renderer checks", () => {
   it("can be called from the Release workflow", () => {
     for (const file of [".github/workflows/rendering.yml", ".github/workflows/obsidian.yml"])
       expect(read(file), file).toMatch(/\n {2}workflow_call:\n/);
+  });
+  it("uses fixed realistic gates and reserves adversarial sampling for discovery", () => {
+    for (const file of [".github/workflows/rendering.yml", ".github/workflows/obsidian.yml"]) {
+      const workflow = read(file);
+      expect(workflow).toContain(
+        "github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic'",
+      );
+      expect(workflow).toContain("default: realistic");
+      expect(workflow).toContain("scripts/renderer-known-differences.json");
+    }
   });
 });
 

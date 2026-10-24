@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Renderer PR/release gates compare existing fixtures and realistic documents at
+  fixed seeds. Fresh adversarial generation becomes weekly/manual discovery with
+  exact issue-linked known differences and stale-entry checks. Maintenance and
+  review now use bounded scope and proportional verification
+  ([#603](https://github.com/viell-dev/slop-markdown-tools/issues/603)).
 - A release is published only after CI has passed on its exact commit and
   GitHub's and Obsidian's rendering of fixed documents is unchanged by
   formatting at that commit. Pull requests that change parsing, rules, presets,

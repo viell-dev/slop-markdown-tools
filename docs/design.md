@@ -187,6 +187,12 @@ Files:
 
 Syntax:
 
+- After 0.4.0, renderer maintenance targets plausible authored CommonMark and
+  documented dialect syntax whose displayed content or meaningful structure
+  changes during formatting. Exotic generated constructions and stray-marker
+  styling can remain documented limits, reopenable with evidence from real use.
+  Fixed regression documents remain protected. A clean fixed realistic corpus is
+  bounded evidence, not a claim to reproduce every renderer quirk.
 - Obsidian inline comments that span several paragraphs are not fully read;
   suppress formatting around them or use comment blocks. A comment on lines of
   its own directly above text is read as a block before a paragraph, where

@@ -38,17 +38,18 @@ jobs:
         shell: bash
   # The real renderers, compared before and after formatting at this commit: GitHub's through
   # its Markdown API, and Obsidian's in Docker. Their reports are the runs' artifacts. A release
-  # compares only fixed documents, GitHub's fixed seeds and Obsidian's fixtures, so that its
-  # result depends only on the commit and the renderers; the random documents of the pull
-  # request runs look for new differences, which get issues.
+  # compares authored fixtures and realistic documents at fixed seeds, so its result depends
+  # on the commit and the renderers. Fresh adversarial seeds are weekly/manual discovery.
   rendering:
     uses: ./.github/workflows/rendering.yml
     with:
+      profile: realistic
       seed: none
   obsidian:
     uses: ./.github/workflows/obsidian.yml
     with:
-      count: "0"
+      profile: realistic
+      seed: none
   prepare:
     needs: [ci, rendering, obsidian]
     runs-on: ubuntu-latest

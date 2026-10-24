@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { evaluate, requiredChecks } from "../../scripts/release-evidence.mjs";
+import {
+  evaluate,
+  requiredChecks,
+  validateRendererEvidence,
+} from "../../scripts/release-evidence.mjs";
 import { fixture, linkDirectory, repository } from "./support.js";
 
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
@@ -25,6 +29,32 @@ const run = (name: string, status: string, conclusion: string | null, started = 
 const passing = () => required.map((check) => run(check.name, "completed", "success"));
 
 describe("release evidence", () => {
+  it("requires fixed realistic native evidence and rejects discovery, omissions and differences", () => {
+    const report = {
+      profile: "realistic",
+      seeds: [1, 2, 3, 4, 5],
+      count: 10,
+      compared: 50,
+      unexpected: [],
+      known: [],
+      stale: [],
+    };
+    expect(() => validateRendererEvidence(report)).not.toThrow();
+    for (const change of [
+      { profile: "adversarial" },
+      { seeds: [42] },
+      { count: 0 },
+      { compared: 0 },
+      { unexpected: [{ name: "changed" }] },
+      { known: [{ issue: 603 }] },
+      { stale: [{ issue: 603 }] },
+      { unexpected: undefined },
+      { seeds: undefined },
+    ])
+      expect(() => validateRendererEvidence({ ...report, ...change })).toThrow(
+        "fixed-seed realistic",
+      );
+  });
   it("requires the ruleset's checks and unit coverage, which CI's jobs produce", () => {
     expect(required.map((check) => check.name)).toEqual([
       "verify (ubuntu-latest, 22)",
