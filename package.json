@@ -110,7 +110,7 @@
     "@mdit/plugin-container": "1.0.2",
     "@mdit/plugin-emoji": "1.1.1",
     "@mdit/plugin-footnote": "1.0.2",
-    "@mdit/plugin-tasklist": "1.0.2",
+    "@mdit/plugin-tasklist": "1.1.3",
     "@types/mdast": "4.0.4",
     "ajv": "8.20.0",
     "commander": "15.0.0",
