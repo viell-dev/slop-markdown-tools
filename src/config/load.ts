@@ -19,8 +19,8 @@ export interface LoadedConfig {
   file?: string;
 }
 /** The names of the configuration files that the search finds; one directory may hold one. */
-const configFiles = ["mdrefine", "mdtools"].flatMap((prefix) =>
-  ["jsonc", "json", "mjs", "js", "cjs"].map((extension) => `${prefix}.config.${extension}`),
+const configFiles = ["jsonc", "json", "mjs", "js", "cjs"].map(
+  (extension) => `mdrefine.config.${extension}`,
 );
 /**
  * Whether Node.js loads `file` as JavaScript. A `.js` file is an ES module or

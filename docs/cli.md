@@ -5,21 +5,22 @@ The command is `mdrefine`; with the package installed in a project, run it as
 
 ## Earlier names
 
-The 0.4.x naming transition keeps the deprecated `mdtools` command, all
-`mdtools.config.*` filenames, and `mdtools-disable`,
-`mdtools-disable-next-line`, and `mdtools-enable` comments working. Replace each
-prefix with `mdrefine`; all old forms will be removed in 0.5.0. Formatting does
-not rename configuration files or rewrite suppression comments automatically.
+Version 0.5.0 removes the names deprecated in 0.4.x. Before upgrading:
 
-The CLI prints one migration notice on stderr per run when an old command,
-configuration name, or actual suppression comment is used. It is separate from
-document findings, JSON reports, and `--max-warnings`, so it does not change a
-clean check's exit code. Code examples mentioning old comments do not trigger
-the notice. The library remains silent.
+1. Replace the `mdtools` command with `mdrefine` in scripts, editor settings and
+   other automation. Use `npx mdrefine`; `npx mdtools` can fetch an unrelated
+   package. The old executable is no longer installed.
+2. Rename `mdtools.config.jsonc`, `.json`, `.mjs`, `.js` or `.cjs` to the
+   corresponding `mdrefine.config.*` filename. Old names are no longer
+   discovered, so an unmigrated workspace uses the configuration found higher up
+   or the default preset instead.
+3. Replace `mdtools-disable`, `mdtools-disable-next-line` and `mdtools-enable`
+   with the matching `mdrefine-` comment prefix. Old comments are ordinary HTML
+   and no longer suppress or enable findings.
 
-Use `npx mdrefine`, or `npx --package=mdrefine mdtools` when deliberately using
-the old command without an installation. `npx mdtools` without a local
-installation can fetch an unrelated package.
+Formatting does not rename files or migrate comments. The transitional CLI
+migration notice is also removed. The npm package and library imports stay
+`mdrefine` and `mdrefine/node`.
 
 ## Commands
 

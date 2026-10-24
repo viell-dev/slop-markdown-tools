@@ -8,7 +8,16 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.5.0 - Unreleased
+
+### Changed
+
+- Remove every `mdtools` compatibility form deprecated in 0.4.x: the command,
+  all five configuration discovery names and all three suppression-comment
+  prefixes. Replace them with `mdrefine` before upgrading; old comments are
+  ordinary HTML and old config names are no longer discovered. The migration
+  notice and legacy wrapper are removed. Formatting does not migrate user files
+  ([#601](https://github.com/viell-dev/slop-markdown-tools/issues/601)).
 
 ### Fixed
 

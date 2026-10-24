@@ -56,10 +56,16 @@ a sensor board.
 
 ## Install
 
+This branch prepares **unreleased 0.5.0**. The [published
+guide](https://viell-dev.github.io/slop-markdown-tools/) describes installable
+0.4.1. The pinned command below applies after 0.5.0 is published; existing users
+should follow the [naming migration](docs/cli.md#earlier-names) before
+upgrading.
+
 mdrefine needs Node.js 22.12 or newer:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.4.1
+npm install --save-dev --save-exact mdrefine@0.5.0
 npx mdrefine lint
 npx mdrefine format --diff
 npx mdrefine format --write

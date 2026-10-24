@@ -10,10 +10,9 @@ export interface Directive {
 }
 /** The directive that an HTML node's value holds, if it is one. */
 export function directive(value: string): Directive | undefined {
-  const match =
-    /^<!--\s*(?:mdrefine|mdtools)-(disable-next-line|disable|enable)(?:\s+([^]*?))?\s*-->$/.exec(
-      value.trim(),
-    );
+  const match = /^<!--\s*mdrefine-(disable-next-line|disable|enable)(?:\s+([^]*?))?\s*-->$/.exec(
+    value.trim(),
+  );
   if (!match) return undefined;
   const names = match[2]
     ?.trim()
@@ -24,8 +23,7 @@ export function directive(value: string): Directive | undefined {
 /** Directives are recognized only in parsed HTML comments, never in code examples. */
 export function suppressions(document: Document): (rule: string, finding: Finding) => boolean {
   // Directives can only appear in HTML comments containing this prefix.
-  if (!document.source.includes("mdrefine-") && !document.source.includes("mdtools-"))
-    return () => false;
+  if (!document.source.includes("mdrefine-")) return () => false;
   const events: (Directive & { start: number; end: number })[] = [];
   walk(document.tree, "html", (node) => {
     const found = directive(node.value);

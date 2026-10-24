@@ -258,7 +258,7 @@ changed code or a concrete evidence gap warrants it.
 
 The narrowed renderer work, including general protections and visible skipped
 style findings, belongs to 0.4.x. The mdrefine naming migration introduces and
-deprecates names in 0.4.x; removing all mdrefine compatibility forms belongs to
+deprecates names in 0.4.x; removing the legacy compatibility forms belongs to
 the 0.5.0 release PR.
 
 ## Project scope
@@ -384,9 +384,9 @@ it helps.
 - TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
   `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
   `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
-  comments use `mdrefine-*`. All `mdtools` forms remain deprecated compatibility
-  aliases in 0.4.x and are removed together in the 0.5.0 release PR. The legacy
-  command has its own wrapper so Windows npm shims reliably emit the notice.
+  comments use `mdrefine-*`. The unreleased 0.5.0 branch removes the legacy
+  command, config discovery names, comments and transitional notice from 0.4.x.
+  Keep this release PR draft and unmerged until the owner authorizes promotion.
 - `src/syntax/` parses with micromark and mdast through the generated internal
   adapter and holds the Obsidian extensions; `src/config/` resolves presets,
   schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the

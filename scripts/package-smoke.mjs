@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, copyFile, lstat, readFile, rename, writeFile, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -177,14 +177,10 @@ process.stdout.write(result.output);`,
     runNode([command, "format", "-", "--root", project], project, "A *small* note.\n"),
     "A _small_ note.\n",
   );
-  const legacy = spawnSync(
-    process.execPath,
-    [path.join(project, "node_modules", manifest.name, manifest.bin.mdtools), "--version"],
-    { cwd: project, encoding: "utf8" },
-  );
-  assert.equal(legacy.status, 0, legacy.stderr);
-  assert.equal(legacy.stdout.trim(), manifest.version);
-  assert.match(legacy.stderr, /mdtools names are deprecated.*0\.5\.0/);
+  for (const suffix of process.platform === "win32" ? ["", ".cmd", ".ps1"] : [""])
+    await assert.rejects(lstat(path.join(project, "node_modules/.bin", `mdtools${suffix}`)), {
+      code: "ENOENT",
+    });
   await writeFile(path.join(project, "consumer.mts"), consumerModule);
   await writeFile(path.join(project, "consumer.cts"), consumerCommonJs);
   execFileSync(
@@ -210,6 +206,12 @@ try {
   );
   // npm 12 keys results by package name; earlier npm versions return an array.
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+  assert(
+    result.files.every(
+      (file) => !file.path.includes("mdtools") && !/^dist\/cli\/deprecations\./.test(file.path),
+    ),
+    "Retired naming files must not ship; build from a clean checkout after source removal",
+  );
   assert(
     result.files.every((file) =>
       /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
@@ -258,8 +260,7 @@ try {
   const installed = path.join(hoisted, "node_modules", manifest.name);
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.equal(metadata.version, manifest.version);
-  assert.equal(metadata.bin.mdrefine, "dist/cli/main.js");
-  assert.equal(metadata.bin.mdtools, "dist/cli/mdtools.js");
+  assert.deepEqual(metadata.bin, { mdrefine: "dist/cli/main.js" });
   assert(
     (await readFile(path.join(installed, metadata.bin.mdrefine), "utf8")).startsWith(
       "#!/usr/bin/env node\n",
@@ -272,10 +273,6 @@ try {
   );
   assert.equal(
     runNpm(["exec", "--no", "--", "mdrefine", "--version"], hoisted).trim(),
-    manifest.version,
-  );
-  assert.equal(
-    runNpm(["exec", "--no", "--", "mdtools", "--version"], hoisted).trim(),
     manifest.version,
   );
   assert.equal(
@@ -327,44 +324,65 @@ try {
   );
   await checkInstalled(strict);
 
-  // Exercise the naming transition as an upgrade from the last old-name release.
-  // Both installed shims and an unchanged legacy configuration must keep working.
+  // Upgrade from the deprecation release, then migrate the user's config/comment.
+  // npm must remove the retired shim as well as install the current command.
   const upgrade = path.join(directory, "upgrade");
   await mkdir(upgrade);
   await writeFile(path.join(upgrade, "package.json"), JSON.stringify({ private: true }));
   runNpm(
-    ["install", "mdrefine@0.4.0", "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
+    ["install", "mdrefine@0.4.1", "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
     upgrade,
   );
-  assert.equal(runNpm(["exec", "--no", "--", "mdtools", "--version"], upgrade).trim(), "0.4.0");
+  assert.equal(runNpm(["exec", "--no", "--", "mdtools", "--version"], upgrade).trim(), "0.4.1");
+  const oldConfig = path.join(upgrade, "mdtools.config.json");
+  const note = path.join(upgrade, "note.md");
+  const oldSource = "<!-- mdtools-disable style/emphasis -->\n\nA *legacy* note.\n";
+  await writeFile(oldConfig, JSON.stringify({ extends: [], rules: { "style/emphasis": "error" } }));
+  await writeFile(note, oldSource);
+  runNpm(
+    ["exec", "--no", "--", "mdrefine", "lint", "--max-warnings", "0", "--root", upgrade, "note.md"],
+    upgrade,
+  );
   runNpm(
     ["install", tarball, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache],
     upgrade,
   );
-  for (const command of ["mdrefine", "mdtools"])
-    assert.equal(
-      runNpm(["exec", "--no", "--", command, "--version"], upgrade).trim(),
-      manifest.version,
-    );
-  await writeFile(
-    path.join(upgrade, "mdtools.config.json"),
-    JSON.stringify({ extends: [], rules: { "style/emphasis": "off" } }),
+  assert.equal(
+    runNpm(["exec", "--no", "--", "mdrefine", "--version"], upgrade).trim(),
+    manifest.version,
   );
-  await writeFile(path.join(upgrade, "note.md"), "A *legacy* note.\n");
-  runNpm(
+  for (const suffix of process.platform === "win32" ? ["", ".cmd", ".ps1"] : [""])
+    await assert.rejects(lstat(path.join(upgrade, "node_modules/.bin", `mdtools${suffix}`)), {
+      code: "ENOENT",
+    });
+  const unmigrated = spawnSync(
+    process.execPath,
     [
+      npm,
       "exec",
       "--no",
       "--",
       "mdrefine",
-      "format",
-      "--check",
+      "lint",
+      "--json",
       "--max-warnings",
       "0",
       "--root",
       upgrade,
       "note.md",
     ],
+    { cwd: upgrade, encoding: "utf8" },
+  );
+  assert.equal(unmigrated.status, 1, unmigrated.stderr);
+  assert(
+    JSON.parse(unmigrated.stdout).files[0].diagnostics.some(
+      (item) => item.rule === "style/emphasis",
+    ),
+  );
+  await rename(oldConfig, path.join(upgrade, "mdrefine.config.json"));
+  await writeFile(note, oldSource.replace("mdtools-disable", "mdrefine-disable"));
+  runNpm(
+    ["exec", "--no", "--", "mdrefine", "lint", "--max-warnings", "0", "--root", upgrade, "note.md"],
     upgrade,
   );
 

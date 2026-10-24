@@ -150,7 +150,7 @@ async function onDisk(corpus, use) {
     const result = spawnSync(process.execPath, [...(memory ? preload : []), ...command, ...args], {
       cwd: root,
       stdio: "ignore",
-      env: { ...process.env, MDTOOLS_BENCHMARK_MEMORY: memoryFile },
+      env: { ...process.env, MDREFINE_BENCHMARK_MEMORY: memoryFile },
     });
     if (result.status !== 0)
       throw new Error(`mdrefine ${args.join(" ")} exited with ${result.status}.`);
