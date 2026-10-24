@@ -1807,8 +1807,8 @@ describe("escaping HTML keeps its originating list markers coherent (#399, #428)
   });
 
   it.each([
-    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "+ <div> a\nlazy\n</div>\n\n- b\n"],
-    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> + <div> a\n> lazy\n> </div>\n>\n> - b\n"],
+    ["+ <div> a\nlazy\n</div>\n\n+ b\n", "- <div> a\nlazy\n</div>\n\n- b\n"],
+    ["> + <div> a\n> lazy\n> </div>\n>\n> + b\n", "> - <div> a\n> lazy\n> </div>\n>\n> - b\n"],
     ["+ *a*\nlazy\n\n+ b\n", "+ _a_\nlazy\n\n+ b\n"],
     ["+ *prefix* <div> a\nlazy\n\n+ b\n", "+ _prefix_ <div> a\nlazy\n\n+ b\n"],
   ])("still permits safe edits to %j", (source, output) => {

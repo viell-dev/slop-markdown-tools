@@ -3,6 +3,7 @@ import type { Document, Edit } from "../core/types.js";
 import { lineStarts } from "./source.js";
 import { walk } from "./walk.js";
 import { startsWithMarker } from "./parse.js";
+import { misreadLists } from "./misread-lists.js";
 
 type Range = [number, number];
 const found = new WeakMap<Root, Range[]>();
@@ -36,17 +37,43 @@ function boundaries(document: Document): Range[] {
   const { source } = document;
   const starts = lineStarts(source);
   const ranges: Range[] = [];
+  // Paragraphs projected inside native literal HTML are not Markdown text
+  // boundaries. Holding only their originating list marker can split a list
+  // whose markers were previously safe to change together (#399, #603).
+  const html: Range[] = [];
+  for (const node of misreadLists(document).htmlText) {
+    const from = node.position?.start.offset,
+      to = node.position?.end.offset;
+    if (from !== undefined && to !== undefined) html.push([from, to]);
+  }
+  html.sort((a, b) => a[0] - b[0]);
+  for (let index = 1; index < html.length; index++)
+    html[index]![1] = Math.max(html[index]![1], html[index - 1]![1]);
+  const literalHtml = (node: Nodes) => {
+    const from = node.position?.start.offset,
+      to = node.position?.end.offset;
+    if (from === undefined || to === undefined) return false;
+    let low = 0,
+      high = html.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (html[middle]![0] <= from) low = middle + 1;
+      else high = middle;
+    }
+    return low > 0 && html[low - 1]![1] >= to;
+  };
   const rows = (from: number, to = from) => {
     const start = starts[from - 1],
       end = starts[to] ?? source.length;
     if (start !== undefined && start < end) ranges.push([start, end]);
   };
   const text = (node: Nodes) =>
-    node.type === "paragraph" ||
-    (node.type === "heading" &&
-      node.position &&
-      node.position.end.line >
-        (node.children.at(-1)?.position?.end.line ?? node.position.start.line));
+    !literalHtml(node) &&
+    (node.type === "paragraph" ||
+      (node.type === "heading" &&
+        node.position &&
+        node.position.end.line >
+          (node.children.at(-1)?.position?.end.line ?? node.position.start.line)));
   const leading = (value: string) => /^[ \t>]*/.exec(value)![0];
   const column = (value: string) => {
     let result = 0;
@@ -86,7 +113,7 @@ function boundaries(document: Document): Range[] {
           rows(before.position.end.line, after.position.start.line);
       }
     }
-    if (node.type !== "paragraph" || !node.position) return;
+    if (node.type !== "paragraph" || !node.position || literalHtml(node)) return;
     const start = node.position.start.offset;
     if (start === undefined) return;
     const prefix = source.slice(starts[node.position.start.line - 1], start);

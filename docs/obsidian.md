@@ -62,7 +62,10 @@ list, block quote, HTML block, table, fence, or definition together when there
 is no blank line between them. They also keep lazy continuation margins, a Tab
 after a container marker, and non-one ordered markers directly below text.
 Properly indented nested blocks and a callout's explicit title/body boundary
-remain eligible. Ordinary ATX headings beside paragraphs still get spacing.
+remain eligible. Ordinary ATX headings beside paragraphs still get spacing. Text
+already protected as literal native HTML does not seed a Markdown continuation
+boundary; otherwise holding only one list marker could split a list whose
+markers are safe to change together.
 
 When a proposed style edit is held by this policy or an existing native
 protection, `lint` and `format` report
