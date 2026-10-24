@@ -6,7 +6,8 @@ name: Rendering
 # up to 600 requests, and a workflow's token may make 1,000 an hour in this repository, so when
 # runs overlap, the script waits for the limit to reset. A difference fails the run; the
 # report, the documents, and their HTML are in the run's rendering artifact, and the summary
-# names the run's new seed, which reproduces it. The paths below are the Obsidian workflow's,
+# records the profile and actual seeds. PR/release gates use fixed realistic documents;
+# weekly/manual adversarial discovery is separate. The paths below are the Obsidian workflow's,
 # with this check's own files; keep the two lists alike.
 on:
   schedule:
@@ -25,15 +26,25 @@ on:
       - scripts/parser-labels.mjs
       - scripts/parser-packages.json
       - scripts/rendering.mjs
+      - scripts/renderer-*.mjs
+      - scripts/renderer-known-differences.json
       - scripts/github-rendering.mjs
       - .github/workflows/rendering.yml
   workflow_dispatch:
     inputs:
+      profile:
+        description: Realistic regression gate or adversarial discovery
+        type: choice
+        options: [adversarial, realistic]
+        default: adversarial
       seed:
-        description: The new seed (a whole number below 2^32, or none); random when empty
+        description: Seed or none; adversarial is random when empty, realistic uses fixed seeds
         required: false
   workflow_call:
     inputs:
+      profile:
+        type: string
+        default: realistic
       seed:
         type: string
         required: false
@@ -63,13 +74,23 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PROFILE:
+            ${{ github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic' }}
           SEED: ${{ inputs.seed }}
         run: |
-          arguments=()
+          arguments=(--profile "$PROFILE")
           if [ -n "$SEED" ]; then arguments+=(--seed "$SEED"); fi
           mkdir -p artifacts
           node scripts/github-rendering.mjs "${arguments[@]}" | tee artifacts/github-rendering.md \
             >> "$GITHUB_STEP_SUMMARY"
+      - name: Validate deterministic gate evidence
+        if: ${{ github.event_name == 'pull_request' || github.workflow == 'Release' }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
+          validateRendererEvidence(JSON.parse(readFileSync('artifacts/github-rendering/report.json', 'utf8')));
+          JS
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -212,12 +212,14 @@ entry to remove; a new one fails the test. The Rendering workflow compares
 GitHub's rendering in the same way, through its Markdown API, every week, for
 pull requests that change a [renderer-sensitive path](#what-the-checks-prove),
 and in the Release workflow. Run it by hand with
-`gh workflow run rendering.yml --ref BRANCH`, optionally with `-f seed=N` to
-repeat a run's new seed or `-f seed=none` for the fixed seeds alone, as the
-Release workflow runs it, or locally after a build with
-`node scripts/github-rendering.mjs`, which needs an authenticated `gh` and takes
-ten to fifteen minutes; its first lines say what it compares. The GitHub
-comparison verifies rendered code text against the parsed source before
+`gh workflow run rendering.yml --ref BRANCH`. PR and release runs use authored
+fixtures and the realistic profile at fixed seeds 1–5, 25 documents each. By
+hand, select `-f profile=adversarial -f seed=N` to reproduce discovery, or omit
+the seed for a new one. Locally, after a build, use
+`node scripts/github-rendering.mjs` for the fixed gate, or add
+`--profile adversarial --seed N` for discovery. It needs an authenticated `gh`;
+the report records the profile, actual seeds and reproduction command. The
+GitHub comparison verifies rendered code text against the parsed source before
 accepting highlighting-wrapper and final-line variations. Code values, language,
 metadata, and actual content differences remain significant; raw HTML `pre`
 elements are compared strictly. Only generated footnote identifiers established
@@ -235,46 +237,52 @@ WebdriverIO with `wdio-obsidian-service`, which downloads Obsidian at run time
 into the `mdrefine-obsidian-cache` volume, because Obsidian's terms do not allow
 redistributing it; the check keeps its own dependencies in
 `scripts/obsidian/package.json`. It writes `artifacts/obsidian/report.json`,
-with screenshots of the first differences. `SEED` repeats a run's generated
-documents, `COUNT` sets how many there are (100), and `OBSIDIAN_VERSION` picks
-Obsidian's version (`latest`). `REDUCE`, a comma-separated list of generated
-documents from a report, shortens each to the lines that still show its
-difference, and `PROBE`, a JSON array of documents, only shows each in Obsidian.
-Live Preview is compared by its lines' text and styles, with the characters that
-it shows as written left out where only the source differs, and Reading view by
-its HTML. The check requires the editor to finish parsing the whole note and
-publish that syntax tree before collecting styles; incomplete parsing fails the
-run. Empty table source rows with no text or embed are ignored. Table widgets
-ignore their known focus and active-handle classes and a generated cell editor
-only when the cell also retains its rendered preview. Rendered content, styles,
-code spacing, alignment, link destinations, and row counts remain significant. A
-host control activates header, code, and link cells with real input and checks
-those negative cases; nested authored tables and editor-only payload remain
-intact. Boundary regressions in `scripts/obsidian/boundary-fixtures.mjs` are
-shared with the unit suite, including the long synthetic note in
-`scripts/obsidian/fixtures/508.txt`. The comparison retains the source delimiter
-of styled list lines, including checkbox widgets, and normalizes spaces within
-and around italic and bold runs while keeping styled characters, code,
-highlights, and decorations significant. Unchecked checkbox widgets retain their
-presence and count even with no text. Styled fence delimiters ignore only their
-terminal spaces and tabs; code body whitespace and internal info-string spacing
-remain significant. A host control checks both the normalization and those
-negative cases. Native heading lines and Setext underlines retain heading
-boundaries independently of optional blank separators; host controls retain
-changes to their count, levels, text, styles, and embeds, including
-single-character underlines and empty headings. Unstyled records emptied by
-punctuation normalization are omitted after grouping, so their removal cannot
-join visible paragraphs. Styled records, code, and widgets remain significant.
-For the default Obsidian theme, a lone unattributed paragraph directly inside a
-list item has no extra spacing and is compared as inline content. Multiple
-paragraphs, attributed paragraphs, and other block boundaries remain
-significant; a deterministic host control checks these cases on every comparison
-run. The Obsidian workflow runs the check for pull requests that change a
-[renderer-sensitive path](#what-the-checks-prove), in the Release workflow, and
-by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
-`seed`, `count`, and `obsidian-version`; its `obsidian` artifact holds the
-report and the screenshots. It fails when the check compared nothing. Every
-week, and in the Release workflow, it runs the fixtures alone (`COUNT=0`).
+with screenshots of the first differences. `PROFILE=realistic` is the default:
+the fixtures and seeds 1–5, ten documents per seed. `PROFILE=adversarial`
+selects discovery: one fresh seed and 100 documents. `SEEDS` selects a list,
+`SEED` adds a seed (`none` adds none), `COUNT` sets documents per seed, and
+`OBSIDIAN_VERSION` picks Obsidian's version (`latest`). Realistic generation
+uses separated blocks, proper container prefixes, closed fences and documented
+dialect syntax. Existing adversarial seed behavior is retained. `REDUCE`, a
+comma-separated list of generated documents from a report, shortens each to the
+lines that still show its difference, and `PROBE`, a JSON array of documents,
+only shows each in Obsidian. Live Preview is compared by its lines' text and
+styles, with the characters that it shows as written left out where only the
+source differs, and Reading view by its HTML. The check requires the editor to
+finish parsing the whole note and publish that syntax tree before collecting
+styles; incomplete parsing fails the run. Empty table source rows with no text
+or embed are ignored. Table widgets ignore their known focus and active-handle
+classes and a generated cell editor only when the cell also retains its rendered
+preview. Rendered content, styles, code spacing, alignment, link destinations,
+and row counts remain significant. A host control activates header, code, and
+link cells with real input and checks those negative cases; nested authored
+tables and editor-only payload remain intact. Boundary regressions in
+`scripts/obsidian/boundary-fixtures.mjs` are shared with the unit suite,
+including the long synthetic note in `scripts/obsidian/fixtures/508.txt`. The
+comparison retains the source delimiter of styled list lines, including checkbox
+widgets, and normalizes spaces within and around italic and bold runs while
+keeping styled characters, code, highlights, and decorations significant.
+Unchecked checkbox widgets retain their presence and count even with no text.
+Styled fence delimiters ignore only their terminal spaces and tabs; code body
+whitespace and internal info-string spacing remain significant. A host control
+checks both the normalization and those negative cases. Native heading lines and
+Setext underlines retain heading boundaries independently of optional blank
+separators; host controls retain changes to their count, levels, text, styles,
+and embeds, including single-character underlines and empty headings. Unstyled
+records emptied by punctuation normalization are omitted after grouping, so
+their removal cannot join visible paragraphs. Styled records, code, and widgets
+remain significant. For the default Obsidian theme, a lone unattributed
+paragraph directly inside a list item has no extra spacing and is compared as
+inline content. Multiple paragraphs, attributed paragraphs, and other block
+boundaries remain significant; a deterministic host control checks these cases
+on every comparison run. The Obsidian workflow runs the check for pull requests
+that change a [renderer-sensitive path](#what-the-checks-prove), in the Release
+workflow, and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the
+inputs `profile`, `seed`, `count`, and `obsidian-version`; its `obsidian`
+artifact holds the report and screenshots. It fails when the check compared
+nothing. PR and release gates require realistic fixed-seed evidence;
+weekly/manual adversarial runs are discovery only. Both profiles retain the
+native calibration controls.
 
 Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
 the actual app and renderer versions separately from the requested version, with
@@ -358,13 +366,11 @@ all four.
   VitePress's own Markdown renderer and Vue. Math: `math.test.ts` against the
   renderers' output recorded in `math-renderers.ts`. The Rendering and Obsidian
   workflows run for pull requests that change a renderer-sensitive path, with
-  fixed and random documents, and every week; the Release workflow runs them at
-  the commit it releases with fixed documents only: the Rendering check's fixed
-  seeds and the Obsidian check's fixtures, which the weekly Obsidian run also
-  uses, so that a new Obsidian release is tested within a week. Generated
-  documents sample the syntax rather than exhaust it, and a random document that
-  shows a new difference gets an issue. Forgejo's and Gitea's own renderers are
-  not compared automatically yet
+  authored fixtures and realistic documents at fixed seeds. The Release workflow
+  validates those reports at its exact commit. Weekly/manual adversarial runs
+  discover differences without gating delivery. New findings receive an issue
+  and a scope disposition; they do not automatically expand the active fix.
+  Forgejo's and Gitea's own renderers are not compared automatically yet
   ([#486](https://github.com/viell-dev/slop-markdown-tools/issues/486)); their
   dialects rest on the reference parsers and on unit tests taken from
   observations of the forges.
@@ -424,23 +430,25 @@ all four.
 The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
 `src/syntax/`, `src/index.ts`, `package.json`, the lockfile,
 `scripts/build-parser.mjs`, `scripts/parser-patches.mjs`,
-`scripts/parser-labels.mjs`, `scripts/parser-packages.json`,
-`scripts/rendering.mjs`, and each check's own files, as the `pull_request` paths
-of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
-request. Run the checks by hand on a branch whose change could alter what a
-renderer shows from another path. A difference fails the check; investigate it
-and record it in an issue rather than running the check again until it passes.
-While confirmed differences are open, runs with random documents can fail on
-them again: reduce the run's documents, with `REDUCE` for the Obsidian check,
-and compare them with the open issues before filing another. The fix of such a
-difference adds its reduced document to `scripts/obsidian/fixtures.mjs` or a
-unit test, so the fixed documents that releases compare grow from what the
-random ones find. A fixed document that shows a difference blocks releases until
-it is fixed or, in the Rendering check, listed with its issue; the Obsidian
-fixtures have no such list, because each records a defect that was fixed. When a
-new Obsidian release makes a fixture differ, as the weekly run is there to find,
-that is a new defect: the tool adapts to the release's reading, with an issue,
-before the next release.
+`scripts/parser-labels.mjs`, `scripts/parser-packages.json`, `scripts/rendering.mjs`, and each check's own
+files, as the `pull_request` paths of `rendering.yml` and `obsidian.yml` list
+them. Link the runs in the pull request. Run the checks by hand on a branch
+whose change could alter what a renderer shows from another path. A difference
+fails the check; investigate it and record it in an issue rather than running
+the check again until it passes. A realistic or existing regression-fixture
+difference blocks its gate. Adversarial discovery instead uses the scope rule in
+[AGENTS.md](AGENTS.md#bounded-renderer-work): fix meaningful changes on
+plausible authored input, and document other cases as limits. A report from real
+use can reopen a limit. Reuse an issue for variants of the same cause.
+
+`scripts/renderer-known-differences.json` lists exact issue-linked discovery
+source/output/view pairs. Weekly discovery replays their sources and rejects
+stale entries; `renderer-profiles.test.ts` checks issue references and current
+formatter outputs offline. A known discovery entry never excuses a realistic
+gate difference. Keep the list empty when no measured differences remain.
+Previously fixed source fixtures stay; a new renderer regression there still
+requires investigation. Completing the fixed gates and disposing of discovery
+findings is the finish condition, rather than finding no more adversarial bugs.
 
 ## Benchmarks
 

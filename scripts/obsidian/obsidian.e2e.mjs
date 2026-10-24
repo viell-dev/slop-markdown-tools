@@ -13,9 +13,11 @@ const { createWorkspace, format } = await import("/repo/dist/index.js");
 const { documentSeed, generateDocument, normalizeHtml } =
   await import("/repo/scripts/rendering.mjs");
 const { fixtures } = await import("/repo/scripts/obsidian/fixtures.mjs");
+const { rendererSettings } = await import("/repo/scripts/renderer-settings.mjs");
+const { classifyDifferences, knownSources } =
+  await import("/repo/scripts/renderer-differences.mjs");
 
-const seed = Number(process.env.SEED || Math.floor(Math.random() * 2 ** 32)) >>> 0;
-const count = Number(process.env.COUNT || 100);
+const { profile, seeds, count } = rendererSettings(process.env);
 /** Widths to format at: the preset's, and a narrow one that reflows nearly every paragraph. */
 const widths = [80, 30];
 
@@ -599,14 +601,17 @@ function outdent(runs, count) {
 
 /** The documents to format: the fixtures, and `count` generated ones from the run's seed. */
 function documents() {
-  const generated = Array.from({ length: count }, (_, index) => {
-    const documentNumber = documentSeed(seed, index);
-    return {
-      name: `generated ${documentNumber}`,
-      source: generateDocument(documentNumber, "obsidian"),
-    };
-  });
-  return [...fixtures, ...generated];
+  const generated = seeds.flatMap((seed) =>
+    Array.from({ length: count }, (_, index) => ({
+      name: `generated ${seed}/${index}`,
+      source: generateDocument(documentSeed(seed, index), "obsidian", profile),
+    })),
+  );
+  const retained =
+    profile === "adversarial"
+      ? knownSources("obsidian").map((source, index) => ({ name: `known ${index}`, source }))
+      : [];
+  return [...fixtures, ...generated, ...retained];
 }
 
 /** How many documents were written to the vault, which names the next ones. */
@@ -1279,7 +1284,9 @@ describe("Obsidian before and after formatting", function () {
   it("shows the same in Live Preview and in Reading view", async function () {
     if (reduce || probe) this.skip();
     const version = await browser.executeObsidian(({ obsidian }) => obsidian.apiVersion);
-    console.log(`Obsidian ${version}. Seed ${seed}; repeat with SEED=${seed}.`);
+    console.log(
+      `Obsidian ${version}. Profile ${profile}, seeds ${seeds.join(",")}, count ${count}.`,
+    );
     const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
     const differences = [];
     let compared = 0;
@@ -1298,13 +1305,35 @@ describe("Obsidian before and after formatting", function () {
           await browser.saveScreenshot(`${stem}-after.png`);
         }
       }
-    const report = { obsidian: version, seed, count, widths, compared, differences };
+    const classified = classifyDifferences(
+      "obsidian",
+      profile,
+      differences.flatMap((difference) =>
+        difference.changed.map((view) => ({ ...difference, view })),
+      ),
+    );
+    const report = {
+      obsidian: version,
+      profile,
+      seeds,
+      count,
+      widths,
+      compared,
+      differences,
+      known: classified.known,
+      unexpected: classified.unexpected,
+      stale: classified.stale,
+    };
     writeFileSync("/out/report.json", `${JSON.stringify(report, null, 2)}\n`);
     console.log(
       `Compared ${compared} formatted documents; ${differences.length} showed differently.`,
     );
     for (const { name, width, changed } of differences)
       console.log(`  ${name} at ${width} columns: ${changed.join(", ")}`);
-    expect(differences.map(({ name, width }) => `${name} at ${width}`)).toEqual([]);
+    expect(compared).toBeGreaterThan(0);
+    expect(
+      classified.unexpected.map(({ name, width, view }) => `${name} at ${width}, ${view}`),
+    ).toEqual([]);
+    expect(classified.stale).toEqual([]);
   });
 });
