@@ -141,6 +141,8 @@ export interface MisreadLists {
    * child can retain that state after the parent's closer (issue #556).
    */
   htmlText: ReadonlySet<Nodes>;
+  /** The block-derived subset; inline-tag Live Preview stretches are not block HTML. */
+  blockHtmlText: ReadonlySet<Nodes>;
   /**
    * In the Obsidian dialect, the underlined headings whose underline one of the
    * views reads as text: Reading view one with blank space after it, or before
@@ -494,6 +496,7 @@ export function misreadLists(document: Document): MisreadLists {
   };
   visit(document.tree);
   const htmlText = new Set<Nodes>();
+  const blockHtmlText = new Set<Nodes>();
   const tableText = new Set<Nodes>();
   const unclosedCode = new Set<Nodes>();
   let htmlCodeToEnd = false;
@@ -736,7 +739,10 @@ export function misreadLists(document: Document): MisreadLists {
           let from = offset;
           while (from > 0 && source[from - 1] !== "\n" && source[from - 1] !== "\r") from--;
           const start = { ...leaf.position.start, offset: from, column: 1 };
-          htmlText.add(from === offset ? leaf : { ...leaf, position: { ...leaf.position, start } });
+          const region =
+            from === offset ? leaf : { ...leaf, position: { ...leaf.position, start } };
+          htmlText.add(region);
+          blockHtmlText.add(region);
           // The opener is still HTML source in Reading view. A physical empty
           // line inside its body ends that HTML, so its closer instead opens
           // Reading-view code and later fences pair differently (#529).
@@ -770,7 +776,9 @@ export function misreadLists(document: Document): MisreadLists {
             end = { offset: cursor, line: end.line + 1, column: cursor - from + 1 };
           }
           topUntil = end.offset!;
-          htmlText.add(stretch(leaf, leaf.position.start, end));
+          const region = stretch(leaf, leaf.position.start, end);
+          htmlText.add(region);
+          blockHtmlText.add(region);
         }
       }
     });
@@ -1568,10 +1576,12 @@ export function misreadLists(document: Document): MisreadLists {
       htmlUntil = until;
       if (block && until <= end) continue;
       escapingHtmlEnds.set(leaf, until);
-      htmlText.add({
+      const region = {
         ...leaf,
         position: { ...leaf.position, end: pointAt(until) },
-      });
+      };
+      htmlText.add(region);
+      if (block) blockHtmlText.add(region);
     }
     /**
      * Comment openers in text, highlights, and image descriptions, where Live
@@ -2118,6 +2128,7 @@ export function misreadLists(document: Document): MisreadLists {
     unclosedCode,
     htmlCodeToEnd,
     htmlText,
+    blockHtmlText,
     underlines,
     widgetHeadings,
     headingLazyLines,

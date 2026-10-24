@@ -37,11 +37,11 @@ function boundaries(document: Document): Range[] {
   const { source } = document;
   const starts = lineStarts(source);
   const ranges: Range[] = [];
-  // Paragraphs projected inside native literal HTML are not Markdown text
+  // Paragraphs projected inside native block HTML are not Markdown text
   // boundaries. Holding only their originating list marker can split a list
   // whose markers were previously safe to change together (#399, #603).
   const html: Range[] = [];
-  for (const node of misreadLists(document).htmlText) {
+  for (const node of misreadLists(document).blockHtmlText) {
     const from = node.position?.start.offset,
       to = node.position?.end.offset;
     if (from !== undefined && to !== undefined) html.push([from, to]);

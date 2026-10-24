@@ -9,6 +9,24 @@ const options = (rules: Config["rules"]) => ({
 });
 
 describe("general Obsidian boundary policy (#603)", () => {
+  it.each(["<span>a</span>\n+ b\n", "> <span>a</span>\n> + b\n", "<span>a\n\nb</span>\n+ c\n"])(
+    "keeps inline HTML inside the ordinary text boundary policy: %j",
+    (body) => {
+      const settings = options({ "style/list-marker": "warn" });
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", "\uFEFF"]) {
+          const source = bom + body.replaceAll("\n", newline);
+          const result = format(source, settings);
+          expect(result.output).toBe(source);
+          expect(result.diagnostics).toMatchObject([
+            { rule: "style/list-marker", severity: "warn" },
+          ]);
+          expect(result.diagnostics[0]!.message).toMatch(/^Left as written/);
+          expect(result.diagnostics[0]!.edit).toBeUndefined();
+          expect(format(result.output, settings).output).toBe(source);
+        }
+    },
+  );
   it.each(["\n", "\r\n", "\r"])(
     "holds adjacent list markers and reports configured findings with %j",
     (newline) => {
