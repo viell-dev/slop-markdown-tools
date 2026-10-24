@@ -16,6 +16,18 @@ updates:
       # The type definitions follow the lowest supported Node.js version, 22.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # PRs #591-#594: these lines require the next reference-parser generation.
+      # VitePress alpha.20 uses markdown-it 14 / mathjax3 4. Compatible older
+      # lines remain eligible. Revisit when compatible peer ranges return,
+      # with a reference upgrade, or when a security advisory requires it.
+      - dependency-name: markdown-it-mathjax3
+        versions: [">=5.0.0 <6.0.0"]
+      - dependency-name: markdown-it
+        versions: [">=15.0.0 <16.0.0"]
+      - dependency-name: "@mdit/plugin-attrs"
+        versions: [">=1.3.0 <2.0.0"]
+      - dependency-name: "@mdit/plugin-footnote"
+        versions: [">=1.1.0 <2.0.0"]
     groups:
       development:
         dependency-type: development

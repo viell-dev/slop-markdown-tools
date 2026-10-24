@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Dependency automation defers the incompatible reference-parser versions
+  assessed in [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591)
+  through [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594),
+  with explicit reconsideration conditions, to prevent repeat incompatible PRs.
+
 - Remove every `mdtools` compatibility form deprecated in 0.4.x: the command,
   all five configuration discovery names and all three suppression-comment
   prefixes. Replace them with `mdrefine` before upgrading; old comments are
