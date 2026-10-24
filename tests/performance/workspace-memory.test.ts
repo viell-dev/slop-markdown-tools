@@ -8,7 +8,7 @@ import {
   setFlagsFromString,
   writeHeapSnapshot,
 } from "node:v8";
-import { runInNewContext } from "node:vm";
+import { runInNewContext, runInThisContext } from "node:vm";
 import type { Nodes } from "mdast";
 import { expect, it, vi } from "vitest";
 import { createWorkspace } from "../../src/index.js";
@@ -35,7 +35,11 @@ vi.mock("../../src/syntax/parse.js", async (importOriginal) => {
   };
   return { ...actual, parse };
 });
-type AsyncGc = (options: { type: "major"; execution: "async" }) => Promise<void>;
+type AsyncGc = (options: {
+  type: "major";
+  execution: "async";
+  flavor: "last-resort";
+}) => Promise<void>;
 let gc: AsyncGc | undefined;
 /** Collect after the JavaScript stack unwinds, without conservative stack roots. */
 async function collectGarbage(): Promise<void> {
@@ -45,10 +49,30 @@ async function collectGarbage(): Promise<void> {
     setFlagsFromString("--expose-gc");
     gc = runInNewContext("gc") as AsyncGc;
   }
-  // A synchronous collection may retain stale stack pointers. V8's async
-  // collector runs as a separate task with no JavaScript heap pointers there.
-  await gc({ type: "major", execution: "async" });
+  // A synchronous collection may retain stale stack pointers. The async task
+  // has no JavaScript stack roots. Regular major GC is not V8's collect-all
+  // operation: last-resort also releases compilation caches and collects until
+  // the root set is stable. Sample once after that operation, not after a
+  // selected successful retry (#413). Strongly retained anchors still survive.
+  await gc({ type: "major", execution: "async", flavor: "last-resort" });
 }
+
+/** No caller keeps this source; only V8's ordinary compilation cache can. */
+function compileAndDiscard(): number {
+  return runInThisContext(
+    `/*${"synthetic compilation cache fixture ".repeat(200_000)}*/ 0`,
+  ) as number;
+}
+
+it("does not count V8 compilation caches as workspace retention (#413)", async () => {
+  await collectGarbage();
+  const before = process.memoryUsage().heapUsed;
+  expect(compileAndDiscard()).toBe(0);
+  await collectGarbage();
+  // The synthetic script is over 7 MB, but no application value retains it.
+  // A regular major GC leaves its source cached and fails this same allowance.
+  expect(process.memoryUsage().heapUsed - before).toBeLessThan(1_160_000 / 3);
+});
 
 /** Failure evidence for #413; receives no workspace, document, source or WeakRef. */
 function retainedTextFailure(
@@ -64,6 +88,7 @@ function retainedTextFailure(
     const report = {
       issue: 413,
       stage: "after-fixed-measurement",
+      collection: { type: "major", execution: "async", flavor: "last-resort" },
       runtime: {
         node: process.version,
         v8: process.versions.v8,
