@@ -5,13 +5,12 @@ the second number plays the part of the first: a minor release such as 0.3.0 may
 change what 0.2 does, and the [changelog](changelog.md) says how, while a patch
 release such as 0.2.1 only fixes defects.
 
-The agreed 0.4.x transition also introduces the `mdrefine` command,
-configuration filenames and suppression comments while retaining all previous
-`mdtools` forms as deprecated aliases. It includes the conservative Obsidian
-boundary policy and visible held-edit findings. These scoped changes are an
-explicit exception to the usual patch-release policy. Version 0.5.0 removes all
-old naming forms; migrate during 0.4.x as the [CLI guide](cli.md#earlier-names)
-describes.
+The agreed 0.4.x transition introduced the `mdrefine` command, configuration
+filenames and suppression comments while retaining all previous `mdtools` forms
+as deprecated aliases. It included the conservative Obsidian boundary policy and
+visible held-edit findings. These scoped changes are an explicit exception to
+the usual patch-release policy. Version 0.5.0 removes all old naming forms;
+follow the [CLI migration steps](cli.md#earlier-names) before upgrading.
 
 ## What a version number covers
 

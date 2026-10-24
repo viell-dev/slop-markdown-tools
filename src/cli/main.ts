@@ -19,7 +19,6 @@ import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
 import { unifiedDiff } from "./diff.js";
-import { warnLegacyConfig, warnLegacyDirectives } from "./deprecations.js";
 import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
@@ -123,7 +122,6 @@ async function workspace(flags: Flags) {
   // configuration file in the root, with a message about a file the user never named.
   if (flags.root !== undefined) await checkRoot(flags.root);
   const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
-  warnLegacyConfig(loaded.file);
   return {
     ...loaded,
     root: path.resolve(flags.root ?? loaded.root),
@@ -252,7 +250,6 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       });
       continue;
     }
-    warnLegacyDirectives(source, options);
     if (mode === "lint") reports.push({ path: name, diagnostics: lint(source, options) });
     else {
       const result = await formatWithCode(source, { ...options, cwd: discovery.root });
@@ -442,7 +439,6 @@ program
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {
     const loaded = await loadConfig(path.resolve("."), flags.config);
-    warnLegacyConfig(loaded.file);
     const { plugins } = loaded;
     const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
       id,

@@ -221,7 +221,7 @@ const blockSpacing: Rule = {
       return block !== undefined && block[0] <= from && to < block[1];
     };
     const directiveLines = new Set<number>();
-    if (source.includes("mdrefine-") || source.includes("mdtools-"))
+    if (source.includes("mdrefine-"))
       walk(document.tree, "html", (node) => {
         if (directive(node.value)?.kind === "disable-next-line")
           directiveLines.add(node.position!.end.line);

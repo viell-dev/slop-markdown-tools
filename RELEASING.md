@@ -25,7 +25,11 @@ On a branch, in one pull request:
    with what a fresh installation of the package gets. The lockfile does not
    ship, and Dependabot updates only the direct dependencies. Check first that
    every updated package is at least seven days old and comes from its known
-   maintainers (`npm view NAME time maintainers`).
+   maintainers (`npm view NAME time maintainers`). An earlier security fix may
+   use a narrowly scoped exception: record the advisory, exact version,
+   publication time, maintainer and patch review, and verification in the
+   release PR and #330. Keep the normal waiting period for other packages; a
+   security exception does not waive checks or review.
 5. Run the checks below, push, and wait for CI.
 
 The release normally gets one independent review of the coherent change range

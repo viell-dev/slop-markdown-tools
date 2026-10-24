@@ -2,11 +2,14 @@
 
 ## Install
 
+When upgrading from 0.4.x, complete the [naming migration](cli.md#earlier-names)
+before installing 0.5.0.
+
 mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.4.1
+npm install --save-dev --save-exact mdrefine@0.5.0
 npx --no-install mdrefine --help
 ```
 

@@ -7,15 +7,10 @@ const config: Config = {
   rules: { "style/emphasis": "warn", "style/strong": "warn" },
 };
 
-it.each([
-  ["mdrefine", "mdrefine"],
-  ["mdtools", "mdtools"],
-  ["mdtools", "mdrefine"],
-  ["mdrefine", "mdtools"],
-])("shares suppression state between %s disable and %s enable", (disable, enable) => {
-  const source = `<!-- ${disable}-disable -->\n\n*one*\n\n<!-- ${enable}-enable -->\n\n*two*\n`;
+it("applies mdrefine suppression regions and the next-line fast path", () => {
+  const source = "<!-- mdrefine-disable -->\n\n*one*\n\n<!-- mdrefine-enable -->\n\n*two*\n";
   expect(format(source, { config }).output).toBe(source.replace("*two*", "_two_"));
-  const next = `Text <!-- ${disable}-disable-next-line style/emphasis -->\n# *one*\n`;
+  const next = "Text <!-- mdrefine-disable-next-line style/emphasis -->\n# *one*\n";
   const settings: Config = {
     extends: [],
     rules: {
@@ -27,6 +22,31 @@ it.each([
   expect(result.output).toBe(next);
   expect(result.diagnostics).toEqual([]);
   expect(format(result.output, { config: settings }).output).toBe(result.output);
+});
+
+it.each(["disable", "disable-next-line"])(
+  "treats retired mdtools-%s as an ordinary comment",
+  (kind) => {
+    const source = `<!-- mdtools-${kind} style/emphasis -->\n*one*\n`;
+    expect(format(source, { config }).output).toBe(source.replace("*one*", "_one_"));
+    expect(lint(source, { config })).toHaveLength(2);
+  },
+);
+
+it("does not let a retired enable comment end a current suppression region", () => {
+  const source = "<!-- mdrefine-disable -->\n\n*one*\n\n<!-- mdtools-enable -->\n\n*two*\n";
+  expect(format(source, { config }).output).toBe(source);
+  expect(lint(source, { config })).toEqual([]);
+});
+
+it("does not preserve next-line directive spacing for retired comments", () => {
+  const source = "Text <!-- mdtools-disable-next-line style/emphasis -->\n# *one*\n";
+  const options = {
+    config: { extends: [], rules: { "style/emphasis": "error", "style/block-spacing": "warn" } },
+  } as const;
+  expect(format(source, options).output).toBe(
+    source.replace("-->\n", "-->\n\n").replace("*one*", "_one_"),
+  );
 });
 
 it.each(["\n", "\r\n", "\r"])(

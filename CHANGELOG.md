@@ -8,9 +8,31 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.5.0 - 2026-10-24
+
+### Changed
+
+- Dependency automation defers the incompatible reference-parser versions
+  assessed in [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591)
+  through [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594),
+  with explicit reconsideration conditions, to prevent repeat incompatible PRs.
+
+- Remove every `mdtools` compatibility form deprecated in 0.4.x: the command,
+  all five configuration discovery names and all three suppression-comment
+  prefixes. Replace them with `mdrefine` before upgrading; old comments are
+  ordinary HTML and old config names are no longer discovered. The migration
+  notice and legacy wrapper are removed. Formatting does not migrate user files
+  ([#601](https://github.com/viell-dev/slop-markdown-tools/issues/601)).
 
 ### Fixed
+
+- Update the indirect `fast-uri` dependency to 3.1.9 for its URI parsing and
+  normalization security fixes, and the Docker-only Obsidian check's
+  `serialize-javascript` override to 7.1.3 for its serialization security fix.
+  The repository lockfile does not ship: existing installations can retain an
+  older indirect version. Run `npm update fast-uri` in the consuming project,
+  then use `npm ls fast-uri` to verify every resolved copy is 3.1.9 or a newer
+  compatible patched release.
 
 - Memory checks settle V8's collectible roots and compilation caches before
   sampling, rather than assuming a regular major collection has released all

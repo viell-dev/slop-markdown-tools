@@ -56,10 +56,13 @@ a sensor board.
 
 ## Install
 
+When upgrading from 0.4.x, complete the [naming
+migration](docs/cli.md#earlier-names) before installing 0.5.0.
+
 mdrefine needs Node.js 22.12 or newer:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.4.1
+npm install --save-dev --save-exact mdrefine@0.5.0
 npx mdrefine lint
 npx mdrefine format --diff
 npx mdrefine format --write

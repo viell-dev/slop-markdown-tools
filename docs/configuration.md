@@ -20,19 +20,11 @@ merged with one above it.
 
 ### Earlier names
 
-During 0.4.x, `mdtools.config.jsonc`, `.json`, `.mjs`, `.js`, and `.cjs` remain
-deprecated aliases of the corresponding `mdrefine.config.*` names. Rename the
-file rather than keeping both: two configuration files in one directory remain
-an error even when their prefixes differ. Explicit `--config` selection still
-works. Both names use the same JSON Schema; editor filename associations can
-include both prefixes during migration.
-
-The old `mdtools-disable`, `mdtools-disable-next-line`, and `mdtools-enable`
-comments also remain accepted, including mixed prefixes: `mdrefine-enable`
-re-enables what `mdtools-disable` turned off. Replace their prefixes manually;
-formatting leaves existing comments intact. All deprecated forms are removed in
-0.5.0. The CLI's [migration notice](cli.md#earlier-names) does not count as a
-document warning.
+Version 0.5.0 no longer discovers `mdtools.config.jsonc`, `.json`, `.mjs`, `.js`
+or `.cjs`, and the `mdtools-disable`, `mdtools-disable-next-line` and
+`mdtools-enable` comments no longer affect findings. Rename files and replace
+comment prefixes before upgrading from 0.4.x; see the [migration
+steps](cli.md#earlier-names). Formatting does not migrate them.
 
 ### File contents
 
