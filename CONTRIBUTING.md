@@ -164,7 +164,13 @@ have; the CI job on 22.12.0 catches those that later 22.x releases added.
 
 Dependabot proposes updates weekly, the development dependencies as one group,
 and only versions published at least seven days earlier, which leaves time for a
-broken or compromised release to be found. Security updates are not delayed.
+broken or compromised release to be found. Security updates are not delayed. An
+update that the pinned dependencies cannot accept, such as one whose peer range
+needs the next markdown-it generation, is closed, and `.github/dependabot.yml`
+ignores its version line with the reason and when to revisit it. A merged update
+ships with the next release, as the [release
+procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md)
+describes.
 
 ## Tests
 
