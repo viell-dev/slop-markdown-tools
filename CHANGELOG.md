@@ -8,6 +8,16 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Fixed
+
+- Memory checks settle V8's collectible roots and compilation caches before
+  sampling, rather than assuming a regular major collection has released all
+  collectible memory. The strict source-retention allowance and negative
+  controls remain in place
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
+
 ## 0.4.1 - 2026-10-24
 
 ### Changed

@@ -327,9 +327,16 @@ requirement; where recoverable, check that the former slow algorithm fails the
 comparison. Garbage-collection checks also run outside coverage, which changes
 execution and allocation costs.
 
+Memory checks await V8's asynchronous `last-resort` major collection, which
+releases compilation caches and collects until its root set is stable. A regular
+major collection does not promise that condition. Each check samples once; it
+does not retry a failed measurement or select a minimum. The retained-text
+allowance, parsed-document WeakRefs and cached-anchor assertions remain strict;
+a deliberately retained source must still fail.
+
 The retained-text check writes numeric failure evidence for #413 under
-`artifacts/workspace-memory/`; CI uploads only its `report.json` files. Its
-original measured delta and assertion remain unchanged. To inspect retaining
+`artifacts/workspace-memory/`; CI uploads only its `report.json` files,
+including the collection protocol and fixed measured delta. To inspect retaining
 paths in a disposable container containing only synthetic inputs and no
 credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
 can contain process secrets, so it is never captured or uploaded automatically.
