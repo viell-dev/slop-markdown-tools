@@ -83,6 +83,9 @@ async function inputSnapshot(repositoryRoot, dependencyInputs = []) {
         /^(?:build(?:-parser)?\.mjs|with-build\.mjs|parser-[^/]+\.(?:mjs|json))$/.test(file),
       )
       .map((file) => `scripts/${file}`),
+    ...(await ordinaryFiles(path.join(repositoryRoot, "scripts", "parser-adaptations"))).map(
+      (file) => `scripts/parser-adaptations/${file}`,
+    ),
     "package.json",
     "package-lock.json",
     "tsconfig.json",

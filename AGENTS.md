@@ -370,7 +370,12 @@ only and remove superseded transition notes.
   or output changes; do not copy receipts across invocations or jobs.
   Publication replaces individual files, not the whole directory atomically.
   Keep consumers outside overlapping builders and preserve intentional parser
-  rebuild tests. `parser-patches.mjs` guards each corrected dependency source;
+  rebuild tests. `parser-patches.mjs` owns each corrected source's identity,
+  rationale, dependency links, maintenance owner and removal conditions.
+  `scripts/parser-adaptations/*.ts` holds the maintained algorithms, checked by
+  TypeScript and ESLint; the small `parser-adaptations.mjs` loader inserts their
+  JavaScript into pinned upstream scopes. Keep these fragments, their types and
+  compiler configuration in manifest provenance and recursive receipt inputs.
   `parser-packages.json` pins the complete graph's license identities. Keep all
   four generated distribution artifacts together. See
   [CONTRIBUTING.md](./CONTRIBUTING.md#what-the-checks-prove) for the

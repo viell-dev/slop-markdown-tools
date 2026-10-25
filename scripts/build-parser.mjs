@@ -8,6 +8,7 @@ import { setTimeout } from "node:timers/promises";
 import { fileURLToPath, URL } from "node:url";
 import { rolldown } from "rolldown";
 import { repairReviewedParserSource, sourceGuards } from "./parser-patches.mjs";
+import { parserAdaptationFiles } from "./parser-adaptations.mjs";
 
 const scriptDirectory = fileURLToPath(new URL(".", import.meta.url));
 const defaultRoot = path.dirname(scriptDirectory);
@@ -37,23 +38,6 @@ export { gfmFootnote } from "micromark-extension-gfm-footnote";
 export { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 export { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 `;
-const provenance = {
-  labelEnd:
-    "mdrefine#94: trusted nested-label impossibility proof; empty dictionaries skip serialization on every path",
-  footnoteSyntax:
-    "mdrefine#94: trusted nearest-barrier prefix cache and earlier-closer proof; original nonempty tokenizer for external syntax",
-  editMap: "micromark/micromark#249: retain the untouched event prefix",
-  footnote: "mdrefine#280: include GFM footnote indentation in list-tail scanning",
-  text: "micromark/micromark#233 and #238: compact adjacent data events; register the audited no-extra resolver identity",
-  code: "micromark/micromark#238: compact code-span data without changing padding",
-  attention:
-    "micromark/micromark#239 walked prefix; local exact-state opener groups, no-closer cleanup and builtin two-run batching; original-resolver compatibility",
-  autolink:
-    "micromark-extension-gfm-autolink-literal#14: guard cached jumps by index, token identity, label type and current unbalanced state before jumping; keep the positive cache private in a WeakMap",
-  strike:
-    "local walked-prefix, equal-length opener groups and no-closer cleanup; register the audited resolver identity and retain original-resolver compatibility",
-  cjk: "retain CJK tokenization and original resolver; share the local fast attention resolver and register the audited method identity",
-};
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
 const slash = (filename) => filename.replaceAll("\\", "/");
@@ -142,7 +126,7 @@ async function correctSource(kind, source, filename) {
   const corrected = repairReviewedParserSource(kind, source, root.metadata);
   return {
     root,
-    source: `/*! mdrefine parser adaptation: ${provenance[kind]}. See ${names.licenses}. */\n${corrected}`,
+    source: `/*! mdrefine parser adaptation: ${sourceGuards[kind].provenance}. See ${names.licenses}. */\n${corrected}`,
   };
 }
 
@@ -170,6 +154,21 @@ async function readLicense(root) {
  * @param {{ repositoryRoot?: string }} [options]
  */
 export async function bundleParser(options = {}) {
+  const localSources = [];
+  for (const file of [
+    "scripts/build-parser.mjs",
+    "scripts/parser-patches.mjs",
+    "scripts/parser-labels.mjs",
+    "scripts/parser-adaptations.mjs",
+    "scripts/parser-packages.json",
+    "src/syntax/parser.generated.d.ts",
+    ...parserAdaptationFiles(),
+  ]) {
+    localSources.push({
+      file,
+      sha256: hash(await readFile(new URL(`../${file}`, import.meta.url))),
+    });
+  }
   const repositoryRoot = await realpath(path.resolve(options.repositoryRoot ?? defaultRoot));
   const resolveFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
   const bundlerRoot = await packageForFile(resolveFromRoot.resolve("rolldown"));
@@ -356,18 +355,12 @@ export async function bundleParser(options = {}) {
     assert.equal(packages.length, 34);
     assertPortableRegions(chunk.code, regionLabels);
 
-    const localSources = [];
-    for (const [file, url] of [
-      ["scripts/build-parser.mjs", new URL(import.meta.url)],
-      ["scripts/parser-patches.mjs", new URL("parser-patches.mjs", import.meta.url)],
-      ["scripts/parser-labels.mjs", new URL("parser-labels.mjs", import.meta.url)],
-      ["scripts/parser-packages.json", new URL("parser-packages.json", import.meta.url)],
-      [
-        "src/syntax/parser.generated.d.ts",
-        new URL("../src/syntax/parser.generated.d.ts", import.meta.url),
-      ],
-    ]) {
-      localSources.push({ file, sha256: hash(await readFile(url)) });
+    for (const { file, sha256 } of localSources) {
+      assert.equal(
+        hash(await readFile(new URL(`../${file}`, import.meta.url))),
+        sha256,
+        "Local parser source changed during generation",
+      );
     }
     const patches = [...redirected.values(), ...transformed.values()]
       .map(({ kind, source }) => ({
@@ -375,7 +368,8 @@ export async function bundleParser(options = {}) {
         file: `${sourceGuards[kind].name}@${sourceGuards[kind].version}/${sourceGuards[kind].relative}`,
         originalSha256: sourceGuards[kind].hash,
         correctedSha256: hash(source),
-        provenance: provenance[kind],
+        provenance: sourceGuards[kind].provenance,
+        tracking: sourceGuards[kind].tracking,
       }))
       .sort((a, b) => compare(a.kind, b.kind));
     const licenses = [

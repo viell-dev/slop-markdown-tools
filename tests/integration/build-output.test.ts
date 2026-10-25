@@ -59,10 +59,15 @@ async function productFixture(): Promise<string> {
     "scripts/with-build.mjs",
     "scripts/parser-patches.mjs",
     "scripts/parser-labels.mjs",
+    "scripts/parser-adaptations.mjs",
     "scripts/parser-packages.json",
     "src/syntax/parser.generated.d.ts",
   ])
     files[name] = await readFile(path.join(repository, name), "utf8");
+  for (const file of await ordinaryFiles(path.join(repository, "scripts/parser-adaptations"))) {
+    const name = `scripts/parser-adaptations/${file}`;
+    files[name] = await readFile(path.join(repository, name), "utf8");
+  }
   const root = await fixture(files);
   // Copy the actual reviewed parser graph inside the fixture; shared build
   // tools are read-only links. No tracked source or installed dependency changes.
@@ -170,6 +175,9 @@ it("validates receipt identity and invalidation, then expires the orchestration-
       "tsconfig.json",
       "package-lock.json",
       "scripts/build.mjs",
+      "scripts/parser-adaptations/attention.ts",
+      "scripts/parser-adaptations/types.ts",
+      "scripts/parser-adaptations/tsconfig.json",
       "node_modules/micromark/lib/parse.js",
       "node_modules/micromark/package.json",
       "node_modules/micromark/license",

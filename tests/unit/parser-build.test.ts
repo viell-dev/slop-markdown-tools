@@ -11,6 +11,7 @@ import {
   sourceGuards,
 } from "../../scripts/parser-patches.mjs";
 import { readReviewedSource } from "../support/parser/parser-module-probes.mjs";
+import { compileParserAdaptation } from "../../scripts/parser-adaptations.mjs";
 
 let bundle: Awaited<ReturnType<typeof bundleParser>>;
 beforeAll(async () => {
@@ -107,18 +108,67 @@ it("ships the reviewed complete graph and exact correction counts", () => {
   expect(hash(bundle.licenses)).toBe(bundle.manifest.licensesSha256);
 });
 
-it("binds the exact five local parser generator sources", async () => {
+it("binds every local parser generator and maintained implementation source", async () => {
   expect(bundle.manifest.localSources.map(({ file }) => file)).toEqual([
     "scripts/build-parser.mjs",
     "scripts/parser-patches.mjs",
     "scripts/parser-labels.mjs",
+    "scripts/parser-adaptations.mjs",
     "scripts/parser-packages.json",
     "src/syntax/parser.generated.d.ts",
+    "scripts/parser-adaptations/attention.ts",
+    "scripts/parser-adaptations/autolink.ts",
+    "scripts/parser-adaptations/compact-code.ts",
+    "scripts/parser-adaptations/compact-text.ts",
+    "scripts/parser-adaptations/footnote.ts",
+    "scripts/parser-adaptations/strike.ts",
+    "scripts/parser-adaptations/tsconfig.json",
+    "scripts/parser-adaptations/types.ts",
   ]);
   for (const { file, sha256 } of bundle.manifest.localSources) {
     if (typeof file !== "string") throw new Error("Non-string local parser source");
     const bytes = await readFile(new URL(`../../${file}`, import.meta.url));
     expect(createHash("sha256").update(bytes).digest("hex"), file).toBe(sha256);
+  }
+});
+
+it("keeps patch tracking in the authoritative guarded records and generated provenance", () => {
+  for (const patch of bundle.manifest.patches) {
+    const guard = sourceGuards[patch.kind];
+    expect(patch.provenance).toBe(guard.provenance);
+    expect(patch.tracking).toEqual(guard.tracking);
+    expect(patch.tracking.dependencyIndex).toBe(
+      "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+    );
+    expect(patch.tracking.issues.length).toBeGreaterThan(0);
+    for (const issue of patch.tracking.issues) {
+      expect(issue).toMatch(/^https:\/\/github\.com\/viell-dev\/slop-markdown-tools\/issues\/\d+$/);
+    }
+    expect(patch.tracking.owner).toBe("mdrefine maintaining agents");
+    expect(patch.tracking.removalCondition.length).toBeGreaterThan(80);
+  }
+});
+
+it("inserts literal fragment source while rejecting additional runtime boundaries", () => {
+  const compiled = compileParserAdaptation(
+    'import type { Token } from "./types.js"; declare const token: Token; export function value() { return [token.type, "$$", "$&"]; }',
+    "literal.ts",
+  );
+  expect(compiled).toContain('"$$"');
+  expect(compiled).toContain('"$&"');
+  expect(compiled).not.toContain("export ");
+  expect(compiled).not.toContain("import ");
+  for (const source of [
+    'import "additional-runtime";',
+    'export function value() { return import("additional-runtime"); }',
+    'export { value } from "additional-runtime";',
+    "const value = 1; export { value };",
+    "export default 1;",
+    "export const value = 1;",
+    "namespace Additional { export const value = 1; }",
+    "const __helper = 1;",
+  ]) {
+    expect(() => compileParserAdaptation(source, "unexpected.ts"), source).toThrow();
   }
 });
 

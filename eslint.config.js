@@ -26,6 +26,16 @@ export default defineConfig(
     },
   },
   {
+    files: ["scripts/parser-adaptations/**/*.ts"],
+    extends: [tseslint.configs.recommendedTypeCheckedOnly],
+    languageOptions: {
+      parserOptions: {
+        project: "./scripts/parser-adaptations/tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     // Examples read like consumer scripts, which use Node's globals without importing them.
     files: ["examples/**/*.mjs"],
     languageOptions: { globals: { console: "readonly", process: "readonly", URL: "readonly" } },

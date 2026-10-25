@@ -67,7 +67,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/parser-adaptations/tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:performance": "vitest run --project performance",

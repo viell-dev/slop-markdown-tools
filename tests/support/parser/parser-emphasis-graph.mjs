@@ -13,8 +13,17 @@ const here = createRequire(path.join(root, "package.json"));
 const slash = (value) => value.replaceAll("\\", "/");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 function once(source, before, after) {
-  assert.equal(source.split(before).length, 2, `Changed emphasis test anchor: ${before}`);
-  return source.replace(before, after);
+  // TypeScript emits different indentation and line breaks. Preserve every
+  // anchored token and still require exactly one actual production site.
+  const pattern = new RegExp(
+    before
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+"),
+    "g",
+  );
+  assert.equal([...source.matchAll(pattern)].length, 1, `Changed emphasis test anchor: ${before}`);
+  return source.replace(pattern, () => after);
 }
 function body(source, signature, change) {
   const at = source.indexOf(signature);
