@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { evaluate as evaluateChecks, requiredChecks } from "../../scripts/release-evidence.mjs";
 import { fixture, linkDirectory, repository } from "./support.js";
 
@@ -44,6 +45,28 @@ const run = (name: string, status: string, conclusion: string | null, started = 
   check_suite: { id: producer.check_suite_id },
 });
 const passing = () => required.map((check) => run(check.name, "completed", "success"));
+type CIWorkflow = {
+  jobs: {
+    verify: {
+      name: string;
+      strategy: {
+        matrix: { include: { os: string; node: number | string; optional?: boolean }[] };
+      };
+    };
+    coverage: { name: string };
+  };
+};
+const verifyProducerIdentities = (ci: CIWorkflow) => {
+  expect(ci.jobs.verify.name).toBe("verify (${{ matrix.os }}, ${{ matrix.node }})");
+  expect(
+    [
+      ...ci.jobs.verify.strategy.matrix.include
+        .filter((entry) => !entry.optional)
+        .map(({ os, node }) => `verify (${os}, ${node})`),
+      ci.jobs.coverage.name,
+    ].sort(),
+  ).toEqual(required.map((check) => check.name).sort());
+};
 
 describe("release evidence", () => {
   it("requires exact-commit core checks and coverage without the PR-only native aggregate", () => {
@@ -54,9 +77,14 @@ describe("release evidence", () => {
       "Unit coverage",
     ]);
     for (const check of required) expect(check.app).toBe(actions);
-    const ci = read(".github/workflows/ci.yml");
-    expect(ci).toContain("name: verify (${{ matrix.os }}, ${{ matrix.node }})");
-    expect(ci).toContain("    name: Unit coverage\n");
+    verifyProducerIdentities(parse(read(".github/workflows/ci.yml")) as CIWorkflow);
+    // Every current required CI identity must actually be bound to the producer,
+    // not merely appear in the ruleset and workflow under the same name.
+    for (const check of required) {
+      const wrongSuite = passing();
+      wrongSuite.find((run) => run.name === check.name)!.check_suite.id = 999;
+      expect(evaluate(wrongSuite, required).state, check.name).toBe("pending");
+    }
     const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
       rules: {
         type: string;
@@ -70,6 +98,11 @@ describe("release evidence", () => {
     expect(
       evaluate([...passing(), run("Native checks", "completed", "failure")], required).state,
     ).toBe("success");
+  });
+  it("allows matrix reordering without changing required producer identities", () => {
+    const ci = parse(read(".github/workflows/ci.yml")) as CIWorkflow;
+    ci.jobs.verify.strategy.matrix.include.reverse();
+    verifyProducerIdentities(ci);
   });
   it("exempts exactly Native checks from Actions, retaining other names and apps", () => {
     const checks = [

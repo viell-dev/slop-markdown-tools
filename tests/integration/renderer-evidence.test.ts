@@ -202,12 +202,17 @@ it("binds the Docker base and inspected identity label to the verified baseline"
     "utf8",
   ).split("\n");
   const verify = (lines: string[]) => {
-    expect(lines.find((line) => line.startsWith("FROM "))).toBe(`FROM ${baseline.baseImage}`);
+    // The declared-base contract currently has one stage. Revisit this check
+    // when introducing multi-stage builds rather than accepting a first FROM.
+    expect(lines.filter((line) => /^FROM\s/i.test(line.trim()))).toEqual([
+      `FROM ${baseline.baseImage}`,
+    ]);
     expect(lines.find((line) => line.startsWith("LABEL org.mdrefine.base-image="))).toBe(
       `LABEL org.mdrefine.base-image="${baseline.baseImage}"`,
     );
   };
   verify(instructions);
+  expect(() => verify([...instructions, "FROM scratch"])).toThrow();
   for (const prefix of ["FROM ", "LABEL org.mdrefine.base-image="])
     expect(() =>
       verify(instructions.map((line) => (line.startsWith(prefix) ? `${prefix}wrong` : line))),

@@ -38,7 +38,7 @@ jobs:
     # so the matrix name
     # uses the major version in `node`, not the exact `node-version`. Node.js
     # 22.12.0 is the lowest version that package.json supports. The Node.js 26
-    # job is not required and may fail without failing the workflow.
+    # job is not required; an allowed test failure does not fail the workflow.
     name: verify (${{ matrix.os }}, ${{ matrix.node }})
     strategy:
       fail-fast: false

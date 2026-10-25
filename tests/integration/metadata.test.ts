@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify } from "yaml";
 import { dialectAliases, dialects } from "../../src/index.js";
 import { repository } from "./support.js";
 
@@ -31,17 +31,79 @@ const names: Record<string, string> = {
   vitepress: "VitePress",
 };
 const everyDialect = [...dialects, ...Object.keys(dialectAliases)];
+type Step = {
+  name?: string;
+  uses?: string;
+  run?: string;
+  if?: string;
+  "continue-on-error"?: boolean;
+  "working-directory"?: string;
+  env?: Record<string, string>;
+  with?: Record<string, unknown>;
+};
+type Job = {
+  name?: string;
+  needs?: string[] | string;
+  if?: string;
+  uses?: string;
+  "runs-on"?: string;
+  permissions?: Record<string, string>;
+  with?: Record<string, unknown>;
+  strategy?: {
+    matrix: { include: { os: string; node: number | string; "node-version": number | string }[] };
+  };
+  steps?: Step[];
+};
+type Workflow = {
+  on: Record<string, { inputs?: Record<string, { default?: unknown }> } | null>;
+  permissions: Record<string, string>;
+  jobs: Record<string, Job>;
+};
+const workflow = (file: string) => parseYaml(read(file)) as Workflow;
+// Keep every other field: failure handling and execution context are part of the contract.
+const commandSteps = (steps: Step[]) =>
+  steps.map((step) => ({ ...step, run: step.run?.trimEnd() }));
+const verifyCommands = (ci: Workflow) => {
+  const commands = commandSteps(ci.jobs.verify!.steps!);
+  expect(commands).toContainEqual({
+    if: "runner.os == 'Linux' && matrix.node == 24",
+    run: "npm run check:ci",
+  });
+  expect(commands).toContainEqual({
+    if: "runner.os != 'Linux' || matrix.node != 24",
+    run: "npm run test:ci",
+  });
+};
+const releaseHosts = (release: Workflow) => {
+  expect(release.jobs.prepare!.needs).toEqual(
+    expect.arrayContaining(["ci", "rendering", "obsidian", "forges"]),
+  );
+  for (const host of ["rendering", "obsidian", "forges"]) {
+    expect(release.jobs[host]!.uses).toBe(`./.github/workflows/${host}.yml`);
+    expect(release.jobs[host]!.with).toEqual({ profile: "realistic", seed: "none" });
+  }
+};
+const coverageJob = (ci: Workflow) => {
+  const coverage = ci.jobs.coverage!;
+  expect(coverage.name).toBe("Unit coverage");
+  expect(coverage["runs-on"]).toBe("ubuntu-latest");
+  expect(
+    String(
+      coverage.steps!.find((step) => step.uses?.startsWith("actions/setup-node@"))?.with?.[
+        "node-version"
+      ],
+    ),
+  ).toBe("24");
+  expect(commandSteps(coverage.steps!)).toContainEqual({ run: "npm run test:coverage" });
+};
 /** The options of the dropdown `id` in an issue form, as written. */
 const dropdown = (file: string, id: string) => {
-  const form = read(file);
-  const start = form.indexOf(`id: ${id}\n`);
-  expect(start, `${file} has no field ${id}`).toBeGreaterThan(-1);
-  const options = /\n {6}options:\n((?: {8}- .*\n)+)/.exec(form.slice(start));
-  expect(options, `${file}: ${id} has no options`).not.toBeNull();
-  return options![1]!
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.replace(/^ *- /, ""));
+  const form = parseYaml(read(file)) as {
+    body: { id?: string; attributes?: { options?: string[] } }[];
+  };
+  const options = form.body.find((field) => field.id === id)?.attributes?.options;
+  expect(options, `${file}: ${id} has no options`).toBeDefined();
+  return options!;
 };
 
 describe("supported dialects", () => {
@@ -85,21 +147,38 @@ describe("Node.js versions", () => {
       );
   });
   it("test the lowest supported version in the CI job named for its major version", () => {
-    expect(read(".github/workflows/ci.yml")).toMatch(
-      new RegExp(`\\n {12}node: ${major}\\n {12}node-version: ${exact!.replaceAll(".", "\\.")}\\n`),
-    );
+    expect(
+      workflow(".github/workflows/ci.yml").jobs.verify!.strategy!.matrix.include.map((entry) => ({
+        os: entry.os,
+        node: String(entry.node),
+        "node-version": String(entry["node-version"]),
+      })),
+    ).toContainEqual({
+      os: "ubuntu-latest",
+      node: major,
+      "node-version": exact,
+    });
     expect(pkg.devDependencies["@types/node"]!.split(".")[0]).toBe(major);
   });
   it("run every other workflow, and the Obsidian image, on the version in .nvmrc", () => {
     const development = read(".nvmrc").trim();
     expect(development).toMatch(/^\d+$/);
-    for (const file of workflows)
-      for (const [, value] of read(file).matchAll(/\bnode-version: (.+)/g))
-        if (!value!.startsWith("${{") && file !== ".github/workflows/ci.yml")
-          expect(value, file).toBe(development);
-    expect(read(".github/workflows/ci.yml")).toMatch(
-      new RegExp(`\\n {12}node: ${development}\\n {12}node-version: ${development}\\n`),
-    );
+    for (const file of workflows.filter((file) => file !== ".github/workflows/ci.yml"))
+      for (const job of Object.values(workflow(file).jobs))
+        for (const step of job.steps ?? [])
+          if (step.uses?.startsWith("actions/setup-node@"))
+            expect(String(step.with?.["node-version"]), file).toBe(development);
+    expect(
+      workflow(".github/workflows/ci.yml").jobs.verify!.strategy!.matrix.include.map((entry) => ({
+        os: entry.os,
+        node: String(entry.node),
+        "node-version": String(entry["node-version"]),
+      })),
+    ).toContainEqual({
+      os: "ubuntu-latest",
+      node: development,
+      "node-version": development,
+    });
     expect(read("scripts/obsidian/Dockerfile")).toMatch(
       new RegExp(`^FROM node:${development}\\.\\d+\\.\\d+-.*@sha256:[0-9a-f]{64}$`, "m"),
     );
@@ -109,20 +188,17 @@ describe("Node.js versions", () => {
 
 describe("release workflow", () => {
   it("reuses gated CI while freshly packing and testing the release artifact", () => {
-    const release = parseYaml(read(".github/workflows/release.yml")) as {
-      jobs: {
-        ci: { permissions: Record<string, string> };
-        prepare: { needs: string[]; steps: { run?: string }[] };
-      };
-    };
-    expect(release.jobs.ci.permissions).toEqual({
+    const release = workflow(".github/workflows/release.yml");
+    expect(release.jobs.ci!.permissions).toEqual({
       actions: "read",
       checks: "read",
       contents: "read",
     });
-    expect(release.jobs.prepare.needs).toContain("ci");
-    expect(release.jobs.prepare.steps.map((step) => step.run)).toContain("npm run release:pack");
-    expect(release.jobs.prepare.steps.map((step) => step.run)).not.toContain(
+    expect(release.jobs.prepare!.needs).toContain("ci");
+    expect(release.jobs.prepare!.steps!.map((step) => step.run?.trimEnd())).toContain(
+      "npm run release:pack",
+    );
+    expect(release.jobs.prepare!.steps!.map((step) => step.run?.trimEnd())).not.toContain(
       "npm run release:prepare",
     );
     expect(pkg.scripts["release:prepare"]).toBe(
@@ -131,40 +207,19 @@ describe("release workflow", () => {
     expect(pkg.scripts["release:pack"]).toBe("node scripts/with-build.mjs release:pack:built");
   });
   it("prepares the version in package.json by default", () => {
-    const input = /\n {6}version:\n(?: {8}.*\n)*? {8}default: (.+)\n/.exec(
-      read(".github/workflows/release.yml"),
-    );
-    expect(input?.[1]).toBe(pkg.version);
+    expect(
+      workflow(".github/workflows/release.yml").on.workflow_dispatch?.inputs?.version?.default,
+    ).toBe(pkg.version);
   });
   it("runs every renderer check before it prepares the package", () => {
-    const release = read(".github/workflows/release.yml");
-    expect(release).toContain("uses: ./.github/workflows/rendering.yml\n");
-    expect(release).toContain("uses: ./.github/workflows/obsidian.yml\n");
-    expect(release).toContain("needs: [ci, rendering, obsidian, forges]\n");
-    expect(release).toContain(
-      "uses: ./.github/workflows/forges.yml\n    with:\n      profile: realistic\n      seed: none\n",
-    );
-    // Fixed documents only, so that the result depends on the commit rather than a random seed.
-    expect(release).toContain(
-      "uses: ./.github/workflows/rendering.yml\n    with:\n      profile: realistic\n      seed: none\n",
-    );
-    expect(release).toContain(
-      "uses: ./.github/workflows/obsidian.yml\n    with:\n      profile: realistic\n      seed: none\n",
-    );
+    releaseHosts(workflow(".github/workflows/release.yml"));
   });
 });
 
 describe("CI evidence ownership", () => {
   it("runs Linux 24 units once with coverage, isolated from performance and integration", () => {
-    const ci = parseYaml(read(".github/workflows/ci.yml")) as {
-      jobs: Record<
-        string,
-        { name: string; "runs-on": string; steps: { run?: string; if?: string }[] }
-      >;
-    };
-    expect(ci.jobs.coverage!.name).toBe("Unit coverage");
-    expect(ci.jobs.coverage!["runs-on"]).toBe("ubuntu-latest");
-    expect(ci.jobs.coverage!.steps.map((step) => step.run)).toContain("npm run test:coverage");
+    const ci = workflow(".github/workflows/ci.yml");
+    coverageJob(ci);
     expect(pkg.scripts["test:coverage"]).toBe("vitest run --project unit --coverage");
     expect(pkg.scripts["check:ci"]).toBe(
       "node scripts/with-build.mjs check:static test:nonunit test:package:installed",
@@ -173,14 +228,7 @@ describe("CI evidence ownership", () => {
       "vitest run --project performance --project integration",
     );
     expect(pkg.scripts["test:ci"]).toBe("node scripts/with-build.mjs test test:package:installed");
-    expect(ci.jobs.verify!.steps).toContainEqual({
-      if: "runner.os == 'Linux' && matrix.node == 24",
-      run: "npm run check:ci",
-    });
-    expect(ci.jobs.verify!.steps).toContainEqual({
-      if: "runner.os != 'Linux' || matrix.node != 24",
-      run: "npm run test:ci",
-    });
+    verifyCommands(ci);
     const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
       rules: { type: string; parameters?: { required_status_checks: unknown[] } }[];
     };
@@ -191,21 +239,95 @@ describe("CI evidence ownership", () => {
   });
 });
 
+describe("workflow structural regression controls", () => {
+  it("accepts a quoted action version and a literal-block standalone command", () => {
+    const ci = workflow(".github/workflows/ci.yml");
+    const setup = ci.jobs.coverage!.steps!.find((step) =>
+      step.uses?.startsWith("actions/setup-node@"),
+    )!;
+    // Real YAML input forms, applied to the current workflow rather than an unrelated sample.
+    setup.with = { ...setup.with, ...(parseYaml('node-version: "24"') as Record<string, unknown>) };
+    for (const [job, command] of [
+      ["verify", "npm run check:ci"],
+      ["verify", "npm run test:ci"],
+      ["coverage", "npm run test:coverage"],
+    ]) {
+      const literal = parseYaml(`run: |\n  ${command}\n`) as Step;
+      ci.jobs[job!]!.steps!.find((step) => step.run?.trimEnd() === command)!.run = literal.run!;
+    }
+    const reformatted = parseYaml(stringify(ci)) as Workflow;
+    coverageJob(reformatted);
+    verifyCommands(reformatted);
+  });
+  it("accepts comments, quoted scalars, alternate indentation and block dependency lists", () => {
+    for (const [file, verify] of [
+      ["release", releaseHosts],
+      ["ci", coverageJob],
+    ] as const) {
+      const original = workflow(`.github/workflows/${file}.yml`);
+      const reformatted = `# Presentation is not a workflow contract.\n${stringify(original, {
+        indent: 4,
+        defaultStringType: "QUOTE_DOUBLE",
+      })}`;
+      expect(reformatted).not.toBe(read(`.github/workflows/${file}.yml`));
+      const parsed = parseYaml(reformatted) as Workflow;
+      expect(parsed).toEqual(original);
+      verify(parsed);
+      if (file === "ci") verifyCommands(parsed);
+    }
+  });
+  it.each([
+    ["verify", "npm run check:ci"],
+    ["verify", "npm run test:ci"],
+    ["coverage", "npm run test:coverage"],
+  ])("rejects failure swallowing or changed execution context for %s / %s", (job, command) => {
+    for (const extra of [
+      { "continue-on-error": true },
+      { env: { NODE_OPTIONS: "--no-warnings" } },
+      { "working-directory": "other" },
+    ]) {
+      const ci = workflow(".github/workflows/ci.yml");
+      const step = ci.jobs[job]!.steps!.find((step) => step.run?.trimEnd() === command)!;
+      Object.assign(step, extra);
+      expect(() => (job === "coverage" ? coverageJob(ci) : verifyCommands(ci))).toThrow();
+    }
+  });
+  it.each(["ci", "rendering", "obsidian", "forges"])(
+    "rejects a missing release dependency on %s",
+    (host) => {
+      const release = workflow(".github/workflows/release.yml");
+      release.jobs.prepare!.needs = (release.jobs.prepare!.needs as string[]).filter(
+        (name) => name !== host,
+      );
+      expect(() => releaseHosts(release)).toThrow();
+    },
+  );
+  it.each(["rendering", "obsidian", "forges"])("rejects a wrong %s workload or call", (host) => {
+    for (const fault of ["uses", "profile", "seed"]) {
+      const release = workflow(".github/workflows/release.yml");
+      const job = release.jobs[host]!;
+      if (fault === "uses") job.uses = "./.github/workflows/ci.yml";
+      else job.with![fault] = "adversarial";
+      expect(() => releaseHosts(release)).toThrow();
+    }
+  });
+  it.each(["name", "runner", "node", "command"])("rejects incorrect coverage %s", (fault) => {
+    const ci = workflow(".github/workflows/ci.yml");
+    const job = ci.jobs.coverage!;
+    if (fault === "name") job.name = "Other coverage";
+    if (fault === "runner") job["runs-on"] = "windows-latest";
+    if (fault === "node")
+      job.steps!.find((step) => step.uses?.startsWith("actions/setup-node@"))!.with![
+        "node-version"
+      ] = 26;
+    if (fault === "command")
+      job.steps!.find((step) => step.run?.trimEnd() === "npm run test:coverage")!.run =
+        "npm run test:unit";
+    expect(() => coverageJob(ci)).toThrow();
+  });
+});
+
 describe("renderer checks", () => {
-  type Job = {
-    name?: string;
-    needs?: string[] | string;
-    if?: string;
-    uses?: string;
-    with?: Record<string, unknown>;
-    steps?: { uses?: string; run?: string; with?: Record<string, unknown> }[];
-  };
-  const workflow = (file: string) =>
-    parseYaml(read(file)) as {
-      on: Record<string, unknown>;
-      permissions: Record<string, string>;
-      jobs: Record<string, Job>;
-    };
   it("always reports a read-only PR aggregate and routes all hosts through one classification", () => {
     const native = workflow(".github/workflows/native.yml");
     expect(native.on).toEqual({ pull_request: null });
@@ -213,8 +335,10 @@ describe("renderer checks", () => {
     expect(native.jobs.gate!.name).toBe("Native checks");
     expect(native.jobs.gate!.needs).toEqual(["classify", "rendering", "obsidian", "forges"]);
     expect(native.jobs.gate!.if).toBe("${{ always() }}");
-    expect(native.jobs.gate!.steps?.at(-1)?.run).toBe("node scripts/native-checks.mjs gate");
-    expect(native.jobs.classify!.steps?.at(-1)?.run).toBe(
+    expect(native.jobs.gate!.steps?.at(-1)?.run?.trimEnd()).toBe(
+      "node scripts/native-checks.mjs gate",
+    );
+    expect(native.jobs.classify!.steps?.at(-1)?.run?.trimEnd()).toBe(
       "node scripts/native-checks.mjs classify",
     );
     expect(native.jobs.classify!.steps?.[0]?.with).toEqual({
@@ -261,11 +385,14 @@ describe("renderer checks", () => {
       ".github/workflows/obsidian.yml",
       ".github/workflows/forges.yml",
     ]) {
-      const workflow = read(file);
-      expect(workflow).toContain(
-        "github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic'",
-      );
-      expect(workflow).toContain("default: realistic");
+      const native = workflow(file);
+      const profiles = native.jobs
+        .compare!.steps!.filter((step) => step.env?.PROFILE !== undefined)
+        .map((step) => step.env!.PROFILE);
+      expect(profiles).toEqual([
+        "${{ github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic' }}",
+      ]);
+      expect(native.on.workflow_call?.inputs?.profile?.default).toBe("realistic");
     }
   });
 });

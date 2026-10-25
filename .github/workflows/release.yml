@@ -39,7 +39,7 @@ jobs:
         run: node scripts/release-evidence.mjs "$GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
   # The real renderers, compared before and after formatting at this commit: GitHub's through
-  # its Markdown API, and Obsidian's in Docker. Their reports are the runs' artifacts. A release
+  # its Markdown API, and Obsidian, Forgejo and Gitea in Docker. Reports are run artifacts. A release
   # compares authored fixtures and realistic documents at fixed seeds, so its result depends
   # on the commit and the renderers. Fresh adversarial seeds are weekly/manual discovery.
   rendering:

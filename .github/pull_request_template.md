@@ -15,7 +15,7 @@ that `CHANGELOG.md` lists it under `Unreleased`.
 - What the evidence cannot show.
 - Review: the author's review of the complete diff after the checks passed, and
   whether an independent review was chosen, with its reason and the commit it
-  reviewed (AGENTS.md, "Review and verification").
+  reviewed (CONTRIBUTING.md, "Review and verification").
 
 If an agent wrote this pull request, say so at its start, as `CONTRIBUTING.md`
 describes.

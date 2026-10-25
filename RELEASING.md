@@ -38,13 +38,11 @@ On a branch, in one pull request:
    security exception does not waive checks or review.
 5. Run the checks below, push, and wait for CI.
 
+Apply the [contributor review policy](CONTRIBUTING.md#review-and-verification).
 The release normally gets one independent review of the coherent change range
-since the previous release, reusing earlier coverage and focusing on unreviewed
-or materially changed code. Routine PRs use author review and tests; optional
-cases and wording do not create another review round. The review considers the
-changes, unresolved defects, the evidence, compatibility, packaging,
-documentation, and installation. Merge it like any other pull request. Merging
-publishes nothing and leaves the documentation site as it is.
+since the previous release, reusing earlier review coverage and focusing on
+unreviewed or materially changed code. Merge it like any other pull request.
+Merging publishes nothing and leaves the documentation site as it is.
 
 Renderer gates use existing fixtures and the realistic profile at fixed seeds
 1–5 at the release commit. Their JSON reports must complete the independently
@@ -110,9 +108,10 @@ version, so the run fails after its checks and packing. The local
 Hosted preparation requires a `ci.yml` push run on `main` in this repository for
 the exact commit. PR checks are not reusable evidence: their head SHA can name
 the branch while checkout tests a synthetic merge tree. A branch-only hosted dry
-run without eligible push/main evidence stops at the CI gate; use the full local
-`release:prepare` to prepare unmerged changes. No build receipt or output is
-transferred from CI into preparation.
+run without eligible push/main evidence waits up to 40 minutes before the CI
+gate rejects it. Retrying the same branch commit cannot create a main producer;
+use the full local `release:prepare` to prepare unmerged changes. No build
+receipt or output is transferred from CI into preparation.
 
 ## Publication prerequisites
 
@@ -168,10 +167,11 @@ any failure publishes nothing:
   the newest eligible CI producer attempt to succeed before accepting its latest
   job results, even when an older attempt passed. A pending producer waits; an
   unsuccessful completed producer fails. Optional Node 26 can delay completion,
-  but its allowed failure does not fail the workflow or become a release
-  requirement. The gate needs read access to checks and Actions runs. It waits
-  up to 40 minutes for CI that is still running, so it can be dispatched right
-  after the merge.
+  but its allowed test failure does not fail the workflow or become a release
+  requirement. Whether a Node 26 timeout or cancellation leaves the CI run
+  successful is unverified; an unsuccessful run is rejected. The gate needs read
+  access to checks and Actions runs. It waits up to 40 minutes for CI that is
+  still running, so it can be dispatched right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
