@@ -356,6 +356,14 @@ only and remove superseded transition notes.
   connects them. The main entry never touches the filesystem. `mdrefine/node`
   exposes `src/workspace/discovery.ts`, which the CLI uses for discovery and
   per-document options, so change the two together.
+- `src/workspace/files.ts` owns filesystem discovery and selection, Git-ignore
+  and vault description helpers, and skipped-entry identity and wording.
+  `selection.ts` applies literal exclusions without pruning link targets;
+  `lookup.ts` supplies synchronous on-demand lookup beneath unlisted entries.
+  `writes.ts` owns in-place writes, preflight checks and recovery, while the CLI
+  keeps sequential batch processing and per-file failure reporting. Keep these
+  concerns separate and preserve lazy reads and filesystem safety; the paths
+  describe their current owners.
 - Shared rule helpers currently start at `src/rules/shared.ts`, edit protections
   at `protections.ts`, and source-line primitives at `src/syntax/source.ts`.
   These are navigation, not mandatory accumulation points: give a cohesive

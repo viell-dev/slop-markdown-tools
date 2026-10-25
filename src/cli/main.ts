@@ -7,13 +7,8 @@ import { lint, ruleRegistry } from "../core/engine.js";
 import { formatWithCode } from "../code/format.js";
 import { loadConfig } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
-import {
-  isIgnoredInput,
-  replacementFailure,
-  replacementProblem,
-  skippedMessage,
-  writeFormatted,
-} from "../workspace/files.js";
+import { isIgnoredInput, skippedMessage } from "../workspace/files.js";
+import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/writes.js";
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
 import { refusal, refusalText } from "../workspace/access.js";
