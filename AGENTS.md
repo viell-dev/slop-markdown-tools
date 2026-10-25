@@ -349,16 +349,21 @@ local task branches.
 the `site-*` branches that correct the current release's site; keep it and
 GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
 `ci.yml`, where `NODE` is the matrix's major version label rather than its exact
-`node-version`, and the PR-only `Native checks` aggregate in `native.yml`. All
-bind to GitHub Actions, app 15368; renaming one needs a ruleset update. The
-aggregate rejects missing or unsuccessful applicable host calls and explicitly
-reports inapplicability. Keep the coordinator unfiltered and read-only on
-`pull_request`, including forks. An applicable external-host outage blocks
-merge; investigate it without waiving evidence or weakening the ruleset.
-`release-evidence.mjs` excludes exactly that PR-only check/app pair from its
-exact-commit requirements because Release calls all three native workflows
-afresh. Every other required check and unit coverage still must pass on the
-release commit. The Node.js 26 job is not required. Zero required approvals is
+`node-version`, its separate `Unit coverage` job, and the PR-only
+`Native checks` aggregate in `native.yml`. All bind to GitHub Actions, app
+15368; renaming one needs a ruleset update. The aggregate rejects missing or
+unsuccessful applicable host calls and explicitly reports inapplicability. Keep
+the coordinator unfiltered and read-only on `pull_request`, including forks. An
+applicable external-host outage blocks merge; investigate it without waiving
+evidence or weakening the ruleset. `release-evidence.mjs` excludes exactly that
+PR-only check/app pair from its exact-commit requirements because Release calls
+all three native workflows afresh. Every other required check and unit coverage
+still must pass on the release commit. Built-in CI evidence must come from this
+repository's `ci.yml` push/main run for that exact SHA; PR checks can test a
+synthetic merge tree and cannot substitute. Hosted preparation reuses those
+static/test results and runs `release:pack` to build and test the actual
+publication artifact. Standalone `release:prepare` still runs the complete
+checks. The Node.js 26 job is not required. Zero required approvals is
 deliberate for a single-account, agent-maintained repository; PRs, passing
 checks, and resolved review threads remain mandatory.
 
@@ -478,8 +483,11 @@ it helps.
 - The Vitest projects run unit tests, performance checks, then integration tests
   (`sequence.groupOrder`). Performance files run serially, outside unit
   coverage; unit and integration workers are capped at four so CPU-heavy
-  properties and CLI subprocesses do not overwhelm a runner. Keep these
-  boundaries when adding checks.
+  properties and CLI subprocesses do not overwhelm a runner. In Linux 24 CI, the
+  required `Unit coverage` job owns unit evidence on a separate runner;
+  `check:ci` runs static checks, performance/integration, and installed
+  packages. Other matrix environments retain their full suites. Keep these
+  evidence and resource boundaries without repeating Linux 24 unit work.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for

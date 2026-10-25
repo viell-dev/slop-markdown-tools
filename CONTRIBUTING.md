@@ -89,14 +89,15 @@ cleanup, follow a link, or remove another live build's staging. Staging is
 excluded from ESLint as well as Git so abandoned output does not break checks.
 
 `scripts/with-build.mjs` owns one build and a temporary receipt for a bounded
-sequence of internal npm scripts. `check:ci` runs `check:built` and
-`test:package:installed` together; `test:ci` runs the full tests and installed
-package check together. Each CI environment still builds and tests its own
-tarball. `release:prepare` similarly builds once for its checks and retained
+sequence of internal npm scripts. Linux 24's `check:ci` runs `check:static`,
+`test:nonunit` and `test:package:installed` together; the required, separate
+`Unit coverage` job supplies its unit results. `test:ci` runs the full tests and
+installed package check together. Each CI environment still builds and tests its
+own tarball. `release:prepare` similarly builds once for its checks and retained
 tarball. The receipt binds the canonical checkout, exact Node.js version,
 source/configuration and lockfile bytes, parser graph/package/license inputs,
 compiler files, and exact output names and hashes to the staged bytes. The
-already-built steps `check:built`, `test:package:installed` and
+already-built steps `check:static`, `test:package:installed` and
 `release:pack:built` reject a missing or changed context. The receipt expires
 with its owning process and is removed on normal success or failure; it is never
 shipped or reused by another job. Edits or dependency installation invalidate
@@ -109,8 +110,8 @@ unit, performance and coverage selections. This adds a TypeScript compile to
 their former parser-only startup and can report a product type error before
 those suites run. The single preparation contract keeps direct Vitest and
 project-filtered invocations predictable; orchestration still shares one build
-where the product is consumed again. Coverage remains a distinct job and its
-tests and evidence are unchanged.
+where the product is consumed again. Coverage remains on a separate runner;
+performance and integration are uninstrumented.
 
 ESLint uses the project's TypeScript types when checking source and tests. It
 also checks the JavaScript scripts and examples with their existing environment
@@ -122,14 +123,16 @@ The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
 `npm run schema` writes it to `config.schema.json`, which the package ships and
 the site serves; a test fails when the two differ.
 
-GitHub Actions runs `check` and a dependency audit on Linux with Node.js 24, the
-build and tests on Linux with Node.js 22.12.0, the lowest version the package
-supports, on Windows with Node.js 24, and on Linux with Node.js 26, and
-`test:package` on all four. `main` requires the first three and the PR-only
-`Native checks` decision described below. The Node.js 26 job is not required, so
-that a defect only the newest Node.js shows does not block unrelated merges; its
-failures get an issue. Windows covers file paths, access control lists,
-junctions, and the installed command; macOS is not a routine target.
+GitHub Actions runs static checks, performance/integration and a dependency
+audit on Linux with Node.js 24, with unit coverage on a separate Linux 24
+runner; the build and tests on Linux with Node.js 22.12.0, the lowest version
+the package supports, on Windows with Node.js 24, and on Linux with Node.js 26,
+and `test:package` on all four. `main` requires the first three, `Unit coverage`
+and the PR-only `Native checks` decision described below. The Node.js 26 job is
+not required, so that a defect only the newest Node.js shows does not block
+unrelated merges; its failures get an issue. Windows covers file paths, access
+control lists, junctions, and the installed command; macOS is not a routine
+target.
 
 ## Dependencies
 
@@ -242,7 +245,10 @@ TypeScript file, including files unit tests never execute. CI publishes the
 `unit-coverage` artifact for 14 days, without a coverage threshold. These are
 unit-coverage figures: performance cases, integration subprocesses, and
 installed package checks are not included, and the command does not replace
-those checks.
+those checks. This required job is the Linux 24 unit run; `check:ci` selects
+only performance and integration with `test:nonunit`. Other matrix environments
+run all three projects without coverage. Local `check` and `npm test` still run
+all three projects.
 
 `tests/unit/` imports from `src/`; renderer checks also read their fixture and
 probe sources. It does not run the CLI. A defect in how a rule reads or rewrites
@@ -481,8 +487,9 @@ all four.
 - **The installed package works.** `npm run test:package` installs the packed
   package with npm and pnpm and runs the command, `import` and `require()`, a
   shipped example, and TypeScript consumers, on every pull request.
-  `release:prepare` tests the exact tarball that the Release workflow publishes,
-  and `scripts/verify-publication.mjs` checks that npm serves that tarball with
+  `release:pack` tests the exact tarball that the Release workflow publishes;
+  local `release:prepare` additionally runs the full checks, and
+  `scripts/verify-publication.mjs` checks that npm serves that tarball with
   provenance naming the workflow and the commit.
 - **Rebuilds and packages contain current output only.** `build-output.test.ts`
   builds synthetic source, renames and removes modules, rebuilds and inspects an
@@ -511,7 +518,17 @@ all four.
 - **A release is the tested commit.** The Release workflow requires CI to have
   passed on the commit it releases (`scripts/release-evidence.mjs`), runs all
   three renderer checks there, refuses a version or tag that exists, and
-  publishes the tarball it tested.
+  publishes the tarball it tested. Built-in verify/coverage checks must have
+  that SHA and Actions app identity, with a check suite from this repository's
+  `ci.yml` push/main run. PR events are rejected because they can test a
+  synthetic merge tree. Other required checks retain their own app identities. A
+  newer queued/running CI producer or rerun waits even before its jobs appear;
+  completed producers use the newest individual check results. Optional Node 26
+  can delay producer completion but its result remains non-required.
+  `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
+  and wrong-producer results. Hosted preparation reuses static/unit/performance/
+  integration evidence, then `release:pack` freshly builds and checks the exact
+  tarball, installed consumers and declarations. No build receipt crosses jobs.
 
 `scripts/native-checks.mjs` owns native PR classification. Shared source,
 parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared

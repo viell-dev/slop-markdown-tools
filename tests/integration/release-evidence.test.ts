@@ -4,7 +4,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
-  evaluate,
+  evaluate as evaluateChecks,
   requiredChecks,
   validateRendererEvidence,
 } from "../../scripts/release-evidence.mjs";
@@ -15,6 +15,24 @@ const required = requiredChecks(
   JSON.parse(read(".github/rulesets/main.json")) as Parameters<typeof requiredChecks>[0],
 );
 const actions = 15368;
+const commit = "a".repeat(40);
+const producer = {
+  id: 10,
+  status: "completed",
+  head_sha: commit,
+  head_branch: "main",
+  event: "push",
+  path: ".github/workflows/ci.yml",
+  check_suite_id: 100,
+  repository: { full_name: "example/project" },
+  head_repository: { full_name: "example/project" },
+};
+const evidence = { commit, repository: "example/project", workflowRuns: [producer] };
+const evaluate = (
+  runs: Parameters<typeof evaluateChecks>[0],
+  checks: Parameters<typeof evaluateChecks>[1],
+  context = evidence,
+) => evaluateChecks(runs, checks, context);
 let id = 0;
 /** A check run as GitHub's API describes it. */
 const run = (name: string, status: string, conclusion: string | null, started = "2026-10-21") => ({
@@ -25,6 +43,8 @@ const run = (name: string, status: string, conclusion: string | null, started = 
   started_at: `${started}T00:00:00Z`,
   html_url: `https://github.com/runs/${id}`,
   app: { id: actions },
+  head_sha: commit,
+  check_suite: { id: producer.check_suite_id },
 });
 const passing = () => required.map((check) => run(check.name, "completed", "success"));
 
@@ -119,6 +139,125 @@ describe("release evidence", () => {
   });
   it("passes when every required check succeeded", () => {
     expect(evaluate(passing(), required).state).toBe("success");
+  });
+  it("requires coverage once, from Actions even when another app owns the first rule", () => {
+    expect(required.filter((check) => check.name === "Unit coverage")).toEqual([
+      { name: "Unit coverage", app: actions },
+    ]);
+    expect(
+      requiredChecks({
+        rules: [
+          {
+            type: "required_status_checks",
+            parameters: {
+              required_status_checks: [{ context: "External check", integration_id: 1 }],
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      { name: "External check", app: 1 },
+      { name: "Unit coverage", app: actions },
+    ]);
+    for (const conclusion of ["failure", "skipped", "cancelled", "timed_out", "neutral"]) {
+      const runs = passing();
+      runs.find((entry) => entry.name === "Unit coverage")!.conclusion = conclusion;
+      expect(evaluate(runs, required).state, conclusion).toBe("failure");
+    }
+    expect(
+      evaluate(
+        passing().filter((entry) => entry.name !== "Unit coverage"),
+        required,
+      ).state,
+    ).toBe("pending");
+  });
+  it("rejects same-named checks from another commit or another CI producer", () => {
+    const runs = passing();
+    for (const change of [
+      { head_sha: "b".repeat(40) },
+      { check_suite: { id: 101 } },
+      { check_suite: null },
+    ])
+      expect(evaluate([{ ...runs[0]!, ...change }, ...runs.slice(1)], required).state).toBe(
+        "pending",
+      );
+    for (const change of [
+      { head_sha: "b".repeat(40) },
+      { event: "pull_request" },
+      { event: "workflow_dispatch" },
+      { event: "workflow_run" },
+      { head_branch: "task-branch" },
+      { path: ".github/workflows/other.yml" },
+      { repository: { full_name: "other/project" } },
+      { head_repository: { full_name: "fork/project" } },
+      { check_suite_id: 101 },
+    ])
+      expect(
+        evaluate(runs, required, {
+          ...evidence,
+          workflowRuns: [{ ...producer, ...change }],
+        }).state,
+      ).toBe("pending");
+    expect(evaluate(runs, required, { ...evidence, workflowRuns: [] }).state).toBe("pending");
+  });
+  it("retains exact-commit third-party requirements without claiming they came from CI", () => {
+    const checks = [{ name: "External check", app: 1 }];
+    const external = {
+      ...run("External check", "completed", "success"),
+      app: { id: 1 },
+      check_suite: { id: 999 },
+    };
+    const context = { ...evidence, workflowRuns: [] };
+    expect(evaluate([external], checks, context).state).toBe("success");
+    expect(evaluate([{ ...external, head_sha: "b".repeat(40) }], checks, context).state).toBe(
+      "pending",
+    );
+    expect(evaluate([{ ...external, app: { id: actions } }], checks, context).state).toBe(
+      "pending",
+    );
+    expect(evaluate([{ ...external, conclusion: "failure" }], checks, context).state).toBe(
+      "failure",
+    );
+  });
+  it("waits for a newer producer or attempt before its job checks appear", () => {
+    for (const status of ["queued", "in_progress", "waiting", "pending"]) {
+      const context = {
+        ...evidence,
+        workflowRuns: [
+          producer,
+          {
+            ...producer,
+            id: 11,
+            check_suite_id: 101,
+            status,
+          },
+        ],
+      };
+      expect(evaluate(passing(), required, context).state, status).toBe("pending");
+      expect(
+        evaluate(passing(), required, {
+          ...evidence,
+          workflowRuns: [{ ...producer, status }],
+        }).state,
+        `rerun ${status}`,
+      ).toBe("pending");
+    }
+    const context = {
+      ...evidence,
+      workflowRuns: [
+        {
+          ...producer,
+          id: 11,
+          check_suite_id: 101,
+        },
+        producer,
+      ],
+    };
+    expect(evaluate(passing(), required, context).state).toBe("pending");
+    const fresh = passing().map((entry) => ({ ...entry, check_suite: { id: 101 } }));
+    expect(evaluate(fresh, required, context).state).toBe("success");
+    fresh[0]!.conclusion = "failure";
+    expect(evaluate([...passing(), ...fresh], required, context).state).toBe("failure");
   });
   it("waits for a check that is missing, queued, or running", () => {
     const runs = passing();
