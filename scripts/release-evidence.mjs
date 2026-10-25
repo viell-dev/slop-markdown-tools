@@ -5,12 +5,16 @@
 // The commit's check runs must include a successful run of every check that the ruleset for
 // main requires (.github/rulesets/main.json), except the PR-only Native checks aggregate, from
 // the app that the ruleset names, and of the
-// CI workflow's unit coverage job. A check that is queued or running is waited for, and so is a
+// CI workflow's unit coverage job. Built-in CI checks must belong to a push/main run of ci.yml
+// in this repository; PR runs can test a synthetic merge tree instead of the named commit.
+// A check that is queued or running is waited for, and so is a
 // check that has not appeared yet, because the Release workflow is often dispatched right
 // after a merge starts CI: for up to 40 minutes, the time CI's slowest job may take to start
-// and finish, or for WAIT_MINUTES. A failed, cancelled, or skipped check fails at once. The Release workflow runs
+// and finish, or for WAIT_MINUTES. A pending producer attempt waits; once completed, its
+// unsuccessful conclusion or any failed, cancelled or skipped required check fails the gate.
+// The Release workflow runs
 // this before it prepares the package; it needs an authenticated gh (GH_TOKEN in GitHub
-// Actions) with read access to checks.
+// Actions) with read access to checks and Actions runs.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
@@ -49,6 +53,19 @@ export function validateRendererEvidence(report) {
  * @property {string | null} [started_at]
  * @property {string} html_url
  * @property {{ id: number } | null} [app]
+ * @property {string} head_sha
+ * @property {{ id: number } | null} [check_suite]
+ * @typedef {object} WorkflowRun The producer identity from GitHub's Actions API.
+ * @property {number} id
+ * @property {string} status
+ * @property {string | null} conclusion
+ * @property {string} head_sha
+ * @property {string} head_branch
+ * @property {string} event
+ * @property {string} path
+ * @property {number} check_suite_id
+ * @property {{ full_name: string }} repository
+ * @property {{ full_name: string }} head_repository
  */
 
 /**
@@ -67,7 +84,10 @@ export function requiredChecks(ruleset) {
       app: check.integration_id,
     }));
   if (!checks.length) throw new Error("The ruleset for main requires no status checks");
-  return [...checks, { name: "Unit coverage", app: checks[0].app }];
+  return [...checks, { name: "Unit coverage", app: 15368 }].filter(
+    (check, index, all) =>
+      all.findIndex((other) => other.name === check.name && other.app === check.app) === index,
+  );
 }
 
 /**
@@ -77,9 +97,25 @@ export function requiredChecks(ruleset) {
  * a run that has not started yet is the newest.
  * @param {CheckRun[]} checkRuns
  * @param {Check[]} required
+ * @param {{ commit: string, repository: string, workflowRuns: WorkflowRun[] }} evidence
  * @returns {{ state: "success" | "pending" | "failure", lines: string[] }}
  */
-export function evaluate(checkRuns, required) {
+export function evaluate(checkRuns, required, evidence) {
+  // Do not use an older suite while a newer run is still starting, or the
+  // previous attempt's checks while a rerun has not created its jobs yet.
+  const producer = evidence.workflowRuns
+    .filter(
+      (run) =>
+        run.head_sha === evidence.commit &&
+        run.head_branch === "main" &&
+        run.event === "push" &&
+        run.path === ".github/workflows/ci.yml" &&
+        run.repository?.full_name === evidence.repository &&
+        run.head_repository?.full_name === evidence.repository &&
+        Number.isSafeInteger(run.id) &&
+        Number.isSafeInteger(run.check_suite_id),
+    )
+    .sort((a, b) => b.id - a.id)[0];
   /** When a run started; one that has not started yet sorts as the newest. */
   const started = (/** @type {CheckRun} */ run) =>
     run.started_at ? Date.parse(run.started_at) : Number.POSITIVE_INFINITY;
@@ -88,11 +124,25 @@ export function evaluate(checkRuns, required) {
   /** @type {"success" | "pending" | "failure"} */
   let state = "success";
   for (const check of required) {
+    const fromCI =
+      check.app === 15368 && (check.name === "Unit coverage" || check.name.startsWith("verify ("));
     const runs = checkRuns
-      .filter((run) => run.name === check.name && run.app?.id === check.app)
+      .filter(
+        (run) =>
+          run.head_sha === evidence.commit &&
+          run.name === check.name &&
+          run.app?.id === check.app &&
+          (!fromCI || run.check_suite?.id === producer?.check_suite_id),
+      )
       .sort((a, b) => started(b) - started(a) || b.id - a.id);
     const run = runs[0];
-    if (!run) {
+    if (fromCI && producer && producer.status !== "completed") {
+      lines.push(`${check.name}: CI producer ${producer.status}`);
+      if (state === "success") state = "pending";
+    } else if (fromCI && producer && producer.conclusion !== "success") {
+      lines.push(`${check.name}: CI producer ${producer.conclusion}`);
+      state = "failure";
+    } else if (!run || (fromCI && !producer)) {
       lines.push(`${check.name}: not started`);
       if (state === "success") state = "pending";
     } else if (run.status !== "completed") {
@@ -121,6 +171,21 @@ function checkRuns(repository, commit) {
   return JSON.parse(pages).flatMap((page) => page.check_runs);
 }
 
+/** The CI producer records, independently bound to their workflow, event, repository and SHA. */
+function ciWorkflowRuns(repository, commit) {
+  const pages = execFileSync(
+    "gh",
+    [
+      "api",
+      "--paginate",
+      "--slurp",
+      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${commit}&per_page=100`,
+    ],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  return JSON.parse(pages).flatMap((page) => page.workflow_runs);
+}
+
 async function main() {
   const commit = process.argv[2];
   if (!/^[0-9a-f]{40}$/.test(commit ?? "")) {
@@ -138,7 +203,12 @@ async function main() {
   const minutes = Number(process.env.WAIT_MINUTES || 40);
   const deadline = Date.now() + minutes * 60 * 1000;
   for (;;) {
-    const { state, lines } = evaluate(checkRuns(repository, commit), required);
+    const workflowRuns = ciWorkflowRuns(repository, commit);
+    const { state, lines } = evaluate(checkRuns(repository, commit), required, {
+      commit,
+      repository,
+      workflowRuns,
+    });
     if (state === "success" || state === "failure" || Date.now() > deadline) {
       process.stdout.write(`CI of ${commit}:\n${lines.map((line) => `- ${line}`).join("\n")}\n`);
       if (state === "success") return;

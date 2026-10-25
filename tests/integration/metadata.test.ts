@@ -15,6 +15,7 @@ const pkg = JSON.parse(read("package.json")) as {
   keywords: string[];
   engines: { node: string };
   devDependencies: Record<string, string>;
+  scripts: Record<string, string>;
 };
 const workflows = readdirSync(path.join(repository, ".github/workflows")).map(
   (name) => `.github/workflows/${name}`,
@@ -107,6 +108,28 @@ describe("Node.js versions", () => {
 });
 
 describe("release workflow", () => {
+  it("reuses gated CI while freshly packing and testing the release artifact", () => {
+    const release = parseYaml(read(".github/workflows/release.yml")) as {
+      jobs: {
+        ci: { permissions: Record<string, string> };
+        prepare: { needs: string[]; steps: { run?: string }[] };
+      };
+    };
+    expect(release.jobs.ci.permissions).toEqual({
+      actions: "read",
+      checks: "read",
+      contents: "read",
+    });
+    expect(release.jobs.prepare.needs).toContain("ci");
+    expect(release.jobs.prepare.steps.map((step) => step.run)).toContain("npm run release:pack");
+    expect(release.jobs.prepare.steps.map((step) => step.run)).not.toContain(
+      "npm run release:prepare",
+    );
+    expect(pkg.scripts["release:prepare"]).toBe(
+      "node scripts/with-build.mjs check:built release:pack:built",
+    );
+    expect(pkg.scripts["release:pack"]).toBe("node scripts/with-build.mjs release:pack:built");
+  });
   it("prepares the version in package.json by default", () => {
     const input = /\n {6}version:\n(?: {8}.*\n)*? {8}default: (.+)\n/.exec(
       read(".github/workflows/release.yml"),
@@ -128,6 +151,43 @@ describe("release workflow", () => {
     expect(release).toContain(
       "uses: ./.github/workflows/obsidian.yml\n    with:\n      profile: realistic\n      seed: none\n",
     );
+  });
+});
+
+describe("CI evidence ownership", () => {
+  it("runs Linux 24 units once with coverage, isolated from performance and integration", () => {
+    const ci = parseYaml(read(".github/workflows/ci.yml")) as {
+      jobs: Record<
+        string,
+        { name: string; "runs-on": string; steps: { run?: string; if?: string }[] }
+      >;
+    };
+    expect(ci.jobs.coverage!.name).toBe("Unit coverage");
+    expect(ci.jobs.coverage!["runs-on"]).toBe("ubuntu-latest");
+    expect(ci.jobs.coverage!.steps.map((step) => step.run)).toContain("npm run test:coverage");
+    expect(pkg.scripts["test:coverage"]).toBe("vitest run --project unit --coverage");
+    expect(pkg.scripts["check:ci"]).toBe(
+      "node scripts/with-build.mjs check:static test:nonunit test:package:installed",
+    );
+    expect(pkg.scripts["test:nonunit"]).toBe(
+      "vitest run --project performance --project integration",
+    );
+    expect(pkg.scripts["test:ci"]).toBe("node scripts/with-build.mjs test test:package:installed");
+    expect(ci.jobs.verify!.steps).toContainEqual({
+      if: "runner.os == 'Linux' && matrix.node == 24",
+      run: "npm run check:ci",
+    });
+    expect(ci.jobs.verify!.steps).toContainEqual({
+      if: "runner.os != 'Linux' || matrix.node != 24",
+      run: "npm run test:ci",
+    });
+    const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
+      rules: { type: string; parameters?: { required_status_checks: unknown[] } }[];
+    };
+    expect(
+      ruleset.rules.find((rule) => rule.type === "required_status_checks")!.parameters!
+        .required_status_checks,
+    ).toContainEqual({ context: "Unit coverage", integration_id: 15368 });
   });
 });
 

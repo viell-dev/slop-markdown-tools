@@ -10,6 +10,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   coverage:
+    # This required job owns Linux 24 unit evidence. Keep its runner separate
+    # from the uninstrumented performance/integration work in verify.
     name: Unit coverage
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,7 +34,8 @@ jobs:
           retention-days: 14
   verify:
     # The ruleset for main requires the jobs named verify (ubuntu-latest, 22),
-    # verify (ubuntu-latest, 24), and verify (windows-latest, 24), so the name
+    # verify (ubuntu-latest, 24), verify (windows-latest, 24), and Unit coverage,
+    # so the matrix name
     # uses the major version in `node`, not the exact `node-version`. Node.js
     # 22.12.0 is the lowest version that package.json supports. The Node.js 26
     # job is not required and may fail without failing the workflow.

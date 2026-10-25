@@ -29,6 +29,7 @@
           { "context": "verify (ubuntu-latest, 22)", "integration_id": 15368 },
           { "context": "verify (ubuntu-latest, 24)", "integration_id": 15368 },
           { "context": "verify (windows-latest, 24)", "integration_id": 15368 },
+          { "context": "Unit coverage", "integration_id": 15368 },
           { "context": "Native checks", "integration_id": 15368 }
         ]
       }

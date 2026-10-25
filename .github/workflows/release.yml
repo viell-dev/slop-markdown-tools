@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
+      actions: read
       checks: read
       contents: read
     steps:
@@ -108,7 +109,9 @@ jobs:
       - run: npm ci
       # Only the dependencies that the package installs; CI audits the development tools too.
       - run: npm audit --omit=dev --audit-level=high
-      - run: npm run release:prepare
+      # ci already proves static checks and tests on this exact main commit.
+      # Build afresh here and test the actual artifact that will be published.
+      - run: npm run release:pack
       - name: Dry-run the tested tarball
         run: |
           npm publish "./artifacts/mdrefine-${EXPECTED_VERSION}.tgz" --dry-run --ignore-scripts \

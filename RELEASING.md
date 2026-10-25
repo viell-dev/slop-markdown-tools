@@ -87,14 +87,24 @@ invocation. The actual tarball, installed npm/pnpm consumers, declarations and
 retained publication assets are still checked separately; native host evidence
 is unchanged.
 
-The **Release** workflow, dispatched with `publish` left false, does the same on
-GitHub after the checks that come before publication, described below, adds an
-audit of the runtime dependencies, warns when the version or its tag already
-exists, and keeps the artifact for 14 days. It publishes nothing, and the Pages
-workflow that follows it leaves the site as it is. A dry run is for a version
-that is not published yet: for one that npm has, npm's own dry-run publish
-refuses the version, so the run fails after its checks and packing. The local
+The **Release** workflow, dispatched with `publish` left false, requires the
+exact-commit CI evidence described below, then runs `release:pack` instead of
+repeating the static checks and test projects. That command freshly builds,
+packs and tests the actual tarball with npm and strict pnpm, including installed
+commands, libraries, declarations and licenses. The workflow adds an audit of
+the runtime dependencies, warns when the version or its tag already exists, and
+keeps the artifact for 14 days. It publishes nothing, and the Pages workflow
+that follows it leaves the site as it is. A dry run is for a version that is not
+published yet: for one that npm has, npm's own dry-run publish refuses the
+version, so the run fails after its checks and packing. The local
 `npm publish … --dry-run` above refuses it the same way.
+
+Hosted preparation requires a `ci.yml` push run on `main` in this repository for
+the exact commit. PR checks are not reusable evidence: their head SHA can name
+the branch while checkout tests a synthetic merge tree. A branch-only hosted dry
+run without eligible push/main evidence stops at the CI gate; use the full local
+`release:prepare` to prepare unmerged changes. No build receipt or output is
+transferred from CI into preparation.
 
 ## Publication prerequisites
 
@@ -106,8 +116,9 @@ Check these GitHub settings with `gh` before each publication:
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
 - GitHub Pages uses GitHub Actions as its source, and the environment
   `github-pages` allows deployments from `main`, where the Pages workflow runs.
-- The ruleset for `main` requires pull requests, the three core CI checks and
-  the PR-only `Native checks` aggregate that `.github/rulesets/main.json` names.
+- The ruleset for `main` requires pull requests, the three core CI checks,
+  `Unit coverage` and the PR-only `Native checks` aggregate that
+  `.github/rulesets/main.json` names.
 
 The npm settings are visible only to the package's maintainer, `viell`, signed
 in on npmjs.com, in the package's **Settings** tab:
@@ -142,19 +153,29 @@ any failure publishes nothing:
   `main` requires and unit coverage (`scripts/release-evidence.mjs`). It
   excludes exactly `Native checks` from GitHub Actions app 15368, because that
   aggregate reports only on PRs and Release runs every native host afresh below.
-  Other required statuses are never exempted. It waits up to 40 minutes for CI
-  that is still running, so it can be dispatched right after the merge.
+  Verify and coverage results must also name this exact SHA and a check suite
+  from this repository's `ci.yml` push/main run. Same-named results from another
+  workflow, event, repository or commit do not qualify; other required statuses
+  retain their specified app identities and are never exempted. The gate needs
+  the newest eligible CI producer attempt to succeed before accepting its latest
+  job results, even when an older attempt passed. A pending producer waits; an
+  unsuccessful completed producer fails. Optional Node 26 can delay completion,
+  but its allowed failure does not fail the workflow or become a release
+  requirement. The gate needs read access to checks and Actions runs. It waits
+  up to 40 minutes for CI that is still running, so it can be dispatched right
+  after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
   file views. Fresh adversarial documents remain discovery, outside the gate.
 - The version and its tag are unused.
 
-The workflow then builds and checks the package again, verifies the artifact's
-checksum, publishes the tested tarball with provenance under
-`publishConfig.tag`, which it checks against the version, and creates the GitHub
-release at the workflow's commit, with the tarball and checksum attached and the
-changelog section as its notes. Tags are exact versions without a `v` prefix.
+The workflow then freshly builds and tests the publication package, reusing CI's
+static and test-project results, verifies the artifact's checksum, publishes the
+tested tarball with provenance under `publishConfig.tag`, which it checks
+against the version, and creates the GitHub release at the workflow's commit,
+with the tarball and checksum attached and the changelog section as its notes.
+Tags are exact versions without a `v` prefix.
 
 A last job, with read-only access, then checks the publication: the registry's
 `integrity` and `shasum` must match the tested tarball, and the version's

@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Linux 24 CI collects unit and coverage evidence in one required, isolated job.
+  Hosted release preparation reuses exact-commit push/main CI results while
+  freshly building and testing its publication tarball; local preparation
+  retains the complete checks
+  ([#628](https://github.com/viell-dev/slop-markdown-tools/issues/628),
+  [#629](https://github.com/viell-dev/slop-markdown-tools/issues/629)).
+
 - Builds prepare fresh staged output and reject unexpected packaged files. CI
   and release preparation reuse one verified build within their invocation,
   while standalone commands remain self-contained
