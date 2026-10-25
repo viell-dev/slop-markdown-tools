@@ -3,10 +3,10 @@ import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { afterEach, expect, it, vi } from "vitest";
 import { formatWithCode } from "../../src/node.js";
-import { block, calls, setup } from "./code-format-support.js";
-import { run } from "./support.js";
-import { parseReport } from "./json.js";
-import { stringContaining } from "../assertions.js";
+import { block, calls, setup } from "../support/code-format.js";
+import { run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
+import { stringContaining } from "../support/assertions.js";
 
 afterEach(() => vi.unstubAllEnvs());
 

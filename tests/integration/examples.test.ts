@@ -5,8 +5,8 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { dialects, lint } from "../../src/index.js";
 import type { Diagnostic, Plugin } from "../../src/index.js";
-import { copyOf, fixture, node, repository, run, tree } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { copyOf, fixture, node, repository, run, tree } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 
 interface Report {
   files: { path: string; changed?: boolean; diagnostics: Diagnostic[] }[];

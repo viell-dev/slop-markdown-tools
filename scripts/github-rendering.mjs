@@ -38,7 +38,7 @@ import { format, parse } from "../dist/index.js";
 import { documentSeed, generateDocument, normalizeGithubHtml } from "./rendering.mjs";
 import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
-import { githubFixtures } from "./renderer-fixtures.mjs";
+import { githubFixtures } from "../tests/fixtures/renderers/common.mjs";
 import {
   createRendererReport,
   startDocument,

@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { fixture, run } from "./support.js";
-import { parseReport } from "./json.js";
+import { fixture, run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
 describe("paths and configuration files that cannot be used", () => {
   const fails = (root: string, args: string[], message: string) => {
     const result = run(root, args);

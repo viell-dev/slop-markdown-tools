@@ -3,8 +3,8 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { lint } from "../../src/index.js";
 import type { Config } from "../../src/index.js";
-import { fixture, run } from "./support.js";
-import { parseReport } from "./json.js";
+import { fixture, run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
 
 it("uses configured problem rules identically in the API, CLI and path overrides", async () => {
   const config: Config = {

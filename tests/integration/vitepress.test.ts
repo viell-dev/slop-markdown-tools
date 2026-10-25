@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { createMarkdownRenderer } from "vitepress";
 import { expect, it } from "vitest";
 import { format } from "../../src/index.js";
-import { fixture } from "./support.js";
+import { fixture } from "../support/cli.js";
 
 // Compare the Vue-compiled page, including its whitespace handling, with the Vue
 // version belonging to VitePress rather than a separately selected renderer.

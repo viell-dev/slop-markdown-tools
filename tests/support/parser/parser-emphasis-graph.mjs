@@ -6,9 +6,9 @@ import { readFile, realpath } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { rolldown } from "rolldown";
-import { repairReviewedParserSource, sourceGuards } from "../scripts/parser-patches.mjs";
+import { repairReviewedParserSource, sourceGuards } from "../../../scripts/parser-patches.mjs";
 
-const root = path.resolve(import.meta.dirname, "..");
+const root = path.resolve(import.meta.dirname, "../../..");
 const here = createRequire(path.join(root, "package.json"));
 const slash = (value) => value.replaceAll("\\", "/");
 const hash = (value) => createHash("sha256").update(value).digest("hex");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { URL } from "node:url";
 
-/** @typedef {import("../src/core/types.js").DialectName} EmphasisDialect */
+/** @typedef {import("../../../src/core/types.js").DialectName} EmphasisDialect */
 /** @typedef {"core" | "text" | "strike" | "cjk"} EmphasisRegistration */
 /** @typedef {"primary" | "generated" | "fileIdentity" | "yamlPlain" | "tomlOther" | "githubFile" | "githubPlainFile" | "eagerFrontMatter"} EmphasisCaseKind */
 /** @typedef {{id: string, kind: EmphasisCaseKind, dialect: EmphasisDialect, source: string, expectHit: boolean, markers?: string[], plugin?: boolean}} EmphasisProductionCase */
@@ -45,7 +45,7 @@ export const profiles = ["commonmark", "github", "forgejo", "gitea", "obsidian",
 export async function productionCases() {
   const manifest = JSON.parse(
     await readFile(
-      new URL("./fixtures/parser-emphasis-reachability.json", import.meta.url),
+      new URL("../../fixtures/parser-emphasis-reachability.json", import.meta.url),
       "utf8",
     ),
   );

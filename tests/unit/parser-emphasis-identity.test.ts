@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { emphasisGraph } from "../parser-emphasis-graph.mjs";
+import { emphasisGraph } from "../support/parser/parser-emphasis-graph.mjs";
 import {
   emphasisSources,
   verifyActualNulAndAsciiFlanking,
@@ -11,7 +11,7 @@ import {
   verifyLargeReplacement,
   verifyNoCloser,
   verifyReplacementDirections,
-} from "../parser-emphasis-regressions.mjs";
+} from "../support/parser/parser-emphasis-regressions.mjs";
 
 it("preserves stock original tokens, fresh leftover tuples, points and first real pipeline identities", async () => {
   const result = await verifyEmphasisIdentity();

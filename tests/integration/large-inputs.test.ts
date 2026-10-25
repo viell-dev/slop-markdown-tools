@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { repository } from "./support.js";
+import { repository } from "../support/cli.js";
 
 it.each(["table", "wrap", "inline-code", "findings", "ignore", "overrides", "lookup"])(
   "handles %s beyond the engine's function-argument limit (#454)",

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createOperationProbe } from "../parser-module-probes.mjs";
+import { createOperationProbe } from "../support/parser/parser-module-probes.mjs";
 
 // Deterministic algorithm checks belong in the ordinary unit suite. These small
 // counts measure array traffic rather than clock time or native parser speed.

@@ -406,7 +406,7 @@ only and remove superseded transition notes.
 - `src/syntax/math.ts` is the project's own dollar-math tokenizer, adapted from
   `micromark-extension-math` (notice in `THIRD_PARTY_NOTICES`, which ships) so
   that the package does not install KaTeX. `parse.ts` picks the conditions per
-  dialect, and `tests/unit/math-renderers.ts` records what the renderers
+  dialect, and `tests/support/math-renderers.ts` records what the renderers
   rendered and how to observe them again. Apply a condition to a dialect only
   when its renderer was observed to apply it.
 - `src/core/engine.ts` orchestrates inline, block, then document phases, with
@@ -448,6 +448,20 @@ only and remove superseded transition notes.
   packages. Other matrix environments retain their full suites. Keep these
   evidence and resource boundaries without repeating Linux 24 unit work;
   preserve meaningful coverage rather than a duplicate run.
+- Test navigation follows product responsibilities: `engine.test.ts` covers
+  phase execution and semantic acceptance; `config.test.ts` and
+  `plugins.test.ts` cover configuration and registration/schema contracts.
+  Engine ranges, front matter and renderer protections have separate suites;
+  rule families and native comparison normalizers do too. Reusable parser probes
+  and compiled-product coverage support live in `tests/support/parser/`, and the
+  shared CLI workspace/permission lifecycle in `tests/support/cli.ts`. Keep a
+  suite's mocks, cleanup and deliberate cache assertions together when splitting
+  it: each Vitest file has its own module isolation. Authored native corpora
+  live once in `tests/fixtures/renderers/`, shared by host execution, unit
+  regressions and independent report plans. Preserve fixture names, order and
+  source bytes, and update all consumers and native path selection on moves.
+  These paths locate current ownership, not a required taxonomy or a reason to
+  append unrelated tests to an existing file.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createWorkspace, format, parse, semanticFingerprint } from "../../src/index.js";
 import type { Config, Plugin } from "../../src/index.js";
-import { boundaryFixtures } from "../../scripts/obsidian/boundary-fixtures.mjs";
+import { boundaryFixtures } from "../fixtures/renderers/obsidian-boundaries.mjs";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 
 const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });

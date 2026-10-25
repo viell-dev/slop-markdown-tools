@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { fixture, run } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { fixture, run } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 describe("without a named dialect", () => {
   // Tables and footnotes on GitHub, Forgejo, Gitea, and in Obsidian. CommonMark, which
   // was assumed up to 0.2.0-rc.1, reads the tables and the consecutive definitions as

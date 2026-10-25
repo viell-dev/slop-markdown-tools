@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import {
   createCoverageDeltaReader,
   successFunctionRange,
-} from "../parser-emphasis-production-support.mjs";
+} from "../support/parser/parser-emphasis-production-support.mjs";
 
 const url = "file:///owned/parser.generated.js";
 interface Range {

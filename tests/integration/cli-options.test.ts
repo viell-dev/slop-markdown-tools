@@ -1,8 +1,8 @@
 import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "./support.js";
-import { parseExplanation, parseReport, parseRules } from "./json.js";
+import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "../support/cli.js";
+import { parseExplanation, parseReport, parseRules } from "../support/json.js";
 describe("the command line", () => {
   it("ends a usage error with code 2, and help and the version with 0", async () => {
     const root = await fixture({ "note.md": "A note.\n" });

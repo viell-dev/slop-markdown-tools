@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml, stringify } from "yaml";
 import { dialectAliases, dialects } from "../../src/index.js";
-import { repository } from "./support.js";
+import { repository } from "../support/cli.js";
 
 // What the package, the README, the site, the issue forms, and the workflows say about the same
 // facts. Live settings, such as GitHub's labels and About description, are compared by

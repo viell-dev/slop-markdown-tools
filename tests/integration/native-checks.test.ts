@@ -9,7 +9,7 @@ import {
   hosts,
   validateNativeChecks,
 } from "../../scripts/native-checks.mjs";
-import { fixture, repository } from "./support.js";
+import { fixture, repository } from "../support/cli.js";
 
 interface Package {
   version?: string;
@@ -137,7 +137,11 @@ describe("native input classification", () => {
     "src/workspace/slug.ts",
     "scripts/build-parser.mjs",
     "scripts/parser-labels.mjs",
-    "scripts/renderer-fixtures.mjs",
+    "tests/fixtures/renderers/common.mjs",
+    "tests/fixtures/renderers/forges.mjs",
+    "tests/fixtures/renderers/obsidian.mjs",
+    "tests/fixtures/renderers/obsidian-boundaries.mjs",
+    "tests/fixtures/renderers/obsidian/508.txt",
     "scripts/rendering.mjs",
     "scripts/release-evidence.mjs",
     "scripts/native-checks.mjs",
@@ -149,13 +153,13 @@ describe("native input classification", () => {
   ])("retains all hosts for shared, transitive or unclassified input %s", (file) => {
     expect(selected(classifyChanges([file]))).toEqual(hosts);
   });
-  it("retains the Obsidian harness's external fixture inputs", () => {
+  it("retains the Obsidian corpus's shared Markdown inputs", () => {
     const boundaries = readFileSync(
-      path.join(repository, "scripts/obsidian/boundary-fixtures.mjs"),
+      path.join(repository, "tests/fixtures/renderers/obsidian-boundaries.mjs"),
       "utf8",
     );
-    const inputs = [...boundaries.matchAll(/"\.\.\/\.\.\/(tests\/[^"\n]+)"/g)].map(
-      (match) => match[1]!,
+    const inputs = [...boundaries.matchAll(/"\.\/(obsidian-[^"\n]+\.md)"/g)].map(
+      (match) => `tests/fixtures/renderers/${match[1]!}`,
     );
     expect(inputs).toHaveLength(4);
     for (const input of inputs) expect(selected(classifyChanges([input]))).toContain("obsidian");
@@ -163,14 +167,12 @@ describe("native input classification", () => {
   it.each([
     ["scripts/github-rendering.mjs", ["rendering"]],
     [".github/workflows/rendering.yml", ["rendering"]],
-    ["scripts/obsidian/boundary-fixtures.mjs", ["obsidian"]],
-    ["scripts/obsidian/fixtures/508.txt", ["obsidian"]],
     ["scripts/obsidian/package-lock.json", ["obsidian"]],
     ["scripts/forge-html.mjs", ["forges"]],
     ["scripts/forge-evidence.mjs", ["forges"]],
     [".github/workflows/forges.yml", ["forges"]],
     ["docs/quick-start.md", []],
-    ["tests/unit/rules.test.ts", []],
+    ["tests/unit/inline-rules.test.ts", []],
   ])("selects applicable hosts for %s", (file, expected) => {
     expect(selected(classifyChanges([file]))).toEqual(expected);
   });

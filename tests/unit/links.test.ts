@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { stringContaining } from "../assertions.js";
+import { stringContaining } from "../support/assertions.js";
 import {
   createWorkspace,
   format,

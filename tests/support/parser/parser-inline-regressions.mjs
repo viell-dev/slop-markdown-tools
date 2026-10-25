@@ -6,7 +6,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 import { toHast } from "mdast-util-to-hast";
 import { toHtml } from "hast-util-to-html";
-import { bundleParser } from "../scripts/build-parser.mjs";
+import { bundleParser } from "../../../scripts/build-parser.mjs";
 import { loadParserModule } from "./parser-module-probes.mjs";
 
 // Actual production builder/repairs; no copied implementation of a resolver.

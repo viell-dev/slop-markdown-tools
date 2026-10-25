@@ -3,7 +3,7 @@ import { mkdir, readdir, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { expect, it } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
-import { fixture, run, tree } from "./support.js";
+import { fixture, run, tree } from "../support/cli.js";
 
 const git = (root: string, args: string[]) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8" });

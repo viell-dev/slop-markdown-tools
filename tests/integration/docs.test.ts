@@ -9,7 +9,7 @@ import type { Code, RootContent } from "mdast";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
-import { manifest, repository } from "./support.js";
+import { manifest, repository } from "../support/cli.js";
 
 const { builtInRules, dialectAliases, dialects, lint, parse, presets, range } = library;
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");

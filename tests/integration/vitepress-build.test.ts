@@ -2,7 +2,7 @@ import path from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { expect, it } from "vitest";
-import { copyOf, repository, linkDirectory } from "./support.js";
+import { copyOf, repository, linkDirectory } from "../support/cli.js";
 
 it("builds the published before/after site with identical rendered page content", async () => {
   const roots = await Promise.all([

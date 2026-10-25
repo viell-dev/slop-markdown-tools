@@ -3,8 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { discover } from "../../src/workspace/files.js";
 import { loadConfig } from "../../src/config/load.js";
-import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "./support.js";
-import { parseReport } from "./json.js";
+import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
 // These tests take permissions away with Unix modes, which root ignores and Windows
 // does not have, so they are skipped there. The tests at the end of this file cover
 // Windows; tests/unit/links.test.ts covers what the library does with an unreadable path.

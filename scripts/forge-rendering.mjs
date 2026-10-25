@@ -12,7 +12,7 @@ import { format } from "../dist/index.js";
 import { documentSeed, generateDocument } from "./rendering.mjs";
 import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
-import { forgeFixtures as fixtures, fileFixtures } from "./forge-fixtures.mjs";
+import { forgeFixtures as fixtures, fileFixtures } from "../tests/fixtures/renderers/forges.mjs";
 import { fileMarkup, forgeHtml } from "./forge-html.mjs";
 import { images, validateForgeEvidence } from "./forge-evidence.mjs";
 import {

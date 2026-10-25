@@ -6,14 +6,14 @@ import {
   productionCases,
   profiles,
   registrationCases,
-} from "../parser-emphasis-production-cases.mjs";
+} from "../support/parser/parser-emphasis-production-cases.mjs";
 import {
   assertBinding,
   assertSources,
   createRegistrationMutant,
   productionBinding,
   runCoverageChild,
-} from "../parser-emphasis-production-support.mjs";
+} from "../support/parser/parser-emphasis-production-support.mjs";
 
 let root: string;
 let binding: Awaited<ReturnType<typeof productionBinding>>;

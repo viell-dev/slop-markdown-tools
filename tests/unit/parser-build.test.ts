@@ -10,7 +10,7 @@ import {
   repairReviewedParserSource,
   sourceGuards,
 } from "../../scripts/parser-patches.mjs";
-import { readReviewedSource } from "../parser-module-probes.mjs";
+import { readReviewedSource } from "../support/parser/parser-module-probes.mjs";
 
 let bundle: Awaited<ReturnType<typeof bundleParser>>;
 beforeAll(async () => {

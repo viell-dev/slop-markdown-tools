@@ -9,10 +9,10 @@ import { gfmFootnote } from "micromark-extension-gfm-footnote";
 import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
-import { bundleParser } from "../scripts/build-parser.mjs";
+import { bundleParser } from "../../../scripts/build-parser.mjs";
 import { loadParserModule } from "./parser-module-probes.mjs";
 
-/** @typedef {typeof import("../src/syntax/parser.generated.js")} LabelAdapter */
+/** @typedef {typeof import("../../../src/syntax/parser.generated.js")} LabelAdapter */
 /** @typedef {{eventReads: number, positiveHits: number, negativeHits: number, serializedCalls: number, serializedCharacters: number}} LabelWorkSnapshot */
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */

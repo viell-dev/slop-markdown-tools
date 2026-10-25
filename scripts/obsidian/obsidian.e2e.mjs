@@ -12,7 +12,7 @@ import { obsidianPage } from "wdio-obsidian-service";
 const { createWorkspace, format } = await import("/repo/dist/index.js");
 const { documentSeed, generateDocument, normalizeHtml } =
   await import("/repo/scripts/rendering.mjs");
-const { fixtures } = await import("/repo/scripts/obsidian/fixtures.mjs");
+const { fixtures } = await import("/repo/tests/fixtures/renderers/obsidian.mjs");
 const { rendererSettings } = await import("/repo/scripts/renderer-settings.mjs");
 const { classifyDifferences, knownSources } =
   await import("/repo/scripts/renderer-differences.mjs");
@@ -1392,12 +1392,13 @@ describe("Obsidian before and after formatting", function () {
       stale: classified.stale,
     });
     checkpoint();
-    validateRendererReport(report, { profile, seeds, count }, "obsidian");
     console.log(
       `Compared ${compared} formatted documents; ${differences.length} showed differently.`,
     );
     for (const { name, width, changed } of differences)
       console.log(`  ${name} at ${width} columns: ${changed.join(", ")}`);
+    // Keep diagnostics visible even if bookkeeping validation rejects the report.
+    validateRendererReport(report, { profile, seeds, count }, "obsidian");
     expect(compared).toBeGreaterThan(0);
     expect(
       classified.unexpected.map(({ name, width, view }) => `${name} at ${width}, ${view}`),
