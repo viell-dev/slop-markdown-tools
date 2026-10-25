@@ -76,6 +76,18 @@ wait for every builder. Do not edit source, configuration or installed
 dependencies during a build or its consumers. An interrupted publication
 requires a fresh standalone command.
 
+Temporary-file ownership uses a live process ID. An orphan whose ID has been
+reused can be preserved; strict consumer verification then rejects that extra
+file. After ruling out a live writer, remove only that exact ordinary temporary
+file. Process IDs are not a general lock or a transactional publication scheme.
+
+An interrupted process can leave its own ignored `.mdrefine-build-*` staging
+directory. After confirming that its owning build process has exited, resolve
+the exact directory path and check that it is an ordinary directory directly
+inside this checkout before removing that directory only. Never use wildcard
+cleanup, follow a link, or remove another live build's staging. Staging is
+excluded from ESLint as well as Git so abandoned output does not break checks.
+
 `scripts/with-build.mjs` owns one build and a temporary receipt for a bounded
 sequence of internal npm scripts. `check:ci` runs `check:built` and
 `test:package:installed` together; `test:ci` runs the full tests and installed
@@ -91,6 +103,14 @@ shipped or reused by another job. Edits or dependency installation invalidate
 the owning invocation: restart it rather than saving or copying its receipt.
 This is verification of an unchanged build, not transactional support for
 editing inputs while tools run or a persistent dependency cache.
+
+All standalone Vitest projects use the same full product preparation, including
+unit, performance and coverage selections. This adds a TypeScript compile to
+their former parser-only startup and can report a product type error before
+those suites run. The single preparation contract keeps direct Vitest and
+project-filtered invocations predictable; orchestration still shares one build
+where the product is consumed again. Coverage remains a distinct job and its
+tests and evidence are unchanged.
 
 ESLint uses the project's TypeScript types when checking source and tests. It
 also checks the JavaScript scripts and examples with their existing environment
@@ -467,11 +487,13 @@ all four.
 - **Rebuilds and packages contain current output only.** `build-output.test.ts`
   builds synthetic source, renames and removes modules, rebuilds and inspects an
   actual tarball. It checks source-map paths, unexpected output, failed
-  preparation, concurrent product builders, linked-output rejection, and receipt
-  identity, invalidation and cleanup. The package smoke check independently
-  compares the tarball's complete `dist` file set with the compiler's expected
-  names plus the four parser artifacts. Every pull request. Per-file publication
-  is not a directory transaction; concurrent edits require a fresh invocation.
+  preparation, concurrent product builders, live/exited child-writer temporary
+  files, linked/lowercase-drive script dispatch, side-effect-free imports,
+  abandoned-staging checks, linked-output rejection, and receipt identity,
+  invalidation and cleanup. The package smoke check independently compares the
+  tarball's complete `dist` file set with the compiler's expected names plus the
+  four parser artifacts. Every pull request. Per-file publication is not a
+  directory transaction; concurrent edits require a fresh invocation.
 - **Cost grows with the input as expected.** `tests/performance/` compares
   growth and checks that memory is released; `large-inputs.test.ts` formats
   documents beyond the engine's argument limits, each in its own process. Every

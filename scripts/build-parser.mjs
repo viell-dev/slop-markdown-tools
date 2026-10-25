@@ -469,7 +469,8 @@ export async function writeIfChanged(filename, contents) {
 }
 
 /**
- * Shared production/Vitest builder. Importing this module never writes output.
+ * Production parser builder; dedicated parser checks also call it directly.
+ * Importing this module never writes output.
  * @param {{ repositoryRoot?: string, outputDirectory?: string }} [options]
  */
 export async function buildParser(options = {}) {

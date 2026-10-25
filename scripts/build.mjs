@@ -300,7 +300,18 @@ export async function verifyBuild(repositoryRoot = defaultRoot) {
   return context;
 }
 
-if (process.argv[1] && (await realpath(process.argv[1])) === fileURLToPath(import.meta.url)) {
+async function invokedAsMain() {
+  if (!process.argv[1]) return false;
+  const scriptPath = await realpath(fileURLToPath(import.meta.url));
+  try {
+    return (await realpath(process.argv[1])) === scriptPath;
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
+if (await invokedAsMain()) {
   await buildProduct();
   process.stdout.write("Product build ready (fresh staged output).\n");
 }

@@ -50,7 +50,18 @@ export async function withBuild(
   }
 }
 
-if (process.argv[1] && (await realpath(process.argv[1])) === fileURLToPath(import.meta.url)) {
+async function invokedAsMain() {
+  if (!process.argv[1]) return false;
+  const scriptPath = await realpath(fileURLToPath(import.meta.url));
+  try {
+    return (await realpath(process.argv[1])) === scriptPath;
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
+if (await invokedAsMain()) {
   const commands = process.argv.slice(2);
   if (commands[0] === "--verify") {
     assert.equal(commands.length, 1);

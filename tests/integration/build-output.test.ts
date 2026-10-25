@@ -1,6 +1,20 @@
-import { execFileSync } from "node:child_process";
-import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  rmdir,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
+import { createInterface } from "node:readline";
+import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
 import { assertDistFiles, buildProduct, ordinaryFiles, verifyBuild } from "../../scripts/build.mjs";
 import { withBuild } from "../../scripts/with-build.mjs";
@@ -207,4 +221,153 @@ it("rejects a linked output target without touching it", async () => {
     "Build tree contains a link",
   );
   expect(await readFile(path.join(outside, "keep.txt"), "utf8")).toBe("retained\n");
+});
+
+it("dispatches both scripts through real linked/lowercase paths and imports them without side effects", async () => {
+  const root = await productFixture();
+  const container = await fixture({});
+  const linked = path.join(container, "checkout");
+  await linkDirectory(root, linked);
+  const checkouts = [linked];
+  if (process.platform === "win32") checkouts.push(root[0]!.toLowerCase() + root.slice(1));
+  const env = { ...process.env };
+  delete env.MDREFINE_BUILD_RECEIPT;
+  for (const checkout of checkouts) {
+    const built = spawnSync(process.execPath, [path.join(checkout, "scripts/build.mjs")], {
+      cwd: checkout,
+      env,
+      encoding: "utf8",
+      timeout: 30000,
+      windowsHide: true,
+    });
+    expect(built.error).toBeUndefined();
+    expect(built.status, built.stderr).toBe(0);
+    expect(built.stdout).toContain("Product build ready (fresh staged output).");
+    await assertDistFiles(root);
+    const verified = spawnSync(
+      process.execPath,
+      [path.join(checkout, "scripts/with-build.mjs"), "--verify"],
+      {
+        cwd: checkout,
+        env,
+        encoding: "utf8",
+        timeout: 10000,
+        windowsHide: true,
+      },
+    );
+    expect(verified.error).toBeUndefined();
+    expect(verified.status).not.toBe(0);
+    expect(verified.stderr).toContain("Missing build context");
+    for (const [script, exported] of [
+      ["build.mjs", "buildProduct"],
+      ["with-build.mjs", "withBuild"],
+    ]) {
+      for (const argv of [
+        path.join(checkout, "missing-entry.mjs"),
+        path.join(checkout, "package.json/child"),
+      ]) {
+        const code = `process.argv[1] = ${JSON.stringify(argv)};
+const module = await import(${JSON.stringify(pathToFileURL(path.join(checkout, "scripts", script!)).href)});
+process.stdout.write(typeof module[${JSON.stringify(exported)}]);`;
+        const imported = spawnSync(process.execPath, ["--input-type=module", "--eval", code], {
+          cwd: checkout,
+          env,
+          encoding: "utf8",
+          timeout: 10000,
+          windowsHide: true,
+        });
+        expect(imported.error).toBeUndefined();
+        expect(imported.status, imported.stderr).toBe(0);
+        expect(imported.stdout).toBe("function");
+        expect(imported.stderr).toBe("");
+      }
+    }
+  }
+}, 90000);
+
+it("preserves a real live child writer's temp, rejects it at consumption, and prunes it after exit", async () => {
+  const root = await productFixture();
+  const context = await buildProduct(root);
+  await writeFile(
+    path.join(root, "writer.mjs"),
+    `import {randomUUID} from "node:crypto";
+import {writeFile} from "node:fs/promises";
+import path from "node:path";
+const filename = path.join(process.cwd(), "dist", ".index.js." + process.pid + "." + randomUUID() + ".tmp");
+await writeFile(filename, "live child owns this file\\n");
+process.stdout.write(JSON.stringify(filename) + "\\n");
+setInterval(() => {}, 1000);
+`,
+  );
+  const child = spawn(process.execPath, ["writer.mjs"], {
+    cwd: root,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  const readyLines = createInterface({ input: child.stdout });
+  const inherited = process.env.MDREFINE_BUILD_RECEIPT;
+  try {
+    const [ready] = (await once(readyLines, "line", { signal: AbortSignal.timeout(10000) })) as [
+      string,
+    ];
+    readyLines.close();
+    const temporary = JSON.parse(ready) as string;
+    const receipt = path.join(root, "receipt.json");
+    await writeFile(receipt, JSON.stringify({ ...context, ownerPid: process.pid }));
+    process.env.MDREFINE_BUILD_RECEIPT = receipt;
+    await buildProduct(root);
+    expect(await readFile(temporary, "utf8")).toBe("live child owns this file\n");
+    await expect(verifyBuild(root)).rejects.toThrow("Build output differs from current source");
+    const exited = once(child, "exit");
+    child.kill();
+    await exited;
+    await buildProduct(root);
+    await expect(readFile(temporary)).rejects.toMatchObject({ code: "ENOENT" });
+    await verifyBuild(root);
+  } finally {
+    readyLines.close();
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, "exit");
+      child.kill();
+      await exited;
+    }
+    if (inherited === undefined) delete process.env.MDREFINE_BUILD_RECEIPT;
+    else process.env.MDREFINE_BUILD_RECEIPT = inherited;
+  }
+}, 60000);
+
+it("excludes abandoned staging output from the actual code-check commands", async () => {
+  const staging = await mkdtemp(path.join(repository, ".mdrefine-build-interrupted-"));
+  const generated = path.join(staging, "generated.js");
+  try {
+    await writeFile(generated, "deliberately invalid generated javascript ( ;\n");
+    const linted = spawnSync(
+      process.execPath,
+      [path.join(repository, "node_modules/eslint/bin/eslint.js"), generated, "--no-warn-ignored"],
+      {
+        cwd: repository,
+        encoding: "utf8",
+        timeout: 20000,
+        windowsHide: true,
+      },
+    );
+    expect(linted.error).toBeUndefined();
+    expect(linted.status, linted.stdout + linted.stderr).toBe(0);
+    const formatted = spawnSync(
+      process.execPath,
+      [path.join(repository, "node_modules/prettier/bin/prettier.cjs"), "--check", generated],
+      {
+        cwd: repository,
+        encoding: "utf8",
+        timeout: 20000,
+        windowsHide: true,
+      },
+    );
+    expect(formatted.error).toBeUndefined();
+    expect(formatted.status, formatted.stdout + formatted.stderr).toBe(0);
+  } finally {
+    expect(path.dirname(await realpath(staging))).toBe(await realpath(repository));
+    await rm(generated);
+    await rmdir(staging);
+  }
 });
