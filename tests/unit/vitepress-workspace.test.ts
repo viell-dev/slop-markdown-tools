@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { createWorkspace, lint, format, validateConfig } from "../../src/index.js";
 import type { VitePressOptions } from "../../src/index.js";
-import { stringContaining } from "../assertions.js";
+import { stringContaining } from "../support/assertions.js";
 
 const files = {
   "docs/.vitepress/config.mts": null,

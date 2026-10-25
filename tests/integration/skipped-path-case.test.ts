@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { canRestrict, repository } from "./support.js";
+import { canRestrict, repository } from "../support/cli.js";
 
 function check(scenario: string) {
   const result = spawnSync(

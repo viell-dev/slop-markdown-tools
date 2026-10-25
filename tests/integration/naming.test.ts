@@ -1,7 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { fixture, run } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { fixture, run } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 
 describe("mdrefine naming after the 0.5.0 retirement (#601)", () => {
   const config = { extends: [], rules: { "style/emphasis": "off" } };

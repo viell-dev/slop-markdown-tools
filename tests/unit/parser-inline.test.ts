@@ -14,7 +14,7 @@ import {
   matchingWork,
   verifyInlineMatrix,
   verifyMatchingIdentity,
-} from "../parser-inline-regressions.mjs";
+} from "../support/parser/parser-inline-regressions.mjs";
 
 const sources = inlineSources(examples);
 const compatibilitySources = [

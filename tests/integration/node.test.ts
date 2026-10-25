@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { format, lint, unifiedDiff } from "../../src/index.js";
 import type { Config, Diagnostic } from "../../src/index.js";
 import { discoverWorkspace } from "../../src/node.js";
-import { fixture, run, tree } from "./support.js";
+import { fixture, run, tree } from "../support/cli.js";
 
 const config: Config = { extends: ["recommended", "github"], ignore: ["drafts/**"] };
 const note = `${"A long line of prose in a vault. ".repeat(4).trim()}\nAnd *more*.\n`;

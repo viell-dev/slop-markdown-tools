@@ -3,8 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { discover } from "../../src/workspace/files.js";
 import { loadConfig } from "../../src/config/load.js";
-import { fixture, linkDirectory, run } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { fixture, linkDirectory, run } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 describe("in an Obsidian vault, without a named dialect", () => {
   // Obsidian shows the first two lines on separate lines unless the vault's "Strict
   // line breaks" setting is on, and a wikilink must stay on one line. Up to 0.2.0-rc.1

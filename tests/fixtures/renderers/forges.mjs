@@ -1,4 +1,4 @@
-import { commonFixtures } from "./renderer-fixtures.mjs";
+import { commonFixtures } from "./common.mjs";
 export const forgeFixtures = [
   ...commonFixtures,
   { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },

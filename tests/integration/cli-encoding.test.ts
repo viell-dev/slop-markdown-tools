@@ -4,8 +4,8 @@ import path from "node:path";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { decodeText, invalidUtf8At } from "../../src/workspace/encoding.js";
-import { fixture, run } from "./support.js";
-import { parseReport } from "./json.js";
+import { fixture, run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
 describe("documents that are not UTF-8 text", () => {
   const text = "# Title\r\n\r\n*text*\r\n";
   // UTF-16 with a byte order mark is what Windows PowerShell 5.1 writes for `>`.

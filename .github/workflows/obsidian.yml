@@ -1,5 +1,5 @@
 name: Obsidian
-# Formats the documents of scripts/obsidian/fixtures.mjs and generated documents in the Obsidian
+# Formats tests/fixtures/renderers/obsidian.mjs and generated documents in the Obsidian
 # dialect and compares what Obsidian's Live Preview and Reading view show before and after, with
 # Obsidian running in Docker (scripts/obsidian-check.mjs). It runs for pull requests that change
 # how documents are read or formatted, by hand, from the Release workflow for the commit that it

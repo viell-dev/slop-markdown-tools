@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { CodeFormatter, Config } from "../../src/index.js";
-import { fixture } from "./support.js";
+import { fixture } from "./cli.js";
 
 export const fence = "`".repeat(3);
 const adapter = await readFile(new URL("../fixtures/code-formatter.mjs", import.meta.url), "utf8");

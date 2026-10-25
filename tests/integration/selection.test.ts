@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { discoverWorkspace } from "../../src/node.js";
 import { discover } from "../../src/workspace/files.js";
-import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "./support.js";
-import { parseConfig, parseReport } from "./json.js";
+import { canRestrict, denyRead, fixture, linkDirectory, restrict, run } from "../support/cli.js";
+import { parseConfig, parseReport } from "../support/json.js";
 
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 /** Where letter case is ignored by default, by Git and by the file system. */

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "../../src/index.js";
 import { obsidianSyntax } from "../../src/syntax/obsidian.js";
 import type { WikiLink } from "../../src/syntax/obsidian.js";
-import { literalWork } from "../obsidian-literal-work.mjs";
+import { literalWork } from "../support/obsidian-literal-work.mjs";
 
 function wikiLinks(source: string): WikiLink[] {
   const pending: Nodes[] = [parse(source, "obsidian").tree];

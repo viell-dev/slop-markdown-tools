@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import { importConditions } from "../../src/config/load.js";
 import { parse, semanticFingerprint } from "../../src/index.js";
 import type { Diagnostic } from "../../src/index.js";
-import { cli, fixture, manifest, run, tree } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { cli, fixture, manifest, run, tree } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 
 interface Report {
   version: string;

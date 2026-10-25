@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { discover } from "../../src/workspace/files.js";
-import { fixture } from "../integration/support.js";
+import { fixture } from "../support/cli.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();

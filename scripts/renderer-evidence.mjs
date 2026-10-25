@@ -1,8 +1,8 @@
 // Native workload contracts. Plans come from fixture ownership, never completed loop output.
 import assert from "node:assert/strict";
-import { githubFixtures } from "./renderer-fixtures.mjs";
-import { forgeFixtures, fileFixtures } from "./forge-fixtures.mjs";
-import { fixtures as obsidianFixtures } from "./obsidian/fixtures.mjs";
+import { githubFixtures } from "../tests/fixtures/renderers/common.mjs";
+import { forgeFixtures, fileFixtures } from "../tests/fixtures/renderers/forges.mjs";
+import { fixtures as obsidianFixtures } from "../tests/fixtures/renderers/obsidian.mjs";
 import baseline from "./obsidian/baseline.json" with { type: "json" };
 import { images, validateForgeEvidence } from "./forge-evidence.mjs";
 import { knownSources } from "./renderer-differences.mjs";

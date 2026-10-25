@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
 import { assertDistFiles, buildProduct, ordinaryFiles, verifyBuild } from "../../scripts/build.mjs";
 import { withBuild } from "../../scripts/with-build.mjs";
-import { fixture, linkDirectory, repository } from "./support.js";
+import { fixture, linkDirectory, repository } from "../support/cli.js";
 
 async function productFixture(): Promise<string> {
   const files: Record<string, string> = {
@@ -367,7 +367,7 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
     expect(formatted.status, formatted.stdout + formatted.stderr).toBe(0);
   } finally {
     expect(path.dirname(await realpath(staging))).toBe(await realpath(repository));
-    await rm(generated);
+    await rm(generated, { force: true });
     await rmdir(staging);
   }
 });

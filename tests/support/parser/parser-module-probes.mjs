@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { rolldown } from "rolldown";
-import { repairParserSource, sourceGuards } from "../scripts/parser-patches.mjs";
+import { repairParserSource, sourceGuards } from "../../../scripts/parser-patches.mjs";
 
 const kinds = {
   editMap: "editMap",

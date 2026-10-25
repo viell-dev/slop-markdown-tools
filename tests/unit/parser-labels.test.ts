@@ -18,7 +18,7 @@ import {
   labelSources,
   verifyCustomDefinitionFallback,
   verifyLabelGraphs,
-} from "../parser-label-regressions.mjs";
+} from "../support/parser/parser-label-regressions.mjs";
 
 const sources = labelSources();
 const emptySyntax: Plugin = { name: "labels-empty-syntax", syntax: { micromark: {}, mdast: {} } };

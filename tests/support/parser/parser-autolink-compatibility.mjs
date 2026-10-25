@@ -8,7 +8,7 @@ import { gfmAutolinkLiteral } from "micromark-extension-gfm-autolink-literal";
 import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 import { gfmFromMarkdown } from "mdast-util-gfm";
-import { bundleParser } from "../scripts/build-parser.mjs";
+import { bundleParser } from "../../../scripts/build-parser.mjs";
 import { loadParserModule } from "./parser-module-probes.mjs";
 
 const stock = { fromMarkdown, gfm, gfmAutolinkLiteral, gfmStrikethrough, cjkFriendlyExtension };

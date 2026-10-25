@@ -7,7 +7,7 @@
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
-import { boundaryFixtures } from "./boundary-fixtures.mjs";
+import { boundaryFixtures } from "./obsidian-boundaries.mjs";
 
 /** @type {{ name: string, source: string }[]} */
 export const fixtures = [

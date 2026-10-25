@@ -136,7 +136,7 @@ export const boundaryFixtures = [
   {
     issue: 586,
     name: "full generated math containment regression",
-    source: readFileSync(new URL("./fixtures/586.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/586.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   { issue: 587, name: "standalone one-line display math", source: "alpha\n$$x = y$$\n" },
@@ -162,7 +162,7 @@ export const boundaryFixtures = [
   ...[582, 583, 584].map((issue) => ({
     issue,
     name: `carried boundary generated regression #${issue}`,
-    source: readFileSync(new URL(`./fixtures/${issue}.txt`, import.meta.url), "utf8"),
+    source: readFileSync(new URL(`./obsidian/${issue}.txt`, import.meta.url), "utf8"),
     preserve: false,
   })),
   ...[
@@ -229,7 +229,7 @@ export const boundaryFixtures = [
   {
     issue: 399,
     name: "full generated HTML/list marker regression",
-    source: readFileSync(new URL("./fixtures/399-followup.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/399-followup.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   ...[
@@ -248,7 +248,7 @@ export const boundaryFixtures = [
   {
     issue: 383,
     name: "full generated widget-only Setext regression",
-    source: readFileSync(new URL("./fixtures/383-followup.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/383-followup.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   ...[
@@ -296,7 +296,7 @@ export const boundaryFixtures = [
   {
     issue: 398,
     name: "full generated one-column paragraph-state regression",
-    source: readFileSync(new URL("./fixtures/398-followup.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/398-followup.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   ...[
@@ -307,7 +307,7 @@ export const boundaryFixtures = [
     ["single-line list before a tilde opener with backticks in its info", "* a\n~~~ lang `x`\nc\n"],
     [
       "full generated tilde-info adjacency regression",
-      readFileSync(new URL("./fixtures/567.txt", import.meta.url), "utf8"),
+      readFileSync(new URL("./obsidian/567.txt", import.meta.url), "utf8"),
     ],
   ].map(([name, source]) => ({ issue: 567, name, source, preserve: false })),
   ...[
@@ -401,13 +401,13 @@ export const boundaryFixtures = [
   {
     issue: 563,
     name: "full generated terminal-break regression",
-    source: readFileSync(new URL("./fixtures/563.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/563.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   {
     issue: 376,
     name: "full generated enclosing-list continuation regression",
-    source: readFileSync(new URL("./fixtures/376-followup.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/376-followup.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   ...[
@@ -435,7 +435,7 @@ export const boundaryFixtures = [
   {
     issue: 560,
     name: "literal backslash before a continuing line in the full generated document",
-    source: readFileSync(new URL("./fixtures/560.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/560.txt", import.meta.url), "utf8"),
     preserve: false,
   },
   ...[
@@ -1429,7 +1429,7 @@ export const boundaryFixtures = [
   {
     issue: 508,
     name: "long nested lists fully parsed before scrolling",
-    source: readFileSync(new URL("./fixtures/508.txt", import.meta.url), "utf8"),
+    source: readFileSync(new URL("./obsidian/508.txt", import.meta.url), "utf8"),
   },
   {
     issue: 493,
@@ -1507,7 +1507,7 @@ export const boundaryFixtures = [
     name: "generated standalone comment before multiline Setext title",
     source: readFileSync(
       new URL(
-        "../../tests/fixtures/renderers/obsidian-comment-setext-3693217873.md",
+        "./obsidian-comment-setext-3693217873.md",
         import.meta.url,
       ),
       "utf8",
@@ -1536,7 +1536,7 @@ export const boundaryFixtures = [
     name: "generated Setext title with terminal raw hashes",
     source: readFileSync(
       new URL(
-        "../../tests/fixtures/renderers/obsidian-terminal-hashes-3194585963.md",
+        "./obsidian-terminal-hashes-3194585963.md",
         import.meta.url,
       ),
       "utf8",
@@ -1548,7 +1548,7 @@ export const boundaryFixtures = [
     name: "generated nested-list indentation before a quoted list",
     source: readFileSync(
       new URL(
-        "../../tests/fixtures/renderers/obsidian-quote-indent-3729668566.md",
+        "./obsidian-quote-indent-3729668566.md",
         import.meta.url,
       ),
       "utf8",
@@ -1649,7 +1649,7 @@ export const boundaryFixtures = [
     name: "generated list continuation after a secondary paragraph",
     source: readFileSync(
       new URL(
-        "../../tests/fixtures/renderers/obsidian-secondary-list-3922240374.md",
+        "./obsidian-secondary-list-3922240374.md",
         import.meta.url,
       ),
       "utf8",

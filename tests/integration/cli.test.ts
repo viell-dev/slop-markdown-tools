@@ -3,8 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { discover } from "../../src/workspace/files.js";
-import { cli, fixture, manifest, run, tree } from "./support.js";
-import { parseExplanation, parseReport } from "./json.js";
+import { cli, fixture, manifest, run, tree } from "../support/cli.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 describe("CLI", () => {
   it.each([undefined, { extends: ["recommended"] }])(
     "warns about missing block spacing, explains it, and formats it with configuration %j (#423)",

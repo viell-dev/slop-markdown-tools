@@ -2,8 +2,12 @@ import type { Nodes } from "mdast";
 import { describe, expect, it } from "vitest";
 import { format, lint, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect, Plugin } from "../../src/index.js";
-import { githubMathContinuations, mathCases, obsidianMathCases } from "./math-renderers.js";
-import type { MathRenderer } from "./math-renderers.js";
+import {
+  githubMathContinuations,
+  mathCases,
+  obsidianMathCases,
+} from "../support/math-renderers.js";
+import type { MathRenderer } from "../support/math-renderers.js";
 
 /** The source text of every formula the tool reads in a document, in order. */
 function formulas(source: string, dialect: Dialect): string[] {

@@ -4,10 +4,10 @@ import { createMarkdownRenderer, disposeMdItInstance } from "vitepress";
 import { afterEach, expect, it } from "vitest";
 import { format, parse, semanticFingerprint, resolveConfig } from "../../src/index.js";
 import type { Config, Plugin, VitePressOptions } from "../../src/index.js";
-import { fixture } from "./support.js";
+import { fixture } from "../support/cli.js";
 import { createWorkspace } from "../../src/index.js";
 import { formatWithCode } from "../../src/node.js";
-import { block, setup } from "./code-format-support.js";
+import { block, setup } from "../support/code-format.js";
 import { slug } from "github-slugger";
 
 const require = createRequire(import.meta.resolve("vitepress"));

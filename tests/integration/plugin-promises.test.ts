@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { stringContaining } from "../assertions.js";
-import { cli, fixture, repository } from "./support.js";
+import { stringContaining } from "../support/assertions.js";
+import { cli, fixture, repository } from "../support/cli.js";
 
 const cases = [
   ["fulfilled async function", "async check() { return []; }"],

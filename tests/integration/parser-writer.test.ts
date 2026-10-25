@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildParser, bundleParser } from "../../scripts/build-parser.mjs";
-import { fixture, linkDirectory, repository } from "./support.js";
+import { fixture, linkDirectory, repository } from "../support/cli.js";
 
 const artifactNames = [
   "parser.generated.d.ts",

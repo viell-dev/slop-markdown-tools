@@ -25,8 +25,8 @@ import {
   run,
   tree,
   windowsTool,
-} from "./support.js";
-import { parseReport } from "./json.js";
+} from "../support/cli.js";
+import { parseReport } from "../support/json.js";
 describe("filesystem safeguards", () => {
   it("detects concurrent writes", async () => {
     const root = await fixture({ "note.md": "new content" });

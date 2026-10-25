@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { evaluate as evaluateChecks, requiredChecks } from "../../scripts/release-evidence.mjs";
-import { fixture, linkDirectory, repository } from "./support.js";
+import { fixture, linkDirectory, repository } from "../support/cli.js";
 
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
 const required = requiredChecks(

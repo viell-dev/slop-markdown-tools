@@ -3,9 +3,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { format, parse, semanticFingerprint } from "../../src/index.js";
 import { formatWithCode } from "../../src/node.js";
-import { repository, run } from "./support.js";
-import { parseReport } from "./json.js";
-import { block, calls, fence, setup } from "./code-format-support.js";
+import { repository, run } from "../support/cli.js";
+import { parseReport } from "../support/json.js";
+import { block, calls, fence, setup } from "../support/code-format.js";
 
 it("executes only through the asynchronous Node API and keeps ordinary fingerprints strict", async () => {
   const { root, record, config } = await setup();

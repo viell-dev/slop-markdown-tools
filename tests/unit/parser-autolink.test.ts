@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { verifyAutolinkCompatibility } from "../parser-autolink-compatibility.mjs";
+import { verifyAutolinkCompatibility } from "../support/parser/parser-autolink-compatibility.mjs";
 
 it("keeps the new autolink cache private and invalidates stale jumps", async () => {
   const result = await verifyAutolinkCompatibility();

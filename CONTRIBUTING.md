@@ -118,7 +118,7 @@ performance and integration are uninstrumented.
 ESLint uses the project's TypeScript types when checking source and tests. It
 also checks the JavaScript scripts and examples with their existing environment
 settings. Integration tests validate CLI JSON before using it; the shared
-readers in `tests/integration/json.ts` keep the original payload, so assertions
+readers in `tests/support/json.ts` keep the original payload, so assertions
 still catch unexpected keys.
 
 The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
@@ -257,13 +257,36 @@ probe sources. It does not run the CLI. A defect in how a rule reads or rewrites
 Markdown belongs here, as the smallest synthetic document that shows it, usually
 checked together with the contracts of every formatting change: formatting the
 output again changes nothing, the parsed meaning is unchanged, and disabling the
-rule leaves the source as written. Rules are tested in `rules.test.ts`, list
-rules in `lists.test.ts`, code fences, thematic breaks, and blank space in
-`blocks.test.ts`, problem rules in `references.test.ts`, `structure.test.ts`,
-and `content.test.ts`, wrapping in `wrap.test.ts` and `callout-wrap.test.ts`,
-links in `links.test.ts`, dollar math in `math.test.ts` against the renderers'
-output recorded in `math-renderers.ts`, the engine, configuration, and plugins
-in `engine.test.ts`, and the diff that `format` prints in `diff.test.ts`.
+rule leaves the source as written. Inline and heading rules have
+`inline-rules.test.ts` and `heading-rules.test.ts`; block spacing has
+`block-spacing.test.ts`, and list rules have `lists.test.ts`. Code fences,
+thematic breaks and blank space are in `blocks.test.ts`, problem rules in
+`references.test.ts`, `structure.test.ts` and `content.test.ts`, wrapping in
+`wrap.test.ts` and `callout-wrap.test.ts`, link rules in `link-rules.test.ts`,
+and workspace resolution in `links.test.ts`. That resolution suite keeps its
+shared heading-attribute mock and cache assertions together. Dollar math is in
+`math.test.ts` against the renderers' output recorded in
+`tests/support/math-renderers.ts`. Engine execution, configuration and plugin
+registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
+`engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
+specific contracts. The printed diff has `diff.test.ts`.
+
+`tests/support/` owns reusable assertions, formatting checks and CLI harness
+helpers. Its `parser/` directory holds reference-parser probes, regression
+assertions and the child-process support for compiled-product coverage. A
+support file is not a discovered test suite. These locations are navigation, not
+a mandatory taxonomy: group tests by what they prove, retaining shared mocks,
+lifecycle and deliberate cache assertions when file isolation matters. Keep the
+three Vitest projects' selection, ordering and worker limits when moving suites,
+and compare discovery before and after a move.
+
+Authored native fixtures have one owner in `tests/fixtures/renderers/`:
+`common.mjs` shares controls between GitHub and the forges, `forges.mjs` adds
+file/API cases, and `obsidian.mjs` includes `obsidian-boundaries.mjs` and its
+`obsidian/` text fixtures. Unit boundary regressions and native runners consume
+that same corpus; `scripts/renderer-evidence.mjs` independently builds expected
+plans from it. Preserve names, order and source bytes during moves, and update
+every runner, plan and native routing check instead of copying a corpus.
 
 The safety check compares the parser's readings, so `renderers.test.ts` also
 compares the HTML of two other implementations, commonmark.js and markdown-it,
@@ -293,12 +316,12 @@ source-authored reserved HTML remain significant.
 HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
 Reading view read some Markdown otherwise. `npm run check:obsidian` builds the
 repository, runs Obsidian in Docker, formats the documents of
-`scripts/obsidian/fixtures.mjs` and generated documents in the Obsidian dialect,
-and compares what both views show before and after. Docker must be running. The
-image, from `scripts/obsidian/Dockerfile`, holds a virtual display and
-WebdriverIO with `wdio-obsidian-service`, which downloads Obsidian at run time
-into the `mdrefine-obsidian-cache` volume, because Obsidian's terms do not allow
-redistributing it; the check keeps its own dependencies in
+`tests/fixtures/renderers/obsidian.mjs` and generated documents in the Obsidian
+dialect, and compares what both views show before and after. Docker must be
+running. The image, from `scripts/obsidian/Dockerfile`, holds a virtual display
+and WebdriverIO with `wdio-obsidian-service`, which downloads Obsidian at run
+time into the `mdrefine-obsidian-cache` volume, because Obsidian's terms do not
+allow redistributing it; the check keeps its own dependencies in
 `scripts/obsidian/package.json`. It writes `artifacts/obsidian/report.json`,
 with screenshots of the first differences. `PROFILE=realistic` is the default:
 the fixtures and seeds 1–5, ten documents per seed. `PROFILE=adversarial`
@@ -322,32 +345,33 @@ retains its rendered preview. Rendered content, styles, code spacing, alignment,
 link destinations, and row counts remain significant. A host control activates
 header, code, and link cells with real input and checks those negative cases;
 nested authored tables and editor-only payload remain intact. Boundary
-regressions in `scripts/obsidian/boundary-fixtures.mjs` are shared with the unit
-suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
-The comparison retains the source delimiter of styled list lines, including
-checkbox widgets, and normalizes spaces within and around italic and bold runs
-while keeping styled characters, code, highlights, and decorations significant.
-Unchecked checkbox widgets retain their presence and count even with no text.
-Styled fence delimiters ignore only their terminal spaces and tabs; code body
-whitespace and internal info-string spacing remain significant. A host control
-checks both the normalization and those negative cases. Native heading lines and
-Setext underlines retain heading boundaries independently of optional blank
-separators; host controls retain changes to their count, levels, text, styles,
-and embeds, including single-character underlines and empty headings. Unstyled
-records emptied by punctuation normalization are omitted after grouping, so
-their removal cannot join visible paragraphs. Styled records, code, and widgets
-remain significant. For the default Obsidian theme, a lone unattributed
-paragraph directly inside a list item has no extra spacing and is compared as
-inline content. Multiple paragraphs, attributed paragraphs, and other block
-boundaries remain significant; a deterministic host control checks these cases
-on every comparison run. The Obsidian workflow runs the check for pull requests
-with an [applicable native input](#what-the-checks-prove), in the Release
-workflow, and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the
-inputs `profile`, `seed`, `count`, `obsidian-version`, and
-`obsidian-installer-version`; its `obsidian` artifact holds the report and
-screenshots. It fails when the check compared nothing. PR and release gates
-require realistic fixed-seed evidence; weekly/manual adversarial runs are
-discovery only. Both profiles retain the native calibration controls.
+regressions in `tests/fixtures/renderers/obsidian-boundaries.mjs` are shared
+with the unit suite, including the long synthetic note in
+`tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
+delimiter of styled list lines, including checkbox widgets, and normalizes
+spaces within and around italic and bold runs while keeping styled characters,
+code, highlights, and decorations significant. Unchecked checkbox widgets retain
+their presence and count even with no text. Styled fence delimiters ignore only
+their terminal spaces and tabs; code body whitespace and internal info-string
+spacing remain significant. A host control checks both the normalization and
+those negative cases. Native heading lines and Setext underlines retain heading
+boundaries independently of optional blank separators; host controls retain
+changes to their count, levels, text, styles, and embeds, including
+single-character underlines and empty headings. Unstyled records emptied by
+punctuation normalization are omitted after grouping, so their removal cannot
+join visible paragraphs. Styled records, code, and widgets remain significant.
+For the default Obsidian theme, a lone unattributed paragraph directly inside a
+list item has no extra spacing and is compared as inline content. Multiple
+paragraphs, attributed paragraphs, and other block boundaries remain
+significant; a deterministic host control checks these cases on every comparison
+run. The Obsidian workflow runs the check for pull requests with an [applicable
+native input](#what-the-checks-prove), in the Release workflow, and by hand with
+`gh workflow run obsidian.yml --ref BRANCH`, with the inputs `profile`, `seed`,
+`count`, `obsidian-version`, and `obsidian-installer-version`; its `obsidian`
+artifact holds the report and screenshots. It fails when the check compared
+nothing. PR and release gates require realistic fixed-seed evidence;
+weekly/manual adversarial runs are discovery only. Both profiles retain the
+native calibration controls.
 
 PR/release checks pin the app, installer and Docker base digest. Weekly checks
 explicitly request `latest` for both app and installer; manual inputs also
@@ -386,14 +410,14 @@ Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
 opt-in code tools, `examples.test.ts` and `docs.test.ts` for the examples and
 documentation, `metadata.test.ts` for what the package, the README, the site,
 the issue forms, and the workflows say about the same facts, and
-`release-evidence.test.ts` for the Release workflow's check of CI. `support.ts`
-holds the helpers: `fixture()` writes a temporary workspace, `run()` starts the
-CLI, `restrict()` and `denyRead()` take away read permission on Unix and on
-Windows, `denyWrite()` takes away write permission on Windows, `windowsTool()`
-runs a program of Windows such as `icacls.exe`, and `linkDirectory()` links a
-directory, as a junction on Windows. Tests that need Unix permission modes are
-skipped on Windows and for the root user, and one that links a file needs
-`canSymlink`.
+`release-evidence.test.ts` for the Release workflow's check of CI.
+`tests/support/cli.ts` holds the shared harness: `fixture()` writes a temporary
+workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take away read
+permission on Unix and on Windows, `denyWrite()` takes away write permission on
+Windows, `windowsTool()` runs a program of Windows such as `icacls.exe`, and
+`linkDirectory()` links a directory, as a junction on Windows. Tests that need
+Unix permission modes are skipped on Windows and for the root user, and one that
+links a file needs `canSymlink`.
 
 A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
 names its issue; remove the marker with the fix. `tests/performance/` guards
@@ -443,17 +467,21 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   refuses an edit that changes the parsed reading; `src/core/semantics.ts` owns
   fingerprints and refusal locations, and `protection-edits.ts` checks renderer
   boundaries from the root-cached `RendererProtections` result. `engine.test.ts`
-  covers phase order, convergence, overlapping edits, synchronous plugin/schema
-  validation and caching, protection-result reuse, and workspace callback
-  binding/errors. `link-fingerprint.test.ts` covers resolved target identity and
-  literal URLs; the boundary regressions and `tests/performance/engine.test.ts`
-  cover source ranges, ordered protection fields and bounded scans. These
-  locations describe current ownership and evidence, rather than requiring
-  future helpers to accumulate there. The rule tests format twice, compare the
-  meaning, and disable the rule; `renderers.test.ts` compares commonmark.js and
-  markdown-it before and after formatting. Every pull request. The guard
-  compares the parser's own readings, so a parser defect can hide from it; the
-  renderer checks below and the workarounds in the [dependency
+  covers phase order, convergence, overlapping edits, protection-result reuse
+  and workspace callback binding/errors. `config.test.ts` checks configuration
+  resolution and defaults; `plugins.test.ts` checks registration, synchronous
+  schema validation and identity-keyed schema caching. `engine-ranges`,
+  `engine-front-matter` and `engine-*-protections` retain their respective
+  selection and preservation regressions. `link-fingerprint.test.ts` covers
+  resolved target identity and literal URLs; the boundary regressions and
+  `tests/performance/engine.test.ts` cover source ranges, ordered protection
+  fields and bounded scans. These locations describe current ownership and
+  evidence, rather than requiring future helpers to accumulate there. The rule
+  tests format twice, compare the meaning, and disable the rule;
+  `renderers.test.ts` compares commonmark.js and markdown-it before and after
+  formatting. Every pull request. The guard compares the parser's own readings,
+  so a parser defect can hide from it; the renderer checks below and the
+  workarounds in the [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) cover
   what is known.
 - **Renderers show the same before and after.** GitHub: the Rendering workflow.
@@ -461,10 +489,10 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   on every pull request: `vitepress-build.test.ts` builds the example site
   before and after formatting, and `vitepress.test.ts` renders pages with
   VitePress's own Markdown renderer and Vue. Math: `math.test.ts` against the
-  renderers' output recorded in `math-renderers.ts`. Forgejo and Gitea: the
-  Forges workflow compares official disposable hosts through their file-mode API
-  and actual repository file views, including heading anchors. The Rendering,
-  Obsidian and Forges workflows run for pull requests that change a
+  renderers' output recorded in `tests/support/math-renderers.ts`. Forgejo and
+  Gitea: the Forges workflow compares official disposable hosts through their
+  file-mode API and actual repository file views, including heading anchors. The
+  Rendering, Obsidian and Forges workflows run for pull requests that change a
   native-sensitive input, with authored fixtures and realistic documents at
   fixed seeds. The Native workflow classifies every PR and requires each
   applicable host call to succeed through its `Native checks` aggregate. It
@@ -483,6 +511,9 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   missing, duplicate and incomplete cases, controls, views and host identities.
   Partial reports and existing failure artifacts survive failed attempts. This
   validates bookkeeping and trusted producers, not arbitrary fabricated reports.
+  `github-normalization.test.ts` and `obsidian-normalization.test.ts` check
+  comparison normalization, including changes that must remain significant;
+  these offline controls do not replace native calibration or host execution.
   Release consumes fresh workflow results within its producing run; reports are
   not copied between runs, so no new cross-run report provenance is implied.
   GitHub's Markdown API version remains externally uncontrolled. Weekly/manual

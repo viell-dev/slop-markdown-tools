@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Test suites separate engine, configuration, plugin, rule and comparison
+  responsibilities. Shared parser/CLI support and authored native fixtures have
+  explicit ownership, preserving their cases and native workload plans
+  ([#634](https://github.com/viell-dev/slop-markdown-tools/issues/634)).
+
 - Internal renderer protections have named collectors and one cached result;
   rule registration and semantic acceptance are separate from engine phase
   orchestration, preserving the public API and formatting behavior
