@@ -19,7 +19,10 @@ RUN apt-get update \
 USER node
 WORKDIR /check
 COPY --chown=node:node package.json package-lock.json ./
+COPY --chown=node:node provided-binaries ./provided-binaries
+COPY --chown=node:node verify-dependencies.mjs service.mjs ./
 RUN npm ci --no-audit --no-fund
+RUN node verify-dependencies.mjs
 COPY --chown=node:node run.sh wdio.conf.mjs obsidian.e2e.mjs baseline.json ./
 COPY --chown=node:node vault ./vault
 ENTRYPOINT ["sh", "/check/run.sh"]

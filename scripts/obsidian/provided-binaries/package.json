@@ -1,0 +1,9 @@
+{
+  "name": "@mdrefine/obsidian-provided-binaries",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Harness-only replacement for unused WebdriverIO automatic browser downloads",
+  "type": "module",
+  "license": "MIT",
+  "exports": "./index.mjs"
+}

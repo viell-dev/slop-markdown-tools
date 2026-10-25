@@ -1,6 +1,7 @@
 // WebdriverIO's configuration for the Obsidian check, inside its container.
 // Explicit latest requests are for weekly/manual drift; PR/release use the verified baseline.
 import process from "node:process";
+import { fileURLToPath, URL } from "node:url";
 import baseline from "./baseline.json" with { type: "json" };
 
 export const config = {
@@ -18,7 +19,7 @@ export const config = {
       },
     },
   ],
-  services: ["obsidian"],
+  services: [fileURLToPath(new URL("./service.mjs", import.meta.url))],
   reporters: ["spec"],
   cacheDir: "/check/.obsidian-cache",
   mochaOpts: { ui: "bdd", timeout: 30 * 60 * 1000 },
