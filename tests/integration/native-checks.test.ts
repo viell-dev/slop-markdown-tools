@@ -49,14 +49,21 @@ describe("native input classification", () => {
       ).toEqual([]);
     },
   );
-  it.each(["rolldown", "typescript", "npm-run-all2", "micromark-extension-gfm", "entities"])(
-    "retains native coverage for %s regardless of development/production labels",
-    (name) => {
-      expect(
-        selected(classifyChanges(["package.json", "package-lock.json"], original, update(name))),
-      ).toEqual(hosts);
-    },
-  );
+  it.each([
+    "rolldown",
+    "typescript",
+    "npm-run-all2",
+    "micromark-extension-gfm",
+    "micromark-extension-gfm-autolink-literal",
+    "micromark-extension-gfm-footnote",
+    "micromark-extension-gfm-strikethrough",
+    "micromark-extension-cjk-friendly",
+    "entities",
+  ])("retains native coverage for %s regardless of development/production labels", (name) => {
+    expect(
+      selected(classifyChanges(["package.json", "package-lock.json"], original, update(name))),
+    ).toEqual(hosts);
+  });
   it("routes lockfile-only indirect updates by all roots that reach their actual location", () => {
     for (const [name, expected] of [
       ["entities", hosts],
