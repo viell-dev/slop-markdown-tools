@@ -19,6 +19,7 @@ const commit = "a".repeat(40);
 const producer = {
   id: 10,
   status: "completed",
+  conclusion: "success",
   head_sha: commit,
   head_branch: "main",
   event: "push",
@@ -31,7 +32,7 @@ const evidence = { commit, repository: "example/project", workflowRuns: [produce
 const evaluate = (
   runs: Parameters<typeof evaluateChecks>[0],
   checks: Parameters<typeof evaluateChecks>[1],
-  context = evidence,
+  context: Parameters<typeof evaluateChecks>[2] = evidence,
 ) => evaluateChecks(runs, checks, context);
 let id = 0;
 /** A check run as GitHub's API describes it. */
@@ -258,6 +259,17 @@ describe("release evidence", () => {
     expect(evaluate(fresh, required, context).state).toBe("success");
     fresh[0]!.conclusion = "failure";
     expect(evaluate([...passing(), ...fresh], required, context).state).toBe("failure");
+  });
+  it("rejects a completed unsuccessful rerun even before replacement job checks appear", () => {
+    for (const conclusion of ["failure", "cancelled", "skipped", "timed_out", "neutral", null]) {
+      expect(
+        evaluate(passing(), required, {
+          ...evidence,
+          workflowRuns: [{ ...producer, conclusion }],
+        }).state,
+        String(conclusion),
+      ).toBe("failure");
+    }
   });
   it("waits for a check that is missing, queued, or running", () => {
     const runs = passing();

@@ -157,11 +157,13 @@ any failure publishes nothing:
   from this repository's `ci.yml` push/main run. Same-named results from another
   workflow, event, repository or commit do not qualify; other required statuses
   retain their specified app identities and are never exempted. The gate needs
-  the newest eligible CI producer attempt to finish before reading its latest
-  job results, even when an older attempt passed. Optional Node 26 can delay
-  completion but its result remains non-required. The gate needs read access to
-  checks and Actions runs. It waits up to 40 minutes for CI that is still
-  running, so it can be dispatched right after the merge.
+  the newest eligible CI producer attempt to succeed before accepting its latest
+  job results, even when an older attempt passed. A pending producer waits; an
+  unsuccessful completed producer fails. Optional Node 26 can delay completion,
+  but its allowed failure does not fail the workflow or become a release
+  requirement. The gate needs read access to checks and Actions runs. It waits
+  up to 40 minutes for CI that is still running, so it can be dispatched right
+  after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository

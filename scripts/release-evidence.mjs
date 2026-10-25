@@ -10,7 +10,9 @@
 // A check that is queued or running is waited for, and so is a
 // check that has not appeared yet, because the Release workflow is often dispatched right
 // after a merge starts CI: for up to 40 minutes, the time CI's slowest job may take to start
-// and finish, or for WAIT_MINUTES. A failed, cancelled, or skipped check fails at once. The Release workflow runs
+// and finish, or for WAIT_MINUTES. A pending producer attempt waits; once completed, its
+// unsuccessful conclusion or any failed, cancelled or skipped required check fails the gate.
+// The Release workflow runs
 // this before it prepares the package; it needs an authenticated gh (GH_TOKEN in GitHub
 // Actions) with read access to checks and Actions runs.
 import { execFileSync } from "node:child_process";
@@ -56,6 +58,7 @@ export function validateRendererEvidence(report) {
  * @typedef {object} WorkflowRun The producer identity from GitHub's Actions API.
  * @property {number} id
  * @property {string} status
+ * @property {string | null} conclusion
  * @property {string} head_sha
  * @property {string} head_branch
  * @property {string} event
@@ -136,6 +139,9 @@ export function evaluate(checkRuns, required, evidence) {
     if (fromCI && producer && producer.status !== "completed") {
       lines.push(`${check.name}: CI producer ${producer.status}`);
       if (state === "success") state = "pending";
+    } else if (fromCI && producer && producer.conclusion !== "success") {
+      lines.push(`${check.name}: CI producer ${producer.conclusion}`);
+      state = "failure";
     } else if (!run || (fromCI && !producer)) {
       lines.push(`${check.name}: not started`);
       if (state === "success") state = "pending";

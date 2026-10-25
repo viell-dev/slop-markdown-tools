@@ -523,8 +523,9 @@ all four.
   `ci.yml` push/main run. PR events are rejected because they can test a
   synthetic merge tree. Other required checks retain their own app identities. A
   newer queued/running CI producer or rerun waits even before its jobs appear;
-  completed producers use the newest individual check results. Optional Node 26
-  can delay producer completion but its result remains non-required.
+  the completed producer must succeed, then its newest individual check results
+  must pass. Optional Node 26 can delay completion, but its allowed failure does
+  not fail the workflow or become a release requirement.
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
   and wrong-producer results. Hosted preparation reuses static/unit/performance/
   integration evidence, then `release:pack` freshly builds and checks the exact
