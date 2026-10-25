@@ -12,6 +12,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Workflow regression tests check YAML structure while retaining exact evidence
+  identities. Contributor and release policy is authoritative; agent navigation
+  permits cohesive internal modules, and optional review bots have no guaranteed
+  availability
+  ([#635](https://github.com/viell-dev/slop-markdown-tools/issues/635),
+  [#641](https://github.com/viell-dev/slop-markdown-tools/issues/641),
+  [#642](https://github.com/viell-dev/slop-markdown-tools/issues/642)).
+
 - Native renderer reports validate the intended documents, widths, views and
   calibration controls, including unchanged formatting attempts. Obsidian
   PR/release checks pin the app, installer and Docker base and record observed

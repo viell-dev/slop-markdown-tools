@@ -90,7 +90,8 @@ Known couplings:
   check map consistent in meaning. Shared/transitive inputs and unknown changes
   select all hosts; host-specific inputs can differ. Dependency roles follow
   actual native use and shared lockfile reachability, never npm's development
-  label alone. Check native imports and file reads before exempting a path.
+  label alone. Consistent classification does not require identical broad path
+  lists. Check native imports and file reads before exempting a path.
 - Native report contracts: `scripts/renderer-evidence.mjs` derives plans from
   owned fixtures and settings independently of execution records. Deterministic
   consumers pass their expected host and canonical workload; never derive an
@@ -215,64 +216,12 @@ back is a gap in the checks: improve them rather than asking again.
 
 ## Review and verification
 
-Every change gets its tests and CI, then the author's review of the complete
-diff after the checks pass, trying inputs that the tests do not cover. Beyond
-that, the maintainer decides whether a separate agent with fresh context reviews
-it, by its sensitivity, complexity, effect, and uncertainty, and records the
-choice:
-
-- Ordinary, well-understood changes use author review and relevant checks. A
-  substantial parser, engine, file-write, packaging or publication change can
-  get one independent review over its coherent change range, shared with the
-  release review where practical. Do not repeat review for every small PR or
-  re-review unchanged code merely because another commit was added.
-- A release PR normally gets an in-depth independent review by a model with
-  stronger reasoning suited to the work, of the changes since the previous
-  release, unresolved defects, the evidence, compatibility, packaging,
-  documentation, and installation and updates, not just the version. Record the
-  reason when one is left out.
-- The same model or provider may review; prefer a different provider for
-  important releases and particularly sensitive work. Name the reviewed commit
-  and scope. Address every finding; a material fix or a disputed finding gets a
-  focused follow-up review of the unresolved material finding and affected
-  changes. Optional cases and wording nits do not start another review round.
-- The review apps described below supplement these reviews and do not replace
-  them; their quotas do not decide whether a change was reviewed enough.
-
-A PR's verification section records the commands and their results, the
-platforms tested, the runs of the real-renderer checks when its changes trigger
-them, what the evidence cannot show, and the review it got. CONTRIBUTING.md's
-map of [what the checks prove](./CONTRIBUTING.md#what-the-checks-prove) says
-which checks back which promise and when the expensive ones run. Investigate a
-failing or intermittent check and fix the product or the check; do not rerun it
-until it passes, and do not widen a limit without understanding the failure.
-
-## Bounded renderer work
-
-PR and release gates use authored fixtures and the realistic generator profile
-at fixed seeds. Weekly/manual adversarial discovery is a separate triage queue,
-never a merge or release gate. Keep discoveries issue-linked; exact known
-source/output/view pairs are replayed, and stale entries fail. Offline tests
-bind entries to current formatter output without needing Docker.
-
-Before implementing a discovered difference, decide whether plausible authored
-CommonMark or documented dialect syntax loses meaningful rendered content or
-structure. Fix those cases. Record exotic constructions and stray-marker styling
-as limits in the design/dialect guides; close them as not planned with
-`Status: Won't Do`, reopenable with a report from real use. New findings go
-through the general boundary policy before adding a specific protection.
-
-Keep existing fixes and fixtures. Consolidate specific guards only when a
-general rule demonstrably replaces them. Finish when the agreed deterministic
-gates pass and discovered cases have a disposition. Do not expand a PR for
-unrelated optional cases, or try to exhaust adversarial seeds. Use focused local
-checks while editing and required final CI; repeat expensive checks only when
-changed code or a concrete evidence gap warrants it.
-
-The narrowed renderer work, including general protections and visible skipped
-style findings, belongs to 0.4.x. The mdrefine naming migration introduces and
-deprecates names in 0.4.x; removing the legacy compatibility forms belongs to
-the 0.5.0 release PR.
+Follow [CONTRIBUTING.md](./CONTRIBUTING.md#review-and-verification) for author,
+independent and optional bot review, and its [bounded renderer
+work](./CONTRIBUTING.md#bounded-renderer-work) policy for discovery
+dispositions. The existing [verification
+map](./CONTRIBUTING.md#what-the-checks-prove) is authoritative; update it in the
+PR that changes a check.
 
 ## Project scope
 
@@ -353,27 +302,11 @@ requires branches to be up to date, so after each merge the other open PRs need
 fast-forward the local `main` before new work, and prune stale tracking refs and
 local task branches.
 
-`.github/rulesets/` records the policies for `main`, for version tags, and for
-the `site-*` branches that correct the current release's site; keep it and
-GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
-`ci.yml`, where `NODE` is the matrix's major version label rather than its exact
-`node-version`, its separate `Unit coverage` job, and the PR-only
-`Native checks` aggregate in `native.yml`. All bind to GitHub Actions, app
-15368; renaming one needs a ruleset update. The aggregate rejects missing or
-unsuccessful applicable host calls and explicitly reports inapplicability. Keep
-the coordinator unfiltered and read-only on `pull_request`, including forks. An
-applicable external-host outage blocks merge; investigate it without waiving
-evidence or weakening the ruleset. `release-evidence.mjs` excludes exactly that
-PR-only check/app pair from its exact-commit requirements because Release calls
-all three native workflows afresh. Every other required check and unit coverage
-still must pass on the release commit. Built-in CI evidence must come from this
-repository's `ci.yml` push/main run for that exact SHA; PR checks can test a
-synthetic merge tree and cannot substitute. Hosted preparation reuses those
-static/test results and runs `release:pack` to build and test the actual
-publication artifact. Standalone `release:prepare` still runs the complete
-checks. The Node.js 26 job is not required. Zero required approvals is
-deliberate for a single-account, agent-maintained repository; PRs, passing
-checks, and resolved review threads remain mandatory.
+Follow CONTRIBUTING's [repository
+enforcement](./CONTRIBUTING.md#repository-enforcement) policy and RELEASING's
+exact-commit evidence requirements. Keep recorded/live rulesets, workflow
+identities and the release-selector producer mapping aligned when changing a
+required check.
 
 Other repository settings, each recorded here with its reason when it changes:
 
@@ -394,12 +327,6 @@ Other repository settings, each recorded here with its reason when it changes:
 - Wiki, Projects, and Discussions are off; issues and pull requests are the only
   channels.
 - #330, the overview of upstream defects, is pinned.
-- Three review apps comment on pull requests: Sourcery and cubic on each push,
-  CodeRabbit when a comment asks for it with `@coderabbitai review`. Their
-  findings are claims to check, not approvals: verify each against the code and,
-  where it concerns rendering, against the renderer; fix a valid one in the PR
-  with a test, and answer every thread with the evidence either way before
-  resolving it. The ruleset itself requires only that every thread is resolved.
 
 Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
 comment, lock a conversation, or close an item that breaks it, and say why where
@@ -407,11 +334,18 @@ it helps.
 
 ## Technical map
 
+Paths below describe the current implementation. Scoped internal reorganizations
+are allowed: retain public entry points and synchronous APIs, the dependency
+direction between layers, rendering and edit safety, parser source/license
+identity, and platform/test isolation. Update affected instructions, navigation
+and verification claims in the owning refactor PR; describe implemented layouts
+only and remove superseded transition notes.
+
 - TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
   `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
   `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
-  comments use `mdrefine-*`. Version 0.5.0 removes the legacy command, config
-  discovery names, comments and transitional notice from 0.4.x.
+  comments use `mdrefine-*`. The legacy 0.4.x compatibility forms were removed
+  in 0.5.0; the changelog and migration guide retain that history.
 - `src/syntax/` parses with micromark and mdast through the generated internal
   adapter and holds the Obsidian extensions; `src/config/` resolves presets,
   schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the
@@ -420,15 +354,17 @@ it helps.
   connects them. The main entry never touches the filesystem. `mdrefine/node`
   exposes `src/workspace/discovery.ts`, which the CLI uses for discovery and
   per-document options, so change the two together.
-- Shared rule helpers belong in `src/rules/shared.ts`, renderer-specific edit
-  protections in `protections.ts`, and source-line primitives in
-  `src/syntax/source.ts`. Rule modules do not import the `style.ts` aggregator.
-  Workspace HTML, anchor collection, target indexing, and link resolution are
-  separate modules behind `src/workspace/index.ts`; keep its public entry
-  stable.
+- Shared rule helpers currently start at `src/rules/shared.ts`, edit protections
+  at `protections.ts`, and source-line primitives at `src/syntax/source.ts`.
+  These are navigation, not mandatory accumulation points: give a cohesive
+  concern a focused module when useful. Rule modules must not import the
+  `style.ts` aggregator. Workspace HTML, anchor collection, target indexing, and
+  link resolution are separate modules behind `src/workspace/index.ts`; keep its
+  public entry stable.
 - Consumers require fresh, verified generated output. `scripts/build.mjs` stages
   the portable parser and TypeScript product; `with-build.mjs` may reuse that
   exact output only inside its live invocation, after checking its receipt.
+  Fresh generated output is the contract, not repeated builder invocation.
   Standalone commands prepare their own build. Restart after input, installation
   or output changes; do not copy receipts across invocations or jobs.
   Publication replaces individual files, not the whole directory atomically.
@@ -495,7 +431,8 @@ it helps.
   required `Unit coverage` job owns unit evidence on a separate runner;
   `check:ci` runs static checks, performance/integration, and installed
   packages. Other matrix environments retain their full suites. Keep these
-  evidence and resource boundaries without repeating Linux 24 unit work.
+  evidence and resource boundaries without repeating Linux 24 unit work;
+  preserve meaningful coverage rather than a duplicate run.
 - The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
   builds the site, with heading anchors generated as GitHub generates them, so
   that the tool's link check validates the site's fragments; CI builds it for
@@ -506,12 +443,5 @@ it helps.
 
 ## Releases
 
-Follow [RELEASING.md](./RELEASING.md). Agents publish a release once it is
-ready, without asking: the owner authorized every release on 2026-10-18. A
-release is ready when its PR has merged after its review; the Release workflow
-then publishes only if CI passed on the commit it releases and GitHub, Obsidian,
-Forgejo and Gitea agree before and after formatting of the fixed realistic
-corpora at that commit. Never rerun publication for an existing version or tag,
-and never store an npm token in GitHub. For each release, check the GitHub
-publication settings, the workflow's result, and the registry provenance; the
-npm settings are the maintainer's to check when they change.
+Follow [RELEASING.md](./RELEASING.md), including its standing publication
+authority, readiness, immutable assets, native evidence and verification policy.

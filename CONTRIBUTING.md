@@ -77,9 +77,11 @@ dependencies during a build or its consumers. An interrupted publication
 requires a fresh standalone command.
 
 Temporary-file ownership uses a live process ID. An orphan whose ID has been
-reused can be preserved; strict consumer verification then rejects that extra
-file. After ruling out a live writer, remove only that exact ordinary temporary
-file. Process IDs are not a general lock or a transactional publication scheme.
+reused can be preserved; receipt-verified consumers, including release package
+checks, reject that extra file. Raw `npm run build` and `npm pack`/prepack do
+not promise that consumer verification. After ruling out a live writer, remove
+only that exact ordinary temporary file. Process IDs are not a general lock or a
+transactional publication scheme.
 
 An interrupted process can leave its own ignored `.mdrefine-build-*` staging
 directory. After confirming that its owning build process has exited, resolve
@@ -433,9 +435,9 @@ before assertions and is never active during timed samples.
 ## What the checks prove
 
 Each promise below names the checks that back it, when they run, and what they
-cannot show. "Every pull request" means CI: `npm run check` on Linux with
-Node.js 24, the build and tests on the other jobs, and `npm run test:package` on
-all four.
+cannot show. "Every pull request" means CI: Linux Node.js 24 runs `check:ci`
+with unit evidence in the separate `Unit coverage` job; other matrix jobs run
+`test:ci`. Each environment builds and tests its own installed package.
 
 - **Formatting keeps what a document means.** The engine refuses an edit that
   changes the parsed reading (`src/core/engine.ts`); the rule tests format
@@ -558,8 +560,8 @@ all four.
   synthetic merge tree. Other required checks retain their own app identities. A
   newer queued/running CI producer or rerun waits even before its jobs appear;
   the completed producer must succeed, then its newest individual check results
-  must pass. Optional Node 26 can delay completion, but its allowed failure does
-  not fail the workflow or become a release requirement.
+  must pass. Optional Node 26 can delay completion, but its allowed test failure
+  does not fail the workflow or become a release requirement.
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
   and wrong-producer results. Hosted preparation reuses static/unit/performance/
   integration evidence, then `release:pack` freshly builds and checks the exact
@@ -593,16 +595,20 @@ calls. Their job names are `GitHub rendering`, `Obsidian rendering` and
 `Forgejo and Gitea rendering`. Link applicable runs in the pull request. When
 changing exemptions, inspect the native scripts' imports and file reads and add
 a routing regression. `native-checks.test.ts` covers routing and failure cases;
-`metadata.test.ts` checks workflow wiring. The PR aggregate is excluded by its
-exact name and Actions app identity from release status evidence; all other
-required exact-commit checks, coverage and fresh native release calls remain
-mandatory. A difference fails the check; investigate it and record it in an
-issue rather than running the check again until it passes. A realistic or
-existing regression-fixture difference blocks its gate. Adversarial discovery
-instead uses the scope rule in [AGENTS.md](AGENTS.md#bounded-renderer-work): fix
-meaningful changes on plausible authored input, and document other cases as
-limits. A report from real use can reopen a limit. Reuse an issue for variants
-of the same cause.
+`metadata.test.ts` checks parsed workflow wiring, including harmless YAML
+reserialization and missing/wrong release dependencies and coverage ownership.
+`release-evidence.test.ts` binds every current required CI name to its producer.
+Keep exact permissions, security values, pinned Actions and protected evidence
+identities; structural checks do not replace their identity assertions. The PR
+aggregate is excluded by its exact name and Actions app identity from release
+status evidence; all other required exact-commit checks, coverage and fresh
+native release calls remain mandatory. A difference fails the check; investigate
+it and record it in an issue rather than running the check again until it
+passes. A realistic or existing regression-fixture difference blocks its gate.
+Adversarial discovery instead uses the [bounded renderer
+work](#bounded-renderer-work) scope rule: fix meaningful changes on plausible
+authored input, and document other cases as limits. A report from real use can
+reopen a limit. Reuse an issue for variants of the same cause.
 
 `scripts/renderer-known-differences.json` lists exact issue-linked discovery
 source/output/view pairs. Weekly discovery replays their sources and rejects
@@ -612,6 +618,28 @@ gate difference. Keep the list empty when no measured differences remain.
 Previously fixed source fixtures stay; a new renderer regression there still
 requires investigation. Completing the fixed gates and disposing of discovery
 findings is the finish condition, rather than finding no more adversarial bugs.
+
+## Bounded renderer work
+
+PR and release gates use authored fixtures and the realistic generator profile
+at fixed seeds. Weekly/manual adversarial discovery is a separate triage queue,
+never a merge or release gate. Keep discoveries issue-linked; exact known
+source/output/view pairs are replayed, and stale entries fail. Offline tests
+bind entries to current formatter output without needing Docker.
+
+Before implementing a discovered difference, decide whether plausible authored
+CommonMark or documented dialect syntax loses meaningful rendered content or
+structure. Fix those cases. Record exotic constructions and stray-marker styling
+as limits in the design/dialect guides; close them as not planned with
+`Status: Won't Do`, reopenable with a report from real use. New findings go
+through the general boundary policy before adding a specific protection.
+
+Keep existing fixes and fixtures. Consolidate specific guards only when a
+general rule demonstrably replaces them. Finish when the agreed deterministic
+gates pass and discovered cases have a disposition. Do not expand a PR for
+unrelated optional cases, or try to exhaust adversarial seeds. Use focused local
+checks while editing and required final CI; repeat expensive checks only when
+changed code or a concrete evidence gap warrants it.
 
 ## Benchmarks
 
@@ -658,17 +686,17 @@ GitHub Pages must use GitHub Actions as its source.
 
 Every change to `main` goes through a pull request with passing CI, and is
 merged with a merge commit; `main` requires three of the CI checks, the native
-PR decision and resolved review threads, but no approval from a second account.
-Contributions are made under the MIT license. Keep discussion respectful and
-about reproducible behavior; harassment and disclosure of private data are not
-acceptable.
+PR decision, `Unit coverage` and resolved review threads, but no approval from a
+second account. Contributions are made under the MIT license. Keep discussion
+respectful and about reproducible behavior; harassment and disclosure of private
+data are not acceptable.
 
 - Describe the problem, the resulting behavior, and the decisions made and why,
   for a reader who will not read the diff. Link the issue.
 - Give the verification: the commands and their results, the platforms, the runs
   of the [renderer checks](#what-the-checks-prove) when the change triggers
-  them, and what the evidence cannot show. Maintainers also record which review
-  the change got, as AGENTS.md describes.
+  them, and what the evidence cannot show. Record which
+  [review](#review-and-verification) the change got.
 - A change to formatting needs tests of the expected output, of formatting
   twice, and of preserved meaning; a defect that changes rendering needs a
   minimal regression example.
@@ -681,3 +709,67 @@ acceptable.
   [versioning
   policy](https://viell-dev.github.io/slop-markdown-tools/versions.html).
 - Keep changes scoped, and state remaining limits.
+
+## Repository enforcement
+
+`.github/rulesets/` records the policies for `main`, for version tags, and for
+the `site-*` branches that correct the current release's site; keep it and
+GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
+`ci.yml`, where `NODE` is the matrix's major version label rather than its exact
+`node-version`, its separate `Unit coverage` job, and the PR-only
+`Native checks` aggregate in `native.yml`. All bind to GitHub Actions, app
+15368; renaming or adding a required check needs recorded/live ruleset and
+release-selector producer-mapping checks. The aggregate rejects missing or
+unsuccessful applicable host calls and explicitly reports inapplicability. Keep
+the coordinator unfiltered and read-only on `pull_request`, including forks. An
+applicable external-host outage blocks merge; investigate it without waiving
+evidence or weakening the ruleset. `release-evidence.mjs` excludes exactly that
+PR-only check/app pair from its exact-commit requirements because Release calls
+all three native workflows afresh. Every other required check and unit coverage
+still must pass on the release commit. Built-in CI evidence must come from this
+repository's `ci.yml` push/main run for that exact SHA; PR checks can test a
+synthetic merge tree and cannot substitute. Hosted preparation reuses those
+static/test results and runs `release:pack` to build and test the actual
+publication artifact. Standalone `release:prepare` still runs the complete
+checks. The Node.js 26 job is not required. Zero required approvals is
+deliberate for a single-account, agent-maintained repository; PRs, passing
+checks, and resolved review threads remain mandatory.
+
+## Review and verification
+
+Every change gets its tests and CI, then the author's review of the complete
+diff after the checks pass, trying inputs that the tests do not cover. Beyond
+that, the maintainer decides whether a separate agent with fresh context reviews
+it, by its sensitivity, complexity, effect, and uncertainty, and records the
+choice:
+
+- Ordinary, well-understood changes use author review and relevant checks. A
+  substantial parser, engine, file-write, packaging or publication change can
+  get one independent review over its coherent change range, shared with the
+  release review where practical. Do not repeat review for every small PR or
+  re-review unchanged code merely because another commit was added.
+- A release PR normally gets an in-depth independent review by a model with
+  stronger reasoning suited to the work, of the changes since the previous
+  release, unresolved defects, the evidence, compatibility, packaging,
+  documentation, and installation and updates, not just the version. Record the
+  reason when one is left out.
+- The same model or provider may review; prefer a different provider for
+  important releases and particularly sensitive work. Name the reviewed commit
+  and scope. Address every finding; a material fix or a disputed finding gets a
+  focused follow-up review of the unresolved material finding and affected
+  changes. Optional cases and wording nits do not start another review round.
+
+A PR's verification section records the commands and their results, the
+platforms tested, the runs of the real-renderer checks when its changes trigger
+them, what the evidence cannot show, and the review it got. The map of [what the
+checks prove](#what-the-checks-prove) says which checks back which promise and
+when the expensive ones run. Investigate a failing or intermittent check and fix
+the product or the check; do not rerun it until it passes, and do not widen a
+limit without understanding the failure.
+
+Review bots may provide PR reviews if usage levels allow. Their findings are
+claims to verify against the code and, for rendering, the actual renderer. Fix
+valid findings with relevant tests; answer each thread with evidence before
+resolving it. Bot reviews supplement author and independent review; their quotas
+neither replace nor gate those reviews. The ruleset requires resolved threads,
+not a bot review.

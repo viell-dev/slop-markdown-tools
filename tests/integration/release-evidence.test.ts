@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { evaluate as evaluateChecks, requiredChecks } from "../../scripts/release-evidence.mjs";
 import { fixture, linkDirectory, repository } from "./support.js";
 
@@ -54,9 +55,29 @@ describe("release evidence", () => {
       "Unit coverage",
     ]);
     for (const check of required) expect(check.app).toBe(actions);
-    const ci = read(".github/workflows/ci.yml");
-    expect(ci).toContain("name: verify (${{ matrix.os }}, ${{ matrix.node }})");
-    expect(ci).toContain("    name: Unit coverage\n");
+    const ci = parse(read(".github/workflows/ci.yml")) as {
+      jobs: {
+        verify: {
+          name: string;
+          strategy: { matrix: { include: { os: string; node: number; optional?: boolean }[] } };
+        };
+        coverage: { name: string };
+      };
+    };
+    expect(ci.jobs.verify.name).toBe("verify (${{ matrix.os }}, ${{ matrix.node }})");
+    expect([
+      ...ci.jobs.verify.strategy.matrix.include
+        .filter((entry) => !entry.optional)
+        .map(({ os, node }) => `verify (${os}, ${node})`),
+      ci.jobs.coverage.name,
+    ]).toEqual(required.map((check) => check.name));
+    // Every current required CI identity must actually be bound to the producer,
+    // not merely appear in the ruleset and workflow under the same name.
+    for (const check of required) {
+      const wrongSuite = passing();
+      wrongSuite.find((run) => run.name === check.name)!.check_suite.id = 999;
+      expect(evaluate(wrongSuite, required).state, check.name).toBe("pending");
+    }
     const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
       rules: {
         type: string;
