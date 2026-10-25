@@ -305,8 +305,9 @@ local task branches.
 Follow CONTRIBUTING's [repository
 enforcement](./CONTRIBUTING.md#repository-enforcement) policy and RELEASING's
 exact-commit evidence requirements. Keep recorded/live rulesets, workflow
-identities and the release-selector producer mapping aligned when changing a
-required check.
+identities, `scripts/release-evidence.mjs` producer mapping and
+`tests/integration/release-evidence.test.ts` aligned when changing a required
+check.
 
 Other repository settings, each recorded here with its reason when it changes:
 

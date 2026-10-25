@@ -36,6 +36,8 @@ type Step = {
   uses?: string;
   run?: string;
   if?: string;
+  "continue-on-error"?: boolean;
+  "working-directory"?: string;
   env?: Record<string, string>;
   with?: Record<string, unknown>;
 };
@@ -58,6 +60,20 @@ type Workflow = {
   jobs: Record<string, Job>;
 };
 const workflow = (file: string) => parseYaml(read(file)) as Workflow;
+// Keep every other field: failure handling and execution context are part of the contract.
+const commandSteps = (steps: Step[]) =>
+  steps.map((step) => ({ ...step, run: step.run?.trimEnd() }));
+const verifyCommands = (ci: Workflow) => {
+  const commands = commandSteps(ci.jobs.verify!.steps!);
+  expect(commands).toContainEqual({
+    if: "runner.os == 'Linux' && matrix.node == 24",
+    run: "npm run check:ci",
+  });
+  expect(commands).toContainEqual({
+    if: "runner.os != 'Linux' || matrix.node != 24",
+    run: "npm run test:ci",
+  });
+};
 const releaseHosts = (release: Workflow) => {
   expect(release.jobs.prepare!.needs).toEqual(
     expect.arrayContaining(["ci", "rendering", "obsidian", "forges"]),
@@ -78,7 +94,7 @@ const coverageJob = (ci: Workflow) => {
       ],
     ),
   ).toBe("24");
-  expect(coverage.steps!.map((step) => step.run?.trimEnd())).toContain("npm run test:coverage");
+  expect(commandSteps(coverage.steps!)).toContainEqual({ run: "npm run test:coverage" });
 };
 /** The options of the dropdown `id` in an issue form, as written. */
 const dropdown = (file: string, id: string) => {
@@ -212,18 +228,7 @@ describe("CI evidence ownership", () => {
       "vitest run --project performance --project integration",
     );
     expect(pkg.scripts["test:ci"]).toBe("node scripts/with-build.mjs test test:package:installed");
-    const commands = ci.jobs.verify!.steps!.map((step) => ({
-      if: step.if,
-      run: step.run?.trimEnd(),
-    }));
-    expect(commands).toContainEqual({
-      if: "runner.os == 'Linux' && matrix.node == 24",
-      run: "npm run check:ci",
-    });
-    expect(commands).toContainEqual({
-      if: "runner.os != 'Linux' || matrix.node != 24",
-      run: "npm run test:ci",
-    });
+    verifyCommands(ci);
     const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
       rules: { type: string; parameters?: { required_status_checks: unknown[] } }[];
     };
@@ -241,11 +246,18 @@ describe("workflow structural regression controls", () => {
       step.uses?.startsWith("actions/setup-node@"),
     )!;
     // Real YAML input forms, applied to the current workflow rather than an unrelated sample.
-    setup.with = parseYaml('node-version: "24"') as Record<string, unknown>;
-    const command = parseYaml("run: |\n  npm run test:coverage\n") as Step;
-    ci.jobs.coverage!.steps!.find((step) => step.run === "npm run test:coverage")!.run =
-      command.run!;
-    coverageJob(parseYaml(stringify(ci)) as Workflow);
+    setup.with = { ...setup.with, ...(parseYaml('node-version: "24"') as Record<string, unknown>) };
+    for (const [job, command] of [
+      ["verify", "npm run check:ci"],
+      ["verify", "npm run test:ci"],
+      ["coverage", "npm run test:coverage"],
+    ]) {
+      const literal = parseYaml(`run: |\n  ${command}\n`) as Step;
+      ci.jobs[job!]!.steps!.find((step) => step.run?.trimEnd() === command)!.run = literal.run!;
+    }
+    const reformatted = parseYaml(stringify(ci)) as Workflow;
+    coverageJob(reformatted);
+    verifyCommands(reformatted);
   });
   it("accepts comments, quoted scalars, alternate indentation and block dependency lists", () => {
     for (const [file, verify] of [
@@ -261,6 +273,23 @@ describe("workflow structural regression controls", () => {
       const parsed = parseYaml(reformatted) as Workflow;
       expect(parsed).toEqual(original);
       verify(parsed);
+      if (file === "ci") verifyCommands(parsed);
+    }
+  });
+  it.each([
+    ["verify", "npm run check:ci"],
+    ["verify", "npm run test:ci"],
+    ["coverage", "npm run test:coverage"],
+  ])("rejects failure swallowing or changed execution context for %s / %s", (job, command) => {
+    for (const extra of [
+      { "continue-on-error": true },
+      { env: { NODE_OPTIONS: "--no-warnings" } },
+      { "working-directory": "other" },
+    ]) {
+      const ci = workflow(".github/workflows/ci.yml");
+      const step = ci.jobs[job]!.steps!.find((step) => step.run?.trimEnd() === command)!;
+      Object.assign(step, extra);
+      expect(() => (job === "coverage" ? coverageJob(ci) : verifyCommands(ci))).toThrow();
     }
   });
   it.each(["ci", "rendering", "obsidian", "forges"])(
@@ -292,7 +321,8 @@ describe("workflow structural regression controls", () => {
         "node-version"
       ] = 26;
     if (fault === "command")
-      job.steps!.find((step) => step.run === "npm run test:coverage")!.run = "npm run test:unit";
+      job.steps!.find((step) => step.run?.trimEnd() === "npm run test:coverage")!.run =
+        "npm run test:unit";
     expect(() => coverageJob(ci)).toThrow();
   });
 });

@@ -685,7 +685,7 @@ GitHub Pages must use GitHub Actions as its source.
 ## Pull requests
 
 Every change to `main` goes through a pull request with passing CI, and is
-merged with a merge commit; `main` requires three of the CI checks, the native
+merged with a merge commit; `main` requires the three verify checks, the native
 PR decision, `Unit coverage` and resolved review threads, but no approval from a
 second account. Contributions are made under the MIT license. Keep discussion
 respectful and about reproducible behavior; harassment and disclosure of private
@@ -718,22 +718,24 @@ GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
 `ci.yml`, where `NODE` is the matrix's major version label rather than its exact
 `node-version`, its separate `Unit coverage` job, and the PR-only
 `Native checks` aggregate in `native.yml`. All bind to GitHub Actions, app
-15368; renaming or adding a required check needs recorded/live ruleset and
-release-selector producer-mapping checks. The aggregate rejects missing or
-unsuccessful applicable host calls and explicitly reports inapplicability. Keep
-the coordinator unfiltered and read-only on `pull_request`, including forks. An
-applicable external-host outage blocks merge; investigate it without waiving
-evidence or weakening the ruleset. `release-evidence.mjs` excludes exactly that
-PR-only check/app pair from its exact-commit requirements because Release calls
-all three native workflows afresh. Every other required check and unit coverage
-still must pass on the release commit. Built-in CI evidence must come from this
-repository's `ci.yml` push/main run for that exact SHA; PR checks can test a
-synthetic merge tree and cannot substitute. Hosted preparation reuses those
-static/test results and runs `release:pack` to build and test the actual
-publication artifact. Standalone `release:prepare` still runs the complete
-checks. The Node.js 26 job is not required. Zero required approvals is
-deliberate for a single-account, agent-maintained repository; PRs, passing
-checks, and resolved review threads remain mandatory.
+15368; renaming or adding a required check needs recorded/live ruleset checks,
+the producer mapping in `scripts/release-evidence.mjs`, and
+`tests/integration/release-evidence.test.ts` kept aligned. The aggregate rejects
+missing or unsuccessful applicable host calls and explicitly reports
+inapplicability. Keep the coordinator unfiltered and read-only on
+`pull_request`, including forks. An applicable external-host outage blocks
+merge; investigate it without waiving evidence or weakening the ruleset.
+`release-evidence.mjs` excludes exactly that PR-only check/app pair from its
+exact-commit requirements because Release calls all three native workflows
+afresh. Every other required check and unit coverage still must pass on the
+release commit. Built-in CI evidence must come from this repository's `ci.yml`
+push/main run for that exact SHA; PR checks can test a synthetic merge tree and
+cannot substitute. Hosted preparation reuses those static/test results and runs
+`release:pack` to build and test the actual publication artifact. Standalone
+`release:prepare` still runs the complete checks. The Node.js 26 job is not
+required. Zero required approvals is deliberate for a single-account,
+agent-maintained repository; PRs, passing checks, and resolved review threads
+remain mandatory.
 
 ## Review and verification
 

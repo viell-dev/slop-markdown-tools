@@ -168,10 +168,10 @@ any failure publishes nothing:
   job results, even when an older attempt passed. A pending producer waits; an
   unsuccessful completed producer fails. Optional Node 26 can delay completion,
   but its allowed test failure does not fail the workflow or become a release
-  requirement. Timeout/cancellation conclusions are not established by that
-  allowed-failure evidence; unsuccessful producers are still rejected. The gate
-  needs read access to checks and Actions runs. It waits up to 40 minutes for CI
-  that is still running, so it can be dispatched right after the merge.
+  requirement. Whether a Node 26 timeout or cancellation leaves the CI run
+  successful is unverified; an unsuccessful run is rejected. The gate needs read
+  access to checks and Actions runs. It waits up to 40 minutes for CI that is
+  still running, so it can be dispatched right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
