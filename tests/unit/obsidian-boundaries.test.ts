@@ -432,6 +432,21 @@ describe("carried Obsidian boundaries (#582–#584)", () => {
 });
 
 describe("Obsidian display math boundaries (#586, #587)", () => {
+  it.each(["\n", "\r\n", "\r"])(
+    "reserves standalone display-widget boundaries for double dollars with %j",
+    (newline) => {
+      const single = parse(`$x$${newline}`, "obsidian");
+      expect([...rendererProtections(single).boundaryText]).toEqual([]);
+      const double = parse(`$$x$$${newline}`, "obsidian");
+      expect(
+        [...rendererProtections(double).boundaryText].map((node) => [
+          node.position!.start.offset,
+          node.position!.end.offset,
+        ]),
+      ).toEqual([[0, double.source.length]]);
+    },
+  );
+
   it("keeps list tightness across display math (#586)", () => {
     const source = "- a\n$$\nx = y\n$$\n- b\n";
     expect(checked(source)).toBe(source);

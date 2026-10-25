@@ -900,7 +900,7 @@ export function collectObsidianProtections(
               const from = inline.position.start.offset!;
               const to = inline.position.end.offset!;
               if (
-                !source.startsWith("$", from) ||
+                !source.startsWith("$$", from) ||
                 inline.position.start.line !== inline.position.end.line
               )
                 continue;
