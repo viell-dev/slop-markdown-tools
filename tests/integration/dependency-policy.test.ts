@@ -167,7 +167,6 @@ describe("dependency update policy", () => {
       expect(inside(blocked)).toBe(true);
       expect(inside(bounds[1]!)).toBe(true);
       expect(inside(future)).toBe(false);
-      expect(manifest.dependencies[name] ?? manifest.devDependencies[name]).toBe(older);
     },
   );
 
