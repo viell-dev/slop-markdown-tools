@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Builds prepare fresh staged output and reject unexpected packaged files. CI
+  and release preparation reuse one verified build within their invocation,
+  while standalone commands remain self-contained
+  ([#626](https://github.com/viell-dev/slop-markdown-tools/issues/626),
+  [#627](https://github.com/viell-dev/slop-markdown-tools/issues/627)).
+
 - Native PR checks classify semantic inputs and resolved dependency roles, avoid
   unnecessary hosts for VitePress-only dependency updates or offline-tool
   changes, and enforce applicable comparisons through one required result.

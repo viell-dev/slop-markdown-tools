@@ -5,6 +5,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
 import assert from "node:assert/strict";
+import { assertDistFiles, verifyBuild } from "./build.mjs";
+
+// Only an invocation-owned, unchanged build may bypass prepack. Consumer
+// installations below still use the actual tarball, never the checkout tree.
+await verifyBuild();
 
 const npm = process.env.npm_execpath;
 assert(npm, "Run this check through npm run test:package.");
@@ -206,6 +211,13 @@ try {
   );
   // npm 12 keys results by package name; earlier npm versions return an array.
   const result = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+  await assertDistFiles(
+    repository,
+    result.files
+      .filter((file) => file.path.startsWith("dist/"))
+      .map((file) => file.path.slice("dist/".length))
+      .sort(),
+  );
   assert(
     result.files.every(
       (file) => !file.path.includes("mdtools") && !/^dist\/cli\/deprecations\./.test(file.path),

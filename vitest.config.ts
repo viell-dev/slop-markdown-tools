@@ -2,7 +2,7 @@ import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 import type { ViteUserConfig } from "vitest/config";
-import { buildParser } from "./scripts/build-parser.mjs";
+import { buildProduct, verifyBuild } from "./scripts/build.mjs";
 
 // Discovery applies the global excludes file of Git's settings, which differ
 // between machines, so the integration tests run with none: no user or system
@@ -10,7 +10,8 @@ import { buildParser } from "./scripts/build-parser.mjs";
 const noGitSettings = path.join(tmpdir(), "mdrefine-tests-no-git-settings");
 
 export default defineConfig(async (): Promise<ViteUserConfig> => {
-  await buildParser({ repositoryRoot: import.meta.dirname });
+  if (process.env.MDREFINE_BUILD_RECEIPT) await verifyBuild(import.meta.dirname);
+  else await buildProduct(import.meta.dirname);
   return {
     resolve: {
       alias: [

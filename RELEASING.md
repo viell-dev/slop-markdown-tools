@@ -79,6 +79,14 @@ package's `publishConfig.tag`. With npm 12, give the tarball as an explicit path
 starting with `./`, because `artifacts/name.tgz` can be read as a GitHub
 package.
 
+Preparation builds once inside an invocation-owned verified context, shared by
+the checks and packing step. The receipt binds current inputs and exact staged
+output, expires with that process, and is never a reusable release artifact.
+Source, configuration, dependency installation or output changes require a fresh
+invocation. The actual tarball, installed npm/pnpm consumers, declarations and
+retained publication assets are still checked separately; native host evidence
+is unchanged.
+
 The **Release** workflow, dispatched with `publish` left false, does the same on
 GitHub after the checks that come before publication, described below, adds an
 audit of the runtime dependencies, warns when the version or its tag already

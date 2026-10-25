@@ -4,6 +4,7 @@ import { mkdir, open, readFile, readdir, realpath, rename, rm } from "node:fs/pr
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
+import { setTimeout } from "node:timers/promises";
 import { fileURLToPath, URL } from "node:url";
 import { rolldown } from "rolldown";
 import { repairReviewedParserSource, sourceGuards } from "./parser-patches.mjs";
@@ -194,6 +195,7 @@ export async function bundleParser(options = {}) {
   /** @typedef {Awaited<ReturnType<typeof correctSource>> & { kind: keyof typeof sourceGuards, filename: string }} Correction */
   /** @type {Map<string, Correction>} */
   const transformed = new Map();
+  const loadedSources = new Map();
   /** @type {Map<string, Correction>} */
   const redirected = new Map();
   const editMapImporters = [];
@@ -214,11 +216,9 @@ export async function bundleParser(options = {}) {
           assert(importer && path.isAbsolute(importer));
           const root = await packageForFile(createRequire(importer).resolve(source));
           const filename = path.join(root.directory, "index.js");
-          const correction = await correctSource(
-            "editMap",
-            await readFile(filename, "utf8"),
-            filename,
-          );
+          const original = await readFile(filename, "utf8");
+          loadedSources.set(filename, hash(original));
+          const correction = await correctSource("editMap", original, filename);
           const previous = redirected.get(filename);
           if (previous) assert.equal(previous.source, correction.source);
           redirected.set(filename, { kind: "editMap", filename, ...correction });
@@ -236,6 +236,7 @@ export async function bundleParser(options = {}) {
           return [...redirected.values()][0].source;
         },
         async transform(source, id) {
+          if (path.isAbsolute(id)) loadedSources.set(id, hash(source));
           for (const [kind, guard] of Object.entries(sourceGuards)) {
             if (kind === "editMap" || !slash(id).endsWith(`/${guard.name}/${guard.relative}`))
               continue;
@@ -302,6 +303,11 @@ export async function bundleParser(options = {}) {
         "Parser graph input resolves outside the repository root; install its dependencies inside the checkout",
       );
       const { root, input } = await identifyInput(canonical);
+      assert.equal(
+        input.sha256,
+        loadedSources.get(filename),
+        "Parser input changed during generation",
+      );
       if (physicalModules.has(filename)) {
         // Redirected EditMap remains a licensed source input, not an emitted module.
         assert.notEqual(
@@ -319,9 +325,16 @@ export async function bundleParser(options = {}) {
     }
     const packages = [];
     const licenseSections = [];
+    // Physical inputs belong only to the short-lived build receipt, never the
+    // portable distribution manifest. Reuse must detect edited installed inputs.
+    const inputFiles = [...physicalModules, ...redirected.keys()];
     for (const root of roots.values()) {
       assert.equal(root.metadata.license, "MIT", `Review changed license: ${root.metadata.name}`);
       const license = await readLicense(root);
+      inputFiles.push(
+        path.join(root.directory, "package.json"),
+        path.join(root.directory, license.filename),
+      );
       packages.push({
         name: root.metadata.name,
         version: root.metadata.version,
@@ -394,7 +407,11 @@ export async function bundleParser(options = {}) {
       patches,
       packages,
     };
-    return { code: chunk.code, declaration, licenses, manifest };
+    inputFiles.push(path.join(bundlerRoot.directory, "package.json"));
+    const inputHashes = await Promise.all(
+      inputFiles.map(async (file) => [file, hash(await readFile(file))]),
+    );
+    return { code: chunk.code, declaration, licenses, manifest, inputFiles, inputHashes };
   } finally {
     await bundle.close();
   }
@@ -417,12 +434,12 @@ async function hasContents(filename, contents) {
  * @param {string} filename
  * @param {string} contents
  */
-async function writeIfChanged(filename, contents) {
+export async function writeIfChanged(filename, contents) {
   if (await hasContents(filename, contents)) return false;
   await mkdir(path.dirname(filename), { recursive: true });
   const temporary = path.join(
     path.dirname(filename),
-    `.${path.basename(filename)}.${randomUUID()}.tmp`,
+    `.${path.basename(filename)}.${process.pid}.${randomUUID()}.tmp`,
   );
   const temporaryFile = await open(temporary, "wx");
   try {
@@ -432,19 +449,19 @@ async function writeIfChanged(filename, contents) {
       await temporaryFile.close();
     }
     if (await hasContents(filename, contents)) return false;
-    try {
-      await rename(temporary, filename);
-      return true;
-    } catch (error) {
-      // Windows can reject a concurrent replacement after another builder won.
-      // Accept only the exact complete artifact; never delete or copy over it.
-      if (
-        ["EPERM", "EACCES", "EEXIST"].includes(error.code) &&
-        (await hasContents(filename, contents))
-      ) {
-        return false;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(temporary, filename);
+        return true;
+      } catch (error) {
+        // Windows readers can briefly prevent replacement before either writer
+        // wins. Retry atomic rename for at most 630 ms; persistent faults fail.
+        // Never remove the destination or fall back to an in-place copy.
+        if (!["EPERM", "EACCES", "EBUSY", "EEXIST"].includes(error.code)) throw error;
+        if (await hasContents(filename, contents)) return false;
+        if (process.platform !== "win32" || attempt === 6) throw error;
+        await setTimeout(10 * 2 ** attempt);
       }
-      throw error;
     }
   } finally {
     await rm(temporary, { force: true });
@@ -452,7 +469,8 @@ async function writeIfChanged(filename, contents) {
 }
 
 /**
- * Shared production/Vitest builder. Importing this module never writes output.
+ * Production parser builder; dedicated parser checks also call it directly.
+ * Importing this module never writes output.
  * @param {{ repositoryRoot?: string, outputDirectory?: string }} [options]
  */
 export async function buildParser(options = {}) {
@@ -474,7 +492,13 @@ export async function buildParser(options = {}) {
   for (const [name, contents] of artifacts) {
     if (await writeIfChanged(path.join(outputDirectory, name), contents)) changed.push(name);
   }
-  return { outputDirectory, changed, manifest: result.manifest };
+  return {
+    outputDirectory,
+    changed,
+    manifest: result.manifest,
+    inputFiles: result.inputFiles,
+    inputHashes: result.inputHashes,
+  };
 }
 
 async function invokedAsMain() {
