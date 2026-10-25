@@ -65,7 +65,6 @@ export function continuesListBlock(source: string, before: Nodes, after: Nodes):
  * it, except in a block quote, and Reading view at an empty item, `*`, `+`,
  * `- `, or `1.`, which Live Preview reads so for `+ ` and `- ` (issue #375).
  */
-
 export function collectListProtections(document: Document, positions: ProtectionSource) {
   const { source } = document;
   const forge = document.dialect === "forgejo" || document.dialect === "gitea";

@@ -210,6 +210,7 @@ export function collectTaskFences(
   }
 }
 
+/** A run of backticks: its offset and its length. */
 type Run = [number, number];
 
 /**

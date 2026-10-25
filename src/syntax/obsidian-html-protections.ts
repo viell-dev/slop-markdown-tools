@@ -595,7 +595,7 @@ function htmlCodeSpans(source: string): Map<number, HtmlCode> {
   return result;
 }
 
-/** A run of backticks: its offset and its length. */
+/** The offset of the first line break at or after `from`, or the length of `source`. */
 function lineBreak(source: string, from: number): number {
   for (let at = from; at < source.length; at++)
     if (source[at] === "\n" || source[at] === "\r") return at;

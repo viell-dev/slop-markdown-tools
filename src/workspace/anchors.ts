@@ -3,7 +3,6 @@ import { walk } from "../syntax/walk.js";
 import type { Heading, Nodes } from "mdast";
 import type { Document } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-
 import { descriptionLine } from "../syntax/list-protections.js";
 import { parse, range, textContent } from "../syntax/parse.js";
 import { lineBreak } from "../syntax/source.js";
