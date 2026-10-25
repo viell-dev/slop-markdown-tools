@@ -409,12 +409,26 @@ only and remove superseded transition notes.
   dialect, and `tests/unit/math-renderers.ts` records what the renderers
   rendered and how to observe them again. Apply a condition to a dialect only
   when its renderer was observed to apply it.
-- Formatting applies inline, block, then document phases, guarded by semantic
-  fingerprints and convergence checks: a rule whose edits would change meaning
-  is left out and reported, and an overlapping edit waits for the next pass
-  (`src/core/engine.ts`). Fix a rule's unsafe edit rather than weakening a
-  guard; preserve unsupported constructs, such as math that spans lines.
-  Obsidian wrapping needs verified strict line breaks.
+- `src/core/engine.ts` orchestrates inline, block, then document phases, with
+  convergence checks and overlapping edits deferred to the next pass.
+  `rule-registry.ts` owns registration and synchronous options/schema
+  validation, including the shared identity-keyed schema cache. `semantics.ts`
+  owns semantic fingerprints, anchor provenance and refusal locations;
+  `protection-edits.ts` checks edits against renderer boundaries. Keep the
+  engine's existing exports and lazy workspace callbacks stable when changing
+  these internal seams.
+- `src/syntax/renderer-protections.ts` owns one `RendererProtections` result
+  cached by positioned root. List and GitHub collectors are separate;
+  `obsidian-protections.ts` orders Obsidian passes over one shared leaf
+  projection, with code and HTML collectors in focused modules. List text seeds
+  physical fences; joined footnotes seed paragraph/table state; Setext readings
+  precede Tab continuation; both structural and line passes finish underlines
+  before table collection; escaping HTML endpoints precede list-marker checks.
+  Retain original nodes where possible, exact UTF-16 positions, Set order and
+  lazy projections. These paths locate current ownership, not future mandatory
+  accumulation points. Fix an unsafe edit rather than weakening a guard or
+  removing historical protections during an unrelated extraction. Obsidian
+  wrapping needs verified strict line breaks.
 - `docs.test.ts` compares the examples page, the rule index, the preset table,
   the library pages, the installation commands, and the changelog with the code,
   and `benchmarks.test.ts` the benchmark page's headings and row labels. Each

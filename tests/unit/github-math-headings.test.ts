@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { format, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { Config, Plugin } from "../../src/index.js";
-import { misreadLists } from "../../src/syntax/misread-lists.js";
+import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 
 const recommended: Config = { extends: ["recommended", "github"], dialect: "github" };
 const configurations: Config[] = [
@@ -43,7 +43,7 @@ describe("GitHub boundaries beside display math (#336)", () => {
         const input = bom + source.replaceAll("\n", newline);
         for (const config of configurations) expect(checked(input, config)).toBe(input);
         const document = parse(input, "github");
-        const ranges = [...misreadLists(document).boundaryText].map(range);
+        const ranges = [...rendererProtections(document).boundaryText].map(range);
         // parse() strips BOMs; node offsets index Document.source.
         expect(ranges).toEqual([
           [document.source.indexOf("$$"), document.source.length - newline.length],

@@ -439,12 +439,21 @@ cannot show. "Every pull request" means CI: Linux Node.js 24 runs `check:ci`
 with unit evidence in the separate `Unit coverage` job; other matrix jobs run
 `test:ci`. Each environment builds and tests its own installed package.
 
-- **Formatting keeps what a document means.** The engine refuses an edit that
-  changes the parsed reading (`src/core/engine.ts`); the rule tests format
-  twice, compare the meaning, and disable the rule; `renderers.test.ts` compares
-  commonmark.js and markdown-it before and after formatting. Every pull request.
-  The guard compares the parser's own readings, so a parser defect can hide from
-  it; the renderer checks below and the workarounds in the [dependency
+- **Formatting keeps what a document means.** The engine orchestrates phases and
+  refuses an edit that changes the parsed reading; `src/core/semantics.ts` owns
+  fingerprints and refusal locations, and `protection-edits.ts` checks renderer
+  boundaries from the root-cached `RendererProtections` result. `engine.test.ts`
+  covers phase order, convergence, overlapping edits, synchronous plugin/schema
+  validation and caching, protection-result reuse, and workspace callback
+  binding/errors. `link-fingerprint.test.ts` covers resolved target identity and
+  literal URLs; the boundary regressions and `tests/performance/engine.test.ts`
+  cover source ranges, ordered protection fields and bounded scans. These
+  locations describe current ownership and evidence, rather than requiring
+  future helpers to accumulate there. The rule tests format twice, compare the
+  meaning, and disable the rule; `renderers.test.ts` compares commonmark.js and
+  markdown-it before and after formatting. Every pull request. The guard
+  compares the parser's own readings, so a parser defect can hide from it; the
+  renderer checks below and the workarounds in the [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) cover
   what is known.
 - **Renderers show the same before and after.** GitHub: the Rendering workflow.

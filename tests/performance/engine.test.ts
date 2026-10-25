@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { applyEdits, format, lint, parse, resolveConfig } from "../../src/index.js";
 import type { Config, Document, Plugin, ProcessOptions } from "../../src/index.js";
-import { misreadLists } from "../../src/syntax/misread-lists.js";
+import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import { scaling } from "./scaling.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
@@ -10,7 +10,7 @@ it("scans a comment's long marker line without quadratic backtracking (#492)", (
     scaling(
       [10000, 40000],
       (count) => parse(`- a\n<!--\n- ${" ".repeat(count)}x\n`, "obsidian"),
-      (document) => misreadLists(document),
+      (document) => rendererProtections(document),
       (result, document) => {
         expect([...result.itemHtml].map((node) => node.position)).toEqual([
           {
@@ -29,7 +29,7 @@ it("scans a shared Obsidian table-row region once (#505)", () => {
     scaling(
       [800, 3200],
       (count) => parse("a | b\n-- | --\n# row | b\n".repeat(count), "obsidian"),
-      (document) => misreadLists(document),
+      (document) => rendererProtections(document),
       (result, document) => {
         expect(
           [...result.tableText].some(
@@ -74,7 +74,7 @@ it.each([
         const template = templates.get(count)!;
         return { document: { ...template, tree: structuredClone(template.tree) }, count };
       },
-      ({ document }) => misreadLists(document),
+      ({ document }) => rendererProtections(document),
       (result, { document, count }) => {
         const ranges = [...result.htmlText]
           .map((node) => [node.position!.start.offset!, node.position!.end.offset!] as const)
@@ -115,7 +115,7 @@ it.each([
     const native = String.prototype.indexOf;
     let volume = 0;
     let unexpected = false;
-    let result: ReturnType<typeof misreadLists> | undefined;
+    let result: ReturnType<typeof rendererProtections> | undefined;
     try {
       String.prototype.indexOf = function (this: string, needle: string, from = 0) {
         const found = native.call(this, needle, from);
@@ -125,13 +125,13 @@ it.each([
         }
         return found;
       };
-      result = misreadLists(document);
+      result = rendererProtections(document);
     } finally {
       String.prototype.indexOf = native;
     }
     // Restore before assertions or the comparison guard can make other calls.
     expect(unexpected).toBe(false);
-    const expected = misreadLists(template);
+    const expected = rendererProtections(template);
     // Both traversals preserve insertion order. Comparing arrays retains every
     // node field without unordered Set equality revisiting all pairs of nodes.
     for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
@@ -222,11 +222,11 @@ it("skips nested comment openers in time proportional to their number", () => {
   // Warm both workloads on other documents, so the first large sample is
   // not also a cold compilation sample. Every timed call still has a fresh tree.
   for (let round = 0; round < 5; round++)
-    for (const size of sizes) expect(misreadLists(prepare(size)).commentText.size).toBe(0);
+    for (const size of sizes) expect(rendererProtections(prepare(size)).commentText.size).toBe(0);
   const elapsed = (documents: Document[]) => {
     const results = [];
     const started = performance.now();
-    for (const document of documents) results.push(misreadLists(document));
+    for (const document of documents) results.push(rendererProtections(document));
     const duration = performance.now() - started;
     for (const result of results) expect(result.commentText.size).toBe(0);
     return duration;

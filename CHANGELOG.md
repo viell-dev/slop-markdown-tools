@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Internal renderer protections have named collectors and one cached result;
+  rule registration and semantic acceptance are separate from engine phase
+  orchestration, preserving the public API and formatting behavior
+  ([#618](https://github.com/viell-dev/slop-markdown-tools/issues/618),
+  [#619](https://github.com/viell-dev/slop-markdown-tools/issues/619)).
+
 - Workflow regression tests check YAML structure while retaining exact evidence
   identities. Contributor and release policy is authoritative; agent navigation
   permits cohesive internal modules, and optional review bots have no guaranteed

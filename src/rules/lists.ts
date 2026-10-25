@@ -1,6 +1,6 @@
 import type { Blockquote, FootnoteDefinition, List, ListItem, Nodes, Parents } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
-import { misreadLists } from "../syntax/misread-lists.js";
+import { rendererProtections } from "../syntax/renderer-protections.js";
 import { joinsTomlFrontMatter } from "../syntax/parse.js";
 import { optionsSchema } from "./shared.js";
 import { lineBreaks } from "../syntax/source.js";
@@ -162,7 +162,7 @@ function analyze(document: Document): Analysis {
   // and the block after those as more of its items (issue #191). Another
   // marker or indentation could move a list among them into or out of that
   // item, or join it to that list, so its group of lists stays as written.
-  const misread = misreadLists(document);
+  const misread = rendererProtections(document);
   // Such text can look safe to capture while its lazy margin supplies a
   // later Live Preview heading. Reuse feasibility's existing margin guard.
   for (const line of misread.headingLazyLines) sensitive.add(line);
@@ -859,7 +859,7 @@ const orderedList: Rule = {
     }
     const other = preferred === "." ? ")" : ".";
     const numbering = String((options.numbering as string | undefined) ?? "auto");
-    const { indentLists } = misreadLists(document);
+    const { indentLists } = rendererProtections(document);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid) continue;
@@ -945,7 +945,7 @@ const listIndent: Rule = {
       ordered: [ordered, Number(options.orderedSpacesMultiline ?? ordered)],
     };
     const nested = options.nestedIndent === undefined ? undefined : Number(options.nestedIndent);
-    const { indentLists } = misreadLists(document);
+    const { indentLists } = rendererProtections(document);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
       if (!unit.valid || unit.lists.some(({ node }) => indentLists.has(node))) continue;

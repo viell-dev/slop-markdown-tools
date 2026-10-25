@@ -3,7 +3,7 @@ import type { Document, Edit } from "../core/types.js";
 import { lineStarts } from "./source.js";
 import { walk } from "./walk.js";
 import { startsWithMarker } from "./parse.js";
-import { misreadLists } from "./misread-lists.js";
+import { rendererProtections } from "./renderer-protections.js";
 
 type Range = [number, number];
 const found = new WeakMap<Root, Range[]>();
@@ -41,7 +41,7 @@ function boundaries(document: Document): Range[] {
   // boundaries. Holding only their originating list marker can split a list
   // whose markers were previously safe to change together (#399, #603).
   const html: Range[] = [];
-  for (const node of misreadLists(document).blockHtmlText) {
+  for (const node of rendererProtections(document).blockHtmlText) {
     const from = node.position?.start.offset,
       to = node.position?.end.offset;
     if (from !== undefined && to !== undefined) html.push([from, to]);
