@@ -17,7 +17,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   # A release is made from the exact commit of this run, so CI must have passed on that commit:
-  # every check that the ruleset for main requires, and unit coverage.
+  # every commit check that the ruleset for main requires, and unit coverage. The PR-only
+  # Native checks aggregate is replaced by the three fresh native calls below.
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 45

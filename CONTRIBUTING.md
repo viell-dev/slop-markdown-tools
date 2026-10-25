@@ -77,11 +77,11 @@ the site serves; a test fails when the two differ.
 GitHub Actions runs `check` and a dependency audit on Linux with Node.js 24, the
 build and tests on Linux with Node.js 22.12.0, the lowest version the package
 supports, on Windows with Node.js 24, and on Linux with Node.js 26, and
-`test:package` on all four. `main` requires the first three. The Node.js 26 job
-is not required, so that a defect only the newest Node.js shows does not block
-unrelated merges; its failures get an issue. Windows covers file paths, access
-control lists, junctions, and the installed command; macOS is not a routine
-target.
+`test:package` on all four. `main` requires the first three and the PR-only
+`Native checks` decision described below. The Node.js 26 job is not required, so
+that a defect only the newest Node.js shows does not block unrelated merges; its
+failures get an issue. Windows covers file paths, access control lists,
+junctions, and the installed command; macOS is not a routine target.
 
 ## Dependencies
 
@@ -216,8 +216,8 @@ specification's examples in `tests/fixtures/commonmark/`. Each known difference
 is listed with its issue and must still differ, so that a fix shows up as an
 entry to remove; a new one fails the test. The Rendering workflow compares
 GitHub's rendering in the same way, through its Markdown API, every week, for
-pull requests that change a [renderer-sensitive path](#what-the-checks-prove),
-and in the Release workflow. Run it by hand with
+pull requests with an [applicable native input](#what-the-checks-prove), and in
+the Release workflow. Run it by hand with
 `gh workflow run rendering.yml --ref BRANCH`. PR and release runs use authored
 fixtures and the realistic profile at fixed seeds 1–5, 25 documents each. By
 hand, select `-f profile=adversarial -f seed=N` to reproduce discovery, or omit
@@ -282,7 +282,7 @@ paragraph directly inside a list item has no extra spacing and is compared as
 inline content. Multiple paragraphs, attributed paragraphs, and other block
 boundaries remain significant; a deterministic host control checks these cases
 on every comparison run. The Obsidian workflow runs the check for pull requests
-that change a [renderer-sensitive path](#what-the-checks-prove), in the Release
+with an [applicable native input](#what-the-checks-prove), in the Release
 workflow, and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the
 inputs `profile`, `seed`, `count`, and `obsidian-version`; its `obsidian`
 artifact holds the report and screenshots. It fails when the check compared
@@ -381,8 +381,11 @@ all four.
   Forges workflow compares official disposable hosts through their file-mode API
   and actual repository file views, including heading anchors. The Rendering,
   Obsidian and Forges workflows run for pull requests that change a
-  renderer-sensitive path, with authored fixtures and realistic documents at
-  fixed seeds. The Release workflow validates those reports at its exact commit.
+  native-sensitive input, with authored fixtures and realistic documents at
+  fixed seeds. The Native workflow classifies every PR and requires each
+  applicable host call to succeed through its `Native checks` aggregate. It
+  explicitly reports hosts that are inapplicable. The Release workflow runs all
+  three checks afresh and validates their reports at its exact commit.
   Weekly/manual adversarial runs discover differences without gating delivery.
   New findings receive an issue and a scope disposition; they do not
   automatically expand the active fix. Forge images are pinned by version and
@@ -447,24 +450,48 @@ all four.
   deployed site, by hand after releases and setting changes. Prose still needs
   reading.
 - **A release is the tested commit.** The Release workflow requires CI to have
-  passed on the commit it releases (`scripts/release-evidence.mjs`), runs both
-  renderer checks there, refuses a version or tag that exists, and publishes the
-  tarball it tested.
+  passed on the commit it releases (`scripts/release-evidence.mjs`), runs all
+  three renderer checks there, refuses a version or tag that exists, and
+  publishes the tarball it tested.
 
-The renderer-sensitive paths are `src/config/`, `src/core/`, `src/rules/`,
-`src/syntax/`, `src/index.ts`, `package.json`, the lockfile,
-`scripts/build-parser.mjs`, `scripts/parser-patches.mjs`,
-`scripts/parser-labels.mjs`, `scripts/parser-packages.json`,
-`scripts/rendering.mjs`, and each check's own files, as the `pull_request` paths
-of `rendering.yml` and `obsidian.yml` list them. Link the runs in the pull
-request. Run the checks by hand on a branch whose change could alter what a
-renderer shows from another path. A difference fails the check; investigate it
-and record it in an issue rather than running the check again until it passes. A
-realistic or existing regression-fixture difference blocks its gate. Adversarial
-discovery instead uses the scope rule in
-[AGENTS.md](AGENTS.md#bounded-renderer-work): fix meaningful changes on
-plausible authored input, and document other cases as limits. A report from real
-use can reopen a limit. Reuse an issue for variants of the same cause.
+`scripts/native-checks.mjs` owns native PR classification. Shared source,
+parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared
+validators and renderer fixtures select all hosts. Each host's harness and
+workflow select that host. Documentation, offline tests and examples do not
+select native hosts. All source changes, including `src/syntax/vitepress/`,
+select all hosts: shared callers invoke those helpers across dialects, and their
+dialect guards are part of the source under review. VitePress also has its real
+build/render checks in CI. Unknown paths select all hosts.
+
+For manifest and lockfile changes, the classifier compares the complete resolved
+graphs on both sides of the PR. Explicit VitePress-only dependencies and offline
+reference/type/tool dependencies can avoid native hosts. Shared indirect
+dependencies inherit every root's role, and semantic build tools such as
+Rolldown and TypeScript remain native even though they are development
+dependencies. Changes outside dependency declarations, unclassified roots,
+unsupported lockfiles and missing/ambiguous comparisons select all hosts. The
+comparison uses a complete local Git merge-base diff, including deletions and
+both sides of renames, rather than the path-filter or API changed-file limits.
+
+The unfiltered Native workflow runs on every `pull_request`, including forks,
+with read-only permissions. Its aggregate fails for a failed classifier, unknown
+selection, or an absent/unsuccessful applicable call. External-host failures
+block applicable PRs; investigate them without waiving evidence. The separate
+host workflows retain their schedules, manual inputs, artifacts and release
+calls. Their job names are `GitHub rendering`, `Obsidian rendering` and
+`Forgejo and Gitea rendering`. Link applicable runs in the pull request. When
+changing exemptions, inspect the native scripts' imports and file reads and add
+a routing regression. `native-checks.test.ts` covers routing and failure cases;
+`metadata.test.ts` checks workflow wiring. The PR aggregate is excluded by its
+exact name and Actions app identity from release status evidence; all other
+required exact-commit checks, coverage and fresh native release calls remain
+mandatory. A difference fails the check; investigate it and record it in an
+issue rather than running the check again until it passes. A realistic or
+existing regression-fixture difference blocks its gate. Adversarial discovery
+instead uses the scope rule in [AGENTS.md](AGENTS.md#bounded-renderer-work): fix
+meaningful changes on plausible authored input, and document other cases as
+limits. A report from real use can reopen a limit. Reuse an issue for variants
+of the same cause.
 
 `scripts/renderer-known-differences.json` lists exact issue-linked discovery
 source/output/view pairs. Weekly discovery replays their sources and rejects
@@ -519,10 +546,11 @@ GitHub Pages must use GitHub Actions as its source.
 ## Pull requests
 
 Every change to `main` goes through a pull request with passing CI, and is
-merged with a merge commit; `main` requires three of the CI checks and resolved
-review threads, but no approval from a second account. Contributions are made
-under the MIT license. Keep discussion respectful and about reproducible
-behavior; harassment and disclosure of private data are not acceptable.
+merged with a merge commit; `main` requires three of the CI checks, the native
+PR decision and resolved review threads, but no approval from a second account.
+Contributions are made under the MIT license. Keep discussion respectful and
+about reproducible behavior; harassment and disclosure of private data are not
+acceptable.
 
 - Describe the problem, the resulting behavior, and the decisions made and why,
   for a reader who will not read the diff. Link the issue.

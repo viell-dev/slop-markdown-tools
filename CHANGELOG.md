@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Native PR checks classify semantic inputs and resolved dependency roles, avoid
+  unnecessary hosts for VitePress-only dependency updates or offline-tool
+  changes, and enforce applicable comparisons through one required result.
+  Release still compares every native host at its exact commit
+  ([#630](https://github.com/viell-dev/slop-markdown-tools/issues/630),
+  [#631](https://github.com/viell-dev/slop-markdown-tools/issues/631)).
+
 - Dependency automation also defers the markdown-it 15 lines of
   `@mdit/plugin-container`, `@mdit/plugin-emoji` and `@mdit/plugin-tasklist`
   assessed in [#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),

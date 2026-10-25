@@ -1,0 +1,67 @@
+name: Native
+# Always report a PR decision; path-filtered required workflows can remain pending forever.
+# No write token, secrets, or privileged workflow_run/pull_request_target execution is needed.
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: native-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  classify:
+    name: Classify native inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rendering: ${{ steps.inputs.outputs.rendering }}
+      obsidian: ${{ steps.inputs.outputs.obsidian }}
+      forges: ${{ steps.inputs.outputs.forges }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: inputs
+        run: node scripts/native-checks.mjs classify
+  rendering:
+    needs: classify
+    if: ${{ needs.classify.outputs.rendering == 'true' }}
+    uses: ./.github/workflows/rendering.yml
+    with:
+      profile: realistic
+      seed: none
+  obsidian:
+    needs: classify
+    if: ${{ needs.classify.outputs.obsidian == 'true' }}
+    uses: ./.github/workflows/obsidian.yml
+    with:
+      profile: realistic
+      seed: none
+  forges:
+    needs: classify
+    if: ${{ needs.classify.outputs.forges == 'true' }}
+    uses: ./.github/workflows/forges.yml
+    with:
+      profile: realistic
+      seed: none
+  gate:
+    name: Native checks
+    needs: [classify, rendering, obsidian, forges]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Require applicable native checks
+        env:
+          NATIVE_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/native-checks.mjs gate

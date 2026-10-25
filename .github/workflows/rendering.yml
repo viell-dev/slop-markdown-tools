@@ -7,29 +7,10 @@ name: Rendering
 # runs overlap, the script waits for the limit to reset. A difference fails the run; the
 # report, the documents, and their HTML are in the run's rendering artifact, and the summary
 # records the profile and actual seeds. PR/release gates use fixed realistic documents;
-# weekly/manual adversarial discovery is separate. The paths below are the Obsidian workflow's,
-# with this check's own files; keep the two lists alike.
+# weekly/manual adversarial discovery is separate. Native PR routing is in native.yml.
 on:
   schedule:
     - cron: "23 5 * * 1"
-  pull_request:
-    paths:
-      - src/config/**
-      - src/core/**
-      - src/rules/**
-      - src/syntax/**
-      - src/index.ts
-      - package.json
-      - package-lock.json
-      - scripts/build-parser.mjs
-      - scripts/parser-patches.mjs
-      - scripts/parser-labels.mjs
-      - scripts/parser-packages.json
-      - scripts/rendering.mjs
-      - scripts/renderer-*.mjs
-      - scripts/renderer-known-differences.json
-      - scripts/github-rendering.mjs
-      - .github/workflows/rendering.yml
   workflow_dispatch:
     inputs:
       profile:
@@ -57,6 +38,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compare:
+    name: GitHub rendering
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

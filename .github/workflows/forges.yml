@@ -2,25 +2,6 @@ name: Forges
 on:
   schedule:
     - cron: "17 6 * * 1"
-  pull_request:
-    paths:
-      - src/config/**
-      - src/core/**
-      - src/rules/**
-      - src/syntax/**
-      - src/index.ts
-      - package.json
-      - package-lock.json
-      - scripts/build-parser.mjs
-      - scripts/parser-patches.mjs
-      - scripts/parser-labels.mjs
-      - scripts/parser-packages.json
-      - scripts/rendering.mjs
-      - scripts/renderer-*.mjs
-      - scripts/renderer-known-differences.json
-      - scripts/forge-*.mjs
-      - scripts/forge-images.json
-      - .github/workflows/forges.yml
   workflow_dispatch:
     inputs:
       profile:
@@ -46,6 +27,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compare:
+    name: Forgejo and Gitea rendering
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

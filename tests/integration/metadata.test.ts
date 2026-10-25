@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { dialectAliases, dialects } from "../../src/index.js";
 import { repository } from "./support.js";
 
@@ -131,43 +132,68 @@ describe("release workflow", () => {
 });
 
 describe("renderer checks", () => {
-  /** The pull_request paths of a workflow. */
-  const paths = (file: string) => {
-    const list = /\n {2}pull_request:\n {4}paths:\n((?: {6}- .*\n)+)/.exec(read(file));
-    expect(list, file).not.toBeNull();
-    return list![1]!
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.replace(/^ *- /, ""));
+  type Job = {
+    name?: string;
+    needs?: string[] | string;
+    if?: string;
+    uses?: string;
+    with?: Record<string, unknown>;
+    steps?: { uses?: string; run?: string; with?: Record<string, unknown> }[];
   };
-  /** Whether a path is one check's own file rather than a renderer-sensitive one. */
-  const own = (file: string) =>
-    /^(?:scripts\/github-rendering\.mjs|scripts\/obsidian.*|scripts\/forge-.*|\.github\/workflows\/.*)$/.test(
-      file,
+  const workflow = (file: string) =>
+    parseYaml(read(file)) as {
+      on: Record<string, unknown>;
+      permissions: Record<string, string>;
+      jobs: Record<string, Job>;
+    };
+  it("always reports a read-only PR aggregate and routes all hosts through one classification", () => {
+    const native = workflow(".github/workflows/native.yml");
+    expect(native.on).toEqual({ pull_request: null });
+    expect(native.permissions).toEqual({ contents: "read" });
+    expect(native.jobs.gate!.name).toBe("Native checks");
+    expect(native.jobs.gate!.needs).toEqual(["classify", "rendering", "obsidian", "forges"]);
+    expect(native.jobs.gate!.if).toBe("${{ always() }}");
+    expect(native.jobs.gate!.steps?.at(-1)?.run).toBe("node scripts/native-checks.mjs gate");
+    expect(native.jobs.classify!.steps?.at(-1)?.run).toBe(
+      "node scripts/native-checks.mjs classify",
     );
-  it("run for the same renderer-sensitive paths, apart from their own files", () => {
-    const rendering = paths(".github/workflows/rendering.yml");
-    const obsidian = paths(".github/workflows/obsidian.yml");
-    const forges = paths(".github/workflows/forges.yml");
-    expect(rendering.filter((file) => !own(file))).toEqual(obsidian.filter((file) => !own(file)));
-    expect(rendering.filter((file) => !own(file))).toEqual(forges.filter((file) => !own(file)));
-    for (const file of [
-      "scripts/build-parser.mjs",
-      "scripts/parser-patches.mjs",
-      "scripts/parser-labels.mjs",
-      "scripts/parser-packages.json",
-    ])
-      expect(rendering).toContain(file);
-    expect(rendering).toContain(".github/workflows/rendering.yml");
-    expect(obsidian).toContain(".github/workflows/obsidian.yml");
+    expect(native.jobs.classify!.steps?.[0]?.with).toEqual({
+      "fetch-depth": 0,
+      "persist-credentials": false,
+    });
+    for (const host of ["rendering", "obsidian", "forges"]) {
+      expect(native.jobs[host]!.needs).toBe("classify");
+      expect(native.jobs[host]!.if).toBe(`\${{ needs.classify.outputs.${host} == 'true' }}`);
+      expect(native.jobs[host]!.uses).toBe(`./.github/workflows/${host}.yml`);
+      expect(native.jobs[host]!.with).toEqual({ profile: "realistic", seed: "none" });
+    }
+    for (const job of Object.values(native.jobs)) {
+      expect(job).not.toHaveProperty("secrets");
+      expect(job).not.toHaveProperty("permissions");
+      for (const step of job.steps ?? [])
+        if (step.uses?.startsWith("actions/checkout@"))
+          expect(step.with?.["persist-credentials"]).toBe(false);
+    }
   });
-  it("can be called from the Release workflow", () => {
-    for (const file of [
-      ".github/workflows/rendering.yml",
-      ".github/workflows/obsidian.yml",
-      ".github/workflows/forges.yml",
-    ])
-      expect(read(file), file).toMatch(/\n {2}workflow_call:\n/);
+  it("keeps unique host jobs, schedules, manual inputs and read-only reusable release calls", () => {
+    const names = new Set<string>();
+    for (const host of ["rendering", "obsidian", "forges"]) {
+      const native = workflow(`.github/workflows/${host}.yml`);
+      expect(Object.keys(native.on).sort()).toEqual([
+        "schedule",
+        "workflow_call",
+        "workflow_dispatch",
+      ]);
+      expect(native.permissions).toEqual({ contents: "read" });
+      expect(Object.keys(native.jobs)).toEqual(["compare"]);
+      expect(native.jobs.compare!.name).toBeTruthy();
+      names.add(native.jobs.compare!.name!);
+      const steps = native.jobs.compare!.steps!;
+      expect(steps.some((step) => step.uses?.startsWith("actions/upload-artifact@"))).toBe(true);
+      expect(steps.some((step) => step.run?.includes("validateRendererEvidence"))).toBe(true);
+      expect(steps[0]!.with?.["persist-credentials"]).toBe(false);
+    }
+    expect(names.size).toBe(3);
   });
   it("uses fixed realistic gates and reserves adversarial sampling for discovery", () => {
     for (const file of [
@@ -180,7 +206,6 @@ describe("renderer checks", () => {
         "github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic'",
       );
       expect(workflow).toContain("default: realistic");
-      expect(workflow).toContain("scripts/renderer-known-differences.json");
     }
   });
 });

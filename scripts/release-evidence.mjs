@@ -3,7 +3,8 @@
 //   node scripts/release-evidence.mjs COMMIT
 //
 // The commit's check runs must include a successful run of every check that the ruleset for
-// main requires (.github/rulesets/main.json), from the app that the ruleset names, and of the
+// main requires (.github/rulesets/main.json), except the PR-only Native checks aggregate, from
+// the app that the ruleset names, and of the
 // CI workflow's unit coverage job. A check that is queued or running is waited for, and so is a
 // check that has not appeared yet, because the Release workflow is often dispatched right
 // after a merge starts CI: for up to 40 minutes, the time CI's slowest job may take to start
@@ -51,17 +52,20 @@ export function validateRendererEvidence(report) {
  */
 
 /**
- * The checks a release needs: the ruleset's required checks, and unit coverage from CI.
+ * The checks a release needs: the ruleset's commit checks and unit coverage from CI.
+ * Native checks is a PR-only aggregate; Release calls every native host afresh instead.
  * @param {{ rules: { type: string, parameters?: any }[] }} ruleset The ruleset for main.
  * @returns {Check[]}
  */
 export function requiredChecks(ruleset) {
   const rule = ruleset.rules.find((entry) => entry.type === "required_status_checks");
   /** @type {Check[]} */
-  const checks = (rule?.parameters?.required_status_checks ?? []).map((check) => ({
-    name: check.context,
-    app: check.integration_id,
-  }));
+  const checks = (rule?.parameters?.required_status_checks ?? [])
+    .filter((check) => !(check.context === "Native checks" && check.integration_id === 15368))
+    .map((check) => ({
+      name: check.context,
+      app: check.integration_id,
+    }));
   if (!checks.length) throw new Error("The ruleset for main requires no status checks");
   return [...checks, { name: "Unit coverage", app: checks[0].app }];
 }

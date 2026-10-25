@@ -98,8 +98,8 @@ Check these GitHub settings with `gh` before each publication:
 - The repository variable `NPM_PUBLISH_ENABLED` is `true`.
 - GitHub Pages uses GitHub Actions as its source, and the environment
   `github-pages` allows deployments from `main`, where the Pages workflow runs.
-- The ruleset for `main` requires pull requests and the three CI checks that
-  `.github/rulesets/main.json` names.
+- The ruleset for `main` requires pull requests, the three core CI checks and
+  the PR-only `Native checks` aggregate that `.github/rulesets/main.json` names.
 
 The npm settings are visible only to the package's maintainer, `viell`, signed
 in on npmjs.com, in the package's **Settings** tab:
@@ -130,10 +130,12 @@ the changelog section, and the package manifest once more. Then dispatch
 Before it builds anything, the workflow checks the evidence for its commit, and
 any failure publishes nothing:
 
-- CI passed on that exact commit: the three checks that the ruleset for `main`
-  requires and unit coverage (`scripts/release-evidence.mjs`). It waits up to 40
-  minutes for CI that is still running, so it can be dispatched right after the
-  merge.
+- CI passed on that exact commit: the three core checks that the ruleset for
+  `main` requires and unit coverage (`scripts/release-evidence.mjs`). It
+  excludes exactly `Native checks` from GitHub Actions app 15368, because that
+  aggregate reports only on PRs and Release runs every native host afresh below.
+  Other required statuses are never exempted. It waits up to 40 minutes for CI
+  that is still running, so it can be dispatched right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
