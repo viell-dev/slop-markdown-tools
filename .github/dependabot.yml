@@ -17,7 +17,7 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       # PR #591: VitePress alpha.20 peers mathjax3 ^4; v5 changes its backend.
-      # The other deferred plugin lines below peer markdown-it 15, while the
+      # The deferred mdit plugin lines below peer markdown-it 15, while the
       # current VitePress reading uses 14. See CONTRIBUTING's dependency procedure.
       # PRs #592-#594, #608, #610 and #611; compatible older lines remain eligible.
       # Revisit when compatible peer ranges return, with a reference upgrade,

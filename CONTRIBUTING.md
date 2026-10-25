@@ -324,14 +324,17 @@ safety. The [native classification](#what-the-checks-prove) still follows actual
 imports and complete resolved-graph reachability; shared inputs and semantic
 build tools remain native-sensitive.
 
+Close a proposal the pinned dependencies cannot accept and add a bounded
+version-line ignore with its reason and revisit condition, leaving compatible
+older lines eligible. Update `tests/integration/dependency-policy.test.ts` with
+the policy change so unrelated compatible updates can proceed.
+
 Version proposals wait at least seven days after publication, leaving time for a
 broken or compromised release to be found. Security updates are not delayed by
 Dependabot's cooldown. Apply the [release procedure](RELEASING.md) when adopting
 a security fix early; its documented exception waives neither verification nor
 review and covers shipped bundled code as well as installed dependencies. A
-merged update ships with the next release, as the [release
-procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md)
-describes.
+merged update ships with the next release under that procedure.
 
 ### Revisiting ignores and tool pins
 
@@ -347,8 +350,8 @@ warnings or advance an assertion merely to make installation/building succeed.
 
 - **TypeScript:** when updating `typescript-eslint`, recheck its [official
   support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. The current range is `>=4.8.4 <6.1.0`,
-  excluding TypeScript 7. Revisit the `7.x` ignore from
+  installed parser's TypeScript peer. As of parser 8.71.2, that range is
+  `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
   [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
   includes the target; remove it only after an unforced install, typed lint,
   typechecking and full/package checks pass. A compiler upgrade also requires
@@ -376,14 +379,13 @@ warnings or advance an assertion merely to make installation/building succeed.
   [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481) until a
   compatible published dependency removes the vulnerable pin and the renderer,
   audit and package checks verify its adoption.
-- **WebdriverIO:** the separate Obsidian harness uses `wdio-obsidian-service`
-  3.3 with a webdriverio `^9.18.1` peer. Retain WDIO major ignores until a
-  service release supports the target. Review its coherent WDIO packages and
-  launcher together, then test the actual Docker host, both views, controls and
-  report identity. The service's `obsidian` API dependency is not the downloaded
-  app or installer identity. Follow the [baseline and latest-route
-  procedure](#tests) independently; no forced major is an established remedy for
-  the separate harness defects in
+- **WebdriverIO:** `wdio-obsidian-service` 3.3.0 declares a webdriverio
+  `^9.18.1` peer. Retain WDIO major ignores until a service release supports the
+  target. Review its coherent WDIO packages and launcher together, then test the
+  actual Docker host, both views, controls and report identity. The service's
+  `obsidian` API dependency is not the downloaded app or installer identity.
+  Follow the [baseline and latest-route procedure](#tests) independently; no
+  forced major is an established remedy for the separate harness defects in
   [#639](https://github.com/viell-dev/slop-markdown-tools/issues/639) and
   [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640).
 - **pnpm:** `scripts/package-smoke.mjs` pins the tool fetched through npm into
