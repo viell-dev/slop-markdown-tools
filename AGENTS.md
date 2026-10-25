@@ -413,10 +413,16 @@ it helps.
   Workspace HTML, anchor collection, target indexing, and link resolution are
   separate modules behind `src/workspace/index.ts`; keep its public entry
   stable.
-- `scripts/build-parser.mjs` builds the portable parser adapter before
-  TypeScript compilation and Vitest. `parser-patches.mjs` guards each corrected
-  dependency source; `parser-packages.json` pins the complete graph's license
-  identities. Keep all four generated distribution artifacts together. See
+- Consumers require fresh, verified generated output. `scripts/build.mjs` stages
+  the portable parser and TypeScript product; `with-build.mjs` may reuse that
+  exact output only inside its live invocation, after checking its receipt.
+  Standalone commands prepare their own build. Restart after input, installation
+  or output changes; do not copy receipts across invocations or jobs.
+  Publication replaces individual files, not the whole directory atomically.
+  Keep consumers outside overlapping builders and preserve intentional parser
+  rebuild tests. `parser-patches.mjs` guards each corrected dependency source;
+  `parser-packages.json` pins the complete graph's license identities. Keep all
+  four generated distribution artifacts together. See
   [CONTRIBUTING.md](./CONTRIBUTING.md#what-the-checks-prove) for the
   verification map and its limits.
 - `src/code/` is the Node host for configured code tools. Keep execution out of

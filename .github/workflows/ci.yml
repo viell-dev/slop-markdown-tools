@@ -67,10 +67,9 @@ jobs:
           cache: npm
       - run: npm ci
       - if: runner.os == 'Linux' && matrix.node == 24
-        run: npm run check
+        run: npm run check:ci
       - if: runner.os != 'Linux' || matrix.node != 24
-        run: npm test
-      - run: npm run test:package
+        run: npm run test:ci
       - if: runner.os == 'Linux' && matrix.node == 24
         run: npm audit --audit-level=high
       - if: ${{ failure() }}
