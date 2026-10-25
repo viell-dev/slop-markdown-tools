@@ -283,9 +283,10 @@ reversals, and do not revert until authorized.
   only compares the parser's readings.
 - Review the packed files before changing packaging. Keep dependencies and
   generated state inside the repository; commit the lockfile, not caches.
-- When updating `typescript-eslint`, recheck its TypeScript support and the
-  TypeScript 7 ignore in `.github/dependabot.yml`; remove the ignore once the
-  upgrade installs and passes without bypassing peer constraints.
+- Follow CONTRIBUTING's [dependency update
+  procedure](./CONTRIBUTING.md#dependencies) for grouping, support-based ignores
+  and tool pins. Maintenance groups cross dependency fields and never replace
+  native-role or shipped-code classification.
 - Decide which release a change belongs to when it is assigned, by the
   [versioning policy](./docs/versions.md): before 1.0, a change to the interface
   that is not a defect fix waits for the next minor release. Say so in the PR.

@@ -300,15 +300,113 @@ command, such as `npm ci` or `pnpm install --frozen-lockfile`.
 version, 22, so that the type check rejects interfaces that Node.js 22 does not
 have; the CI job on 22.12.0 catches those that later 22.x releases added.
 
-Dependabot proposes updates weekly, the development dependencies as one group,
-and only versions published at least seven days earlier, which leaves time for a
-broken or compromised release to be found. Security updates are not delayed. An
-update that the pinned dependencies cannot accept, such as one whose peer range
-needs the next markdown-it generation, is closed, and `.github/dependabot.yml`
-ignores its version line with the reason and when to revisit it. A merged update
-ships with the next release, as the [release
+### Update groups
+
+Dependabot proposes updates weekly, using the groups in
+[`.github/dependabot.yml`](.github/dependabot.yml). Parser syntax, mdast tree
+extensions and public types form one group across production and development
+declarations. Their compatible generations need not share a major number:
+from-markdown 2 uses micromark 4, mdast types 4 and unist types 3. The VitePress
+group keeps its markdown-it generation and plugins together. Other offline
+references, including `mdast-util-to-hast`, form a separate group. Ordinary
+development tools are the fallback, with explicit exclusions; Rolldown and
+TypeScript remain individually proposed because their emission changes need
+focused review. Specific groups precede the fallback; Dependabot selects the
+first matching group.
+
+Routine groups select minor and patch updates; majors remain separate proposals
+until a maintainer deliberately coordinates a compatible migration. Check
+prerelease changes, including VitePress alpha updates, explicitly rather than
+assuming their grouping or compatibility. A minor update can also change peers:
+the ignored mdit plugin lines are examples. Group membership, an unchanged major
+and npm's development label establish neither peer compatibility nor semantic
+safety. The [native classification](#what-the-checks-prove) still follows actual
+imports and complete resolved-graph reachability; shared inputs and semantic
+build tools remain native-sensitive.
+
+Version proposals wait at least seven days after publication, leaving time for a
+broken or compromised release to be found. Security updates are not delayed by
+Dependabot's cooldown. Apply the [release procedure](RELEASING.md) when adopting
+a security fix early; its documented exception waives neither verification nor
+review and covers shipped bundled code as well as installed dependencies. A
+merged update ships with the next release, as the [release
 procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md)
 describes.
+
+### Revisiting ignores and tool pins
+
+During assigned dependency maintenance and release preparation, inspect the
+existing ignores and tool pins, including the literal pnpm pin outside the
+manifests. Check the proposed version's publication time, known maintainers,
+release changes, engines and peers in its published manifest; for example,
+`npm view NAME@VERSION peerDependencies engines --json` and
+`npm view NAME time maintainers --json`. Follow upstream support documentation
+as well as installable peer ranges. Keep an ignore while the required support or
+verification is missing. Do not force peers, disable unsupported-version
+warnings or advance an assertion merely to make installation/building succeed.
+
+- **TypeScript:** when updating `typescript-eslint`, recheck its [official
+  support](https://typescript-eslint.io/users/dependency-versions/) and the
+  installed parser's TypeScript peer. The current range is `>=4.8.4 <6.1.0`,
+  excluding TypeScript 7. Revisit the `7.x` ignore from
+  [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
+  includes the target; remove it only after an unforced install, typed lint,
+  typechecking and full/package checks pass. A compiler upgrade also requires
+  the parser-fragment emission review described above and applicable native
+  checks.
+- **Node types:** retain the `@types/node` major ignore while the lowest
+  supported Node.js major remains 22. A deliberate support change updates
+  engines, types, minimum-version CI and public requirements together; the
+  development or newest advisory CI version alone does not justify advancing
+  these types. Keep actual execution on the exact supported minimum.
+- **VitePress and markdown-it:** inspect peers for the ignored markdown-it 15
+  and attrs, container, emoji, footnote and tasklist plugin lines. The pinned
+  plugins accept markdown-it 14; the deferred generation requires 15. The
+  separate MathJax plugin deferral exists because VitePress alpha.20 peers
+  `markdown-it-mathjax3: ^4`; v5 changes the backend and adds native deasync,
+  rather than itself declaring a markdown-it 15 peer. Keep the bounded ranges in
+  the configuration until compatible peers return or a coordinated reference
+  migration passes actual VitePress builds/rendering, math, full and installed
+  package checks. Reassess for a security advisory even while a range is
+  ignored. Existing decisions:
+  [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591) through
+  [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594), and
+  [#612](https://github.com/viell-dev/slop-markdown-tools/pull/612). Keep the
+  scoped MathJax transitive override under
+  [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481) until a
+  compatible published dependency removes the vulnerable pin and the renderer,
+  audit and package checks verify its adoption.
+- **WebdriverIO:** the separate Obsidian harness uses `wdio-obsidian-service`
+  3.3 with a webdriverio `^9.18.1` peer. Retain WDIO major ignores until a
+  service release supports the target. Review its coherent WDIO packages and
+  launcher together, then test the actual Docker host, both views, controls and
+  report identity. The service's `obsidian` API dependency is not the downloaded
+  app or installer identity. Follow the [baseline and latest-route
+  procedure](#tests) independently; no forced major is an established remedy for
+  the separate harness defects in
+  [#639](https://github.com/viell-dev/slop-markdown-tools/issues/639) and
+  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640).
+- **pnpm:** `scripts/package-smoke.mjs` pins the tool fetched through npm into
+  the repository cache. Dependabot does not update that literal. After the
+  age/support review, inspect the target's installation route, platform and
+  option changes, then advance the literal in a tested PR. Run the actual npm
+  and strict-pnpm package consumers on the existing CI matrix, including the
+  supported minimum Node.js and Windows. Preserve disabled hoisting and checks
+  of commands, library use and published types; a registry engine range alone is
+  not adoption evidence.
+- **Rolldown:** advance the manifest pin and exact version assertion in
+  `scripts/build-parser.mjs` together only after reviewing its emission, runtime
+  helpers, portable module-region labels, neutral import/default graph,
+  corrected sources and package/license identities. Apply the source and
+  maintained-copy reconciliation above rather than resetting hashes until a
+  build passes. Run the parser parity/work, browser, full, installed-package and
+  applicable native checks before accepting new expectations.
+- **Host images:** retain the existing [Forge digest
+  procedure](#what-the-checks-prove) and Obsidian baseline procedure below. Node
+  Docker major updates remain deliberate LTS changes coordinated with the
+  development major. Patch/digest proposals stay enabled; complete a verified
+  baseline change rather than freezing the image or bypassing its agreement
+  checks.
 
 ## Tests
 
@@ -465,13 +563,18 @@ advance the baseline, verify the official Obsidian release and Docker digest,
 run the realistic native workload and controls, and update `baseline.json`, the
 Dockerfile's base and identity label together in a tested PR. Record the
 observed Electron and Chrome versions in the baseline. Recheck the deliberate
-latest route. Do not upgrade dependencies incidentally. The base digest does not
-freeze apt repository contents: each report records the inspected built image ID
-and platform, and the runner starts that exact ID. The `declaredBase` field is
-the image's declared base label, mechanically checked against the Dockerfile's
-`FROM` and `baseline.json`; it is not independent inspection of base ancestry.
-Reports read app, installer, Electron and Chrome versions from the running
-application; requested versions alone cannot certify a host.
+latest route. A Docker updater proposal changing only `FROM`, or an edit
+changing only the identity label, must fail agreement checks until its assignee
+verifies and completes that coordinated update. These failures keep an update
+reviewable; do not add an all-version ignore or weaken the checks to clear them.
+App and installer versions remain independently selected. Do not upgrade
+dependencies incidentally. The base digest does not freeze apt repository
+contents: each report records the inspected built image ID and platform, and the
+runner starts that exact ID. The `declaredBase` field is the image's declared
+base label, mechanically checked against the Dockerfile's `FROM` and
+`baseline.json`; it is not independent inspection of base ancestry. Reports read
+app, installer, Electron and Chrome versions from the running application;
+requested versions alone cannot certify a host.
 
 Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
 the actual app, installer and renderer versions separately from the requested
@@ -730,21 +833,25 @@ host workflows retain their schedules, manual inputs, artifacts and release
 calls. Their job names are `GitHub rendering`, `Obsidian rendering` and
 `Forgejo and Gitea rendering`. Link applicable runs in the pull request. When
 changing exemptions, inspect the native scripts' imports and file reads and add
-a routing regression. `native-checks.test.ts` covers routing and failure cases;
-`metadata.test.ts` checks parsed workflow wiring, including harmless YAML
-reserialization and missing/wrong release dependencies and coverage ownership.
-`release-evidence.test.ts` binds every current required CI name to its producer.
-Keep exact permissions, security values, pinned Actions and protected evidence
-identities; structural checks do not replace their identity assertions. The PR
-aggregate is excluded by its exact name and Actions app identity from release
-status evidence; all other required exact-commit checks, coverage and fresh
-native release calls remain mandatory. A difference fails the check; investigate
-it and record it in an issue rather than running the check again until it
-passes. A realistic or existing regression-fixture difference blocks its gate.
-Adversarial discovery instead uses the [bounded renderer
-work](#bounded-renderer-work) scope rule: fix meaningful changes on plausible
-authored input, and document other cases as limits. A report from real use can
-reopen a limit. Reuse an issue for variants of the same cause.
+a routing regression. `native-checks.test.ts` covers routing and failure cases.
+`dependency-policy.test.ts` parses the maintained updater configuration and
+checks finite grouping, exclusion and ignored-version examples across dependency
+fields. These are policy assertions, not Dependabot service execution or proof
+that an upgrade installs or renders correctly. `metadata.test.ts` checks parsed
+workflow wiring, including harmless YAML reserialization and missing/wrong
+release dependencies and coverage ownership. `release-evidence.test.ts` binds
+every current required CI name to its producer. Keep exact permissions, security
+values, pinned Actions and protected evidence identities; structural checks do
+not replace their identity assertions. The PR aggregate is excluded by its exact
+name and Actions app identity from release status evidence; all other required
+exact-commit checks, coverage and fresh native release calls remain mandatory. A
+difference fails the check; investigate it and record it in an issue rather than
+running the check again until it passes. A realistic or existing
+regression-fixture difference blocks its gate. Adversarial discovery instead
+uses the [bounded renderer work](#bounded-renderer-work) scope rule: fix
+meaningful changes on plausible authored input, and document other cases as
+limits. A report from real use can reopen a limit. Reuse an issue for variants
+of the same cause.
 
 `scripts/renderer-known-differences.json` lists exact issue-linked discovery
 source/output/view pairs. Weekly discovery replays their sources and rejects

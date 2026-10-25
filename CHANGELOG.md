@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Dependency updates follow parser, VitePress/reference and tooling maintenance
+  units across dependency declarations. Existing compatibility deferrals remain,
+  with explicit revisit checks for peers, tool pins and verified host baselines
+  ([#636](https://github.com/viell-dev/slop-markdown-tools/issues/636),
+  [#637](https://github.com/viell-dev/slop-markdown-tools/issues/637)).
+
 - Five parser extensions used only to build the bundled parser are development
   dependencies. Installed consumers retain the required runtime utilities and
   public plugin types; package checks cover both parser paths and the shipped
