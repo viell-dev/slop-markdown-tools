@@ -83,9 +83,14 @@ Known couplings:
 - Branch and tag policy: `.github/rulesets/`, GitHub's settings, the job names
   in `ci.yml`, and `scripts/release-evidence.mjs`, which reads the required
   checks from the ruleset for `main`.
-- Renderer-sensitive paths: the `pull_request` paths of `rendering.yml` and
-  `obsidian.yml`, which are alike apart from each check's own files, and the map
-  of what the checks prove in CONTRIBUTING.md.
+- Native PR classification: `scripts/native-checks.mjs` owns the conservative
+  path and dependency-role contract; `native.yml` calls Rendering, Obsidian and
+  Forges when applicable and always reports `Native checks`. Keep its tests,
+  each reusable host workflow, the ruleset, release evidence and CONTRIBUTING's
+  check map consistent in meaning. Shared/transitive inputs and unknown changes
+  select all hosts; host-specific inputs can differ. Dependency roles follow
+  actual native use and shared lockfile reachability, never npm's development
+  label alone. Check native imports and file reads before exempting a path.
 - Versions and requirements: `package.json`, the lockfile, the installation
   commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
   and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
@@ -342,12 +347,20 @@ local task branches.
 
 `.github/rulesets/` records the policies for `main`, for version tags, and for
 the `site-*` branches that correct the current release's site; keep it and
-GitHub's settings in sync. The required checks bind to three `verify (OS, NODE)`
-job names in `ci.yml`, where `NODE` is the matrix's major version label rather
-than its exact `node-version`, and to GitHub Actions, app 15368, so renaming one
-of those jobs needs a ruleset update. The Node.js 26 job is not required. Zero
-required approvals is deliberate for a single-account, agent-maintained
-repository; PRs, passing checks, and resolved review threads remain mandatory.
+GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
+`ci.yml`, where `NODE` is the matrix's major version label rather than its exact
+`node-version`, and the PR-only `Native checks` aggregate in `native.yml`. All
+bind to GitHub Actions, app 15368; renaming one needs a ruleset update. The
+aggregate rejects missing or unsuccessful applicable host calls and explicitly
+reports inapplicability. Keep the coordinator unfiltered and read-only on
+`pull_request`, including forks. An applicable external-host outage blocks
+merge; investigate it without waiving evidence or weakening the ruleset.
+`release-evidence.mjs` excludes exactly that PR-only check/app pair from its
+exact-commit requirements because Release calls all three native workflows
+afresh. Every other required check and unit coverage still must pass on the
+release commit. The Node.js 26 job is not required. Zero required approvals is
+deliberate for a single-account, agent-maintained repository; PRs, passing
+checks, and resolved review threads remain mandatory.
 
 Other repository settings, each recorded here with its reason when it changes:
 

@@ -55,7 +55,7 @@ describe("release evidence", () => {
         "fixed-seed realistic",
       );
   });
-  it("requires the ruleset's checks and unit coverage, which CI's jobs produce", () => {
+  it("requires exact-commit core checks and coverage without the PR-only native aggregate", () => {
     expect(required.map((check) => check.name)).toEqual([
       "verify (ubuntu-latest, 22)",
       "verify (ubuntu-latest, 24)",
@@ -66,6 +66,56 @@ describe("release evidence", () => {
     const ci = read(".github/workflows/ci.yml");
     expect(ci).toContain("name: verify (${{ matrix.os }}, ${{ matrix.node }})");
     expect(ci).toContain("    name: Unit coverage\n");
+    const ruleset = JSON.parse(read(".github/rulesets/main.json")) as {
+      rules: {
+        type: string;
+        parameters?: { required_status_checks: { context: string; integration_id: number }[] };
+      }[];
+    };
+    expect(
+      ruleset.rules.find((rule) => rule.type === "required_status_checks")!.parameters!
+        .required_status_checks,
+    ).toContainEqual({ context: "Native checks", integration_id: actions });
+    expect(
+      evaluate([...passing(), run("Native checks", "completed", "failure")], required).state,
+    ).toBe("success");
+  });
+  it("exempts exactly Native checks from Actions, retaining other names and apps", () => {
+    const checks = [
+      { context: "verify (ubuntu-latest, 24)", integration_id: actions },
+      { context: "Native checks", integration_id: actions },
+      { context: "Native checks", integration_id: 1 },
+      { context: "Other required check", integration_id: actions },
+    ];
+    expect(
+      requiredChecks({
+        rules: [
+          {
+            type: "required_status_checks",
+            parameters: {
+              required_status_checks: checks,
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      { name: "verify (ubuntu-latest, 24)", app: actions },
+      { name: "Native checks", app: 1 },
+      { name: "Other required check", app: actions },
+      { name: "Unit coverage", app: actions },
+    ]);
+    expect(() =>
+      requiredChecks({
+        rules: [
+          {
+            type: "required_status_checks",
+            parameters: {
+              required_status_checks: [checks[1]],
+            },
+          },
+        ],
+      }),
+    ).toThrow("no status checks");
   });
   it("passes when every required check succeeded", () => {
     expect(evaluate(passing(), required).state).toBe("success");

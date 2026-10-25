@@ -5,30 +5,10 @@ name: Obsidian
 # how documents are read or formatted, by hand, from the Release workflow for the commit that it
 # releases, with realistic fixed-seed documents and the fixtures. Weekly/manual adversarial
 # discovery reports new differences separately. report.json and screenshots of the first
-# differences are in the run's obsidian artifact. The paths below are the Rendering workflow's,
-# with the check's own files; keep the two lists alike.
+# differences are in the run's obsidian artifact. Native PR routing is in native.yml.
 on:
   schedule:
     - cron: "47 5 * * 1"
-  pull_request:
-    paths:
-      - src/config/**
-      - src/core/**
-      - src/rules/**
-      - src/syntax/**
-      - src/index.ts
-      - package.json
-      - package-lock.json
-      - scripts/build-parser.mjs
-      - scripts/parser-patches.mjs
-      - scripts/parser-labels.mjs
-      - scripts/parser-packages.json
-      - scripts/rendering.mjs
-      - scripts/renderer-*.mjs
-      - scripts/renderer-known-differences.json
-      - scripts/obsidian-check.mjs
-      - scripts/obsidian/**
-      - .github/workflows/obsidian.yml
   workflow_dispatch:
     inputs:
       profile:
@@ -68,6 +48,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compare:
+    name: Obsidian rendering
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
