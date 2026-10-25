@@ -22,27 +22,6 @@ import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { URL, fileURLToPath } from "node:url";
 
-/** Verify a deterministic native-renderer gate report, never discovery evidence. */
-export function validateRendererEvidence(report) {
-  if (
-    report.profile !== "realistic" ||
-    JSON.stringify(report.seeds) !== "[1,2,3,4,5]" ||
-    !Number.isInteger(report.count) ||
-    report.count <= 0 ||
-    !Number.isInteger(report.compared) ||
-    report.compared <= 0 ||
-    !Array.isArray(report.unexpected) ||
-    report.unexpected.length ||
-    !Array.isArray(report.known) ||
-    report.known.length ||
-    !Array.isArray(report.stale) ||
-    report.stale.length
-  )
-    throw new Error(
-      "A release requires fixed-seed realistic renderer evidence with no differences",
-    );
-}
-
 /**
  * @typedef {{ name: string, app: number }} Check A check by its name and the app that reports it.
  * @typedef {object} CheckRun A check run as GitHub's API describes it.

@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Native renderer reports validate the intended documents, widths, views and
+  calibration controls, including unchanged formatting attempts. Obsidian
+  PR/release checks pin the app, installer and Docker base and record observed
+  runtime/image identity; weekly/manual checks retain explicit latest coverage
+  ([#632](https://github.com/viell-dev/slop-markdown-tools/issues/632),
+  [#633](https://github.com/viell-dev/slop-markdown-tools/issues/633)).
+
 - Linux 24 CI collects unit and coverage evidence in one required, isolated job.
   Hosted release preparation reuses exact-commit push/main CI results while
   freshly building and testing its publication tarball; local preparation

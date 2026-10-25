@@ -302,27 +302,29 @@ with screenshots of the first differences. `PROFILE=realistic` is the default:
 the fixtures and seeds 1–5, ten documents per seed. `PROFILE=adversarial`
 selects discovery: one fresh seed and 100 documents. `SEEDS` selects a list,
 `SEED` adds a seed (`none` adds none), `COUNT` sets documents per seed, and
-`OBSIDIAN_VERSION` picks Obsidian's version (`latest`). Realistic generation
-uses separated blocks, proper container prefixes, closed fences and documented
-dialect syntax. Existing adversarial seed behavior is retained. `REDUCE`, a
-comma-separated list of generated documents from a report, shortens each to the
-lines that still show its difference, and `PROBE`, a JSON array of documents,
-only shows each in Obsidian. Live Preview is compared by its lines' text and
-styles, with the characters that it shows as written left out where only the
-source differs, and Reading view by its HTML. The check requires the editor to
-finish parsing the whole note and publish that syntax tree before collecting
-styles; incomplete parsing fails the run. Empty table source rows with no text
-or embed are ignored. Table widgets ignore their known focus and active-handle
-classes and a generated cell editor only when the cell also retains its rendered
-preview. Rendered content, styles, code spacing, alignment, link destinations,
-and row counts remain significant. A host control activates header, code, and
-link cells with real input and checks those negative cases; nested authored
-tables and editor-only payload remain intact. Boundary regressions in
-`scripts/obsidian/boundary-fixtures.mjs` are shared with the unit suite,
-including the long synthetic note in `scripts/obsidian/fixtures/508.txt`. The
-comparison retains the source delimiter of styled list lines, including checkbox
-widgets, and normalizes spaces within and around italic and bold runs while
-keeping styled characters, code, highlights, and decorations significant.
+`OBSIDIAN_VERSION` and `OBSIDIAN_INSTALLER_VERSION` override the app and
+installer independently. They default to the verified versions in
+`scripts/obsidian/baseline.json`, currently 1.14.5 for both. Realistic
+generation uses separated blocks, proper container prefixes, closed fences and
+documented dialect syntax. Existing adversarial seed behavior is retained.
+`REDUCE`, a comma-separated list of generated documents from a report, shortens
+each to the lines that still show its difference, and `PROBE`, a JSON array of
+documents, only shows each in Obsidian. Live Preview is compared by its lines'
+text and styles, with the characters that it shows as written left out where
+only the source differs, and Reading view by its HTML. The check requires the
+editor to finish parsing the whole note and publish that syntax tree before
+collecting styles; incomplete parsing fails the run. Empty table source rows
+with no text or embed are ignored. Table widgets ignore their known focus and
+active-handle classes and a generated cell editor only when the cell also
+retains its rendered preview. Rendered content, styles, code spacing, alignment,
+link destinations, and row counts remain significant. A host control activates
+header, code, and link cells with real input and checks those negative cases;
+nested authored tables and editor-only payload remain intact. Boundary
+regressions in `scripts/obsidian/boundary-fixtures.mjs` are shared with the unit
+suite, including the long synthetic note in `scripts/obsidian/fixtures/508.txt`.
+The comparison retains the source delimiter of styled list lines, including
+checkbox widgets, and normalizes spaces within and around italic and bold runs
+while keeping styled characters, code, highlights, and decorations significant.
 Unchecked checkbox widgets retain their presence and count even with no text.
 Styled fence delimiters ignore only their terminal spaces and tabs; code body
 whitespace and internal info-string spacing remain significant. A host control
@@ -339,18 +341,32 @@ boundaries remain significant; a deterministic host control checks these cases
 on every comparison run. The Obsidian workflow runs the check for pull requests
 with an [applicable native input](#what-the-checks-prove), in the Release
 workflow, and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the
-inputs `profile`, `seed`, `count`, and `obsidian-version`; its `obsidian`
-artifact holds the report and screenshots. It fails when the check compared
-nothing. PR and release gates require realistic fixed-seed evidence;
-weekly/manual adversarial runs are discovery only. Both profiles retain the
-native calibration controls.
+inputs `profile`, `seed`, `count`, `obsidian-version`, and
+`obsidian-installer-version`; its `obsidian` artifact holds the report and
+screenshots. It fails when the check compared nothing. PR and release gates
+require realistic fixed-seed evidence; weekly/manual adversarial runs are
+discovery only. Both profiles retain the native calibration controls.
+
+PR/release checks pin the app, installer and Docker base digest. Weekly checks
+explicitly request `latest` for both app and installer; manual inputs also
+default to `latest`, including a manual realistic run. Local checks default to
+the pinned baseline; set both version variables to `latest` for drift checks. To
+advance the baseline, verify the official Obsidian release and Docker digest,
+run the realistic native workload and controls, and update `baseline.json`, the
+Dockerfile's base and identity label together in a tested PR. Record the
+observed Electron and Chrome versions in the baseline. Recheck the deliberate
+latest route. Do not upgrade dependencies incidentally. The base digest does not
+freeze apt repository contents: each report records the inspected built image ID
+and platform, and the runner starts that exact ID. Reports read app, installer,
+Electron and Chrome versions from the running application; requested versions
+alone cannot certify a host.
 
 Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
-the actual app and renderer versions separately from the requested version, with
-hashes of the input, executed spec file (`specSha256`), and completed capture.
-The spec hash covers `obsidian.e2e.mjs`; it does not hash the Docker image or
-the complete harness configuration. Interrupted captures retain a null capture
-hash.
+the actual app, installer and renderer versions separately from the requested
+versions, the inspected image identity, and hashes of the input, executed spec
+file (`specSha256`), and completed capture. The spec hash covers
+`obsidian.e2e.mjs`; it does not hash the Docker image or the complete harness
+configuration. Interrupted captures retain a null capture hash.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
@@ -441,11 +457,26 @@ all four.
   applicable host call to succeed through its `Native checks` aggregate. It
   explicitly reports hosts that are inapplicable. The Release workflow runs all
   three checks afresh and validates their reports at its exact commit.
-  Weekly/manual adversarial runs discover differences without gating delivery.
-  New findings receive an issue and a scope disposition; they do not
-  automatically expand the active fix. Forge images are pinned by version and
-  digest in `scripts/forge-images.json`. Run `npm run check:forges` with Docker
-  to reproduce the realistic gate;
+  `renderer-evidence.mjs` independently reconstructs intended fixture/generated
+  document names, widths, views and calibration controls. Reports distinguish
+  planned documents from attempted/completed formatting cases and changed
+  output; unchanged cases are legitimate and need no redundant host request.
+  Every expected view records comparison or unchanged output. Actual repository
+  file views remain mandatory even when unchanged. Deterministic consumers bind
+  the report to their host and canonical workload sizes (25 generated documents
+  per seed for GitHub, ten for Obsidian and each forge), rejecting truncation
+  even if a report shrinks its own plan. `renderer-evidence.test.ts` exercises
+  missing, duplicate and incomplete cases, controls, views and host identities.
+  Partial reports and existing failure artifacts survive failed attempts. This
+  validates bookkeeping and trusted producers, not arbitrary fabricated reports.
+  Release consumes fresh workflow results within its producing run; reports are
+  not copied between runs, so no new cross-run report provenance is implied.
+  GitHub's Markdown API version remains externally uncontrolled. Weekly/manual
+  adversarial runs discover differences without gating delivery. New findings
+  receive an issue and a scope disposition; they do not automatically expand the
+  active fix. Forge images are pinned by version and digest in
+  `scripts/forge-images.json`. Run `npm run check:forges` with Docker to
+  reproduce the realistic gate;
   `PROFILE=adversarial SEED=42 npm run check:forges` selects reproducible
   discovery (set those environment variables in your shell). Each run creates
   only disposable loopback instances and synthetic accounts, then removes its

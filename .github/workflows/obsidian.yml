@@ -23,8 +23,13 @@ on:
         description: Documents per seed (realistic 10, adversarial 100 when empty)
         required: false
       obsidian-version:
-        description: The Obsidian version to test (latest when empty)
+        description: App version for deliberate drift checks
         required: false
+        default: latest
+      obsidian-installer-version:
+        description: Installer version for deliberate drift checks
+        required: false
+        default: latest
   workflow_call:
     inputs:
       profile:
@@ -37,6 +42,9 @@ on:
         type: string
         required: false
       obsidian-version:
+        type: string
+        required: false
+      obsidian-installer-version:
         type: string
         required: false
 permissions:
@@ -66,15 +74,18 @@ jobs:
             ${{ github.event_name == 'schedule' && 'adversarial' || inputs.profile || 'realistic' }}
           SEED: ${{ inputs.seed }}
           COUNT: ${{ inputs.count }}
-          OBSIDIAN_VERSION: ${{ inputs.obsidian-version }}
+          OBSIDIAN_VERSION:
+            ${{ github.event_name == 'schedule' && 'latest' || inputs.obsidian-version }}
+          OBSIDIAN_INSTALLER_VERSION:
+            ${{ github.event_name == 'schedule' && 'latest' || inputs.obsidian-installer-version }}
         run: npm run check:obsidian
       - name: Validate deterministic gate evidence
         if: ${{ github.event_name == 'pull_request' || github.workflow == 'Release' }}
         run: |
           node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
-          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
-          validateRendererEvidence(JSON.parse(readFileSync('artifacts/obsidian/report.json', 'utf8')));
+          import { validateRendererEvidence } from './scripts/renderer-evidence.mjs';
+          validateRendererEvidence(JSON.parse(readFileSync('artifacts/obsidian/report.json', 'utf8')), 'obsidian');
           JS
       # Fails too when the check compared nothing, so that a run that skipped its work cannot
       # pass for one that found no difference.
@@ -90,8 +101,9 @@ jobs:
           }
           const report = JSON.parse(readFileSync(file, 'utf8'));
           console.log(`## Obsidian ${report.obsidian}, before and after formatting\n`);
+          console.log(`Installer ${report.identity?.installer}, Electron ${report.identity?.electron}, Chrome ${report.identity?.chrome}; image ${report.identity?.image?.id}, base ${report.identity?.image?.base}.\n`);
           console.log(`Profile **${report.profile}**, seeds **${report.seeds.join(',')}**, ${report.count} documents per seed and the fixtures, at widths ${report.widths.join(' and ')}: ${report.compared} compared, ${report.unexpected.length} new view differences, ${report.known.length} known, ${report.stale.length} stale.`);
-          console.log(`\nRepeat with \`PROFILE=${report.profile} SEEDS=${report.seeds.join(',')} SEED=none COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} npm run check:obsidian\`.`);
+          console.log(`\nRepeat with \`PROFILE=${report.profile} SEEDS=${report.seeds.join(',')} SEED=none COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} OBSIDIAN_INSTALLER_VERSION=${report.identity?.installer} npm run check:obsidian\`.`);
           if (!(report.compared > 0)) process.exit(1);
           JS
       - if: ${{ !cancelled() }}

@@ -16,10 +16,42 @@ const { fixtures } = await import("/repo/scripts/obsidian/fixtures.mjs");
 const { rendererSettings } = await import("/repo/scripts/renderer-settings.mjs");
 const { classifyDifferences, knownSources } =
   await import("/repo/scripts/renderer-differences.mjs");
+const {
+  createRendererReport,
+  startDocument,
+  validateRendererReport,
+  obsidianWidths,
+  obsidianControls,
+} = await import("/repo/scripts/renderer-evidence.mjs");
+const { default: baseline } = await import("/repo/scripts/obsidian/baseline.json", {
+  with: { type: "json" },
+});
 
 const { profile, seeds, count } = rendererSettings(process.env);
 /** Widths to format at: the preset's, and a narrow one that reflows nearly every paragraph. */
-const widths = [80, 30];
+const widths = obsidianWidths;
+const report = createRendererReport("obsidian", { profile, seeds, count });
+report.widths = widths;
+report.requested = {
+  app: process.env.OBSIDIAN_VERSION || baseline.app,
+  installer: process.env.OBSIDIAN_INSTALLER_VERSION || baseline.installer,
+};
+function checkpoint() {
+  report.compared = report.documents.filter((item) =>
+    item.views.some((view) => view.status === "compared"),
+  ).length;
+  writeFileSync("/out/report.json", `${JSON.stringify(report, null, 2)}\n`);
+}
+async function identifyHost() {
+  report.identity = await browser.executeObsidian(({ obsidian, require }) => ({
+    app: obsidian.apiVersion,
+    installer: require("@electron/remote").app.getVersion(),
+    electron: require("node:process").versions.electron,
+    chrome: require("node:process").versions.chrome,
+  }));
+  report.identity.image = JSON.parse(process.env.OBSIDIAN_IMAGE);
+  report.obsidian = report.identity.app;
+}
 
 /** Whether Obsidian has loaded the vault's settings, such as its strict line breaks. */
 let loaded = false;
@@ -659,6 +691,23 @@ const reduce = process.env.REDUCE?.split(",")
  */
 const probe = process.env.PROBE ? JSON.parse(process.env.PROBE) : undefined;
 
+/** A missing, skipped or failed calibration cannot certify a completed native run. */
+function it(title, body) {
+  if (!obsidianControls.includes(title)) return globalThis.it(title, body);
+  globalThis.it(title, async function () {
+    if (probe || reduce) this.skip();
+    const outcome = { name: title, passed: false };
+    report.controls.push(outcome);
+    try {
+      if (!report.identity) await identifyHost();
+      await body.call(this);
+      outcome.passed = true;
+    } finally {
+      checkpoint();
+    }
+  });
+}
+
 describe("Obsidian before and after formatting", function () {
   it("retains rendered table content while a real cell editor owns focus (#550)", async function () {
     if (probe || reduce) this.skip();
@@ -1195,6 +1244,7 @@ describe("Obsidian before and after formatting", function () {
       const versions = require("node:process").versions;
       return {
         obsidian: obsidian.apiVersion,
+        installer: require("@electron/remote").app.getVersion(),
         chrome: versions.chrome ?? null,
         electron: versions.electron ?? null,
       };
@@ -1202,8 +1252,11 @@ describe("Obsidian before and after formatting", function () {
     const digest = (value) => createHash("sha256").update(value).digest("hex");
     const metadata = {
       schemaVersion: 1,
-      requestedObsidian: process.env.OBSIDIAN_VERSION || "latest",
+      requestedObsidian: process.env.OBSIDIAN_VERSION || baseline.app,
+      requestedInstaller: process.env.OBSIDIAN_INSTALLER_VERSION || baseline.installer,
       observedObsidian: environment.obsidian,
+      observedInstaller: environment.installer,
+      image: JSON.parse(process.env.OBSIDIAN_IMAGE),
       browser: {
         chrome: environment.chrome,
         electron: environment.electron,
@@ -1283,28 +1336,41 @@ describe("Obsidian before and after formatting", function () {
 
   it("shows the same in Live Preview and in Reading view", async function () {
     if (reduce || probe) this.skip();
-    const version = await browser.executeObsidian(({ obsidian }) => obsidian.apiVersion);
+    await identifyHost();
+    const version = report.identity.app;
     console.log(
       `Obsidian ${version}. Profile ${profile}, seeds ${seeds.join(",")}, count ${count}.`,
     );
     const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
     const differences = [];
     let compared = 0;
-    for (const width of widths)
-      for (const { name, source } of documents()) {
-        const { output, views, changed, before, after } = await compare(source, width, workspace);
-        if (output === source) continue;
-        compared++;
-        if (!changed.length) continue;
-        differences.push({ name, width, changed, source, output, views });
-        if (differences.length <= 20) {
-          const stem = `/out/${String(differences.length).padStart(2, "0")}`;
-          await obsidianPage.openFile(before);
-          await browser.saveScreenshot(`${stem}-before.png`);
-          await obsidianPage.openFile(after);
-          await browser.saveScreenshot(`${stem}-after.png`);
+    try {
+      for (const width of widths)
+        for (const { name, source } of documents()) {
+          const record = startDocument(report, name, width);
+          const { output, views, changed, before, after } = await compare(source, width, workspace);
+          record.changed = output !== source;
+          record.views = ["livePreview", "reading"].map((name) => ({
+            name,
+            changed: record.changed,
+            status: record.changed ? "compared" : "unchanged",
+          }));
+          record.completed = true;
+          if (output === source) continue;
+          compared++;
+          if (!changed.length) continue;
+          differences.push({ name, width, changed, source, output, views });
+          if (differences.length <= 20) {
+            const stem = `/out/${String(differences.length).padStart(2, "0")}`;
+            await obsidianPage.openFile(before);
+            await browser.saveScreenshot(`${stem}-before.png`);
+            await obsidianPage.openFile(after);
+            await browser.saveScreenshot(`${stem}-after.png`);
+          }
         }
-      }
+    } finally {
+      checkpoint();
+    }
     const classified = classifyDifferences(
       "obsidian",
       profile,
@@ -1312,7 +1378,7 @@ describe("Obsidian before and after formatting", function () {
         difference.changed.map((view) => ({ ...difference, view })),
       ),
     );
-    const report = {
+    Object.assign(report, {
       obsidian: version,
       profile,
       seeds,
@@ -1323,8 +1389,9 @@ describe("Obsidian before and after formatting", function () {
       known: classified.known,
       unexpected: classified.unexpected,
       stale: classified.stale,
-    };
-    writeFileSync("/out/report.json", `${JSON.stringify(report, null, 2)}\n`);
+    });
+    checkpoint();
+    validateRendererReport(report, { profile, seeds, count }, "obsidian");
     console.log(
       `Compared ${compared} formatted documents; ${differences.length} showed differently.`,
     );

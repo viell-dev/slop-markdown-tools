@@ -51,10 +51,10 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
-          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
+          import { validateRendererEvidence } from './scripts/renderer-evidence.mjs';
           import { validateForgeEvidence } from './scripts/forge-evidence.mjs';
           const report = JSON.parse(readFileSync('artifacts/forge-rendering/report.json', 'utf8'));
-          validateRendererEvidence(report);
+          validateRendererEvidence(report, 'forges');
           validateForgeEvidence(report);
           JS
       - if: ${{ !cancelled() }}

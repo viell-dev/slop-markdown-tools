@@ -47,13 +47,21 @@ documentation, and installation. Merge it like any other pull request. Merging
 publishes nothing and leaves the documentation site as it is.
 
 Renderer gates use existing fixtures and the realistic profile at fixed seeds
-1–5 at the release commit. Their JSON reports must name that profile and seeds,
-compare nonzero generated documents, and contain no unexpected, known or stale
-differences. `validateRendererEvidence()` in `scripts/release-evidence.mjs`
-checks this independently of a runner's exit status. Adversarial generation is
-weekly/manual discovery and never gates release. Each discovery since the last
-release receives an issue and is fixed within scope or recorded as a limit;
-publication does not wait for adversarial discovery to stop producing cases.
+1–5 at the release commit. Their JSON reports must complete the independently
+derived document, width, view and control plan, and contain no unexpected, known
+or stale differences. Unchanged documents are completed formatting attempts;
+changed counts are observations, not fixed expectations. Each workflow passes
+its expected renderer to `validateRendererEvidence()` in
+`scripts/renderer-evidence.mjs`. It enforces canonical workload sizes and host
+identity independently of a runner's exit status. Obsidian uses the verified
+app, installer and runtime versions in `scripts/obsidian/baseline.json` and its
+digest-pinned Docker base; reports include observed versions and the actual
+built-image identity. The [contributor guide](CONTRIBUTING.md#checks) explains
+baseline advancement and the separate explicit latest route. Adversarial
+generation is weekly/manual discovery and never gates release. Each discovery
+since the last release receives an issue and is fixed within scope or recorded
+as a limit; publication does not wait for adversarial discovery to stop
+producing cases.
 
 The Forges workflow additionally validates both pinned host identities and
 nonzero actual repository-file comparisons with `validateForgeEvidence()`. Its

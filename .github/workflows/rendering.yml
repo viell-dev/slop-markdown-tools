@@ -70,8 +70,8 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
-          import { validateRendererEvidence } from './scripts/release-evidence.mjs';
-          validateRendererEvidence(JSON.parse(readFileSync('artifacts/github-rendering/report.json', 'utf8')));
+          import { validateRendererEvidence } from './scripts/renderer-evidence.mjs';
+          validateRendererEvidence(JSON.parse(readFileSync('artifacts/github-rendering/report.json', 'utf8')), 'github');
           JS
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

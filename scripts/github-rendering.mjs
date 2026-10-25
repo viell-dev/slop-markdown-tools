@@ -28,6 +28,7 @@
 // to 600 requests and take ten to fifteen minutes. The Rendering workflow runs this every
 // week, and by hand with `gh workflow run rendering.yml`.
 import { Buffer } from "node:buffer";
+import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -38,6 +39,11 @@ import { documentSeed, generateDocument, normalizeGithubHtml } from "./rendering
 import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
 import { githubFixtures } from "./renderer-fixtures.mjs";
+import {
+  createRendererReport,
+  startDocument,
+  validateRendererReport,
+} from "./renderer-evidence.mjs";
 
 const usage =
   "Usage: node scripts/github-rendering.mjs [--profile realistic|adversarial] [--seeds 1,2,3,4,5] [--seed N|none|random] [--documents 25] [--out DIR]\n";
@@ -129,11 +135,15 @@ const modes = [
   ["gfm", config],
 ];
 /** The renderings of `source` in each mode in which formatting changes it. */
-async function renderings(source) {
+async function renderings(source, record) {
   const result = [];
   for (const [mode, modeConfig] of modes) {
     const output = format(source, { config: modeConfig }).output;
-    if (output === source) continue;
+    const changed = output !== source;
+    if (!changed) {
+      record.views.push({ name: mode, changed, status: "unchanged" });
+      continue;
+    }
     const before = await render(source, mode);
     const after = await render(output, mode);
     result.push({
@@ -143,6 +153,7 @@ async function renderings(source) {
       after,
       differs: compared(before, mode, source) !== compared(after, mode, output),
     });
+    record.views.push({ name: mode, changed, status: "compared" });
   }
   return result;
 }
@@ -155,6 +166,12 @@ try {
   process.exit(2);
 }
 const results = [];
+rmSync(options.out, { recursive: true, force: true });
+mkdirSync(options.out, { recursive: true });
+const report = createRendererReport("github", options);
+report.identity = { service: "GitHub Markdown API", version: "externally-uncontrolled" };
+const checkpoint = () =>
+  writeFileSync(path.join(options.out, "report.json"), JSON.stringify(report, null, 2) + "\n");
 const cases = githubFixtures.map(({ name, source }) => ({ name: `fixture-${name}`, source }));
 for (const seed of options.seeds)
   for (let index = 0; index < options.count; index++) {
@@ -163,8 +180,25 @@ for (const seed of options.seeds)
   }
 if (options.profile === "adversarial")
   knownSources("github").forEach((source, index) => cases.push({ name: `known-${index}`, source }));
-for (const { name, source } of cases)
-  results.push({ name, source, modes: await renderings(source) });
+try {
+  for (const [mode] of modes) {
+    assert.notEqual(
+      compared(await render("First text.\n", mode), mode, "First text.\n"),
+      compared(await render("Changed text.\n", mode), mode, "Changed text.\n"),
+    );
+    report.controls.push({ name: `${mode}-text-difference`, passed: true });
+  }
+  for (const { name, source } of cases) {
+    const record = startDocument(report, name, 80);
+    const rendered = await renderings(source, record);
+    record.changed = record.views.some((view) => view.changed);
+    record.completed = true;
+    if (rendered.length) report.compared++;
+    results.push({ name, source, modes: rendered });
+  }
+} finally {
+  checkpoint();
+}
 
 const name = (item) => item.name;
 const differing = results.filter((result) => result.modes.some((mode) => mode.differs));
@@ -182,7 +216,6 @@ const { unexpected, known, stale } = classifyDifferences(
       })),
   ),
 );
-rmSync(options.out, { recursive: true, force: true });
 for (const result of differing) {
   const folder = path.join(options.out, result.name);
   mkdirSync(folder, { recursive: true });
@@ -196,23 +229,9 @@ for (const result of differing) {
 
 const changed = results.filter((result) => result.modes.length > 0).length;
 mkdirSync(options.out, { recursive: true });
-writeFileSync(
-  path.join(options.out, "report.json"),
-  JSON.stringify(
-    {
-      renderer: "github",
-      profile: options.profile,
-      seeds: options.seeds,
-      count: options.count,
-      compared: changed,
-      unexpected,
-      known,
-      stale,
-    },
-    null,
-    2,
-  ) + "\n",
-);
+Object.assign(report, { unexpected, known, stale });
+checkpoint();
+validateRendererReport(report, options, "github");
 const lines = [
   "## GitHub's rendering before and after formatting",
   "",
