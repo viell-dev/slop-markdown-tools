@@ -61,9 +61,10 @@ published release and verified local adoption are separate events.
 `node verify-dependencies.mjs` runs during the image build after `npm ci`. It
 checks actual resolution from WebdriverIO, the absent dependency modules, the
 real provided-binary branches, fatal launcher errors and explicit missing-binary
-fallback failures. `obsidian-dependencies.test.ts` checks the configured session
-guard and lockfile in ordinary CI. Native Obsidian jobs exercise the service and
-actual host; these offline checks do not replace them.
+fallback failures. `obsidian-dependencies.test.ts` checks the provided-binary
+validator, disabled operations and pruned lockfile in ordinary CI. Native
+Obsidian jobs exercise the service and actual host; these offline checks do not
+replace them.
 
 The `serialize-javascript` 7.1.3 override remains: `@wdio/mocha-framework`
 9.32.0 uses Mocha 10.8.2, whose `^6.0.2` range cannot select that verified
