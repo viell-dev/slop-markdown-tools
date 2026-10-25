@@ -83,6 +83,23 @@ const releaseHosts = (release: Workflow) => {
     expect(release.jobs[host]!.with).toEqual({ profile: "realistic", seed: "none" });
   }
 };
+const releaseAudit = (release: Workflow) => {
+  const steps = commandSteps(release.jobs.prepare!.steps!);
+  const install = steps.findIndex((step) => step.run === "npm ci");
+  const audit = steps.findIndex(
+    (step) => step.run === "npm audit --include=dev --audit-level=high",
+  );
+  const pack = steps.findIndex((step) => step.run === "npm run release:pack");
+  expect(install).toBeGreaterThanOrEqual(0);
+  expect(audit).toBeGreaterThan(install);
+  expect(pack).toBeGreaterThan(audit);
+  // Step names are presentation; conditions, failure handling, environment and
+  // working directory can narrow coverage or stop the audit from gating release.
+  const context = { ...steps[audit] };
+  delete context.name;
+  delete context.run;
+  expect(context).toEqual({});
+};
 const coverageJob = (ci: Workflow) => {
   const coverage = ci.jobs.coverage!;
   expect(coverage.name).toBe("Unit coverage");
@@ -214,6 +231,9 @@ describe("release workflow", () => {
   it("runs every renderer check before it prepares the package", () => {
     releaseHosts(workflow(".github/workflows/release.yml"));
   });
+  it("freshly gates packing on a full-root audit including bundled development inputs", () => {
+    releaseAudit(workflow(".github/workflows/release.yml"));
+  });
 });
 
 describe("CI evidence ownership", () => {
@@ -240,6 +260,13 @@ describe("CI evidence ownership", () => {
 });
 
 describe("workflow structural regression controls", () => {
+  it("accepts a named literal-block release audit", () => {
+    const release = workflow(".github/workflows/release.yml");
+    const audit = release.jobs.prepare!.steps!.find((step) => step.run?.startsWith("npm audit"))!;
+    audit.name = "Fresh audit of shipped and tooling inputs";
+    audit.run = (parseYaml("run: |\n  npm audit --include=dev --audit-level=high\n") as Step).run!;
+    releaseAudit(parseYaml(stringify(release)) as Workflow);
+  });
   it("accepts a quoted action version and a literal-block standalone command", () => {
     const ci = workflow(".github/workflows/ci.yml");
     const setup = ci.jobs.coverage!.steps!.find((step) =>
@@ -274,6 +301,7 @@ describe("workflow structural regression controls", () => {
       expect(parsed).toEqual(original);
       verify(parsed);
       if (file === "ci") verifyCommands(parsed);
+      else releaseAudit(parsed);
     }
   });
   it.each([
@@ -302,6 +330,34 @@ describe("workflow structural regression controls", () => {
       expect(() => releaseHosts(release)).toThrow();
     },
   );
+  it.each([
+    "omit-dev",
+    "weaker-threshold",
+    "ignore-failure",
+    "conditional",
+    "wrong-directory",
+    "missing",
+    "before-install",
+    "after-pack",
+  ])("rejects a release audit with %s", (fault) => {
+    const release = workflow(".github/workflows/release.yml");
+    const steps = release.jobs.prepare!.steps!;
+    const index = steps.findIndex(
+      (step) => step.run === "npm audit --include=dev --audit-level=high",
+    );
+    const audit = steps[index]!;
+    if (fault === "omit-dev") audit.run = "npm audit --omit=dev --audit-level=high";
+    if (fault === "weaker-threshold") audit.run = "npm audit --include=dev --audit-level=critical";
+    if (fault === "ignore-failure") audit["continue-on-error"] = true;
+    if (fault === "conditional") audit.if = "inputs.publish";
+    if (fault === "wrong-directory") audit["working-directory"] = "scripts/obsidian";
+    if (["missing", "before-install", "after-pack"].includes(fault)) {
+      steps.splice(index, 1);
+      if (fault === "before-install") steps.unshift(audit);
+      if (fault === "after-pack") steps.push(audit);
+    }
+    expect(() => releaseAudit(release)).toThrow();
+  });
   it.each(["rendering", "obsidian", "forges"])("rejects a wrong %s workload or call", (host) => {
     for (const fault of ["uses", "profile", "seed"]) {
       const release = workflow(".github/workflows/release.yml");

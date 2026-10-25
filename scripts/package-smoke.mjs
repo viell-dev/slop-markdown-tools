@@ -143,8 +143,11 @@ for (const dialect of ["github", "vitepress"]) for (const external of [false, tr
   assert(nodes.some(node => node.type === "listItem" && node.checked === true));
   assert.equal(transformed, external);
   if (dialect === "vitepress") {
-    const cjk = parse("中文**字。**", dialect, "cjk.md", plugins).tree.children[0];
+    const cjkSource = "**字。**中文";
+    const cjk = parse(cjkSource, dialect, "cjk.md", plugins).tree.children[0];
     assert(cjk.children.some(node => node.type === "strong"));
+    const plain = parse(cjkSource, dialect, "cjk.md", plugins, {cjkFriendlyEmphasis:false}).tree.children[0];
+    assert(!plain.children.some(node => node.type === "strong"));
   }
 }`,
       ],

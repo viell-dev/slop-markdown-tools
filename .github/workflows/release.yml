@@ -107,8 +107,9 @@ jobs:
           }
           JS
       - run: npm ci
-      # Only the dependencies that the package installs; CI audits the development tools too.
-      - run: npm audit --omit=dev --audit-level=high
+      # Recheck the full root tree, as CI does: bundled parser code still ships
+      # when npm classifies its source packages as development dependencies.
+      - run: npm audit --include=dev --audit-level=high
       # ci already proves static checks and tests on this exact main commit.
       # Build afresh here and test the actual artifact that will be published.
       - run: npm run release:pack

@@ -175,6 +175,16 @@ future adaptation of either algorithm must cover both paths or deliberately
 share the reviewed implementation. Development parser inputs remain
 native-sensitive; their installation label does not change their semantic role.
 
+Code bundled from development inputs also counts as shipped code for security
+fixes and patch-release policy. Release preparation freshly audits the full root
+tree with `npm audit --include=dev --audit-level=high`, retaining CI's broad
+high-severity gate for bundled, installed and build/test dependencies. This may
+block preparation for a tooling advisory; it avoids maintaining a separate
+advisory filter. Fixes confined to unshipped build/test code still follow the
+[dependency-only release
+policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
+The independently managed Obsidian harness is a separate dependency tree.
+
 `scripts/parser-patches.mjs` pins the ten corrected source modules by package,
 version and SHA-256, with exact source anchors. Its existing per-kind guards
 also own each correction's rationale, links to the permanent dependency index
@@ -688,7 +698,10 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
   and wrong-producer results. Hosted preparation reuses static/unit/performance/
   integration evidence, then `release:pack` freshly builds and checks the exact
-  tarball, installed consumers and declarations. No build receipt crosses jobs.
+  tarball, installed consumers and declarations. A fresh full-root npm audit
+  includes development inputs whose code is bundled into that tarball;
+  `metadata.test.ts` rejects an omitted, narrowed or non-gating release audit.
+  No build receipt crosses jobs.
 
 `scripts/native-checks.mjs` owns native PR classification. Shared source,
 parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared
