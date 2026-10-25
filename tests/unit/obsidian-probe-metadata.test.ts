@@ -20,7 +20,7 @@ const factory = new Function(
   "scope",
   `
   const { probe, browser, process, createHash, readFileSync, writeFileSync,
-    obsidianPage, shown, cleanHtml, livePreview, console } = scope;
+    obsidianPage, shown, cleanHtml, livePreview, console, baseline } = scope;
   let callback;
   const it = (_title, run) => { callback = run; };
   ${harness.slice(start, end)}
@@ -39,7 +39,15 @@ function probeRun(
   let observed = 0;
   const callback = factory({
     probe: options.absent ? null : sources,
-    process: { env: { OBSIDIAN_VERSION: "requested-only", PROBE: packet } },
+    process: {
+      env: {
+        OBSIDIAN_VERSION: "requested-only",
+        OBSIDIAN_INSTALLER_VERSION: "requested-installer",
+        OBSIDIAN_IMAGE: '{"id":"inspected-image"}',
+        PROBE: packet,
+      },
+    },
+    baseline: { app: "pinned-app", installer: "pinned-installer" },
     createHash,
     readFileSync: (filename: string) => {
       if (filename === "/check/obsidian.e2e.mjs") return harness;
@@ -55,7 +63,10 @@ function probeRun(
       executeObsidian: (
         read: (context: {
           obsidian: { apiVersion: string };
-          require: (name: string) => { versions: Record<string, string> };
+          require: (name: string) => {
+            versions: Record<string, string>;
+            app: { getVersion(): string };
+          };
         }) => unknown,
       ) => {
         observed++;
@@ -63,8 +74,9 @@ function probeRun(
           read({
             obsidian: { apiVersion: "observed-app" },
             require(name) {
-              expect(name).toBe("node:process");
+              expect(["node:process", "@electron/remote"]).toContain(name);
               return {
+                app: { getVersion: () => "observed-installer" },
                 versions: options.versions ?? {
                   chrome: "observed-chrome",
                   electron: "observed-electron",
@@ -113,7 +125,10 @@ it("binds probe evidence to observed renderer metadata and the completed capture
   expect(JSON.parse(probe.metadata[1]!)).toEqual({
     schemaVersion: 1,
     requestedObsidian: "requested-only",
+    requestedInstaller: "requested-installer",
     observedObsidian: "observed-app",
+    observedInstaller: "observed-installer",
+    image: { id: "inspected-image" },
     browser: { chrome: "observed-chrome", electron: "observed-electron" },
     probeCount: probe.sources.length,
     sourcePacketSha256: digest(probe.packet),

@@ -12,39 +12,20 @@ import { format } from "../dist/index.js";
 import { documentSeed, generateDocument } from "./rendering.mjs";
 import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
-import { commonFixtures } from "./renderer-fixtures.mjs";
+import { forgeFixtures as fixtures, fileFixtures } from "./forge-fixtures.mjs";
 import { fileMarkup, forgeHtml } from "./forge-html.mjs";
 import { images, validateForgeEvidence } from "./forge-evidence.mjs";
+import {
+  createRendererReport,
+  startDocument,
+  validateRendererReport,
+} from "./renderer-evidence.mjs";
 
 const { fetch, AbortSignal } = globalThis;
 const options = rendererSettings(process.env);
 const out = path.resolve("artifacts/forge-rendering");
 await mkdir(out, { recursive: true });
 await rm(path.join(out, "report.json"), { force: true });
-const fixtures = [
-  ...commonFixtures,
-  { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },
-  { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
-  { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail*.\n" },
-  { name: "definitions", source: "Term\n: A *useful* description.\n\nAnother\n: More detail.\n" },
-  { name: "math", source: "A formula $x^2$ in prose.\n\n$$\nx = y\n$$\n\n~~~math\nz = w\n~~~\n" },
-  { name: "frontmatter", source: "---\ntitle: Example\n---\n\n# *Heading*\n\nSome __words__.\n" },
-  { name: "html", source: "<details>\n<summary>More</summary>\n\nSome *detail*.\n\n</details>\n" },
-];
-const fileFixtures = [
-  {
-    name: "anchors",
-    source:
-      '# *Title* &amp; more\n\n## Repeated\n\n## Repeated\n\n## Explicit {#chosen}\n\n<a id="raw"></a>\n\n[Title](#title--more) [Chosen](#chosen) [Raw](#raw)\n',
-  },
-  { name: "definition-headings", source: "Term\n: # H\n\n# H\n\n[First](#h) [Next](#h-1)\n" },
-  {
-    name: "links",
-    source:
-      "# Links\n\nA *link* to [a file](../page.md#part), [the root](/page.md) and [this title](#links).\n",
-  },
-];
-
 function docker(...args) {
   return new Promise((resolve, reject) => {
     const child = spawn("docker", args, { windowsHide: true });
@@ -69,6 +50,18 @@ const renderers = [],
   differences = [],
   known = [],
   stale = [];
+const report = {
+  ...createRendererReport("forges", options),
+  renderers,
+  unexpected: differences,
+  known,
+  stale,
+};
+const checkpoint = async () => {
+  report.compared = renderers.reduce((sum, item) => sum + item.compared, 0);
+  await writeFile(path.join(out, "report.json"), JSON.stringify(report, null, 2) + "\n");
+};
+await checkpoint();
 for (const image of images) {
   const directory = path.join(out, image.name);
   await mkdir(directory, { recursive: true });
@@ -121,6 +114,8 @@ for (const image of images) {
       image.version,
       `${image.name} did not start at the pinned version`,
     );
+    const observed = { ...image, observedVersion: version, compared: 0, fileViews: 0 };
+    renderers.push(observed);
     await docker(
       "exec",
       "--user",
@@ -181,7 +176,9 @@ for (const image of images) {
       forgeHtml(await render("First text.\n")),
       forgeHtml(await render("Changed text.\n")),
     );
+    report.controls.push({ name: `${image.name}/text-difference`, passed: true });
     assert.match(await render("$x^2$\n"), /language-math/);
+    report.controls.push({ name: `${image.name}/math-recognition`, passed: true });
     await request(
       "/api/v1/user/repos",
       "POST",
@@ -193,11 +190,25 @@ for (const image of images) {
     let compared = 0,
       fileViews = 0;
     async function compare(name, source, view, renderer, force = false) {
+      const record = startDocument(
+        report,
+        `${image.name}/${view === "repository-file" ? "repository-" : ""}${name}`,
+        80,
+      );
       const output = format(source, { config }).output;
-      if (output === source && !force) return;
+      record.changed = output !== source;
+      if (output === source && !force) {
+        record.views.push({ name: view, changed: false, status: "unchanged" });
+        record.completed = true;
+        return;
+      }
       compared++;
       const before = await renderer(source),
         after = await renderer(output);
+      record.views.push({ name: view, changed: record.changed, status: "compared" });
+      record.completed = true;
+      observed.compared = compared;
+      observed.fileViews = fileViews;
       if (forgeHtml(before, source) === forgeHtml(after, output)) return;
       found.push({ name, source, output, view });
       const stem = path.join(directory, `difference-${found.length}`);
@@ -264,30 +275,27 @@ for (const image of images) {
     );
     known.push(...classified.known.map((difference) => ({ renderer: image.name, ...difference })));
     stale.push(...classified.stale);
-    renderers.push({ ...image, observedVersion: version, compared, fileViews });
+    report.controls.push({ name: `${image.name}/repository-anchors`, passed: true });
     process.stdout.write(
       `${image.name} ${version}: ${compared} comparisons, ${fileViews} actual file views, ${found.length} differences.\n`,
     );
   } finally {
-    if (started) {
-      try {
-        await writeFile(path.join(directory, "server.log"), await docker("logs", container));
-      } finally {
-        await docker("rm", "--force", "--volumes", container);
+    try {
+      await checkpoint();
+    } finally {
+      if (started) {
+        try {
+          await writeFile(path.join(directory, "server.log"), await docker("logs", container));
+        } finally {
+          await docker("rm", "--force", "--volumes", container);
+        }
       }
     }
   }
 }
-const report = {
-  ...options,
-  renderers,
-  compared: renderers.reduce((sum, item) => sum + item.compared, 0),
-  unexpected: differences,
-  known,
-  stale,
-};
-await writeFile(path.join(out, "report.json"), JSON.stringify(report, null, 2) + "\n");
+await checkpoint();
 validateForgeEvidence(report);
+validateRendererReport(report, options, "forges");
 assert.equal(
   differences.length,
   0,

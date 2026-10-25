@@ -101,7 +101,7 @@ describe("Node.js versions", () => {
       new RegExp(`\\n {12}node: ${development}\\n {12}node-version: ${development}\\n`),
     );
     expect(read("scripts/obsidian/Dockerfile")).toMatch(
-      new RegExp(`^FROM node:${development}-`, "m"),
+      new RegExp(`^FROM node:${development}\\.\\d+\\.\\d+-.*@sha256:[0-9a-f]{64}$`, "m"),
     );
     expect(read("CONTRIBUTING.md")).toContain(`\`.nvmrc\` names ${development},`);
   });

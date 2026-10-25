@@ -91,6 +91,14 @@ Known couplings:
   select all hosts; host-specific inputs can differ. Dependency roles follow
   actual native use and shared lockfile reachability, never npm's development
   label alone. Check native imports and file reads before exempting a path.
+- Native report contracts: `scripts/renderer-evidence.mjs` derives plans from
+  owned fixtures and settings independently of execution records. Deterministic
+  consumers pass their expected host and canonical workload; never derive an
+  expectation from completed records or accept a report's shrunken plan. Keep
+  unchanged formatting attempts explicit. Obsidian's verified baseline belongs
+  in `scripts/obsidian/baseline.json` and the Dockerfile; maintain observed host
+  identity and the separate explicit latest route as CONTRIBUTING describes.
+  These same-run workflow results are not cross-run report provenance.
 - Versions and requirements: `package.json`, the lockfile, the installation
   commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
   and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version

@@ -2,7 +2,13 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { expect, it, vi } from "vitest";
 
-vi.mock("node:fs", () => ({ chmodSync: vi.fn(), mkdirSync: vi.fn(), rmSync: vi.fn() }));
+vi.mock("node:fs", () => ({
+  chmodSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  rmSync: vi.fn(),
+  mkdtempSync: vi.fn(() => "synthetic-image"),
+  readFileSync: vi.fn(() => `sha256:${"a".repeat(64)}`),
+}));
 vi.mock("node:child_process", async (original) => {
   const actual = await original<typeof import("node:child_process")>();
   return { ...actual, spawnSync: vi.fn() };
@@ -17,11 +23,34 @@ it("passes a Windows-sized PROBE batch through the runner without putting it in 
   vi.stubEnv("COUNT", "0");
   vi.stubEnv("REDUCE", "");
   vi.stubEnv("OBSIDIAN_VERSION", "");
+  vi.stubEnv("OBSIDIAN_INSTALLER_VERSION", "");
   let received: string | undefined;
   vi.mocked(spawnSync).mockImplementation((command, parameters) => {
     expect(command).toBe("docker");
     if (parameters?.[0] === "build")
       return { pid: 0, output: [], stdout: "", stderr: "", status: 0, signal: null };
+    if (parameters?.[0] === "image")
+      return {
+        pid: 0,
+        output: [],
+        stdout: JSON.stringify([
+          {
+            Id: `sha256:${"a".repeat(64)}`,
+            Os: "linux",
+            Architecture: "amd64",
+            Config: {
+              Labels: {
+                "org.mdrefine.base-image":
+                  "node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
+              },
+            },
+          },
+        ]),
+        stderr: "",
+        status: 0,
+        signal: null,
+      };
+    expect(parameters?.at(-1)).toBe(`sha256:${"a".repeat(64)}`);
     // Stand in for Docker with a real child process: argument-size limits still apply,
     // while no daemon, image, application, or changes to artifacts/ are needed.
     const result = actual.spawnSync(
@@ -32,6 +61,7 @@ it("passes a Windows-sized PROBE batch through the runner without putting it in 
 for (let i = 0; i < process.argv.length; i++) {
   if (process.argv[i] !== "--env") continue;
   const name = process.argv[++i];
+  if (name.startsWith("OBSIDIAN_IMAGE=")) continue;
   values[name] = process.env[name];
 }
 process.stdout.write(JSON.stringify(values));`,
