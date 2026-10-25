@@ -64,8 +64,9 @@ the library through `import` and `require()`, a shipped example, and TypeScript
 consumers of the published types. npm fetches the pinned pnpm into the
 repository's cache, and both installations can need access to the npm registry.
 
-The public check, test and formatting commands prepare a fresh product build;
-raw steps such as `format:docs:write` consume prepared output.
+Standalone `check`, `test` and its suite variants, `test:package`, `format:docs`
+and `format:docs:check` prepare a fresh product build. Raw steps such as
+`format:docs:write` consume prepared output through those wrappers.
 `scripts/build.mjs` generates the parser and compiles TypeScript in one unique
 staging directory, checks the expected files, then publishes individual files
 and prunes obsolete ordinary output. The live directory is not replaced
@@ -82,13 +83,14 @@ package check together. Each CI environment still builds and tests its own
 tarball. `release:prepare` similarly builds once for its checks and retained
 tarball. The receipt binds the canonical checkout, exact Node.js version,
 source/configuration and lockfile bytes, parser graph/package/license inputs,
-compiler files, and exact output names and hashes to the staged bytes. Internal
-entry points reject a missing or changed context. The receipt expires with its
-owning process and is removed on normal success or failure; it is never shipped
-or reused by another job. Edits or dependency installation invalidate the owning
-invocation: restart it rather than saving or copying its receipt. This is
-verification of an unchanged build, not transactional support for editing inputs
-while tools run or a persistent dependency cache.
+compiler files, and exact output names and hashes to the staged bytes. The
+already-built steps `check:built`, `test:package:installed` and
+`release:pack:built` reject a missing or changed context. The receipt expires
+with its owning process and is removed on normal success or failure; it is never
+shipped or reused by another job. Edits or dependency installation invalidate
+the owning invocation: restart it rather than saving or copying its receipt.
+This is verification of an unchanged build, not transactional support for
+editing inputs while tools run or a persistent dependency cache.
 
 ESLint uses the project's TypeScript types when checking source and tests. It
 also checks the JavaScript scripts and examples with their existing environment

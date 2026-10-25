@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rmdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rmdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -50,7 +50,7 @@ export async function withBuild(
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && (await realpath(process.argv[1])) === fileURLToPath(import.meta.url)) {
   const commands = process.argv.slice(2);
   if (commands[0] === "--verify") {
     assert.equal(commands.length, 1);

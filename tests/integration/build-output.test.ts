@@ -37,6 +37,7 @@ async function productFixture(): Promise<string> {
     "src/index.ts": "export const current = 1;\n",
     "src/removed.ts": "export const renamed = 1;\n",
     "src/discarded.ts": "export const discarded = 1;\n",
+    "src/was-file.js/nested.ts": "export const oldNested = 1;\n",
   };
   for (const name of [
     "scripts/build.mjs",
@@ -81,6 +82,8 @@ it("rebuilds from current source, rejects unknown output, preserves failed prepa
   await buildProduct(root);
   await rename(path.join(root, "src/removed.ts"), path.join(root, "src/renamed.ts"));
   await rm(path.join(root, "src/discarded.ts"));
+  await rm(path.join(root, "src/was-file.js/nested.ts"));
+  await writeFile(path.join(root, "src/was-file.ts"), "export const newFile = 1;\n");
   await writeFile(path.join(root, "dist/unexpected.txt"), "must not ship\n");
   await expect(assertDistFiles(root)).rejects.toThrow("Build output differs from current source");
   await buildProduct(root);
@@ -88,6 +91,8 @@ it("rebuilds from current source, rejects unknown output, preserves failed prepa
   const output = await ordinaryFiles(path.join(root, "dist"));
   expect(output.some((file: string) => /removed|discarded|unexpected/.test(file))).toBe(false);
   expect(output).toContain("renamed.js");
+  expect(output).toContain("was-file.js");
+  expect(output.some((file) => file.startsWith("was-file.js/"))).toBe(false);
   expect(JSON.parse(await readFile(path.join(root, "dist/renamed.js.map"), "utf8"))).toMatchObject({
     sources: ["../src/renamed.ts"],
     sourcesContent: ["export const renamed = 1;\n"],
@@ -141,6 +146,11 @@ it("validates receipt identity and invalidation, then expires the orchestration-
     process.env.MDREFINE_BUILD_RECEIPT = receipt;
     await verifyBuild(root);
     await expect(verifyBuild(repository)).rejects.toThrow("another checkout");
+    await writeFile(receipt, JSON.stringify({ ...context, ownerPid: process.pid, node: "v0.0.0" }));
+    await expect(verifyBuild(root)).rejects.toThrow("another Node.js version");
+    await writeFile(receipt, JSON.stringify({ ...context, ownerPid: -1 }));
+    await expect(verifyBuild(root)).rejects.toThrow("Invalid build owner");
+    await writeFile(receipt, JSON.stringify({ ...context, ownerPid: process.pid }));
     for (const file of [
       "src/index.ts",
       "tsconfig.json",

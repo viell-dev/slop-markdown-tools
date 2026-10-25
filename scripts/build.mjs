@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, readdir, realpath, rm, rmdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
@@ -95,7 +95,10 @@ async function inputSnapshot(repositoryRoot, dependencyInputs = []) {
       await Promise.all(
         [...new Set(files)]
           .sort()
-          .map(async (file) => [file, hash(await readFile(path.join(repositoryRoot, file)))]),
+          // path.relative returns an absolute path for another Windows volume.
+          // Shared build tools may live there; parser graph containment is
+          // independently enforced by the parser builder.
+          .map(async (file) => [file, hash(await readFile(path.resolve(repositoryRoot, file)))]),
       ),
     ),
   );
@@ -137,6 +140,40 @@ async function treeSnapshot(directory, files) {
       ),
     ),
   );
+}
+
+/** Remove only empty obsolete directories; never recursively delete live output. */
+async function pruneEmptyDirectories(directory, expected, outputRoot = directory) {
+  let entries;
+  try {
+    entries = await readdir(directory);
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  for (const entry of entries) {
+    const filename = path.join(directory, entry);
+    let info;
+    try {
+      info = await lstat(filename);
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    assert(!info.isSymbolicLink(), `Build tree contains a link: ${filename}`);
+    if (!info.isDirectory()) continue;
+    await pruneEmptyDirectories(filename, expected, outputRoot);
+    const relative = slash(path.relative(outputRoot, filename));
+    // Another same-input writer may have created an expected directory but not
+    // opened its temporary file yet. Only obsolete directories may be removed.
+    if (expected.some((file) => file.startsWith(`${relative}/`))) continue;
+    try {
+      await rmdir(filename);
+    } catch (error) {
+      // A concurrent writer can retain files or remove an already empty folder.
+      if (!["ENOTEMPTY", "ENOENT"].includes(error.code)) throw error;
+    }
+  }
 }
 
 /** Fresh preparation; no durable cache, and no recursive deletion of live output. */
@@ -200,6 +237,7 @@ export async function buildProduct(repositoryRoot = defaultRoot) {
       if (!expected.includes(file) && !activeWriterTemporary(file))
         await rm(path.join(repositoryRoot, "dist", file), { force: true });
     }
+    await pruneEmptyDirectories(path.join(repositoryRoot, "dist"), expected);
     // Individual replacements are atomic; the directory as a whole is not.
     // Publish the runtime last, after its companions and product files.
     const runtime = "syntax/parser.generated.js";
@@ -247,6 +285,7 @@ export async function verifyBuild(repositoryRoot = defaultRoot) {
     "Build belongs to another checkout",
   );
   assert.equal(context.node, process.version, "Build belongs to another Node.js version");
+  assert(Number.isSafeInteger(context.ownerPid) && context.ownerPid > 0, "Invalid build owner");
   process.kill(context.ownerPid, 0);
   assert.equal(
     await inputSnapshot(context.repositoryRoot, context.dependencies),
