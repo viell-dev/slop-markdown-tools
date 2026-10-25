@@ -55,14 +55,21 @@ export function compileParserAdaptation(source, filename) {
   assert.equal(compiled.diagnostics?.length, 0, `Invalid parser fragment: ${filename}`);
   const code = compiled.outputText;
   const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.ES2023, true, ts.ScriptKind.JS);
-  function inspect(node) {
+  assert.equal(ast.parseDiagnostics.length, 0, `Invalid emitted parser fragment: ${filename}`);
+  const removals = [];
+  function inspect(node, allowExports) {
     assert(!ts.isImportDeclaration(node), "Parser fragments cannot add runtime imports");
     assert(
       !(ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword),
       "Parser fragments cannot add dynamic imports",
     );
+    assert(
+      !(ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword),
+      "Parser fragments cannot use import.meta",
+    );
     assert(!ts.isExportAssignment(node), "Parser fragments cannot add export assignments");
     if (ts.isExportDeclaration(node)) {
+      assert(allowExports, "Unexpected export in inserted parser fragment");
       assert.equal(node.moduleSpecifier, undefined, "Parser fragments cannot re-export");
       assert(
         node.exportClause &&
@@ -70,22 +77,37 @@ export function compileParserAdaptation(source, filename) {
           node.exportClause.elements.length === 0,
         "Parser fragments cannot add named export lists",
       );
+      removals.push([node.getStart(ast), node.end]);
     }
     for (const modifier of ts.getModifiers(node) ?? []) {
       assert(
-        modifier.kind === ts.SyntaxKind.ExportKeyword &&
+        allowExports &&
+          modifier.kind === ts.SyntaxKind.ExportKeyword &&
           (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)),
         "Unexpected parser fragment declaration modifier",
       );
+      removals.push([modifier.getStart(ast), modifier.end]);
     }
     if (node.name && ts.isIdentifier(node.name)) {
       assert(!node.name.text.startsWith("__"), "Unexpected parser compiler helper");
     }
-    ts.forEachChild(node, inspect);
+    ts.forEachChild(node, (child) => inspect(child, allowExports));
   }
-  inspect(ast);
-  // Replacement callbacks preserve literal dollars in maintained source.
-  return code
-    .replace(/^export (?=(?:function|class) )/gm, () => "")
-    .replace(/^export \{\};\n/gm, () => "");
+  inspect(ast, true);
+  let inserted = code;
+  // Remove only parsed syntax spans. Matching text inside literals is data,
+  // and a generator's asterisk is independent of its export modifier.
+  for (const [start, end] of removals.sort(([left], [right]) => right - left)) {
+    inserted = inserted.slice(0, start) + inserted.slice(end);
+  }
+  const final = ts.createSourceFile(
+    filename,
+    inserted,
+    ts.ScriptTarget.ES2023,
+    true,
+    ts.ScriptKind.JS,
+  );
+  assert.equal(final.parseDiagnostics.length, 0, `Invalid inserted parser fragment: ${filename}`);
+  inspect(final, false);
+  return inserted;
 }

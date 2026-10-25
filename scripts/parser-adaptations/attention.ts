@@ -1,3 +1,6 @@
+// Origin: micromark-core-commonmark@2.0.4, lib/attention.js, resolveAllAttention.
+// This is its maintained local fast copy. Opener groups, no-closer cleanup,
+// homogeneous batching and the audited resolver registry are local additions.
 import type { Construct, Context, Event, Opener, Point, Resolver, Token } from "./types.js";
 declare const push: (events: Event[], items: Event[]) => Event[];
 declare const splice: (events: Event[], start: number, remove: number, items: Event[]) => void;

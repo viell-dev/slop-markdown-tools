@@ -1,3 +1,6 @@
+// Origin: micromark@4.0.3, lib/initialize/text.js, createResolver's nested
+// resolveAllText data-merging loop. This local compaction replacement leaves
+// the upstream extraResolver callback in the host scope.
 import type { Event } from "./types.js";
 declare const events: Event[];
 // Internal source fragment, inserted into the reviewed upstream scope.

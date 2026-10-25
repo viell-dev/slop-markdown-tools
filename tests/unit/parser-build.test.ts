@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { beforeAll, expect, it } from "vitest";
 import { assertPortableRegions, bundleParser } from "../../scripts/build-parser.mjs";
@@ -161,6 +162,7 @@ it("inserts literal fragment source while rejecting additional runtime boundarie
   for (const source of [
     'import "additional-runtime";',
     'export function value() { return import("additional-runtime"); }',
+    "export function value() { return import.meta; }",
     'export { value } from "additional-runtime";',
     "const value = 1; export { value };",
     "export default 1;",
@@ -169,6 +171,71 @@ it("inserts literal fragment source while rejecting additional runtime boundarie
     "const __helper = 1;",
   ]) {
     expect(() => compileParserAdaptation(source, "unexpected.ts"), source).toThrow();
+  }
+});
+
+it("removes only parsed exports while preserving template literal bytes and generator syntax", () => {
+  const template =
+    "`before\nexport function value() {}\nexport class Value {}\nexport {};\nimport.meta\n$$ $&\nafter`";
+  const compiled = compileParserAdaptation(
+    `export function value() { return ${template}; }\nexport class Value {}`,
+    "template.ts",
+  );
+  expect(compiled).toContain(template);
+  const value: unknown = runInNewContext(`${compiled}\nvalue()`);
+  expect(value).toBe(template.slice(1, -1));
+
+  const generator = compileParserAdaptation(
+    'export function* values() { yield "$$"; yield "$&"; }',
+    "generator.ts",
+  );
+  const values: unknown = runInNewContext(`${generator}\nArray.from(values())`);
+  expect(values).toEqual(["$$", "$&"]);
+  const ast = ts.createSourceFile(
+    "inserted.js",
+    compiled + generator,
+    ts.ScriptTarget.ES2023,
+    true,
+  );
+  const inspect = (node: ts.Node): void => {
+    expect(ts.isExportDeclaration(node)).toBe(false);
+    if (ts.canHaveModifiers(node)) {
+      expect(
+        ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+      ).not.toBe(true);
+    }
+    ts.forEachChild(node, inspect);
+  };
+  inspect(ast);
+});
+
+it("rejects ambient Node.js globals through the actual fragment TypeScript project", () => {
+  const directory = path.resolve(import.meta.dirname, "../../scripts/parser-adaptations");
+  const loaded = ts.readConfigFile(path.join(directory, "tsconfig.json"), (filename) =>
+    ts.sys.readFile(filename),
+  );
+  expect(loaded.error).toBeUndefined();
+  const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, directory);
+  expect(parsed.errors).toHaveLength(0);
+  const attention = path.join(directory, "attention.ts");
+  const host = ts.createCompilerHost(parsed.options);
+  const originalRead = host.readFile.bind(host);
+  host.readFile = (filename) => {
+    const source = originalRead(filename);
+    return path.resolve(filename) === attention && source !== undefined
+      ? `${source}\nexport function mdrefineNodeAmbientControl() { return [Buffer, process, require]; }\n`
+      : source;
+  };
+  const program = ts.createProgram(parsed.fileNames, parsed.options, host);
+  const errors = ts
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+  expect(errors).toHaveLength(3);
+  for (const name of ["Buffer", "process", "require"]) {
+    expect(
+      errors.some((message) => message.includes(`Cannot find name '${name}'`)),
+      name,
+    ).toBe(true);
   }
 });
 

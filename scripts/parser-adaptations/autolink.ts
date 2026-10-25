@@ -1,3 +1,6 @@
+// Origin: micromark-extension-gfm-autolink-literal@2.1.0, lib/syntax.js,
+// previousUnbalanced. This local replacement adds a private positive cache
+// and checks destination index, identity, label role and balance before jumps.
 import type { Event, Token } from "./types.js";
 // Internal source fragment, inserted into the reviewed upstream scope.
 // Upstream MIT notices remain in parser.generated.LICENSES.txt.

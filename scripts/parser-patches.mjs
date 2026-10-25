@@ -50,7 +50,7 @@ const specs = {
       issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/300"],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Revisit micromark/micromark#249 (open, not adopted); remove after a compatible release retains the untouched prefix at all three import sites and passes positioned/event/array identity, container work and package/native checks.",
+        "Remove after an adopted compatible correction retains the untouched prefix at all three import sites and passes positioned/event/array identity, container work and package/native checks.",
     },
   },
   footnote: {
@@ -85,7 +85,7 @@ const specs = {
       ],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove compaction after an adopted equivalent correction (micromark/micromark#233/#238 remain open) passes data-event identity, repeated undefined-reference work and public parse checks. Keep or replace audited resolver registration while homogeneous batching needs it.",
+        "Remove compaction after an adopted equivalent correction passes data-event identity, repeated undefined-reference work and public parse checks. Keep or replace audited resolver registration while homogeneous batching needs it.",
     },
   },
   code: {
@@ -100,7 +100,7 @@ const specs = {
       issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/151"],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove after an adopted equivalent code compaction (micromark/micromark#238 remains open) preserves padding, suffixes, line endings and event/endpoint identities and passes inline-tree and work checks.",
+        "Remove after an adopted equivalent code compaction preserves padding, suffixes, line endings and event/endpoint identities and passes inline-tree and work checks.",
     },
   },
   attention: {
@@ -119,7 +119,7 @@ const specs = {
       ],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Revisit micromark/micromark#239 (open) for walked-prefix handling only. Retire each local opener, cleanup or batching component only after equivalent adopted behavior passes exact event/token/point and callback observations, work bounds, external-syntax fallback and actual compiled-product reachability.",
+        "The walked-prefix origin in micromark/micromark#239 does not cover every local adaptation. Retire each local opener, cleanup or batching component only after equivalent adopted behavior passes exact event/token/point and callback observations, work bounds, external-syntax fallback and actual compiled-product reachability.",
     },
   },
   autolink: {
@@ -135,7 +135,7 @@ const specs = {
       issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/542"],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove only after a compatible adopted guarded cache passes all stale-witness controls, enumerable-token observations, actual-at-sign work and package/native checks. Upstream PR14 remains open and its index/identity-only public token cache does not replace the local label-role/current-balance checks or private WeakMap.",
+        "Remove only after a compatible adopted guarded cache passes all stale-witness controls, enumerable-token observations, actual-at-sign work and package/native checks. Equivalent adoption must include label-role/current-balance guards and a private cache; index/identity-only guards or a public token cache are insufficient.",
     },
   },
   strike: {
@@ -154,7 +154,7 @@ const specs = {
       ],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "No equivalent upstream fix is established. Remove after adopted matching/no-closer handling preserves event/token/point identity and deterministic work, external-syntax fallback and the homogeneous resolver pipeline's audited function identities.",
+        "Remove these local matching/no-closer paths after adopted equivalent handling preserves event/token/point identity and deterministic work, external-syntax fallback and the homogeneous resolver pipeline's audited function identities.",
     },
   },
   cjk: {

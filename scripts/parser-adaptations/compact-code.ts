@@ -1,3 +1,6 @@
+// Origin: micromark-core-commonmark@2.0.4, lib/code-text.js, resolveCodeText's
+// "Merge adjacent spaces and data" section. This local compaction replacement
+// retains the upstream padding preparation and suffix events in the host scope.
 import type { Event } from "./types.js";
 declare const events: Event[];
 declare let index: number;

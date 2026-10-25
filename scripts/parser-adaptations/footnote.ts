@@ -1,3 +1,6 @@
+// Origin: micromark-extension-gfm-footnote@2.1.0, lib/syntax.js,
+// tokenizePotentialGfmFootnoteCall. The fast tokenizer is a maintained local
+// copy; dispatch, prefix caching and earlier-closer proofs are local additions.
 import type { Code, Effects, State } from "micromark-util-types";
 import type { Context, Event, Token } from "./types.js";
 type Barrier = { index: number; event?: Event; type?: string };

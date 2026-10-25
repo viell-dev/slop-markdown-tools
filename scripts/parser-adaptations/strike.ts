@@ -1,3 +1,6 @@
+// Origin: micromark-extension-gfm-strikethrough@2.1.0, lib/syntax.js,
+// gfmStrikethrough's nested resolveAllStrikethrough. This maintained fast copy
+// adds local walked-prefix/opener groups and no-closer cleanup.
 import type { Construct, Context, Event, Opener, Token } from "./types.js";
 declare const splice: (events: Event[], start: number, remove: number, items: Event[]) => void;
 declare const resolveAll: (constructs: Construct[], events: Event[], context: Context) => Event[];
