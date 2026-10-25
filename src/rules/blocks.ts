@@ -11,7 +11,8 @@ import {
   startsWithMarker,
   unclosedFrontMatter,
 } from "../syntax/parse.js";
-import { misreadLists, obsidianWidgetHeading } from "../syntax/misread-lists.js";
+import { rendererProtections } from "../syntax/renderer-protections.js";
+import { obsidianWidgetHeading } from "../syntax/obsidian-protections.js";
 import { walk } from "../syntax/walk.js";
 import {
   escaped,
@@ -142,7 +143,7 @@ export function takesFinalLineEnding(document: Document): boolean {
   if (document.dialect === "obsidian") {
     // The parser can still read HTML where Live Preview entered unfinished
     // code. Its end must keep the final line ending too (#433).
-    if (misreadLists(document).htmlCodeToEnd) return true;
+    if (rendererProtections(document).htmlCodeToEnd) return true;
     const final = document.tree.children.at(-1);
     if (final?.type === "code" && located(final)) {
       const fence = codeFence(source, final);
@@ -366,7 +367,7 @@ function obsidianShownBlanks(document: Document, lines: Line[]): Set<number> {
     if (parent && containers.has(parent.type) && node.position) below.add(node.position.end.line);
   });
   // And so does the text that Obsidian reads as more of such a block.
-  for (const node of misreadLists(document).htmlText)
+  for (const node of rendererProtections(document).htmlText)
     if (node.position) below.add(node.position.end.line);
   lines.forEach((line, index) => {
     const text = document.source.slice(line.start, line.end);

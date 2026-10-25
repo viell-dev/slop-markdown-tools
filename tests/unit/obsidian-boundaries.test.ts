@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createWorkspace, format, parse, semanticFingerprint } from "../../src/index.js";
 import type { Config, Plugin } from "../../src/index.js";
 import { boundaryFixtures } from "../../scripts/obsidian/boundary-fixtures.mjs";
-import { misreadLists } from "../../src/syntax/misread-lists.js";
+import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 
 const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
 const config: Config = {
@@ -692,7 +692,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     "keeps paragraph-state protection when a widget underline is also literal (#383): %j",
     (title) => {
       const source = title + "| a | __b__ |\n| :-- | --: |\n| c | d |\n";
-      expect(misreadLists(parse(source, "obsidian")).underlines.size).toBeGreaterThan(0);
+      expect(rendererProtections(parse(source, "obsidian")).underlines.size).toBeGreaterThan(0);
       expect(checked(source)).toBe(source);
     },
   );
@@ -762,7 +762,7 @@ describe("Obsidian boundaries read differently by its views", () => {
         expect(output).not.toContain("_inside_");
         const document = parse(input, "obsidian");
         expect(
-          [...misreadLists(document).openFences].some(
+          [...rendererProtections(document).openFences].some(
             ({ position }) => position!.end.offset === document.source.length,
           ),
         ).toBe(true);
@@ -771,20 +771,20 @@ describe("Obsidian boundaries read differently by its views", () => {
 
   it("recognizes a final closed ignored-info fence without a later leaf (#567)", () => {
     const document = parse("~~~ lang `x`\nc\n~~~\n", "obsidian");
-    expect(misreadLists(document).openFences.size).toBe(1);
+    expect(rendererProtections(document).openFences.size).toBe(1);
   });
 
   it.each(["~~~ lang\nc\n~~~\n\n*outside*\n", "~~~ lang &#96;x&#96;\nc\n~~~\n\n*outside*\n"])(
     "formats the tail of a genuine tilde fence (%j, #567)",
     (source) => {
       expect(checked(source)).toContain("_outside_");
-      expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0);
+      expect(rendererProtections(parse(source, "obsidian")).openFences.size).toBe(0);
     },
   );
 
   it.each(["~~~~ lang `x`\nc\n~~~\n", "~~~ lang `x`\nc\n    ~~~\n"])(
     "does not mistake a body run for a closing fence (#567): %j",
-    (source) => expect(misreadLists(parse(source, "obsidian")).openFences.size).toBe(0),
+    (source) => expect(rendererProtections(parse(source, "obsidian")).openFences.size).toBe(0),
   );
 
   it.each([
@@ -840,7 +840,7 @@ describe("Obsidian boundaries read differently by its views", () => {
           const document = parse(input, "obsidian");
           const later = document.source.lastIndexOf("later");
           expect(
-            [...misreadLists(document).unclosedCode].some(
+            [...rendererProtections(document).unclosedCode].some(
               ({ position }) => position!.start.offset! <= later && later < position!.end.offset!,
             ),
           ).toBe(carries);
@@ -910,7 +910,7 @@ describe("Obsidian boundaries read differently by its views", () => {
   it("bounds the short multiline-code protection to its first containing inline node (#565)", () => {
     const source = "*left* and **before `a\nb` after** and *right*\n\nLater *outside*.\n";
     const document = parse(source, "obsidian");
-    const regions = [...misreadLists(document).unclosedCode];
+    const regions = [...rendererProtections(document).unclosedCode];
     expect(
       regions.map(({ position }) =>
         document.source.slice(position!.start.offset, position!.end.offset),
@@ -976,7 +976,7 @@ describe("Obsidian boundaries read differently by its views", () => {
           const document = parse(input, "obsidian");
           const following = document.source.lastIndexOf("c");
           expect(
-            [...misreadLists(document).lazyItems].some(
+            [...rendererProtections(document).lazyItems].some(
               ({ position }) => position!.start.offset === 0 && position!.end.offset! > following,
             ),
           ).toBe(true);
@@ -987,7 +987,7 @@ describe("Obsidian boundaries read differently by its views", () => {
   it.each(["+ - a\n    b\n  1) c\n", "+ - a\nb\n", "+ - a\nb\n\n1) c\n"])(
     "permits list reflow without a later affected enclosing block (#376): %j",
     (source) => {
-      expect(misreadLists(parse(source, "obsidian")).lazyItems.size).toBe(0);
+      expect(rendererProtections(parse(source, "obsidian")).lazyItems.size).toBe(0);
       control(source);
     },
   );
@@ -1004,7 +1004,7 @@ describe("Obsidian boundaries read differently by its views", () => {
         expect(checked(input)).toBe(input.replace("*outside*", "_outside_"));
         const document = parse(input, "obsidian");
         const outside = document.source.lastIndexOf("Later");
-        const { htmlText, htmlCodeToEnd } = misreadLists(document);
+        const { htmlText, htmlCodeToEnd } = rendererProtections(document);
         expect(htmlCodeToEnd).toBe(false);
         expect(
           [...htmlText].some(
@@ -1037,7 +1037,7 @@ describe("Obsidian boundaries read differently by its views", () => {
           expect(checked(source)).toBe(source);
           const document = parse(source, "obsidian");
           expect(
-            [...misreadLists(document).tableText].some(
+            [...rendererProtections(document).tableText].some(
               ({ position }) =>
                 position!.start.offset === table.length - 1 &&
                 position!.end.offset === source.length - 1,
@@ -1062,7 +1062,7 @@ describe("Obsidian boundaries read differently by its views", () => {
         ...(cells > 1 ? [`| ${row(cells, "x")}`] : []),
       ]) {
         const source = `${table}${tail}\n`;
-        expect(misreadLists(parse(source, "obsidian")).tableText.size).toBe(0);
+        expect(rendererProtections(parse(source, "obsidian")).tableText.size).toBe(0);
         checked(source);
       }
     }
@@ -1073,7 +1073,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     const document = parse(source, "obsidian");
     expect(checked(source)).toBe(source);
     expect(
-      [...misreadLists(document).tableText].some(
+      [...rendererProtections(document).tableText].some(
         ({ position }) =>
           position!.start.offset === source.indexOf("\nleft") &&
           position!.end.offset === source.length - 1,
@@ -1103,7 +1103,7 @@ describe("Obsidian boundaries read differently by its views", () => {
           const input = bom + source.replaceAll("\n", newline);
           expect(checked(input)).toBe(input);
           const document = parse(input, "obsidian");
-          const { htmlText, htmlCodeToEnd } = misreadLists(document);
+          const { htmlText, htmlCodeToEnd } = rendererProtections(document);
           expect(htmlCodeToEnd).toBe(false);
           expect(
             [...htmlText].some(
@@ -1135,7 +1135,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     expect(output).toContain(raw);
     expect(output).toContain("Before _safe_.");
     expect(output).toContain("After _safe_.");
-    const ranges = [...misreadLists(parse(source, "obsidian")).htmlText];
+    const ranges = [...rendererProtections(parse(source, "obsidian")).htmlText];
     const outside = source.lastIndexOf("After");
     expect(
       ranges.some(
@@ -1664,7 +1664,7 @@ describe("Obsidian boundaries read differently by its views", () => {
   it("ignores a plugin paragraph without source positions", () => {
     const document = parse("words\n", "obsidian");
     delete document.tree.children[0]!.position;
-    expect(() => misreadLists(document)).not.toThrow();
+    expect(() => rendererProtections(document)).not.toThrow();
   });
   it("retains prior protection for a quote-opening ordered item (#524)", () => {
     const source = "> text ```\n\n> 1) *first*\n>    - *second*\n";

@@ -4,7 +4,8 @@ import stringWidth from "string-width";
 import type { Paragraph, Parents } from "mdast";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { definitionLike } from "../syntax/misread-lists.js";
+
+import { definitionLike } from "../syntax/obsidian-protections.js";
 import { labelEnd, lazyIndentation, parse, range, startsWithMarker } from "../syntax/parse.js";
 import { type Range, located, holds } from "./shared.js";
 import { obsidianOpaque, obsidianTabBreak, goldmarkForges, misreadTable } from "./protections.js";

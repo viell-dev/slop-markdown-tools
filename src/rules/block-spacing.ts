@@ -3,7 +3,8 @@ import type { Blockquote, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { continuesListBlock, misreadLists } from "../syntax/misread-lists.js";
+import { rendererProtections } from "../syntax/renderer-protections.js";
+import { continuesListBlock } from "../syntax/list-protections.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { countBelow } from "../syntax/source.js";
@@ -142,7 +143,7 @@ function together(
   // above a list or quote that starts with such text, as `- -` or `- 2. Step`
   // directly below text, would make the parser read the list too, and one
   // between the blocks of such a list would make it loose.
-  const misread = misreadLists(document);
+  const misread = rendererProtections(document);
   if (
     misread.nested.has(after) ||
     (after.type === "list" && misread.next.has(after)) ||
@@ -170,7 +171,7 @@ const blockSpacing: Rule = {
     // These parsed headings continue as paragraph text in an Obsidian view
     // (#383, #397). Keep the boundary after their underline too (#434).
     const paragraphHeadingEnds = new Set(
-      [...misreadLists(document).underlines]
+      [...rendererProtections(document).underlines]
         .filter((node) => node.type === "heading")
         .map((node) => range(node)[1]),
     );
@@ -179,7 +180,7 @@ const blockSpacing: Rule = {
     // physical line's start, including a continuation leaf's first newline.
     const continued: Range[] = [];
     if (document.dialect === "obsidian") {
-      for (const node of misreadLists(document).htmlText) continued.push(range(node));
+      for (const node of rendererProtections(document).htmlText) continued.push(range(node));
     }
     continued.sort((a, b) => a[0] - b[0]);
     const joined: Range[] = [];

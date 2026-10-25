@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { stringContaining } from "../assertions.js";
 import { Ajv } from "ajv";
 import * as syntax from "../../src/syntax/parse.js";
-import { misreadLists } from "../../src/syntax/misread-lists.js";
+import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import fc from "fast-check";
 import type { Nodes } from "mdast";
 import {
@@ -32,6 +32,7 @@ import type {
   ProcessOptions,
   Rule,
   RuleContext,
+  Workspace,
 } from "../../src/index.js";
 
 const narrow: Config = {
@@ -48,6 +49,50 @@ function formatted(source: string, options: ProcessOptions = {}) {
 const frontMatterDialects = dialects.filter((dialect) => dialect !== "vitepress");
 
 describe("formatting contracts", () => {
+  it("reuses renderer protections by positioned root across document wrappers", () => {
+    const document = parse("Text\n2. *item*\n", "obsidian");
+    const protections = rendererProtections(document);
+    expect(protections.text.size).toBeGreaterThan(0);
+    expect(rendererProtections({ ...document })).toBe(protections);
+    expect(rendererProtections(parse(document.source, document.dialect))).not.toBe(protections);
+  });
+
+  it("preserves workspace method binding and exceptions during candidate comparison", () => {
+    const error = new Error("candidate resolution failed");
+    class BoundWorkspace implements Workspace {
+      #calls = 0;
+      #failure: Error | undefined;
+      resolve() {
+        this.#calls++;
+        if (this.#failure) throw this.#failure;
+        return { status: "resolved" as const, target: "Note.md" };
+      }
+      fail() {
+        this.#failure = error;
+      }
+      calls() {
+        return this.#calls;
+      }
+    }
+    const workspace = new BoundWorkspace();
+    const options: ProcessOptions = {
+      workspace,
+      config: { extends: [], rules: { "style/emphasis": "warn" } },
+    };
+    const source = "[Link](Note.md) *text*\n";
+    expect(format(source, options).output).toBe("[Link](Note.md) _text_\n");
+    expect(workspace.calls()).toBeGreaterThan(0);
+    workspace.fail();
+    // Only a style edit is enabled: resolution first runs in the semantic guard.
+    let thrown: unknown;
+    try {
+      format(source, options);
+    } catch (caught) {
+      thrown = caught;
+    }
+    expect(thrown).toBe(error);
+  });
+
   it("orders diagnostic ties by UTF-16 rule IDs on every host", () => {
     const names = ["z", "a", "Z", "ä", "A", "😀"];
     const plugin: Plugin = {
@@ -960,7 +1005,7 @@ describe("text that the parser read in place of a list", () => {
   // cannot see what an edit there does to the renderers' list.
   const texts = (source: string, dialect: Dialect = "github") => {
     const document = parse(source, dialect);
-    const { text, nested, next } = misreadLists(document);
+    const { text, nested, next } = rendererProtections(document);
     const sources = (nodes: ReadonlySet<Nodes>) =>
       [...nodes].map((node) => source.slice(...range(node)));
     return { text: sources(text), nested: sources(nested), next: sources(next) };
@@ -1191,7 +1236,7 @@ describe("definition descriptions on Forgejo and Gitea", () => {
     workspace: createWorkspace({}, { dialect, strictLineBreaks: true }),
   });
   const found = (source: string, dialect: Dialect) => {
-    const { descriptions, nested } = misreadLists(parse(source, dialect));
+    const { descriptions, nested } = rendererProtections(parse(source, dialect));
     const sources = (nodes: ReadonlySet<Nodes>) =>
       [...nodes].map((node) => source.slice(...range(node)));
     return { descriptions: sources(descriptions), nested: sources(nested) };
@@ -1417,7 +1462,7 @@ describe("backticks that nothing closes in Obsidian", () => {
       position: document.tree.position,
     };
     document.tree.children = [container as unknown as (typeof blocks)[number]];
-    const { unclosedCode } = misreadLists(document);
+    const { unclosedCode } = rendererProtections(document);
     expect([...unclosedCode].map((node) => source.slice(...range(node)))).toEqual([
       "a ``` b",
       "c *d*",
