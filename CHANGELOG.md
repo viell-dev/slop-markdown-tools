@@ -10,14 +10,14 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Changed
+
 - The Obsidian verification harness uses only its service-provided browser and
   ChromeDriver binaries, removing unused automatic-download FTP/PAC and
   `extract-zip` dependencies. Missing or incomplete executables fail explicitly;
   native host downloads, caching and version selection retain their existing
   owners ([#639](https://github.com/viell-dev/slop-markdown-tools/issues/639),
   [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640)).
-
-### Changed
 
 - Dependency updates follow parser, VitePress/reference and tooling maintenance
   units across dependency declarations. Existing compatibility deferrals remain,

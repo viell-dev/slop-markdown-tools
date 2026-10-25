@@ -4,7 +4,6 @@ import path from "node:path";
 import process from "node:process";
 import { expect, it } from "vitest";
 import * as boundary from "../../scripts/obsidian/provided-binaries/index.mjs";
-import { config } from "../../scripts/obsidian/wdio.conf.mjs";
 
 it("rejects every automatic-browser operation instead of silently attempting another download", () => {
   for (const operation of [
@@ -22,12 +21,12 @@ it("checks both supplied executables before starting a session", () => {
     "goog:chromeOptions": { binary: process.execPath },
     "wdio:chromedriverOptions": { binary: process.execPath },
   };
-  expect(() => config.beforeSession({}, capabilities)).not.toThrow();
+  expect(() => boundary.assertProvidedBinaries(capabilities)).not.toThrow();
   for (const option of ["goog:chromeOptions", "wdio:chromedriverOptions"] as const) {
     for (const binary of [undefined, "relative-executable", path.dirname(process.execPath)]) {
-      expect(() => config.beforeSession({}, { ...capabilities, [option]: { binary } })).toThrow(
-        `${option}.binary`,
-      );
+      expect(() =>
+        boundary.assertProvidedBinaries({ ...capabilities, [option]: { binary } }),
+      ).toThrow(`${option}.binary`);
     }
   }
 });
@@ -40,10 +39,12 @@ it("reports an incomplete cache instead of allowing WebdriverIO to fall back", (
     "wdio:chromedriverOptions": { binary: process.execPath },
   };
   try {
-    expect(() => config.beforeSession({}, capabilities)).toThrow("download cache");
+    expect(() => boundary.assertProvidedBinaries(capabilities)).toThrow("download cache");
     if (process.platform !== "win32") {
       writeFileSync(binary, "not executable", { mode: 0o644 });
-      expect(() => config.beforeSession({}, capabilities)).toThrow("executable Obsidian browser");
+      expect(() => boundary.assertProvidedBinaries(capabilities)).toThrow(
+        "executable Obsidian browser",
+      );
     }
   } finally {
     rmSync(cache, { recursive: true, force: true });

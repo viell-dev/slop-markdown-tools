@@ -387,11 +387,12 @@ warnings or advance an assertion merely to make installation/building succeed.
   Follow the [baseline and latest-route procedure](#tests) independently; no
   forced major is an established remedy for the separate harness defects in
   [#639](https://github.com/viell-dev/slop-markdown-tools/issues/639) and
-  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640).
-  The harness's [download ownership and provided-binary
-  boundary](scripts/obsidian/README.md) explains its local dependency replacement,
-  executable checks and removal conditions, including the separate serialization
-  override. General automatic browser downloads are disabled in this harness.
+  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640). The
+  harness's [download ownership and provided-binary
+  boundary](scripts/obsidian/README.md) explains its local dependency
+  replacement, executable checks and removal conditions, including the separate
+  serialization override. General automatic browser downloads are disabled in
+  this harness.
 - **pnpm:** `scripts/package-smoke.mjs` pins the tool fetched through npm into
   the repository cache. Dependabot does not update that literal. After the
   age/support review, inspect the target's installation route, platform and

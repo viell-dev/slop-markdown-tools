@@ -1,8 +1,8 @@
 // WebdriverIO's configuration for the Obsidian check, inside its container.
 // Explicit latest requests are for weekly/manual drift; PR/release use the verified baseline.
 import process from "node:process";
+import { fileURLToPath, URL } from "node:url";
 import baseline from "./baseline.json" with { type: "json" };
-import { assertProvidedBinaries } from "./provided-binaries/index.mjs";
 
 export const config = {
   runner: "local",
@@ -19,12 +19,9 @@ export const config = {
       },
     },
   ],
-  services: ["obsidian"],
+  services: [fileURLToPath(new URL("./service.mjs", import.meta.url))],
   reporters: ["spec"],
   cacheDir: "/check/.obsidian-cache",
-  beforeSession(_config, capabilities) {
-    assertProvidedBinaries(capabilities);
-  },
   mochaOpts: { ui: "bdd", timeout: 30 * 60 * 1000 },
   logLevel: "warn",
 };

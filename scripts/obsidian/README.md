@@ -24,8 +24,8 @@ The launcher stages downloads and extraction before publishing a cache entry.
 Existing entries are reused. Metadata refreshes after 30 minutes, with valid
 cached metadata retained on network failure. The launcher does not revalidate
 every existing extracted executable. A missing, non-file or non-executable
-browser or driver fails before session startup; investigate that version's
-cache entry and the service setup rather than enabling another downloader.
+browser or driver fails before session startup; investigate that version's cache
+entry and the service setup rather than enabling another downloader.
 
 ## Provided binaries boundary
 
@@ -38,11 +38,16 @@ automatic browser setup is attempted. It downloads and extracts nothing.
 
 The configured Obsidian service already owns all required downloads. Its cold
 and warm startup paths were checked before removing the unused fallback. This
-removes the installed `extract-zip` and proxy/PAC/get-uri/basic-ftp chains rather
-than leaving vulnerable dependencies behind an unused helper. FTP and PAC
-configuration retrieval are unsupported here; the active publisher downloads
-use HTTPS. General WebdriverIO browser downloading is outside this harness's
+removes the installed `extract-zip` and proxy/PAC/get-uri/basic-ftp chains
+rather than leaving vulnerable dependencies behind an unused helper. FTP and PAC
+configuration retrieval are unsupported here; the active publisher downloads use
+HTTPS. General WebdriverIO browser downloading is outside this harness's
 contract.
+
+`service.mjs` re-exports the upstream worker and wraps its launcher: after
+awaiting the existing download/setup hook, it validates both executables and
+throws WebdriverIO's fatal `SevereServiceError` on failure. Ordinary session
+hooks log their errors and continue, so they cannot enforce this contract.
 
 mdrefine maintainers own this small boundary and its executable checks. On a
 WDIO or service update, inspect its actual imports and startup behavior before
@@ -55,26 +60,26 @@ published release and verified local adoption are separate events.
 
 `node verify-dependencies.mjs` runs during the image build after `npm ci`. It
 checks actual resolution from WebdriverIO, the absent dependency modules, the
-real provided-binary branches and explicit missing-binary fallback failures.
-`obsidian-dependencies.test.ts` checks the configured session guard and lockfile
-in ordinary CI. Native Obsidian jobs exercise the service and actual host; these
-offline checks do not replace them.
+real provided-binary branches, fatal launcher errors and explicit missing-binary
+fallback failures. `obsidian-dependencies.test.ts` checks the configured session
+guard and lockfile in ordinary CI. Native Obsidian jobs exercise the service and
+actual host; these offline checks do not replace them.
 
-The `serialize-javascript` 7.1.3 override remains: `@wdio/mocha-framework` 9.32.0
-uses Mocha 10.8.2, whose `^6.0.2` range cannot select that verified patch. Remove
-the override only when its owning chain disappears, or a supported update
-resolves a safely patched version without it and clean installation, audit,
-Mocha execution and actual Obsidian evidence pass. This pin is separate from
-the removed downloader chains; its presence does not assert a new defect.
+The `serialize-javascript` 7.1.3 override remains: `@wdio/mocha-framework`
+9.32.0 uses Mocha 10.8.2, whose `^6.0.2` range cannot select that verified
+patch. Remove the override only when its owning chain disappears, or a supported
+update resolves a safely patched version without it and clean installation,
+audit, Mocha execution and actual Obsidian evidence pass. This pin is separate
+from the removed downloader chains; its presence does not assert a new defect.
 
 ## Evidence limits
 
-The container runs as nonroot with a read-only checkout, synthetic documents
-and no forwarded credentials. Network access remains enabled; output and the
-named download cache are writable. Removing a container does not erase that
-cache on a persistent host. Trusted downloads and cache reuse are not proof of
-safe extraction of hostile archives, and the unchanged `7z-wasm` path is not a
-newly audited archive implementation.
+The container runs as nonroot with a read-only checkout, synthetic documents and
+no forwarded credentials. Network access remains enabled; output and the named
+download cache are writable. Removing a container does not erase that cache on a
+persistent host. Trusted downloads and cache reuse are not proof of safe
+extraction of hostile archives, and the unchanged `7z-wasm` path is not a newly
+audited archive implementation.
 
 [#639]: https://github.com/viell-dev/slop-markdown-tools/issues/639
 [#640]: https://github.com/viell-dev/slop-markdown-tools/issues/640
