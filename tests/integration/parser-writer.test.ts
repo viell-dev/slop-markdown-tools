@@ -6,6 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildParser, bundleParser } from "../../scripts/build-parser.mjs";
+import { parserAdaptationFiles } from "../../scripts/parser-adaptations.mjs";
 import { fixture, linkDirectory, repository } from "../support/cli.js";
 
 const artifactNames = [
@@ -63,8 +64,10 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       "scripts/build-parser.mjs",
       "scripts/parser-patches.mjs",
       "scripts/parser-labels.mjs",
+      "scripts/parser-adaptations.mjs",
       "scripts/parser-packages.json",
       "src/syntax/parser.generated.d.ts",
+      ...parserAdaptationFiles(),
     ])
       files[`dev/micromark-util-edit-map/source/${name}`] = await readFile(
         path.join(repository, name),
@@ -98,10 +101,11 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
         dereference: true,
       });
     }
-    await linkDirectory(
-      path.join(repository, "node_modules/rolldown"),
-      path.join(source, "node_modules/rolldown"),
-    );
+    for (const name of ["rolldown", "typescript"])
+      await linkDirectory(
+        path.join(repository, "node_modules", name),
+        path.join(source, "node_modules", name),
+      );
     const linked = path.join(root, "linked");
     await linkDirectory(source, linked);
     // Compare against the actual builder at this copied root and require the

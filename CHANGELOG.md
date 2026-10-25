@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Maintained internal parser algorithms live in directly checked TypeScript
+  source, with source guards and generated provenance linking their rationale,
+  ownership and removal conditions to the dependency records. Parser behavior,
+  extension compatibility and the bundled license graph are preserved
+  ([#622](https://github.com/viell-dev/slop-markdown-tools/issues/622),
+  [#623](https://github.com/viell-dev/slop-markdown-tools/issues/623)).
+
 - Test suites separate engine, configuration, plugin, rule and comparison
   responsibilities. Shared parser/CLI support and authored native fixtures have
   explicit ownership, preserving their cases and native workload plans

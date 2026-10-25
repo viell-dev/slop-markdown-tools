@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["ES2023"],
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["./*.ts"]
+}

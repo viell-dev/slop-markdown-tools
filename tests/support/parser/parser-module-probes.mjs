@@ -63,8 +63,16 @@ export function serializeLabel(context, ...args) {
 `;
 
 function labelOnce(source, before, after) {
-  assert.equal(source.split(before).length, 2, `Changed label probe anchor: ${before}`);
-  return source.replace(before, after);
+  // Match the same source tokens across the fragment compiler's whitespace.
+  const pattern = new RegExp(
+    before
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+"),
+    "g",
+  );
+  assert.equal([...source.matchAll(pattern)].length, 1, `Changed label probe anchor: ${before}`);
+  return source.replace(pattern, () => after);
 }
 
 /**

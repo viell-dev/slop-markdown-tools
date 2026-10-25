@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { beforeAll, expect, it } from "vitest";
 import { assertPortableRegions, bundleParser } from "../../scripts/build-parser.mjs";
@@ -11,6 +12,7 @@ import {
   sourceGuards,
 } from "../../scripts/parser-patches.mjs";
 import { readReviewedSource } from "../support/parser/parser-module-probes.mjs";
+import { compileParserAdaptation } from "../../scripts/parser-adaptations.mjs";
 
 let bundle: Awaited<ReturnType<typeof bundleParser>>;
 beforeAll(async () => {
@@ -107,18 +109,133 @@ it("ships the reviewed complete graph and exact correction counts", () => {
   expect(hash(bundle.licenses)).toBe(bundle.manifest.licensesSha256);
 });
 
-it("binds the exact five local parser generator sources", async () => {
+it("binds every local parser generator and maintained implementation source", async () => {
   expect(bundle.manifest.localSources.map(({ file }) => file)).toEqual([
     "scripts/build-parser.mjs",
     "scripts/parser-patches.mjs",
     "scripts/parser-labels.mjs",
+    "scripts/parser-adaptations.mjs",
     "scripts/parser-packages.json",
     "src/syntax/parser.generated.d.ts",
+    "scripts/parser-adaptations/attention.ts",
+    "scripts/parser-adaptations/autolink.ts",
+    "scripts/parser-adaptations/compact-code.ts",
+    "scripts/parser-adaptations/compact-text.ts",
+    "scripts/parser-adaptations/footnote.ts",
+    "scripts/parser-adaptations/strike.ts",
+    "scripts/parser-adaptations/tsconfig.json",
+    "scripts/parser-adaptations/types.ts",
   ]);
   for (const { file, sha256 } of bundle.manifest.localSources) {
     if (typeof file !== "string") throw new Error("Non-string local parser source");
     const bytes = await readFile(new URL(`../../${file}`, import.meta.url));
     expect(createHash("sha256").update(bytes).digest("hex"), file).toBe(sha256);
+  }
+});
+
+it("keeps patch tracking in the authoritative guarded records and generated provenance", () => {
+  for (const patch of bundle.manifest.patches) {
+    const guard = sourceGuards[patch.kind];
+    expect(patch.provenance).toBe(guard.provenance);
+    expect(patch.tracking).toEqual(guard.tracking);
+    expect(patch.tracking.dependencyIndex).toBe(
+      "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+    );
+    expect(patch.tracking.issues.length).toBeGreaterThan(0);
+    for (const issue of patch.tracking.issues) {
+      expect(issue).toMatch(/^https:\/\/github\.com\/viell-dev\/slop-markdown-tools\/issues\/\d+$/);
+    }
+    expect(patch.tracking.owner).toBe("mdrefine maintaining agents");
+    expect(patch.tracking.removalCondition.length).toBeGreaterThan(80);
+  }
+});
+
+it("inserts literal fragment source while rejecting additional runtime boundaries", () => {
+  const compiled = compileParserAdaptation(
+    'import type { Token } from "./types.js"; declare const token: Token; export function value() { return [token.type, "$$", "$&"]; }',
+    "literal.ts",
+  );
+  expect(compiled).toContain('"$$"');
+  expect(compiled).toContain('"$&"');
+  expect(compiled).not.toContain("export ");
+  expect(compiled).not.toContain("import ");
+  for (const source of [
+    'import "additional-runtime";',
+    'export function value() { return import("additional-runtime"); }',
+    "export function value() { return import.meta; }",
+    'export { value } from "additional-runtime";',
+    "const value = 1; export { value };",
+    "export default 1;",
+    "export const value = 1;",
+    "namespace Additional { export const value = 1; }",
+    "const __helper = 1;",
+  ]) {
+    expect(() => compileParserAdaptation(source, "unexpected.ts"), source).toThrow();
+  }
+});
+
+it("removes only parsed exports while preserving template literal bytes and generator syntax", () => {
+  const template =
+    "`before\nexport function value() {}\nexport class Value {}\nexport {};\nimport.meta\n$$ $&\nafter`";
+  const compiled = compileParserAdaptation(
+    `export function value() { return ${template}; }\nexport class Value {}`,
+    "template.ts",
+  );
+  expect(compiled).toContain(template);
+  const value: unknown = runInNewContext(`${compiled}\nvalue()`);
+  expect(value).toBe(template.slice(1, -1));
+
+  const generator = compileParserAdaptation(
+    'export function* values() { yield "$$"; yield "$&"; }',
+    "generator.ts",
+  );
+  const values: unknown = runInNewContext(`${generator}\nArray.from(values())`);
+  expect(values).toEqual(["$$", "$&"]);
+  const ast = ts.createSourceFile(
+    "inserted.js",
+    compiled + generator,
+    ts.ScriptTarget.ES2023,
+    true,
+  );
+  const inspect = (node: ts.Node): void => {
+    expect(ts.isExportDeclaration(node)).toBe(false);
+    if (ts.canHaveModifiers(node)) {
+      expect(
+        ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+      ).not.toBe(true);
+    }
+    ts.forEachChild(node, inspect);
+  };
+  inspect(ast);
+});
+
+it("rejects ambient Node.js globals through the actual fragment TypeScript project", () => {
+  const directory = path.resolve(import.meta.dirname, "../../scripts/parser-adaptations");
+  const loaded = ts.readConfigFile(path.join(directory, "tsconfig.json"), (filename) =>
+    ts.sys.readFile(filename),
+  );
+  expect(loaded.error).toBeUndefined();
+  const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, directory);
+  expect(parsed.errors).toHaveLength(0);
+  const attention = path.join(directory, "attention.ts");
+  const host = ts.createCompilerHost(parsed.options);
+  const originalRead = host.readFile.bind(host);
+  host.readFile = (filename) => {
+    const source = originalRead(filename);
+    return path.resolve(filename) === attention && source !== undefined
+      ? `${source}\nexport function mdrefineNodeAmbientControl() { return [Buffer, process, require]; }\n`
+      : source;
+  };
+  const program = ts.createProgram(parsed.fileNames, parsed.options, host);
+  const errors = ts
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+  expect(errors).toHaveLength(3);
+  for (const name of ["Buffer", "process", "require"]) {
+    expect(
+      errors.some((message) => message.includes(`Cannot find name '${name}'`)),
+      name,
+    ).toBe(true);
   }
 });
 
