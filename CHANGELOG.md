@@ -12,6 +12,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Five parser extensions used only to build the bundled parser are development
+  dependencies. Installed consumers retain the required runtime utilities and
+  public plugin types; package checks cover both parser paths and the shipped
+  internal declarations. Release audits include bundled inputs regardless of
+  npm's development flag
+  ([#624](https://github.com/viell-dev/slop-markdown-tools/issues/624)).
+
 - Maintained internal parser algorithms live in directly checked TypeScript
   source, with source guards and generated provenance linking their rationale,
   ownership and removal conditions to the dependency records. Parser behavior,

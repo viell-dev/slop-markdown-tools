@@ -9,9 +9,10 @@ version.
 
 Dependency updates alone are not a reason to release. Once merged, they ship
 with the next release that fixes a defect or adds a feature. The exception is a
-security fix in a dependency that installed packages use: publish it in a patch
-release without waiting. Updates of development-only dependencies never need a
-release of their own.
+security fix in code that installations use, including code bundled from a
+development dependency: publish it in a patch release without waiting. npm's
+development flag does not decide whether code ships. Updates confined to build
+or test tools whose code does not ship never need a release of their own.
 
 ## Prepare the release pull request
 
@@ -97,13 +98,18 @@ The **Release** workflow, dispatched with `publish` left false, requires the
 exact-commit CI evidence described below, then runs `release:pack` instead of
 repeating the static checks and test projects. That command freshly builds,
 packs and tests the actual tarball with npm and strict pnpm, including installed
-commands, libraries, declarations and licenses. The workflow adds an audit of
-the runtime dependencies, warns when the version or its tag already exists, and
-keeps the artifact for 14 days. It publishes nothing, and the Pages workflow
-that follows it leaves the site as it is. A dry run is for a version that is not
-published yet: for one that npm has, npm's own dry-run publish refuses the
-version, so the run fails after its checks and packing. The local
-`npm publish … --dry-run` above refuses it the same way.
+commands, libraries, declarations and licenses. The workflow freshly audits the
+full root dependency tree with `npm audit --include=dev --audit-level=high`,
+covering bundled parser inputs as well as installed dependencies. This retains
+CI's broad high-severity gate, including build/test tools, rather than relying
+on advisories known when CI ran or maintaining a separate advisory filter. The
+Obsidian harness has its own dependency tree and handling. The workflow warns
+when the version or its tag already exists and keeps the artifact for 14 days.
+It publishes nothing, and the Pages workflow that follows it leaves the site as
+it is. A dry run is for a version that is not published yet: for one that npm
+has, npm's own dry-run publish refuses the version, so the run fails after its
+checks and packing. The local `npm publish … --dry-run` above refuses it the
+same way.
 
 Hosted preparation requires a `ci.yml` push run on `main` in this repository for
 the exact commit. PR checks are not reusable evidence: their head SHA can name

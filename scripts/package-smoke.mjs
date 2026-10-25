@@ -1,5 +1,15 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, copyFile, lstat, readFile, rename, writeFile, rm } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  copyFile,
+  lstat,
+  readFile,
+  realpath,
+  rename,
+  writeFile,
+  rm,
+} from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,16 +29,34 @@ assert(npm, "Run this check through npm run test:package.");
  * repository's cache, so nothing is installed globally.
  */
 const pnpm = "pnpm@12.14.0";
-const directory = await mkdtemp(path.join(tmpdir(), "mdrefine-package-"));
-const repository = process.cwd();
+const directory = await realpath(await mkdtemp(path.join(tmpdir(), "mdrefine-package-")));
+const repository = await realpath(process.cwd());
+const relativeDirectory = path.relative(repository, directory);
+assert(
+  path.isAbsolute(relativeDirectory) || relativeDirectory.startsWith(`..${path.sep}`),
+  "Installed consumers must be outside the checkout's dependency lookup tree",
+);
+// In particular, require() must not recover undeclared checkout dependencies
+// through a caller's Node.js search-path override.
+const consumerEnvironment = { ...process.env, NODE_PATH: "" };
 const cache = path.join(repository, ".npm-cache");
 const manifest = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
 const named = (entry = "") => JSON.stringify(`${manifest.name}${entry}`);
 function runNpm(args, cwd = repository, input) {
-  return execFileSync(process.execPath, [npm, ...args], { cwd, input, encoding: "utf8" });
+  return execFileSync(process.execPath, [npm, ...args], {
+    cwd,
+    input,
+    encoding: "utf8",
+    env: consumerEnvironment,
+  });
 }
 function runNode(args, cwd, input) {
-  return execFileSync(process.execPath, args, { cwd, input, encoding: "utf8" });
+  return execFileSync(process.execPath, args, {
+    cwd,
+    input,
+    encoding: "utf8",
+    env: consumerEnvironment,
+  });
 }
 /** A TypeScript consumer of the published types, as an ES module. */
 const consumerModule = `import {
@@ -40,7 +68,16 @@ const schema: JsonSchema = { type: "object", properties: { level: { type: "integ
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem", schema,
   check: ({ document }) => document.tree.children.length ? [] : [{ start: 0, message: "Empty" }],
-} } };
+} }, syntax: {
+  micromark: { text: { [0x25]: { tokenize(effects, ok, nok) {
+    return code => {
+      if (code !== 0x25) return nok(code);
+      effects.enter("data"); effects.consume(code); effects.exit("data");
+      return ok;
+    };
+  } } } },
+  mdast: { transforms: [tree => tree] },
+} };
 // Settings written as constants are read-only, which a configuration may be.
 const config = {
   $schema: "./node_modules/mdrefine/config.schema.json",
@@ -52,6 +89,7 @@ const output: string = format("Text", options).output;
 const patch: string = unifiedDiff("a/note.md", "b/note.md", "Text", output); void patch;
 const assumed: Dialect = resolveConfig({ ...options, defaultDialect: "codeberg" }).dialect; void assumed;
 void lint(output, { config: presets.github });
+void parse("100%", "github", "plugin.md", [plugin]);
 // @ts-expect-error The tables that every caller shares are read-only.
 builtInRules["style/wrap"] = builtInRules["style/emphasis"]!;
 void configSchema.properties;
@@ -79,6 +117,42 @@ void output; void discoverWorkspace; void patch; void formatWithCode;
 /** What every installation of the package must do, whatever its layout. */
 async function checkInstalled(project) {
   for (const mode of ["module", "commonjs"]) {
+    const parserLoad =
+      mode === "module"
+        ? `import { parse } from ${named()};`
+        : `const { parse } = require(${named()});`;
+    // GFM bundles table/task-list tokenizers; VitePress imports those two
+    // packages directly. Exercise both with builtin and external syntax.
+    const source =
+      "| A | B |\n| - | - |\n| a | b |\n\n- [x] Done\n\n~~gone~~ www.example.com [^a]\n\n[^a]: Note\n";
+    runNode(
+      [
+        `--input-type=${mode}`,
+        "-e",
+        `${parserLoad}
+const assert = ${mode === "module" ? '(await import("node:assert/strict")).default' : 'require("node:assert/strict")'};
+for (const dialect of ["github", "vitepress"]) for (const external of [false, true]) {
+  let transformed = false;
+  const plugins = external ? [{name:"consumer", syntax:{micromark:{}, mdast:{transforms:[tree => {transformed=true; return tree;}]}}}] : [];
+  const document = parse(${JSON.stringify(source)}, dialect, "consumer.md", plugins);
+  const nodes = [];
+  const visit = node => { nodes.push(node); for (const child of node.children ?? []) visit(child); };
+  visit(document.tree);
+  for (const type of ["table", "delete", "link", "footnoteDefinition", "footnoteReference"])
+    assert(nodes.some(node => node.type === type), dialect + ": " + type);
+  assert(nodes.some(node => node.type === "listItem" && node.checked === true));
+  assert.equal(transformed, external);
+  if (dialect === "vitepress") {
+    const cjkSource = "**字。**中文";
+    const cjk = parse(cjkSource, dialect, "cjk.md", plugins).tree.children[0];
+    assert(cjk.children.some(node => node.type === "strong"));
+    const plain = parse(cjkSource, dialect, "cjk.md", plugins, {cjkFriendlyEmphasis:false}).tree.children[0];
+    assert(!plain.children.some(node => node.type === "strong"));
+  }
+}`,
+      ],
+      project,
+    );
     const load =
       mode === "module"
         ? `import { unifiedDiff } from ${named()};`
@@ -201,8 +275,13 @@ process.stdout.write(result.output);`,
       "ES2023",
       "consumer.mts",
       "consumer.cts",
+      // This artifact is internal, but it ships. Check it explicitly so public
+      // declarations cannot hide a dangling build-only type forward.
+      await realpath(
+        path.join(project, "node_modules", manifest.name, "dist/syntax/parser.generated.d.ts"),
+      ),
     ],
-    { cwd: project, stdio: "inherit" },
+    { cwd: project, stdio: "inherit", env: consumerEnvironment },
   );
 }
 try {
@@ -383,7 +462,7 @@ try {
       upgrade,
       "note.md",
     ],
-    { cwd: upgrade, encoding: "utf8" },
+    { cwd: upgrade, encoding: "utf8", env: consumerEnvironment },
   );
   assert.equal(unmigrated.status, 1, unmigrated.stderr);
   assert(

@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
-import { beforeAll, expect, it } from "vitest";
+import { beforeAll, expect, expectTypeOf, it } from "vitest";
 import { assertPortableRegions, bundleParser } from "../../scripts/build-parser.mjs";
 import {
   repairParserSource,
@@ -19,6 +19,24 @@ beforeAll(async () => {
   bundle = await bundleParser();
 });
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+
+it("keeps bundled factory declarations aligned with the pinned upstream signatures", () => {
+  expectTypeOf<typeof import("../../src/syntax/parser.generated.js").gfm>().toEqualTypeOf<
+    typeof import("micromark-extension-gfm").gfm
+  >();
+  expectTypeOf<
+    typeof import("../../src/syntax/parser.generated.js").gfmAutolinkLiteral
+  >().toEqualTypeOf<typeof import("micromark-extension-gfm-autolink-literal").gfmAutolinkLiteral>();
+  expectTypeOf<typeof import("../../src/syntax/parser.generated.js").gfmFootnote>().toEqualTypeOf<
+    typeof import("micromark-extension-gfm-footnote").gfmFootnote
+  >();
+  expectTypeOf<
+    typeof import("../../src/syntax/parser.generated.js").gfmStrikethrough
+  >().toEqualTypeOf<typeof import("micromark-extension-gfm-strikethrough").gfmStrikethrough>();
+  expectTypeOf<
+    typeof import("../../src/syntax/parser.generated.js").cjkFriendlyExtension
+  >().toEqualTypeOf<typeof import("micromark-extension-cjk-friendly").cjkFriendlyExtension>();
+});
 
 it("rejects changed dependency identities, source bytes and missing anchors", async () => {
   for (const kind of Object.keys(sourceGuards)) {
