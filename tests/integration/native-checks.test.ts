@@ -129,6 +129,9 @@ describe("native input classification", () => {
   it.each([
     "src/core/engine.ts",
     "src/syntax/parse.ts",
+    "src/syntax/vitepress/reader.ts",
+    "src/syntax/vitepress/projection.ts",
+    "src/syntax/vitepress/links.ts",
     "src/workspace/html.ts",
     "src/workspace/github-file-anchors.ts",
     "src/workspace/slug.ts",
@@ -166,7 +169,6 @@ describe("native input classification", () => {
     ["scripts/forge-html.mjs", ["forges"]],
     ["scripts/forge-evidence.mjs", ["forges"]],
     [".github/workflows/forges.yml", ["forges"]],
-    ["src/syntax/vitepress/reader.ts", []],
     ["docs/quick-start.md", []],
     ["tests/unit/rules.test.ts", []],
   ])("selects applicable hosts for %s", (file, expected) => {

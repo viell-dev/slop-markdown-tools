@@ -457,8 +457,10 @@ all four.
 `scripts/native-checks.mjs` owns native PR classification. Shared source,
 parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared
 validators and renderer fixtures select all hosts. Each host's harness and
-workflow select that host. Documentation, offline tests, examples and isolated
-VitePress reader files do not select native hosts; VitePress still has its real
+workflow select that host. Documentation, offline tests and examples do not
+select native hosts. All source changes, including `src/syntax/vitepress/`,
+select all hosts: shared callers invoke those helpers across dialects, and their
+dialect guards are part of the source under review. VitePress also has its real
 build/render checks in CI. Unknown paths select all hosts.
 
 For manifest and lockfile changes, the classifier compares the complete resolved

@@ -185,7 +185,7 @@ export function classifyChanges(files, before, after) {
     } else if (file.startsWith("tests/fixtures/renderers/")) {
       return all(`${file}: native renderer regression input.`);
     } else if (
-      /^(?:docs\/|examples\/|benchmarks\/|tests\/|src\/syntax\/vitepress\/)/.test(file) ||
+      /^(?:docs\/|examples\/|benchmarks\/|tests\/)/.test(file) ||
       /^(?:README|CHANGELOG|CONTRIBUTING|RELEASING|AGENTS|CODE_OF_CONDUCT|SECURITY)\.md$/.test(
         file,
       ) ||
