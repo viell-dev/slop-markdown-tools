@@ -380,6 +380,14 @@ only and remove superseded transition notes.
   four generated distribution artifacts together. See
   [CONTRIBUTING.md](./CONTRIBUTING.md#what-the-checks-prove) for the
   verification map and its limits.
+- Parser dependency roles follow installed runtime and declaration reachability.
+  The five bundled-only extension factories are development inputs; public
+  mdast/plugin types and utilities used outside the bundle remain production
+  dependencies. GFM bundles table/task-list tokenizers while VitePress imports
+  them directly, so a future adaptation must account for both paths. Keep the
+  shipped internal shim free of build-only type forwards and preserve native
+  selection for semantic build inputs regardless of npm's dev label. See
+  [CONTRIBUTING.md](./CONTRIBUTING.md#dependencies) for the current boundary.
 - `src/code/` is the Node host for configured code tools. Keep execution out of
   ordinary rules and the portable entry. Its internal fingerprint path permits
   only selected code values and must cover alternative readings; the ordinary
