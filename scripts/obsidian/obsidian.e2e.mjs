@@ -1350,7 +1350,8 @@ describe("Obsidian before and after formatting", function () {
           const record = startDocument(report, name, width);
           const { output, views, changed, before, after } = await compare(source, width, workspace);
           record.changed = output !== source;
-          record.views = ["livePreview", "reading"].map((name) => ({
+          const captured = record.changed ? Object.keys(views) : ["livePreview", "reading"];
+          record.views = captured.map((name) => ({
             name,
             changed: record.changed,
             status: record.changed ? "compared" : "unchanged",

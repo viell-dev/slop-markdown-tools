@@ -159,7 +159,7 @@ export function validateRendererReport(report, settings, renderer) {
       if (requested !== "latest")
         assert.equal(host[key], requested, `Observed ${key} differs from request`);
     }
-    assert.equal(host.image?.base, baseline.baseImage);
+    assert.equal(host.image?.declaredBase, baseline.baseImage);
     assert.match(host.image?.id ?? "", /^sha256:[0-9a-f]{64}$/);
     assert.match(host.image?.platform ?? "", /^linux\/(?:amd64|arm64)$/);
     assert.deepEqual(report.widths, obsidianWidths);
@@ -189,6 +189,7 @@ export function validateRendererEvidence(report, renderer) {
     count: renderer === "github" ? 25 : 10,
   };
   validateRendererReport(report, settings, renderer);
+  assert(report.compared > 0, "No native documents compared");
   if (report.renderer === "obsidian") {
     assert.deepEqual(report.requested, { app: baseline.app, installer: baseline.installer });
     for (const key of ["electron", "chrome"]) assert.equal(report.identity[key], baseline[key]);

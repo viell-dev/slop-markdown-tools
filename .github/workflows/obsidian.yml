@@ -101,7 +101,7 @@ jobs:
           }
           const report = JSON.parse(readFileSync(file, 'utf8'));
           console.log(`## Obsidian ${report.obsidian}, before and after formatting\n`);
-          console.log(`Installer ${report.identity?.installer}, Electron ${report.identity?.electron}, Chrome ${report.identity?.chrome}; image ${report.identity?.image?.id}, base ${report.identity?.image?.base}.\n`);
+          console.log(`Installer ${report.identity?.installer}, Electron ${report.identity?.electron}, Chrome ${report.identity?.chrome}; image ${report.identity?.image?.id}, declared base ${report.identity?.image?.declaredBase}.\n`);
           console.log(`Profile **${report.profile}**, seeds **${report.seeds.join(',')}**, ${report.count} documents per seed and the fixtures, at widths ${report.widths.join(' and ')}: ${report.compared} compared, ${report.unexpected.length} new view differences, ${report.known.length} known, ${report.stale.length} stale.`);
           console.log(`\nRepeat with \`PROFILE=${report.profile} SEEDS=${report.seeds.join(',')} SEED=none COUNT=${report.count} OBSIDIAN_VERSION=${report.obsidian} OBSIDIAN_INSTALLER_VERSION=${report.identity?.installer} npm run check:obsidian\`.`);
           if (!(report.compared > 0)) process.exit(1);

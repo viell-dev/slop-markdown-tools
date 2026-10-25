@@ -56,10 +56,10 @@ try {
   assert.equal(observed.Id, id);
   identity = {
     id,
-    base: observed.Config.Labels["org.mdrefine.base-image"],
+    declaredBase: observed.Config.Labels["org.mdrefine.base-image"],
     platform: `${observed.Os}/${observed.Architecture}`,
   };
-  assert.equal(identity.base, baseline.baseImage);
+  assert.equal(identity.declaredBase, baseline.baseImage);
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }

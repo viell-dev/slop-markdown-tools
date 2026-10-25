@@ -18,23 +18,27 @@ function complete(renderer: string) {
   const report = createRendererReport(renderer, settings);
   return {
     ...report,
-    documents: report.plan.documents.flatMap((item) =>
-      item.widths.map((width) => ({
+    documents: report.plan.documents.flatMap((item, documentIndex) =>
+      item.widths.map((width, widthIndex) => ({
         name: item.name,
         width,
         attempted: true,
         completed: true,
-        changed: false,
+        changed: renderer !== "forges" && documentIndex === 0 && widthIndex === 0,
         views: item.views.map((name) => ({
           name,
-          changed: false,
-          status: name === "repository-file" ? "compared" : "unchanged",
+          changed: renderer !== "forges" && documentIndex === 0 && widthIndex === 0,
+          status:
+            name === "repository-file" ||
+            (renderer !== "forges" && documentIndex === 0 && widthIndex === 0)
+              ? "compared"
+              : "unchanged",
         })),
       })),
     ),
     controls: report.plan.controls.map((name) => ({ name, passed: true })),
     unexpected: [] as { name: string }[],
-    compared: renderer === "forges" ? 6 : 0,
+    compared: renderer === "forges" ? 6 : 1,
     identity:
       renderer === "github"
         ? { service: "GitHub Markdown API", version: "externally-uncontrolled" }
@@ -44,7 +48,7 @@ function complete(renderer: string) {
             electron: baseline.electron,
             chrome: baseline.chrome,
             image: {
-              base: baseline.baseImage,
+              declaredBase: baseline.baseImage,
               id: `sha256:${"a".repeat(64)}`,
               platform: "linux/amd64",
             },
@@ -64,8 +68,8 @@ describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (
   it("allows unchanged documents without freezing changed counts", () => {
     const report = complete(renderer);
     expect(() => validateRendererEvidence(report, renderer)).not.toThrow();
-    report.documents[0]!.changed = true;
-    report.documents[0]!.views.forEach((view) => {
+    report.documents[1]!.changed = true;
+    report.documents[1]!.views.forEach((view) => {
       view.changed = true;
       view.status = "compared";
     });
@@ -103,7 +107,7 @@ describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (
     if (mutation === "missing-control") report.controls.pop();
     if (mutation === "failed-control") report.controls[0]!.passed = false;
     if (mutation === "duplicate-control") report.controls.push(report.controls[0]!);
-    if (mutation === "wrong-count") report.compared = 1;
+    if (mutation === "wrong-count") report.compared++;
     if (mutation === "wrong-profile") report.profile = "adversarial";
     if (mutation === "difference") report.unexpected.push({ name: "changed" });
     if (mutation === "missing-identity") {
@@ -111,9 +115,11 @@ describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (
       Reflect.deleteProperty(report, "renderers");
     }
     if (mutation === "shrunk-plan") {
-      report.count = 1;
-      report.plan.documents = report.plan.documents.slice(0, 1);
-      report.documents = [first];
+      const omitted = report.plan.documents.pop()!;
+      report.documents = report.documents.filter((item) => item.name !== omitted.name);
+      expect(() => validateRendererEvidence(report, renderer)).toThrow(
+        "Native plan differs from intended workload",
+      );
     }
     expect(() => validateRendererEvidence(report, renderer)).toThrow();
   });
@@ -142,7 +148,7 @@ it("requires the pinned observed app, installer, runtime and image identity", ()
     expect(() => validateRendererEvidence(report, "obsidian")).toThrow();
   }
   const report = complete("obsidian");
-  report.identity.image!.base = "mutable:latest";
+  report.identity.image!.declaredBase = "mutable:latest";
   expect(() => validateRendererEvidence(report, "obsidian")).toThrow();
 });
 
@@ -154,6 +160,25 @@ it("allows an explicit latest observation only outside deterministic gate eviden
   expect(() => validateRendererReport(report, report, "obsidian")).not.toThrow();
   expect(() => validateRendererEvidence(report, "obsidian")).toThrow();
 });
+
+it.each(["github", "obsidian"])(
+  "retains the independent positive-comparison floor for %s",
+  (renderer) => {
+    const report = complete(renderer);
+    for (const record of report.documents) {
+      record.changed = false;
+      for (const view of record.views) {
+        view.changed = false;
+        view.status = "unchanged";
+      }
+    }
+    report.compared = 0;
+    expect(() => validateRendererReport(report, report, renderer)).not.toThrow();
+    expect(() => validateRendererEvidence(report, renderer)).toThrow(
+      "No native documents compared",
+    );
+  },
+);
 
 it("keeps deliberate latest workflow inputs separate from reusable baseline defaults", () => {
   const workflow = parse(
@@ -169,4 +194,22 @@ it("keeps deliberate latest workflow inputs separate from reusable baseline defa
   const environment = workflow.jobs.compare.steps.find((step) => step.name === "Compare")!.env!;
   for (const name of ["OBSIDIAN_VERSION", "OBSIDIAN_INSTALLER_VERSION"])
     expect(environment[name]).toContain("github.event_name == 'schedule' && 'latest'");
+});
+
+it("binds the Docker base and inspected identity label to the verified baseline", () => {
+  const instructions = readFileSync(
+    new URL("../../scripts/obsidian/Dockerfile", import.meta.url),
+    "utf8",
+  ).split("\n");
+  const verify = (lines: string[]) => {
+    expect(lines.find((line) => line.startsWith("FROM "))).toBe(`FROM ${baseline.baseImage}`);
+    expect(lines.find((line) => line.startsWith("LABEL org.mdrefine.base-image="))).toBe(
+      `LABEL org.mdrefine.base-image="${baseline.baseImage}"`,
+    );
+  };
+  verify(instructions);
+  for (const prefix of ["FROM ", "LABEL org.mdrefine.base-image="])
+    expect(() =>
+      verify(instructions.map((line) => (line.startsWith(prefix) ? `${prefix}wrong` : line))),
+    ).toThrow();
 });

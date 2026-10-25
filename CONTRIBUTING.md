@@ -357,16 +357,18 @@ Dockerfile's base and identity label together in a tested PR. Record the
 observed Electron and Chrome versions in the baseline. Recheck the deliberate
 latest route. Do not upgrade dependencies incidentally. The base digest does not
 freeze apt repository contents: each report records the inspected built image ID
-and platform, and the runner starts that exact ID. Reports read app, installer,
-Electron and Chrome versions from the running application; requested versions
-alone cannot certify a host.
+and platform, and the runner starts that exact ID. The `declaredBase` field is
+the image's declared base label, mechanically checked against the Dockerfile's
+`FROM` and `baseline.json`; it is not independent inspection of base ancestry.
+Reports read app, installer, Electron and Chrome versions from the running
+application; requested versions alone cannot certify a host.
 
 Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
 the actual app, installer and renderer versions separately from the requested
-versions, the inspected image identity, and hashes of the input, executed spec
-file (`specSha256`), and completed capture. The spec hash covers
-`obsidian.e2e.mjs`; it does not hash the Docker image or the complete harness
-configuration. Interrupted captures retain a null capture hash.
+versions, the inspected image ID/platform and declared base label, and hashes of
+the input, executed spec file (`specSha256`), and completed capture. The spec
+hash covers `obsidian.e2e.mjs`; it does not hash the Docker image or the
+complete harness configuration. Interrupted captures retain a null capture hash.
 
 `tests/integration/` runs the built CLI as a child process in temporary
 workspaces, and runs `examples/` and `benchmarks/` as they are, without the
@@ -460,12 +462,13 @@ all four.
   `renderer-evidence.mjs` independently reconstructs intended fixture/generated
   document names, widths, views and calibration controls. Reports distinguish
   planned documents from attempted/completed formatting cases and changed
-  output; unchanged cases are legitimate and need no redundant host request.
-  Every expected view records comparison or unchanged output. Actual repository
-  file views remain mandatory even when unchanged. Deterministic consumers bind
-  the report to their host and canonical workload sizes (25 generated documents
-  per seed for GitHub, ten for Obsidian and each forge), rejecting truncation
-  even if a report shrinks its own plan. `renderer-evidence.test.ts` exercises
+  output; unchanged cases are legitimate and need no redundant host request. A
+  deterministic gate still requires at least one document comparison. Every
+  expected view records comparison or unchanged output. Actual repository file
+  views remain mandatory even when unchanged. Deterministic consumers bind the
+  report to their host and canonical workload sizes (25 generated documents per
+  seed for GitHub, ten for Obsidian and each forge), rejecting truncation even
+  if a report shrinks its own plan. `renderer-evidence.test.ts` exercises
   missing, duplicate and incomplete cases, controls, views and host identities.
   Partial reports and existing failure artifacts survive failed attempts. This
   validates bookkeeping and trusted producers, not arbitrary fabricated reports.
