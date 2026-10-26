@@ -17,11 +17,11 @@ export async function collectGarbage() {
 }
 
 // ASCII and non-ASCII sources exercise different substring/lowercase storage.
-// Loaders build fresh text: only a kept index can retain its large backing strings.
+// Loaders build fresh text and keep no copy of the generated backing strings.
 const marks = ["plain", "é-𝒳"];
 
-/** @param {number} scale */
-export function memoryFixture(scale) {
+/** @param {number} scale @param {string} [prefix] */
+export function memoryFixture(scale, prefix = "") {
   const long = (/** @type {string} */ words, /** @type {number} */ times) =>
     `${words} `.repeat(times * scale);
   const html = (/** @type {string} */ mark) =>
@@ -30,7 +30,7 @@ export function memoryFixture(scale) {
   /** @type {Record<string, () => string>} */
   const files = {};
   marks.forEach((mark, target) => {
-    files[`Wide ${target}.md`] = () =>
+    files[`${prefix}Wide ${target}.md`] = () =>
       [
         `## A heading of target ${target} that is long {#custom-heading-id-${mark}}`,
         "",
@@ -44,7 +44,7 @@ export function memoryFixture(scale) {
         "```",
         "",
       ].join("\n");
-    files[`Block ${target}.md`] = () => `${prose(mark)} ^block-identifier-${target}\n`;
+    files[`${prefix}Block ${target}.md`] = () => `${prose(mark)} ^block-identifier-${target}\n`;
   });
   /** @type {Map<string, number>} Counts only; wrappers never keep the generated source strings. */
   const reads = new Map();
@@ -74,11 +74,11 @@ const anchors = [
   ["gitea", "Wide", (mark) => `custom-heading-id-${mark}`],
 ];
 
-/** @param {import("../../src/index.js").Workspace} index */
-export function checkMemoryAnchors(index) {
+/** @param {import("../../src/index.js").Workspace} index @param {string} [prefix] */
+export function checkMemoryAnchors(index, prefix = "") {
   for (const [dialect, file, anchor] of anchors)
     marks.forEach((mark, target) => {
-      const link = `${file} ${target}.md#${anchor(mark, target)}`;
+      const link = `${prefix}${file} ${target}.md#${anchor(mark, target)}`;
       assert.equal(index.resolve("Doc.md", link, dialect).fragmentExists, true, link);
       assert.equal(index.resolve("Doc.md", `${link}x`, dialect).fragmentExists, false, link);
     });

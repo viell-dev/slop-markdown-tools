@@ -106,15 +106,11 @@ it("keeps large target documents collectible without reloading their anchors", a
 }, 60_000);
 
 it("does not keep a target's text alive through its anchors", () => {
-  // This runner-only root exceeds the source allowance. It must not enter the
-  // child's heap delta, unlike the original process-wide Vitest measurement.
-  const unrelated = Array.from({ length: 1_000_000 }, (_, index) => index);
   const measured = spawnSync(
     process.execPath,
     [fileURLToPath(new URL("../support/workspace-memory-child.mjs", import.meta.url))],
     { encoding: "utf8", windowsHide: true, timeout: 45_000, maxBuffer: 1024 * 1024 },
   );
-  expect(unrelated.at(-1)).toBe(999_999);
   expect(measured.error, measured.stderr).toBeUndefined();
   expect(measured.signal, measured.stderr).toBeNull();
   expect(measured.status, measured.stderr + measured.stdout).toBe(0);

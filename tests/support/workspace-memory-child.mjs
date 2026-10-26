@@ -26,10 +26,25 @@ async function settledHeap() {
   return process.memoryUsage().heapUsed;
 }
 
-// Warm the measured sizes/paths before the baseline. Small warm-ups left a
-// repeatable negative setup delta that could offset a retained source block.
-for (let warm = 0; warm < 2; warm++) checkMemoryAnchors(createWorkspace(memoryFixture(1000).files));
+const targetPaths = new Set();
+/** @param {Record<string, () => string>} files */
+function registerPaths(files) {
+  for (const name of Object.keys(files)) {
+    assert(!targetPaths.has(name), `Memory workloads reused target path: ${name}`);
+    targetPaths.add(name);
+  }
+}
+
+// Warm full-size paths without populating a filename cache for measured inputs.
+// Each warm-up also has its own names, so an unbounded path cache keeps growing.
+for (let warm = 0; warm < 2; warm++) {
+  const prefix = `warmup-${warm}/`;
+  const fixture = memoryFixture(1000, prefix);
+  registerPaths(fixture.files);
+  checkMemoryAnchors(createWorkspace(fixture.files), prefix);
+}
 const fixture = memoryFixture(1000);
+registerPaths(fixture.files);
 assert(fixture.smallest > 1_000_000);
 const before = await settledHeap();
 const index = createWorkspace(fixture.files);

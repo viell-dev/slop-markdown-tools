@@ -633,14 +633,20 @@ follow parsed documents and trees with WeakRefs and verify cached answers
 without reloading source. The residual retained-text check runs the same
 synthetic workload in a fresh Node process using the actual compiled product,
 prepared or verified by Vitest's normal build setup. Its heap excludes the
-runner, mocks and other test work; a parent-only allocation control checks that
-boundary. The child warms two discarded full-size workspaces before its
-baseline, keeps the measured workspace live across its single fixed sample and
-checks cached answers again. The input size and one-third allowance stay
-unchanged: no retry, selected minimum or larger limit. Deliberate anchor-copy
-and cached-source retention must still fail on runtimes where those mutants keep
-actual text alive. Primitive strings cannot be WeakRef targets, and collecting a
-wrapper would not prove their backing storage was released.
+runner, mocks and other test work; a distinct reported PID checks that boundary.
+The child warms two discarded full-size workspaces before its baseline, using
+disjoint target paths for each warm-up and the measured workspace. It keeps the
+measured workspace live across its single fixed sample and checks cached answers
+again. The input size and one-third allowance stay unchanged: no retry, selected
+minimum or larger limit. Deliberate anchor-copy and cached-source retention must
+still fail on runtimes where those mutants keep actual text alive. Primitive
+strings cannot be WeakRef targets, and collecting a wrapper would not prove
+their backing storage was released.
+
+Distinct paths expose a filename cache that grows with the corpus. A bounded
+cache that is already full before the baseline can replace entries without
+growing across the sample; this check does not establish universal absence of
+source retention.
 
 The measured child writes numeric failure evidence for #413 under
 `artifacts/workspace-memory/`; CI uploads only its `report.json` files,
@@ -651,6 +657,54 @@ no credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
 can contain process secrets, so it is never captured or uploaded automatically.
 Snapshot generation can itself collect or transform the heap; it cannot replace
 or explain away the original measurement.
+
+To reproduce a bounded source-retention control, first run `npm run build` from
+the checkout. Save this JavaScript as a temporary `.mjs` file and run it with
+`node` from the checkout to prepare an owned copy with its own ESM package
+boundary and resolvable dependencies:
+
+```js
+import { cp, mkdtemp, realpath, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+const checkout = process.cwd();
+const directory = await mkdtemp(path.join(tmpdir(), "mdrefine-memory-"));
+await cp("dist", path.join(directory, "dist"), { recursive: true });
+await writeFile(path.join(directory, "package.json"), JSON.stringify({ type: "module" }));
+await symlink(
+  await realpath("node_modules"),
+  path.join(directory, "node_modules"),
+  process.platform === "win32" ? "junction" : "dir",
+);
+console.log({
+  directory,
+  runner: path.join(checkout, "tests/support/workspace-memory-child.mjs"),
+  product: path.join(directory, "dist/index.js"),
+});
+```
+
+Edit only the copied `dist` files, never the checkout or linked dependencies.
+Record the source commit, runtime, exact mutation and SHA-256 hashes before and
+after it. Existing controls replace anchor detachment with identity on Node 22,
+cache a source on its target on Node 26, retain only the smallest plain block,
+or add a module-level map populated with `name` and `source` in `compute()`. An
+identity operation is a valid leak control only where that runtime actually
+keeps backing storage alive.
+
+Change to the printed owned directory so failure artifacts stay with the
+experiment, then supply the absolute runner and copied-product paths:
+
+```sh
+cd "<directory>"
+node "<runner>" "<product>"
+```
+
+An unmodified copy should exit 0. An actual retention control should exit 1 with
+the fixed sample in stdout and `artifacts/workspace-memory/<pid>/report.json`.
+Retain every declared result and useful failed evidence. Remove only the owned
+copy after the experiment; never remove the linked dependency target. Keep
+full-heap capture limited to the isolated, credential-free procedure above.
 
 The HTML-continuation check parses its fixtures once per size and clones their
 positioned trees for fresh range-cache keys. Those fixtures need no separate
