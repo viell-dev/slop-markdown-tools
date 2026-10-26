@@ -40,7 +40,7 @@ export function protectionSource(source: string) {
     return at;
   };
   /** A copy of `node` that starts at `start` and ends at `end`. */
-  const stretch = (node: Nodes, start: Point, end = node.position!.end): Nodes =>
+  const stretch = (node: Nodes, start: Point, end: Point = node.position!.end): Nodes =>
     start.offset === node.position!.start.offset && end === node.position!.end
       ? node
       : { ...node, position: { start, end } };

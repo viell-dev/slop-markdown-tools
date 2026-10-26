@@ -12,6 +12,21 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Tokenizer identity verification partitions the unchanged deterministic corpus
+  into bounded unit cases while retaining every source, selection and assertion
+  under the existing deadline
+  ([#654](https://github.com/viell-dev/slop-markdown-tools/issues/654)).
+
+- Release evidence selects the latest check-run identity, preserving pending and
+  unsuccessful reruns without letting an older completed null-start check hide a
+  newer success
+  ([#647](https://github.com/viell-dev/slop-markdown-tools/issues/647)).
+
+- The shipped internal protection-source declaration uses its existing point
+  type without an undeclared direct type import. Installed package checks cover
+  that declaration with npm and strict pnpm; public entry points are unchanged
+  ([#655](https://github.com/viell-dev/slop-markdown-tools/issues/655)).
+
 - Maintainer guidance distinguishes intentional first-occurrence fixture
   rewrites from sanitizers, preserving intended bytes when triaging scanner
   alerts ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).

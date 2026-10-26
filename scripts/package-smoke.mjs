@@ -275,11 +275,13 @@ process.stdout.write(result.output);`,
       "ES2023",
       "consumer.mts",
       "consumer.cts",
-      // This artifact is internal, but it ships. Check it explicitly so public
-      // declarations cannot hide a dangling build-only type forward.
-      await realpath(
-        path.join(project, "node_modules", manifest.name, "dist/syntax/parser.generated.d.ts"),
-      ),
+      // These artifacts are internal, but they ship. Check them explicitly so
+      // public declarations cannot hide a dangling build-only type reference.
+      ...(await Promise.all(
+        ["parser.generated.d.ts", "protection-source.d.ts"].map((file) =>
+          realpath(path.join(project, "node_modules", manifest.name, "dist/syntax", file)),
+        ),
+      )),
     ],
     { cwd: project, stdio: "inherit", env: consumerEnvironment },
   );

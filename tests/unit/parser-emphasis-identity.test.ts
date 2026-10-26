@@ -42,15 +42,19 @@ it("declines absent/deferred/both opt-in, unknown identities and reordered pipel
 });
 
 const sources = emphasisSources();
-it.each(["commonmark", "gfm", "cjk"])(
-  "preserves actual %s tokenizer coordinates, flags, off-array tokens and lossless ASTs",
-  async (mode) => {
-    const result = await verifyEmphasisTokenizer(mode, sources);
-    expect(result.sources).toBe(sources.length);
-    expect(result.comparisons).toBe(sources.length * 4);
-    expect(result.nativeCoordinateCases).toBeGreaterThan(0);
-  },
-);
+// Keep this deterministic correctness corpus within each unit case's deadline
+// under worker contention. Every source, selection and identity oracle remains.
+for (const mode of ["commonmark", "gfm", "cjk"]) {
+  for (let start = 0; start < sources.length; start += 130) {
+    const batch = sources.slice(start, start + 130);
+    it(`preserves actual ${mode} tokenizer coordinates, flags, off-array tokens and lossless ASTs (sources ${start + 1}-${start + batch.length})`, async () => {
+      const result = await verifyEmphasisTokenizer(mode, batch);
+      expect(result.sources).toBe(batch.length);
+      expect(result.comparisons).toBe(batch.length * 4);
+      expect(result.nativeCoordinateCases).toBeGreaterThan(0);
+    });
+  }
+}
 
 // Compile/load each actual repaired mutant BEFORE expecting the mechanism
 // assertion to fail. An anchor/build/registration failure must fail this test,
