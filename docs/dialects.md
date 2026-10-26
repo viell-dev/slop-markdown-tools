@@ -193,6 +193,18 @@ default rendering settings. Custom hard-break or math settings, themes and
 browser math layout need separate validation. Weekly adversarial generation
 discovers limits without becoming a release gate.
 
+**Unreleased:** formatting also retains native table rows that the primary
+parser reads as ordered lists, table headers and bodies hidden inside quoted
+paragraphs, and a single backslash hard break immediately after a literal URL.
+These protections apply to Forgejo and Gitea; GitHub reads that URL backslash as
+part of the link instead.
+
+Generated stray-marker text can still change emphasis or strikethrough pairing
+when wrapping moves markers across quoted lines. The observed case preserves
+text and block structure and is tracked as a bounded styling limit in
+[#665](https://github.com/viell-dev/slop-markdown-tools/issues/665), reopenable
+with meaningful impact on authored input.
+
 Both render GitHub Markdown and more. The tool parses their documents as GitHub
 Markdown and protects the rest:
 
