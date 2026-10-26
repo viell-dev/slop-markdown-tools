@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Workspace memory verification separates document/cache lifecycle checks from a
+  fresh compiled-product process's retained-text sample. The existing source
+  allowance remains enforced, with numeric failure evidence and opt-in heap
+  diagnostics
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
+
 - Filesystem discovery and selection, on-demand related-file lookup, and
   in-place write/recovery now have separate internal owners. Public discovery,
   selection and filesystem safety contracts are preserved

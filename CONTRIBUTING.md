@@ -628,16 +628,26 @@ execution and allocation costs.
 
 Memory checks await V8's asynchronous `last-resort` major collection, which
 releases compilation caches and collects until its root set is stable. A regular
-major collection does not promise that condition. Each check samples once; it
-does not retry a failed measurement or select a minimum. The retained-text
-allowance, parsed-document WeakRefs and cached-anchor assertions remain strict;
-a deliberately retained source must still fail.
+major collection does not promise that condition. Deterministic lifecycle checks
+follow parsed documents and trees with WeakRefs and verify cached answers
+without reloading source. The residual retained-text check runs the same
+synthetic workload in a fresh Node process using the actual compiled product,
+prepared or verified by Vitest's normal build setup. Its heap excludes the
+runner, mocks and other test work; a parent-only allocation control checks that
+boundary. The child warms two discarded full-size workspaces before its
+baseline, keeps the measured workspace live across its single fixed sample and
+checks cached answers again. The input size and one-third allowance stay
+unchanged: no retry, selected minimum or larger limit. Deliberate anchor-copy
+and cached-source retention must still fail on runtimes where those mutants keep
+actual text alive. Primitive strings cannot be WeakRef targets, and collecting a
+wrapper would not prove their backing storage was released.
 
-The retained-text check writes numeric failure evidence for #413 under
+The measured child writes numeric failure evidence for #413 under
 `artifacts/workspace-memory/`; CI uploads only its `report.json` files,
-including the collection protocol and fixed measured delta. To inspect retaining
-paths in a disposable container containing only synthetic inputs and no
-credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
+including the isolation/collection protocol and fixed measured delta. Child
+failure, timeout, signal or malformed output fails the parent check. To inspect
+retaining paths in a disposable container containing only synthetic inputs and
+no credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
 can contain process secrets, so it is never captured or uploaded automatically.
 Snapshot generation can itself collect or transform the heap; it cannot replace
 or explain away the original measurement.
