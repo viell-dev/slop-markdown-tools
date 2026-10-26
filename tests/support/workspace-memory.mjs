@@ -16,6 +16,8 @@ export async function collectGarbage() {
   await gc({ type: "major", execution: "async", flavor: "last-resort" });
 }
 
+// ASCII and non-ASCII sources exercise different substring/lowercase storage.
+// Loaders build fresh text: only a kept index can retain its large backing strings.
 const marks = ["plain", "é-𝒳"];
 
 /** @param {number} scale */

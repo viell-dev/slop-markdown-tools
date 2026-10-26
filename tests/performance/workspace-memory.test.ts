@@ -125,6 +125,8 @@ it("does not keep a target's text alive through its anchors", () => {
     collection: { type: "major", execution: "async", flavor: "last-resort" },
     sample: { smallest: 1_160_000, allowance: 1_160_000 / 3 },
   });
+  expect(report).toHaveProperty("runtime.pid", expect.any(Number));
+  expect(report).not.toMatchObject({ runtime: { pid: process.pid } });
 }, 60_000);
 
 it("keeps paired file anchors without either Markdown reading or the YAML AST", async () => {
