@@ -1,6 +1,24 @@
 import { commonFixtures } from "./common.mjs";
+// Shared authored regressions for native paragraph/table and hard-break readings.
+export const forgeBoundaryFixtures = [
+  { name: "table-ordered-row", source: "Number | Description\n--- | ---\n2) | Second entry\n" },
+  { name: "table-empty-ordered-row", source: "Step\n:-:\n2)\n" },
+  { name: "table-ordered-stop", source: "| Step |\n| --- |\n2) Continue\n1) Outside\n" },
+  { name: "table-indented-row", source: "| Step |\n| --- |\n2) Continue\n    1) Still a row\n" },
+  { name: "table-quoted-row", source: "> | Step |\n> | --- |\n> 2) Continue\n" },
+  { name: "table-hidden-quote-list", source: ">1) Item\n>   | Name |\n>   | --- |\n>   | Value |\n" },
+  { name: "table-hidden-lazy-list", source: ">1) Item\n| Name |\n| --- |\n| Value |\n" },
+  { name: "table-hidden-quote", source: "> Item\n| Name |\n| --- |\n| Value |\n" },
+  { name: "url-backslash-break", source: "Visit www.example.com\\\nThen continue.\n" },
+  { name: "https-backslash-break", source: "Visit https://example.com\\\nThen continue.\n" },
+  { name: "url-two-backslashes", source: "Visit www.example.com\\\\\nThen continue.\n" },
+  { name: "url-three-backslashes", source: "Visit www.example.com\\\\\\\nThen continue.\n" },
+  { name: "url-backslash-space", source: "Visit www.example.com\\ \nThen continue.\n" },
+  { name: "url-backslash-path", source: "Visit https://example.com/a\\b\nThen continue.\n" },
+];
 export const forgeFixtures = [
   ...commonFixtures,
+  ...forgeBoundaryFixtures,
   { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },
   { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
   { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail*.\n" },

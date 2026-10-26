@@ -447,7 +447,9 @@ only and remove superseded transition notes.
   engine's existing exports and lazy workspace callbacks stable when changing
   these internal seams.
 - `src/syntax/renderer-protections.ts` owns one `RendererProtections` result
-  cached by positioned root. List and GitHub collectors are separate;
+  cached by positioned root. List, GitHub and forge collectors are separate;
+  `forge-protections.ts` retains native table continuations, paragraph-hidden
+  tables and URL-adjacent hard breaks without requesting another parse.
   `obsidian-protections.ts` orders Obsidian passes over one shared leaf
   projection, with code and HTML collectors in focused modules. List text seeds
   physical fences; joined footnotes seed paragraph/table state; Setext readings

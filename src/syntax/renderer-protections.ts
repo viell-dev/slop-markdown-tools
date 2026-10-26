@@ -3,6 +3,7 @@ import type { Document } from "../core/types.js";
 import { protectionSource } from "./protection-source.js";
 import { collectListProtections } from "./list-protections.js";
 import { collectGithubMathProtections } from "./github-protections.js";
+import { collectForgeProtections } from "./forge-protections.js";
 import { collectObsidianProtections } from "./obsidian-protections.js";
 
 /**
@@ -213,6 +214,8 @@ export interface RendererProtections {
    * A one-column table also keeps its source when either header or delimiter
    * lacks an outer pipe: Live Preview needs both borders, while Reading view
    * also accepts matching trailing-only borders (#568).
+   * On Forgejo and Gitea, tables also retain rows that GFM instead reads as
+   * lists: native paragraph continuation ends at its first interruption (#661).
    */
   tableText: ReadonlySet<Nodes>;
   /**
@@ -230,6 +233,8 @@ export interface RendererProtections {
    * continuations stay together, as do quoted blank rows between consecutive
    * such children: Reading view keeps them inside one code block. Later
    * independent blocks remain editable.
+   * Forgejo and Gitea retain table header/delimiter pairs hidden inside primary
+   * paragraphs (#663), and URL-adjacent backslash hard breaks (#664).
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
@@ -280,6 +285,7 @@ export function rendererProtections(document: Document): RendererProtections {
     boundaryLists,
     indentLists,
   } = collectObsidianProtections(document, positions, text, boundaryText);
+  collectForgeProtections(document, positions, tableText, boundaryText);
   const result = {
     text,
     nested,

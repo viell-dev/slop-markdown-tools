@@ -10,6 +10,16 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Fixed
+
+- Forgejo and Gitea retain native table rows misread as ordered lists, tables
+  hidden inside quoted paragraphs, and URL-adjacent backslash hard breaks.
+  Shared edit protections cover builtin rules and plugins while leaving
+  independent prose editable
+  ([#661](https://github.com/viell-dev/slop-markdown-tools/issues/661),
+  [#663](https://github.com/viell-dev/slop-markdown-tools/issues/663),
+  [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
+
 ### Changed
 
 - Tokenizer identity verification partitions the unchanged deterministic corpus
