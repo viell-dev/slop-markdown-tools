@@ -8,6 +8,13 @@ that `CHANGELOG.md` lists it under `Unreleased`.
 
 ## Verification
 
+For a release or substantial UI/workflow change, assess the human-testing gate
+in RELEASING.md. Link the assigned test request and pending stable-release
+blockers, or the completed human report and why it still covers this candidate.
+State what changed since the tested build and how relevant open defects were
+resolved or accepted. Candidate publication and this PR's merge must not close
+an unanswered human request; link it in the handoff as well.
+
 - Commands and results, and the platforms they ran on; the regression example
   for any rendering defect.
 - The Native workflow's classification and applicable Rendering, Obsidian and

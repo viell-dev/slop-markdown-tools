@@ -14,6 +14,69 @@ development dependency: publish it in a patch release without waiting. npm's
 development flag does not decide whether code ships. Updates confined to build
 or test tools whose code does not ship never need a release of their own.
 
+## Human release testing
+
+A person must install and use a representative candidate before the first stable
+release, including a stable release below 1.0, and before stable delivery of
+substantial changes to the interface, interaction, or main user workflow.
+Working functions, automated UI checks, agent review, and CI cannot establish
+that the product is understandable and usable. Human testing complements all
+required automated checks; it does not replace them.
+
+For a routine fix, the release PR may reuse recorded human evidence while the
+tested workflow remains representative. Link the report and explain what changed
+since the tested build and why no further human pass is needed. Genuine earlier
+use can supply evidence with its build, scope, feedback, and limits recorded;
+silence, downloads, and a partial test are not blanket acceptance.
+
+1. Prepare a brief practical test of the main user journey, including
+   installation, discoverability, ordinary tasks, feedback, and recovery.
+   Complete agent verification first. Supply a directly downloadable installable
+   build, installation instructions, synthetic inputs, numbered tasks and
+   expected outcomes. Ask what felt unclear or awkward as well as what failed,
+   and request the build, environment, tested tasks, and remaining untested
+   areas. Do not ask a person to build from source or reconstruct a development
+   thread.
+2. Create or reuse a dedicated issue before requesting the test. Use
+   `Type: Maintenance` and `Needs: Human`, or `Needs: Owner` when only the owner
+   can supply the answer; never both Needs labels. Assign the person being
+   asked, including the owner when asking them under `Needs: Human`. If no
+   tester is identified, assign the owner to arrange one. State the stable
+   release it blocks, use `Status: Blocked` on the waiting release work, and
+   link the request from the release tracker and preparation PR.
+3. A prerelease can supply the test build after its required automated checks.
+   Create the request before publishing it; add and verify the actual download
+   links before handoff, and link the request in the release notes. A dry-run
+   artifact is also usable if the recipient can download and install it. Before
+   ending the thread, verify the live issue's assignee and labels and link it
+   prominently with the pending action and release impact. Publishing a
+   candidate or merging preparation does not finish the human request; do not
+   close it through a PR closing keyword.
+4. Record the person's actual observations separately from the agent's
+   assessment. Retain useful partial results, request only missing coverage, and
+   retest material fixes in affected workflows. Track and triage reported
+   defects. Assess open defects against ordinary use, safety, accessibility, and
+   advertised scope: a known-issues entry, enhancement label, or upstream cause
+   does not by itself make one acceptable. Fix release blockers. An
+   owner-identified blocker remains blocking until fixed or the owner explicitly
+   changes its scope; agents cannot silently defer it past stable.
+5. Before stable publication, the release PR links the completed human report,
+   relevant defect dispositions, candidate-to-final changes, and remaining
+   limits. Missing required coverage or unresolved blockers stop publication
+   even with green CI. Keep the request open until its answer and resulting work
+   are handled, or explicitly supersede it with a linked replacement. Check
+   pending requests when maintenance resumes; an issue reply alone does not
+   restart an agent unless monitoring is configured.
+
+Agents continue to own implementation, verification, review, packaging,
+publication, and follow-up. This gate requires a proportionate human usability
+pass, not human code review or repeated approval for every routine release.
+
+For mdrefine, cover installing the package and completing a small check/format
+workflow: understand diagnostics, preview changes, apply them, and recover from
+an unwanted result. Include library integration when that is the changed
+workflow.
+
 ## Prepare the release pull request
 
 On a branch, in one pull request:
