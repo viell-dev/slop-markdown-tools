@@ -12,6 +12,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Maintainer guidance distinguishes intentional first-occurrence fixture
+  rewrites from sanitizers, preserving intended bytes when triaging scanner
+  alerts ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).
+
 - Workspace memory verification separates document/cache lifecycle checks from a
   fresh compiled-product process's retained-text sample. The existing source
   allowance remains enforced, with numeric failure evidence and opt-in heap
