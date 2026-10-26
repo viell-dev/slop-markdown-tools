@@ -12,7 +12,8 @@ import {
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { discover, replacementFailure, writeFormatted } from "../../src/workspace/files.js";
+import { discover } from "../../src/workspace/files.js";
+import { replacementFailure, writeFormatted } from "../../src/workspace/writes.js";
 import { enclosingVault, isVault } from "../../src/workspace/vault.js";
 import { loadConfig } from "../../src/config/load.js";
 import {

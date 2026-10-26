@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Filesystem discovery and selection, on-demand related-file lookup, and
+  in-place write/recovery now have separate internal owners. Public discovery,
+  selection and filesystem safety contracts are preserved
+  ([#620](https://github.com/viell-dev/slop-markdown-tools/issues/620)).
+
 - The Obsidian verification harness uses only its service-provided browser and
   ChromeDriver binaries, removing unused automatic-download FTP/PAC and
   `extract-zip` dependencies. Missing or incomplete executables fail explicitly;

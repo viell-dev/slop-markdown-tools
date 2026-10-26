@@ -11,9 +11,10 @@ import type {
   VitePressOptions,
 } from "../core/types.js";
 import { pathError } from "./access.js";
-import { discover, isIgnoredInput, unlistedLookup, vaultFor } from "./files.js";
+import { discover, isIgnoredInput, vaultFor } from "./files.js";
 import type { Skipped } from "./files.js";
 import { createWorkspace } from "./index.js";
+import { unlistedLookup } from "./lookup.js";
 import { excludeSelection } from "./selection.js";
 import { vaultOf } from "./vault.js";
 import type { Vault } from "./vault.js";
