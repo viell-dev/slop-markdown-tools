@@ -470,6 +470,15 @@ only and remove superseded transition notes.
   packages. Other matrix environments retain their full suites. Keep these
   evidence and resource boundaries without repeating Linux 24 unit work;
   preserve meaningful coverage rather than a duplicate run.
+- Workspace memory lifecycle checks retain their parser mocks in the performance
+  suite. `tests/support/workspace-memory.mjs` shares the synthetic fixture and
+  collection protocol with `workspace-memory-child.mjs`, which measures the
+  freshly prepared compiled product outside the runner's heap. Preserve the
+  single sample, source-size allowance, cached-answer checks and failing actual
+  retention controls. Each full-size warm-up and measured corpus must use
+  disjoint paths, basenames and full source content. Content guards retain only
+  bounded digests; prefilled cache keys can otherwise hide growth. Wrapper
+  collection is not evidence about primitive text.
 - Test navigation follows product responsibilities: `engine.test.ts` covers
   phase execution and semantic acceptance; `config.test.ts` and
   `plugins.test.ts` cover configuration and registration/schema contracts.
