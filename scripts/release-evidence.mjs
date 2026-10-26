@@ -72,8 +72,8 @@ export function requiredChecks(ruleset) {
 /**
  * The state of the required checks among a commit's check runs: "success" when each has a
  * successful run, "failure" when one has finished otherwise, and "pending" while one is missing,
- * queued, or running. With several runs of a check, as after a re-run, the newest one counts;
- * a run that has not started yet is the newest.
+ * queued, or running. With several runs of a check, as after a re-run, the newest check-run
+ * identity counts. Reruns can carry earlier timestamps; null starts do not establish recency.
  * @param {CheckRun[]} checkRuns
  * @param {Check[]} required
  * @param {{ commit: string, repository: string, workflowRuns: WorkflowRun[] }} evidence
@@ -95,9 +95,6 @@ export function evaluate(checkRuns, required, evidence) {
         Number.isSafeInteger(run.check_suite_id),
     )
     .sort((a, b) => b.id - a.id)[0];
-  /** When a run started; one that has not started yet sorts as the newest. */
-  const started = (/** @type {CheckRun} */ run) =>
-    run.started_at ? Date.parse(run.started_at) : Number.POSITIVE_INFINITY;
   /** @type {string[]} */
   const lines = [];
   /** @type {"success" | "pending" | "failure"} */
@@ -113,7 +110,10 @@ export function evaluate(checkRuns, required, evidence) {
           run.app?.id === check.app &&
           (!fromCI || run.check_suite?.id === producer?.check_suite_id),
       )
-      .sort((a, b) => started(b) - started(a) || b.id - a.id);
+      // GitHub gives rerun jobs new check-run identities, including carried
+      // successes with their original timestamps. Select the latest identity
+      // before considering status so queued/cancelled/skipped runs stay visible.
+      .sort((a, b) => b.id - a.id);
     const run = runs[0];
     if (fromCI && producer && producer.status !== "completed") {
       lines.push(`${check.name}: CI producer ${producer.status}`);

@@ -813,11 +813,13 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   batch calls in an isolated V8 coverage session, including lazy readings and
   four missing-registration mutants. `obsidian-openers` bounds failed
   literal-suffix scans; `obsidian-probe-metadata` checks complete and
-  interrupted capture bookkeeping. These checks do not prove native-host
-  behavior or compatibility with arbitrary event-history rewrites by external
-  extensions. Mixed and multiple raw emphasis pairs can still copy their
-  interiors; syntax plugins retain the original attention/strike resolvers and
-  their cost. The [dependency
+  interrupted capture bookkeeping. Tokenizer identity cases partition the full
+  deterministic corpus into contiguous batches under the unchanged unit
+  deadline, retaining every source, selection and identity assertion. These
+  checks do not prove native-host behavior or compatibility with arbitrary
+  event-history rewrites by external extensions. Mixed and multiple raw emphasis
+  pairs can still copy their interiors; syntax plugins retain the original
+  attention/strike resolvers and their cost. The [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) lists
   the corrections and remaining limits.
 - **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
@@ -832,10 +834,12 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   run outside the checkout with `NODE_PATH` disabled, including syntax-plugin
   declarations and execution, bundled GFM and directly imported VitePress
   table/task-list paths. The compiler also checks the shipped internal parser
-  shim explicitly, because public declarations do not reach it. The compiler
-  executable comes from the checkout; consumer imports resolve from the actual
-  installation. `release:pack` tests the exact tarball that the Release workflow
-  publishes; local `release:prepare` additionally runs the full checks, and
+  shim and protection-source declaration explicitly, because public declarations
+  do not reach them. These checks do not add exported entry points or promise
+  completeness for every internal declaration. The compiler executable comes
+  from the checkout; consumer imports resolve from the actual installation.
+  `release:pack` tests the exact tarball that the Release workflow publishes;
+  local `release:prepare` additionally runs the full checks, and
   `scripts/verify-publication.mjs` checks that npm serves that tarball with
   provenance naming the workflow and the commit.
 - **Rebuilds and packages contain current output only.** `build-output.test.ts`
@@ -871,8 +875,9 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   synthetic merge tree. Other required checks retain their own app identities. A
   newer queued/running CI producer or rerun waits even before its jobs appear;
   the completed producer must succeed, then its newest individual check results
-  must pass. Optional Node 26 can delay completion, but its allowed test failure
-  does not fail the workflow or become a release requirement.
+  must pass. Check-run identities determine recency; carried rerun timestamps
+  and null starts do not. Optional Node 26 can delay completion, but its allowed
+  test failure does not fail the workflow or become a release requirement.
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
   and wrong-producer results. Hosted preparation reuses static/unit/performance/
   integration evidence, then `release:pack` freshly builds and checks the exact

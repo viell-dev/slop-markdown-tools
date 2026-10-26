@@ -291,17 +291,50 @@ describe("release evidence", () => {
   });
   it("counts the newest run of a check that ran again", () => {
     const name = required[0]!.name;
-    const rerun = [...passing(), run(name, "completed", "failure", "2026-10-20")];
+    const old = run(name, "completed", "failure", "2026-10-22");
+    const rerun = [old, ...passing()];
     expect(evaluate(rerun, required).state).toBe("success");
-    const failedAgain = [...passing(), run(name, "completed", "failure", "2026-10-22")];
+    // Carried rerun successes keep their original timestamps. Conversely, an
+    // older check may start later than its replacement; neither sets run age.
+    const failedAgain = [...passing(), run(name, "completed", "failure", "2026-10-20")];
     expect(evaluate(failedAgain, required).state).toBe("failure");
   });
   it("waits for a run that was queued again after a failure", () => {
     const name = required[0]!.name;
+    const failed = run(name, "completed", "failure");
     const queued = { ...run(name, "queued", null), started_at: null };
-    const runs = [...passing().slice(1), run(name, "completed", "failure"), queued];
+    const runs = [...passing().slice(1), failed, queued];
     expect(evaluate(runs, required).state).toBe("pending");
   });
+  it("ignores an older completed null-start check after a successful rerun (#647)", () => {
+    for (const conclusion of ["cancelled", "skipped", "failure"]) {
+      const old = { ...run(required[0]!.name, "completed", conclusion), started_at: null };
+      const runs = [old, ...passing()];
+      expect(evaluate(runs, required).state, conclusion).toBe("success");
+      expect(evaluate(runs.toReversed(), required).state, conclusion).toBe("success");
+    }
+  });
+  it.each([
+    ["queued", null, "pending"],
+    ["in_progress", null, "pending"],
+    ["completed", "skipped", "failure"],
+    ["completed", "cancelled", "failure"],
+    ["completed", "failure", "failure"],
+    ["completed", "success", "success"],
+  ] as const)(
+    "keeps the newer null-start %s/%s check visible (#647)",
+    (status, conclusion, state) => {
+      for (const oldStart of [null, "2026-10-21T00:00:00Z"]) {
+        const runs = passing().map((entry, index) =>
+          index === 0 ? { ...entry, started_at: oldStart } : entry,
+        );
+        const newest = { ...run(required[0]!.name, status, conclusion), started_at: null };
+        const checks = [...runs, newest];
+        expect(evaluate(checks, required).state).toBe(state);
+        expect(evaluate(checks.toReversed(), required).state).toBe(state);
+      }
+    },
+  );
   it("refuses a ruleset that requires no checks rather than passing", () => {
     expect(() => requiredChecks({ rules: [{ type: "deletion" }] })).toThrow(/no status checks/);
     expect(() =>
