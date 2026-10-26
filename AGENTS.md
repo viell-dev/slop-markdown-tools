@@ -281,6 +281,13 @@ reversals, and do not revert until authorized.
   where they apply. Check what a renderer shows with GitHub's Markdown API, the
   reference parsers in the test suite, or the renderer itself; the safety check
   only compares the parser's readings.
+- For scanner alerts in synthetic fixtures, inspect the inputs and intended
+  occurrence count before changing a replacement. A first-occurrence operation
+  is not inherently a sanitizer; `replaceAll` is appropriate only when every
+  occurrence should change. Preserve intended fixture bytes. Dismiss a false
+  positive with evidence and a condition for reopening, or clarify the operation
+  without changing its inputs. Do not suppress the rule or rewrite all matches
+  merely to clear an alert; real sanitizer findings still need investigation.
 - Review the packed files before changing packaging. Keep dependencies and
   generated state inside the repository; commit the lockfile, not caches.
 - Follow CONTRIBUTING's [dependency update
@@ -476,8 +483,8 @@ only and remove superseded transition notes.
   freshly prepared compiled product outside the runner's heap. Preserve the
   single sample, source-size allowance, cached-answer checks and failing actual
   retention controls. Each full-size warm-up and measured corpus must use
-  disjoint paths, basenames and full source content. Content guards retain only
-  bounded digests; prefilled cache keys can otherwise hide growth. Wrapper
+  disjoint paths, basenames and full source content; prefilled cache keys can
+  otherwise hide growth. Content guards retain only bounded digests. Wrapper
   collection is not evidence about primitive text.
 - Test navigation follows product responsibilities: `engine.test.ts` covers
   phase execution and semantic acceptance; `config.test.ts` and
