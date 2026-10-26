@@ -167,7 +167,7 @@ not replace explanatory comments or links to PRs.
 - Every item has one `Type:` label and at most one `Status:` label, for its
   current disposition or next action. A feature's implementation PR uses
   `Type: Feature Request`. There are no priority labels; milestones and projects
-  are not used, and only a request for the owner has an assignee.
+  are not used. Requests for people are assigned to the person being asked.
 - New items carry only a type until an assigned agent reviews them.
   `Status: Confirmed` means a reproduced defect or an accepted request within
   scope.
@@ -179,8 +179,8 @@ not replace explanatory comments or links to PRs.
 - `Needs: Owner` marks a request that only the repository owner can answer: a
   change of direction or scope, or a step that needs their identity, sign-in, or
   second factor, such as npm account settings. `Needs: Human` marks an
-  observation or action that any suitable person could provide and no check can.
-  Use only the more specific of the two; either can stand with
+  observation, usability judgement, or action that a suitable person can
+  provide. Use only the more specific of the two; either can stand with
   `Status: Blocked`. See [Requests for people](#requests-for-people).
 - A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
   item explains the decision and keeps `Status: Won't Do`, and can be
@@ -196,11 +196,13 @@ links to other issues and PRs.
 
 ## Requests for people
 
-The maintaining agents own verification as well as the code. The repository
-owner is not a routine tester, reviewer, or release engineer, and nothing waits
-for them to try a change. Ask a person only for what no check can provide: the
-owner's decision on direction or scope, a step that needs their identity or
-access, or an observation that no test, container, or API can make.
+The maintaining agents own verification as well as the code. Human usability
+testing is required before the first stable release and after substantial
+interface or workflow changes, as
+[RELEASING.md](RELEASING.md#human-release-testing) describes. Agents prepare and
+track that work; the owner does not take over engineering, regression testing,
+or code review. Other requests cover decisions on direction or scope, identity
+or access, and unavailable observations.
 
 Make such a request an issue, or reuse the issue that already owns the question,
 so that it can be answered on GitHub without a checkout or a conversation. State
@@ -208,11 +210,15 @@ what is needed, why an agent cannot provide it, the recommendation or the
 choices, what result to expect, and which work waits for it. A request for an
 observation names the build, supplies synthetic inputs, gives numbered steps and
 the expected outcome, and lists what to report. Label it `Needs: Owner` or
-`Needs: Human`, assign an owner-only request to the owner, and give the work it
-blocks `Status: Blocked` with a link; optional feedback blocks nothing. Keep
-private details out of the issue. Record an answer given elsewhere in the issue,
-act on it, and update its labels and the items it unblocks. A request that comes
-back is a gap in the checks: improve them rather than asking again.
+`Needs: Human`, assign the person being asked (including the owner under either
+label), and give the work it blocks `Status: Blocked` with a link; optional
+feedback blocks nothing. Keep private details out of the issue. Record an answer
+given elsewhere in the issue, act on it, and update its labels and the items it
+unblocks. Verify the live assignment and labels and link the pending request
+before ending the thread. Keep it open after candidate publication or
+preparation merges; close it only after the answer and resulting work are
+handled. Improve repeated mechanical checks without removing required human
+judgement.
 
 ## Review and verification
 
