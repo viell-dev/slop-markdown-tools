@@ -20,13 +20,17 @@ export async function collectGarbage() {
 // Loaders build fresh text and keep no copy of the generated backing strings.
 const marks = ["plain", "é-𝒳"];
 
-/** @param {number} scale @param {string} [prefix] */
-export function memoryFixture(scale, prefix = "") {
+/** @param {number} scale @param {string} [prefix] @param {string} [filler] */
+export function memoryFixture(scale, prefix = "", filler = "") {
+  assert(/^[a-z]?$/.test(filler), "Filler must be empty or one lowercase ASCII letter");
+  const htmlWord = filler ? `${filler}iller` : "filler";
+  const proseWord = filler ? `${filler}rose` : "prose";
+  const codeWord = filler ? `${filler}ode` : "code";
   const long = (/** @type {string} */ words, /** @type {number} */ times) =>
     `${words} `.repeat(times * scale);
   const html = (/** @type {string} */ mark) =>
-    `<p>${long(`filler ${mark} in an HTML block`, 80)}</p>`;
-  const prose = (/** @type {string} */ mark) => long(`prose ${mark} in one paragraph`, 40);
+    `<p>${long(`${htmlWord} ${mark} in an HTML block`, 80)}</p>`;
+  const prose = (/** @type {string} */ mark) => long(`${proseWord} ${mark} in one paragraph`, 40);
   /** @type {Record<string, () => string>} */
   const files = {};
   marks.forEach((mark, target) => {
@@ -40,7 +44,7 @@ export function memoryFixture(scale, prefix = "") {
         "</div>",
         "",
         "```",
-        long(`code ${mark} in a block that makes the file larger than its parts`, 20),
+        long(`${codeWord} ${mark} in a block that makes the file larger than its parts`, 20),
         "```",
         "",
       ].join("\n");

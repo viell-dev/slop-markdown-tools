@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import console from "node:console";
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import process from "node:process";
 import {
   getHeapCodeStatistics,
@@ -27,24 +29,35 @@ async function settledHeap() {
 }
 
 const targetPaths = new Set();
+const targetBasenames = new Set();
+const sourceHashes = new Set();
 /** @param {Record<string, () => string>} files */
-function registerPaths(files) {
-  for (const name of Object.keys(files)) {
+function registerWorkload(files) {
+  for (const [name, read] of Object.entries(files)) {
     assert(!targetPaths.has(name), `Memory workloads reused target path: ${name}`);
+    const basename = path.posix.basename(name);
+    assert(!targetBasenames.has(basename), `Memory workloads reused basename: ${basename}`);
+    // Retain only a bounded digest. The raw generated source stays in this
+    // synchronous call, which finishes before the baseline's collection.
+    const hash = createHash("sha256").update(read()).digest("hex");
+    assert(!sourceHashes.has(hash), `Memory workloads reused source content: ${name}`);
     targetPaths.add(name);
+    targetBasenames.add(basename);
+    sourceHashes.add(hash);
   }
 }
 
-// Warm full-size paths without populating a filename cache for measured inputs.
-// Each warm-up also has its own names, so an unbounded path cache keeps growing.
+// Keep warm-up paths, basenames and full source content distinct from measured
+// inputs, while preserving construct kinds and sizes with filler substitutions.
 for (let warm = 0; warm < 2; warm++) {
-  const prefix = `warmup-${warm}/`;
-  const fixture = memoryFixture(1000, prefix);
-  registerPaths(fixture.files);
+  const prefix = `warmup-${warm}-`;
+  const filler = warm === 0 ? "x" : "y";
+  const fixture = memoryFixture(1000, prefix, filler);
+  registerWorkload(fixture.files);
   checkMemoryAnchors(createWorkspace(fixture.files), prefix);
 }
 const fixture = memoryFixture(1000);
-registerPaths(fixture.files);
+registerWorkload(fixture.files);
 assert(fixture.smallest > 1_000_000);
 const before = await settledHeap();
 const index = createWorkspace(fixture.files);

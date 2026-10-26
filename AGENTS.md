@@ -476,8 +476,9 @@ only and remove superseded transition notes.
   freshly prepared compiled product outside the runner's heap. Preserve the
   single sample, source-size allowance, cached-answer checks and failing actual
   retention controls. Each full-size warm-up and measured corpus must use
-  disjoint target paths; prefilled filename caches can otherwise hide growth.
-  Wrapper collection is not evidence about primitive text.
+  disjoint paths, basenames and full source content. Content guards retain only
+  bounded digests; prefilled cache keys can otherwise hide growth. Wrapper
+  collection is not evidence about primitive text.
 - Test navigation follows product responsibilities: `engine.test.ts` covers
   phase execution and semantic acceptance; `config.test.ts` and
   `plugins.test.ts` cover configuration and registration/schema contracts.
