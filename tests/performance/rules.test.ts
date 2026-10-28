@@ -114,3 +114,21 @@ it("checks heading link attributes with linear scaling", () => {
     ),
   ).toBeLessThan(10);
 });
+
+it("verifies spaced emphasis in one paragraph with linear scaling", () => {
+  // Reading the paragraph again for each pair of markers took time that grew
+  // with the square of their number; one reading checks them all.
+  const { check } = builtInRules["content/emphasis-spacing"]!;
+  expect(
+    scaling(
+      [250, 1000],
+      (count) => {
+        const source = `${Array.from({ length: count }, (_, line) => `Line ${line} has ** bold ** text.`).join("\n")}\n`;
+        return { count, document: parse(source, "github") };
+      },
+      ({ document }) => check({ document, options: {} }),
+      (findings, { count }) => expect(findings).toHaveLength(count),
+      1,
+    ),
+  ).toBeLessThan(10);
+});

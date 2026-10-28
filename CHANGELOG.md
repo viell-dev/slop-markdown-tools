@@ -12,6 +12,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Three report-only rules, in no preset, cover markdownlint's MD037, MD038, and
+  MD039: `content/emphasis-spacing` reports emphasis or strong markers with
+  blank space just inside them, as in `** bold **`, where the parser reads
+  emphasis once the spaces are gone; `content/inline-code-spacing` reports blank
+  space at the ends of a code span that renderers show as part of the code; and
+  `links/text-spacing` reports blank space at the ends of link text. They leave
+  alone a single `*` or `_` with spaces on both sides, as in `a * b * c`,
+  arithmetic, markers inside words, identifiers, emoji codes, the content of
+  inline HTML elements such as `<code>`, JSX comments, and code whose blank
+  space shows syntax or indentation, as in `- `, or keeps a backtick apart
+  ([#689](https://github.com/viell-dev/slop-markdown-tools/issues/689),
+  [#690](https://github.com/viell-dev/slop-markdown-tools/issues/690),
+  [#691](https://github.com/viell-dev/slop-markdown-tools/issues/691)).
+
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
   also reports a fragment that reaches its anchor only because the renderer
