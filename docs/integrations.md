@@ -155,9 +155,9 @@ follow each check's documented purpose, not the other tool's known defects.
 
 `style/table` leaves tables inside lists and block quotes as written
 ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
-markdownlint's [suppression comments](configuration.md#suppression-comments)
-correspond to `<!-- mdrefine-disable -->` and its relatives, and its custom
-rules to [plugins](plugins.md).
+markdownlint's comments such as `<!-- markdownlint-disable -->` correspond to
+mdrefine's [suppression comments](configuration.md#suppression-comments), and
+its custom rules to [plugins](plugins.md).
 
 For the heading checks, markdownlint's `level`, `allow_preamble`, and
 `front_matter_title` choices correspond to mdrefine's `level`, `allowPreamble`,
