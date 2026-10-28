@@ -609,7 +609,8 @@ describe("style/heading closing sequences", () => {
     ["#  #\n", "#\n"],
     ["> # Quoted #\n", "> # Quoted\n"],
     ["- # Listed #\n", "- # Listed\n"],
-    ["  # Indented #\n", "  # Indented\n"],
+    // The indentation goes too, since #680.
+    ["  # Indented #\n", "# Indented\n"],
     ["# Title #\r\n", "# Title\r\n"],
     ["# Title #", "# Title"],
   ])("removes the closing sequence of %j", (source, output) => {
@@ -673,13 +674,15 @@ describe("style/heading with underlined headings", () => {
     ["# [a]: https://example.com\n"],
     ["## a | b\n"],
     ["# Ends\\\\\n"],
-    // Headings in containers, empty headings, and indented ones.
+    // Headings in containers and empty headings.
     ["> # Quoted\n"],
     ["- # Listed\n"],
     ["#\n"],
-    ["  # Indented\n"],
   ])("keeps %j a # heading", (source) => {
     kept(source, setext);
+  });
+  it("underlines an indented # heading once its indentation is removed (#680)", () => {
+    expect(formatted("  # Indented\n", setext)).toBe("Indented\n========\n");
   });
   it("keeps a heading with an attribute block on Forgejo and Gitea", () => {
     for (const dialect of ["forgejo", "gitea"] as const)
