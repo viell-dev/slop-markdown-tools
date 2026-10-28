@@ -1,4 +1,6 @@
 import fc from "fast-check";
+import { HtmlRenderer, Parser } from "commonmark";
+import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
 import { dialects, lint, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { Dialect, RuleSetting } from "../../src/index.js";
@@ -250,6 +252,47 @@ describe("style/emphasis and style/strong in reference labels", () => {
 
 describe("style/inline-code", () => {
   const rule = { "style/inline-code": "warn" } as const;
+  it.each(dialects)("minimizes delimiters without changing content on %s", (dialect) => {
+    for (const [source, output] of [
+      ["Use ``a``.", "Use `a`."],
+      ["Use ````a``b````.", "Use `a``b`."],
+      ["Use ``` `a` ```.", "Use `` `a` ``."],
+      ["Use ``  a  ``.", "Use `  a  `."],
+      ["Use ``   ``.", "Use `   `."],
+      ["Use `` a ``.", "Use `a`."],
+      ["Use ``a`` and ```b```.", "Use `a` and `b`."],
+    ] as const) {
+      const config = only(rule, dialect);
+      expect(formatted(source, config)).toBe(output);
+      expect(semanticFingerprint(parse(output, dialect))).toBe(
+        semanticFingerprint(parse(source, dialect)),
+      );
+      expect(formatted(source, only({}, dialect))).toBe(source);
+      for (const eol of ["\n", "\r\n"]) expect(formatted(source + eol, config)).toBe(output + eol);
+      const commonmark = new Parser();
+      const html = new HtmlRenderer();
+      expect(html.render(commonmark.parse(output))).toBe(html.render(commonmark.parse(source)));
+      const markdown = new MarkdownIt();
+      expect(markdown.render(output)).toBe(markdown.render(source));
+    }
+  });
+  it.each(dialects)("keeps earlier potential backtick partners on %s", (dialect) => {
+    for (const source of ["A ` stray and ``code``.", "A \\`` stray and ``code``."])
+      expect(formatted(source, only(rule, dialect))).toBe(source);
+  });
+  it.each(["github", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+    "keeps escaped pipes inside table cells on %s (#714)",
+    (dialect) => {
+      const source = "| Value | Other |\n| --- | --- |\n| ``a\\|b`` | c |\n";
+      const output = source.replace("``a\\|b``", "`a\\|b`");
+      expect(formatted(source, only(rule, dialect))).toBe(output);
+      expect(semanticFingerprint(parse(output, dialect))).toBe(
+        semanticFingerprint(parse(source, dialect)),
+      );
+      const markdown = new MarkdownIt();
+      expect(markdown.render(output)).toBe(markdown.render(source));
+    },
+  );
   it.each([
     // Joined, an `==` or `[[` left as text would open a highlight or wikilink.
     "Text with ==a highlight `code` `\nspan`== here.\n",

@@ -18,7 +18,7 @@ import { optionsSchema } from "./shared.js";
 const styleRules: Record<string, Rule> = {
   "style/wrap": wrap,
   "style/inline-code": {
-    description: "Join multiline code spans using their CommonMark rendered value.",
+    description: "Use minimal backticks and join code spans using their CommonMark rendered value.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({}),
@@ -41,7 +41,7 @@ const styleRules: Record<string, Rule> = {
         if (inlineBlocks.has(node.type)) blockStart = range(node)[0];
         if (node.type !== "inlineCode") return;
         const [start, end] = range(node);
-        if (!/[\r\n]/.test(source.slice(start, end))) return;
+        const original = source.slice(start, end);
         // Forgejo and Gitea look for a heading's attribute block on its last
         // text line, and Forgejo also builds the anchor from that line alone.
         // Joining lines would change what that line holds.
@@ -87,10 +87,18 @@ const styleRules: Record<string, Rule> = {
         // The joined span holds the text that GitHub shows. A space at each end
         // keeps a backtick there from joining the fence, or spaces there from
         // being taken off.
-        const value = codeSpanText(node);
-        let longest = 0;
-        for (const run of value.matchAll(/`+/g)) longest = Math.max(longest, run[0].length);
-        const marker = "`".repeat(longest + 1);
+        const originalLength = /^`+/.exec(original)![0].length;
+        let value = codeSpanText(node);
+        if (!/[\r\n]/.test(original)) {
+          // Preserve source escapes in table cells (notably \|). Their parsed
+          // value alone cannot be printed back without changing cell boundaries.
+          value = original.slice(originalLength, -originalLength);
+          if (/^ [^]* $/.test(value) && /[^ ]/.test(value)) value = value.slice(1, -1);
+        }
+        const lengths = new Set([...value.matchAll(/`+/g)].map((run) => run[0].length));
+        let length = 1;
+        while (lengths.has(length)) length++;
+        const marker = "`".repeat(length);
         // An earlier run of the new backticks that the parser left as text, or
         // that lies in a link destination, would pair with the new opening one.
         // The span's own backticks cannot have such a run before them.
@@ -106,11 +114,15 @@ const styleRules: Record<string, Rule> = {
           }
         }
         const pad = /^`|`$/.test(value) || (/^ .* $/.test(value) && /[^ ]/.test(value)) ? " " : "";
+        const text = `${marker}${pad}${value}${pad}${marker}`;
+        if (text === original) return;
         findings.push({
           start,
           end,
-          message: "Join the code span onto one line.",
-          edit: { start, end, text: `${marker}${pad}${value}${pad}${marker}` },
+          message: /[\r\n]/.test(original)
+            ? "Join the code span onto one line."
+            : "Use the fewest backticks for the code span.",
+          edit: { start, end, text },
         });
       });
       return findings;

@@ -188,9 +188,10 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
     const token = fences.get(node.position!.start.line - 1);
     if (!token) return;
     // Keep the written alias, separating highlight/line-number/title suffixes.
-    const language = /^[a-zA-Z0-9_-]+/.exec(token.info)?.[0] ?? "";
+    const info = token.info.trimStart();
+    const language = /^[a-zA-Z0-9_-]+/.exec(info)?.[0] ?? "";
     node.lang = language || null;
-    node.meta = token.info.slice(language.length).trim() || null;
+    node.meta = info.slice(language.length).trim() || null;
   });
   const lines = new Map<number, InlineCode[]>();
   walk(tree, "inlineCode", (node) => {
