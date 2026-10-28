@@ -859,7 +859,7 @@ describe("the block and whitespace rules together", () => {
     const source =
       "\n\nTitle  \n=====\n\n\n\n## Setup ##\nInstall it.   \n~~~sh\nnpm test  \n~~~\n***\n\n\n* * *\n| a |\n|-|\n\n\n";
     expect(formatted(source, only(all))).toBe(
-      "# Title\n\n## Setup\n\nInstall it.\n```sh\nnpm test  \n```\n---\n\n---\n| a   |\n| --- |\n",
+      "# Title\n\n## Setup\n\nInstall it.\n\n```sh\nnpm test  \n```\n\n---\n\n---\n\n| a   |\n| --- |\n",
     );
   });
   it("is in the recommended preset", () => {

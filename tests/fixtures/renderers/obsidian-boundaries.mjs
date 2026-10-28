@@ -1677,4 +1677,41 @@ export const boundaryFixtures = [
     source: "a ``` b\n\n- item\n  *x* y\n\nc ```\n",
     preserve: false,
   },
+  // New separators around closed fences and tables, which both views must still
+  // read as the same blocks (#684, #697).
+  ...[
+    ["fence below a quote", "> quote\n```\ncode\n```\n"],
+    ["fence above a quote", "```\ncode\n```\n> quote\n"],
+    ["adjacent fences", "```\na\n```\n~~~\nb\n~~~\n"],
+    ["fence below display math", "$$\nx\n$$\n```\ncode\n```\n"],
+    ["fence below a footnote definition", "a[^1]\n\n[^1]: note\n```\ncode\n```\n"],
+    ["fence above an HTML block", "```\ncode\n```\n<div>x</div>\n"],
+    ["fence below a thematic break", "***\n```\ncode\n```\n"],
+  ].map(([name, source]) => ({ issue: 684, name, source, preserve: false })),
+  ...[
+    ["table above a quote", "| a | b |\n| - | - |\n| c | d |\n> quote *text*\n"],
+    ["table above a fence", "| a | b |\n| - | - |\n```\ncode\n```\n"],
+    ["table above a thematic break", "| a | b |\n| - | - |\n***\n"],
+    ["table above an HTML block", "| a | b |\n| - | - |\n<div>x</div>\n"],
+    // Live Preview shows the rows of a table directly below another block as
+    // text, where Reading view shows a table, so these keep their boundary.
+    ["table below a fence", "```\ncode\n```\n| a | b |\n| - | - |\n"],
+    ["table below a thematic break", "***\n| a | b |\n| - | - |\n"],
+    ["table below an HTML block", "<pre>\nx\n</pre>\n| a | b |\n| - | - |\n"],
+  ].map(([name, source]) => ({ issue: 697, name, source, preserve: false })),
+  // The views keep text with an adjacent fence or table and read a piped line
+  // or a hyphen underline below a table otherwise, so these stay as written.
+  { issue: 684, name: "text around a fence", source: "Text\n```\ncode\n```\nText\n" },
+  {
+    issue: 684,
+    name: "tilde fence with a backtick below a table",
+    source: "| a   | b   |\n| --- | --- |\n~~~ a`b\nc\n~~~\n",
+  },
+  { issue: 697, name: "text above a table", source: "Text\n| a   | b   |\n| --- | --- |\n" },
+  { issue: 697, name: "piped quote below a table", source: "| a   | b   |\n| --- | --- |\n> c | d\n" },
+  {
+    issue: 697,
+    name: "hyphen break below a table",
+    source: "| a   | b   |\n| --- | --- |\n| c   | d   |\n---\n",
+  },
 ];

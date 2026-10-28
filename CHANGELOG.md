@@ -73,6 +73,14 @@ prereleases' notes there are longer than their entries here.
   ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
   [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
 
+- `style/block-spacing` also separates fenced code blocks that have a closing
+  fence, and tables, from the blocks around them, as markdownlint's `MD031` and
+  `MD058` and Prettier do. Blocks inside list items and footnote definitions
+  stay as written, and a table is separated only from blocks that every renderer
+  reads as separate from it: text below a table, which GFM reads as another row,
+  stays ([#684](https://github.com/viell-dev/slop-markdown-tools/issues/684),
+  [#697](https://github.com/viell-dev/slop-markdown-tools/issues/697)).
+
 - `style/heading` writes one space between ATX heading hashes and text,
   including tabs and retained closing sequences. Empty headings need no
   separator. Protected Forgejo and Gitea attribute suffixes stay as written
