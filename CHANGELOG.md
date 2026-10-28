@@ -10,6 +10,14 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Added
+
+- `style/emphasis` and `style/strong` accept `marker: "consistent"`: the first
+  parsed emphasis or strong text chooses its marker for the document. Preset
+  defaults stay unchanged
+  ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
+  [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
+
 ### Fixed
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's

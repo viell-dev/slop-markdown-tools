@@ -249,7 +249,9 @@ describe("configuration and plugins", () => {
     expect(() =>
       lint("", { config: { extends: [], rules: { "style/emphasis": ["warn", { marker: "~" }] } } }),
     ).toThrow(
-      new Error('Invalid options for style/emphasis: "marker" must be "*" or "_", not "~"'),
+      new Error(
+        'Invalid options for style/emphasis: "marker" must be "*", "_", or "consistent", not "~"',
+      ),
     );
   });
 });
