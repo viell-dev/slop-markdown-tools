@@ -165,8 +165,15 @@ const transparent = new Set(["emphasis", "strong", "delete"]);
 const notAfter = /[\w\])]/;
 /** Characters that a backslash escapes. */
 const asciiPunctuation = /[!-/:-@[-`{-~]/;
-/** The start of a URL written as text, which a bracket in it belongs to. */
-const urlStart = /^(?:[A-Za-z][A-Za-z\d+.-]*:\/\/|www\.)/;
+/** A character of a URL's scheme. */
+const schemeCharacter = /[A-Za-z\d+.-]/;
+/**
+ * What may come before a URL written as text that starts with `www.`, as GFM's
+ * autolink literals allow: blank space or one of `(*_[]~`, besides the block's
+ * start. A scheme such as `https://` may come after any character that is not
+ * part of it, such as a quote.
+ */
+const beforeWww = /[\t\n\r (*_[\]~]/;
 /** HTML elements without content, whose start tag opens nothing. */
 const voidElements = new Set([
   "area",
@@ -188,9 +195,11 @@ const voidElements = new Set([
  * The ranges of a block's text that lie inside an element of its inline HTML,
  * as `[i]` in `<code>[i]</code>`: written as HTML, where the author does not
  * expect a Markdown reference. An element that is never closed runs to the
- * block's end, as it does in a browser.
+ * block's end, as it does in a browser. A browser ignores the `/` of
+ * `<span/>`, which leaves the element open; only Vue, which renders VitePress's
+ * HTML, closes any element with it.
  */
-function insideInlineHtml(block: Nodes): [number, number][] {
+function insideInlineHtml(block: Nodes, vue: boolean): [number, number][] {
   const ranges: [number, number][] = [];
   const open: string[] = [];
   let from = 0;
@@ -204,7 +213,7 @@ function insideInlineHtml(block: Nodes): [number, number][] {
       if (at < 0) return;
       open.length = at;
       if (at === 0) ranges.push([from, start]);
-    } else if (!voidElements.has(name) && !/\/>$/.test(node.value)) {
+    } else if (!voidElements.has(name) && !(vue && /\/>$/.test(node.value))) {
       if (open.length === 0) from = end;
       open.push(name);
     }
@@ -273,15 +282,15 @@ function undefinedReferences(
         : undefined;
     let html: [number, number][] | undefined;
     /** Whether the shortcut `[label]` from `opener` to `close` means something other than a reference. */
-    const notShortcut = (opener: number, close: number, word: number) => {
+    const notShortcut = (opener: number, close: number, url: boolean) => {
       const label = source.slice(opener + 1, close);
       if (opener === start && leading === "task" && [...label].length === 1) return true;
       if (opener === start && leading === "callout" && label.startsWith("!")) return true;
       const before = opener > 0 && readable[opener - 1] ? source[opener - 1] : "";
       if (document.dialect === "obsidian" && before === "^") return true;
       if (forge && before === "[" && source[close + 1] === "]" && readable[close + 1]) return true;
-      if (urlStart.test(source.slice(word, Math.min(opener, word + 64)))) return true;
-      html ??= insideInlineHtml(node);
+      if (url) return true;
+      html ??= insideInlineHtml(node, document.dialect === "vitepress");
       return html.some(([from, to]) => opener >= from && opener < to);
     };
     // Forgejo and Gitea render `\(...\)` and `\[...\]` as math, which GFM reads as text.
@@ -298,22 +307,37 @@ function undefinedReferences(
           from = closing + 2;
         }
     const openers: number[] = [];
-    // Where the run of characters without blank space that holds each opener starts.
-    const words: number[] = [];
-    let wordStart = start;
+    // Whether each opener lies in a URL written as text, which runs from its
+    // scheme or `www.` to blank space or a `<`, as GFM's autolink literals do.
+    const urls: boolean[] = [];
+    let url = false;
     // The opening bracket of the last full reference's label, which is not read again.
     let label = -1;
     for (let i = start; i < end; i++) {
-      if (shortcuts && /[ \t\r\n]/.test(source[i]!)) wordStart = i + 1;
+      if (shortcuts) {
+        const character = source[i]!;
+        if (character === "<" || /[ \t\r\n]/.test(character)) url = false;
+        else if (!url && character === ":" && source.startsWith("//", i + 1)) {
+          let scheme = i;
+          while (scheme > start && schemeCharacter.test(source[scheme - 1]!)) scheme--;
+          url = /[A-Za-z]/.test(source.slice(scheme, i));
+        } else if (
+          !url &&
+          (character === "w" || character === "W") &&
+          /^www\./i.test(source.slice(i, i + 4)) &&
+          (i === start || beforeWww.test(source[i - 1]!))
+        )
+          url = true;
+      }
       if (!readable[i]) continue;
       if (source[i] === "[") {
         openers.push(i);
-        words.push(wordStart);
+        urls.push(url);
         continue;
       }
       if (source[i] !== "]") continue;
       const opener = openers.pop();
-      const word = words.pop() ?? start;
+      const inUrl = urls.pop() ?? false;
       if (opener === undefined || opener === label) continue;
       let reference: Reference | undefined;
       if (source[i + 1] === "[" && readable[i + 1]) {
@@ -362,7 +386,7 @@ function undefinedReferences(
         labelEnd(source, opener, i + 1) === i + 1 &&
         !definitions.has(normalizeLabel(labelText(source.slice(opener + 1, i)))) &&
         !(opener > 0 && readable[opener - 1] && notAfter.test(source[opener - 1]!)) &&
-        !notShortcut(opener, i, word)
+        !notShortcut(opener, i, inUrl)
       )
         references.push({
           start: opener,

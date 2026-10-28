@@ -1,10 +1,4 @@
-import {
-  hasHeadingPath,
-  headingPath,
-  obsidianAnchors,
-  githubAnchors,
-  forgeAnchors,
-} from "./anchors.js";
+import { headingPath, obsidianAnchors, githubAnchors, forgeAnchors } from "./anchors.js";
 import type { ObsidianAnchors, GithubAnchors, ForgeAnchors } from "./anchors.js";
 import { githubFileAnchors } from "./github-file-anchors.js";
 import path from "node:path";
@@ -171,6 +165,11 @@ export function createTargetIndex(
     return foldedDirectories.has(name.toLowerCase());
   }
   const targets = new Map<string, Target>();
+  /**
+   * The heading path that hasAnchor() last searched for, without regard to case,
+   * which anchorSpelling() reads for the same fragment rather than search again.
+   */
+  let lastPath: { anchors: ObsidianAnchors; fragment: string; names?: string[] } | undefined;
   /** What the host's lookup found, by the matching asked for and the path. */
   const lookedUp = new Map<string, LookupResult | undefined>();
   /** The sources of the files that the lookup found, by path. */
@@ -282,7 +281,10 @@ export function createTargetIndex(
       if (anchors.headings.has(fragment) || anchors.foldedHeadings.has(fragment.toLowerCase()))
         return true;
       // A path of headings, each below the one before, such as `Setup#Mobile`.
-      return fragment.includes("#") && hasHeadingPath(anchors.outline, fragment.split("#"));
+      if (!fragment.includes("#")) return false;
+      const names = headingPath(anchors.outline, fragment.split("#"));
+      lastPath = { anchors, fragment, ...(names ? { names } : {}) };
+      return names !== undefined;
     }
     if (dialect === "forgejo" || dialect === "gitea") {
       const forge = target.forge ?? compute(target, value, name, forgeAnchors);
@@ -321,11 +323,6 @@ export function createTargetIndex(
   ): string | undefined {
     const target = targets.get(name);
     if (!target) return undefined;
-    const variant = (anchors: Iterable<string>, wanted: string) => {
-      const folded = wanted.toLowerCase();
-      for (const candidate of anchors) if (candidate.toLowerCase() === folded) return candidate;
-      return undefined;
-    };
     if (dialect === "vitepress") {
       // The anchor reached is the fragment's slug, which is lowercase.
       const reached = vitepressSlug(fragment, options.vitepress);
@@ -334,12 +331,15 @@ export function createTargetIndex(
     if (dialect === "obsidian") {
       const anchors = target.obsidian;
       if (!anchors || fragment.startsWith("^") || anchors.headings.has(fragment)) return undefined;
-      const parts = fragment.includes("#") ? fragment.split("#") : undefined;
-      if (parts && headingPath(anchors.outline, parts, true)) return undefined;
-      return (
-        variant(anchors.headings, fragment) ??
-        (parts && headingPath(anchors.outline, parts)?.join("#"))
-      );
+      const heading = anchors.foldedHeadings.get(fragment.toLowerCase());
+      if (!fragment.includes("#")) return heading;
+      const parts = fragment.split("#");
+      const found =
+        lastPath?.anchors === anchors && lastPath.fragment === fragment ? lastPath : undefined;
+      // A chain of headings spelled as the fragment is, which hasAnchor() may have found.
+      if (found?.names?.join("#") === fragment || headingPath(anchors.outline, parts, true))
+        return undefined;
+      return heading ?? (found ? found.names : headingPath(anchors.outline, parts))?.join("#");
     }
     if (dialect === "forgejo" || dialect === "gitea" || !target.github) return undefined;
     const anchors = dialect === "github" ? target.github.file : target.github.markdown;

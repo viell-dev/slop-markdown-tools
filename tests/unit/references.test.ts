@@ -174,8 +174,12 @@ describe("links/undefined-reference options", () => {
     ["- Item [x] here\n", "[x]", "x"],
     // A marker only starts a block quote.
     ["Text [!NOTE] here.\n", "[!NOTE]", "!NOTE"],
-    // Brackets after a URL's blank space are no longer in it.
+    // Brackets after a URL's blank space or `<` are no longer in it.
     ["See https://example.com/ [a]\n", "[a]", "a"],
+    ["See https://example.com/<[a]\n", "[a]", "a"],
+    // GFM links `www.` only after blank space or one of `(*_[]~`.
+    ["See 'www.example.com/[a]'.\n", "[a]", "a"],
+    ["See xwww.example.com/[a]\n", "[a]", "a"],
   ])("reports a shortcut when asked: %j", (source, span, label) => {
     expect(check(source, rule)).toEqual([]);
     const findings = check(source, rule, "github", shortcuts);
@@ -229,6 +233,11 @@ describe("links/undefined-reference options", () => {
     // URLs written as text, which GFM links and CommonMark shows as written.
     ["https://example.com/[a] and www.example.com/path/[b]\n", "github"],
     ["https://example.com/[a] and www.example.com/path/[b]\n", "commonmark"],
+    // A URL starts after punctuation as autolink literals start, such as in parentheses or quotes.
+    ["See (https://example.com/[a]) and (www.example.com/[b]).\n", "commonmark"],
+    ["See \"https://example.com/[a]\" and 'ftp://example.com/[b]'.\n", "commonmark"],
+    ["See *www.example.com/[a]* and x.https://example.com/[b]\n", "commonmark"],
+    ["See (https://example.com/[a]).\n", "obsidian"],
     // Task marks, where the parser reads none.
     ["- [x] done\n- [X] done\n1. [ ] todo\n", "commonmark"],
     ["- [x]\n- [/] in progress\n", "github"],
@@ -245,6 +254,16 @@ describe("links/undefined-reference options", () => {
     ["[[toc]]\n", "vitepress"],
   ] as const)("does not read %j in %s as a shortcut", (source, dialect) => {
     expect(check(source, rule, dialect, shortcuts)).toEqual([]);
+  });
+  it("reads `/>` as closing only void elements, except in VitePress's Vue templates", () => {
+    // A browser ignores the slash, so `[label]` is inside the span.
+    const source = "Text <br/>[before] and <span/>[label]\n";
+    expect(spans(source, check(source, rule, "github", shortcuts))).toEqual(["[before]"]);
+    expect(spans(source, check(source, rule, "commonmark", shortcuts))).toEqual(["[before]"]);
+    expect(spans(source, check(source, rule, "vitepress", shortcuts))).toEqual([
+      "[before]",
+      "[label]",
+    ]);
   });
   it("reads double brackets outside Forgejo and Gitea", () => {
     const source = "See [[Page]].\n";

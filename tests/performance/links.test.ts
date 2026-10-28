@@ -95,3 +95,34 @@ it("reads unclosed headings with linear scaling", () => {
     ),
   ).toBeLessThan(10);
 });
+
+function obsidianHeadings(count: number) {
+  const workspace = createWorkspace({
+    "Doc.md": "",
+    "Note.md": Array.from({ length: count }, (_, index) => `# Heading ${index}`).join("\n\n"),
+  });
+  // Reading the note's anchors once is linear, and stays outside the timed lookups.
+  workspace.resolve("Doc.md", "Note.md#Heading%200", "obsidian");
+  return { workspace, count };
+}
+it("spells the heading of a fragment in other letter case without scanning the headings", () => {
+  // Recovering `fragmentAnchor` by lowercasing every heading on each lookup
+  // took 1,380 ms for these 3,000 lookups in 10,000 headings, against 16 ms.
+  expect(
+    scaling(
+      [1000, 16000],
+      obsidianHeadings,
+      ({ workspace, count }) => {
+        let result = workspace.resolve("Doc.md", "Note.md", "obsidian");
+        for (let lookup = 0; lookup < 3000; lookup++)
+          result = workspace.resolve("Doc.md", `Note.md#heading%20${count - 1}`, "obsidian");
+        return result;
+      },
+      (result, { count }) =>
+        expect(result).toMatchObject({
+          fragmentExists: true,
+          fragmentAnchor: `Heading ${count - 1}`,
+        }),
+    ),
+  ).toBeLessThan(4);
+});

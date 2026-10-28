@@ -146,6 +146,71 @@ describe("content/image-alt", () => {
     expect(spans(inline, check(inline, rule, "vitepress"))).toEqual(['<img src="chart.png">']);
     expect(check('<img src="chart.png">\n', rule, "vitepress")).toEqual([]);
   });
+  it("reads raw-text elements across the Markdown between their tags, as a browser does", () => {
+    const others = dialects.filter((name) => name !== "github" && name !== "vitepress");
+    // The page holds `<textarea></p>\n<img src="x.png">\n</textarea>`: one textarea of text.
+    const open = 'Text <textarea>\n\n<img src="x.png">\n\n</textarea>\n';
+    for (const dialect of others) expect(check(open, rule, dialect), dialect).toEqual([]);
+    expect(spans(open, check(open, rule, "github"))).toEqual(['<img src="x.png">']);
+    // A comment does not exist inside the element, so its `</textarea>` ends it.
+    const closed = 'Text <textarea><!-- </textarea> --><img src="x.png"> text.\n';
+    for (const dialect of dialects)
+      expect(spans(closed, check(closed, rule, dialect)), dialect).toEqual(['<img src="x.png">']);
+    // Only the element's own end tag ends it.
+    const longer = 'Text <textarea></textareas><img src="x.png"></textarea> text.\n';
+    for (const dialect of others) expect(check(longer, rule, dialect), dialect).toEqual([]);
+    // Footnotes are shown at the page's end, after the image written below them.
+    const footnote = 'Text[^1] <textarea>\n\n[^1]: Note </textarea>\n\n<img src="x.png">\n';
+    for (const dialect of ["forgejo", "gitea", "obsidian"] as const)
+      expect(check(footnote, rule, dialect), dialect).toEqual([]);
+    const ordered = 'Text <textarea>\n\nNote </textarea>\n\n<img src="x.png">\n';
+    expect(spans(ordered, check(ordered, rule, "forgejo"))).toEqual(['<img src="x.png">']);
+  });
+  it("reads comments and script content as browsers do", () => {
+    const commonmark = (source: string) => spans(source, check(source, rule, "commonmark"));
+    // `<!-->` is a whole comment, and an end tag's attributes hold no elements.
+    expect(commonmark('<div>\n<!--> <img src="a.png">\n</div>\n')).toEqual(['<img src="a.png">']);
+    expect(commonmark("<div>\n</p title=\"<img src='b.png'>\">\n</div>\n")).toEqual([]);
+    expect(commonmark("<div>\n<!x <img src='c.png'>\n</div>\n")).toEqual([]);
+    // In a script, `<!--<script>` hides the next `</script>`.
+    const escaped = '<script>\n<!--<script>\n</script>\n<img src="d.png">\n</script>\n';
+    expect(commonmark(escaped)).toEqual([]);
+    const ended = '<script>\n<!-- -->\n</script>\n<img src="e.png">\n';
+    expect(commonmark(ended)).toEqual(['<img src="e.png">']);
+  });
+  it("reads Vue's attributes in VitePress's inline HTML", () => {
+    const vitepress = (source: string) => spans(source, check(source, rule, "vitepress"));
+    expect(vitepress('Text <img src="x.png" @click="() => {}"> text.\n')).toEqual([
+      '<img src="x.png" @click="() => {}">',
+    ]);
+    expect(vitepress('## Logo <img src="x.png" @load="done" :title="t">\n')).toEqual([
+      '<img src="x.png" @load="done" :title="t">',
+    ]);
+    expect(vitepress('Text <img src="x.png" @click="go" alt="Go"> text.\n')).toEqual([]);
+    // VitePress shows these as text: an escaped tag, and names its Markdown does not read.
+    expect(vitepress('Text \\<img src="x.png" @click="go"> text.\n')).toEqual([]);
+    expect(vitepress('Text <img #default src="x.png"> text.\n')).toEqual([]);
+    expect(vitepress('Text <img v-bind:[name]="v" src="x.png"> text.\n')).toEqual([]);
+    // A raw-text element that Vue reads holds the image.
+    expect(vitepress('Text <textarea @input="i"><img src="x.png"></textarea>\n')).toEqual([]);
+    // Elsewhere, CommonMark reads such a tag as text.
+    const source = 'Text <img src="x.png" @click="go"> text.\n';
+    expect(check(source, rule, "github")).toEqual([]);
+  });
+  it.each([
+    [":alt", ":title"],
+    [":alt.attr", ":title.attr"],
+    [":alt.prop", ":title.prop"],
+    [":alt.camel", ":title.camel"],
+    ["v-bind:alt", "v-bind:title"],
+    ["v-bind:alt.attr", "v-bind:title.attr"],
+    ["v-bind", "v-on"],
+    [":aria-hidden", ":aria-label"],
+  ])("reads Vue's %s binding in VitePress, unlike %s", (name, other) => {
+    const image = (attribute: string) => `Text <img src="x.png" ${attribute}="value"> text.\n`;
+    expect(check(image(name), rule, "vitepress")).toEqual([]);
+    expect(check(image(other), rule, "vitepress")).toHaveLength(1);
+  });
 });
 
 describe("content/table-columns", () => {

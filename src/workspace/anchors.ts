@@ -78,7 +78,8 @@ function literalUnderscoreText(node: Nodes, source: string): string {
  */
 interface ObsidianAnchors {
   headings: Set<string>;
-  foldedHeadings: Set<string>;
+  /** Each heading name lowercased, with the first heading's own spelling of it. */
+  foldedHeadings: Map<string, string>;
   /**
    * The headings in document order, with their levels and names, for a link to
    * a heading below another one, such as `[[Note#Setup#Mobile]]`.
@@ -181,12 +182,13 @@ function headingPath(
   parts: string[],
   exact = false,
 ): string[] | undefined {
-  const named = (names: string[], part: string) =>
-    names.find((name) => name === part) ??
-    (exact ? undefined : names.find((name) => name.toLowerCase() === part.toLowerCase()));
+  const folded = exact ? [] : parts.map((part) => part.toLowerCase());
+  const named = (names: string[], part: number) =>
+    names.find((name) => name === parts[part]) ??
+    (exact ? undefined : names.find((name) => name.toLowerCase() === folded[part]));
   const below = (part: number, from: number, depth: number): string[] | undefined => {
     for (let at = from; at < outline.length && outline[at]!.depth > depth; at++) {
-      const name = named(outline[at]!.names, parts[part]!);
+      const name = named(outline[at]!.names, part);
       if (name === undefined) continue;
       if (part === parts.length - 1) return [name];
       const rest = below(part + 1, at + 1, outline[at]!.depth);
@@ -196,16 +198,12 @@ function headingPath(
   };
   return below(0, 0, 0);
 }
-/** Whether the outline holds a chain of headings that `parts` name; see headingPath(). */
-function hasHeadingPath(outline: ObsidianAnchors["outline"], parts: string[]): boolean {
-  return headingPath(outline, parts) !== undefined;
-}
 
 /** A target's anchors for Obsidian. */
 function obsidianAnchors(document: Document): ObsidianAnchors {
   const anchors: ObsidianAnchors = {
     headings: new Set(),
-    foldedHeadings: new Set(),
+    foldedHeadings: new Map(),
     outline: [],
     blocks: new Set(),
   };
@@ -221,7 +219,8 @@ function obsidianAnchors(document: Document): ObsidianAnchors {
     const names = [...new Set([textContent(node), written])].map(detach);
     for (const name of names) {
       anchors.headings.add(name);
-      anchors.foldedHeadings.add(name.toLowerCase());
+      const folded = name.toLowerCase();
+      if (!anchors.foldedHeadings.has(folded)) anchors.foldedHeadings.set(folded, name);
     }
     anchors.outline.push({ depth: node.depth, names });
   });
@@ -380,5 +379,5 @@ function descriptionContents(
   });
   return contents;
 }
-export { hasHeadingPath, headingPath, obsidianAnchors, githubAnchors, forgeAnchors };
+export { headingPath, obsidianAnchors, githubAnchors, forgeAnchors };
 export type { ObsidianAnchors, GithubAnchors, ForgeAnchors };

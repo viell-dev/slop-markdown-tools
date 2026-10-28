@@ -118,9 +118,20 @@ from assistive technology with `aria-hidden="true"` is accepted too, except on
 GitHub, which removes that attribute but keeps `alt`. HTML in comments and in
 elements whose content is text, such as `<textarea>` and `<script>`, is not
 read, except on GitHub, whose tag filter shows those tags as text and the HTML
-between them as elements. In VitePress, `:alt`, `v-bind:alt`, and `v-bind` give
-Vue's `alt`, and an HTML block is an [opaque area](vitepress.md#preservation)
-whose findings are omitted, so only inline HTML images are checked there.
+between them as elements. The HTML of the whole document is read as a browser
+reads the page: such an element runs to its own end tag, across the Markdown
+between, and an end tag inside a comment there still ends it. Where such an
+element is left open, the rest of the document counts as its text; a renderer
+that shows each block on its own can still display an image there, which is then
+not reported. A tag that Markdown does not read as HTML, such as one with an
+attribute name that its grammar rejects, is not checked.
+
+In VitePress, an inline tag may hold Vue's attributes, such as `@click` and
+`:title`, as VitePress reads them; a tag with `#slot` or `v-bind:[key]` shows as
+text there. `:alt`, `v-bind:alt`, with modifiers such as `.attr` or `.prop`, and
+`v-bind` give Vue's `alt`, and a bound `aria-hidden` is accepted. An HTML block
+is an [opaque area](vitepress.md#preservation) whose findings are omitted, so
+only inline HTML images are checked there.
 
 Reported:
 
@@ -474,7 +485,13 @@ CommonMark or Obsidian's `[/]`; an alert or callout marker such as `[!NOTE]`
 that starts a block quote; an Obsidian inline footnote `^[note]`; a Forgejo or
 Gitea shortlink `[[Page]]`; text inside an inline HTML element, as in
 `<kbd>[Enter]</kbd>`; and a URL written as text, such as
-`https://example.com/[id]`.
+`https://example.com/[id]`. An element stays open until its end tag, except a
+void element such as `<br>`: a browser ignores the `/` in `<span/>`, which
+closes an element only in VitePress, whose HTML Vue renders. A URL runs from its
+scheme or `www.` to blank space or a `<`, as GFM's autolink literals read it: a
+scheme may follow any character that is not part of it, as in
+`(https://example.com/[id])` or a quoted URL, while `www.` must start the text
+or follow blank space or one of `(*_[]~`.
 
 `ignoredLabels` is an array of labels not to report, of any kind of reference.
 Its default, `[]`, ignores none. Labels match as the renderers match them,

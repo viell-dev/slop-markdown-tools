@@ -2670,6 +2670,12 @@ describe("links/valid options", () => {
       "Missing fragment in Note#^BLK.",
       caseMessage("Note.md#HEADING%20TWO", "Heading Two"),
     ]);
+    // A path that a later chain spells exactly is no other case, whichever chain is found first.
+    const paths = { "Note.md": "# A\n\n## b\n\n# a\n\n## B\n" };
+    const linked = "[[Note#a#B]] [[Note#a#b]] [[Note#A#b]]\n";
+    expect(messages(linked, "obsidian", paths, { exactCase: true })).toEqual([
+      caseMessage("Note#a#b", "A#b"),
+    ]);
   });
   it("reports a VitePress fragment that differs from its anchor in case alone", () => {
     const files = { "guide.md": "# Getting Started\n" };
