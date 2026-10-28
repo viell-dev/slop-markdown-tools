@@ -155,13 +155,12 @@ const styleRules: Record<string, Rule> = {
         const [headingStart, end] = range(node);
         const first = node.children[0];
         const last = node.children.at(-1);
-        // A protected heading can belong to a list the parser missed (#191).
-        // Its leading spaces lie before the node's protected source range.
-        const indentation = protectedHeading({
-          start: headingStart,
-          end: headingStart + 1,
-          text: "",
-        })
+        // A heading that a renderer protection covers in part keeps all of its
+        // indentation: it can belong to a list the parser missed (#191), or a
+        // view can read it as text, as Obsidian does with a reference-like
+        // Setext title whose underline is protected (#434). Its leading spaces
+        // lie before the protected source, so check the heading's whole range.
+        const indentation = protectedHeading({ start: headingStart, end, text: "" })
           ? []
           : headingIndentation(document, node);
         if (indentation.length) {

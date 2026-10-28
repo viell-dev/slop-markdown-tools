@@ -977,9 +977,9 @@ After 0.5.0, the rule also removes one to three spaces of heading indentation,
 including on Setext text and underline lines, without an option. Required list
 and quote prefixes stay as written; only spaces beyond those prefixes are
 removed. Indented code is not a heading. Ambiguous container prefixes stay as
-written, as do edits refused by the renderer protections. In Obsidian, protected
-indented Setext underlines retain their indentation and heading form;
-independent title lines can still be deindented.
+written. A heading that a renderer protection covers in part keeps all of its
+indentation and its form, such as an Obsidian Setext title whose indented
+underline or reference-like first line a view reads differently.
 
 | Option    | Values                              | Default    |
 | --------- | ----------------------------------- | ---------- |

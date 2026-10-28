@@ -27,15 +27,17 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
           const input = source!.replaceAll("\n", newline);
           const output = formatted(input, config);
           // Obsidian's existing renderer protection retains indented
-          // underlines; deindent only the independent title lines there.
+          // underlines, and a heading with any protected part keeps all of
+          // its indentation (#434).
           const protectedExpected =
-            dialect === "obsidian" && source === ">   Two\n>   lines\n>    ===\n"
-              ? "> Two\n> lines\n>    ===\n"
-              : dialect === "obsidian" && source === "- item\n\n    Two\n    lines\n     ===\n"
-                ? "- item\n\n  Two\n  lines\n     ===\n"
-                : dialect === "obsidian" && source === "  Two\n   lines\n  ===\n"
-                  ? "Two\nlines\n  ===\n"
-                  : expected!;
+            dialect === "obsidian" &&
+            [
+              ">   Two\n>   lines\n>    ===\n",
+              "- item\n\n    Two\n    lines\n     ===\n",
+              "  Two\n   lines\n  ===\n",
+            ].includes(source!)
+              ? source!
+              : expected!;
           expect(output).toBe(protectedExpected.replaceAll("\n", newline));
           expect(semanticFingerprint(parse(output, dialect))).toBe(
             semanticFingerprint(parse(input, dialect)),
@@ -47,7 +49,7 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
         const input = `  Title${newline}   ===${newline}`;
         expect(formatted(input, config)).toBe(
           dialect === "obsidian"
-            ? `Title${newline}   ===${newline}`
+            ? input
             : style === "atx"
               ? `# Title${newline}`
               : `Title${newline}===${newline}`,
