@@ -19,6 +19,7 @@ presets, dialects, and options.
 | ------------------------------- | :--: | :-----------: | :------------: | :-----: |
 | `content/code-language`         | 🔍   | ❌            | ❌             | ✅      |
 | `content/image-alt`             | 🔍   | ✅            | ❌             | ❌      |
+| `content/shell-prompt`          | 🔍   | ❌            | ❌             | ❌      |
 | `content/table-columns`         | 🔍   | ✅            | ❌             | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `github/alert-marker`           | 🎨   | ❌            | ✅             | ❌      |
@@ -39,6 +40,8 @@ presets, dialects, and options.
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌             | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌             | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌             | ✅      |
+| `structure/split-quote`         | 🔍   | ❌            | ❌             | ❌      |
+| `structure/unspaced-heading`    | 🔍   | ❌            | ❌             | ❌      |
 | `style/blank-lines`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/block-spacing`           | 🎨   | ✅            | ❌             | ❌      |
 | `style/code-fence`              | 🎨   | ✅            | ❌             | ✅      |
@@ -135,6 +138,50 @@ Not reported:
 <img src="sales-by-month.png" alt="Sales by month, rising from March">
 <img src="divider.png" alt="">
 ```
+
+## `content/shell-prompt`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reports a code block of shell commands in which every command starts with a
+prompt, `$` or `%` followed by blank space, and that shows no output. Such
+prompts tell a reader nothing that the block does not, and get in the way of
+copying the commands. Removing them changes the code that readers copy, so the
+rule only reports.
+
+A block is checked when it names no language, as indented blocks cannot, or
+names a shell or a shell session: `sh`, `bash`, `zsh`, `fish`, `ksh`, `csh`,
+`tcsh`, `dash`, `shell`, `console`, `terminal`, `shell-session`, `sh-session`,
+or `shellsession`, in any letter case. Other languages, `text` among them, can
+start a line with `$` or `%`, as TeX's comments and math do. Blank lines do not
+count, nor do lines that a backslash at the end of the line above continues the
+command onto. A line that starts with `#` is not a command: it is a comment in
+shell code, and output or a root prompt in a session, so a block with one is not
+reported. Nor is a block in which any other line shows output, even if some
+commands show none.
+
+Reported:
+
+````markdown
+```sh
+$ npm ci
+$ npm test
+```
+````
+
+Not reported:
+
+````markdown
+```sh
+npm ci
+npm test
+```
+
+```console
+$ node --version
+v24.21.0
+```
+````
 
 ## `content/table-columns`
 
@@ -874,6 +921,88 @@ title: Install
 ---
 
 ## Requirements
+```
+
+## `structure/split-quote`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reports a blank line between two block quotes with nothing else between them.
+GitHub, Forgejo, Gitea, Obsidian, VitePress, and CommonMark show two quotes,
+while some other renderers join them into one, and the blank line may have been
+meant to separate paragraphs of one quote. To write one quote, start the blank
+line with `>`; to keep two, put text or a comment, such as `<!-- -->`, between
+them. Either changes what renderers show, so the rule only reports. Quotes
+inside a list item or another quote are checked among their siblings.
+
+A quote whose first line opens with an alert's or callout's marker, such as
+`[!NOTE]` or `[!tip]`, is not reported after a blank line, because a blank line
+is the only way to write two alerts or callouts one after the other. The marker
+shows the quote's intent in every dialect. A plain quote after an alert is
+reported: its text may have been meant as part of the alert.
+
+Reported:
+
+```markdown
+> Back up the database first.
+
+> Then run the migration.
+```
+
+Not reported:
+
+```markdown
+> Back up the database first.
+>
+> Then run the migration.
+
+> [!NOTE]
+> Migrations run in a transaction.
+
+> [!WARNING]
+> Old backups cannot be restored.
+```
+
+## `structure/unspaced-heading`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reports text that would be an ATX heading with a space after its hashes, such as
+`#Installation` or `##Usage##`. Every supported renderer needs blank space after
+the opening hashes, so it shows the line as paragraph text with its `#`. Adding
+the space turns text into a heading, which changes the outline and may not be
+what was meant, so the rule only reports.
+
+One to six `#` start the line, followed by a letter or a digit, also after a
+`*`, `_`, or backtick that opens emphasis or code. A line that ends with a run
+of `#` gets the advice to add spaces inside the hashes too. Only the first line
+of a paragraph is checked, after its container's markers, as in `> #Note` or
+`- #Item`, and the line below an alert's or callout's marker, which starts its
+body, outside CommonMark. A paragraph's later lines are not checked, because
+wrapped text can start a line with any word.
+
+Text that only resembles a heading is not reported: a single `#` before a
+number, as in an issue reference such as `#123 fixed`; another character after
+the hashes, as in a shebang (`#!/bin/sh`) or `#[attribute]`; seven or more
+hashes; and an escaped `\#`. In Obsidian, `#` and a word is a tag, as in
+`#project text`, and is not reported. A heading whose closing hashes follow its
+text without a space, such as `# C#`, is a heading whose text ends with `#`, and
+is not reported either.
+
+Reported:
+
+```markdown
+#Installation
+
+##Usage##
+```
+
+Not reported:
+
+```markdown
+# Installation
+
+#123 fixed the crash.
 ```
 
 ## `style/blank-lines`

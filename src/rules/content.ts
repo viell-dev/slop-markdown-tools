@@ -3,7 +3,7 @@ import type { Html } from "mdast";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
-import { lineStarts } from "../syntax/source.js";
+import { lineBreak, lineStarts } from "../syntax/source.js";
 import { htmlAttribute, htmlFlow, htmlTokens, rawText } from "../workspace/html.js";
 import type { HtmlToken } from "../workspace/html.js";
 import { optionsSchema } from "./shared.js";
@@ -48,6 +48,55 @@ function sourceOffset(document: Document, node: Html, offset: number): number {
   const rawLine = lineText(raw, rawStarts);
   if (rawStarts[line] === undefined || !rawLine.endsWith(valueLine)) return start;
   return start + rawStarts[line]! + rawLine.length - valueLine.length + offset - valueStarts[line]!;
+}
+
+/**
+ * The languages of shell commands and of shell sessions, whose prompts mark
+ * the commands. Another language's code can start a line with `$` or `%`,
+ * such as TeX's comments or math.
+ */
+const shellLanguages = new Set([
+  "bash",
+  "console",
+  "csh",
+  "dash",
+  "fish",
+  "ksh",
+  "sh",
+  "sh-session",
+  "shell",
+  "shell-session",
+  "shellsession",
+  "tcsh",
+  "terminal",
+  "zsh",
+]);
+/** A command after a `$` or `%` prompt and blank space. */
+const prompted = /^[ \t]*([$%])[ \t]+\S/;
+/** A line that ends in a backslash that is not escaped, which continues the command below it. */
+const continued = /(?:^|[^\\])(?:\\\\)*\\$/;
+/**
+ * The prompt that every command in code starts with, when the code holds no
+ * output: each line that is not blank is a command after a prompt, or a line
+ * that a backslash continues the command of. `#` is no prompt, because shell
+ * code starts its comments with it, and a session shows output with it.
+ */
+function promptOnly(code: string): string | undefined {
+  let prompt: string | undefined;
+  let continuation = false;
+  for (const line of code.split(lineBreak)) {
+    if (!line.trim()) {
+      continuation = false;
+      continue;
+    }
+    if (!continuation) {
+      const found = prompted.exec(line)?.[1];
+      if (!found) return undefined;
+      prompt = prompt === undefined || prompt === found ? found : "";
+    }
+    continuation = continued.test(line);
+  }
+  return prompt;
 }
 
 export const contentRules: Record<string, Rule> = {
@@ -137,6 +186,27 @@ export const contentRules: Record<string, Rule> = {
                 : `${counted}; the row is shown with ${columns - cells === 1 ? "an empty cell" : "empty cells"} added.`,
           });
         }
+      });
+      return findings;
+    },
+  },
+  "content/shell-prompt": {
+    description:
+      "Report shell code blocks whose every command has a prompt and that show no output.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const findings: Finding[] = [];
+      walk(document.tree, "code", (node) => {
+        if (node.lang && !shellLanguages.has(node.lang.toLowerCase())) return;
+        const prompt = promptOnly(node.value);
+        if (prompt === undefined) return;
+        const [start, end] = range(node);
+        findings.push({
+          start,
+          end,
+          message: `Every command in the code block starts with ${prompt ? `a "${prompt}" prompt` : "a prompt"} and the block shows no output; remove the prompts, which get in the way of copying the commands.`,
+        });
       });
       return findings;
     },

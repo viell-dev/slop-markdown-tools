@@ -6,7 +6,7 @@ import type { Dialect, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
 import { labelEnd, lazyIndentation, parse, range, startsWithMarker } from "../syntax/parse.js";
-import { type Range, located, holds } from "./shared.js";
+import { type Range, located, holds, obsidianTag } from "./shared.js";
 import { obsidianOpaque, obsidianTabBreak, goldmarkForges, misreadTable } from "./protections.js";
 import { capturedLineBreak, lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
@@ -215,14 +215,6 @@ function startsSiteSyntax(text: string): boolean {
  * a definition list.
  */
 const leadingMarker = /^(?:[-+*]|\d{1,9}[.)]|#{1,6}|>)[ \t\r\n]/;
-
-/**
- * A word that Obsidian's Live Preview reads as a tag after blank space or at
- * the start of a line's content, but not directly after a block quote's `>`
- * (issue #409): `#` and the characters Obsidian allows in a tag, letters,
- * digits, `_`, `-`, and `/`, among them one that is not a digit.
- */
-const obsidianTag = /^#[\p{L}\p{N}_/-]*[\p{L}_/-]/u;
 
 /**
  * Keep an atom that opens a definition-like label attached to the preceding
