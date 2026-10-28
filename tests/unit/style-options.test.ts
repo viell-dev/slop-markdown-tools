@@ -126,6 +126,29 @@ describe.each(dialects)("style options in %s", (dialect) => {
     check(`- one${eol}`, "style/list-indent", { startIndented: true, startIndent: 4 }, dialect);
     check(`Text${eol}- one${eol}`, "style/list-indent", { startIndented: true }, dialect);
     check(`- one${eol}`, "style/list-indent", { startIndent: 3 }, dialect);
+    // A list after one left as written must not reach into its last item.
+    check(
+      `Text${eol}- a${eol}${eol}* b${eol}`,
+      "style/list-indent",
+      { startIndented: true },
+      dialect,
+    );
+    check(
+      `- a${eol}${eol}* b${eol}`,
+      "style/list-indent",
+      { startIndented: true },
+      dialect,
+      `  - a${eol}${eol}  * b${eol}`,
+    );
+    // A blank quote line is no text above the list; quoted text is.
+    check(
+      `>${eol}> - item${eol}`,
+      "style/list-indent",
+      { startIndented: true },
+      dialect,
+      `>${eol}>   - item${eol}`,
+    );
+    check(`> text${eol}> - item${eol}`, "style/list-indent", { startIndented: true }, dialect);
   });
 });
 

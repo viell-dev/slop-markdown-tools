@@ -989,7 +989,11 @@ const listIndent: Rule = {
         if (initial > 0 && (!list.parent || list.parent.type !== "listItem")) {
           if (
             first.first > 0 &&
-            /\S/.test(source.slice(lines[first.first - 1]!.start, lines[first.first - 1]!.end))
+            /\S/.test(
+              source
+                .slice(lines[first.first - 1]!.start, lines[first.first - 1]!.end)
+                .replace(/^[ \t>]*/, ""),
+            )
           )
             continue;
         }
@@ -1022,7 +1026,9 @@ const listIndent: Rule = {
               )
             : holder
               ? 0
-              : initial;
+              : // A list after another one must not reach that list's last item,
+                // which a list left as written would otherwise take it into.
+                Math.max(0, Math.min(initial, (before ? (lowest.get(before) ?? 0) : Infinity) - 1));
         const marks: Op[] = [];
         const changes = new Map<Item, number>();
         let possible = true;

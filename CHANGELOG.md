@@ -17,7 +17,8 @@ prereleases' notes there are longer than their entries here.
   `codeBlocks`. `style/thematic-break` accepts any exact break text and follows
   the first exact text with `consistent`. `style/list-indent` takes
   `startIndented` and `startIndent` for first-level indentation. Preset defaults
-  and renderer protections stay unchanged
+  stay unchanged; existing protections remain, and the thematic-break protection
+  for a compact hyphen line now also covers longer runs such as `-----`
   ([#702](https://github.com/viell-dev/slop-markdown-tools/issues/702),
   [#687](https://github.com/viell-dev/slop-markdown-tools/issues/687),
   [#701](https://github.com/viell-dev/slop-markdown-tools/issues/701)).
