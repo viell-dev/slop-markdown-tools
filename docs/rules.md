@@ -1443,7 +1443,7 @@ Run `npm run build` before the tests.
 ## `style/list-indent`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
-Options: spaces after markers, `nestedIndent`.
+Options: spaces after markers, `nestedIndent`, `startIndented`, `startIndent`.
 
 Puts the configured spaces, one by default, between a list marker and the item's
 text, and starts each item where its container's text starts: at the start of
@@ -1458,6 +1458,8 @@ paragraphs, code blocks, and nested lists stay inside it as they were.
 | `bulletSpacesMultiline`  | An integer from 1 to 4 | `bulletSpaces`        |
 | `orderedSpacesMultiline` | An integer from 1 to 4 | `orderedSpaces`       |
 | `nestedIndent`           | An integer from 1 to 8 | Under the item's text |
+| `startIndented`          | A boolean              | `false`               |
+| `startIndent`            | A nonnegative integer  | `2`                   |
 
 - `bulletSpaces` and `orderedSpaces`: the spaces after the marker of a bullet
   item and of a numbered one. As in markdownlint's MD030, the `Multiline`
@@ -1469,6 +1471,15 @@ paragraphs, code blocks, and nested lists stay inside it as they were.
   `4` puts it two columns in under `- item` and one under `1. item`. A nested
   list that starts on its item's line, as in `- - item`, stays there, and one
   that follows another list stays out of that list's last item.
+
+After 0.5.0, with `startIndented: true`, the first level of lists starts
+`startIndent` columns into its container. For example,
+`{ "startIndented": true, "startIndent": 2 }` writes `- item` as `  - item`,
+moving its continuation lines too. Nested lists still use `nestedIndent`. Both
+bullet and ordered lists follow this preference. Four or more columns would make
+code, so the rule keeps lists as written for those values. A first-level list
+directly below nonblank text also stays, because indentation can make it
+continue that text.
 
 With the defaults, before:
 
@@ -1762,9 +1773,14 @@ After:
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
 Options: `marker`.
 
-Writes thematic breaks with one marker. The option `marker` is `"---"` (the
-default), `"***"`, `"___"`, or `"consistent"`, which takes the character of the
-document's first break. Blank space before and after the break stays.
+After 0.5.0, writes thematic breaks with one exact text. The option `marker` is
+`"---"` (the default), any valid thematic-break text, such as `"* * *"`,
+`"-----"`, or `"___"`, or `"consistent"`, which takes the exact text of the
+document's first break. A break text has at least three identical `-`, `*`, or
+`_` markers, optionally separated by spaces or tabs, without leading or trailing
+whitespace. Blank space before and after the break stays. With
+`marker: "* * *"`, the example below instead ends in `* * *`; with `consistent`,
+a first `-----` makes later breaks `-----` too.
 
 Before:
 
@@ -1785,9 +1801,9 @@ Text.
 A break is left as written where the new marker would change what the document
 means:
 
-- With `---`, directly below a paragraph, a link reference definition, or
-  display math, which `---` would underline as a heading; GitHub builds display
-  math from a paragraph.
+- With compact hyphens such as `---` or `-----`, directly below a paragraph, a
+  link reference definition, or display math, which `---` would underline as a
+  heading; GitHub builds display math from a paragraph.
 - After 0.4.0, a compact hyphen line already directly below display math also
   stays when another marker is requested. Spaced `- - -` remains eligible for
   star or underscore preferences, as does a break separated from the math by a
@@ -1807,12 +1823,34 @@ means:
 ## `style/trailing-space`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
-Options: `hardBreak`.
+Options: `hardBreak`, `hardBreakSpaces`, `listItemEmptyLines`, `codeBlocks`.
 
 Removes spaces and tabs at the end of lines. A hard line break written as two or
 more spaces keeps them. The option `hardBreak` is `"keep"` (the default) or
 `"backslash"`, which writes such a break as a backslash, so that it is visible
 in the source.
+
+| Option               | Values                    | Default             |
+| -------------------- | ------------------------- | ------------------- |
+| `hardBreak`          | `"keep"` or `"backslash"` | `"keep"`            |
+| `hardBreakSpaces`    | An integer of at least 2  | Keep existing count |
+| `listItemEmptyLines` | A boolean                 | `false`             |
+| `codeBlocks`         | A boolean                 | `false`             |
+
+After 0.5.0, with `{ "hardBreakSpaces": 2 }`, a space-style hard break written
+with three spaces becomes exactly two, as Prettier writes it.
+`hardBreak: "backslash"` takes precedence; where converting to a backslash is
+unsafe, the break stays. The exact count applies only to existing space-style
+breaks, never creates a break, and leaves the protected Tab suffixes described
+below intact. `listItemEmptyLines: true` keeps whitespace-only lines inside list
+items, including their existing indentation. Spaces that make no break elsewhere
+are removed, matching markdownlint's strict checking.
+
+`codeBlocks: true` reports trailing spaces and tabs in fenced and indented code
+without an edit. Code content always stays byte for byte as written. Existing
+opaque renderer regions still suppress ordinary findings; in particular,
+VitePress's indented code remains opaque. With all options omitted, code remains
+unreported and existing hard-break counts stay unchanged.
 
 In the Obsidian dialect, a list marker alone on its line keeps one space after
 it. Live Preview needs that separator to style the line as a list item, even

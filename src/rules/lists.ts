@@ -957,6 +957,8 @@ const listIndent: Rule = {
     bulletSpacesMultiline: spaces,
     orderedSpacesMultiline: spaces,
     nestedIndent: { type: "integer", minimum: 1, maximum: 8 },
+    startIndented: { type: "boolean" },
+    startIndent: { type: "integer", minimum: 0 },
   }),
   check({ document, options }) {
     const analysis = analyze(document);
@@ -968,6 +970,8 @@ const listIndent: Rule = {
       ordered: [ordered, Number(options.orderedSpacesMultiline ?? ordered)],
     };
     const nested = options.nestedIndent === undefined ? undefined : Number(options.nestedIndent);
+    const initial = options.startIndented === true ? Number(options.startIndent ?? 2) : 0;
+    if (initial >= 4) return [];
     const { indentLists } = rendererProtections(document);
     const findings: Finding[] = [];
     for (const unit of analysis.units) {
@@ -979,6 +983,20 @@ const listIndent: Rule = {
       const reach = new Map<Item, number>();
       const lowest = new Map<Item, number>();
       for (const list of unit.lists) {
+        // Below text an indented marker can be a continuation; preserve that
+        // boundary rather than guessing.
+        const first = list.items[0]!;
+        if (initial > 0 && (!list.parent || list.parent.type !== "listItem")) {
+          if (
+            first.first > 0 &&
+            /\S/.test(
+              source
+                .slice(lines[first.first - 1]!.start, lines[first.first - 1]!.end)
+                .replace(/^[ \t>]*/, ""),
+            )
+          )
+            continue;
+        }
         for (const item of list.items) analysis.match(item.first);
         // As in markdownlint, a list whose items each take one line, with no
         // blank line between them, gets the spacing for single lines.
@@ -1006,7 +1024,11 @@ const listIndent: Rule = {
                   (before ? (lowest.get(before) ?? 0) : Infinity) - 1,
                 ),
               )
-            : 0;
+            : holder
+              ? 0
+              : // A list after another one must not reach that list's last item,
+                // which a list left as written would otherwise take it into.
+                Math.max(0, Math.min(initial, (before ? (lowest.get(before) ?? 0) : Infinity) - 1));
         const marks: Op[] = [];
         const changes = new Map<Item, number>();
         let possible = true;

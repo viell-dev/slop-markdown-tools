@@ -229,14 +229,14 @@ describe("style/thematic-break", () => {
   it.each(dialects)("converts thematic breaks in the %s dialect", (dialect) => {
     expect(formatted("Text\n\n***\n\n> ***\n", only(rule, dialect))).toBe("Text\n\n---\n\n> ---\n");
   });
-  it("takes the character of the first break with `consistent`", () => {
+  it("takes the exact text of the first break with `consistent`", () => {
     const consistent = only({ "style/thematic-break": ["warn", { marker: "consistent" }] });
     expect(formatted("Text\n\n* * *\n\n---\n\n___\n", consistent)).toBe(
-      "Text\n\n***\n\n***\n\n***\n",
+      "Text\n\n* * *\n\n* * *\n\n* * *\n",
     );
-    // The exceptions still apply: `---` below text would underline it.
+    // Spaced hyphens do not underline the preceding paragraph.
     expect(formatted("Text\n\n- - -\n\nMore\n***\n", consistent)).toBe(
-      "Text\n\n---\n\nMore\n***\n",
+      "Text\n\n- - -\n\nMore\n- - -\n",
     );
   });
 });
