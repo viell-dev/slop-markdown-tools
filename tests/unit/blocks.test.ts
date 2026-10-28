@@ -1,4 +1,6 @@
 import fc from "fast-check";
+import { HtmlRenderer, Parser } from "commonmark";
+import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
@@ -37,7 +39,7 @@ describe("style/code-fence", () => {
     ["~~~js\nconst a = 1;\n~~~\n", "```js\nconst a = 1;\n```\n"],
     ["~~~~\ncode\n~~~~~~\n", "```\ncode\n```\n"],
     ["````\ncode\n````\n", "```\ncode\n```\n"],
-    ["``` js title\ncode\n```\n", "``` js title\ncode\n```\n"],
+    ["``` js title\ncode\n```\n", "```js title\ncode\n```\n"],
     // A content line that would close the new fence makes it longer.
     ["~~~\n```\ninner\n```\n~~~\n", "````\n```\ninner\n```\n````\n"],
     ["~~~\n  ````  \n~~~\n", "`````\n  ````  \n`````\n"],
@@ -66,7 +68,7 @@ describe("style/code-fence", () => {
   it.each([
     ["```js\ncode\n```\n", "~~~js\ncode\n~~~\n"],
     ["```\n~~~\n```\n", "~~~~\n~~~\n~~~~\n"],
-    ["``` a~b\ncode\n```\n", "~~~ a~b\ncode\n~~~\n"],
+    ["``` a~b\ncode\n```\n", "~~~a~b\ncode\n~~~\n"],
   ])("writes %j with tildes on request", (source, output) => {
     expect(formatted(source, only(tildes))).toBe(output);
   });
@@ -87,6 +89,22 @@ describe("style/code-fence", () => {
     expect(formatted("~~~\n$$\n%% x\n~~~\n\n> ~~~\n> y\n> ~~~\n", only(rule, dialect))).toBe(
       "```\n$$\n%% x\n```\n\n> ```\n> y\n> ```\n",
     );
+  });
+  it.each(dialects)("removes only leading info spacing on %s (#715)", (dialect) => {
+    for (const eol of ["\n", "\r\n"])
+      for (const prefix of ["", "> ", "  "]) {
+        const source = ["`````  \tjs title=demo  ", "```", "body", "```", "`````", ""]
+          .map((line) => (line ? prefix + line : line))
+          .join(eol);
+        const output = source.replace("`````  \tjs", "````js").replace(/`````(?=\r?\n$)/, "````");
+        expect(formatted(source, only(rule, dialect))).toBe(output);
+        expect(formatted(source, only({}, dialect))).toBe(source);
+        const commonmark = new Parser();
+        const html = new HtmlRenderer();
+        expect(html.render(commonmark.parse(output))).toBe(html.render(commonmark.parse(source)));
+        const markdown = new MarkdownIt();
+        expect(markdown.render(output)).toBe(markdown.render(source));
+      }
   });
   it("reports both fences of a block", () => {
     expect(lint("~~~\ncode\n~~~\n", { config: only(rule) })).toMatchObject([
