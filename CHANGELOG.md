@@ -27,6 +27,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- The [comparison with Prettier and
+  markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
+  lists every markdownlint rule and every Prettier Markdown option and
+  formatting choice, with the issue that tracks each check not yet covered
+  ([#668](https://github.com/viell-dev/slop-markdown-tools/issues/668)).
+
 - Tokenizer identity verification partitions the unchanged deterministic corpus
   into bounded unit cases while retaining every source, selection and assertion
   under the existing deadline
