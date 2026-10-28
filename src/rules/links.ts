@@ -105,6 +105,29 @@ function normalizeLabel(label: string): string {
     .toLowerCase();
 }
 /**
+ * The `ignoredDefinitions` option of the rules that check link definitions:
+ * labels of definitions written as comments, as in `[//]: # (comment)`.
+ */
+const ignoredDefinitions = {
+  type: "array",
+  items: { type: "string", pattern: "\\S" },
+  default: ["//"],
+};
+/**
+ * Whether a link definition is a comment: its label is one of the configured
+ * labels, matched as the renderers match labels, and no reference uses it, so
+ * that the renderers show nothing for it. A definition that a reference uses
+ * is a link, whatever its label.
+ */
+function commentDefinition(
+  options: Record<string, unknown>,
+): (node: Definition, used: Set<string>) => boolean {
+  const labels = new Set(
+    ((options.ignoredDefinitions as string[] | undefined) ?? ["//"]).map(normalizeLabel),
+  );
+  return (node, used) => labels.has(node.identifier) && !used.has(node.identifier);
+}
+/**
  * A label's text as the parser reads it, from its source: without the block
  * quote markers and indentation that continue its lines inside a container.
  */
@@ -588,22 +611,27 @@ export const linkRules: Record<string, Rule> = {
   "links/unused-definition": {
     description: "Report link and footnote definitions that no reference uses.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({ ignoredDefinitions }),
+    check({ document, options }) {
       // Link and footnote labels are kept apart, as `link:` and `footnote:` keys.
       const used = new Set<string>();
+      const links = new Set<string>();
       const definitions: (Definition | FootnoteDefinition)[] = [];
       walk(document.tree, (node) => {
         // A shortcut reference `[label]` that has a definition is a reference node too.
-        if (node.type === "linkReference" || node.type === "imageReference")
+        if (node.type === "linkReference" || node.type === "imageReference") {
           used.add(`link:${node.identifier}`);
-        else if (node.type === "footnoteReference") used.add(`footnote:${node.identifier}`);
+          links.add(node.identifier);
+        } else if (node.type === "footnoteReference") used.add(`footnote:${node.identifier}`);
         else if (node.type === "definition" || node.type === "footnoteDefinition")
           definitions.push(node);
       });
+      const comment = commentDefinition(options);
       const findings: Finding[] = [];
       const seen = new Set<string>();
       for (const node of definitions) {
+        // Footnotes show their text, so a footnote is never a comment.
+        if (node.type === "definition" && comment(node, links)) continue;
         const footnote = node.type === "footnoteDefinition";
         const key = `${footnote ? "footnote" : "link"}:${node.identifier}`;
         const label = (node.label ?? node.identifier).replace(/\s+/g, " ").trim();
@@ -630,11 +658,14 @@ export const linkRules: Record<string, Rule> = {
   "links/empty": {
     description: "Report links and images whose destination is empty or only #.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
-      const findings: Finding[] = [];
+    schema: optionsSchema({ ignoredDefinitions }),
+    check({ document, options }) {
+      const findings: [Nodes, Finding][] = [];
+      const used = new Set<string>();
       // A reference has its definition's destination, which is reported once, at the definition.
       walk(document.tree, (node) => {
+        if (node.type === "linkReference" || node.type === "imageReference")
+          used.add(node.identifier);
         if (node.type !== "link" && node.type !== "image" && node.type !== "definition") return;
         if (node.url !== "" && node.url !== "#") return;
         const what =
@@ -643,15 +674,22 @@ export const linkRules: Record<string, Rule> = {
             : node.type === "definition"
               ? `Destination of definition [${(node.label ?? node.identifier).replace(/\s+/g, " ").trim()}]`
               : "Link destination";
-        findings.push({
-          start: range(node)[0],
-          message:
-            node.url === ""
-              ? `${what} is empty.`
-              : `${what} is only #${node.type === "link" ? ", which only leads to the top of the page" : ""}.`,
-        });
+        findings.push([
+          node,
+          {
+            start: range(node)[0],
+            message:
+              node.url === ""
+                ? `${what} is empty.`
+                : `${what} is only #${node.type === "link" ? ", which only leads to the top of the page" : ""}.`,
+          },
+        ]);
       });
-      return findings;
+      // Whether a definition is used is known only once every reference has been seen.
+      const comment = commentDefinition(options);
+      return findings.flatMap(([node, finding]) =>
+        node.type === "definition" && comment(node, used) ? [] : [finding],
+      );
     },
   },
 };
