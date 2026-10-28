@@ -1054,13 +1054,15 @@ Writes the fences of a fenced code block with one marker, and as long as its
 content allows: three characters, or one more than the longest line inside that
 holds only the marker, which would otherwise close the block. The option
 `marker` is ``"```"`` (the default), `"~~~"`, or `"consistent"`, which takes the
-marker of the document's first fence. The info string and the content are left
-as written.
+marker of the document's first fence. **Unreleased:** removes spaces and tabs
+between the opening fence and its info string. The info string's text and
+metadata, and the code content, stay as written; nested fences keep the outer
+fence long enough to contain them. `content/code-language` remains report-only.
 
 Before:
 
 ```markdown
-~~~sh
+~~~  sh
 npm test
 ~~~
 ```
@@ -1255,6 +1257,14 @@ heading conversion.
 ## `style/inline-code`
 
 **Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+
+**Unreleased:** writes the fewest backticks whose run does not occur in the
+content, so ``` ``a`` ``` becomes `` `a` ``. Padding keeps backticks at the
+content's edges separate from the delimiters and preserves CommonMark's
+single-space stripping. Table cell escapes stay intact. A span keeps its
+delimiters where shortening them could pair with an earlier run in the same
+inline block. This extends the existing rule without adding an option; it
+remains opt-in.
 
 Joins a code span that is written across lines onto one line. A line break
 inside a code span renders as a space, so the content stays the same, and the

@@ -239,6 +239,15 @@ const codeFenceRule: Rule = {
         source.slice(fence.open[1], lineEnd(source, fence.open[1])).includes("`")
       )
         continue;
+      const infoStart = fence.open[1];
+      const spacing = /^[ \t]+/.exec(source.slice(infoStart, lineEnd(source, infoStart)));
+      if (spacing)
+        findings.push({
+          start: infoStart,
+          end: infoStart + spacing[0].length,
+          message: "Remove blank space before the code fence info string.",
+          edit: { start: infoStart, end: infoStart + spacing[0].length, text: "" },
+        });
       // A content line of the marker alone, at any indentation, could close a
       // fence that is not longer than it.
       let longest = 0;

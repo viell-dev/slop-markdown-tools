@@ -12,6 +12,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `style/inline-code` writes a code span with the fewest backticks its content
+  allows, keeping padding and table cell escapes, and keeps its delimiters where
+  a shorter run could pair with an earlier one. `style/code-fence` removes
+  spaces and tabs before the info string, keeping metadata and nested fence
+  lengths. These extend the existing rules without new options
+  ([#714](https://github.com/viell-dev/slop-markdown-tools/issues/714),
+  [#715](https://github.com/viell-dev/slop-markdown-tools/issues/715)).
+
 - `links/unused-definition` and `links/empty` take `ignoredDefinitions`, the
   labels of definitions written as comments, which default to `["//"]`.
   `recommended` no longer reports `[//]: # (comment)` while no reference uses
