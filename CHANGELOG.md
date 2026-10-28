@@ -20,6 +20,15 @@ prereleases' notes there are longer than their entries here.
   ([#714](https://github.com/viell-dev/slop-markdown-tools/issues/714),
   [#715](https://github.com/viell-dev/slop-markdown-tools/issues/715)).
 
+- `style/table` takes `pipeStyle` for explicit, document-consistent, or
+  per-table borders, `style: "tight"`, `alignedDelimiter` for header-aligned
+  delimiters, and `padding: "alignment"` for padding by column alignment.
+  Defaults remain aligned cells with both borders and padding on the right;
+  required pipes and renderer protections remain
+  ([#708](https://github.com/viell-dev/slop-markdown-tools/issues/708),
+  [#709](https://github.com/viell-dev/slop-markdown-tools/issues/709),
+  [#719](https://github.com/viell-dev/slop-markdown-tools/issues/719)).
+
 - `links/unused-definition` and `links/empty` take `ignoredDefinitions`, the
   labels of definitions written as comments, which default to `["//"]`.
   `recommended` no longer reports `[//]: # (comment)` while no reference uses
