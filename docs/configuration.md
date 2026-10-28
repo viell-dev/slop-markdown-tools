@@ -126,9 +126,10 @@ plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
 
 `recommended` enables [`style/block-spacing`](rules.md#styleblock-spacing) at
-`warn`, adding a blank line between headings or lists and adjacent blocks where
-safe. `lint` reports missing separators, and `format` adds them. To keep compact
-spacing, set `"rules": { "style/block-spacing": "off" }`.
+`warn`, separating headings and lists, and after 0.5.0 code fences and tables,
+from adjacent blocks with a blank line where safe. `lint` reports missing
+separators, and `format` adds them. To keep compact spacing, set
+`"rules": { "style/block-spacing": "off" }`.
 
 ## Rules and severity
 

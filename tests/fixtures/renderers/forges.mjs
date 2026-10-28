@@ -9,6 +9,8 @@ export const forgeBoundaryFixtures = [
   { name: "table-hidden-quote-list", source: ">1) Item\n>   | Name |\n>   | --- |\n>   | Value |\n" },
   { name: "table-hidden-lazy-list", source: ">1) Item\n| Name |\n| --- |\n| Value |\n" },
   { name: "table-hidden-quote", source: "> Item\n| Name |\n| --- |\n| Value |\n" },
+  // A table directly below a description's text belongs to the description (#697).
+  { name: "table-in-description", source: "Term\n: A description.\n| Name |\n| --- |\n| Value |\n" },
   { name: "url-backslash-break", source: "Visit www.example.com\\\nThen continue.\n" },
   { name: "https-backslash-break", source: "Visit https://example.com\\\nThen continue.\n" },
   { name: "url-two-backslashes", source: "Visit www.example.com\\\\\nThen continue.\n" },

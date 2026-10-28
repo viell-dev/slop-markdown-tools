@@ -7,10 +7,11 @@ import { rendererProtections } from "../syntax/renderer-protections.js";
 import { continuesListBlock } from "../syntax/list-protections.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
+import { codeFence } from "../syntax/fences.js";
 import { countBelow } from "../syntax/source.js";
 import { type Range } from "./shared.js";
 import { misreadTable } from "./protections.js";
-import { lineBounds, lineEnding } from "../syntax/source.js";
+import { lineBounds, lineEnd, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 /** A line holding nothing but block quote markers and blank space. */
@@ -33,8 +34,88 @@ function firstBlock(node: RootContent): RootContent {
 }
 
 /**
+ * Whether a block is a fenced code block with its closing fence. A fence
+ * without one, and in Obsidian a tilde opener with a written backtick in its
+ * info, which Live Preview reads as paragraph text (#567), keep the handling
+ * they have as a neighbor of a heading or list and are not separated on their
+ * own account.
+ */
+function closedFence(document: Document, node: RootContent): boolean {
+  if (node.type !== "code") return false;
+  const { source } = document;
+  const fence = codeFence(source, node);
+  if (!fence?.close) return false;
+  return !(
+    document.dialect === "obsidian" &&
+    fence.marker === "~" &&
+    source.slice(fence.open[0], lineEnd(source, fence.open[0])).includes("`")
+  );
+}
+
+/**
+ * Whether a block ends a table directly above it in every renderer. GFM reads
+ * any other line below a table as one more row, and Forgejo and Gitea read a
+ * table as a paragraph that only a block able to interrupt one ends.
+ */
+function endsTable(document: Document, node: RootContent): boolean {
+  return ["blockquote", "thematicBreak", "html"].includes(node.type) || closedFence(document, node);
+}
+
+/**
+ * Whether a table directly below a block starts where the parser starts it in
+ * every renderer. A block quote, list or footnote definition can end in a
+ * paragraph that would take the header in lazily, and math is text to the
+ * renderers without it.
+ */
+function precedesTable(document: Document, node: RootContent): boolean {
+  if (node.type === "code")
+    return codeFence(document.source, node) === undefined || closedFence(document, node);
+  return ["paragraph", "thematicBreak", "html"].includes(node.type);
+}
+
+/**
+ * Whether the text directly above a table starts with a link reference
+ * definition. GitHub shows such a definition as text when the table
+ * interrupts the paragraph that its lines start, where the parser reads a
+ * definition, and a blank line above the table would hide that text.
+ */
+function definitionAbove(parent: Root | Blockquote, index: number): boolean {
+  for (let at = index - 1; at > 0; at--) {
+    const node = parent.children[at]!;
+    const above = parent.children[at - 1]!;
+    if (node.type !== "paragraph" && node.type !== "definition") return false;
+    if (above.position?.end.line !== (node.position?.start.line ?? 0) - 1) return false;
+    if (above.type === "definition") return true;
+  }
+  return false;
+}
+
+/** The block that needs separating from its neighbor, with its name in findings. */
+function subjectOf(
+  document: Document,
+  parent: Root | Blockquote,
+  index: number,
+): { node: RootContent; kind: string } | undefined {
+  const before = parent.children[index - 1]!;
+  const after = parent.children[index]!;
+  const block = [after, before].find((node) => node.type === "heading" || node.type === "list");
+  if (block) return { node: block, kind: block.type };
+  // Fences can interrupt a paragraph, and the line after a closing fence
+  // starts a block, so their neighbors keep their reading (#684).
+  for (const node of [after, before])
+    if (closedFence(document, node)) return { node, kind: "fenced code block" };
+  // A table ends only before a block that interrupts it; text below it is
+  // another row. Above it, the parser's reading decides (#697).
+  if (before.type === "table" && endsTable(document, after)) return { node: before, kind: "table" };
+  if (after.type === "table" && precedesTable(document, before) && !definitionAbove(parent, index))
+    return { node: after, kind: "table" };
+  return undefined;
+}
+
+/**
  * Whether two neighboring blocks have to stay as they are, although one of
- * them is a heading or a list, because a blank line between them would change
+ * them is a heading, a list, a fenced code block, or a table that ends or
+ * starts there, because a blank line between them would change
  * what they mean or what a comment or callout applies to.
  */
 function together(
@@ -76,6 +157,10 @@ function together(
       before.position!.end.line === after.position!.start.line - 1
     )
       return true;
+    // Live Preview shows the rows of a table directly below a block other than
+    // a heading as text, such as below a fence, where Reading view shows a
+    // table; a blank line would make it a table in Live Preview too (#697).
+    if (after.type === "table" && before.type !== "heading") return true;
     // Reading view takes text directly below an empty marker into its item
     // (#438). Keep both boundaries of a lone marker, including after a table
     // that Live Preview reads as paragraph text.
@@ -144,6 +229,10 @@ function together(
   // directly below text, would make the parser read the list too, and one
   // between the blocks of such a list would make it loose.
   const misread = rendererProtections(document);
+  // Forgejo and Gitea read the lines of a table directly below a definition
+  // description's text as more of that text, which they then turn into a
+  // table inside the description; a blank line would move it out.
+  if (after.type === "table" && misread.descriptions.has(before)) return true;
   if (
     misread.nested.has(after) ||
     (after.type === "list" && misread.next.has(after)) ||
@@ -160,7 +249,8 @@ function together(
 }
 
 const blockSpacing: Rule = {
-  description: "Separate headings and lists from neighboring blocks with a blank line.",
+  description:
+    "Separate headings, lists, fenced code blocks, and tables from neighboring blocks with a blank line.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({}),
@@ -237,15 +327,14 @@ const blockSpacing: Rule = {
       for (let index = 1; index < parent.children.length; index++) {
         const before = parent.children[index - 1]!;
         const after = parent.children[index]!;
-        const subject = [after, before].find(
-          (node) => node.type === "heading" || node.type === "list",
-        );
         // A plugin's syntax can add a node without a source position.
         const located = [before, after].every(
           ({ position }) =>
             position?.start.offset !== undefined && position.end.offset !== undefined,
         );
-        if (!subject || !located || together(document, parent, index, directiveLines)) continue;
+        if (!located) continue;
+        const subject = subjectOf(document, parent, index);
+        if (!subject || together(document, parent, index, directiveLines)) continue;
         const end = range(before)[1];
         const start = range(after)[0];
         const lineStart = lineBounds(source, start, start)[0];
@@ -260,10 +349,10 @@ const blockSpacing: Rule = {
         // The block's own line holds the quote markers that the new line needs.
         const prefix = source.slice(lineStart, start);
         if (!blankLine.test(prefix)) continue;
-        const kind = subject.type === "heading" ? "heading" : "list";
+        const below = subject.node === after;
         findings.push({
-          start: subject === after ? start : end,
-          message: `Add a blank line ${subject === after ? "before" : "after"} the ${kind}.`,
+          start: below ? start : end,
+          message: `Add a blank line ${below ? "before" : "after"} the ${subject.kind}.`,
           edit: {
             start: breakStart,
             end: lineStart,
