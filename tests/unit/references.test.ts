@@ -172,6 +172,9 @@ describe("links/undefined-reference options", () => {
     // Only a single character that starts a list item is a task mark.
     ["- [todo] item\n", "[todo]", "todo"],
     ["- Item [x] here\n", "[x]", "x"],
+    // Outside Obsidian, a task mark is only `[ ]`, `[x]` or `[X]`.
+    ["- [a] item\n", "[a]", "a"],
+    ["- [/] in progress\n", "[/]", "/"],
     // A marker only starts a block quote.
     ["Text [!NOTE] here.\n", "[!NOTE]", "!NOTE"],
     // Brackets after a URL's blank space or `<` are no longer in it.
@@ -240,7 +243,7 @@ describe("links/undefined-reference options", () => {
     ["See (https://example.com/[a]).\n", "obsidian"],
     // Task marks, where the parser reads none.
     ["- [x] done\n- [X] done\n1. [ ] todo\n", "commonmark"],
-    ["- [x]\n- [/] in progress\n", "github"],
+    ["- [x]\n- [X] done\n", "github"],
     ["- [/] in progress\n- [?] question\n- [>] later\n", "obsidian"],
     // Alert and callout markers.
     ["> [!NOTE]\n> Text.\n", "github"],

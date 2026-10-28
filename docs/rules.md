@@ -479,9 +479,9 @@ than references, nor brackets in code, math, HTML, or links, nor escaped ones
 `shortcutSyntax`, default `false`, also reports a shortcut reference whose label
 has no definition when `true`: brackets that hold a label and are not followed
 by `[]` or another label, as CommonMark reads them, such as `[Enter]`. It leaves
-alone brackets that mean something else where they stand: a one-character task
-mark that starts a list item where the parser reads none, such as `[x]` in
-CommonMark or Obsidian's `[/]`; an alert or callout marker such as `[!NOTE]`
+alone brackets that mean something else where they stand: a task mark that
+starts a list item where the parser reads none, `[ ]`, `[x]` or `[X]`, and in
+Obsidian any one character, such as a custom status `[/]`; an alert or callout marker such as `[!NOTE]`
 that starts a block quote; an Obsidian inline footnote `^[note]`; a Forgejo or
 Gitea shortlink `[[Page]]`; text inside an inline HTML element, as in
 `<kbd>[Enter]</kbd>`; and a URL written as text, such as

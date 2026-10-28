@@ -236,7 +236,8 @@ interface Reference {
  * math, HTML, links, images, and other syntax, and escaped ones, are not read.
  *
  * A shortcut is also not read where the brackets mean something else: a task
- * mark that starts a list item, such as `[x]` or Obsidian's `[/]`, an alert or
+ * mark that starts a list item, `[ ]`, `[x]` or `[X]`, or in Obsidian any one
+ * character such as `[/]`, an alert or
  * callout marker such as `[!NOTE]` that starts a block quote, an Obsidian
  * inline footnote `^[note]`, a Forgejo or Gitea shortlink `[[Page]]`, text
  * inside an inline HTML element, and a URL written as text.
@@ -284,7 +285,14 @@ function undefinedReferences(
     /** Whether the shortcut `[label]` from `opener` to `close` means something other than a reference. */
     const notShortcut = (opener: number, close: number, url: boolean) => {
       const label = source.slice(opener + 1, close);
-      if (opener === start && leading === "task" && [...label].length === 1) return true;
+      // A task mark is `[ ]`, `[x]` or `[X]`; Obsidian also reads any other
+      // single character as a custom task status, such as `[/]`.
+      if (
+        opener === start &&
+        leading === "task" &&
+        (/^[ xX]$/.test(label) || (document.dialect === "obsidian" && [...label].length === 1))
+      )
+        return true;
       if (opener === start && leading === "callout" && label.startsWith("!")) return true;
       const before = opener > 0 && readable[opener - 1] ? source[opener - 1] : "";
       if (document.dialect === "obsidian" && before === "^") return true;
