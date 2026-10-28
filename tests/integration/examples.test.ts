@@ -168,6 +168,7 @@ describe("plugin", () => {
     expect(summary(checked.stdout)).toEqual([
       "notes/release-checklist.md:3:25 error house/no-placeholder",
       "notes/release-checklist.md:7:1 warn house/heading-space",
+      "notes/release-checklist.md:7:3 warn style/heading",
     ]);
   });
   it("applies the style rule's edit and leaves the problem for a person", () => {
@@ -270,9 +271,10 @@ describe("automation", () => {
       return summarized.stdout;
     };
     expect(summarize(run(path.join(examples, "plugin"), ["lint", "--json"]).stdout)).toBe(
-      "lint: 1 file(s), 2 diagnostic(s)\n" +
+      "lint: 1 file(s), 3 diagnostic(s)\n" +
         "1 error house/no-placeholder in 1 file(s)\n" +
-        "1 warn house/heading-space in 1 file(s)\n",
+        "1 warn house/heading-space in 1 file(s)\n" +
+        "1 warn style/heading in 1 file(s)\n",
     );
     const checked = run(path.join(examples, "plugin"), ["format", "--check", "--json"]);
     expect(summarize(checked.stdout)).toBe(
