@@ -12,6 +12,16 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `links/reversed` reports likely reversed link syntax without changing
+  literal text into a link. `links/bare-url` reports bare addresses and brackets
+  only equivalent literal links. `links/allowed-notation` restricts Markdown
+  link and image forms with six boolean options, all allowed by default, and
+  converts exact, title-free URL links to equivalent autolinks where safe. These
+  interface additions belong to the next minor release
+  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672),
+  [#686](https://github.com/viell-dev/slop-markdown-tools/issues/686),
+  [#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
+
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
   also reports a fragment that reaches its anchor only because the renderer
