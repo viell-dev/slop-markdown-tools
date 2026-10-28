@@ -1,5 +1,6 @@
 import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
+import { protectedEdit } from "../core/protection-edits.js";
 import { codeSpanText, joinsTomlFrontMatter, lazyIndentation, range } from "../syntax/parse.js";
 import { headingAttributeBlock } from "../workspace/heading-attributes.js";
 import { takesFinalLineEnding, underlinedHeadings, underlineEdit } from "./blocks.js";
@@ -10,6 +11,7 @@ import { markerRule } from "./emphasis.js";
 import { table } from "./table.js";
 import { blockSpacing } from "./block-spacing.js";
 import { wrap } from "./wrap.js";
+import { headingIndentation } from "./lists.js";
 import { lineBounds, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
@@ -141,17 +143,38 @@ const styleRules: Record<string, Rule> = {
     phase: "block",
     schema: optionsSchema({
       style: { enum: ["atx", "setext", "consistent"] },
-      closing: { enum: ["remove", "keep"] },
+      closing: { enum: ["remove", "keep", "add"] },
     }),
     check({ document, options }) {
       const findings: Finding[] = [];
       const { source } = document;
       // Only levels 1 and 2 can be underlined; deeper headings keep their `#`.
       const underlined = underlinedHeadings(document, options.style);
+      const protectedHeading = protectedEdit(document);
       walk(document.tree, "heading", (node) => {
         const [headingStart, end] = range(node);
         const first = node.children[0];
         const last = node.children.at(-1);
+        // A protected heading can belong to a list the parser missed (#191).
+        // Its leading spaces lie before the node's protected source range.
+        const indentation = protectedHeading({
+          start: headingStart,
+          end: headingStart + 1,
+          text: "",
+        })
+          ? []
+          : headingIndentation(document, node);
+        if (indentation.length) {
+          for (const [start, end] of indentation)
+            findings.push({
+              start,
+              end,
+              message: "Remove the heading's indentation.",
+              edit: { start, end, text: "" },
+            });
+          // Reparse before conversion so source offsets and container prefixes stay exact.
+          return;
+        }
         // An ATX heading is one line, a Setext heading also has its underline.
         if (!/[\r\n]/.test(source.slice(headingStart, end))) {
           const edit = underlined ? underlineEdit(document, node) : undefined;
@@ -180,7 +203,7 @@ const styleRules: Record<string, Rule> = {
             ? range(last)[1]
             : headingStart + /^#*/.exec(source.slice(headingStart))![0].length;
           const lineEnd = lineBounds(source, textEnd, textEnd)[1];
-          if (!/^[ \t]+#+[ \t]*$/.test(source.slice(textEnd, lineEnd))) return;
+          const closed = /^[ \t]+#+[ \t]*$/.test(source.slice(textEnd, lineEnd));
           // Gitea before 1.26 reads an attribute block that a closing sequence
           // follows, and Forgejo and later Gitea versions do not.
           if (
@@ -189,6 +212,18 @@ const styleRules: Record<string, Rule> = {
             headingAttributeBlock(source.slice(range(first)[0], textEnd))
           )
             return;
+          if (options.closing === "add") {
+            const text = ` ${"#".repeat(node.depth)}`;
+            if (source.slice(textEnd, lineEnd) !== text)
+              findings.push({
+                start: textEnd,
+                end: lineEnd,
+                message: "Use a matching closing # sequence.",
+                edit: { start: textEnd, end: lineEnd, text },
+              });
+            return;
+          }
+          if (!closed) return;
           if (options.closing === "keep") {
             // Empty closed headings share a single separator between the runs.
             if (!first) return;
@@ -238,7 +273,11 @@ const styleRules: Record<string, Rule> = {
           start,
           end,
           message: "Use an ATX heading.",
-          edit: { start, end, text: `${"#".repeat(node.depth)} ${text}` },
+          edit: {
+            start,
+            end,
+            text: `${"#".repeat(node.depth)} ${text}${options.closing === "add" && !block ? ` ${"#".repeat(node.depth)}` : ""}`,
+          },
         });
       });
       return findings;
