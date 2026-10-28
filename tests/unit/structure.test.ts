@@ -137,3 +137,199 @@ describe("document structure rules", () => {
     ).toEqual([]);
   });
 });
+
+describe("structure/unspaced-heading", () => {
+  const rule = "structure/unspaced-heading";
+  /** The source of each finding, from the rule run in `dialect`. */
+  const found = (source: string, dialect: Config["dialect"] = "github") =>
+    check(source, rule, {}, "Title.md", dialect).map((item) => source.slice(item.start, item.end));
+  it.each([
+    ["#Heading\n", "#Heading"],
+    ["##Heading 2\n", "##Heading 2"],
+    ["######Six\n", "######Six"],
+    // Without a blank line below, the first line would still be a heading of its own.
+    ["#Heading\nBody text below.\n", "#Heading"],
+    ["Intro.\n\n#Heading  \n\nBody.\n", "#Heading"],
+    ["> #Quoted\n", "#Quoted"],
+    ["- #Item\n", "#Item"],
+    ["1. ##Step\n", "##Step"],
+    ["Text[^1].\n\n[^1]: #Note\n", "#Note"],
+    ["#**Bold**\n", "#**Bold**"],
+    ["#_Emphasis_\n", "#_Emphasis_"],
+    ["#`code`\n", "#`code`"],
+    ["##2 Setup\n", "##2 Setup"],
+    ["#Ünïcode\n", "#Ünïcode"],
+    // Below an alert's marker, the line starts the alert's body.
+    ["> [!NOTE]\n> #Heading\n", "#Heading"],
+    [">[!NOTE]\n>##Heading\n", "##Heading"],
+  ])("reports %j", (source, span) => {
+    expect(found(source)).toEqual([span]);
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea", "vitepress", "obsidian"] as const)(
+    "reports a look-alike in %s",
+    (dialect) => {
+      expect(found("##Heading\n", dialect)).toEqual(["##Heading"]);
+      expect(found("Intro.\r\n\r\n##Heading\r\nBody.\r\n", dialect)).toEqual(["##Heading"]);
+    },
+  );
+  it("reports text inside VitePress containers, as markdown-it reads it", () => {
+    expect(found("::: tip\n#Heading\n:::\n", "vitepress")).toEqual(["#Heading"]);
+  });
+  it("reports the start of an Obsidian callout's body", () => {
+    expect(found("> [!note] Title\n> ##Heading\n", "obsidian")).toEqual(["##Heading"]);
+  });
+  it("says how to make it a heading, with or without closing hashes", () => {
+    const [open] = check("##Heading\n", rule, {}, "T.md", "github");
+    expect(open).toMatchObject({ line: 1, column: 1 });
+    expect(open?.message).toBe(
+      'Text starts with "##" without a space after it, so it is not a heading; if it should be one, add a space after "##".',
+    );
+    for (const source of ["##Heading##\n", "##Heading 2 ##\n", "##Heading#\n"])
+      expect(check(source, rule, {}, "T.md", "github")[0]?.message).toBe(
+        'Text starts with "##" without a space after it, so it is not a heading; if it should be one, add spaces inside the hashes, as in "## Heading ##".',
+      );
+    // An escaped `#` is text, not a closing sequence.
+    expect(check("#C\\#\n", rule, {}, "T.md", "github")[0]?.message).toMatch(
+      /add a space after "#"\.$/,
+    );
+  });
+  it("reports with CRLF and CR line endings", () => {
+    for (const eol of ["\r\n", "\r"]) {
+      const source = ["Intro.", "", "#Heading#", "Body.", ""].join(eol);
+      const findings = check(source, rule, {}, "T.md", "github");
+      expect(findings).toMatchObject([{ line: 3, column: 1 }]);
+      expect(source.slice(findings[0]!.start, findings[0]!.end)).toBe("#Heading#");
+      expect(found(`> [!NOTE]${eol}> #Heading${eol}`)).toEqual(["#Heading"]);
+    }
+  });
+  it.each([
+    "# Heading\n",
+    "#\tHeading\n",
+    "#\n",
+    // Headings whose closing hashes follow their text are headings, as `# C#` is.
+    "# C#\n",
+    "## Heading##\n",
+    // Issue references and numbers, shebangs, and other notations.
+    "#123 fixed\n",
+    "#42\n",
+    "#7: crash on start\n",
+    "#!/bin/sh\n",
+    "#\uFE0F\u20E3 keycap\n",
+    "#[derive(Debug)]\n",
+    "#{x}\n",
+    "#-1\n",
+    "#.class\n",
+    "#/path\n",
+    // Seven hashes are no heading even with a space.
+    "#######Seven\n",
+    "\\#Escaped\n",
+    "&#35;Reference\n",
+    // A later line of a paragraph can start with any word once wrapped.
+    "Fixed in\n#123 and\n#Hashtag too.\n",
+    "Text `#Code`.\n",
+    "```\n#Code\n```\n",
+    "    #Indented code\n",
+    "<div>\n#Html\n</div>\n",
+    "| a |\n| - |\n| #Cell |\n",
+    "Setext\n#Underlined\n===\n",
+  ])("accepts %j", (source) => {
+    expect(found(source)).toEqual([]);
+  });
+  it("leaves the line below a marker alone where there are no alerts", () => {
+    expect(found("> [!NOTE]\n> #Heading\n", "commonmark")).toEqual([]);
+  });
+  it.each([
+    "#tag text\n",
+    "#Heading\n",
+    "#Heading#\n",
+    "#nested/tag and more\n",
+    "#2024-review\n",
+    "> #tag\n",
+    ">#tag\n",
+    "- #tag\n",
+    "> [!note]\n> #tag\n",
+  ])("accepts an Obsidian tag: %j", (source) => {
+    expect(found(source, "obsidian")).toEqual([]);
+  });
+  it("reports elsewhere what Obsidian reads as a tag", () => {
+    expect(found("#tag text\n")).toEqual(["#tag text"]);
+    expect(found("> [!note]\n> #tag\n", "gitea")).toEqual(["#tag"]);
+  });
+  it("is in no preset", () => {
+    for (const preset of Object.values(presets)) expect(preset.rules?.[rule]).toBeUndefined();
+  });
+});
+
+describe("structure/split-quote", () => {
+  const rule = "structure/split-quote";
+  const found = (source: string, dialect: Config["dialect"] = "github") =>
+    check(source, rule, {}, "Title.md", dialect).map((item) => [
+      item.line,
+      source.slice(item.start, item.end),
+    ]);
+  it.each([
+    ["> a\n\n> b\n", [[2, ""]]],
+    ["> This is a quote\n> of two lines.\n\n> And another.\n", [[3, ""]]],
+    ["> a\n\n\n> b\n", [[2, "\n"]]],
+    ["> a\nlazy\n\n> b\n", [[3, ""]]],
+    ["> > a\n>\n> > b\n", [[2, ">"]]],
+    ["- > a\n\n  > b\n", [[2, ""]]],
+    [
+      "> a\n\n> b\n\n> c\n",
+      [
+        [2, ""],
+        [4, ""],
+      ],
+    ],
+    // The body of an alert can be meant to continue below the blank line.
+    ["> [!NOTE]\n> a\n\n> b\n", [[3, ""]]],
+    ["> a\n  \n> b\n", [[2, "  "]]],
+  ] as const)("reports %j", (source, expected) => {
+    expect(found(source)).toEqual(expected);
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea", "vitepress", "obsidian"] as const)(
+    "reports a split in %s, also with CRLF and CR",
+    (dialect) => {
+      expect(found("> a\n\n> b\n", dialect)).toEqual([[2, ""]]);
+      expect(found("> a\r\n\r\n> b\r\n", dialect)).toEqual([[2, ""]]);
+      expect(found("> a\r\r> b\r", dialect)).toEqual([[2, ""]]);
+      expect(found("> a\r\n>\r\n> b\r\n", dialect)).toEqual([]);
+    },
+  );
+  it("says how to join or separate the quotes", () => {
+    expect(check("> a\n\n> b\n", rule, {}, "T.md", "github")[0]?.message).toBe(
+      'A blank line separates two block quotes, which some renderers join into one; to write one quote, start the blank line with ">", or to keep two, put text or a comment between them.',
+    );
+  });
+  it.each([
+    "> a\n>\n> b\n",
+    "> a\n\nText.\n\n> b\n",
+    "> a\n\n<!-- separate -->\n\n> b\n",
+    "> a\n\n---\n\n> b\n",
+    "- > a\n\n- > b\n",
+    "> a\n\n    > b\n",
+    "```\n> a\n\n> b\n```\n",
+  ])("accepts %j", (source) => {
+    expect(found(source)).toEqual([]);
+  });
+  it.each([
+    ["> [!NOTE]\n> a\n\n> [!TIP]\n> b\n", "github"],
+    ["> a\n\n> [!WARNING]\n> b\n", "github"],
+    ["> [!NOTE]\n> a\n\n> [!CAUTION]\n> b\n", "forgejo"],
+    ["> [!NOTE]\n> a\n\n> [!IMPORTANT]\n> b\n", "gitea"],
+    ["> [!NOTE]\n> a\n\n> [!TIP]\n> b\n", "vitepress"],
+    ["> [!note]\n> a\n\n> [!tip]- Folded\n> b\n", "obsidian"],
+    ["> [!note] Title\n> a\n\n> [!quote]\n> b\n", "obsidian"],
+    // The marker shows that the quote stands apart, also where it is text.
+    ["> a\n\n> [!NOTE]\n> b\n", "commonmark"],
+    ["- > [!note]\n  > a\n\n  > [!tip]\n  > b\n", "obsidian"],
+  ] as const)("accepts an alert or callout after a blank line: %j in %s", (source, dialect) => {
+    expect(found(source, dialect)).toEqual([]);
+  });
+  it("accepts quotes separated by an Obsidian comment", () => {
+    expect(found("> a\n\n%% separate %%\n\n> b\n", "obsidian")).toEqual([]);
+  });
+  it("is in no preset", () => {
+    for (const preset of Object.values(presets)) expect(preset.rules?.[rule]).toBeUndefined();
+  });
+});

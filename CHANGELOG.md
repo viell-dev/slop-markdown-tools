@@ -24,6 +24,19 @@ prereleases' notes there are longer than their entries here.
   ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
   [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
 
+- Three report-only rules, in no preset, cover markdownlint's MD014, MD018,
+  MD020, and MD028: `structure/unspaced-heading` reports text such as `#Heading`
+  or `#Heading#` that would be a heading with a space after its hashes,
+  `structure/split-quote` a blank line between two block quotes, and
+  `content/shell-prompt` a shell code block whose every command starts with a
+  `$` or `%` prompt and that shows no output. They leave Obsidian tags, issue
+  references such as `#123`, shebangs, and a blank line before an alert or
+  callout alone
+  ([#674](https://github.com/viell-dev/slop-markdown-tools/issues/674),
+  [#675](https://github.com/viell-dev/slop-markdown-tools/issues/675),
+  [#677](https://github.com/viell-dev/slop-markdown-tools/issues/677),
+  [#683](https://github.com/viell-dev/slop-markdown-tools/issues/683)).
+
 ### Fixed
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's
