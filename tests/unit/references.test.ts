@@ -238,6 +238,117 @@ describe("links/empty", () => {
   });
 });
 
+describe("links/descriptive-text", () => {
+  const rule = "links/descriptive-text";
+  const vague = (text: string) =>
+    `Link text "${text}" does not say where the link leads; name its destination or purpose.`;
+  /** The findings with options for the rule, which formatting reports too without changing the document. */
+  const checkWith = (
+    source: string,
+    options: Record<string, unknown>,
+    dialect: Dialect = "github",
+  ) => {
+    const config: Config = { extends: [], dialect, rules: { [rule]: ["warn", options] } };
+    const diagnostics = lint(source, { config });
+    expect(format(source, { config })).toMatchObject({ output: source, diagnostics });
+    return diagnostics;
+  };
+  describe.each(["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+    "in %s",
+    (dialect) => {
+      it.each([
+        ["Read [here](guide.md).\n", "[here](guide.md)", "here"],
+        ["[Click here](guide.md)\n", "[Click here](guide.md)", "Click here"],
+        ["[CLICK HERE!](guide.md)\n", "[CLICK HERE!](guide.md)", "CLICK HERE!"],
+        ["[click-here](guide.md)\n", "[click-here](guide.md)", "click-here"],
+        ["[ *More* ](guide.md)\n", "[ *More* ](guide.md)", "More"],
+        ["[`link`](guide.md)\n", "[`link`](guide.md)", "link"],
+        ["[click\nhere](guide.md)\n", "[click\nhere](guide.md)", "click here"],
+        ["[click\r\nhere](guide.md)\r\n", "[click\r\nhere](guide.md)", "click here"],
+        // A title is the link's description, which screen readers do not list
+        // links by, and appears only when a mouse hovers over the link.
+        [
+          '[here](guide.md "The installation guide")\n',
+          '[here](guide.md "The installation guide")',
+          "here",
+        ],
+        // An image's alternative text is the text of a link around it.
+        ["[![More](more.png)](guide.md)\n", "[![More](more.png)](guide.md)", "More"],
+        ["[here][guide]\n\n[guide]: guide.md\n", "[here][guide]", "here"],
+        ["[here][]\n\n[here]: guide.md\n", "[here][]", "here"],
+        ["[here]\n\n[here]: guide.md\n", "[here]", "here"],
+        ["# Read [more](guide.md)\n", "[more](guide.md)", "more"],
+      ])("reports %j", (source, span, text) => {
+        const findings = checkWith(source, {}, dialect);
+        expect(spans(source, findings)).toEqual([span]);
+        expect(findings.map((item) => item.message)).toEqual([vague(text)]);
+      });
+      it.each([
+        // The whole text is compared: text that says more describes the link.
+        "[Click here to read the installation guide](guide.md)\n",
+        "[Read more about pricing](pricing.md)\n",
+        "[Link checker](checker.md)\n",
+        "[Here be dragons](dragons.md)\n",
+        "[Installation guide](guide.md)\n",
+        // An autolink shows its destination.
+        "<https://example.com/here>\n",
+        "![here](here.png)\n",
+        "[here]\n",
+        '<a href="guide.md">here</a>\n',
+        "`[here](guide.md)`\n",
+        "[](guide.md)\n",
+        "[→](guide.md)\n",
+      ])("accepts %j", (source) => {
+        expect(checkWith(source, {}, dialect)).toEqual([]);
+      });
+      it("uses the configured texts, in every script", () => {
+        const source = "[ここ](a.md), [Weiterlesen](b.md), [here](c.md), [mehr…](d.md)\n";
+        const findings = checkWith(
+          source,
+          { prohibitedTexts: ["ここ", "weiterlesen", "Mehr"] },
+          dialect,
+        );
+        expect(spans(source, findings)).toEqual([
+          "[ここ](a.md)",
+          "[Weiterlesen](b.md)",
+          "[mehr…](d.md)",
+        ]);
+        expect(checkWith(source, { prohibitedTexts: [] }, dialect)).toEqual([]);
+      });
+    },
+  );
+  it("reads literal autolinks as their destinations", () => {
+    expect(check("See www.here.com and https://example.com/more.\n", rule)).toEqual([]);
+  });
+  it("checks the text that Obsidian shows for a wikilink, but not embeds", () => {
+    const source = "[[Install|here]], [[here]], [[Install|the guide]], and ![[here]]\n";
+    const findings = check(source, rule, "obsidian");
+    expect(spans(source, findings)).toEqual(["[[Install|here]]", "[[here]]"]);
+    expect(check(source, rule, "github")).toEqual([]);
+  });
+  it("checks links in Obsidian callout titles and GitHub alerts", () => {
+    expect(
+      spans(
+        "> [!tip] See [here](a.md)\n> Body.\n",
+        check("> [!tip] See [here](a.md)\n> Body.\n", rule, "obsidian"),
+      ),
+    ).toEqual(["[here](a.md)"]);
+    expect(check("> [!NOTE]\n> See [more](a.md).\n", rule, "github")).toHaveLength(1);
+  });
+  it.each([
+    { prohibitedTexts: "here" },
+    { prohibitedTexts: [""] },
+    { prohibitedTexts: ["→"] },
+    { prohibitedTexts: ["..."] },
+    { prohibitedTexts: [1] },
+    { prohibited_texts: ["here"] },
+  ])("rejects options %j", (options) => {
+    expect(() =>
+      lint("", { config: { extends: [], rules: { [rule]: ["warn", options] } } }),
+    ).toThrow(`Invalid options for ${rule}`);
+  });
+});
+
 describe("comment definitions in links/unused-definition and links/empty", () => {
   const rules = ["links/unused-definition", "links/empty"];
   const renders = (source: string) => [
@@ -345,5 +456,9 @@ describe("link problem rules in presets", () => {
     const recommended = presets.recommended!.rules!;
     for (const rule of ["links/undefined-reference", "links/unused-definition", "links/empty"])
       expect(recommended[rule], rule).toBe("warn");
+  });
+  it("leave descriptive link text out of every preset", () => {
+    for (const preset of Object.values(presets))
+      expect(preset.rules?.["links/descriptive-text"]).toBeUndefined();
   });
 });

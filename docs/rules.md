@@ -15,42 +15,45 @@ the built-in rules and those of the configuration's [plugins](plugins.md).
 which is reported only. ✅ is yes and ❌ no. Each rule's section names its
 presets, dialects, and options.
 
-| Rule                          | Kind | `recommended` | Dialect preset | Options |
-| ----------------------------- | :--: | :-----------: | :------------: | :-----: |
-| `content/code-language`       | 🔍   | ❌            | ❌             | ✅      |
-| `content/image-alt`           | 🔍   | ✅            | ❌             | ❌      |
-| `content/table-columns`       | 🔍   | ✅            | ❌             | ❌      |
-| `forgejo/heading-id`          | 🔍   | ❌            | ✅ (error)     | ❌      |
-| `github/alert-marker`         | 🎨   | ❌            | ✅             | ❌      |
-| `github/task-marker`          | 🎨   | ❌            | ✅             | ❌      |
-| `links/empty`                 | 🔍   | ✅            | ❌             | ✅      |
-| `links/notation`              | 🎨   | ❌            | ❌             | ✅      |
-| `links/path`                  | 🎨   | ❌            | ❌             | ✅      |
-| `links/undefined-reference`   | 🔍   | ✅            | ❌             | ❌      |
-| `links/unused-definition`     | 🔍   | ✅            | ❌             | ✅      |
-| `links/valid`                 | 🔍   | ✅ (error)    | ❌             | ❌      |
-| `obsidian/block-reference`    | 🔍   | ❌            | ✅ (error)     | ❌      |
-| `obsidian/callout-marker`     | 🎨   | ❌            | ✅             | ❌      |
-| `obsidian/strict-line-breaks` | 🔍   | ❌            | ✅             | ❌      |
-| `structure/duplicate-heading` | 🔍   | ❌            | ❌             | ✅      |
-| `structure/heading-increment` | 🔍   | ✅            | ❌             | ❌      |
-| `structure/initial-heading`   | 🔍   | ❌            | ❌             | ✅      |
-| `structure/single-title`      | 🔍   | ❌            | ❌             | ✅      |
-| `style/blank-lines`           | 🎨   | ✅            | ❌             | ✅      |
-| `style/block-spacing`         | 🎨   | ✅            | ❌             | ❌      |
-| `style/code-fence`            | 🎨   | ✅            | ❌             | ✅      |
-| `style/emphasis`              | 🎨   | ✅            | ❌             | ✅      |
-| `style/final-newline`         | 🎨   | ✅            | ❌             | ❌      |
-| `style/heading`               | 🎨   | ✅            | ❌             | ✅      |
-| `style/inline-code`           | 🎨   | ❌            | ❌             | ❌      |
-| `style/list-indent`           | 🎨   | ✅            | ❌             | ✅      |
-| `style/list-marker`           | 🎨   | ✅            | ❌             | ✅      |
-| `style/ordered-list`          | 🎨   | ✅            | ❌             | ✅      |
-| `style/strong`                | 🎨   | ✅            | ❌             | ✅      |
-| `style/table`                 | 🎨   | ✅            | ✅             | ✅      |
-| `style/thematic-break`        | 🎨   | ✅            | ❌             | ✅      |
-| `style/trailing-space`        | 🎨   | ✅            | ❌             | ✅      |
-| `style/wrap`                  | 🎨   | ✅            | ❌             | ✅      |
+| Rule                            | Kind | `recommended` | Dialect preset | Options |
+| ------------------------------- | :--: | :-----------: | :------------: | :-----: |
+| `content/code-language`         | 🔍   | ❌            | ❌             | ✅      |
+| `content/image-alt`             | 🔍   | ✅            | ❌             | ❌      |
+| `content/table-columns`         | 🔍   | ✅            | ❌             | ❌      |
+| `forgejo/heading-id`            | 🔍   | ❌            | ✅ (error)     | ❌      |
+| `github/alert-marker`           | 🎨   | ❌            | ✅             | ❌      |
+| `github/task-marker`            | 🎨   | ❌            | ✅             | ❌      |
+| `links/descriptive-text`        | 🔍   | ❌            | ❌             | ✅      |
+| `links/empty`                   | 🔍   | ✅            | ❌             | ✅      |
+| `links/notation`                | 🎨   | ❌            | ❌             | ✅      |
+| `links/path`                    | 🎨   | ❌            | ❌             | ✅      |
+| `links/undefined-reference`     | 🔍   | ✅            | ❌             | ❌      |
+| `links/unused-definition`       | 🔍   | ✅            | ❌             | ✅      |
+| `links/valid`                   | 🔍   | ✅ (error)    | ❌             | ❌      |
+| `obsidian/block-reference`      | 🔍   | ❌            | ✅ (error)     | ❌      |
+| `obsidian/callout-marker`       | 🎨   | ❌            | ✅             | ❌      |
+| `obsidian/strict-line-breaks`   | 🔍   | ❌            | ✅             | ❌      |
+| `structure/duplicate-heading`   | 🔍   | ❌            | ❌             | ✅      |
+| `structure/emphasis-heading`    | 🔍   | ❌            | ❌             | ✅      |
+| `structure/heading-increment`   | 🔍   | ✅            | ❌             | ❌      |
+| `structure/heading-punctuation` | 🔍   | ❌            | ❌             | ✅      |
+| `structure/initial-heading`     | 🔍   | ❌            | ❌             | ✅      |
+| `structure/single-title`        | 🔍   | ❌            | ❌             | ✅      |
+| `style/blank-lines`             | 🎨   | ✅            | ❌             | ✅      |
+| `style/block-spacing`           | 🎨   | ✅            | ❌             | ❌      |
+| `style/code-fence`              | 🎨   | ✅            | ❌             | ✅      |
+| `style/emphasis`                | 🎨   | ✅            | ❌             | ✅      |
+| `style/final-newline`           | 🎨   | ✅            | ❌             | ❌      |
+| `style/heading`                 | 🎨   | ✅            | ❌             | ✅      |
+| `style/inline-code`             | 🎨   | ❌            | ❌             | ❌      |
+| `style/list-indent`             | 🎨   | ✅            | ❌             | ✅      |
+| `style/list-marker`             | 🎨   | ✅            | ❌             | ✅      |
+| `style/ordered-list`            | 🎨   | ✅            | ❌             | ✅      |
+| `style/strong`                  | 🎨   | ✅            | ❌             | ✅      |
+| `style/table`                   | 🎨   | ✅            | ✅             | ✅      |
+| `style/thematic-break`          | 🎨   | ✅            | ❌             | ✅      |
+| `style/trailing-space`          | 🎨   | ✅            | ❌             | ✅      |
+| `style/wrap`                    | 🎨   | ✅            | ❌             | ✅      |
 
 A preset enables its rules as warnings, unless the rule's section says error.
 The `codeberg` preset is the `forgejo` preset under another name. In a dialect
@@ -215,6 +218,45 @@ After:
 
 ```markdown
 - [x] Write the guide
+```
+
+## `links/descriptive-text`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`prohibitedTexts`.
+
+Reports a link whose whole text is a phrase that does not say where the link
+leads, such as "here" or "click here". Screen reader users often move through a
+page by its list of links, which reads each link by its text alone, and readers
+who scan a page see a link's text before the sentence around it. Text that names
+the destination or purpose, such as "the installation guide", serves both.
+
+The whole text is compared, without case, blank space, punctuation, or symbols,
+so `[Click here!]` is `click here`. A text that says more, such as
+`[Read more about pricing]`, is not reported. Inline and reference links are
+checked, and in Obsidian the text that a wikilink shows: its alias, or else its
+target. An image's alternative text is the text of a link around it. Autolinks,
+which show their destination, embeds, and HTML `<a>` elements are not checked. A
+link's title does not make its text descriptive: the title is the link's
+description, not its name, so screen readers do not list links by it, and other
+readers see it only when a mouse hovers over the link.
+
+`prohibitedTexts` is an array of the phrases to report, default
+`["click here", "here", "link", "more"]`. They are compared in the same way, in
+any script, and each needs at least one letter or digit; `[]` reports nothing.
+Add the phrases of the languages your documents are written in, such as `"hier"`
+or `"weiterlesen"`.
+
+Reported:
+
+```markdown
+To install the tool, follow the steps [here](install.md).
+```
+
+Not reported:
+
+```markdown
+Follow the [installation steps](install.md).
 ```
 
 ## `links/empty`
@@ -564,6 +606,48 @@ Not reported:
 ## Setup
 ```
 
+## `structure/emphasis-heading`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`punctuation`.
+
+Reports a paragraph that consists only of emphasized or strong text, such as
+`**Installation**`, which reads as a heading but is not one: the outline and a
+table of contents leave it out, links cannot reach it by an anchor, and screen
+readers do not announce it as a heading. If it names a section, make it a
+heading. That changes the outline, so the rule only reports.
+
+Only the document's own paragraphs are checked, whatever their length and
+however their lines wrap. In a list item, block quote, callout, alert, VitePress
+container such as `::: tip`, table cell, or footnote, emphasized text labels the
+content beside it, and is not reported. The emphasis may hold text, code, math,
+strikethrough, Obsidian highlights, and further emphasis; with a link, an image,
+or a line break inside it, or other text beside it, the paragraph is not
+reported. HTML tags and comments beside it do not count, nor does an Obsidian
+block identifier such as `^setup` after it.
+
+`punctuation` is a string of characters: text that ends with one of them is a
+sentence, and is not reported. The default, `.,;:!?。，；：！？`, is
+markdownlint's; with `""`, such text is reported whatever it ends with.
+
+Reported:
+
+```markdown
+**Installation**
+
+Run the installer.
+```
+
+Not reported:
+
+```markdown
+## Installation
+
+Run the installer.
+
+**Close other programs first.**
+```
+
 ## `structure/heading-increment`
 
 **Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
@@ -597,6 +681,53 @@ Not reported:
 > [!NOTE]
 >
 > ### Older versions
+```
+
+## `structure/heading-punctuation`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`punctuation`.
+
+Reports a heading whose text ends with sentence punctuation, as in
+`## Installation.` or `## Options:`. A heading is a title, not a sentence.
+Removing the character would change the heading's anchor, which links may use,
+so the rule only reports.
+
+The text is read as its renderer shows it. A character reference counts as the
+character it shows: `&copy;` is not punctuation, and `&#46;` is a period. A
+closing `#` sequence, a comment, or a footnote reference after the text does not
+count, and neither does a trailing attribute block such as `{#setup}` in
+Forgejo, Gitea, and VitePress, which read it as the heading's attributes, or a
+block identifier such as `^setup` in Obsidian. With VitePress's
+[`attrs`](vitepress.md#renderer-options) setting off, the block is text and counts.
+The text before such a suffix counts even when it is formatted, as in
+`## **Use.** ^usage`. A heading that ends with code,
+math, an image, an autolink, or an Obsidian embed is not reported. Nor are these
+endings:
+
+- an emoji shortcode such as `:tada:`, whose colon closes the shortcode;
+- an ellipsis of three or more periods;
+- the period of an abbreviation: initials such as `e.g.`, `U.S.`, or `Ph.D.`,
+  and `etc.`, `et al.`, `cf.`, `vs.`, `viz.`, `approx.`, `Inc.`, `Ltd.`, `Co.`,
+  `Corp.`, `Jr.`, and `Sr.`, in any case. Use a [suppression
+  comment](configuration.md#suppression-comments) for another abbreviation.
+
+`punctuation` is a string of the characters to report. The default,
+`.,;:!。，；：！`, is markdownlint's: it leaves out `?`, with which the
+questions of an FAQ end. `""` reports nothing.
+
+Reported:
+
+```markdown
+## Installation.
+```
+
+Not reported:
+
+```markdown
+## Why does it need a configuration file?
+
+## Plugins, tools, etc.
 ```
 
 ## `structure/initial-heading`
@@ -973,17 +1104,30 @@ After 0.5.0, ATX headings use one space between their opening hashes and text,
 including when a tab separated them. Empty headings need no separator. This also
 applies to headings kept in ATX form with `setext` or `consistent`.
 
+After 0.5.0, the rule also removes one to three spaces of heading indentation,
+including on Setext text and underline lines, without an option. Required list
+and quote prefixes stay as written; only spaces beyond those prefixes are
+removed. Indented code is not a heading. Ambiguous container prefixes stay as
+written. A heading that a renderer protection covers in part keeps all of its
+indentation and its form, such as an Obsidian Setext title whose indented
+underline or reference-like first line a view reads differently.
+
 | Option    | Values                              | Default    |
 | --------- | ----------------------------------- | ---------- |
 | `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
-| `closing` | `"remove"`, `"keep"`                | `"remove"` |
+| `closing` | `"remove"`, `"keep"`, `"add"`       | `"remove"` |
 
 - `style`: `atx` writes `#` headings. `setext` underlines headings of levels 1
   and 2 and keeps `#` for deeper levels, which cannot be underlined.
   `consistent` follows the document's first heading: `setext` when it is
   underlined, otherwise `atx`.
 - `closing`: `keep` retains existing closing sequences. After 0.5.0, their
-  separator from the text becomes one space; no absent sequence is added.
+  separator from the text becomes one space; no absent sequence is added. After
+  0.5.0, `add` writes a closing sequence matching the heading's level, with one
+  preceding space, and normalizes existing sequences to that length. It applies
+  to headings retained in ATX form by `setext` and `consistent` too. For
+  example, `### Details` becomes `### Details ###`; with `style: "setext"`,
+  levels 1 and 2 remain underlined. An empty `##` becomes `## ##`.
 
 Before:
 
@@ -1010,11 +1154,14 @@ nonterminal hashes still allow conversion.
 
 Underlined headings of more than one line, those inside lists or block quotes,
 and one directly below TOML front matter, whose lines renderers without TOML
-front matter read as part of the heading, are left as written. On Forgejo and
-Gitea, a closing sequence after an attribute block such as `{#id}` stays,
+front matter read as part of the heading, retain their heading form. On Forgejo
+and Gitea, a closing sequence after an attribute block such as `{#id}` stays,
 because Gitea before 1.26 reads the block only when the sequence follows it. The
 block and its suffix, including the spacing before that sequence, retain their
-existing protection; the opening separator can still be normalized.
+existing protection; the opening separator can still be normalized. With
+`closing: "add"`, no sequence is added after such an attribute block either.
+Converted Setext text ending in literal hashes keeps the escape described above,
+before the new closing sequence.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not

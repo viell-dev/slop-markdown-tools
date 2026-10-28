@@ -33,6 +33,17 @@ prereleases' notes there are longer than their entries here.
   ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
   [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
 
+- Three report-only rules, in no preset, cover markdownlint's MD026, MD036, and
+  MD059 with their options: `structure/heading-punctuation` reports a heading
+  that ends with sentence punctuation, `structure/emphasis-heading` a paragraph
+  of only emphasized or strong text, and `links/descriptive-text` a link whose
+  whole text, such as "here", does not say where it leads. They read headings
+  and links as each dialect's renderer shows them, and leave abbreviations,
+  ellipses, and emoji shortcodes at the end of a heading alone
+  ([#681](https://github.com/viell-dev/slop-markdown-tools/issues/681),
+  [#688](https://github.com/viell-dev/slop-markdown-tools/issues/688),
+  [#698](https://github.com/viell-dev/slop-markdown-tools/issues/698)).
+
 ### Fixed
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's
@@ -49,6 +60,14 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- `style/heading` removes heading-owned indentation, including Setext text and
+  underlines, while retaining container prefixes. Its new `closing: "add"`
+  option writes matching closing hash sequences on ATX headings, including the
+  deeper levels of the Setext style. Renderer protections still apply. This
+  interface addition belongs to the next minor release
+  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
+  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
 
 - `style/heading` writes one space between ATX heading hashes and text,
   including tabs and retained closing sequences. Empty headings need no
