@@ -136,7 +136,7 @@ const styleRules: Record<string, Rule> = {
     },
   },
   "style/heading": {
-    description: "Use ATX or Setext headings, without closing sequences.",
+    description: "Use ATX or Setext headings with single-space hash separators.",
     kind: "style",
     phase: "block",
     schema: optionsSchema({
@@ -164,7 +164,18 @@ const styleRules: Record<string, Rule> = {
             });
             return;
           }
-          if (options.closing === "keep") return;
+          const opening = /^#{1,6}([ \t]+)/.exec(source.slice(headingStart, end));
+          if (opening) {
+            const start = headingStart + opening[0].length - opening[1]!.length;
+            const text = first || /#/.test(source.slice(start, end)) ? " " : "";
+            if (opening[1] !== text)
+              findings.push({
+                start,
+                end: start + opening[1]!.length,
+                message: "Use one space after the opening # sequence.",
+                edit: { start, end: start + opening[1]!.length, text },
+              });
+          }
           const textEnd = last
             ? range(last)[1]
             : headingStart + /^#*/.exec(source.slice(headingStart))![0].length;
@@ -178,6 +189,19 @@ const styleRules: Record<string, Rule> = {
             headingAttributeBlock(source.slice(range(first)[0], textEnd))
           )
             return;
+          if (options.closing === "keep") {
+            // Empty closed headings share a single separator between the runs.
+            if (!first) return;
+            const separator = /^[ \t]+/.exec(source.slice(textEnd, lineEnd))![0];
+            if (separator !== " ")
+              findings.push({
+                start: textEnd,
+                end: textEnd + separator.length,
+                message: "Use one space before the closing # sequence.",
+                edit: { start: textEnd, end: textEnd + separator.length, text: " " },
+              });
+            return;
+          }
           findings.push({
             start: textEnd,
             end: lineEnd,

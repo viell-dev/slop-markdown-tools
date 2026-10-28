@@ -35,6 +35,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- `style/heading` writes one space between ATX heading hashes and text,
+  including tabs and retained closing sequences. Empty headings need no
+  separator. Protected Forgejo and Gitea attribute suffixes stay as written
+  ([#676](https://github.com/viell-dev/slop-markdown-tools/issues/676),
+  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678)).
+
 - The [comparison with Prettier and
   markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
   lists every markdownlint rule and every Prettier Markdown option and
