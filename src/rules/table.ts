@@ -7,17 +7,35 @@ import { lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 const table: Rule = {
-  description: "Align or compact GFM table cells while preserving their inline source.",
+  description: "Format GFM table padding and pipes while preserving inline source.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({ style: { enum: ["aligned", "compact"] } }),
+  schema: optionsSchema({
+    style: { enum: ["aligned", "compact", "tight"] },
+    pipeStyle: {
+      enum: [
+        "consistent",
+        "leadingAndTrailing",
+        "leadingOnly",
+        "trailingOnly",
+        "noLeadingOrTrailing",
+        "perTable",
+      ],
+    },
+    alignedDelimiter: { type: "boolean" },
+    padding: { enum: ["right", "alignment"] },
+  }),
   check({ document, options }) {
     const findings: Finding[] = [];
-    // A compact table has one space around each cell and the shortest delimiters.
-    const compact = options.style === "compact";
+    const aligned = options.style !== "compact" && options.style !== "tight";
+    const gap = options.style === "tight" ? "" : " ";
+    let firstBorders: readonly [boolean, boolean] | undefined;
     const newline = lineEnding(document.source);
     walk(document.tree, "table", (node) => {
       const [start, end] = range(node);
+      const header = document.source.slice(...range(node.children[0]!)).trim();
+      const borders = [header.startsWith("|"), /(?<!\\)(?:\\\\)*\|$/.test(header)] as const;
+      firstBorders ??= borders;
       // Nested tables retain container prefixes until a dedicated container printer handles them.
       if (node.position!.start.column !== 1) return;
       // Site generators close or open a container here, where GFM still reads table rows.
@@ -33,32 +51,61 @@ const table: Rule = {
       const count = node.align?.length ?? rows[0]?.length ?? 0;
       if (rows.some((row) => row.length > count)) return;
       const widths = Array.from({ length: count }, (_, i) =>
-        compact ? 3 : rows.reduce((width, row) => Math.max(width, stringWidth(row[i] ?? "")), 3),
+        aligned
+          ? rows.reduce((width, row) => Math.max(width, stringWidth(row[i] ?? "")), 3)
+          : Math.max(3, options.alignedDelimiter ? stringWidth(rows[0]?.[i] ?? "") : 3),
       );
-      const pad = (cell: string, i: number) =>
-        compact ? cell : cell + " ".repeat(widths[i]! - stringWidth(cell));
+      let [leading, trailing] =
+        options.pipeStyle === "consistent"
+          ? firstBorders
+          : options.pipeStyle === "perTable"
+            ? borders
+            : [
+                options.pipeStyle !== "trailingOnly" && options.pipeStyle !== "noLeadingOrTrailing",
+                options.pipeStyle !== "leadingOnly" && options.pipeStyle !== "noLeadingOrTrailing",
+              ];
+      // Obsidian's table widget needs both borders for one column. Never remove a
+      // leading border there: body rows with a different convention can become prose.
+      if (document.dialect === "obsidian") {
+        if (borders[0]) leading = true;
+        if (count === 1) leading = trailing = true;
+      }
+      // A one-column header needs a border to remain a table.
+      if (!leading && !trailing && count === 1) leading = trailing = true;
+      const render = (cells: string[]) =>
+        (leading ? `|${gap}` : "") + cells.join(`${gap}|${gap}`) + (trailing ? `${gap}|` : "");
+      const pad = (cell: string, i: number, header: boolean) => {
+        if (!aligned && !(header && options.alignedDelimiter)) return cell;
+        const extra = widths[i]! - stringWidth(cell);
+        const alignment = options.padding === "alignment" ? node.align?.[i] : null;
+        const left =
+          alignment === "right" ? extra : alignment === "center" ? Math.floor(extra / 2) : 0;
+        return " ".repeat(left) + cell + " ".repeat(extra - left);
+      };
       // Keep each row's own cell count: adding cells to a short row changes the parsed table.
-      const rendered = rows.map((row) => `| ${row.map(pad).join(" | ")} |`);
+      const rendered = rows.map((row, index) =>
+        render(row.map((cell, i) => pad(cell, i, index === 0))),
+      );
       rendered.splice(
         1,
         0,
-        `| ${widths
-          .map((width, i) => {
+        render(
+          widths.map((width, i) => {
             const align = node.align?.[i];
             return (
               (align === "left" || align === "center" ? ":" : "-") +
               "-".repeat(width - 2) +
               (align === "right" || align === "center" ? ":" : "-")
             );
-          })
-          .join(" | ")} |`,
+          }),
+        ),
       );
       const replacement = rendered.join(newline);
       if (replacement !== document.source.slice(start, end))
         findings.push({
           start,
           end,
-          message: compact ? "Write the table compactly." : "Align table cells.",
+          message: "Format table padding and pipes.",
           edit: { start, end, text: replacement },
         });
     });
