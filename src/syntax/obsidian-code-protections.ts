@@ -124,9 +124,13 @@ export function collectUnclosedCode(
     }
     if (carry !== undefined) {
       const fenced = leaf.type === "code" && /^ {0,3}(?:```|~~~)/.test(source.slice(start, end));
+      // A list item that a footnote definition opens, as in `[^1]: - a`, is
+      // footnote text to Live Preview, which carries the code through it (#670).
+      const opener = openers.get(leaf)?.type;
       if (
         (item &&
-          openers.get(leaf)?.type !== "blockquote" &&
+          opener !== "blockquote" &&
+          opener !== "footnoteDefinition" &&
           (!quotedItems.has(leaf) || carryInQuote)) ||
         fenced
       )

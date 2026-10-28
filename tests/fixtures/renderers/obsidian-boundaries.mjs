@@ -1666,4 +1666,15 @@ export const boundaryFixtures = [
     ["closed-fence spacing control", "* a\n  ```\n  b\n  ```\n9) c\n"],
     ["heading spacing control", "* # a\n9) c\n"],
   ].map(([name, source]) => ({ issue: 598, name, source, preserve: false })),
+  {
+    issue: 670,
+    name: "footnote list item in carried code",
+    source: "a ``` b\n\n[^1]: - item\n    *x* y\n\nc ```\n",
+  },
+  {
+    issue: 670,
+    name: "bullet list ends carried code control",
+    source: "a ``` b\n\n- item\n  *x* y\n\nc ```\n",
+    preserve: false,
+  },
 ];
