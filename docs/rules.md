@@ -1528,15 +1528,69 @@ A **bold** claim.
 
 **Style rule**, fixed by `format`. Presets: `recommended`, `github`, `forgejo`,
 `gitea`, `obsidian`, `vitepress`. Dialects: all but CommonMark. Options:
-`style`.
+`style`, `pipeStyle`, `alignedDelimiter`, `padding`.
 
-Aligns a table: every cell of a column is padded to the column's width, measured
-in display columns, and the delimiter row keeps each column's alignment. The
-option `style` is `"aligned"` (the default) or `"compact"`, which writes one
-space on each side of a cell's text and delimiters of three characters, such as
-`| :-- | --: |`. The text of each cell is left as written, and so is the number
-of cells in each row. A table inside a list or block quote, and one with a row
-that has more cells than its header, are left as written.
+`style: "tight"`, `pipeStyle`, `alignedDelimiter`, and `padding` are unreleased
+additions for the next minor release; `aligned` and `compact` are released, and
+the defaults keep the existing output.
+
+| Option             | Values                                                                                                           | Default                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `style`            | `"aligned"`, `"compact"`, `"tight"`                                                                              | `"aligned"`            |
+| `pipeStyle`        | `"leadingAndTrailing"`, `"leadingOnly"`, `"trailingOnly"`, `"noLeadingOrTrailing"`, `"consistent"`, `"perTable"` | `"leadingAndTrailing"` |
+| `alignedDelimiter` | Boolean                                                                                                          | `false`                |
+| `padding`          | `"right"`, `"alignment"`                                                                                         | `"right"`              |
+
+`aligned` pads every cell to its column's width, measured in display columns
+(including emoji and CJK), and keeps the delimiter row's column alignment.
+`compact` writes one space around cell text and three-character delimiters, such
+as `| :-- | --: |`. `tight` writes no padding: `|a|b|`. `alignedDelimiter`
+aligns delimiter pipes with the header in compact and tight tables; short
+headers gain padding to fit the minimum three-character delimiters. Body cells
+still use the selected style.
+
+`padding: "alignment"` pads right-aligned text on the left and centered text on
+both sides (an odd extra space goes on the right). It applies to aligned cells
+and to headers padded for `alignedDelimiter`. `"right"` puts all extra spaces on
+the right, as before.
+
+`pipeStyle: "consistent"` takes the first table header's borders for the
+document; `"perTable"` takes each table's own header. The other values request
+specific borders. Pipes needed to retain a one-column table are kept: when
+neither border is requested, such a table uses both. A table keeps its leading
+border when a row's first cell is empty or starts like another block, such as
+`- x`, `# x`, or `1. x`, which would otherwise start that block; it keeps its
+trailing border when a row's last cell is empty, which would otherwise vanish.
+Without a trailing border, the last cell gets no padding, so no line ends in
+blank space. In Obsidian, an existing leading border is retained, and one-column
+tables retain both borders. The existing renderer protections below still apply.
+A preferred form that would change meaning stays as written.
+
+Unlike markdownlint's `any`, each `style` names a target output. Accepting any
+of several styles would leave a formatter without a target; choose the desired
+style or disable the rule to retain spacing.
+
+Cell text and each row's number of cells stay as written. Tables inside lists or
+block quotes, and tables with more cells in a row than in the header, stay as
+written.
+
+For example, with
+`{ "style": "tight", "pipeStyle": "noLeadingOrTrailing", "alignedDelimiter": true }`:
+
+```markdown
+Alpha|Beta
+-----|----
+x|y
+```
+
+With `{ "padding": "alignment" }`, right and centered columns instead pad as
+follows:
+
+```markdown
+| Right | Center |
+| ----: | :----: |
+|     x |   y    |
+```
 
 A table containing a standalone colon-container boundary such as `:::` or
 `:::tip` stays as written too: site generators use it to open or close a
