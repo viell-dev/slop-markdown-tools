@@ -18,6 +18,12 @@ prereleases' notes there are longer than their entries here.
   its label; footnotes are still reported
   ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
 
+- `style/emphasis` and `style/strong` accept `marker: "consistent"`: the first
+  parsed emphasis or strong text chooses its marker for the document. Preset
+  defaults stay unchanged
+  ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
+  [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
+
 - Three report-only rules, in no preset, cover markdownlint's MD026, MD036, and
   MD059 with their options: `structure/heading-punctuation` reports a heading
   that ends with sentence punctuation, `structure/emphasis-heading` a paragraph
