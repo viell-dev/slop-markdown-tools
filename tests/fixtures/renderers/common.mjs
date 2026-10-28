@@ -9,6 +9,18 @@ export const commonFixtures = [
   { name: "quote", source: "> A quoted paragraph with *emphasis*.\n> \n> A second paragraph.\n" },
   { name: "table", source: "| Name | Value |\n| --- | ---: |\n| *First* | 1 |\n" },
   { name: "code", source: "~~~js\nconst answer = 42;\n\n~~~\n" },
+  // Blank lines added around closed fences and tables (#684, #697).
+  {
+    name: "fence-spacing",
+    source: "Text before.\n```js\nconst a = 1;\n```\nText after.\n~~~\nb\n~~~\n> A quote.\n",
+  },
+  {
+    name: "table-spacing",
+    source:
+      "Text before.\n| Name | Value |\n| --- | --- |\n| a | 1 |\n> A quote.\n\n```\ncode\n```\n| x | y |\n| - | - |\n***\n",
+  },
+  // Text below a table is another row; the forges read the indented line as one too.
+  { name: "table-row-text", source: "| Name | Value |\n| --- | --- |\nmore text\n    indented\n" },
 ];
 
 export const githubFixtures = [
@@ -17,4 +29,9 @@ export const githubFixtures = [
   { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
   { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail* about the note.\n" },
   { name: "math", source: "A formula $x^2$ in prose.\n\n$$\nx = y\n$$\n" },
+  // GitHub shows the definition as text when the table interrupts its lines (#697).
+  {
+    name: "definition-above-table",
+    source: "[ref]: https://example.com\nText\n| a | b |\n| - | - |\n\nA [link][ref].\n",
+  },
 ];

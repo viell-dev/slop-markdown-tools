@@ -747,7 +747,7 @@ describe("tables that Obsidian reads otherwise", () => {
       formatted("a\n| x | y |\n| - | - |\n", {
         config: { ...config, extends: ["recommended"], dialect: "github" },
       }),
-    ).toBe("a\n| x   | y   |\n| --- | --- |\n");
+    ).toBe("a\n\n| x   | y   |\n| --- | --- |\n");
   });
 });
 
