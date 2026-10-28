@@ -1685,6 +1685,12 @@ describe("Obsidian boundaries read differently by its views", () => {
     const source = "> text ```\n\n> 1) *first*\n>    - *second*\n";
     expect(checked(source)).toContain("> 1) *first*\n");
   });
+  it("carries code through a list item that a footnote definition opens (#670)", () => {
+    const footnote = "a ``` b\n\n[^1]: - item\n    *x* y\n\nc ```\n";
+    expect(checked(footnote)).toBe(footnote);
+    // A bullet list ends Live Preview's carried code, so its emphasis still formats.
+    expect(checked(footnote.replace("[^1]: - item\n    ", "- item\n  "))).toContain("_x_");
+  });
   it.each(boundaries)("preserves the source for #%i", (_issue, source) => {
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", String.fromCharCode(0xfeff)]) {

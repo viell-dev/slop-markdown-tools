@@ -106,7 +106,9 @@ note shows there, the tool keeps the text as written:
   Preview shows them as code too, across blank lines and out of a list item, up
   to a run of the same length outside an indented code block, a fenced code
   block, or a list item. No rule changes them, nor a table that holds such a
-  run.
+  run. **Unreleased:** a list that starts on a footnote's label line, as in
+  `[^1]: - item`, does not end that code, because Live Preview reads the line as
+  the footnote, and its blocks stay as written too.
 - A paragraph with a later line that starts a list item in Obsidian, where
   CommonMark reads more of the paragraph: Live Preview starts a list at a number
   other than 1 with text after it, as in `3. Step`, except in a block quote, and
