@@ -21,6 +21,13 @@ function holds(node: Nodes, type: string): boolean {
   });
   return found;
 }
-export { inlineBlocks, located, holds };
+/**
+ * A word that Obsidian reads as a tag after blank space or at the start of a
+ * line's content; Live Preview does not directly after a block quote's `>`
+ * (issue #409). It is `#` and the characters Obsidian allows in a tag,
+ * letters, digits, `_`, `-`, and `/`, among them one that is not a digit.
+ */
+const obsidianTag = /^#[\p{L}\p{N}_/-]*[\p{L}_/-]/u;
+export { inlineBlocks, located, holds, obsidianTag };
 
 export type { Range };

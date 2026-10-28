@@ -1,10 +1,12 @@
 import type { Emphasis, Heading, Nodes, PhrasingContent, Root, RootContent, Strong } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { range, textContent } from "../syntax/parse.js";
+import { range, startsWithMarker, textContent } from "../syntax/parse.js";
+import { lineEnd, lineStart } from "../syntax/source.js";
 import { vitepressTokens } from "../syntax/vitepress/projection.js";
+import { walk } from "../syntax/walk.js";
 import { headingAttributes } from "../workspace/heading-attributes.js";
-import { optionsSchema } from "./shared.js";
+import { obsidianTag, optionsSchema } from "./shared.js";
 
 function content(nodes: RootContent[]): RootContent[] {
   return nodes.filter((node) => !["yaml", "toml"].includes(node.type));
@@ -209,6 +211,42 @@ function emphasisOnly(document: Document, paragraph: Nodes): Emphasis | Strong |
   return only.children.every(plain) ? only : undefined;
 }
 
+/**
+ * The offsets where paragraphs start a line that renderers would read as an
+ * ATX heading if it started with one: each paragraph's first line, and, below
+ * the line of an alert's or callout's marker, the line where its body starts.
+ * Later lines of a paragraph can start with any word once it is wrapped, such
+ * as an issue reference or a hashtag, so they are left out.
+ */
+function lineStartsOfParagraphs(document: Document): number[] {
+  const { source } = document;
+  const starts: number[] = [];
+  walk(document.tree, "paragraph", (node, _index, parent) => {
+    const [start, end] = range(node);
+    starts.push(start);
+    if (document.dialect === "commonmark" || parent?.type !== "blockquote") return;
+    if (parent.children[0] !== node) return;
+    const first = lineEnd(source, start);
+    if (first >= end || !startsWithMarker(source.slice(start, first), node)) return;
+    let at = first + (source.startsWith("\r\n", first) ? 2 : 1);
+    // The body's line starts after its container's markers and indentation.
+    while (at < end && (source[at] === ">" || source[at] === " " || source[at] === "\t")) at++;
+    if (at < end) starts.push(at);
+  });
+  return starts;
+}
+/**
+ * One to six `#` before what would be a heading's text after a space: a
+ * letter or a digit, also after `*`, `_`, or a backtick that opens emphasis or
+ * code. Other characters after `#` mark other notations, such as a shebang
+ * (`#!`) or a keycap emoji.
+ */
+const unspacedHeading = /^(#{1,6})(?=[*_`]*[\p{L}\p{N}])/u;
+/** A single `#` before a number alone, as in an issue reference such as `#123`. */
+const numberReference = /^#\p{N}+(?![\p{L}\p{N}])/u;
+/** A closing run of `#` that a space before it would make a closed heading's, not escaped. */
+const closingRun = /(?:^|[^\\#])#+$/;
+
 export const structureRules: Record<string, Rule> = {
   "structure/initial-heading": {
     description: "Require an initial heading at the configured level.",
@@ -321,6 +359,29 @@ export const structureRules: Record<string, Rule> = {
       return findings;
     },
   },
+  "structure/unspaced-heading": {
+    description: "Report paragraph text that would be an ATX heading with a space after its #.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const { source } = document;
+      const findings: Finding[] = [];
+      for (const start of lineStartsOfParagraphs(document)) {
+        const line = source.slice(start, lineEnd(source, start)).trimEnd();
+        const hashes = unspacedHeading.exec(line)?.[1];
+        if (!hashes || numberReference.test(line)) continue;
+        // Obsidian reads `#word` as a tag.
+        if (document.dialect === "obsidian" && obsidianTag.test(line)) continue;
+        const closed = closingRun.test(line.slice(hashes.length));
+        findings.push({
+          start,
+          end: start + line.length,
+          message: `Text starts with "${hashes}" without a space after it, so it is not a heading; if it should be one, ${closed ? `add spaces inside the hashes, as in "${hashes} Heading ${hashes}"` : `add a space after "${hashes}"`}.`,
+        });
+      }
+      return findings;
+    },
+  },
   "structure/heading-punctuation": {
     description: "Report headings that end with sentence punctuation.",
     kind: "problem",
@@ -380,6 +441,43 @@ export const structureRules: Record<string, Rule> = {
           message: `Paragraph "${quoted(text)}" is only ${emphasis.type === "strong" ? "strong" : "emphasized"} text; if it names a section, make it a heading, which the outline lists and links can reach.`,
         });
       }
+      return findings;
+    },
+  },
+  "structure/split-quote": {
+    description: "Report block quotes separated only by blank lines, which may be meant as one.",
+    kind: "problem",
+    schema: optionsSchema({}),
+    check({ document }) {
+      const { source } = document;
+      const findings: Finding[] = [];
+      walk(document.tree, (parent) => {
+        if (!("children" in parent)) return;
+        const children: Nodes[] = parent.children;
+        for (let i = 1; i < children.length; i++) {
+          const before = children[i - 1]!;
+          const after = children[i]!;
+          if (before.type !== "blockquote" || after.type !== "blockquote") continue;
+          // A blank line is the only way to write an alert or callout directly
+          // after a quote, so one that opens the next quote stands apart.
+          const opening = after.children[0];
+          if (opening?.type === "paragraph") {
+            const [start] = range(opening);
+            if (startsWithMarker(source.slice(start, lineEnd(source, start)), opening)) continue;
+          }
+          const end = lineEnd(source, range(before)[1]);
+          const from = end + (source.startsWith("\r\n", end) ? 2 : 1);
+          const gap = source.slice(from, lineStart(source, range(after)[0]));
+          // Only blank lines, with the markers of an enclosing quote.
+          if (!/^[ \t>\r\n]*$/.test(gap)) continue;
+          findings.push({
+            start: from,
+            end: from + gap.replace(/(?:\r\n|\r|\n)$/, "").length,
+            message:
+              'A blank line separates two block quotes, which some renderers join into one; to write one quote, start the blank line with ">", or to keep two, put text or a comment between them.',
+          });
+        }
+      });
       return findings;
     },
   },

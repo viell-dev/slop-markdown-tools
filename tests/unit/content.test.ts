@@ -140,3 +140,78 @@ describe("content rules in presets", () => {
     expect(check(source, "content/image-alt").map((item) => item.line)).toEqual([4]);
   });
 });
+
+describe("content/shell-prompt", () => {
+  const rule = "content/shell-prompt";
+  const message = (prompt: string) =>
+    `Every command in the code block starts with ${prompt} and the block shows no output; remove the prompts, which get in the way of copying the commands.`;
+  it.each([
+    ["```sh\n$ ls\n$ cd docs\n```\n", "github"],
+    ["```\n$ ls\n$ cat foo\n$ less bar\n```\n", "github"],
+    ["~~~bash\n  $ npm ci\n\n  $ npm test\n~~~\n", "github"],
+    ["```Bash\n$\tls\n```\n", "github"],
+    ["```console\n$ ls\n```\n", "github"],
+    ["```shell-session\n$ ls\n```\n", "forgejo"],
+    ["```zsh\n$ ls\n```\n", "gitea"],
+    ["    $ ls\n    $ pwd\n", "commonmark"],
+    ["- Run:\n\n  ```sh\n  $ ls\n  ```\n", "obsidian"],
+    ["> ```sh\n> $ ls\n> ```\n", "obsidian"],
+    // VitePress reads line highlighting and numbering apart from the language.
+    ["```bash{1}\n$ ls\n```\n", "vitepress"],
+    ["```sh:line-numbers\n$ ls\n```\n", "vitepress"],
+    // Lines that a backslash continues belong to the command.
+    ["```sh\n$ docker run \\\n    --rm \\\n    image\n$ ls\n```\n", "github"],
+  ] as const)("reports %j in %s", (source, dialect) => {
+    const findings = check(source, rule, dialect);
+    // The whole block, from its fence or indentation.
+    expect(spans(source, findings)).toEqual([
+      source.slice(source.search(/`{3}|~{3}|^ {4}/m)).trimEnd(),
+    ]);
+    expect(findings[0]?.message).toBe(message('a "$" prompt'));
+  });
+  it("reports zsh's % prompt and names a mix of prompts generally", () => {
+    expect(check("```zsh\n% ls\n% pwd\n```\n", rule)[0]?.message).toBe(message('a "%" prompt'));
+    expect(check("```console\n$ ls\n% pwd\n```\n", rule)[0]?.message).toBe(message("a prompt"));
+  });
+  it.each(["\r\n", "\r"])("reads %j line endings", (eol) => {
+    const source = ["Intro.", "", "```sh", "$ ls", "$ cd \\", "  docs", "```", ""].join(eol);
+    expect(check(source, rule)).toMatchObject([{ line: 3, column: 1 }]);
+    const output = ["```sh", "$ ls", "output", "```", ""].join(eol);
+    expect(check(output, rule)).toEqual([]);
+  });
+  it.each([
+    // Output below a command.
+    "```sh\n$ ls\nfoo bar\n$ cat foo\nHello world\n```\n",
+    // Some commands may show no output, if one does.
+    "```sh\n$ mkdir test\nmkdir: created directory 'test'\n$ ls test\n```\n",
+    "```sh\nls\ncd docs\n```\n",
+    "```sh\nls\n$ cd docs\n```\n",
+    // `#` starts a comment in shell code, and a line of output or a root prompt in a session.
+    "```sh\n# Install the dependencies\n$ npm ci\n```\n",
+    "```console\n$ cat config\n# generated\n```\n",
+    "```console\n# apt install curl\n```\n",
+    // A prompt needs blank space and a command after it.
+    "```sh\n$HOME/bin/tool\n```\n",
+    "```sh\n$\n```\n",
+    "```sh\n$ls\n```\n",
+    // An escaped backslash continues nothing.
+    "```sh\n$ echo a\\\\\noutput\n```\n",
+    "```sh\n$ echo \\\n\noutput\n```\n",
+    "```sh\n```\n",
+    "```\n\n```\n",
+    // Other languages can start lines with `$` or `%`.
+    "```text\n$ 5 for the ticket\n```\n",
+    "```latex\n% A comment\n% Another\n```\n",
+    "```tex\n$ x^2 $\n```\n",
+    "```php\n$ value = 1;\n```\n",
+    "```powershell\n$ value = 1\n```\n",
+    "```math\n$ x $\n```\n",
+    "$$\n$ x $\n$$\n",
+    "Run `$ ls` first.\n",
+  ])("accepts %j", (source) => {
+    expect(check(source, rule)).toEqual([]);
+  });
+  it("is in no preset", () => {
+    for (const preset of Object.values(presets)) expect(preset.rules?.[rule]).toBeUndefined();
+  });
+});
