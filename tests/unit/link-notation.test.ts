@@ -1,7 +1,8 @@
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
-import { lint } from "../../src/index.js";
+import { lint, parse } from "../../src/index.js";
+import { githubAnchors } from "../../src/workspace/anchors.js";
 import type { Dialect } from "../../src/index.js";
 import { formatted, only } from "../support/rules.js";
 const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"];
@@ -11,6 +12,7 @@ describe("link notation checks", () => {
     for (const destination of [
       "https://example.com",
       "a@example.com",
+      "mailto:a@example.com",
       "a/b",
       "./a",
       "../b",
@@ -24,6 +26,14 @@ describe("link notation checks", () => {
     for (const source of [
       "(Smith 2020)[1]",
       "(see above)[note]",
+      "(see)[p.12]",
+      "(see)[v1.2]",
+      "(1, 2)[0.5]",
+      "f(x)[i.j]",
+      "Call fn(arg)[idx.len]",
+      "é(x)[i.j]",
+      "𐐀(x)[i.j]",
+      "$fn(arg)[idx.len]",
       "(text)[^1]",
       "(text)[[file.md]]",
       "`(text)[file.md]`",
@@ -41,6 +51,58 @@ describe("link notation checks", () => {
       expect(lint("$(text)[file.md]$", { config })).toEqual([]);
     if (dialect === "forgejo" || dialect === "gitea")
       expect(lint("\\((text)[file.md]\\)", { config })).toEqual([]);
+  });
+  it.each(dialects)("reports unsafe address boundaries without a refused fix (%s)", (dialect) => {
+    const config = only({ "links/bare-url": "warn" }, dialect);
+    for (const ending of ["\n", "\r\n"]) {
+      const source = `\\https://e.com${ending}`;
+      expect(lint(source, { config })).toHaveLength(1);
+      expect(formatted(source, config)).toBe(source);
+    }
+    // Adjacent punctuation, emphasis and HTML must neither consume nor escape brackets.
+    for (const source of [
+      "(https://e.com).\n",
+      "*https://e.com*\n",
+      "https://e.com>\n",
+      "<https://e.com\n",
+      "https://e.com/</b>\n",
+    ]) {
+      formatted(source, config);
+    }
+  });
+  it.each(dialects)("preserves source-sensitive heading addresses (%s)", (dialect) => {
+    const config = only({ "links/bare-url": "warn" }, dialect);
+    for (const ending of ["\n", "\r\n"]) {
+      for (const heading of ["# https://e.com", "https://e.com\n===", "# *https://e.com*"]) {
+        const source = heading.replaceAll("\n", ending) + ending;
+        expect(lint(source, { config })).toHaveLength(1);
+        const output = formatted(source, config);
+        expect(output).toBe(
+          dialect === "github" || dialect === "vitepress"
+            ? source.replace("https://e.com", "<https://e.com>")
+            : source,
+        );
+        if (dialect === "github")
+          expect(githubAnchors(parse(output, dialect)).slugs).toEqual(
+            githubAnchors(parse(source, dialect)).slugs,
+          );
+      }
+    }
+  });
+  it("retains VitePress linkifier boundary and extent differences", () => {
+    const config = only({ "links/bare-url": "warn" }, "vitepress");
+    for (const source of [
+      "+https://e.com\n",
+      "0https://e.com\n",
+      "https://e.com#\n",
+      "https://e.com%\n",
+      "https://e.com@\n",
+      "https://e.com_\n",
+      "https://e.com~\n",
+    ]) {
+      expect(lint(source, { config }), source).toHaveLength(1);
+      expect(formatted(source, config), source).toBe(source);
+    }
   });
   it.each(dialects)("reports bare addresses and preserves authored syntax (%s)", (dialect) => {
     const config = only({ "links/bare-url": "warn" }, dialect);

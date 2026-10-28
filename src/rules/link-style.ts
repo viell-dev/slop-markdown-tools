@@ -7,7 +7,10 @@ import { optionsSchema } from "./shared.js";
 
 const literal = (raw: string) => !/^[<![]/.test(raw);
 /** Visit prose and literal links, never descendants of authored links or other syntax. */
-function prose(document: Document, visit: (node: Nodes, html: [number, number][]) => void) {
+function prose(
+  document: Document,
+  visit: (node: Nodes, html: [number, number][], block: Nodes) => void,
+) {
   walk(document.tree, (block) => {
     if (!["paragraph", "heading", "tableCell"].includes(block.type)) return;
     const html = insideInlineHtml(block, document.dialect === "vitepress");
@@ -25,7 +28,7 @@ function prose(document: Document, visit: (node: Nodes, html: [number, number][]
       html.push([blockStart + match.index, blockStart + match.index + match[0].length]);
     }
     const collect = (node: Nodes) => {
-      if (node.type === "text" || node.type === "link") visit(node, html);
+      if (node.type === "text" || node.type === "link") visit(node, html, block);
       else if (
         "children" in node &&
         ["paragraph", "heading", "tableCell", "emphasis", "strong", "delete"].includes(node.type)
@@ -71,10 +74,11 @@ export const linkStyleRules: Record<string, Rule> = {
         const end = start + match[0].length;
         if (
           !readable.slice(start, end).every(Boolean) ||
+          /[\p{L}\p{N}\p{M}_$]$/u.test(document.source.slice(Math.max(0, start - 2), start)) ||
           document.source[end] === "]" ||
           definitions.has(normalizeLabel(label)) ||
           label.startsWith("^") ||
-          !/^(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|mailto:|[^@]+@[^@]+\.[^@]+|\.{0,2}\/|#\S)|\/|\.[A-Za-z0-9]{1,10}(?:[#?].*)?$/.test(
+          !/^(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|mailto:|[^@]+@[^@]+\.[^@]+|\.{0,2}\/|#\S)|\/|\.[A-Za-z][A-Za-z0-9]{0,9}(?:[#?].*)?$/.test(
             label,
           )
         )
@@ -95,7 +99,7 @@ export const linkStyleRules: Record<string, Rule> = {
     schema: false,
     check({ document }) {
       const findings: Finding[] = [];
-      prose(document, (node, ignored) => {
+      prose(document, (node, ignored, block) => {
         const [start, end] = range(node);
         const raw = document.source.slice(start, end);
         if (node.type === "link") {
@@ -105,11 +109,29 @@ export const linkStyleRules: Record<string, Rule> = {
               ? node.children[0].value
               : undefined;
           const equivalent = text === raw && (node.url === raw || node.url === `mailto:${raw}`);
+          // Check source boundaries, even when the backslash is a separate text node.
+          const boundarySafe =
+            !/[\\<]/.test(document.source[start - 1] ?? "") && document.source[end] !== ">";
+          // markdown-it's linkifier disagrees with the GFM literal reader at
+          // these boundaries. Bracketing would add a link or change its extent.
+          const projectionSafe =
+            document.dialect !== "vitepress" ||
+            (!/[\p{L}\p{N}_+]$/u.test(document.source.slice(Math.max(0, start - 2), start)) &&
+              !/[_~]/.test(document.source[end] ?? "") &&
+              !/[#%@]$/.test(raw));
+          // Obsidian accepts source heading names; the forges also support
+          // versions whose heading IDs depend on source rather than rendered text.
+          const headingSafe =
+            block.type !== "heading" ||
+            document.dialect === "github" ||
+            document.dialect === "vitepress";
           findings.push({
             start,
             end,
             message: "Write this bare address as an autolink where rendering permits.",
-            ...(equivalent && angleSafe(raw) ? { edit: { start, end, text: `<${raw}>` } } : {}),
+            ...(equivalent && boundarySafe && projectionSafe && headingSafe && angleSafe(raw)
+              ? { edit: { start, end, text: `<${raw}>` } }
+              : {}),
           });
         } else {
           for (const match of raw.matchAll(barePattern)) {
@@ -122,7 +144,7 @@ export const linkStyleRules: Record<string, Rule> = {
               continue;
             // An angle-delimited attempt, including one with spaces, is already explicit.
             const before = raw.slice(0, match.index);
-            if (before.lastIndexOf("<") > before.lastIndexOf(">") || /[\\\w@]$/.test(before))
+            if (before.lastIndexOf("<") > before.lastIndexOf(">") || /[\w@]$/.test(before))
               continue;
             findings.push({
               start: start + match.index,

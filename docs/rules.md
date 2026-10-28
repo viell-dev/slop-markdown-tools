@@ -331,6 +331,18 @@ unchanged text and destination, using the conservative character subset of
 addresses whose displayed text differs from their destination. Trailing
 punctuation excluded from a literal link stays outside the brackets.
 
+An address directly after a backslash or `<`, or directly before `>`, reports
+without a fix: adjacent source characters can escape or combine with the new
+brackets. Headings also report without a fix in Obsidian, which accepts source
+heading names, and Forgejo/Gitea, which support versions with source-based
+heading IDs. GitHub builds anchors from rendered heading text; VitePress uses
+inline token content. Bracketing these exact literal links preserves both, so
+headings remain fixable in those two dialects.
+
+VitePress also retains addresses next to a preceding letter, digit, `_` or `+`,
+a following `_` or `~`, or ending in `#`, `%` or `@`: its linkifier can read
+these boundaries differently from the literal-link parser.
+
 Before, in GitHub:
 
 ```markdown
@@ -514,13 +526,17 @@ Added after 0.5.0. Reports likely reversed links such as
 so there is no automatic repair. The bracketed part must contain no whitespace
 or brackets and look like a destination: a scheme followed by `://`, `mailto:`,
 an email-like address, a slash anywhere, a leading `#`, or a final dot extension
-of one to ten ASCII letters or digits (optionally followed by a query or
-fragment).
+of one to ten ASCII letters or digits, starting with a letter (optionally
+followed by a query or fragment). A parenthesis immediately after an identifier
+character (a Unicode letter, number or combining mark, `_`, or `$`) is treated
+as call/subscript syntax and excluded.
 
 Defined labels are excluded using the renderer's Unicode case folding and
 whitespace normalization. Citations such as `(Smith 2020)[1]`, cross-references
-such as `(see above)[note]`, footnotes, wikilinks, task markers, code, math,
-HTML, and text inside authored links and destinations are not reported.
+such as `(see above)[note]`, versions such as `(see)[v1.2]`, numeric references
+such as `(see)[p.12]` and `(1, 2)[0.5]`, calls such as `f(x)[i.j]`, footnotes,
+wikilinks, task markers, code, math, HTML, and text inside authored links and
+destinations are not reported.
 
 Reported:
 
