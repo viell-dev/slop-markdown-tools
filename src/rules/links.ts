@@ -2,7 +2,7 @@ import path from "node:path";
 import { walk } from "../syntax/walk.js";
 import type { Definition, FootnoteDefinition, Nodes } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
-import { range } from "../syntax/parse.js";
+import { codeSpanText, range } from "../syntax/parse.js";
 import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { splitDestination } from "../workspace/index.js";
 import { giteaPyLine } from "./protections.js";
@@ -295,6 +295,41 @@ function inTableCells(tree: Nodes): Set<Nodes> {
   const nodes = new Set<Nodes>();
   walk(tree, "tableCell", (cell) => walk(cell, (child) => nodes.add(child)));
   return nodes;
+}
+
+/** markdownlint's MD059 default. */
+const prohibitedTexts = ["click here", "here", "link", "more"];
+/**
+ * The text of a link as readers and screen readers get it: its text and code,
+ * and the alternative text of its images, but not HTML tags or comments.
+ */
+function linkText(node: Nodes): string {
+  switch (node.type) {
+    case "text":
+    case "inlineMath":
+    case "obsidianHighlight":
+      return node.value;
+    case "inlineCode":
+      return codeSpanText(node);
+    case "image":
+    case "imageReference":
+      return node.alt ?? "";
+    case "break":
+      return " ";
+  }
+  return "children" in node ? node.children.map(linkText).join("") : "";
+}
+/**
+ * Link text for comparison: case, blank space, punctuation, and symbols do
+ * not count, so `Click here!` and `click-here` are both `click here`. Letters
+ * and digits of every script count.
+ */
+function comparableText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, " ")
+    .trim();
 }
 
 export const linkRules: Record<string, Rule> = {
@@ -690,6 +725,42 @@ export const linkRules: Record<string, Rule> = {
       return findings.flatMap(([node, finding]) =>
         node.type === "definition" && comment(node, used) ? [] : [finding],
       );
+    },
+  },
+  "links/descriptive-text": {
+    description: "Report links whose whole text, such as here, does not say where they lead.",
+    kind: "problem",
+    schema: optionsSchema({
+      prohibitedTexts: {
+        description: "Link texts to report, compared without case, punctuation, or symbols.",
+        type: "array",
+        // An entry with no letter or digit would compare as empty.
+        items: { type: "string", pattern: "[\\p{L}\\p{N}]" },
+        default: prohibitedTexts,
+      },
+    }),
+    check({ document, options }) {
+      const prohibited = new Set(
+        ((options.prohibitedTexts as string[] | undefined) ?? prohibitedTexts).map(comparableText),
+      );
+      const findings: Finding[] = [];
+      walk(document.tree, (node) => {
+        let text: string;
+        if (node.type === "wikiLink" && !node.embed) text = node.label ?? node.target;
+        else if (node.type === "link" || node.type === "linkReference") {
+          // An autolink shows its destination, which describes itself.
+          if (document.source[range(node)[0]] !== "[") return;
+          text = linkText(node);
+        } else return;
+        if (!prohibited.has(comparableText(text))) return;
+        const [start, end] = range(node);
+        findings.push({
+          start,
+          end,
+          message: `Link text "${text.replace(/\s+/g, " ").trim()}" does not say where the link leads; name its destination or purpose.`,
+        });
+      });
+      return findings;
     },
   },
 };
