@@ -890,9 +890,16 @@ whose info string contains a backtick, because a backtick fence cannot have one.
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
 Options: `marker`.
 
-Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
-`"*"`. With `_`, emphasis inside a word keeps `*`, because `_` cannot mark
-emphasis there.
+Writes emphasis with one marker. The option `marker` is `"_"` (the default),
+`"*"`, or `"consistent"` (unreleased). With `"consistent"`, the first parsed
+emphasis in the document chooses the marker, including emphasis inside a word.
+Thus a document starting with `un*believ*able` uses `*` for later emphasis too.
+With `_`, emphasis inside a word keeps `*`, because `_` cannot mark emphasis
+there. Code, HTML blocks, and Obsidian wikilinks do not choose a marker.
+
+For example, `*first* and _later_` becomes `*first* and *later*` with
+`marker: "consistent"`. Each document chooses independently, including when the
+first node cannot safely change; the preset default remains `_`.
 
 Before:
 
@@ -1298,7 +1305,11 @@ After:
 Options: `marker`.
 
 Writes strong emphasis with one marker. The option `marker` is `"*"` (the
-default) or `"_"`. The exceptions of `style/emphasis` apply.
+default), `"_"`, or `"consistent"` (unreleased). With `"consistent"`, the first
+parsed strong text chooses the marker independently of ordinary emphasis. For
+example, `__first__ and **later**` becomes `__first__ and __later__`. Each
+document chooses independently; the preset default remains `*`. The exceptions
+of `style/emphasis` apply, including when the first node cannot safely change.
 
 Before:
 

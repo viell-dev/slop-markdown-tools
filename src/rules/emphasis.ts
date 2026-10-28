@@ -265,13 +265,25 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
     description: `Choose ${type} delimiters without reprinting their contents.`,
     kind: "style",
     phase: "inline",
-    schema: optionsSchema({ marker: { enum: ["*", "_"] } }),
+    schema: optionsSchema({ marker: { enum: ["*", "_", "consistent"] } }),
     check({ document, options }) {
       const findings: Finding[] = [];
       const { source } = document;
       const gfm = document.dialect !== "commonmark";
       const size = type === "strong" ? 2 : 1;
-      const marker = String((options.marker as string | undefined) ?? fallback).repeat(size);
+      const preference = (options.marker as string | undefined) ?? fallback;
+      let selected: string | undefined;
+      if (preference === "consistent") {
+        // Pre-order traversal visits opening delimiters in source order. Even
+        // protected or intraword nodes choose the document's marker; the guards
+        // below still decide whether each later node can safely change.
+        walk(document.tree, type, (node) => {
+          selected ??= source[range(node)[0]];
+        });
+      }
+      const marker = (selected ?? (preference === "consistent" ? fallback : preference)).repeat(
+        size,
+      );
       const labels = markerLabels(document.tree);
       const titles = calloutTitles(document);
       const loose = document.dialect === "obsidian" ? blocksWithLooseMarkers(document) : [];
