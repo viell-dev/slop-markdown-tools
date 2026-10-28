@@ -2958,3 +2958,44 @@ describe("destination spelling", () => {
     expect(result.diagnostics).toEqual([]);
   });
 });
+
+describe("Workspace.resolve's lazy fragmentAnchor", () => {
+  const workspace = () =>
+    createWorkspace({ "Doc.md": "", "Note.md": "# Heading\n\n## Tail\n" }, { dialect: "obsidian" });
+  it.each([
+    ["Note.md#heading", "Heading"],
+    ["Note.md#Heading%23Tail", undefined],
+  ] as const)("reads %s from a frozen or sealed result", (link, expected) => {
+    for (const lock of [Object.freeze, Object.seal]) {
+      const result = lock(workspace().resolve("Doc.md", link, "obsidian")!);
+      expect(result.fragmentAnchor).toBe(expected);
+      expect(result.fragmentAnchor).toBe(expected);
+      expect(JSON.parse(JSON.stringify(result)).fragmentAnchor).toBe(expected);
+      expect({ ...result }.fragmentAnchor).toBe(expected);
+    }
+  });
+  it("settles an unlocked result to a plain value, or removes an exact match's", () => {
+    const spelled = workspace().resolve("Doc.md", "Note.md#heading", "obsidian")!;
+    expect(spelled.fragmentAnchor).toBe("Heading");
+    expect(Object.getOwnPropertyDescriptor(spelled, "fragmentAnchor")).toMatchObject({
+      value: "Heading",
+      writable: true,
+    });
+    const exact = workspace().resolve("Doc.md", "Note.md#Heading%23Tail", "obsidian")!;
+    expect(exact.fragmentAnchor).toBeUndefined();
+    expect("fragmentAnchor" in exact).toBe(false);
+  });
+  it("assigns to its receiver, and a frozen result ignores assignments", () => {
+    const result = workspace().resolve("Doc.md", "Note.md#heading", "obsidian")!;
+    const derived = Object.create(result) as typeof result;
+    derived.fragmentAnchor = "Override";
+    expect(derived.fragmentAnchor).toBe("Override");
+    expect(result.fragmentAnchor).toBe("Heading");
+    const frozen = Object.freeze(workspace().resolve("Doc.md", "Note.md#heading", "obsidian")!);
+    Reflect.set(frozen, "fragmentAnchor", "Changed");
+    expect(frozen.fragmentAnchor).toBe("Heading");
+    const sealed = Object.seal(workspace().resolve("Doc.md", "Note.md#heading", "obsidian")!);
+    sealed.fragmentAnchor = "Changed";
+    expect(sealed.fragmentAnchor).toBe("Changed");
+  });
+});

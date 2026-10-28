@@ -253,27 +253,44 @@ export function resolveLink(
  * since most callers never read it and finding it can mean searching the
  * target's headings. Reading it replaces it with its value, or removes it when
  * the fragment matches an anchor exactly; until then it is listed among the
- * result's keys, as a property whose value may turn out undefined.
+ * result's keys, as a property whose value may turn out undefined. A frozen or
+ * sealed result keeps the property as it is and answers from the value found
+ * on the first read, and a frozen one ignores assignments.
  */
 function spellLazily(result: LinkResolution, spell: () => string | undefined): void {
-  const settle = (value: string | undefined) => {
-    if (value === undefined) delete result.fragmentAnchor;
-    else
-      Object.defineProperty(result, "fragmentAnchor", {
-        value,
-        configurable: true,
-        enumerable: true,
-        writable: true,
-      });
-  };
+  let spelled = false;
+  let value: string | undefined;
+  const define = (target: object, next: string | undefined) =>
+    Object.defineProperty(target, "fragmentAnchor", {
+      value: next,
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
+  const replaceable = () =>
+    Object.getOwnPropertyDescriptor(result, "fragmentAnchor")?.configurable === true;
   Object.defineProperty(result, "fragmentAnchor", {
     configurable: true,
     enumerable: true,
     get() {
-      const value = spell();
-      settle(value);
+      if (!spelled) {
+        value = spell();
+        spelled = true;
+      }
+      if (replaceable()) {
+        if (value === undefined) delete result.fragmentAnchor;
+        else define(result, value);
+      }
       return value;
     },
-    set: settle,
+    set(this: object, next: string | undefined) {
+      // An object created from the result gets its own value.
+      if (this !== result) define(this, next);
+      else if (!Object.isFrozen(result)) {
+        spelled = true;
+        value = next;
+        if (replaceable()) define(result, next);
+      }
+    },
   });
 }
