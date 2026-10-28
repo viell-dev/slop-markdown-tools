@@ -1460,8 +1460,9 @@ A **bold** claim.
 `gitea`, `obsidian`, `vitepress`. Dialects: all but CommonMark. Options:
 `style`, `pipeStyle`, `alignedDelimiter`, `padding`.
 
-These options are unreleased additions for the next minor release; the defaults
-keep the existing output.
+`style: "tight"`, `pipeStyle`, `alignedDelimiter`, and `padding` are unreleased
+additions for the next minor release; `aligned` and `compact` are released, and
+the defaults keep the existing output.
 
 | Option             | Values                                                                                                           | Default                |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------- |
