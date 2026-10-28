@@ -16,6 +16,7 @@ prereleases' notes there are longer than their entries here.
   and `spacesPerTab`, replacing safe prose and indentation tabs while keeping
   literal content and Obsidian list nesting
   ([#671](https://github.com/viell-dev/slop-markdown-tools/issues/671)).
+
 - Opt-in `style/prose-space` collapses repeated prose spaces without moving line
   breaks, preserving literal content, indentation and hard breaks
   ([#720](https://github.com/viell-dev/slop-markdown-tools/issues/720)).

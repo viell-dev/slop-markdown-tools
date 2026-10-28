@@ -1651,7 +1651,7 @@ list nesting and tab-only lines differently.
 | Option                 | Default | Meaning                                                                               |
 | ---------------------- | ------- | ------------------------------------------------------------------------------------- |
 | `codeBlocks`           | `true`  | Report tabs in code blocks and spans, without fixes.                                  |
-| `ignoredCodeLanguages` | `[]`    | Case-sensitive code languages whose tabs are neither reported nor fixed.              |
+| `ignoredCodeLanguages` | `[]`    | Case-insensitive code languages whose tabs are neither reported nor fixed.            |
 | `spacesPerTab`         | `1`     | Nonnegative integer replacement width in prose; indentation always follows tab stops. |
 
 A zero `spacesPerTab` removes prose tabs only beside an existing ASCII space;
@@ -1663,6 +1663,12 @@ block, since it can make whitespace significant. Existing renderer protections
 can suppress findings and edits in ambiguous regions. Tables and link syntax are
 reported without fixes. This rule is opt-in because tabs can be intentional,
 particularly in code; it does not add diagnostics to `recommended`.
+
+ATX and Setext heading tabs are reported without fixes in every dialect to keep
+heading anchors and heading links intact. VitePress container delimiters,
+attributes, includes, table-of-contents syntax and Vue `{{ }}` interpolations
+also report tabs without fixes. Indented code is reported under `codeBlocks` in
+VitePress as in the other dialects.
 
 ```json
 { "rules": { "style/no-tabs": ["warn", { "ignoredCodeLanguages": ["make", "makefile", "go"] }] } }
@@ -1733,6 +1739,11 @@ indentation, trailing spaces (including hard breaks), non-breaking spaces, code,
 math, images, link destinations and titles, and table cells stay as written. A
 block containing inline HTML stays whole, since HTML can make whitespace
 significant; HTML blocks and front matter stay literal too.
+
+ATX and Setext heading spaces are reported without fixes in every dialect,
+because changing heading text can change anchors and heading links. VitePress
+projection syntax and Vue `{{ }}` interpolations keep their spaces without a
+finding: expressions can contain whitespace-sensitive JavaScript strings.
 
 ```json
 { "rules": { "style/wrap": "off", "style/prose-space": "warn" } }

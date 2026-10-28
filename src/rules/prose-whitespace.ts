@@ -3,6 +3,7 @@ import type { Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { lineBounds } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
+import { vitepressWhitespaceLiterals } from "../syntax/vitepress/projection.js";
 import { holds, inlineBlocks, optionsSchema, type Range } from "./shared.js";
 
 /** Text leaves only: source delimiters, destinations, code and formulas stay literal.
@@ -33,6 +34,32 @@ function containerPrefix(text: string): boolean {
   return /^[ \t]*(?:>[ \t]*)*(?:(?:[-+*]|\d+[.)])[ \t]+)?$/.test(text);
 }
 
+/** Merge once, then query in logarithmic time even for overlapping literals. */
+function membership(ranges: Range[]): (offset: number) => boolean {
+  const merged: Range[] = [];
+  for (const [start, end] of ranges.sort((a, b) => a[0] - b[0])) {
+    const previous = merged.at(-1);
+    if (previous && start <= previous[1]) previous[1] = Math.max(previous[1], end);
+    else merged.push([start, end]);
+  }
+  return (offset) => {
+    let low = 0;
+    let high = merged.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (merged[middle]![0] <= offset) low = middle + 1;
+      else high = middle;
+    }
+    return low > 0 && offset < merged[low - 1]![1];
+  };
+}
+
+function headings(document: Document): Range[] {
+  const result: Range[] = [];
+  walk(document.tree, "heading", (node) => result.push(range(node)));
+  return result;
+}
+
 export const proseSpace: Rule = {
   description: "Collapse repeated prose spaces without moving line breaks.",
   kind: "style",
@@ -41,10 +68,13 @@ export const proseSpace: Rule = {
   check({ document }) {
     const findings: Finding[] = [];
     const { source } = document;
+    const heading = membership(headings(document));
+    const literal = membership(vitepressWhitespaceLiterals(document));
     for (const [from, to] of prose(document)) {
       for (const match of source.slice(from, to).matchAll(/ {2,}/g)) {
         const start = from + match.index;
         const end = start + match[0].length;
+        if (literal(start)) continue;
         // Keep physical indentation, hard breaks and whitespace next to tabs/NBSP.
         const [lineStart, lineEnd] = lineBounds(source, start, end);
         if (
@@ -58,7 +88,7 @@ export const proseSpace: Rule = {
           start,
           end,
           message: "Use one space between prose words.",
-          edit: { start, end, text: " " },
+          ...(heading(start) ? {} : { edit: { start, end, text: " " } }),
         });
       }
     }
@@ -78,8 +108,13 @@ export const noTabs: Rule = {
   check({ document, options }) {
     const { source } = document;
     const text = prose(document);
-    const literal: Range[] = [];
+    const literal: Range[] = [...headings(document), ...vitepressWhitespaceLiterals(document)];
     const ignored: Range[] = [];
+    const languages = new Set(
+      ((options.ignoredCodeLanguages as string[] | undefined) ?? []).map((lang) =>
+        lang.toLowerCase(),
+      ),
+    );
     walk(document.tree, (node) => {
       if (
         ["code", "inlineCode", "math", "inlineMath", "html", "yaml", "toml"].includes(node.type)
@@ -87,10 +122,7 @@ export const noTabs: Rule = {
         let [start, end] = range(node);
         if (node.type === "code") {
           [start, end] = lineBounds(source, start, end);
-          if (
-            options.codeBlocks === false ||
-            (options.ignoredCodeLanguages as string[] | undefined)?.includes(node.lang ?? "")
-          ) {
+          if (options.codeBlocks === false || languages.has((node.lang ?? "").toLowerCase())) {
             ignored.push([start, end]);
           }
         }
@@ -98,12 +130,16 @@ export const noTabs: Rule = {
         literal.push([start, end]);
       }
     });
-    const contains = (ranges: Range[], offset: number) =>
-      ranges.some(([a, b]) => a <= offset && offset < b);
+    const inText = membership(text);
+    const inLiteral = membership(literal);
+    const inIgnored = membership(ignored);
     const findings: Finding[] = [];
     let lineStart = 0;
     let column = 0;
     let leading = true;
+    let prefixEnd = 0;
+    let contentEnd = 0;
+    let measuredLine = -1;
     for (let start = 0; start < source.length; start++) {
       const char = source[start];
       if (char === "\n" || char === "\r") {
@@ -114,16 +150,20 @@ export const noTabs: Rule = {
       }
       if (char === "\t") {
         const width = 4 - (column % 4);
-        if (!contains(ignored, start)) {
+        if (measuredLine !== lineStart) {
+          measuredLine = lineStart;
+          const end = lineBounds(source, start, start)[1];
+          const line = source.slice(lineStart, end);
+          prefixEnd =
+            lineStart + /^[ \t]*(?:>[ \t]*)*(?:(?:[-+*]|\d+[.)])[ \t]+)?/.exec(line)![0].length;
+          contentEnd = end;
+          while (contentEnd > lineStart && /\s/.test(source[contentEnd - 1]!)) contentEnd--;
+        }
+        if (!inIgnored(start)) {
           let replacement: string | undefined;
-          if (!contains(literal, start)) {
+          if (!inLiteral(start)) {
             if (leading && document.dialect !== "obsidian") replacement = " ".repeat(width);
-            else if (
-              !leading &&
-              contains(text, start) &&
-              !containerPrefix(source.slice(lineStart, start)) &&
-              /\S/.test(source.slice(start + 1, lineBounds(source, start, start)[1]))
-            ) {
+            else if (!leading && inText(start) && start >= prefixEnd && start + 1 < contentEnd) {
               const count = (options.spacesPerTab as number | undefined) ?? 1;
               // Deleting a separator must not join words.
               if (count > 0 || source[start - 1] === " " || source[start + 1] === " ")

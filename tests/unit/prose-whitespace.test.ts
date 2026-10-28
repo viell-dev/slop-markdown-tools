@@ -72,6 +72,30 @@ describe.each(dialects)("prose whitespace in %s", (dialect) => {
       ).toEqual([]);
       expect(check(source, source, "style/no-tabs", dialect, { codeBlocks: false })).toEqual([]);
     }
+    for (const [lang, ignored] of [
+      ["Go", "go"],
+      ["go", "GO"],
+      ["MAKE", "make"],
+    ]) {
+      const source = `\`\`\`${lang}\n\tcommand\n\`\`\`\n`;
+      expect(
+        check(source, source, "style/no-tabs", dialect, {
+          ignoredCodeLanguages: [ignored],
+        }),
+      ).toEqual([]);
+    }
+  });
+  it.each(["\n", "\r\n"])("reports heading whitespace without editing anchors with %j", (eol) => {
+    for (const [rule, gap] of [
+      ["style/no-tabs", "\t"],
+      ["style/prose-space", "  "],
+    ]) {
+      for (const source of [`# a${gap}b${eol}`, `a${gap}b${eol}===${eol}`]) {
+        const findings = check(source, source, rule!, dialect);
+        expect(findings).toHaveLength(1);
+        expect(findings[0]?.edit).toBeUndefined();
+      }
+    }
   });
   it("preserves tab stops and reports ambiguous container prefixes without edits", () => {
     for (const source of ["- one\n \t- two\n", "- one\n  \tcontinued\n", ">\ttext\n"]) {
@@ -80,6 +104,41 @@ describe.each(dialects)("prose whitespace in %s", (dialect) => {
     }
   });
 });
+
+it.each(["\n", "\r\n"])("keeps VitePress syntax and Vue expressions literal with %j", (eol) => {
+  for (const source of [
+    "::: tip\tTitle\nx\n:::\n",
+    "<<< @/example\tfile.js\n",
+    "[[toc]]\t\n",
+    "{{ s.split('a\tb') }}\n",
+    "before {{ 'a\tb' }} after\n",
+    "{{\n 'a\tb'\n}}\n",
+    "text {.a\tb}\n",
+  ]) {
+    const input = source.replaceAll("\n", eol);
+    const findings = check(input, input, "style/no-tabs", "vitepress");
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.edit).toBeUndefined();
+    const spaces = input.replaceAll("\t", "  ");
+    expect(check(spaces, spaces, "style/prose-space", "vitepress")).toEqual([]);
+  }
+  check(
+    "before  {{ s.split('  ') }}  after\n",
+    "before {{ s.split('  ') }} after\n",
+    "style/prose-space",
+    "vitepress",
+  );
+});
+
+it.each(["\t\tcode\n", "- a\n\n\t\tcode\n"])(
+  "reports VitePress indented code tabs: %j",
+  (source) => {
+    const findings = check(source, source, "style/no-tabs", "vitepress");
+    expect(findings).toHaveLength(2);
+    expect(findings.every((finding) => !finding.edit)).toBe(true);
+    expect(check(source, source, "style/no-tabs", "vitepress", { codeBlocks: false })).toEqual([]);
+  },
+);
 
 it("retains Obsidian tab-only separators and list nesting", () => {
   for (const source of ["- parent\n\t- child\n\t\t- grandchild\n", "before\n\t\nafter\n"]) {
