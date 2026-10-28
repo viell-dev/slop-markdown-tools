@@ -128,6 +128,14 @@ describe("Obsidian Live Preview normalizer", () => {
       livePreview([line("```", "HyperMD-codeblock-end")]),
     );
     expect(livePreview([line("~~~js one  two")])).not.toEqual(livePreview([line("```js one two")]));
+    // The separator before an opening fence's info string is source formatting too (#715).
+    expect(livePreview([line("~~~ \t&copy;  ")])).toEqual(livePreview([line("```&copy;")]));
+    expect(livePreview([line("``` js one  two")])).not.toEqual(
+      livePreview([line("```js one two")]),
+    );
+    expect(livePreview([line("```  ", "HyperMD-codeblock", "")])).not.toEqual(
+      livePreview([line("```", "HyperMD-codeblock", "")]),
+    );
     expect(livePreview([line("x  ", "", "")])).not.toEqual(livePreview([line("x", "", "")]));
     expect(livePreview([line("~~~js  ", "HyperMD-codeblock-begin", "")])).not.toEqual(
       livePreview([line("~~~js", "HyperMD-codeblock-begin", "")]),

@@ -531,7 +531,12 @@ function livePreview(lines) {
         if (/\blist-bullet\b/.test(classes)) text = "•";
         // A code block's fence, whose characters and length `style/code-fence` chooses.
         else if (/\bcm-formatting-code-block\b/.test(classes)) {
-          text = text.replace(/^(?:`{3,}|~{3,})/, "```");
+          // Blank space between an opening fence and its info string is a
+          // separator too, which `style/code-fence` removes and the language
+          // reading ignores (#715).
+          text = /\bHyperMD-codeblock-begin\b/.test(block.kind)
+            ? text.replace(/^(?:`{3,}|~{3,})[ \t]*/, "```")
+            : text.replace(/^(?:`{3,}|~{3,})/, "```");
           // Source-only trailing separators on a styled fence carry no code
           // or info-string content (#533). Code body and internal info spaces
           // remain exact, as do unstyled text runs that happen to contain ticks.
