@@ -230,13 +230,67 @@ export function resolveLink(
       };
     fragmentExists = found;
   }
-  return {
+  const spelling =
+    fragment && fragmentExists
+      ? index.anchorSpelling(resolved, dialect, fragment, fragment.replace(/^user-content-/, ""))
+      : undefined;
+  const result: LinkResolution = {
     status: "resolved",
     target: resolved,
     fragment,
     fragmentExists,
+  };
+  if (spelling) spellLazily(result, spelling);
+  return Object.assign(result, {
     ...(uncertain.length ? { unreadable: uncertain } : {}),
     ...(vault ? { vault, rooted: resolved.slice(vault.length + 1) } : {}),
     ...(partial ? { rooted: `${rootFolders.join("/")}/${resolved}` } : {}),
-  };
+  });
+}
+
+/**
+ * Gives `result` a `fragmentAnchor` that `spell` finds when it is first read,
+ * since most callers never read it and finding it can mean searching the
+ * target's headings. Reading it replaces it with its value, or removes it when
+ * the fragment matches an anchor exactly; until then it is listed among the
+ * result's keys, as a property whose value may turn out undefined. A frozen or
+ * sealed result keeps the property as it is and answers from the value found
+ * on the first read, and a frozen one ignores assignments.
+ */
+function spellLazily(result: LinkResolution, spell: () => string | undefined): void {
+  let spelled = false;
+  let value: string | undefined;
+  const define = (target: object, next: string | undefined) =>
+    Object.defineProperty(target, "fragmentAnchor", {
+      value: next,
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
+  const replaceable = () =>
+    Object.getOwnPropertyDescriptor(result, "fragmentAnchor")?.configurable === true;
+  Object.defineProperty(result, "fragmentAnchor", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      if (!spelled) {
+        value = spell();
+        spelled = true;
+      }
+      if (replaceable()) {
+        if (value === undefined) delete result.fragmentAnchor;
+        else define(result, value);
+      }
+      return value;
+    },
+    set(this: object, next: string | undefined) {
+      // An object created from the result gets its own value.
+      if (this !== result) define(this, next);
+      else if (!Object.isFrozen(result)) {
+        spelled = true;
+        value = next;
+        if (replaceable()) define(result, next);
+      }
+    },
+  });
 }

@@ -165,6 +165,62 @@ const transparent = new Set(["emphasis", "strong", "delete"]);
 const notAfter = /[\w\])]/;
 /** Characters that a backslash escapes. */
 const asciiPunctuation = /[!-/:-@[-`{-~]/;
+/** A character of a URL's scheme. */
+const schemeCharacter = /[A-Za-z\d+.-]/;
+/**
+ * What may come before a URL written as text that starts with `www.`, as GFM's
+ * autolink literals allow: blank space or one of `(*_[]~`, besides the block's
+ * start. A scheme such as `https://` may come after any character that is not
+ * part of it, such as a quote.
+ */
+const beforeWww = /[\t\n\r (*_[\]~]/;
+/** HTML elements without content, whose start tag opens nothing. */
+const voidElements = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+/**
+ * The ranges of a block's text that lie inside an element of its inline HTML,
+ * as `[i]` in `<code>[i]</code>`: written as HTML, where the author does not
+ * expect a Markdown reference. An element that is never closed runs to the
+ * block's end, as it does in a browser. A browser ignores the `/` of
+ * `<span/>`, which leaves the element open; only Vue, which renders VitePress's
+ * HTML, closes any element with it.
+ */
+function insideInlineHtml(block: Nodes, vue: boolean): [number, number][] {
+  const ranges: [number, number][] = [];
+  const open: string[] = [];
+  let from = 0;
+  walk(block, "html", (node) => {
+    const tag = /^<(\/?)([A-Za-z][A-Za-z0-9-]*)/.exec(node.value);
+    if (!tag) return;
+    const name = tag[2]!.toLowerCase();
+    const [start, end] = range(node);
+    if (tag[1]) {
+      const at = open.lastIndexOf(name);
+      if (at < 0) return;
+      open.length = at;
+      if (at === 0) ranges.push([from, start]);
+    } else if (!voidElements.has(name) && !(vue && /\/>$/.test(node.value))) {
+      if (open.length === 0) from = end;
+      open.push(name);
+    }
+  });
+  if (open.length) ranges.push([from, range(block)[1]]);
+  return ranges;
+}
 interface Reference {
   start: number;
   end: number;
@@ -172,17 +228,25 @@ interface Reference {
   footnote: boolean;
 }
 /**
- * The full (`[text][label]`) and collapsed (`[label][]`) references, and with
- * `footnotes` the footnote references (`[^label]`), whose label has no
- * definition. The parser leaves these as plain text, so they are found in the
- * text of each paragraph, heading, and table cell, as CommonMark pairs its
- * brackets. Brackets in code, math, HTML, links, images, and other syntax, and
- * escaped ones, are not read.
+ * The full (`[text][label]`) and collapsed (`[label][]`) references, with
+ * `footnotes` the footnote references (`[^label]`), and with `shortcuts` the
+ * shortcut references (`[label]`), whose label has no definition. The parser
+ * leaves these as plain text, so they are found in the text of each paragraph,
+ * heading, and table cell, as CommonMark pairs its brackets. Brackets in code,
+ * math, HTML, links, images, and other syntax, and escaped ones, are not read.
+ *
+ * A shortcut is also not read where the brackets mean something else: a task
+ * mark that starts a list item, `[ ]`, `[x]` or `[X]`, or in Obsidian any one
+ * character such as `[/]`, an alert or
+ * callout marker such as `[!NOTE]` that starts a block quote, an Obsidian
+ * inline footnote `^[note]`, a Forgejo or Gitea shortlink `[[Page]]`, text
+ * inside an inline HTML element, and a URL written as text.
  */
 function undefinedReferences(
   document: Document,
   definitions: Set<string>,
   footnotes: Set<string> | undefined,
+  shortcuts = false,
 ): Reference[] {
   const { source } = document;
   if (!source.includes("[")) return [];
@@ -201,13 +265,42 @@ function undefinedReferences(
         }
       } else if (transparent.has(child.type)) collect(child);
   };
-  walk(document.tree, (node) => {
+  walk(document.tree, (node, index, parent) => {
     if (node.type !== "paragraph" && node.type !== "heading" && node.type !== "tableCell") return;
     const [start, end] = range(node);
     // Searched in the block's own text, so that blocks without brackets cost no more than that.
     const text = source.slice(start, end);
     if (!text.includes("[")) return;
     collect(node);
+    // Where a shortcut at the block's start is a task mark or a callout marker.
+    const leading =
+      index === 0 && node.type === "paragraph"
+        ? parent?.type === "listItem"
+          ? "task"
+          : parent?.type === "blockquote"
+            ? "callout"
+            : undefined
+        : undefined;
+    let html: [number, number][] | undefined;
+    /** Whether the shortcut `[label]` from `opener` to `close` means something other than a reference. */
+    const notShortcut = (opener: number, close: number, url: boolean) => {
+      const label = source.slice(opener + 1, close);
+      // A task mark is `[ ]`, `[x]` or `[X]`; Obsidian also reads any other
+      // single character as a custom task status, such as `[/]`.
+      if (
+        opener === start &&
+        leading === "task" &&
+        (/^[ xX]$/.test(label) || (document.dialect === "obsidian" && [...label].length === 1))
+      )
+        return true;
+      if (opener === start && leading === "callout" && label.startsWith("!")) return true;
+      const before = opener > 0 && readable[opener - 1] ? source[opener - 1] : "";
+      if (document.dialect === "obsidian" && before === "^") return true;
+      if (forge && before === "[" && source[close + 1] === "]" && readable[close + 1]) return true;
+      if (url) return true;
+      html ??= insideInlineHtml(node, document.dialect === "vitepress");
+      return html.some(([from, to]) => opener >= from && opener < to);
+    };
     // Forgejo and Gitea render `\(...\)` and `\[...\]` as math, which GFM reads as text.
     if (forge)
       for (const [open, close] of [
@@ -222,16 +315,37 @@ function undefinedReferences(
           from = closing + 2;
         }
     const openers: number[] = [];
+    // Whether each opener lies in a URL written as text, which runs from its
+    // scheme or `www.` to blank space or a `<`, as GFM's autolink literals do.
+    const urls: boolean[] = [];
+    let url = false;
     // The opening bracket of the last full reference's label, which is not read again.
     let label = -1;
     for (let i = start; i < end; i++) {
+      if (shortcuts) {
+        const character = source[i]!;
+        if (character === "<" || /[ \t\r\n]/.test(character)) url = false;
+        else if (!url && character === ":" && source.startsWith("//", i + 1)) {
+          let scheme = i;
+          while (scheme > start && schemeCharacter.test(source[scheme - 1]!)) scheme--;
+          url = /[A-Za-z]/.test(source.slice(scheme, i));
+        } else if (
+          !url &&
+          (character === "w" || character === "W") &&
+          /^www\./i.test(source.slice(i, i + 4)) &&
+          (i === start || beforeWww.test(source[i - 1]!))
+        )
+          url = true;
+      }
       if (!readable[i]) continue;
       if (source[i] === "[") {
         openers.push(i);
+        urls.push(url);
         continue;
       }
       if (source[i] !== "]") continue;
       const opener = openers.pop();
+      const inUrl = urls.pop() ?? false;
       if (opener === undefined || opener === label) continue;
       let reference: Reference | undefined;
       if (source[i + 1] === "[" && readable[i + 1]) {
@@ -266,10 +380,28 @@ function undefinedReferences(
         }
       }
       // A footnote label has at most 999 characters after its `^`.
-      if (!footnotes || source[opener + 1] !== "^" || i - opener > 1001) continue;
-      const footnote = footnoteLabel.exec(source.slice(opener + 1, i));
-      if (footnote && !footnotes.has(normalizeLabel(footnote[1]!)))
-        references.push({ start: opener, end: i + 1, label: footnote[1]!, footnote: true });
+      if (footnotes && source[opener + 1] === "^" && i - opener <= 1001) {
+        const footnote = footnoteLabel.exec(source.slice(opener + 1, i));
+        if (footnote) {
+          if (!footnotes.has(normalizeLabel(footnote[1]!)))
+            references.push({ start: opener, end: i + 1, label: footnote[1]!, footnote: true });
+          continue;
+        }
+      }
+      // A shortcut: brackets not followed by `[]` or a label, as CommonMark reads them.
+      if (
+        shortcuts &&
+        labelEnd(source, opener, i + 1) === i + 1 &&
+        !definitions.has(normalizeLabel(labelText(source.slice(opener + 1, i)))) &&
+        !(opener > 0 && readable[opener - 1] && notAfter.test(source[opener - 1]!)) &&
+        !notShortcut(opener, i, inUrl)
+      )
+        references.push({
+          start: opener,
+          end: i + 1,
+          label: source.slice(opener + 1, i),
+          footnote: false,
+        });
     }
   });
   return references;
@@ -336,9 +468,26 @@ export const linkRules: Record<string, Rule> = {
   "links/valid": {
     description: "Check local link destinations and dialect-specific heading/block references.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document, workspace }) {
+    schema: optionsSchema({
+      ignoredFragments: {
+        description:
+          "A JavaScript regular expression; fragments that it matches, after `#` and decoded, are not checked. An empty string ignores none.",
+        type: "string",
+        format: "regex",
+        default: "",
+      },
+      exactCase: {
+        description:
+          "Also report a fragment that reaches its anchor only because the renderer ignores letter case.",
+        type: "boolean",
+        default: false,
+      },
+    }),
+    check({ document, options, workspace }) {
       const findings: Finding[] = [];
+      const pattern = options.ignoredFragments
+        ? new RegExp(options.ignoredFragments as string)
+        : undefined;
       // The parser only produces reference nodes for labels that have a
       // definition; undefined references stay plain text.
       walk(document.tree, (node) => {
@@ -350,6 +499,11 @@ export const linkRules: Record<string, Rule> = {
           document.dialect,
           node.type === "wikiLink",
         );
+        // An ignored fragment is left unchecked, while its target still has to exist.
+        const fragment = result.fragment;
+        const ignored =
+          fragment !== undefined && fragment !== "" && pattern?.test(fragment) === true;
+        if (ignored && (result.status === "resolved" || result.target !== undefined)) return;
         if (result.status === "missing" && result.outside !== undefined && result.vault)
           // The file is there, so "missing" would mislead: Obsidian cannot reach it.
           findings.push({
@@ -388,6 +542,15 @@ export const linkRules: Record<string, Rule> = {
           });
         } else if (result.status === "resolved" && !result.fragmentExists)
           findings.push({ start: range(node)[0], message: `Missing fragment in ${url}.` });
+        else if (
+          result.status === "resolved" &&
+          options.exactCase === true &&
+          result.fragmentAnchor !== undefined
+        )
+          findings.push({
+            start: range(node)[0],
+            message: `Fragment in ${url} differs in letter case from its anchor, #${result.fragmentAnchor}; other renderers may not find it.`,
+          });
       });
       return findings;
     },
@@ -618,28 +781,50 @@ export const linkRules: Record<string, Rule> = {
   },
   "links/undefined-reference": {
     description:
-      "Report full, collapsed, and footnote references whose label has no definition, which show as plain text.",
+      "Report full, collapsed, footnote, and optionally shortcut references whose label has no definition, which show as plain text.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({
+      shortcutSyntax: {
+        description:
+          "Also report shortcut references, `[label]` alone, whose label has no definition.",
+        type: "boolean",
+        default: false,
+      },
+      ignoredLabels: {
+        description:
+          "Labels not to report, matched as the renderers match labels; a footnote's label starts with `^`.",
+        type: "array",
+        items: { type: "string", pattern: "\\S" },
+        default: [],
+      },
+    }),
+    check({ document, options }) {
       const definitions = new Set<string>();
       const footnotes = new Set<string>();
       walk(document.tree, (node) => {
         if (node.type === "definition") definitions.add(node.identifier);
         if (node.type === "footnoteDefinition") footnotes.add(node.identifier);
       });
+      const ignored = new Set(
+        ((options.ignoredLabels as string[] | undefined) ?? []).map(normalizeLabel),
+      );
       // CommonMark has no footnotes: there `[^label]` is an ordinary shortcut reference.
       return undefinedReferences(
         document,
         definitions,
         document.dialect === "commonmark" ? undefined : footnotes,
-      ).map(({ start, end, label, footnote }) => {
-        const name = (footnote ? `^${label}` : labelText(label)).replace(/\s+/g, " ").trim();
-        return {
-          start,
-          end,
-          message: `${footnote ? "Footnote" : "Reference"} [${name}] has no definition and shows as plain text.`,
-        };
+        options.shortcutSyntax === true,
+      ).flatMap(({ start, end, label, footnote }) => {
+        const written = footnote ? `^${label}` : labelText(label);
+        if (ignored.has(normalizeLabel(written))) return [];
+        const name = written.replace(/\s+/g, " ").trim();
+        return [
+          {
+            start,
+            end,
+            message: `${footnote ? "Footnote" : "Reference"} [${name}] has no definition and shows as plain text.`,
+          },
+        ];
       });
     },
   },

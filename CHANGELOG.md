@@ -12,6 +12,22 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `links/valid` takes `ignoredFragments`, a regular expression for fragments not
+  to check, validated when the configuration is read, and `exactCase`, which
+  also reports a fragment that reaches its anchor only because the renderer
+  ignores letter case. By default fragments still match as each dialect's
+  renderer matches them, and anchors are still generated per dialect.
+  `Workspace.resolve` returns the anchor's own spelling as `fragmentAnchor`
+  ([#705](https://github.com/viell-dev/slop-markdown-tools/issues/705)).
+
+- `links/undefined-reference` takes `shortcutSyntax`, which also reports an
+  undefined shortcut reference such as `[label]`, and `ignoredLabels`. Shortcuts
+  leave alone task marks, alert and callout markers, Obsidian inline footnotes,
+  Forgejo and Gitea shortlinks, inline HTML elements, and URLs written as text,
+  delimited as GFM's autolink literals are, besides the existing indexes, code,
+  math, and HTML. Both are off by default
+  ([#706](https://github.com/viell-dev/slop-markdown-tools/issues/706)).
+
 - `style/trailing-space` takes `hardBreakSpaces` for exact space-style breaks,
   `listItemEmptyLines` to keep blank list-line indentation, and report-only
   `codeBlocks`. `style/thematic-break` accepts any exact break text and follows

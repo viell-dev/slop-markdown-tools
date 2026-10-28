@@ -2571,6 +2571,194 @@ describe("fragment case on GitHub", () => {
   });
 });
 
+describe("links/valid options", () => {
+  const caseMessage = (url: string, anchor: string) =>
+    `Fragment in ${url} differs in letter case from its anchor, #${anchor}; other renderers may not find it.`;
+  const messages = (
+    source: string,
+    dialect: Dialect,
+    files: Record<string, string | (() => string)>,
+    options?: Record<string, unknown>,
+    path = "Doc.md",
+  ) => {
+    const config: Config = {
+      extends: [],
+      dialect,
+      rules: { "links/valid": options ? ["error", options] : "error" },
+    };
+    const workspace = createWorkspace({ ...files, [path]: source }, { dialect });
+    const findings = lint(source, { config, path, workspace });
+    // A problem rule never edits.
+    expect(format(source, { config, path, workspace }).output).toBe(source);
+    return findings.map((item) => item.message);
+  };
+  const github = {
+    "Note.md": '# Getting Started\n\n## Sponsors\n\n<a name="Upper"></a>\n',
+  };
+  it("reports a fragment that GitHub reaches only by ignoring case when asked", () => {
+    const source = [
+      "[a](Note.md#Sponsors) [b](Note.md#sponsors) [c](Note.md#user-content-Sponsors)",
+      "[d](Note.md#Upper) [e](Note.md#upper) [f](Note.md#GETTING-started) [g](Note.md#Missing)",
+      "[h](#Local) [i](#local)",
+      "",
+      "## Local",
+      "",
+    ].join("\n");
+    for (const dialect of ["github", "commonmark"] as const) {
+      expect(messages(source, dialect, github)).toEqual(["Missing fragment in Note.md#Missing."]);
+      expect(messages(source, dialect, github, { exactCase: false })).toEqual([
+        "Missing fragment in Note.md#Missing.",
+      ]);
+      expect(messages(source, dialect, github, { exactCase: true })).toEqual([
+        caseMessage("Note.md#Sponsors", "sponsors"),
+        caseMessage("Note.md#user-content-Sponsors", "user-content-sponsors"),
+        // GitHub lowercases the `id` and `name` of HTML elements too.
+        caseMessage("Note.md#Upper", "upper"),
+        caseMessage("Note.md#GETTING-started", "getting-started"),
+        "Missing fragment in Note.md#Missing.",
+        caseMessage("#Local", "local"),
+      ]);
+    }
+  });
+  it("keeps GitHub's anchors for colons, emoji variation selectors, and HTML comments", () => {
+    // Rendered through GitHub's Markdown API on 2026-10-28: a single anchor
+    // algorithm has missed these, which the options must not bring back.
+    const files = {
+      "Note.md": [
+        "## Step 1: Setup",
+        "## ⚠️ Warning",
+        "## Com <!-- note --> ment",
+        "## Note: `a:b` <!-- x -->",
+        "",
+      ].join("\n\n"),
+    };
+    const fragments = ["step-1-setup", "️-warning", "com--ment", "note-ab-"];
+    const links = (spell: (text: string) => string) =>
+      fragments.map((fragment) => `[a](Note.md#${encodeURIComponent(spell(fragment))})`).join(" ");
+    const options = { exactCase: true, ignoredFragments: "^figure-" };
+    expect(messages(`${links((text) => text)}\n`, "github", files, options)).toEqual([]);
+    const upper = links((text) => text.toUpperCase());
+    expect(messages(`${upper}\n`, "github", files, options)).toEqual(
+      fragments.map((fragment) =>
+        caseMessage(`Note.md#${encodeURIComponent(fragment.toUpperCase())}`, fragment),
+      ),
+    );
+  });
+  it("adds nothing on Forgejo and Gitea, which match fragments exactly", () => {
+    const source = "[a](Note.md#sponsors) [b](Note.md#Sponsors) [c](Note.md#Upper)\n";
+    for (const dialect of ["forgejo", "gitea"] as const) {
+      const expected = ["Missing fragment in Note.md#Sponsors."];
+      expect(messages(source, dialect, github)).toEqual(expected);
+      expect(messages(source, dialect, github, { exactCase: true })).toEqual(expected);
+    }
+  });
+  it("reports Obsidian headings and heading paths written in another case", () => {
+    const note = "# Heading Two\n\n## Mobile\n\n## `move`\n\nText ^blk\n";
+    const source = [
+      "[[Note#Heading Two]] [[Note#heading two]] [[Note#Heading Two#Mobile]]",
+      "[[Note#heading two#MOBILE]] [[Note#move]] [[Note#Move]] [[Note#^blk]] [[Note#^BLK]]",
+      "[x](Note.md#HEADING%20TWO)",
+      "",
+    ].join("\n");
+    const files = { "Note.md": note };
+    expect(messages(source, "obsidian", files)).toEqual(["Missing fragment in Note#^BLK."]);
+    expect(messages(source, "obsidian", files, { exactCase: true })).toEqual([
+      caseMessage("Note#heading two", "Heading Two"),
+      caseMessage("Note#heading two#MOBILE", "Heading Two#Mobile"),
+      caseMessage("Note#Move", "move"),
+      // Block identifiers already match exactly.
+      "Missing fragment in Note#^BLK.",
+      caseMessage("Note.md#HEADING%20TWO", "Heading Two"),
+    ]);
+    // A path that a later chain spells exactly is no other case, whichever chain is found first.
+    const paths = { "Note.md": "# A\n\n## b\n\n# a\n\n## B\n" };
+    const linked = "[[Note#a#B]] [[Note#a#b]] [[Note#A#b]]\n";
+    expect(messages(linked, "obsidian", paths, { exactCase: true })).toEqual([
+      caseMessage("Note#a#b", "A#b"),
+    ]);
+  });
+  it("reports a VitePress fragment that differs from its anchor in case alone", () => {
+    const files = { "guide.md": "# Getting Started\n" };
+    // VitePress passes a fragment through its slugger, which changes more than case.
+    const source =
+      "[a](./guide.md#getting-started) [b](./guide.md#Getting-Started) [c](<./guide.md#Getting Started>)\n";
+    const exact = messages(source, "vitepress", files, { exactCase: true });
+    expect(exact).toEqual([caseMessage("./guide.md#Getting-Started", "getting-started")]);
+    expect(messages(source, "vitepress", files)).toEqual([]);
+  });
+  it("does not check fragments that ignoredFragments matches", () => {
+    const source = [
+      "[a](Note.md#figure-1) [b](#figure-2) [c](Missing.md#figure-3) [d](Note.md#other)",
+      "[e](Note.md#figure%20one) [f](Note.md#Figure-4) [g](Note.md#Sponsors)",
+      "",
+    ].join("\n");
+    expect(messages(source, "github", github)).toEqual([
+      "Missing fragment in Note.md#figure-1.",
+      "Missing fragment in #figure-2.",
+      "Missing local target: Missing.md#figure-3.",
+      "Missing fragment in Note.md#other.",
+      "Missing fragment in Note.md#figure%20one.",
+      "Missing fragment in Note.md#Figure-4.",
+    ]);
+    // The pattern is tested on the fragment after `#`, decoded, with no flags.
+    const options = { ignoredFragments: "^figure[- ]", exactCase: true };
+    expect(messages(source, "github", github, options)).toEqual([
+      // A missing target is still reported.
+      "Missing local target: Missing.md#figure-3.",
+      "Missing fragment in Note.md#other.",
+      "Missing fragment in Note.md#Figure-4.",
+      caseMessage("Note.md#Sponsors", "sponsors"),
+    ]);
+    // An ignored fragment is not reported for its case either.
+    expect(
+      messages("[a](Note.md#Sponsors)\n", "github", github, {
+        ignoredFragments: "^Spon",
+        exactCase: true,
+      }),
+    ).toEqual([]);
+    // An empty pattern ignores nothing.
+    expect(messages(source, "github", github, { ignoredFragments: "" })).toHaveLength(6);
+  });
+  it("leaves ignored fragments unchecked in every dialect", () => {
+    const files = { "Note.md": "# Title\n\nText ^real\n" };
+    const source = "[[Note#^ref-1]] [[Note#Generated]] [[Gone#^ref-2]] [a](Note.md#ref-3)\n";
+    const options = { ignoredFragments: "^(\\^ref-|Generated$|ref-)" };
+    expect(messages(source, "obsidian", files, options)).toEqual([
+      "Missing local target: Gone#^ref-2.",
+    ]);
+    for (const dialect of ["github", "commonmark", "forgejo", "gitea", "vitepress"] as const)
+      expect(messages("[a](Note.md#ref-3) [b](Note.md#other)\n", dialect, files, options)).toEqual([
+        "Missing fragment in Note.md#other.",
+      ]);
+  });
+  it("does not report an ignored fragment of a target it cannot read", () => {
+    const refused = () => {
+      throw Object.assign(new Error("EACCES: refused, open 'Secret.md'"), { code: "EACCES" });
+    };
+    const source = "[a](Secret.md#figure-1) [b](Secret.md#setup)\n";
+    expect(messages(source, "github", { "Secret.md": refused })).toEqual([
+      "Fragment could not be checked: Secret.md#figure-1 (cannot read Secret.md).",
+      "Fragment could not be checked: Secret.md#setup (cannot read Secret.md).",
+    ]);
+    expect(
+      messages(source, "github", { "Secret.md": refused }, { ignoredFragments: "^figure-" }),
+    ).toEqual(["Fragment could not be checked: Secret.md#setup (cannot read Secret.md)."]);
+  });
+  it("rejects invalid options when the configuration is read", () => {
+    for (const options of [
+      { ignoredFragments: "(" },
+      { ignoredFragments: "[a-" },
+      { ignoredFragments: ["^figure-"] },
+      { exactCase: "yes" },
+      { ignored_pattern: "^figure-" },
+      { ignore_case: true },
+    ])
+      expect(() =>
+        lint("", { config: { extends: [], rules: { "links/valid": ["warn", options] } } }),
+      ).toThrow("Invalid options for links/valid");
+  });
+});
+
 describe("anchors of headings written as HTML", () => {
   it("keeps entity decoding inside each Gitea HTML text token", () => {
     // Source-backed in Gitea 1.26.0 and 28.2.0: getNodeText concatenates
@@ -2768,5 +2956,47 @@ describe("destination spelling", () => {
     const result = format(source, { path: "Sub/Doc.md", config, workspace });
     expect(result.output).toBe("[label](<Sub/A%23B%2520.md#Heading>)\n");
     expect(result.diagnostics).toEqual([]);
+  });
+});
+
+describe("Workspace.resolve's lazy fragmentAnchor", () => {
+  const workspace = () =>
+    createWorkspace({ "Doc.md": "", "Note.md": "# Heading\n\n## Tail\n" }, { dialect: "obsidian" });
+  it.each([
+    ["Note.md#heading", "Heading"],
+    ["Note.md#Heading%23Tail", undefined],
+  ] as const)("reads %s from a frozen or sealed result", (link, expected) => {
+    for (const lock of [Object.freeze, Object.seal]) {
+      const result = lock(workspace().resolve("Doc.md", link, "obsidian"));
+      expect(result.fragmentAnchor).toBe(expected);
+      expect(result.fragmentAnchor).toBe(expected);
+      const json = JSON.parse(JSON.stringify(result)) as { fragmentAnchor?: string };
+      expect(json.fragmentAnchor).toBe(expected);
+      expect({ ...result }.fragmentAnchor).toBe(expected);
+    }
+  });
+  it("settles an unlocked result to a plain value, or removes an exact match's", () => {
+    const spelled = workspace().resolve("Doc.md", "Note.md#heading", "obsidian");
+    expect(spelled.fragmentAnchor).toBe("Heading");
+    expect(Object.getOwnPropertyDescriptor(spelled, "fragmentAnchor")).toMatchObject({
+      value: "Heading",
+      writable: true,
+    });
+    const exact = workspace().resolve("Doc.md", "Note.md#Heading%23Tail", "obsidian");
+    expect(exact.fragmentAnchor).toBeUndefined();
+    expect("fragmentAnchor" in exact).toBe(false);
+  });
+  it("assigns to its receiver, and a frozen result ignores assignments", () => {
+    const result = workspace().resolve("Doc.md", "Note.md#heading", "obsidian");
+    const derived = Object.create(result) as typeof result;
+    derived.fragmentAnchor = "Override";
+    expect(derived.fragmentAnchor).toBe("Override");
+    expect(result.fragmentAnchor).toBe("Heading");
+    const frozen = Object.freeze(workspace().resolve("Doc.md", "Note.md#heading", "obsidian"));
+    Reflect.set(frozen, "fragmentAnchor", "Changed");
+    expect(frozen.fragmentAnchor).toBe("Heading");
+    const sealed = Object.seal(workspace().resolve("Doc.md", "Note.md#heading", "obsidian"));
+    sealed.fragmentAnchor = "Changed";
+    expect(sealed.fragmentAnchor).toBe("Changed");
   });
 });

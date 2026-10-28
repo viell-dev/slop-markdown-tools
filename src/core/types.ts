@@ -126,6 +126,14 @@ export interface LinkResolution {
    * a fragment.
    */
   fragmentExists?: boolean;
+  /**
+   * With status `resolved` and `fragmentExists`: the anchor as the target spells
+   * it, when `fragment` reaches it only because the renderer ignores letter
+   * case, as GitHub and Obsidian headings do. Absent when the fragment matches
+   * an anchor exactly. It is found when first read: until then a fragment that
+   * may differ in case gives a property whose value can turn out undefined.
+   */
+  fragmentAnchor?: string | undefined;
   /** The target was read, but its renderer's fragment targets are not fully known. */
   fragmentIncomplete?: true;
   /**
