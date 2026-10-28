@@ -18,6 +18,12 @@ prereleases' notes there are longer than their entries here.
   its label; footnotes are still reported
   ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
 
+- `style/emphasis` and `style/strong` accept `marker: "consistent"`: the first
+  parsed emphasis or strong text chooses its marker for the document. Preset
+  defaults stay unchanged
+  ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
+  [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
+
 ### Fixed
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's
@@ -34,6 +40,14 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- `style/heading` removes heading-owned indentation, including Setext text and
+  underlines, while retaining container prefixes. Its new `closing: "add"`
+  option writes matching closing hash sequences on ATX headings, including the
+  deeper levels of the Setext style. Renderer protections still apply. This
+  interface addition belongs to the next minor release
+  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
+  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
 
 - `style/block-spacing` also separates fenced code blocks that have a closing
   fence, and tables, from the blocks around them, as markdownlint's `MD031` and
