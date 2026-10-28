@@ -179,7 +179,8 @@ Formatting:
   `_` cannot mark emphasis there.
 - Tables are aligned only outside lists and block quotes.
 - Footnotes, strikethrough, and literal autolinks are read but have no rules of
-  their own. Reference definitions are checked but not rewritten.
+  their own. Reference definitions are checked; opt-in title and spacing rules
+  preserve their destinations and multiline layout.
 - Embedded code is formatted only by explicitly configured [external
   tools](configuration.md#code-formatters). Their output is checked for changes
   to surrounding Markdown, not for preservation of program semantics. There is

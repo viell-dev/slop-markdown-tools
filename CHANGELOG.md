@@ -12,6 +12,17 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `style/link-title` normalizes link, image, and definition title
+  delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
+  It retains source escapes and line breaks and never changes destinations
+  ([#716](https://github.com/viell-dev/slop-markdown-tools/issues/716)).
+
+- Opt-in `style/definition-spacing` writes one space after a reference
+  definition's colon and before its title. Multiline definitions, tabbed
+  definitions, definitions without whitespace after the colon, footnotes, and
+  Obsidian spacing stay as written
+  ([#717](https://github.com/viell-dev/slop-markdown-tools/issues/717)).
+
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
   also reports a fragment that reaches its anchor only because the renderer

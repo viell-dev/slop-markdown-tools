@@ -45,10 +45,12 @@ presets, dialects, and options.
 | `style/blank-lines`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/block-spacing`           | 🎨   | ✅            | ❌             | ❌      |
 | `style/code-fence`              | 🎨   | ✅            | ❌             | ✅      |
+| `style/definition-spacing`      | 🎨   | ❌            | ❌             | ❌      |
 | `style/emphasis`                | 🎨   | ✅            | ❌             | ✅      |
 | `style/final-newline`           | 🎨   | ✅            | ❌             | ❌      |
 | `style/heading`                 | 🎨   | ✅            | ❌             | ✅      |
 | `style/inline-code`             | 🎨   | ❌            | ❌             | ❌      |
+| `style/link-title`              | 🎨   | ❌            | ❌             | ✅      |
 | `style/list-indent`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/list-marker`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/ordered-list`            | 🎨   | ✅            | ❌             | ✅      |
@@ -1252,6 +1254,38 @@ npm test
 Indented code blocks have no fence and are left as written. So is a `~~~` fence
 whose info string contains a backtick, because a backtick fence cannot have one.
 
+## `style/definition-spacing`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all except Obsidian.
+Options: none.
+
+Added after 0.5.0, for the next minor release.
+
+Writes one space after a link reference definition's colon and before its title,
+without changing the label, destination, or title. This is independent of
+`links/path`, which needs a workspace and changes destinations.
+
+Multiline definitions stay as written, including multiline labels and titles:
+joining could change wrapping or a container's reading. Footnotes and labels
+starting with `^` stay as written, even in CommonMark. Definitions without
+whitespace after the colon and definitions containing tabs also stay as written,
+because reference parsers disagree about their recognition. Obsidian definitions
+keep their spacing, since Live Preview styles these lines separately from
+Reading view. This optional source style is outside `recommended`, preserving
+existing default formatting.
+
+Before:
+
+```markdown
+[guide]:   <guide.md>   "Guide"
+```
+
+After:
+
+```markdown
+[guide]: <guide.md> "Guide"
+```
+
 ## `style/emphasis`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1483,6 +1517,47 @@ After:
 
 ```markdown
 Run `npm run build` before the tests.
+```
+
+## `style/link-title`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`delimiter`.
+
+Added after 0.5.0, for the next minor release.
+
+Normalizes the delimiters of inline link, image, and reference definition
+titles. Wikilinks and Obsidian embeds have no titles. Destinations, including
+angle brackets and balanced parentheses, stay byte for byte as written.
+
+| Option      | Values                                          | Default  |
+| ----------- | ----------------------------------------------- | -------- |
+| `delimiter` | `double`, `single`, `parentheses`, `consistent` | `double` |
+
+`double` uses double quotes, `single` uses single quotes, and `parentheses` uses
+parentheses. `consistent` follows the first parsed title in the document,
+allowing an existing document to keep its convention. Double quotes are the
+default because they match the usual Markdown title notation.
+
+When the preferred delimiter occurs unescaped inside a title, its existing
+delimiters stay rather than adding escapes. Existing escapes, entities,
+backslashes, and line breaks inside titles remain exact. Empty titles use the
+same delimiter choice. Definitions containing tabs or lacking whitespace after
+the colon stay as written, since reference parsers disagree about their
+recognition. Forgejo and Gitea heading titles stay as written where their source
+contributes to an anchor or attribute block. This optional source style is
+outside `recommended`, preserving existing default formatting.
+
+Before:
+
+```markdown
+[guide](guide(v2).md 'Guide') ![map](<map.png> (Map))
+```
+
+After:
+
+```markdown
+[guide](guide(v2).md "Guide") ![map](<map.png> "Map")
 ```
 
 ## `style/list-indent`

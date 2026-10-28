@@ -1,3 +1,4 @@
+import { linkTitle, definitionSpacing } from "./link-format.js";
 import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
@@ -16,6 +17,8 @@ import { lineBounds, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 const styleRules: Record<string, Rule> = {
+  "style/link-title": linkTitle,
+  "style/definition-spacing": definitionSpacing,
   "style/wrap": wrap,
   "style/inline-code": {
     description: "Use minimal backticks and join code spans using their CommonMark rendered value.",
