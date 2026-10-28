@@ -51,7 +51,9 @@ presets, dialects, and options.
 | `style/inline-code`             | 🎨   | ❌            | ❌             | ❌      |
 | `style/list-indent`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/list-marker`             | 🎨   | ✅            | ❌             | ✅      |
+| `style/no-tabs`                 | 🎨   | ❌            | ❌             | ✅      |
 | `style/ordered-list`            | 🎨   | ✅            | ❌             | ✅      |
+| `style/prose-space`             | 🎨   | ❌            | ❌             | ❌      |
 | `style/strong`                  | 🎨   | ✅            | ❌             | ✅      |
 | `style/table`                   | 🎨   | ✅            | ✅             | ✅      |
 | `style/thematic-break`          | 🎨   | ✅            | ❌             | ✅      |
@@ -1633,6 +1635,42 @@ After:
 * Plates
 ```
 
+## `style/no-tabs`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`codeBlocks`, `ignoredCodeLanguages`, `spacesPerTab`.
+
+After 0.5.0. Reports tab characters. Replaces prose tabs with spaces, as
+`style/wrap` does when reflowing. Physical leading indentation uses four-column
+tab stops instead: a tab after one space becomes three spaces, preserving the
+column of the following text. Tabs in container prefixes that are not entirely
+leading indentation are reported without a fix, since a marker can consume only
+part of a tab. Obsidian leading tabs stay as written because its views can read
+list nesting and tab-only lines differently.
+
+| Option                 | Default | Meaning                                                                               |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `codeBlocks`           | `true`  | Report tabs in code blocks and spans, without fixes.                                  |
+| `ignoredCodeLanguages` | `[]`    | Case-sensitive code languages whose tabs are neither reported nor fixed.              |
+| `spacesPerTab`         | `1`     | Nonnegative integer replacement width in prose; indentation always follows tab stops. |
+
+A zero `spacesPerTab` removes prose tabs only beside an existing ASCII space;
+otherwise it reports without a fix to avoid joining words.
+
+Code is literal content: code blocks and spans, math, HTML and front matter are
+reported without fixes. Inline HTML also keeps prose tabs in its enclosing
+block, since it can make whitespace significant. Existing renderer protections
+can suppress findings and edits in ambiguous regions. Tables and link syntax are
+reported without fixes. This rule is opt-in because tabs can be intentional,
+particularly in code; it does not add diagnostics to `recommended`.
+
+```json
+{ "rules": { "style/no-tabs": ["warn", { "ignoredCodeLanguages": ["make", "makefile", "go"] }] } }
+```
+
+For example, `a<Tab>b` becomes `a b`, and ` <Tab>- child` becomes `    - child`
+outside Obsidian. `<Tab>` here stands for a literal tab.
+
 ## `style/ordered-list`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1684,6 +1722,41 @@ After:
 2. Connect the sensor.
 3. Power it on.
 ```
+
+## `style/prose-space`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+
+After 0.5.0. Collapses repeated ASCII spaces between prose words without moving
+line breaks: `a.  b   c` becomes `a. b c`. Link text counts as prose. Leading
+indentation, trailing spaces (including hard breaks), non-breaking spaces, code,
+math, images, link destinations and titles, and table cells stay as written. A
+block containing inline HTML stays whole, since HTML can make whitespace
+significant; HTML blocks and front matter stay literal too.
+
+```json
+{ "rules": { "style/wrap": "off", "style/prose-space": "warn" } }
+```
+
+Before:
+
+```markdown
+a.  b   c
+next  line
+```
+
+After:
+
+```markdown
+a. b c
+next line
+```
+
+This independent rule supports space normalization while preserving authored
+line breaks, without adding a mode to the paragraph reflow rule. Both rules
+agree on one space between prose words. It is opt-in because sentence spacing
+can be an intentional source convention. Existing renderer and semantic checks
+retain source wherever changing spaces would change meaning.
 
 ## `style/strong`
 
