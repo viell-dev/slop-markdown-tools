@@ -72,8 +72,23 @@ const table: Rule = {
       }
       // A one-column header needs a border to remain a table.
       if (!leading && !trailing && count === 1) leading = trailing = true;
-      const render = (cells: string[]) =>
-        (leading ? `|${gap}` : "") + cells.join(`${gap}|${gap}`) + (trailing ? `${gap}|` : "");
+      // A row keeps the border it needs: without it, an empty first or last
+      // cell would vanish into the remaining pipe, and a first cell that
+      // starts like another block, such as `- x` or `# x`, would start that
+      // block and end the table.
+      if (
+        !leading &&
+        rows.some((row) => /^(?:$|[-+*#>=~`<|:[!$\\]|\d{1,9}[.)])/.test(row[0] ?? ""))
+      )
+        leading = true;
+      if (!trailing && rows.some((row) => (row.at(-1) ?? "") === "")) trailing = true;
+      // Without a trailing pipe, padding after the last cell would only leave
+      // blank space at the end of the line.
+      const render = (cells: string[]) => {
+        const text =
+          (leading ? `|${gap}` : "") + cells.join(`${gap}|${gap}`) + (trailing ? `${gap}|` : "");
+        return trailing ? text : text.replace(/[ \t]+$/, "");
+      };
       const pad = (cell: string, i: number, header: boolean) => {
         if (!aligned && !(header && options.alignedDelimiter)) return cell;
         const extra = widths[i]! - stringWidth(cell);

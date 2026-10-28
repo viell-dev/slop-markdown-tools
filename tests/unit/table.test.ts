@@ -70,6 +70,29 @@ describe("table style options", () => {
       expect(check(input, { style: "tight", pipeStyle }, "obsidian")).toBe("|a|\n|---|\n|b|\n");
     },
   );
+  it.each([
+    ["| | b |\n| - | - |\n| c | d |\n", "leading"],
+    ["| a | b |\n| - | - |\n| - x | d |\n", "leading"],
+    ["| a | b |\n| - | - |\n| # x | d |\n", "leading"],
+    ["| a | b |\n| - | - |\n| > x | d |\n", "leading"],
+    ["| a | b |\n| - | - |\n| 1. x | d |\n", "leading"],
+    ["| a | |\n| - | - |\n| c | |\n", "trailing"],
+  ] as const)("keeps the border that a row of %j needs", (input, border) => {
+    for (const pipeStyle of ["noLeadingOrTrailing", "leadingOnly", "trailingOnly"]) {
+      const lines = check(input, { pipeStyle }).trimEnd().split("\n");
+      if (border === "leading") expect(lines.every((line) => line.startsWith("|"))).toBe(true);
+      else expect(lines.every((line) => line.endsWith("|"))).toBe(true);
+      expect(lines.some((line) => /[ \t]$/.test(line))).toBe(false);
+    }
+  });
+  it("leaves no padding after the last cell without a trailing pipe", () => {
+    expect(
+      check("| Alpha | Beta |\n| --- | --- |\n| x | y |\n", { pipeStyle: "noLeadingOrTrailing" }),
+    ).toBe("Alpha | Beta\n----- | ----\nx     | y\n");
+    expect(check("| 1 | b |\n| - | - |\n| 22 | d |\n", { pipeStyle: "noLeadingOrTrailing" })).toBe(
+      "1   | b\n--- | ---\n22  | d\n",
+    );
+  });
   it("keeps Obsidian's leading borders and protected one-column forms", () => {
     expect(check(source, { style: "tight", pipeStyle: "trailingOnly" }, "obsidian")).toBe(
       "|Alpha|Beta|\n|:--|--:|\n|x|y|\n",

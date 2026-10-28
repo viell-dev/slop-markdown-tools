@@ -1339,10 +1339,14 @@ the right, as before.
 `pipeStyle: "consistent"` takes the first table header's borders for the
 document; `"perTable"` takes each table's own header. The other values request
 specific borders. Pipes needed to retain a one-column table are kept: when
-neither border is requested, such a table uses both. In Obsidian, an existing
-leading border is retained, and one-column tables retain both borders. The
-existing renderer protections below still apply. A preferred form that would
-change meaning stays as written.
+neither border is requested, such a table uses both. A table keeps its leading
+border when a row's first cell is empty or starts like another block, such as
+`- x`, `# x`, or `1. x`, which would otherwise start that block; it keeps its
+trailing border when a row's last cell is empty, which would otherwise vanish.
+Without a trailing border, the last cell gets no padding, so no line ends in
+blank space. In Obsidian, an existing leading border is retained, and one-column
+tables retain both borders. The existing renderer protections below still apply.
+A preferred form that would change meaning stays as written.
 
 Unlike markdownlint's `any`, each `style` names a target output. Accepting any
 of several styles would leave a formatter without a target; choose the desired
