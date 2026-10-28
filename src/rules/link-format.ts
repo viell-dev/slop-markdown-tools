@@ -51,14 +51,10 @@ export const linkTitle: Rule = {
       const [start, end] = range(node);
       const raw = document.source.slice(start, end);
       if (node.title == null && !emptyTitle(raw, node.type === "definition")) return;
-      // Reference renderers can leave these as visible source rather than
-      // definitions. Changing even just delimiters would change that text.
-      if (
-        node.type === "definition" &&
-        (raw.includes("\t") ||
-          !/^[ \r\n]/.test(raw.slice(definitionLabel.exec(raw)?.[0].length ?? raw.length)))
-      )
-        return;
+      // commonmark.js leaves a definition with a tab as visible source, where
+      // other renderers read a definition. Changing even just delimiters would
+      // change that text.
+      if (node.type === "definition" && raw.includes("\t")) return;
       const span = titleRange(raw, node.type === "definition");
       if (!span) return;
       const [a, b] = span;
@@ -87,18 +83,19 @@ export const linkTitle: Rule = {
 
 /** Locate just the separators, without reconstructing a destination or label. */
 function separators(raw: string, node: Definition): [number, number][] {
+  // Multiline definitions keep their lines. commonmark.js 0.31.2 reads a
+  // definition separated by a tab as text, where GitHub, markdown-it and the
+  // positioned parser read a definition, so replacing the tab would change
+  // that reading.
   if (/[\t\r\n]/.test(raw)) return [];
   const label = definitionLabel.exec(raw);
   if (!label || label[0].startsWith("[^")) return [];
   const result: [number, number][] = [];
-  const after = /^[ \t]*/.exec(raw.slice(label[0].length))![0];
-  // Commonmark.js requires whitespace here, unlike the positioned parser.
-  // Inserting it could turn visible text into a hidden definition.
-  if (!after) return [];
-  // Never join physical lines: that can alter container prefixes, wrapping,
-  // or Obsidian Live Preview's definition-like line styling.
-  if (!/[\r\n]/.test(raw[label[0].length + after.length] ?? ""))
-    result.push([label[0].length, label[0].length + after.length]);
+  // No space at all, as in `[a]:https://example.com`, is a definition for
+  // GitHub, commonmark.js, markdown-it and the positioned parser alike, so the
+  // separator may be inserted. Lines are never joined: `raw` has none.
+  const after = /^ */.exec(raw.slice(label[0].length))![0];
+  result.push([label[0].length, label[0].length + after.length]);
   if (node.title != null || emptyTitle(raw, true)) {
     const title = titleRange(raw, true);
     if (title) {

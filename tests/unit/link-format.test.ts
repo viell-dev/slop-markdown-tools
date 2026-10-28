@@ -100,7 +100,7 @@ label]:   url   "title"
     expect(output).toBe(source);
   });
 
-  it("preserves definitions without whitespace that renderers read differently", () => {
+  it("preserves a tab-separated definition whose label holds an escaped bracket", () => {
     const source = String.raw`[a\]:b]:<url>		"title"
 [a\]:b]
 `;
@@ -134,8 +134,20 @@ label]:   url   "title"
     preserved(source, output);
   });
 
-  it.each(["[a]:<url>   'Title'", "[a]:   <url>\t\t'Title'", "[a]:\turl 'Title'"])(
-    "preserves reference parser disagreement: %s",
+  it.each([
+    ["[a]:<url>   'Title'", '[a]: <url> "Title"'],
+    ["[a]:url", "[a]: url"],
+    ["> [a]:<url>", "> [a]: <url>"],
+  ])("inserts a missing space after the colon: %s", (line, expected) => {
+    // GitHub, commonmark.js and markdown-it all read these as definitions.
+    const source = line + "\n\n[a]\n";
+    const output = formatted(source, only(rules));
+    expect(output).toBe(expected + "\n\n[a]\n");
+    preserved(source, output);
+  });
+
+  it.each(["[a]:   <url>\t\t'Title'", "[a]:\turl 'Title'"])(
+    "preserves tab-separated definitions, which commonmark.js reads as text: %s",
     (line) => {
       const source = line + "\n\n[a]\n";
       const output = formatted(source, only(rules));

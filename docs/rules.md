@@ -1267,12 +1267,13 @@ without changing the label, destination, or title. This is independent of
 
 Multiline definitions stay as written, including multiline labels and titles:
 joining could change wrapping or a container's reading. Footnotes and labels
-starting with `^` stay as written, even in CommonMark. Definitions without
-whitespace after the colon and definitions containing tabs also stay as written,
-because reference parsers disagree about their recognition. Obsidian definitions
-keep their spacing, since Live Preview styles these lines separately from
-Reading view. This optional source style is outside `recommended`, preserving
-existing default formatting.
+starting with `^` stay as written, even in CommonMark. A definition without a
+space after the colon, such as `[guide]:guide.md`, gets one. Definitions
+containing tabs stay as written, because commonmark.js reads a tab-separated
+definition as text where GitHub and markdown-it read a definition. Obsidian
+definitions keep their spacing, since Live Preview styles these lines separately
+from Reading view. This optional source style is outside `recommended`,
+preserving existing default formatting.
 
 Before:
 
