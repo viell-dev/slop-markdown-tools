@@ -145,7 +145,8 @@ function headingEndings(document: Document): Map<Heading, Trailing | null | unde
   const endings = new Map<Heading, Trailing | null | undefined>();
   const visit = (node: Nodes) => {
     if (node.type === "heading") {
-      let ending = trailingText(attributes?.get(node)?.heading ?? node, document.source);
+      const heading = attributes?.get(node)?.heading ?? node;
+      let ending = trailingText(heading, document.source);
       const suffix = attributed.has(node.position!.start.line - 1)
         ? /\s*\{[^{}]*\}$/u
         : document.dialect === "obsidian" && blockIdentifier(document.source, node)
@@ -153,7 +154,15 @@ function headingEndings(document: Document): Map<Heading, Trailing | null | unde
           : undefined;
       if (ending && suffix) {
         const text = ending.text.replace(suffix, "");
-        ending = text.trim() ? { ...ending, text } : undefined;
+        if (text.trim()) ending = { ...ending, text };
+        else {
+          // The suffix fills its whole text node, as in `**Use.** ^usage`:
+          // the inline content before that node ends the heading.
+          const at = heading.children.indexOf(ending.node as PhrasingContent);
+          ending = undefined;
+          for (let index = at - 1; at > 0 && index >= 0 && ending === undefined; index--)
+            ending = trailingText(heading.children[index]!, document.source);
+        }
       }
       endings.set(node, ending);
     } else if ("children" in node) for (const child of node.children) visit(child);

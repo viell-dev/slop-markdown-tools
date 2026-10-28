@@ -698,7 +698,10 @@ character it shows: `&copy;` is not punctuation, and `&#46;` is a period. A
 closing `#` sequence, a comment, or a footnote reference after the text does not
 count, and neither does a trailing attribute block such as `{#setup}` in
 Forgejo, Gitea, and VitePress, which read it as the heading's attributes, or a
-block identifier such as `^setup` in Obsidian. A heading that ends with code,
+block identifier such as `^setup` in Obsidian. With VitePress's
+[`attrs`](vitepress.md#renderer-options) setting off, the block is text and counts.
+The text before such a suffix counts even when it is formatted, as in
+`## **Use.** ^usage`. A heading that ends with code,
 math, an image, an autolink, or an Obsidian embed is not reported. Nor are these
 endings:
 

@@ -254,6 +254,17 @@ describe("structure/heading-punctuation", () => {
       expect(check(source.replace(". {", " {"), rule, {}, "Title.md", dialect)).toEqual([]);
     },
   );
+  it.each([
+    ["## **Use.** ^usage\n", "obsidian"],
+    ["## *Use.* {#usage}\n", "vitepress"],
+    ["## **Use.** {#usage}\n", "forgejo"],
+  ] as const)(
+    "reads the markup before a suffix that fills its own text node in %j on %s",
+    (source, dialect) => {
+      expect(covered(source, check(source, rule, {}, "Title.md", dialect))).toEqual(["."]);
+      expect(check(source.replace(".", ""), rule, {}, "Title.md", dialect)).toEqual([]);
+    },
+  );
   it.each(["commonmark", "github", "obsidian"] as const)(
     "keeps an attribute block as text in %s, which shows it",
     (dialect) => {

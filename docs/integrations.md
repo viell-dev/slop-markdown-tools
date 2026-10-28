@@ -97,6 +97,11 @@ follow each check's documented purpose, not the other tool's known defects.
 
 ### markdownlint rules
 
+markdownlint enables every rule by default. mdrefine's presets enable fewer: a
+rule that no preset in your configuration enables, such as
+`structure/heading-punctuation`, needs an entry under `rules`. Each rule's
+[section](rules.md) names its presets.
+
 | markdownlint                             | mdrefine                                                                                                                                                                                                  |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MD001 `heading-increment`                | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart. Not yet a front-matter title ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699)) |
