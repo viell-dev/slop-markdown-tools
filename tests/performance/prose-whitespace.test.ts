@@ -29,3 +29,26 @@ it("checks tabs across many literal and prose ranges with near-linear scaling", 
   // the original scans. Ten allows runner noise while rejecting that regression.
   expect(ratio).toBeLessThan(10);
 });
+
+it("collapses many space runs on one long line with near-linear scaling", () => {
+  const ratio = scaling(
+    [2000, 8000],
+    (count) => {
+      const source = `${Array.from({ length: count }, (_, i) => `w${i}`).join("  ")}\n`;
+      return { source, count, document: parse(source, "github") };
+    },
+    ({ document }) => builtInRules["style/prose-space"]!.check({ document, options: {} }),
+    (findings, { count, source }) => {
+      expect(findings).toHaveLength(count - 1);
+      expect(
+        applyEdits(
+          source,
+          findings.map((finding) => finding.edit!),
+        ),
+      ).toBe(source.replaceAll("  ", " "));
+    },
+    1,
+  );
+  // Slicing the line for each run grew with the square of the line's length.
+  expect(ratio).toBeLessThan(10);
+});

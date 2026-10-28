@@ -70,16 +70,31 @@ export const proseSpace: Rule = {
     const { source } = document;
     const heading = membership(headings(document));
     const literal = membership(vitepressWhitespaceLiterals(document));
+    // Measured once per physical line, so a long line with many runs stays linear.
+    let lineStart = -1;
+    let lineEnd = -1;
+    let prefixEnd = 0;
+    let contentEnd = 0;
     for (const [from, to] of prose(document)) {
       for (const match of source.slice(from, to).matchAll(/ {2,}/g)) {
         const start = from + match.index;
         const end = start + match[0].length;
         if (literal(start)) continue;
+        if (start < lineStart || start > lineEnd) {
+          [lineStart, lineEnd] = lineBounds(source, start, start);
+          // The longest container prefix: a run after it cannot be indentation.
+          prefixEnd =
+            lineStart +
+            /^[ \t]*(?:>[ \t]*)*(?:(?:[-+*]|\d+[.)])[ \t]+)?/.exec(
+              source.slice(lineStart, lineEnd),
+            )![0].length;
+          contentEnd = lineEnd;
+          while (contentEnd > lineStart && /\s/.test(source[contentEnd - 1]!)) contentEnd--;
+        }
         // Keep physical indentation, hard breaks and whitespace next to tabs/NBSP.
-        const [lineStart, lineEnd] = lineBounds(source, start, end);
         if (
-          containerPrefix(source.slice(lineStart, start)) ||
-          !/\S/.test(source.slice(end, lineEnd)) ||
+          (start <= prefixEnd && containerPrefix(source.slice(lineStart, start))) ||
+          end >= contentEnd ||
           /\s/.test(source[start - 1] ?? "") ||
           /\s/.test(source[end] ?? "")
         )

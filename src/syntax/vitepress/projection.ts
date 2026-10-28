@@ -228,9 +228,11 @@ export function vitepressWhitespaceLiterals(document: Document): [number, number
       (match): [number, number] => [match.index, match.index + match[0].length],
     ),
     // The container plugin requires a space after its name. Replacing a tab
-    // can turn a paragraph into a container, so protect candidates too.
+    // can turn a paragraph into a container, so protect candidates too. Each
+    // repetition starts with a marker, so blank space has one way to match;
+    // accepting a list marker without its space only protects more lines.
     ...Array.from(
-      document.source.matchAll(/^(?:[ \t]|>[ \t]*|(?:[-+*]|\d+[.)])[ \t]+)*:{3,}[^\r\n]*/gm),
+      document.source.matchAll(/^[ \t]*(?:(?:>|[-+*]|\d+[.)])[ \t]*)*:{3,}[^\r\n]*/gm),
       (match): [number, number] => [match.index, match.index + match[0].length],
     ),
   ];
