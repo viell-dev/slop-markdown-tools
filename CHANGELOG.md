@@ -12,17 +12,21 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
-- Opt-in `links/reversed` reports likely reversed link syntax without changing
-  literal text into a link. `links/bare-url` reports bare addresses and brackets
-  only equivalent literal links, preserving source-sensitive headings and unsafe
-  bracket boundaries. Reversed-link checks exclude numeric citations, versions
-  and call/subscript syntax. `links/allowed-notation` restricts Markdown link
-  and image forms with six boolean options, all allowed by default, and converts
-  exact, title-free URL links to equivalent autolinks where safe. These
-  interface additions belong to the next minor release
-  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672),
-  [#686](https://github.com/viell-dev/slop-markdown-tools/issues/686),
-  [#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
+- Opt-in `links/reversed` reports likely reversed links such as
+  `(text)[https://example.com]`, without a fix, since a fix would turn text into
+  a link. Citations, versions, numbers, call syntax and defined labels are not
+  reported
+  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672)).
+
+- Opt-in `links/bare-url` reports bare URLs and email addresses, and adds angle
+  brackets where the dialect already links the address and the brackets keep the
+  same link. CommonMark, which shows them as text, is only reported
+  ([#686](https://github.com/viell-dev/slop-markdown-tools/issues/686)).
+
+- Opt-in `links/allowed-notation` restricts link and image notations with
+  markdownlint's MD054 options, all allowed by default, and turns a title-free
+  link whose text is its URL into an autolink where that renders the same
+  ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
 
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
