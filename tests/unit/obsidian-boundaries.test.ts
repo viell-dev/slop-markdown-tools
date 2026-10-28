@@ -1276,7 +1276,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     },
   );
 
-  it.each([
+  const adjacentBreaks: [string, string, string][] = [
     [
       "spaced break under body row",
       "| h |\n| - |\n| v |\n- - -\n",
@@ -1288,6 +1288,29 @@ describe("Obsidian boundaries read differently by its views", () => {
       "| h |\n| - |\n- - -\n",
       "| h   |\n| --- |\n- - -\n",
     ],
+  ];
+  it.each(adjacentBreaks)(
+    "keeps the marker of an adjacent %s without block spacing (#553)",
+    (_name, source, expected) => {
+      const settings: Config = {
+        ...config,
+        rules: { ...config.rules, "style/block-spacing": "off" },
+      };
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)])
+          expect(checked(bom + source.replaceAll("\n", newline), settings)).toBe(
+            bom + expected.replaceAll("\n", newline),
+          );
+    },
+  );
+
+  it.each([
+    // Block spacing separates these breaks first (#697); the marker is then free.
+    ...adjacentBreaks.map(([name, source, expected]) => [
+      name,
+      source,
+      expected.replace(/\n(?:- - -|\*\*\*)\n$/, "\n\n---\n"),
+    ]),
     [
       "compact break preserves literal body-row spacing",
       "|h|\n|-|\n|last|\n---\n",
@@ -1777,6 +1800,7 @@ describe("Obsidian boundaries read differently by its views", () => {
           "joined footnote ending in span paragraph",
           "ordinary paragraph with indented HTML",
           "unindented HTML interrupts joined paragraph",
+          "tilde fence with a backtick below a table",
         ].includes(name),
     ))
       expect(checked(`${source}\nLater *outside*.\n`)).toContain("Later _outside_.");

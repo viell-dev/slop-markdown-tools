@@ -128,11 +128,12 @@ describe("style/block-spacing", () => {
     // Front matter.
     ["---\ntitle: T\n---\n# H\n"],
     ["+++\ntitle = 'T'\n+++\n- A\n"],
-    // Continuation lines, and blocks that are neither headings nor lists.
+    // Continuation lines, and blocks that are neither headings, lists, closed
+    // fences, nor tables.
     ["Text\n2. Two\n"],
     ["- A\nlazy\n"],
     ["Text\n> Quote\n"],
-    ["```\ncode\n```\nText\n"],
+    ["Text\n$$\nx\n$$\n"],
     // Comments, callouts, and lines the parser reads differently below text.
     ["<!-- note -->\n# H\n"],
     ["<!-- mdrefine-disable-next-line style/emphasis -->\n- *A*\n"],
@@ -484,6 +485,272 @@ describe("style/block-spacing", () => {
     ).toBe(
       "# A\n\n# Title\n\n| a   |\n| --- |\n\n# B\n\nA paragraph that is long\nenough to wrap.\n\n- Item\n",
     );
+  });
+  describe("fenced code blocks and tables (#684, #697)", () => {
+    const newlines = ["\n", "\r\n", "\r"];
+    it.each([
+      // A closed fence, in either marker, with indentation, or a longer closer.
+      ["Text\n```js\ncode\n```\nMore\n", "Text\n\n```js\ncode\n```\n\nMore\n"],
+      ["Text\n~~~\ncode\n~~~\nMore\n", "Text\n\n~~~\ncode\n~~~\n\nMore\n"],
+      ["Text\n  ```\n  code\n  ```\nMore\n", "Text\n\n  ```\n  code\n  ```\n\nMore\n"],
+      ["Text\n```\ncode\n````\nMore\n", "Text\n\n```\ncode\n````\n\nMore\n"],
+      ["```\na\n```\n~~~\nb\n~~~\n", "```\na\n```\n\n~~~\nb\n~~~\n"],
+      ["    code\n```\nb\n```\n", "    code\n\n```\nb\n```\n"],
+      ["> Quote\n```\ncode\n```\n> Quote\n", "> Quote\n\n```\ncode\n```\n\n> Quote\n"],
+      ["$$\nx\n$$\n```\ncode\n```\n", "$$\nx\n$$\n\n```\ncode\n```\n"],
+      [
+        "[a]: https://example.com\n```\ncode\n```\n",
+        "[a]: https://example.com\n\n```\ncode\n```\n",
+      ],
+      ["```\ncode\n```\n^id\n", "```\ncode\n```\n\n^id\n"],
+      // In a block quote at any depth, with the quote's markers.
+      ["> Text\n> ```\n> code\n> ```\n> More\n", "> Text\n>\n> ```\n> code\n> ```\n>\n> More\n"],
+      ["> > Text\n> > ```\n> > code\n> > ```\n", "> > Text\n> >\n> > ```\n> > code\n> > ```\n"],
+      // A table directly below text that the parser reads as a separate paragraph.
+      ["Text\n| a | b |\n| - | - |\n", "Text\n\n| a | b |\n| - | - |\n"],
+      ["Two\nlines\n| a | b |\n| - | - |\n", "Two\nlines\n\n| a | b |\n| - | - |\n"],
+      ["> Text\n> | a |\n> | - |\n> > Quote\n", "> Text\n>\n> | a |\n> | - |\n>\n> > Quote\n"],
+      // Blocks that end a table, and blocks whose end a table can start below.
+      ["| a | b |\n| - | - |\n> Quote\n", "| a | b |\n| - | - |\n\n> Quote\n"],
+      ["| a | b |\n| - | - |\n```\ncode\n```\n", "| a | b |\n| - | - |\n\n```\ncode\n```\n"],
+      ["| a | b |\n| - | - |\n***\n", "| a | b |\n| - | - |\n\n***\n"],
+      ["| a | b |\n| - | - |\n<div>x</div>\n", "| a | b |\n| - | - |\n\n<div>x</div>\n"],
+      ["| a | b |\n| - | - |\n<!-- c -->\n", "| a | b |\n| - | - |\n\n<!-- c -->\n"],
+      ["```\ncode\n```\n| a | b |\n| - | - |\n", "```\ncode\n```\n\n| a | b |\n| - | - |\n"],
+      ["***\n| a | b |\n| - | - |\n", "***\n\n| a | b |\n| - | - |\n"],
+      ["<pre>\nx\n</pre>\n| a | b |\n| - | - |\n", "<pre>\nx\n</pre>\n\n| a | b |\n| - | - |\n"],
+      ["    code\n| a | b |\n| - | - |\n", "    code\n\n| a | b |\n| - | - |\n"],
+    ])("separates %j", (source, output) => {
+      for (const newline of newlines)
+        expect(spaced(source.replaceAll("\n", newline))).toBe(output.replaceAll("\n", newline));
+    });
+    it.each([
+      // Do not imitate MD031's `list_items: true`: a blank line between the
+      // blocks of a tight list item makes the list loose.
+      ["- Item\n  ```\n  code\n  ```\n  More\n- Next\n"],
+      ["1. Item\n   | a |\n   | - |\n   > Quote\n"],
+      ["[^1]: Note\n    ```\n    code\n    ```\n    More\n"],
+      // Do not imitate a separator between a table and text below it, which
+      // GFM reads as another row, nor before other lines that some renderer
+      // reads as one: Forgejo and Gitea take in indented code, and GitHub
+      // shows a definition directly above a table as text.
+      ["| a | b |\n| - | - |\nText\n"],
+      ["| a | b |\n| - | - |\n    indented\n"],
+      ["| a | b |\n| - | - |\n[^1]: Note\n"],
+      ["| a | b |\n| - | - |\n$$\nx\n$$\n"],
+      ["[a]: https://example.com\nText\n| a | b |\n| - | - |\n"],
+      ["[a]: https://example.com\n[b]: https://example.org\nText\n| a | b |\n| - | - |\n"],
+      ["[a]: https://example.com\n| a | b |\n| - | - |\n"],
+      ["> [a]: https://example.com\n> Text\n> | a |\n> | - |\n"],
+      // A container or math above a table, whose text renderers may continue.
+      ["> Quote\n| a | b |\n| - | - |\n"],
+      ["[^1]: Note\n| a | b |\n| - | - |\n"],
+      ["$$\nx\n$$\n| a | b |\n| - | - |\n"],
+      // A fence without its closing fence keeps its existing handling.
+      ["Text\n```\nunclosed\n"],
+      ["> Text\n> ```\n> unclosed\n"],
+      // Comments, directives, callout titles, and front matter.
+      ["<!-- note -->\n```\ncode\n```\n"],
+      ["<!-- mdrefine-disable-next-line style/emphasis -->\n| *a* |\n| - |\n"],
+      ["> [!NOTE]\n> ```\n> code\n> ```\n"],
+      ["---\ntitle: T\n---\n```\ncode\n```\n"],
+      ["+++\ntitle = 'T'\n+++\n| a |\n| - |\n"],
+      // Existing blank lines, also lines of quote markers, stay as they are.
+      ["Text\n\n```\ncode\n```\n\n\nMore\n"],
+      ["> Text\n>\n> | a |\n> | - |\n"],
+    ])("leaves %j unchanged", (source) => {
+      for (const newline of newlines) {
+        const input = source.replaceAll("\n", newline);
+        expect(spaced(input)).toBe(input);
+        expect(lint(input, { config: only(rule, "github") })).toEqual([]);
+      }
+    });
+    it("keeps a tight list item tight", () => {
+      const source = "- Item\n  ```\n  code\n  ```\n  More\n- Next\n";
+      const list = parse(spaced(source), "github").tree.children[0];
+      expect(list).toMatchObject({ type: "list", spread: false });
+    });
+    it("reports each place at the fence or table that needs the blank line", () => {
+      expect(
+        lint("Text\n```\ncode\n```\n| a |\n| - |\n", { config: only(rule, "github") }),
+      ).toEqual([
+        {
+          rule: "style/block-spacing",
+          severity: "warn",
+          line: 2,
+          column: 1,
+          start: 5,
+          message: "Add a blank line before the fenced code block.",
+          edit: { start: 4, end: 5, text: "\n\n" },
+        },
+        {
+          rule: "style/block-spacing",
+          severity: "warn",
+          line: 4,
+          column: 4,
+          start: 17,
+          message: "Add a blank line after the fenced code block.",
+          edit: { start: 17, end: 18, text: "\n\n" },
+        },
+      ]);
+      expect(lint("| a |\n| - |\n> Quote\n", { config: only(rule, "github") })).toEqual([
+        {
+          rule: "style/block-spacing",
+          severity: "warn",
+          line: 2,
+          column: 6,
+          start: 11,
+          message: "Add a blank line after the table.",
+          edit: { start: 11, end: 12, text: "\n\n" },
+        },
+      ]);
+      expect(lint("Text\n| a |\n| - |\n", { config: only(rule, "github") })).toMatchObject([
+        { line: 2, column: 1, message: "Add a blank line before the table." },
+      ]);
+    });
+    it.each(dialects)("follows the %s parser's reading of tables", (dialect) => {
+      const fences = "Text\n```\ncode\n```\nMore\n";
+      const table = "Text\n| a | b |\n| - | - |\n> Quote\n";
+      if (dialect === "obsidian") {
+        // Both views keep text with an adjacent fence or table; the rule
+        // reports the place without changing it.
+        expect(spaced(fences, dialect)).toBe(fences);
+        expect(spaced(table, dialect)).toBe("Text\n| a | b |\n| - | - |\n\n> Quote\n");
+        expect(
+          lint(fences, { config: only(rule, dialect) }).map(({ line, message }) => [line, message]),
+        ).toEqual([
+          [
+            2,
+            "Left as written to preserve Obsidian rendering: Add a blank line before the fenced code block.",
+          ],
+          [
+            4,
+            "Left as written to preserve Obsidian rendering: Add a blank line after the fenced code block.",
+          ],
+        ]);
+      } else {
+        expect(spaced(fences, dialect)).toBe("Text\n\n```\ncode\n```\n\nMore\n");
+        // CommonMark has no tables: its text continues to the quote.
+        expect(spaced(table, dialect)).toBe(
+          dialect === "commonmark" ? table : "Text\n\n| a | b |\n| - | - |\n\n> Quote\n",
+        );
+      }
+    });
+    it.each(["forgejo", "gitea"] as const)(
+      "keeps a table in the definition description above it in the %s dialect",
+      (dialect) => {
+        for (const source of [
+          "Term\n: Description\n| a |\n| - |\n",
+          "Term\n: Description\nmore\n| a |\n| - |\n",
+        ])
+          for (const newline of newlines) {
+            const input = source.replaceAll("\n", newline);
+            expect(spaced(input, dialect)).toBe(input);
+            expect(lint(input, { config: only(rule, dialect) })).toEqual([]);
+          }
+        expect(spaced("Term\n: Description\n```\ncode\n```\n", dialect)).toBe(
+          "Term\n: Description\n\n```\ncode\n```\n",
+        );
+        expect(spaced("Term\n: Description\n| a |\n| - |\n")).toBe(
+          "Term\n: Description\n\n| a |\n| - |\n",
+        );
+      },
+    );
+    it("keeps Obsidian's readings of tilde fences and lines below a table", () => {
+      for (const source of [
+        "Text\n~~~ a`b\ncode\n~~~\nMore\n",
+        "| a | b |\n| - | - |\n~~~ a`b\ncode\n~~~\n",
+        "| a | b |\n| - | - |\n> c | d\n",
+        "| a | b |\n| - | - |\n| c | d |\n---\n",
+      ])
+        expect(spaced(source, "obsidian")).toBe(source);
+      expect(spaced("| a | b |\n| - | - |\n~~~ a`b\ncode\n~~~\n")).toBe(
+        "| a | b |\n| - | - |\n\n~~~ a`b\ncode\n~~~\n",
+      );
+      expect(spaced("| a | b |\n| - | - |\n> c | d\n")).toBe("| a | b |\n| - | - |\n\n> c | d\n");
+    });
+    it.each([
+      "```\ncode\n```\n| a | b |\n| - | - |\n",
+      "***\n| a | b |\n| - | - |\n",
+      "<pre>\nx\n</pre>\n| a | b |\n| - | - |\n",
+      "    code\n| a | b |\n| - | - |\n",
+      "Text\n| a | b |\n| - | - |\n",
+    ])("keeps the block above an Obsidian table in %j", (source) => {
+      // Live Preview shows the rows of a table directly below another block as
+      // text, where Reading view shows a table; a blank line would make them a
+      // table in Live Preview too.
+      for (const newline of newlines) {
+        const input = source.replaceAll("\n", newline);
+        expect(spaced(input, "obsidian")).toBe(input);
+        expect(lint(input, { config: only(rule, "obsidian") })).toEqual([]);
+        expect(spaced(input)).toBe(input.replace(`${newline}|`, `${newline}${newline}|`));
+      }
+    });
+    it("separates the fences of a VitePress code group", () => {
+      const source = "::: code-group\n```js [a.js]\na\n```\n```ts [b.ts]\nb\n```\n:::\n";
+      expect(spaced(source, "vitepress")).toBe(
+        "::: code-group\n```js [a.js]\na\n```\n\n```ts [b.ts]\nb\n```\n:::\n",
+      );
+    });
+    it("separates them under recommended and leaves them when the rule is off", () => {
+      const source = "Text\n```js\ncode\n```\n| a | b |\n| - | - |\n> Quote\n";
+      expect(formatted(source, { extends: ["recommended"], dialect: "github" })).toBe(
+        "Text\n\n```js\ncode\n```\n\n| a   | b   |\n| --- | --- |\n\n> Quote\n",
+      );
+      expect(formatted(source, only({ "style/block-spacing": "off" }, "github"))).toBe(source);
+    });
+    it("keeps the meaning of randomly assembled fences and tables", () => {
+      const blocks = fc.constantFrom(
+        "Text.",
+        "Two\nlines.",
+        "```\ncode\n```",
+        "~~~js\ncode\n~~~",
+        "  ```\n  code\n  ```",
+        "~~~ a`b\ncode\n~~~",
+        "```\nunclosed",
+        "    code",
+        "| a | b |\n| - | - |",
+        "| a | b |\n| - | - |\n| c | d |",
+        "a | b\n--|--",
+        "> Quoted",
+        "> c | d",
+        "***",
+        "---",
+        "<div>x</div>",
+        "<!-- comment -->",
+        "$$\nx\n$$",
+        "[a]: https://example.com",
+        "[^1]: Note.",
+        "Term\n: Description",
+        "- Item",
+        "# Heading",
+        "lazy",
+      );
+      const containers = fc.constantFrom(["", ""], ["> ", "> "], ["- ", "  "], ["> > ", "> > "]);
+      const group = fc.tuple(
+        containers,
+        fc.array(fc.tuple(blocks, fc.boolean()), { minLength: 1, maxLength: 6 }),
+      );
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...dialects),
+          fc.array(group, { minLength: 1, maxLength: 3 }),
+          fc.constantFrom("\n", "\r\n"),
+          (dialect, groups, newline) => {
+            const lines: string[] = [];
+            for (const [[first, rest], items] of groups)
+              items.forEach(([block, blank], index) => {
+                if (index > 0 && blank) lines.push(rest.trimEnd());
+                block.split("\n").forEach((line, at) => {
+                  lines.push((index === 0 && at === 0 ? first : rest) + line);
+                });
+              });
+            spaced(lines.join(newline) + newline, dialect);
+          },
+        ),
+        { numRuns: 300, seed: 20261028 },
+      );
+    });
   });
   it("keeps the meaning of randomly assembled documents", () => {
     const blocks = fc.constantFrom(

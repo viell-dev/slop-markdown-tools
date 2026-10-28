@@ -67,16 +67,16 @@ Schema](configuration.md#json-schema).
 `recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
 text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
 code fences with backticks, and thematic breaks as `---`; aligns tables; removes
-trailing spaces and repeated blank lines; separates headings and lists from
-adjacent blocks with a blank line where safe; ends every file with a line break;
-and checks local links. It also warns about [problems](rules.md) that show on
-the rendered page, such as a reference without a definition, a skipped heading
-level, or an image without alternative text. The second
-[preset](configuration.md#presets) names where your documents are rendered and
-so their [dialect](dialects.md): replace `github` with `forgejo` (or
-`codeberg`), `gitea`, `obsidian`, or `vitepress`. Match a VitePress site's
-[renderer options](vitepress.md#renderer-options) explicitly. For plain
-CommonMark, keep only `recommended` and add `"dialect": "commonmark"`.
+trailing spaces and repeated blank lines; separates headings and lists, and
+after 0.5.0 code fences and tables, from adjacent blocks with a blank line where
+safe; ends every file with a line break; and checks local links. It also warns
+about [problems](rules.md) that show on the rendered page, such as a reference
+without a definition, a skipped heading level, or an image without alternative
+text. The second [preset](configuration.md#presets) names where your documents
+are rendered and so their [dialect](dialects.md): replace `github` with
+`forgejo` (or `codeberg`), `gitea`, `obsidian`, or `vitepress`. Match a
+VitePress site's [renderer options](vitepress.md#renderer-options) explicitly.
+For plain CommonMark, keep only `recommended` and add `"dialect": "commonmark"`.
 
 Without a configuration file, the `recommended` rules apply, and documents are
 read as GitHub Markdown, or as Obsidian notes inside a vault. A configuration
