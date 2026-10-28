@@ -1,4 +1,12 @@
-import type { Blockquote, FootnoteDefinition, List, ListItem, Nodes, Parents } from "mdast";
+import type {
+  Blockquote,
+  FootnoteDefinition,
+  Heading,
+  List,
+  ListItem,
+  Nodes,
+  Parents,
+} from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { rendererProtections } from "../syntax/renderer-protections.js";
 import { joinsTomlFrontMatter } from "../syntax/parse.js";
@@ -144,6 +152,21 @@ const isContainer = (node: Nodes): node is Container =>
   node.type === "blockquote" || node.type === "listItem" || node.type === "footnoteDefinition";
 
 const analyses = new WeakMap<Document, Analysis>();
+/** Heading-owned spaces after every container's required prefix, including Setext underlines. */
+export function headingIndentation(document: Document, node: Heading): [number, number][] {
+  const analysis = analyze(document);
+  const result: [number, number][] = [];
+  const first = node.children[0]?.position?.start.line ?? node.position!.start.line;
+  for (let line = first - 1; line < node.position!.end.line; line++) {
+    if (analysis.sensitive.has(line)) continue;
+    const { levels } = analysis.match(line);
+    if (levels.some((level) => level.kind !== "content")) continue;
+    const start = levels.at(-1)?.end ?? analysis.lines[line]!.start;
+    const spaces = /^ {1,3}(?=\S)/.exec(document.source.slice(start, analysis.lines[line]!.end));
+    if (spaces) result.push([start, start + spaces[0].length]);
+  }
+  return result;
+}
 /** The lists of a document and the means to read their lines, shared by the list rules. */
 function analyze(document: Document): Analysis {
   const known = analyses.get(document);
