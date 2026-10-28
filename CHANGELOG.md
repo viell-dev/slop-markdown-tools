@@ -24,6 +24,17 @@ prereleases' notes there are longer than their entries here.
   ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
   [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
 
+- Three report-only rules, in no preset, cover markdownlint's MD026, MD036, and
+  MD059 with their options: `structure/heading-punctuation` reports a heading
+  that ends with sentence punctuation, `structure/emphasis-heading` a paragraph
+  of only emphasized or strong text, and `links/descriptive-text` a link whose
+  whole text, such as "here", does not say where it leads. They read headings
+  and links as each dialect's renderer shows them, and leave abbreviations,
+  ellipses, and emoji shortcodes at the end of a heading alone
+  ([#681](https://github.com/viell-dev/slop-markdown-tools/issues/681),
+  [#688](https://github.com/viell-dev/slop-markdown-tools/issues/688),
+  [#698](https://github.com/viell-dev/slop-markdown-tools/issues/698)).
+
 - Three report-only rules, in no preset, cover markdownlint's MD014, MD018,
   MD020, and MD028: `structure/unspaced-heading` reports text such as `#Heading`
   or `#Heading#` that would be a heading with a space after its hashes,
