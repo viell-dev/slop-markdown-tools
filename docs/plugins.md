@@ -185,7 +185,10 @@ The other fields are present when they apply:
 - After 0.5.0, `fragmentAnchor`: with status `resolved`, the anchor as the
   target spells it, when the fragment reaches it only because the renderer
   ignores letter case, as GitHub and Obsidian headings do; absent when the
-  fragment matches an anchor exactly. `links/valid`'s `exactCase` reports it.
+  fragment matches an anchor exactly. `links/valid`'s `exactCase` reports it. It
+  is found when first read, because that can mean searching the target's
+  headings: until then, a fragment that may differ in case gives a property
+  whose value can turn out `undefined`, and reading it settles the property.
 - In versions after 0.4.0, `fragmentIncomplete: true`, with status `unreadable`,
   means the file was read but its renderer's fragment targets are not fully
   known. No `unreadable` file/directory list accompanies this result. Verified

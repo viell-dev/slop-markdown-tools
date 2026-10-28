@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { createWorkspace } from "../../src/index.js";
+import { createWorkspace, lint } from "../../src/index.js";
+import type { Config } from "../../src/index.js";
 import { createForgejoSlugger, createGiteaSlugger } from "../../src/workspace/slug.js";
 import { scaling } from "./scaling.js";
 const sluggers = [
@@ -134,3 +135,58 @@ it.each(["", " C#"])(
     ).toBeLessThan(4);
   },
 );
+
+/** A note with many headings of one name, and last a heading whose name holds a `#`. */
+function repeatedHeadings(count: number) {
+  const workspace = createWorkspace(
+    { "Doc.md": "", "Note.md": `${"# Heading\n\n".repeat(count)}# Heading#Tail\n` },
+    { dialect: "obsidian" },
+  );
+  // Reading the note's anchors once is linear, and stays outside the timed lookups.
+  workspace.resolve("Doc.md", "Note.md#Heading", "obsidian");
+  return workspace;
+}
+const repeatedLink = "Note.md#heading%23tail";
+// Spelling the fragment's anchor for every resolution, wanted or not, looked for
+// a chain of headings spelled as the fragment is among all those of the name in
+// any case: 1,090 ms for 3,000 lookups in 10,000 headings, against 23 ms.
+it("resolves a fragment in other letter case without searching repeated headings", () => {
+  expect(
+    scaling(
+      [1000, 16000],
+      repeatedHeadings,
+      (workspace) => {
+        let result = workspace.resolve("Doc.md", "Note.md", "obsidian");
+        for (let lookup = 0; lookup < 3000; lookup++)
+          result = workspace.resolve("Doc.md", repeatedLink, "obsidian");
+        return result;
+      },
+      (result) =>
+        expect(result).toMatchObject({ fragmentExists: true, fragmentAnchor: "Heading#Tail" }),
+    ),
+  ).toBeLessThan(4);
+});
+// With `exactCase`, each link reads the spelling, which the target's headings
+// are searched for once rather than once per link: searching for each link took
+// 2,000 ms for 3,000 links to 16,000 headings, against 340 ms.
+it("spells a repeated fragment for exactCase once per target", () => {
+  const source = `[a](${repeatedLink})\n`.repeat(3000);
+  const config: Config = {
+    extends: [],
+    dialect: "obsidian",
+    rules: { "links/valid": ["error", { exactCase: true }] },
+  };
+  expect(
+    scaling(
+      [1000, 32000],
+      repeatedHeadings,
+      (workspace) => lint(source, { config, path: "Doc.md", workspace }),
+      (findings) => {
+        expect(findings).toHaveLength(3000);
+        expect(findings[0]?.message).toBe(
+          `Fragment in ${repeatedLink} differs in letter case from its anchor, #Heading#Tail; other renderers may not find it.`,
+        );
+      },
+    ),
+  ).toBeLessThan(4);
+});

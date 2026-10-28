@@ -230,18 +230,50 @@ export function resolveLink(
       };
     fragmentExists = found;
   }
-  const fragmentAnchor =
+  const spelling =
     fragment && fragmentExists
       ? index.anchorSpelling(resolved, dialect, fragment, fragment.replace(/^user-content-/, ""))
       : undefined;
-  return {
+  const result: LinkResolution = {
     status: "resolved",
     target: resolved,
     fragment,
     fragmentExists,
-    ...(fragmentAnchor === undefined ? {} : { fragmentAnchor }),
+  };
+  if (spelling) spellLazily(result, spelling);
+  return Object.assign(result, {
     ...(uncertain.length ? { unreadable: uncertain } : {}),
     ...(vault ? { vault, rooted: resolved.slice(vault.length + 1) } : {}),
     ...(partial ? { rooted: `${rootFolders.join("/")}/${resolved}` } : {}),
+  });
+}
+
+/**
+ * Gives `result` a `fragmentAnchor` that `spell` finds when it is first read,
+ * since most callers never read it and finding it can mean searching the
+ * target's headings. Reading it replaces it with its value, or removes it when
+ * the fragment matches an anchor exactly; until then it is listed among the
+ * result's keys, as a property whose value may turn out undefined.
+ */
+function spellLazily(result: LinkResolution, spell: () => string | undefined): void {
+  const settle = (value: string | undefined) => {
+    if (value === undefined) delete result.fragmentAnchor;
+    else
+      Object.defineProperty(result, "fragmentAnchor", {
+        value,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
   };
+  Object.defineProperty(result, "fragmentAnchor", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      const value = spell();
+      settle(value);
+      return value;
+    },
+    set: settle,
+  });
 }
