@@ -279,17 +279,22 @@ const thematicBreak: Rule = {
   description: "Write thematic breaks with one marker.",
   kind: "style",
   phase: "block",
-  schema: schema({ marker: { enum: ["---", "***", "___", "consistent"] } }),
+  schema: schema({
+    marker: {
+      type: "string",
+      pattern: "^(?:consistent|\\*(?:[ \\t]*\\*){2,}|-(?:[ \\t]*-){2,}|_(?:[ \\t]*_){2,})$",
+    },
+  }),
   check({ document, options }) {
     const { source } = document;
     let marker = typeof options.marker === "string" ? options.marker : "---";
-    // `consistent` takes the character of the first thematic break in the document.
+    // `consistent` takes the exact text of the first thematic break.
     if (marker === "consistent") {
       let first: string | undefined;
       walk(document.tree, "thematicBreak", (node) => {
-        if (first === undefined && located(node)) first = source[range(node)[0]];
+        if (first === undefined && located(node)) first = source.slice(...range(node)).trimEnd();
       });
-      marker = (first ?? "-").repeat(3);
+      marker = first ?? "---";
     }
     const findings: Finding[] = [];
     walk(document.tree, "thematicBreak", (node, index, parent) => {
@@ -319,7 +324,7 @@ const thematicBreak: Rule = {
       // which a line of `---` directly below underlines as a heading, as one
       // written there already does (issue #333).
       if (
-        (marker === "---" && belowTomlFrontMatter(document.tree, node)) ||
+        (/^-{3,}$/.test(marker) && belowTomlFrontMatter(document.tree, node)) ||
         joinsTomlFrontMatter(document.tree, node)
       )
         return;
@@ -329,7 +334,7 @@ const thematicBreak: Rule = {
       const items = new RegExp(`[ \\t${marker[0] === "-" ? "\\-" : marker[0]}]*$`);
       const prefix = source.slice(lineStart(source, start), start);
       if (items.exec(prefix)![0].includes(marker[0]!)) return;
-      if (marker === "---" || /^-{3,}$/.test(source.slice(start, end))) {
+      if (/^-{3,}$/.test(marker) || /^-{3,}$/.test(source.slice(start, end))) {
         // A new `---` can underline the paragraph or definition above it.
         // Directly below display math, compact hyphens already do so on
         // GitHub: keep that boundary in both directions (#336). Spaced
@@ -340,7 +345,7 @@ const thematicBreak: Rule = {
         if (
           above &&
           (above.type === "math" ||
-            (marker === "---" &&
+            (/^-{3,}$/.test(marker) &&
               (above.type === "paragraph" ||
                 above.type === "definition" ||
                 (document.dialect === "obsidian" && above.type === "table")))) &&
@@ -493,7 +498,12 @@ const trailingSpace: Rule = {
   description: "Remove spaces and tabs at the end of lines outside code and HTML.",
   kind: "style",
   phase: "document",
-  schema: schema({ hardBreak: { enum: ["keep", "backslash"] } }),
+  schema: schema({
+    hardBreak: { enum: ["keep", "backslash"] },
+    hardBreakSpaces: { type: "integer", minimum: 2 },
+    listItemEmptyLines: { type: "boolean" },
+    codeBlocks: { type: "boolean" },
+  }),
   check({ document, options }) {
     const { source } = document;
     if (!/[ \t](?:\r|\n|$)/.test(source)) return [];
@@ -501,6 +511,8 @@ const trailingSpace: Rule = {
     const forge = document.dialect === "forgejo" || document.dialect === "gitea";
     /** Source in which blank space at the end of a line is content. */
     const kept: [number, number][] = [];
+    const code: [number, number][] = [];
+    const listItems: [number, number][] = [];
     /**
      * Hard line breaks, with the paragraph or heading each one is in, and
      * whether that block starts like an alert's or callout's marker, `[!`.
@@ -517,6 +529,7 @@ const trailingSpace: Rule = {
         return;
       }
       const [start, end] = range(node);
+      if (node.type === "listItem") listItems.push([start, end]);
       if (node.type === "paragraph" || node.type === "heading") {
         block = [start, end];
         if (document.dialect === "obsidian" && node.type === "paragraph") {
@@ -547,6 +560,10 @@ const trailingSpace: Rule = {
         // A fence line ends in syntax, unless an info string's text runs to its end.
         const from = fence && !node.meta ? lineEnd(source, start) : start;
         kept.push([from, fence?.close ? lineStart(source, fence.close[0]) : end]);
+        code.push([
+          fence ? lineEnd(source, start) : start,
+          fence?.close ? lineStart(source, fence.close[0]) : end,
+        ]);
       } else if (node.type === "footnoteDefinition" && document.dialect === "obsidian") {
         // Obsidian's Reading view appends the footnote's backreference to the
         // paragraph that ends the definition, after the text as written, blank
@@ -595,6 +612,20 @@ const trailingSpace: Rule = {
       if (!space || shown.has(index)) continue;
       const start = line.start + space.index;
       const end = line.end;
+      if (options.codeBlocks === true && code.some(([from, to]) => from <= start && start < to)) {
+        findings.push({
+          start,
+          end,
+          message: "Trailing spaces and tabs in code are left as written.",
+        });
+        continue;
+      }
+      if (
+        options.listItemEmptyLines === true &&
+        /^[ \t]*$/.test(source.slice(line.start, end)) &&
+        listItems.some(([from, to]) => from < start && end < to)
+      )
+        continue;
       while (next < ranges.length && ranges[next]![1] <= start) next++;
       if (next < ranges.length && ranges[next]![0] < end) continue;
       // Breaks are in document order, as lines are.
@@ -631,6 +662,23 @@ const trailingSpace: Rule = {
         continue;
       }
       const brk = breaks[following]!;
+      if (
+        !emptyMarker &&
+        !backslash &&
+        options.hardBreakSpaces !== undefined &&
+        brk.start === start &&
+        /^ +$/.test(space[0])
+      ) {
+        const text = " ".repeat(Number(options.hardBreakSpaces));
+        if (space[0] !== text)
+          findings.push({
+            start,
+            end,
+            message: `Use ${text.length} spaces for the hard line break.`,
+            edit: { start, end, text },
+          });
+        continue;
+      }
       if (
         emptyMarker ||
         !backslash ||
