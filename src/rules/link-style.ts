@@ -38,6 +38,15 @@ function prose(
     collect(block);
   });
 }
+/**
+ * The character just before `at`, whole when it is a surrogate pair. Callers
+ * test it with a start-anchored pattern: on Node.js 26, V8 fails to match a
+ * surrogate pair with a character class right before `$` in a `u` pattern.
+ */
+function characterBefore(source: string, at: number): string {
+  const code = at >= 2 ? source.codePointAt(at - 2) : undefined;
+  return code !== undefined && code > 0xffff ? String.fromCodePoint(code) : (source[at - 1] ?? "");
+}
 /** Deliberately conservative shared subset of literal/angle autolinks across hosts. */
 function angleSafe(raw: string): boolean {
   return (
@@ -74,7 +83,7 @@ export const linkStyleRules: Record<string, Rule> = {
         const end = start + match[0].length;
         if (
           !readable.slice(start, end).every(Boolean) ||
-          /[\p{L}\p{N}\p{M}_$]$/u.test(document.source.slice(Math.max(0, start - 2), start)) ||
+          /^[\p{L}\p{N}\p{M}_$]/u.test(characterBefore(document.source, start)) ||
           document.source[end] === "]" ||
           definitions.has(normalizeLabel(label)) ||
           label.startsWith("^") ||
@@ -116,7 +125,7 @@ export const linkStyleRules: Record<string, Rule> = {
           // these boundaries. Bracketing would add a link or change its extent.
           const projectionSafe =
             document.dialect !== "vitepress" ||
-            (!/[\p{L}\p{N}_+]$/u.test(document.source.slice(Math.max(0, start - 2), start)) &&
+            (!/^[\p{L}\p{N}_+]/u.test(characterBefore(document.source, start)) &&
               !/[_~]/.test(document.source[end] ?? "") &&
               !/[#%@]$/.test(raw));
           // Obsidian accepts source heading names; the forges also support
