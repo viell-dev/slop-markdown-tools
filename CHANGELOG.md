@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- In Obsidian, rules no longer change a list item that starts on a footnote's
+  label line, as in `[^1]: - item`, below a run of three or more backticks that
+  nothing closes. Live Preview shows such an item as code carried from the run
+  ([#670](https://github.com/viell-dev/slop-markdown-tools/issues/670)).
+
 - Forgejo and Gitea retain native table rows misread as ordered lists, tables
   hidden inside quoted paragraphs, and URL-adjacent backslash hard breaks.
   Shared edit protections cover builtin rules and plugins while leaving
