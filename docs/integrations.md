@@ -145,7 +145,7 @@ follow each check's documented purpose, not the other tool's known defects.
 | MD050 `strong-style`                     | [`style/strong`](rules.md#stylestrong). Not yet `consistent` ([#704](https://github.com/viell-dev/slop-markdown-tools/issues/704))                                                                        |
 | MD051 `link-fragments`                   | [`links/valid`](rules.md#linksvalid), which also checks that local files exist. Not yet its options ([#705](https://github.com/viell-dev/slop-markdown-tools/issues/705))                                 |
 | MD052 `reference-links-images`           | [`links/undefined-reference`](rules.md#linksundefined-reference), which also checks footnotes. Not yet its options ([#706](https://github.com/viell-dev/slop-markdown-tools/issues/706))                  |
-| MD053 `link-image-reference-definitions` | [`links/unused-definition`](rules.md#linksunused-definition), which also checks footnotes. Not yet `ignored_definitions` ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707))            |
+| MD053 `link-image-reference-definitions` | [`links/unused-definition`](rules.md#linksunused-definition), which also checks footnotes, with `ignoredDefinitions`                                                                                      |
 | MD054 `link-image-style`                 | None yet ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696))                                                                                                                            |
 | MD055 `table-pipe-style`                 | [`style/table`](rules.md#styletable), which writes leading and trailing pipes. Not yet other pipe styles ([#708](https://github.com/viell-dev/slop-markdown-tools/issues/708))                            |
 | MD056 `table-column-count`               | [`content/table-columns`](rules.md#contenttable-columns)                                                                                                                                                  |
@@ -164,11 +164,14 @@ For the heading checks, markdownlint's `level`, `allow_preamble`, and
 and `frontMatterTitle`. For duplicate headings, use `siblingsOnly`; its default
 is `true`, so set it to `false` for whole-outline checking. For fenced-code
 languages, use `allowedLanguages` and `languageOnly`, corresponding to
-`allowed_languages` and `language_only`. These are option mappings, not a
-promise of identical defaults or behavior: initial-heading's metadata-title
-recognition is off by default, and the heading checks use Markdown headings with
-independent quote and footnote outlines. See each rule's reference for its exact
-contract.
+`allowed_languages` and `language_only`. For unused definitions, use
+`ignoredDefinitions`, corresponding to `ignored_definitions` with the same
+default, `["//"]`, for comments written as `[//]: # (comment)`; `links/empty`
+takes it too, so that it does not report such a comment's `#`. These are option
+mappings, not a promise of identical defaults or behavior: initial-heading's
+metadata-title recognition is off by default, and the heading checks use
+Markdown headings with independent quote and footnote outlines. See each rule's
+reference for its exact contract.
 
 ### Prettier
 

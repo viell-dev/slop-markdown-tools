@@ -10,6 +10,14 @@ prereleases' notes there are longer than their entries here.
 
 ## Unreleased
 
+### Added
+
+- `links/unused-definition` and `links/empty` take `ignoredDefinitions`, the
+  labels of definitions written as comments, which default to `["//"]`.
+  `recommended` no longer reports `[//]: # (comment)` while no reference uses
+  its label; footnotes are still reported
+  ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
+
 ### Fixed
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's
