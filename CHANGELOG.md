@@ -28,6 +28,15 @@ prereleases' notes there are longer than their entries here.
   link whose text is its URL into an autolink where that renders the same
   ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
 
+- Opt-in `style/no-tabs` reports tabs with `codeBlocks`, `ignoredCodeLanguages`,
+  and `spacesPerTab`, replacing safe prose and indentation tabs while keeping
+  literal content and Obsidian list nesting
+  ([#671](https://github.com/viell-dev/slop-markdown-tools/issues/671)).
+
+- Opt-in `style/prose-space` collapses repeated prose spaces without moving line
+  breaks, preserving literal content, indentation and hard breaks
+  ([#720](https://github.com/viell-dev/slop-markdown-tools/issues/720)).
+
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
   also reports a fragment that reaches its anchor only because the renderer
