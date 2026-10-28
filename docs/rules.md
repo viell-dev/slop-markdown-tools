@@ -941,6 +941,10 @@ turns a heading underlined with `===` or `---` into a `#` heading of the same
 level, and removes the closing sequence of a `#` heading with the blank space
 around it.
 
+After 0.5.0, ATX headings use one space between their opening hashes and text,
+including when a tab separated them. Empty headings need no separator. This also
+applies to headings kept in ATX form with `setext` or `consistent`.
+
 | Option    | Values                              | Default    |
 | --------- | ----------------------------------- | ---------- |
 | `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
@@ -950,7 +954,8 @@ around it.
   and 2 and keeps `#` for deeper levels, which cannot be underlined.
   `consistent` follows the document's first heading: `setext` when it is
   underlined, otherwise `atx`.
-- `closing`: `keep` leaves the closing sequences of `#` headings as written.
+- `closing`: `keep` retains existing closing sequences. After 0.5.0, their
+  separator from the text becomes one space; no absent sequence is added.
 
 Before:
 
@@ -958,7 +963,7 @@ Before:
 Installation
 ------------
 
-## Usage ##
+##  Usage  ##
 ```
 
 After:
@@ -979,7 +984,9 @@ Underlined headings of more than one line, those inside lists or block quotes,
 and one directly below TOML front matter, whose lines renderers without TOML
 front matter read as part of the heading, are left as written. On Forgejo and
 Gitea, a closing sequence after an attribute block such as `{#id}` stays,
-because Gitea before 1.26 reads the block only when the sequence follows it.
+because Gitea before 1.26 reads the block only when the sequence follows it. The
+block and its suffix, including the spacing before that sequence, retain their
+existing protection; the opening separator can still be normalized.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not

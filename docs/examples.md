@@ -369,7 +369,9 @@ Searching the notes with `grep TODO` is not reported: code is not prose.
 Ask for a review.
 ```
 
-Linting reports both, but not the `TODO` inside the code span:
+Linting reports both, but not the `TODO` inside the code span. After 0.5.0, the
+built-in `style/heading` also reports the separator; the custom rule remains an
+example of proposing an edit from a plugin.
 
 ```sh
 node dist/cli/main.js lint --root examples/plugin
@@ -378,7 +380,8 @@ node dist/cli/main.js lint --root examples/plugin
 ```text
 examples/plugin/notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
 examples/plugin/notes/release-checklist.md:7:1: warn house/heading-space: Write one space after the heading's # marks.
-1 file(s) linted; 1 error(s), 1 warning(s).
+examples/plugin/notes/release-checklist.md:7:3: warn style/heading: Use one space after the opening # sequence.
+1 file(s) linted; 1 error(s), 2 warning(s).
 ```
 
 Formatting applies the style rule's edit and leaves the placeholder to a person:
@@ -603,7 +606,8 @@ node dist/cli/main.js lint --root examples/plugin --json | node examples/automat
 ```
 
 ```text
-lint: 1 file(s), 2 diagnostic(s)
+lint: 1 file(s), 3 diagnostic(s)
 1 error house/no-placeholder in 1 file(s)
 1 warn house/heading-space in 1 file(s)
+1 warn style/heading in 1 file(s)
 ```
