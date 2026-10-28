@@ -97,6 +97,11 @@ follow each check's documented purpose, not the other tool's known defects.
 
 ### markdownlint rules
 
+markdownlint enables every rule by default. mdrefine's presets enable fewer: a
+rule that no preset in your configuration enables, such as
+`structure/heading-punctuation`, needs an entry under `rules`. Each rule's
+[section](rules.md) names its presets.
+
 | markdownlint                             | mdrefine                                                                                                                                                                                                  |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MD001 `heading-increment`                | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart. Not yet a front-matter title ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699)) |
@@ -118,7 +123,7 @@ follow each check's documented purpose, not the other tool's known defects.
 | MD023 `heading-start-left`               | [`style/heading`](rules.md#styleheading), after 0.5.0; preserves container prefixes                                                                                                                       |
 | MD024 `no-duplicate-heading`             | [`structure/duplicate-heading`](rules.md#structureduplicate-heading); `siblingsOnly` defaults to `true`                                                                                                   |
 | MD025 `single-title`                     | [`structure/single-title`](rules.md#structuresingle-title)                                                                                                                                                |
-| MD026 `no-trailing-punctuation`          | None yet ([#681](https://github.com/viell-dev/slop-markdown-tools/issues/681))                                                                                                                            |
+| MD026 `no-trailing-punctuation`          | [`structure/heading-punctuation`](rules.md#structureheading-punctuation), which reads headings as renderers show them and leaves abbreviations, ellipses, and emoji shortcodes alone                      |
 | MD027 `no-multiple-space-blockquote`     | None yet ([#682](https://github.com/viell-dev/slop-markdown-tools/issues/682))                                                                                                                            |
 | MD028 `no-blanks-blockquote`             | None yet ([#683](https://github.com/viell-dev/slop-markdown-tools/issues/683))                                                                                                                            |
 | MD029 `ol-prefix`                        | [`style/ordered-list`](rules.md#styleordered-list); `same` stands for `one` and `zero` in lists that start at 1 or 0, because the first number is never changed                                           |
@@ -128,7 +133,7 @@ follow each check's documented purpose, not the other tool's known defects.
 | MD033 `no-inline-html`                   | None yet ([#685](https://github.com/viell-dev/slop-markdown-tools/issues/685))                                                                                                                            |
 | MD034 `no-bare-urls`                     | None yet ([#686](https://github.com/viell-dev/slop-markdown-tools/issues/686))                                                                                                                            |
 | MD035 `hr-style`                         | [`style/thematic-break`](rules.md#stylethematic-break). Not yet other break texts, such as `* * *` ([#687](https://github.com/viell-dev/slop-markdown-tools/issues/687))                                  |
-| MD036 `no-emphasis-as-heading`           | None yet ([#688](https://github.com/viell-dev/slop-markdown-tools/issues/688))                                                                                                                            |
+| MD036 `no-emphasis-as-heading`           | [`structure/emphasis-heading`](rules.md#structureemphasis-heading), whatever the paragraph's line length                                                                                                  |
 | MD037 `no-space-in-emphasis`             | None yet ([#689](https://github.com/viell-dev/slop-markdown-tools/issues/689))                                                                                                                            |
 | MD038 `no-space-in-code`                 | None yet ([#690](https://github.com/viell-dev/slop-markdown-tools/issues/690))                                                                                                                            |
 | MD039 `no-space-in-links`                | None yet ([#691](https://github.com/viell-dev/slop-markdown-tools/issues/691))                                                                                                                            |
@@ -150,7 +155,7 @@ follow each check's documented purpose, not the other tool's known defects.
 | MD055 `table-pipe-style`                 | [`style/table`](rules.md#styletable), which writes leading and trailing pipes. Not yet other pipe styles ([#708](https://github.com/viell-dev/slop-markdown-tools/issues/708))                            |
 | MD056 `table-column-count`               | [`content/table-columns`](rules.md#contenttable-columns)                                                                                                                                                  |
 | MD058 `blanks-around-tables`             | [`style/block-spacing`](rules.md#styleblock-spacing); next to blocks other than headings and lists after 0.5.0, where every renderer reads the same blocks                                                |
-| MD059 `descriptive-link-text`            | None yet ([#698](https://github.com/viell-dev/slop-markdown-tools/issues/698))                                                                                                                            |
+| MD059 `descriptive-link-text`            | [`links/descriptive-text`](rules.md#linksdescriptive-text), with `prohibited_texts` as `prohibitedTexts`, also for Obsidian wikilinks                                                                     |
 | MD060 `table-column-style`               | [`style/table`](rules.md#styletable), aligned or compact. Not yet `tight` and aligned delimiters ([#709](https://github.com/viell-dev/slop-markdown-tools/issues/709))                                    |
 
 `style/table` leaves tables inside lists and block quotes as written
