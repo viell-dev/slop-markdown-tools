@@ -102,52 +102,22 @@ npm test
 none.
 
 Reports an image without alternative text, the text between the brackets of
-`![text](chart.png)`, and an HTML `<img>` element without an `alt` attribute.
-Screen readers read the text in place of the image, and browsers show it when
-the image does not load. Markdown text that is only blank space counts as none.
-In the Obsidian dialect, a size after `|`, as in `![|100](chart.png)`, is not
-text, and embeds such as `![[chart.png]]` are not reported, because they have no
-place for text.
-
-An HTML image with `alt=""` is accepted. HTML marks a decorative image, which
-screen readers skip, with an empty `alt`, and an author writes the attribute on
-purpose. Markdown has no such mark: `![](divider.png)` is also what an image
-looks like when its text was forgotten, so blank Markdown text is reported.
-Write a decorative image as `<img src="divider.png" alt="">`. An image hidden
-from assistive technology with `aria-hidden="true"` is accepted too, except on
-GitHub, which removes that attribute but keeps `alt`. HTML in comments and in
-elements whose content is text, such as `<textarea>` and `<script>`, is not
-read, except on GitHub, whose tag filter shows those tags as text and the HTML
-between them as elements. The HTML of the whole document is read as a browser
-reads the page: such an element runs to its own end tag, across the Markdown
-between, and an end tag inside a comment there still ends it. Where such an
-element is left open, the rest of the document counts as its text; a renderer
-that shows each block on its own can still display an image there, which is then
-not reported. A tag that Markdown does not read as HTML, such as one with an
-attribute name that its grammar rejects, is not checked.
-
-In VitePress, an inline tag may hold Vue's attributes, such as `@click` and
-`:title`, as VitePress reads them; a tag with `#slot` or `v-bind:[key]` shows as
-text there. `:alt`, `v-bind:alt`, with modifiers such as `.attr` or `.prop`, and
-`v-bind` give Vue's `alt`, and a bound `aria-hidden` is accepted. An HTML block
-is an [opaque area](vitepress.md#preservation) whose findings are omitted, so
-only inline HTML images are checked there.
+`![text](chart.png)`. Screen readers read it in place of the image, and browsers
+show it when the image does not load. Text that is only blank space counts as
+none. In the Obsidian dialect, a size after `|`, as in `![|100](chart.png)`, is
+not text, and embeds such as `![[chart.png]]` are not reported, because they
+have no place for text. HTML `<img>` elements are not checked.
 
 Reported:
 
 ```markdown
 ![](sales-by-month.png)
-
-<img src="sales-by-month.png" width="400">
 ```
 
 Not reported:
 
 ```markdown
 ![Sales by month, rising from March](sales-by-month.png)
-
-<img src="sales-by-month.png" alt="Sales by month, rising from March">
-<img src="divider.png" alt="">
 ```
 
 ## `content/shell-prompt`

@@ -109,16 +109,6 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
-- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
-  without an `alt` attribute. `alt=""`, which marks a decorative image, is
-  accepted, and so is `aria-hidden="true"` outside GitHub, which removes it. The
-  document's HTML is read as a browser reads the page, so comments and elements
-  whose content is text, such as `<textarea>`, hold what follows them up to
-  their end. In VitePress, inline tags may hold Vue's attributes such as
-  `@click`, and Vue's bindings of `alt` count. Blank Markdown alternative text
-  is still reported, because Markdown cannot mark an image as decorative
-  ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
-
 - `style/heading` removes heading-owned indentation, including Setext text and
   underlines, while retaining container prefixes. Its new `closing: "add"`
   option writes matching closing hash sequences on ATX headings, including the

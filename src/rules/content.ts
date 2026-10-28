@@ -1,58 +1,12 @@
 import { walk } from "../syntax/walk.js";
-import type { Html, RootContent } from "mdast";
-import type { Dialect, Document, Finding, Rule } from "../core/types.js";
+import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
-import { lineBreak, lineStarts } from "../syntax/source.js";
-import { htmlReader, vueTags } from "./html-stream.js";
-import type { StartTag } from "./html-stream.js";
+import { lineBreak } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
 const obsidianSize = /\|\d+(?:x\d+)?$/;
-
-/**
- * Vue's bindings of `alt` or `aria-hidden`, with any modifiers such as
- * `.attr` or `.prop`, and `v-bind`, which spreads an object of attributes.
- */
-const vueBinding = /^(?:(?::|v-bind:)(?:alt|aria-hidden)(?:\.[\w-]+)*|v-bind(?:\.[\w-]+)*)$/;
-
-/**
- * Whether an HTML `<img>` start tag gives alternative text or hides the image
- * from assistive technology: any `alt` attribute, `alt=""` included, which
- * marks a decorative image, or `aria-hidden="true"`. GitHub's sanitizer removes
- * `aria-hidden` and keeps `alt`, as its Markdown API showed on 2026-10-28;
- * Forgejo 16.0.6 and Gitea 28.2.0 keep both. In VitePress, Vue can bind either
- * (`:alt`, `v-bind:alt.attr`) or spread an object of attributes (`v-bind`).
- */
-function describedImage(attributes: Map<string, string>, dialect: Dialect): boolean {
-  if (attributes.has("alt")) return true;
-  if (dialect === "vitepress" && [...attributes.keys()].some((name) => vueBinding.test(name)))
-    return true;
-  return dialect !== "github" && attributes.get("aria-hidden")?.trim().toLowerCase() === "true";
-}
-
-/**
- * The source offset of an offset in a raw HTML node's value. Inside a block
- * quote or list item the value leaves out each line's container prefix, which
- * the source line keeps before it; a line that cannot be matched maps to the
- * node's start.
- */
-function sourceOffset(document: Document, node: Html, offset: number): number {
-  const [start, end] = range(node);
-  const raw = document.source.slice(start, end);
-  if (raw === node.value) return start + offset;
-  const valueStarts = lineStarts(node.value);
-  const rawStarts = lineStarts(raw);
-  let line = valueStarts.length - 1;
-  while (line > 0 && valueStarts[line]! > offset) line--;
-  const lineText = (text: string, starts: number[]) =>
-    text.slice(starts[line], starts[line + 1] ?? text.length).replace(/[\r\n]+$/, "");
-  const valueLine = lineText(node.value, valueStarts);
-  const rawLine = lineText(raw, rawStarts);
-  if (rawStarts[line] === undefined || !rawLine.endsWith(valueLine)) return start;
-  return start + rawStarts[line]! + rawLine.length - valueLine.length + offset - valueStarts[line]!;
-}
 
 /**
  * The languages of shell commands and of shell sessions, whose prompts mark
@@ -105,7 +59,7 @@ function promptOnly(code: string): string | undefined {
 
 export const contentRules: Record<string, Rule> = {
   "content/image-alt": {
-    description: "Report images, Markdown or HTML, without alternative text.",
+    description: "Report images without alternative text.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -123,36 +77,6 @@ export const contentRules: Record<string, Rule> = {
           message: "Add alternative text to the image, for readers who cannot see it.",
         });
       });
-      // Raw HTML in the order the page shows it, footnotes at its end, as one
-      // stream: a comment or raw-text element can hold what follows it.
-      const read = htmlReader(document.dialect);
-      const vitepress = document.dialect === "vitepress";
-      const report = (tag: StartTag, at: (offset: number) => number) => {
-        if (tag.name !== "img" || describedImage(tag.attributes, document.dialect)) return;
-        findings.push({
-          start: at(tag.start),
-          end: at(tag.end),
-          message:
-            'Add an alt attribute to the HTML image, for readers who cannot see it, or alt="" if it is decorative.',
-        });
-      };
-      const visit = (block: RootContent) =>
-        walk(block, (node) => {
-          if (node.type === "html") {
-            for (const tag of read(node.value, vitepress ? "vitepress" : "commonmark"))
-              report(tag, (offset) => sourceOffset(document, node, offset));
-          } else if (vitepress && node.type === "text") {
-            const [start, end] = range(node);
-            for (const [from, to] of vueTags(document.source, start, end, node.value))
-              for (const tag of read(document.source.slice(from, to), "vitepress"))
-                report(tag, (offset) => from + offset);
-          }
-        });
-      const footnotes: RootContent[] = [];
-      for (const block of document.tree.children)
-        if (block.type === "footnoteDefinition") footnotes.push(block);
-        else visit(block);
-      for (const block of footnotes) visit(block);
       return findings;
     },
   },

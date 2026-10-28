@@ -168,35 +168,81 @@ function htmlParts(
   return parts;
 }
 
+/** Where an outline's headings are, for finding a chain of them without reading every heading. */
+interface OutlineIndex {
+  /** The positions of the headings with a name of each lowercase spelling, in document order. */
+  positions: Map<string, number[]>;
+  /** The end of each heading's section: the next heading of its level or higher, or the end. */
+  ends: number[];
+}
+
+/** Each outline's index, made on its first chain lookup and kept while the outline is. */
+const outlineIndexes = new WeakMap<ObsidianAnchors["outline"], OutlineIndex>();
+
+function outlineIndex(outline: ObsidianAnchors["outline"]): OutlineIndex {
+  let index = outlineIndexes.get(outline);
+  if (index) return index;
+  index = { positions: new Map(), ends: Array.from(outline, () => outline.length) };
+  const open: number[] = [];
+  for (const [at, { depth, names }] of outline.entries()) {
+    while (open.length && outline[open.at(-1)!]!.depth >= depth) index.ends[open.pop()!] = at;
+    open.push(at);
+    for (const folded of new Set(names.map((name) => name.toLowerCase()))) {
+      const positions = index.positions.get(folded);
+      if (positions) positions.push(at);
+      else index.positions.set(folded, [at]);
+    }
+  }
+  outlineIndexes.set(outline, index);
+  return index;
+}
+
+/** The first of the ascending `positions` at or after `from`. */
+function firstFrom(positions: number[], from: number): number {
+  let low = 0;
+  let high = positions.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (positions[middle]! < from) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
 /**
  * The names of a chain of headings in the outline that `parts` name, each one
  * below the one before, within its section: `Setup#Mobile` is a heading
  * `Mobile` of any lower level after a heading `Setup` and before the next
  * heading of `Setup`'s level or higher. Every heading that a part names is
- * tried, so the link is missing only when no such chain exists. Names match as
- * written, or with `exact` false also without regard to case; each name is
- * returned as its heading spells it.
+ * tried, in document order, so the link is missing only when no such chain
+ * exists. Names match as written, or with `exact` false also without regard to
+ * case; each name is returned as its heading spells it. Only the headings with
+ * a part's name in any case are read, from the outline's index.
  */
 function headingPath(
   outline: ObsidianAnchors["outline"],
   parts: string[],
   exact = false,
 ): string[] | undefined {
-  const folded = exact ? [] : parts.map((part) => part.toLowerCase());
+  const { positions, ends } = outlineIndex(outline);
+  const folded = parts.map((part) => part.toLowerCase());
   const named = (names: string[], part: number) =>
     names.find((name) => name === parts[part]) ??
     (exact ? undefined : names.find((name) => name.toLowerCase() === folded[part]));
-  const below = (part: number, from: number, depth: number): string[] | undefined => {
-    for (let at = from; at < outline.length && outline[at]!.depth > depth; at++) {
+  const below = (part: number, from: number, end: number): string[] | undefined => {
+    const candidates = positions.get(folded[part]!) ?? [];
+    for (let next = firstFrom(candidates, from); next < candidates.length; next++) {
+      const at = candidates[next]!;
+      if (at >= end) break;
       const name = named(outline[at]!.names, part);
       if (name === undefined) continue;
       if (part === parts.length - 1) return [name];
-      const rest = below(part + 1, at + 1, outline[at]!.depth);
+      const rest = below(part + 1, at + 1, ends[at]!);
       if (rest) return [name, ...rest];
     }
     return undefined;
   };
-  return below(0, 0, 0);
+  return below(0, 0, outline.length);
 }
 
 /** A target's anchors for Obsidian. */
