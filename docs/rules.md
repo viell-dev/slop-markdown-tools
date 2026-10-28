@@ -877,9 +877,22 @@ paragraph still permits blank-line cleanup and inline preferences.
 Options: none.
 
 Separates every heading and every list from the blocks before and after it with
-a blank line, in the document and in block quotes at any depth. It adds one
-blank line where there is none and keeps the blank lines that are already there.
-Inside a block quote, the new line holds the quote's `>` markers.
+a blank line, in the document and in block quotes at any depth. After 0.5.0, it
+separates fenced code blocks with their closing fence, and tables, too. It adds
+one blank line where there is none and keeps the blank lines that are already
+there. Inside a block quote, the new line holds the quote's `>` markers.
+
+A table is separated where every renderer reads the same blocks: from text, a
+code block, a thematic break, or an HTML block directly above it, and from a
+block quote, a fenced code block, a thematic break, or an HTML block directly
+below it. GFM reads text directly below a table as another row of it, and
+Forgejo and Gitea read an indented line there as one, so nothing is added before
+a block that does not end a table in every renderer, such as indented code, a
+footnote definition, or display math. Whether text directly above a table is a
+paragraph of its own follows the dialect's parser: in CommonMark, which has no
+tables, it is all one paragraph. In the Obsidian dialect, a table is separated
+only from a heading above it: Live Preview shows the rows of a table directly
+below another block as text.
 
 Enabled at `warn` in `recommended`: `lint` reports missing separators and
 `format` adds them where safe. To keep compact spacing, set
@@ -902,6 +915,35 @@ Install the package.
 
 - Run the command.
 ```
+
+Before:
+
+````markdown
+Run it with:
+```sh
+npx mdrefine format
+```
+| Option  | Default |
+| ------- | ------- |
+| `width` | `80`    |
+> It reads the configuration file.
+````
+
+After:
+
+````markdown
+Run it with:
+
+```sh
+npx mdrefine format
+```
+
+| Option  | Default |
+| ------- | ------- |
+| `width` | `80`    |
+
+> It reads the configuration file.
+````
 
 Nothing is added at the start or the end of a document, and these places are
 left as written, because a blank line there would change what the document means
@@ -970,6 +1012,24 @@ or what a comment applies to:
 - In a block quote, below a list whose last item ends in an empty footnote
   definition, such as `> - [^1]:`. The parser would count the new line of `>` as
   part of the item and read the list as loose.
+- After 0.5.0, a fenced code block without its closing fence, and in the
+  Obsidian dialect a tilde fence whose info string holds a backtick, which Live
+  Preview reads as text. They are separated only from a heading or list, as
+  before.
+- After 0.5.0, a table directly below a block quote, footnote definition, link
+  reference definition, or display math, whose text a renderer can continue into
+  the table's first line, and a table directly below text that starts with a
+  link reference definition, as in `[a]: /b`, `Text`, and a table below them.
+  GitHub shows that definition as text there, and a blank line above the table
+  would hide it.
+- After 0.5.0, on Forgejo and Gitea, a table directly below the text of a
+  definition description, as in `Term`, `: Description`, and a table below them.
+  Those renderers put the table in the description.
+- After 0.5.0, in the Obsidian dialect, text directly above or below a fenced
+  code block, which its views can read together, and a line below a table that
+  one of its views reads as part of the table. The [boundary
+  policy](obsidian.md#visible-boundary-refusals) reports these places without
+  changing them.
 
 After 0.4.0, an Obsidian list ending in a paragraph also stays adjacent to a
 parsed tilde opener whose info contains a written backtick. Live Preview reads
