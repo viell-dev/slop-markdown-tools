@@ -1,4 +1,5 @@
 import { linkTitle, definitionSpacing } from "./link-format.js";
+import { noTabs, proseSpace } from "./prose-whitespace.js";
 import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
@@ -20,6 +21,8 @@ const styleRules: Record<string, Rule> = {
   "style/link-title": linkTitle,
   "style/definition-spacing": definitionSpacing,
   "style/wrap": wrap,
+  "style/no-tabs": noTabs,
+  "style/prose-space": proseSpace,
   "style/inline-code": {
     description: "Use minimal backticks and join code spans using their CommonMark rendered value.",
     kind: "style",
