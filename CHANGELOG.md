@@ -41,6 +41,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- `style/heading` removes heading-owned indentation, including Setext text and
+  underlines, while retaining container prefixes. Its new `closing: "add"`
+  option writes matching closing hash sequences on ATX headings, including the
+  deeper levels of the Setext style. Renderer protections still apply. This
+  interface addition belongs to the next minor release
+  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
+  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
+
 - `style/heading` writes one space between ATX heading hashes and text,
   including tabs and retained closing sequences. Empty headings need no
   separator. Protected Forgejo and Gitea attribute suffixes stay as written

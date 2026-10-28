@@ -973,17 +973,30 @@ After 0.5.0, ATX headings use one space between their opening hashes and text,
 including when a tab separated them. Empty headings need no separator. This also
 applies to headings kept in ATX form with `setext` or `consistent`.
 
+After 0.5.0, the rule also removes one to three spaces of heading indentation,
+including on Setext text and underline lines, without an option. Required list
+and quote prefixes stay as written; only spaces beyond those prefixes are
+removed. Indented code is not a heading. Ambiguous container prefixes stay as
+written. A heading that a renderer protection covers in part keeps all of its
+indentation and its form, such as an Obsidian Setext title whose indented
+underline or reference-like first line a view reads differently.
+
 | Option    | Values                              | Default    |
 | --------- | ----------------------------------- | ---------- |
 | `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
-| `closing` | `"remove"`, `"keep"`                | `"remove"` |
+| `closing` | `"remove"`, `"keep"`, `"add"`       | `"remove"` |
 
 - `style`: `atx` writes `#` headings. `setext` underlines headings of levels 1
   and 2 and keeps `#` for deeper levels, which cannot be underlined.
   `consistent` follows the document's first heading: `setext` when it is
   underlined, otherwise `atx`.
 - `closing`: `keep` retains existing closing sequences. After 0.5.0, their
-  separator from the text becomes one space; no absent sequence is added.
+  separator from the text becomes one space; no absent sequence is added. After
+  0.5.0, `add` writes a closing sequence matching the heading's level, with one
+  preceding space, and normalizes existing sequences to that length. It applies
+  to headings retained in ATX form by `setext` and `consistent` too. For
+  example, `### Details` becomes `### Details ###`; with `style: "setext"`,
+  levels 1 and 2 remain underlined. An empty `##` becomes `## ##`.
 
 Before:
 
@@ -1010,11 +1023,14 @@ nonterminal hashes still allow conversion.
 
 Underlined headings of more than one line, those inside lists or block quotes,
 and one directly below TOML front matter, whose lines renderers without TOML
-front matter read as part of the heading, are left as written. On Forgejo and
-Gitea, a closing sequence after an attribute block such as `{#id}` stays,
+front matter read as part of the heading, retain their heading form. On Forgejo
+and Gitea, a closing sequence after an attribute block such as `{#id}` stays,
 because Gitea before 1.26 reads the block only when the sequence follows it. The
 block and its suffix, including the spacing before that sequence, retain their
-existing protection; the opening separator can still be normalized.
+existing protection; the opening separator can still be normalized. With
+`closing: "add"`, no sequence is added after such an attribute block either.
+Converted Setext text ending in literal hashes keeps the escape described above,
+before the new closing sequence.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not

@@ -27,7 +27,7 @@ describe("style/heading hash spacing (#676, #678)", () => {
             ["#  Text #tag", "# Text #tag"],
             ["> #  Quoted  #", closing === "keep" ? "> # Quoted #" : "> # Quoted"],
             ["- #  Listed  #", closing === "keep" ? "- # Listed #" : "- # Listed"],
-            ["  #  Indented", "  # Indented"],
+            ["  #  Indented", "# Indented"],
             ["#", "#"],
             ["##  \t", "##"],
             ["#  #", closing === "keep" ? "# #" : "#"],
