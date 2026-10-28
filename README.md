@@ -11,7 +11,7 @@ mdrefine is meant to replace a general-purpose linter and formatter, such as
 markdownlint and Prettier, for Markdown. It does not cover all of their checks
 yet; [the
 comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
-shows which have a rule.
+lists each one with its rule or the issue that tracks it.
 
 - **One configuration for lint and format.** Style rules report in `lint` and
   fix in `format`; problem rules report what has no single correct repair.
