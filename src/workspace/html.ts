@@ -17,7 +17,7 @@ const attribute =
  * escaping belongs in htmlView(), before browser tokenization. Forgejo/Gitea
  * retain this default handling; `<plaintext>` has no end.
  */
-const rawText = new Set([
+export const rawText = new Set([
   "iframe",
   "noembed",
   "noframes",
@@ -53,18 +53,29 @@ const githubInlineTagfilter = new RegExp(
 // Decline exact anchors instead of treating their contents as ordinary tags.
 const githubUnsupportedRawText = new RegExp(githubTagfilterStart + String.raw`(?:/(?!>)|\v)`, "i");
 
-/** A tag that becomes an element, or the text between tags. */
+/** A tag that becomes an element, with its offsets in the HTML, or the text between tags. */
 type HtmlToken =
-  | { name: string; attributes: string; close: boolean; selfClosing?: true }
+  | {
+      name: string;
+      attributes: string;
+      close: boolean;
+      selfClosing?: true;
+      start: number;
+      end: number;
+    }
   | { name?: undefined; text: string };
 
 /**
  * HTML as a browser tokenizes it, in one forward pass: comments, which run to
  * the end when unterminated, declarations, and raw-text elements with their
  * content are left out, and a tag is read whole, so a `<!--` or `<h2>` inside
- * a quoted attribute value is part of the value.
+ * a quoted attribute value is part of the value. With `rawText` false, as
+ * GitHub's tag filter leaves them, raw-text elements are ordinary elements.
  */
-function htmlTokens(html: string): HtmlToken[] {
+function htmlTokens(
+  html: string,
+  { rawText: raw = true }: { rawText?: boolean } = {},
+): HtmlToken[] {
   const tokens: HtmlToken[] = [];
   const lower = html.toLowerCase();
   let copied = 0;
@@ -96,13 +107,15 @@ function htmlTokens(html: string): HtmlToken[] {
       const selfClosing = open && tag[0].slice(1 + name.length + open[2]!.length).endsWith("/>");
       end = at + tag[0].length;
       text(at);
-      if (!open) tokens.push({ name, attributes: "", close: true });
-      else if (!rawText.has(name))
+      if (!open) tokens.push({ name, attributes: "", close: true, start: at, end });
+      else if (!raw || !rawText.has(name))
         tokens.push({
           name,
           attributes: tag[2]!,
           close: false,
           ...(selfClosing ? { selfClosing: true as const } : {}),
+          start: at,
+          end,
         });
       else {
         const close = name === "plaintext" ? -1 : lower.indexOf(`</${name}`, end);
@@ -250,4 +263,21 @@ function htmlViewUncertain(node: Nodes, options: HtmlViewOptions = {}): boolean 
     node.children.some((child) => htmlViewUncertain(child, { ...options, flow: false }))
   );
 }
-export { htmlTokens, htmlAnchors, htmlHeadings, htmlText, htmlView, htmlFlow, htmlViewUncertain };
+/** The value of an element's first attribute of that name, decoded, or undefined without one. */
+function htmlAttribute(attributes: string, name: string): string | undefined {
+  for (const match of attributes.matchAll(attribute))
+    if (match[1]!.toLowerCase() === name)
+      return decodeHTMLAttribute(match[2] ?? match[3] ?? match[4] ?? "");
+  return undefined;
+}
+export {
+  htmlTokens,
+  htmlAnchors,
+  htmlAttribute,
+  htmlHeadings,
+  htmlText,
+  htmlView,
+  htmlFlow,
+  htmlViewUncertain,
+};
+export type { HtmlToken };

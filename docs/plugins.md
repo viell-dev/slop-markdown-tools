@@ -182,6 +182,10 @@ The other fields are present when they apply:
   with status `resolved`, whether the target has that heading, block, or anchor
   by the rules of `dialect`, and `true` without a fragment and for a target that
   is not Markdown, whose fragments are its own.
+- After 0.5.0, `fragmentAnchor`: with status `resolved`, the anchor as the
+  target spells it, when the fragment reaches it only because the renderer
+  ignores letter case, as GitHub and Obsidian headings do; absent when the
+  fragment matches an anchor exactly. `links/valid`'s `exactCase` reports it.
 - In versions after 0.4.0, `fragmentIncomplete: true`, with status `unreadable`,
   means the file was read but its renderer's fragment targets are not fully
   known. No `unreadable` file/directory list accompanies this result. Verified

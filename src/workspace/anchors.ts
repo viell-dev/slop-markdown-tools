@@ -168,25 +168,37 @@ function htmlParts(
 }
 
 /**
- * Whether the outline holds a chain of headings that `parts` name, each one
+ * The names of a chain of headings in the outline that `parts` name, each one
  * below the one before, within its section: `Setup#Mobile` is a heading
  * `Mobile` of any lower level after a heading `Setup` and before the next
  * heading of `Setup`'s level or higher. Every heading that a part names is
- * tried, so the link is missing only when no such chain exists.
+ * tried, so the link is missing only when no such chain exists. Names match as
+ * written, or with `exact` false also without regard to case; each name is
+ * returned as its heading spells it.
  */
-function hasHeadingPath(outline: ObsidianAnchors["outline"], parts: string[]): boolean {
+function headingPath(
+  outline: ObsidianAnchors["outline"],
+  parts: string[],
+  exact = false,
+): string[] | undefined {
   const named = (names: string[], part: string) =>
-    names.some((name) => name === part || name.toLowerCase() === part.toLowerCase());
-  const below = (part: number, from: number, depth: number): boolean => {
-    for (let at = from; at < outline.length && outline[at]!.depth > depth; at++)
-      if (
-        named(outline[at]!.names, parts[part]!) &&
-        (part === parts.length - 1 || below(part + 1, at + 1, outline[at]!.depth))
-      )
-        return true;
-    return false;
+    names.find((name) => name === part) ??
+    (exact ? undefined : names.find((name) => name.toLowerCase() === part.toLowerCase()));
+  const below = (part: number, from: number, depth: number): string[] | undefined => {
+    for (let at = from; at < outline.length && outline[at]!.depth > depth; at++) {
+      const name = named(outline[at]!.names, parts[part]!);
+      if (name === undefined) continue;
+      if (part === parts.length - 1) return [name];
+      const rest = below(part + 1, at + 1, outline[at]!.depth);
+      if (rest) return [name, ...rest];
+    }
+    return undefined;
   };
   return below(0, 0, 0);
+}
+/** Whether the outline holds a chain of headings that `parts` name; see headingPath(). */
+function hasHeadingPath(outline: ObsidianAnchors["outline"], parts: string[]): boolean {
+  return headingPath(outline, parts) !== undefined;
 }
 
 /** A target's anchors for Obsidian. */
@@ -368,5 +380,5 @@ function descriptionContents(
   });
   return contents;
 }
-export { hasHeadingPath, obsidianAnchors, githubAnchors, forgeAnchors };
+export { hasHeadingPath, headingPath, obsidianAnchors, githubAnchors, forgeAnchors };
 export type { ObsidianAnchors, GithubAnchors, ForgeAnchors };

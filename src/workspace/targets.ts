@@ -1,4 +1,10 @@
-import { hasHeadingPath, obsidianAnchors, githubAnchors, forgeAnchors } from "./anchors.js";
+import {
+  hasHeadingPath,
+  headingPath,
+  obsidianAnchors,
+  githubAnchors,
+  forgeAnchors,
+} from "./anchors.js";
 import type { ObsidianAnchors, GithubAnchors, ForgeAnchors } from "./anchors.js";
 import { githubFileAnchors } from "./github-file-anchors.js";
 import path from "node:path";
@@ -299,6 +305,50 @@ export function createTargetIndex(
     if (anchors.slugs.has(folded) || anchors.explicit.has(folded)) return true;
     return anchors.complete ? false : "incomplete";
   }
+  /**
+   * After hasAnchor() found a fragment: the anchor as the target spells it, when
+   * the fragment reaches it only because the renderer ignores letter case, or
+   * undefined when the fragment matches an anchor exactly. Forgejo and Gitea
+   * match exactly, and Obsidian block identifiers do too. VitePress passes a
+   * fragment through its slugger, which also changes more than case; only a
+   * fragment that differs from an anchor in case alone is spelled here.
+   */
+  function anchorSpelling(
+    name: string,
+    dialect: Dialect,
+    fragment: string,
+    anchor: string,
+  ): string | undefined {
+    const target = targets.get(name);
+    if (!target) return undefined;
+    const variant = (anchors: Iterable<string>, wanted: string) => {
+      const folded = wanted.toLowerCase();
+      for (const candidate of anchors) if (candidate.toLowerCase() === folded) return candidate;
+      return undefined;
+    };
+    if (dialect === "vitepress") {
+      // The anchor reached is the fragment's slug, which is lowercase.
+      const reached = vitepressSlug(fragment, options.vitepress);
+      return reached !== fragment && reached === fragment.toLowerCase() ? reached : undefined;
+    }
+    if (dialect === "obsidian") {
+      const anchors = target.obsidian;
+      if (!anchors || fragment.startsWith("^") || anchors.headings.has(fragment)) return undefined;
+      const parts = fragment.includes("#") ? fragment.split("#") : undefined;
+      if (parts && headingPath(anchors.outline, parts, true)) return undefined;
+      return (
+        variant(anchors.headings, fragment) ??
+        (parts && headingPath(anchors.outline, parts)?.join("#"))
+      );
+    }
+    if (dialect === "forgejo" || dialect === "gitea" || !target.github) return undefined;
+    const anchors = dialect === "github" ? target.github.file : target.github.markdown;
+    // GitHub's anchors are lowercase, and its page script lowercases a fragment it cannot find.
+    if (anchors.slugs.has(anchor) || anchors.explicit.has(anchor)) return undefined;
+    const folded = anchor.toLowerCase();
+    if (!anchors.slugs.has(folded) && !anchors.explicit.has(folded)) return undefined;
+    return fragment.slice(0, fragment.length - anchor.length) + folded;
+  }
   // Vaults of their own, deepest first, so that a note belongs to the nearest one.
   const vaults = [
     ...new Set(
@@ -397,6 +447,7 @@ export function createTargetIndex(
     lookup,
     unreadableAbove,
     hasAnchor,
+    anchorSpelling,
     vaultOf,
     belowRoot,
     overlapCandidates,

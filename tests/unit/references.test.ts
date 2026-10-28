@@ -143,6 +143,149 @@ describe("links/undefined-reference", () => {
   });
 });
 
+describe("links/undefined-reference options", () => {
+  const rule = "links/undefined-reference";
+  const shortcuts = { shortcutSyntax: true };
+  const undefinedReference = (label: string) =>
+    `Reference [${label}] has no definition and shows as plain text.`;
+  const renders = (source: string) => [
+    new HtmlRenderer().render(new Parser().parse(source)),
+    new MarkdownIt().render(source),
+  ];
+  it("shows an undefined shortcut reference as its brackets", () => {
+    const text = "<p>Press [Enter] to continue.</p>\n";
+    expect(renders("Press [Enter] to continue.\n")).toEqual([text, text]);
+    const link = '<p>Press <a href="keys.md">Enter</a> to continue.</p>\n';
+    expect(renders("Press [Enter] to continue.\n\n[enter]: keys.md\n")).toEqual([link, link]);
+  });
+  it.each([
+    ["Press [Enter] to continue.\n", "[Enter]", "Enter"],
+    ["## Press [Enter]\n", "[Enter]", "Enter"],
+    ["| [Enter] |\n| --- |\n", "[Enter]", "Enter"],
+    ["Text **[bold]** here.\n", "[bold]", "bold"],
+    ["Text ~~[gone]~~ here.\n", "[gone]", "gone"],
+    // A failed inline link leaves a shortcut reference.
+    ["See [a](b c) here.\n", "[a]", "a"],
+    // Brackets inside a label are no label, but inner brackets can be one.
+    ["[a [b] c]\n", "[b]", "b"],
+    ["> Quoted [the\n> guide].\n", "[the\n> guide]", "the guide"],
+    // Only a single character that starts a list item is a task mark.
+    ["- [todo] item\n", "[todo]", "todo"],
+    ["- Item [x] here\n", "[x]", "x"],
+    // A marker only starts a block quote.
+    ["Text [!NOTE] here.\n", "[!NOTE]", "!NOTE"],
+    // Brackets after a URL's blank space are no longer in it.
+    ["See https://example.com/ [a]\n", "[a]", "a"],
+  ])("reports a shortcut when asked: %j", (source, span, label) => {
+    expect(check(source, rule)).toEqual([]);
+    const findings = check(source, rule, "github", shortcuts);
+    expect(spans(source, findings)).toEqual([span]);
+    expect(findings[0]?.message).toBe(undefinedReference(label));
+  });
+  it("reads shortcut references across any line ending", () => {
+    for (const newline of ["\n", "\r\n", "\r"]) {
+      const source = `> See [the${newline}> guide] here.${newline}`;
+      expect(check(source, rule, "github", shortcuts).map((item) => item.message)).toEqual([
+        undefinedReference("the guide"),
+      ]);
+    }
+  });
+  it("reports each kind of reference once", () => {
+    const source = "One [a][b], two [c][], three [d], and a note.[^1]\n";
+    expect(spans(source, check(source, rule, "github", shortcuts))).toEqual([
+      "[a][b]",
+      "[c][]",
+      "[d]",
+      "[^1]",
+    ]);
+    expect(spans("[a][b][c][d]\n", check("[a][b][c][d]\n", rule, "github", shortcuts))).toEqual([
+      "[a][b]",
+    ]);
+    expect(check(`${"[a]".repeat(5000)}\n`, rule, "github", shortcuts)).toHaveLength(1);
+    // A defined label makes a link, whose text is not read.
+    expect(check("[a] and [b][a]\n\n[a]: a.md\n", rule, "github", shortcuts)).toEqual([]);
+  });
+  it("reads `[^label]` as a shortcut reference in CommonMark", () => {
+    const source = "Text [^1].\n";
+    expect(check(source, rule, "commonmark")).toEqual([]);
+    expect(check(source, rule, "commonmark", shortcuts)[0]?.message).toBe(undefinedReference("^1"));
+    expect(check(source, rule, "github", shortcuts)[0]?.message).toBe(
+      "Footnote [^1] has no definition and shows as plain text.",
+    );
+  });
+  it.each([
+    // Indexes, code, math, HTML, links, and escaped brackets.
+    ["matrix[i] and f(x)[0] and a_[b] and list][c]\n", "github"],
+    ["`[a]` and $[b]$ and $$[c]$$\n", "github"],
+    ["<span title='[a]'>text</span> <!-- [b] --> <code>[c]</code> <kbd>[d]</kbd>\n", "github"],
+    ["Text <b>[a] <i>[b]</i> [c]</b> and <span>[d]\n", "github"],
+    ["<div>\n[a]\n</div>\n", "github"],
+    ["An [inline](setup.md) link, an ![image](a.png), and <https://example.com/[a]>.\n", "github"],
+    ["\\[a] and [b\\] and \\[c\\]\n", "github"],
+    ["```md\n[a]\n```\n\n    [b]\n", "github"],
+    // A label cannot be blank or hold 1000 characters.
+    ["[ ] and [] and [\t]\n", "github"],
+    [`[${"x".repeat(1000)}]\n`, "github"],
+    // URLs written as text, which GFM links and CommonMark shows as written.
+    ["https://example.com/[a] and www.example.com/path/[b]\n", "github"],
+    ["https://example.com/[a] and www.example.com/path/[b]\n", "commonmark"],
+    // Task marks, where the parser reads none.
+    ["- [x] done\n- [X] done\n1. [ ] todo\n", "commonmark"],
+    ["- [x]\n- [/] in progress\n", "github"],
+    ["- [/] in progress\n- [?] question\n- [>] later\n", "obsidian"],
+    // Alert and callout markers.
+    ["> [!NOTE]\n> Text.\n", "github"],
+    ["> [!NOTE]\n> Text.\n", "forgejo"],
+    ["> [!note]\n> Text.\n", "commonmark"],
+    ["> [!tip]- Folded title\n> Body.\n", "obsidian"],
+    // Obsidian's inline footnotes and wikilinks, Forgejo's and Gitea's shortlinks.
+    ["Text^[an inline note] and [[Note]].\n", "obsidian"],
+    ["See [[Page]] and [[Page|label]].\n", "forgejo"],
+    ["See [[Page]] and [[Page|label]].\n", "gitea"],
+    ["[[toc]]\n", "vitepress"],
+  ] as const)("does not read %j in %s as a shortcut", (source, dialect) => {
+    expect(check(source, rule, dialect, shortcuts)).toEqual([]);
+  });
+  it("reads double brackets outside Forgejo and Gitea", () => {
+    const source = "See [[Page]].\n";
+    expect(spans(source, check(source, rule, "github", shortcuts))).toEqual(["[Page]"]);
+    expect(spans("Text^[note].\n", check("Text^[note].\n", rule, "github", shortcuts))).toEqual([
+      "[note]",
+    ]);
+  });
+  it("ignores the configured labels", () => {
+    const source = "See [guide][Set  Up], [x][], [TODO], and a note.[^Draft]\n";
+    expect(check(source, rule, "github", shortcuts)).toHaveLength(4);
+    expect(
+      check(source, rule, "github", {
+        ...shortcuts,
+        ignoredLabels: ["set up", "X", "todo", "^draft"],
+      }),
+    ).toEqual([]);
+    // A footnote's label is written with its `^`.
+    expect(
+      check(source, rule, "github", { ignoredLabels: ["set up", "x", "draft"] }).map(
+        (item) => item.message,
+      ),
+    ).toEqual(["Footnote [^Draft] has no definition and shows as plain text."]);
+    // No label is ignored by default, whatever its kind.
+    expect(spans("[a][x]\n", check("[a][x]\n", rule))).toEqual(["[a][x]"]);
+  });
+  it("rejects invalid options", () => {
+    for (const options of [
+      { shortcutSyntax: "yes" },
+      { ignoredLabels: "x" },
+      { ignoredLabels: [""] },
+      { ignoredLabels: [" "] },
+      { ignored_labels: ["x"] },
+      { shortcut_syntax: true },
+    ])
+      expect(() =>
+        lint("", { config: { extends: [], rules: { [rule]: ["warn", options] } } }),
+      ).toThrow(`Invalid options for ${rule}`);
+  });
+});
+
 describe("links/unused-definition", () => {
   const rule = "links/unused-definition";
   it.each([

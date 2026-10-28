@@ -27,9 +27,9 @@ presets, dialects, and options.
 | `links/empty`                   | 🔍   | ✅            | ❌             | ✅      |
 | `links/notation`                | 🎨   | ❌            | ❌             | ✅      |
 | `links/path`                    | 🎨   | ❌            | ❌             | ✅      |
-| `links/undefined-reference`     | 🔍   | ✅            | ❌             | ❌      |
+| `links/undefined-reference`     | 🔍   | ✅            | ❌             | ✅      |
 | `links/unused-definition`       | 🔍   | ✅            | ❌             | ✅      |
-| `links/valid`                   | 🔍   | ✅ (error)    | ❌             | ❌      |
+| `links/valid`                   | 🔍   | ✅ (error)    | ❌             | ✅      |
 | `obsidian/block-reference`      | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `obsidian/callout-marker`       | 🎨   | ❌            | ✅             | ❌      |
 | `obsidian/strict-line-breaks`   | 🔍   | ❌            | ✅             | ❌      |
@@ -99,22 +99,41 @@ npm test
 none.
 
 Reports an image without alternative text, the text between the brackets of
-`![text](chart.png)`. Screen readers read it in place of the image, and browsers
-show it when the image does not load. Text that is only blank space counts as
-none. In the Obsidian dialect, a size after `|`, as in `![|100](chart.png)`, is
-not text, and embeds such as `![[chart.png]]` are not reported, because they
-have no place for text. HTML `<img>` elements are not checked.
+`![text](chart.png)`, and an HTML `<img>` element without an `alt` attribute.
+Screen readers read the text in place of the image, and browsers show it when
+the image does not load. Markdown text that is only blank space counts as none.
+In the Obsidian dialect, a size after `|`, as in `![|100](chart.png)`, is not
+text, and embeds such as `![[chart.png]]` are not reported, because they have no
+place for text.
+
+An HTML image with `alt=""` is accepted. HTML marks a decorative image, which
+screen readers skip, with an empty `alt`, and an author writes the attribute on
+purpose. Markdown has no such mark: `![](divider.png)` is also what an image
+looks like when its text was forgotten, so blank Markdown text is reported.
+Write a decorative image as `<img src="divider.png" alt="">`. An image hidden
+from assistive technology with `aria-hidden="true"` is accepted too, except on
+GitHub, which removes that attribute but keeps `alt`. HTML in comments and in
+elements whose content is text, such as `<textarea>` and `<script>`, is not
+read, except on GitHub, whose tag filter shows those tags as text and the HTML
+between them as elements. In VitePress, `:alt`, `v-bind:alt`, and `v-bind` give
+Vue's `alt`, and an HTML block is an [opaque area](vitepress.md#preservation)
+whose findings are omitted, so only inline HTML images are checked there.
 
 Reported:
 
 ```markdown
 ![](sales-by-month.png)
+
+<img src="sales-by-month.png" width="400">
 ```
 
 Not reported:
 
 ```markdown
 ![Sales by month, rising from March](sales-by-month.png)
+
+<img src="sales-by-month.png" alt="Sales by month, rising from March">
+<img src="divider.png" alt="">
 ```
 
 ## `content/table-columns`
@@ -385,7 +404,7 @@ See the [guide](./docs/guide.md#setup).
 ## `links/undefined-reference`
 
 **Problem rule**, reported only. Presets: `recommended`. Dialects: all;
-footnotes all but CommonMark. Options: none.
+footnotes all but CommonMark. Options: `shortcutSyntax`, `ignoredLabels`.
 
 Reports a reference whose label has no definition in the document: a full
 reference `[text][label]`, a collapsed reference `[label][]`, and, in every
@@ -393,20 +412,38 @@ dialect but CommonMark, a footnote reference `[^label]`. The renderer shows such
 a reference as plain text, brackets and all. Labels match as the renderer
 matches them, without regard to case or to how much blank space separates words.
 
-A shortcut reference, `[label]` alone, is not reported, because brackets in
-prose are usually just brackets. Neither are brackets directly after a letter,
-digit, `_`, or `)`, as in `matrix[i][j]`, which are indexes rather than
-references, nor brackets in code, math, HTML, or links, nor escaped ones (`\[`).
-A run of brackets such as `[a][b][c]` is reported once, at its start.
+A shortcut reference, `[label]` alone, is not reported by default, because
+brackets in prose are usually just brackets. Neither are brackets directly after
+a letter, digit, `_`, or `)`, as in `matrix[i][j]`, which are indexes rather
+than references, nor brackets in code, math, HTML, or links, nor escaped ones
+(`\[`). A run of brackets such as `[a][b][c]` is reported once, at its start.
+
+`shortcutSyntax`, default `false`, also reports a shortcut reference whose label
+has no definition when `true`: brackets that hold a label and are not followed
+by `[]` or another label, as CommonMark reads them, such as `[Enter]`. It leaves
+alone brackets that mean something else where they stand: a one-character task
+mark that starts a list item where the parser reads none, such as `[x]` in
+CommonMark or Obsidian's `[/]`; an alert or callout marker such as `[!NOTE]`
+that starts a block quote; an Obsidian inline footnote `^[note]`; a Forgejo or
+Gitea shortlink `[[Page]]`; text inside an inline HTML element, as in
+`<kbd>[Enter]</kbd>`; and a URL written as text, such as
+`https://example.com/[id]`.
+
+`ignoredLabels` is an array of labels not to report, of any kind of reference.
+Its default, `[]`, ignores none. Labels match as the renderers match them,
+without regard to case or to how much blank space separates words; write a
+footnote's label with its `^`, as in `^draft`. markdownlint's MD052 ignores `x`
+by default for task marks, which `shortcutSyntax` already leaves alone at the
+start of a list item.
 
 Reported, when neither a definition `[setup]: …` nor a footnote `[^1]: …`
-exists:
+exists, and with `shortcutSyntax`, also at `[Enter]`:
 
 ```markdown
-See the [installation guide][setup] and [setup][].[^1]
+See the [installation guide][setup] and [setup][].[^1] Press [Enter].
 ```
 
-Not reported:
+Not reported, with the default options:
 
 ```markdown
 See the [installation guide][Setup] and press [Enter].
@@ -458,7 +495,7 @@ See the [guide][setup] and the [changelog].
 ## `links/valid`
 
 **Problem rule**, reported only. Presets: `recommended` (error). Dialects: all.
-Options: none.
+Options: `ignoredFragments`, `exactCase`.
 
 Reports a local link, image, wikilink, embed, or reference definition whose
 target does not exist, and a fragment (`#heading`, `#^block`) that its target
@@ -470,15 +507,16 @@ ambiguous is reported, never guessed. A link into a directory that the CLI does
 not visit, such as `dist`, or through a symbolic link is checked on disk; see
 [ignored files](configuration.md#ignored-files-and-link-targets).
 
-| Message                                | Meaning                                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Missing local target: …`              | No file matches.                                                                                             |
-| `Ambiguous local target: …`            | Several files match, such as two notes whose names differ only by case.                                      |
-| `Missing fragment in …`                | The target exists but has no such heading, block, or anchor.                                                 |
-| `Local target is a directory: …`       | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.           |
-| `Local target is outside the vault: …` | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                            |
-| `Local target could not be checked: …` | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
-| `Fragment could not be checked: …`     | The target exists but could not be read.                                                                     |
+| Message                                  | Meaning                                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `Missing local target: …`                | No file matches.                                                                                             |
+| `Ambiguous local target: …`              | Several files match, such as two notes whose names differ only by case.                                      |
+| `Missing fragment in …`                  | The target exists but has no such heading, block, or anchor.                                                 |
+| `Local target is a directory: …`         | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.           |
+| `Local target is outside the vault: …`   | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                            |
+| `Local target could not be checked: …`   | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
+| `Fragment could not be checked: …`       | The target exists but could not be read.                                                                     |
+| `Fragment in … differs in letter case …` | With `exactCase` only: the fragment reaches its anchor because the renderer ignores case.                    |
 
 In versions after 0.4.0, `Fragment could not be checked` also reports a readable
 target whose renderer-dependent anchor information is incomplete. It does not
@@ -494,6 +532,26 @@ choice; the formatter's math reading stays the same.
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on
 the website, and is not checked either.
+
+`ignoredFragments` is a JavaScript regular expression, written as a string, for
+fragments that are not checked, such as `"^figure-"` for anchors that a site
+generator adds. It is tested, without flags, against the fragment after `#` with
+its percent escapes decoded, such as `^id` for a block reference. A matching
+fragment is neither reported missing nor reported as not checkable, while its
+file still has to exist. Its default, `""`, ignores none. A pattern that is not
+a valid regular expression is a configuration error.
+
+`exactCase`, default `false`, also reports a fragment whose letter case differs
+from the anchor it reaches when `true`, for documents that are read in more than
+one renderer. By default a fragment is matched as the dialect's renderer matches
+it: GitHub and CommonMark ignore case, so `#Setup` reaches `## Setup`, whose
+anchor is `#setup`, and Obsidian ignores the case of headings. With `exactCase`,
+such a fragment is reported with the anchor as the target spells it. Forgejo,
+Gitea, and Obsidian block identifiers match exactly, so the option adds nothing
+there; in VitePress, which passes a fragment through its slugger, only a
+fragment that differs from an anchor in case alone is reported. Anchors are
+still generated per dialect, as [heading anchors](dialects.md#heading-anchors)
+describes.
 
 In the Obsidian dialect, links resolve as in Obsidian: a path that starts with
 `./` or `../` counts from the note; otherwise an exact path from the vault's

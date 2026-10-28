@@ -12,6 +12,21 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `links/valid` takes `ignoredFragments`, a regular expression for fragments not
+  to check, validated when the configuration is read, and `exactCase`, which
+  also reports a fragment that reaches its anchor only because the renderer
+  ignores letter case. By default fragments still match as each dialect's
+  renderer matches them, and anchors are still generated per dialect.
+  `Workspace.resolve` returns the anchor's own spelling as `fragmentAnchor`
+  ([#705](https://github.com/viell-dev/slop-markdown-tools/issues/705)).
+
+- `links/undefined-reference` takes `shortcutSyntax`, which also reports an
+  undefined shortcut reference such as `[label]`, and `ignoredLabels`. Shortcuts
+  leave alone task marks, alert and callout markers, Obsidian inline footnotes,
+  Forgejo and Gitea shortlinks, inline HTML elements, and URLs written as text,
+  besides the existing indexes, code, math, and HTML. Both are off by default
+  ([#706](https://github.com/viell-dev/slop-markdown-tools/issues/706)).
+
 - `style/inline-code` writes a code span with the fewest backticks its content
   allows, keeping padding and table cell escapes, and keeps its delimiters where
   a shorter run could pair with an earlier one. `style/code-fence` removes
@@ -68,6 +83,13 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
+  without an `alt` attribute. `alt=""`, which marks a decorative image, is
+  accepted, and so is `aria-hidden="true"` outside GitHub, which removes it.
+  Blank Markdown alternative text is still reported, because Markdown cannot
+  mark an image as decorative
+  ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
 
 - `style/heading` removes heading-owned indentation, including Setext text and
   underlines, while retaining container prefixes. Its new `closing: "add"`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { format, lint, presets } from "../../src/index.js";
+import { dialects, format, lint, presets } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
 
 /**
@@ -43,7 +43,6 @@ describe("content/image-alt", () => {
     ["![Sales][chart]\n\n[chart]: chart.png\n", "github"],
     ["[![Build status](badge.svg)](https://example.com/ci)\n", "github"],
     ["`![](chart.png)`\n\n```md\n![](chart.png)\n```\n", "github"],
-    ['<img src="chart.png">\n', "github"],
     // Outside Obsidian, `|100` is text.
     ["![|100](chart.png)\n", "github"],
     ["![Sales|100](chart.png)\n", "obsidian"],
@@ -51,6 +50,101 @@ describe("content/image-alt", () => {
     ["![[chart.png]]\n", "obsidian"],
   ] as const)("accepts %j in %s", (source, dialect) => {
     expect(check(source, rule, dialect)).toEqual([]);
+  });
+  const htmlMessage =
+    'Add an alt attribute to the HTML image, for readers who cannot see it, or alt="" if it is decorative.';
+  it.each([
+    ['<img src="chart.png">\n', '<img src="chart.png">'],
+    ['Text <img src="chart.png"> text.\n', '<img src="chart.png">'],
+    ['<IMG SRC="chart.png" />\n', '<IMG SRC="chart.png" />'],
+    [
+      '<p align="center">\n  <img src="logo.svg" width="80">\n</p>\n',
+      '<img src="logo.svg" width="80">',
+    ],
+    ['<img\n  src="chart.png"\n  title="alt">\n', '<img\n  src="chart.png"\n  title="alt">'],
+    // An `alt` in another attribute's value, or on another element, gives none.
+    ['<img src="x.png" title="alt=\'a\'">\n', '<img src="x.png" title="alt=\'a\'">'],
+    ['<span alt="a"><img src="x.png"></span>\n', '<img src="x.png">'],
+    ['<img src="x.png" aria-hidden="false">\n', '<img src="x.png" aria-hidden="false">'],
+    ['[<img src="badge.svg">](https://example.com/ci)\n', '<img src="badge.svg">'],
+    ['| <img src="x.png"> |\n| --- |\n', '<img src="x.png">'],
+    ["## Logo <img src='x.png'>\n", "<img src='x.png'>"],
+  ])("reports an HTML image without alt: %j", (source, span) => {
+    // VitePress keeps HTML blocks, Vue templates there, opaque to every rule; see below.
+    for (const dialect of dialects.filter((name) => name !== "vitepress")) {
+      const findings = check(source, rule, dialect);
+      expect(spans(source, findings), dialect).toEqual([span]);
+      expect(findings[0]?.message).toBe(htmlMessage);
+    }
+  });
+  it("locates HTML images inside block quotes and list items", () => {
+    for (const newline of ["\n", "\r\n"]) {
+      const source = [
+        "> <div>",
+        '> <p><img src="a.png"></p>',
+        "> </div>",
+        "",
+        "- <div>",
+        '  <img src="b.png" alt="B"><img src="c.png">',
+        "  </div>",
+        "",
+      ].join(newline);
+      const findings = check(source, rule);
+      expect(spans(source, findings)).toEqual(['<img src="a.png">', '<img src="c.png">']);
+      expect(findings.map((item) => item.line)).toEqual([2, 6]);
+    }
+  });
+  it.each([
+    // `alt=""` marks a decorative image in HTML, as blank Markdown text cannot.
+    ['<img src="divider.png" alt="">\n', "github"],
+    ['<img src="divider.png" alt>\n', "github"],
+    ["<img src=chart.png alt=Sales>\n", "github"],
+    ['<img src="chart.png" ALT="Sales">\n', "github"],
+    ['<img src="x.png" aria-hidden="true">\n', "forgejo"],
+    ['<img src="x.png" aria-hidden="true">\n', "gitea"],
+    ['<img src="x.png" aria-hidden="true">\n', "obsidian"],
+    ['<img src="x.png" aria-hidden=" TRUE ">\n', "commonmark"],
+    // Not an image element: comments, code, and other text.
+    ['<!-- <img src="x.png"> -->\n', "github"],
+    ['Text <!-- <img src="x.png"> --> text.\n', "github"],
+    ['`<img src="x.png">`\n\n```html\n<img src="x.png">\n```\n', "github"],
+    ['\\<img src="x.png">\n', "github"],
+    ['<imgx src="x.png"> <picture><source srcset="x.png"></picture>\n', "github"],
+    // Raw-text elements hold text, except where GitHub's tag filter shows the tags as text.
+    ['<textarea>\n<img src="x.png">\n</textarea>\n', "forgejo"],
+    ['Text <textarea><img src="x.png"></textarea> text.\n', "gitea"],
+    ["<script>let a = '<img src=\"x.png\">';</script>\n", "obsidian"],
+    // Vue binds attributes in VitePress.
+    ['<img src="/logo.svg" :alt="title">\n', "vitepress"],
+    ['<img src="/logo.svg" v-bind:alt="title">\n', "vitepress"],
+    ['<img src="/logo.svg" v-bind="image">\n', "vitepress"],
+  ] as const)("accepts HTML %j in %s", (source, dialect) => {
+    expect(check(source, rule, dialect)).toEqual([]);
+  });
+  it("reads raw-text elements as GitHub's tag filter leaves them", () => {
+    const flow = '<textarea>\n<img src="x.png">\n</textarea>\n';
+    const inline = 'Text <textarea><img src="x.png"></textarea> text.\n';
+    for (const source of [flow, inline]) {
+      expect(spans(source, check(source, rule, "github"))).toEqual(['<img src="x.png">']);
+      expect(check(source, rule, "commonmark")).toEqual([]);
+    }
+  });
+  it("reports aria-hidden images on GitHub, whose sanitizer removes the attribute", () => {
+    // GitHub's Markdown API rendered `<img src="x.png">` for this on 2026-10-28.
+    const source = 'Text <img src="x.png" aria-hidden="true"> text.\n';
+    expect(spans(source, check(source, rule, "github"))).toEqual([
+      '<img src="x.png" aria-hidden="true">',
+    ]);
+    expect(check(source, rule, "forgejo")).toEqual([]);
+  });
+  it("reads Vue bindings only in VitePress", () => {
+    const source = '<img src="/logo.svg" :alt="title">\n';
+    expect(check(source, rule, "github")).toHaveLength(1);
+  });
+  it("checks inline HTML in VitePress and leaves its HTML blocks to Vue", () => {
+    const inline = 'Text <img src="chart.png"> text.\n';
+    expect(spans(inline, check(inline, rule, "vitepress"))).toEqual(['<img src="chart.png">']);
+    expect(check('<img src="chart.png">\n', rule, "vitepress")).toEqual([]);
   });
 });
 

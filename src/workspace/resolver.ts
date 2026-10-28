@@ -230,11 +230,16 @@ export function resolveLink(
       };
     fragmentExists = found;
   }
+  const fragmentAnchor =
+    fragment && fragmentExists
+      ? index.anchorSpelling(resolved, dialect, fragment, fragment.replace(/^user-content-/, ""))
+      : undefined;
   return {
     status: "resolved",
     target: resolved,
     fragment,
     fragmentExists,
+    ...(fragmentAnchor === undefined ? {} : { fragmentAnchor }),
     ...(uncertain.length ? { unreadable: uncertain } : {}),
     ...(vault ? { vault, rooted: resolved.slice(vault.length + 1) } : {}),
     ...(partial ? { rooted: `${rootFolders.join("/")}/${resolved}` } : {}),
