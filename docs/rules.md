@@ -24,11 +24,11 @@ presets, dialects, and options.
 | `github/alert-marker`           | 🎨   | ❌            | ✅             | ❌      |
 | `github/task-marker`            | 🎨   | ❌            | ✅             | ❌      |
 | `links/descriptive-text`        | 🔍   | ❌            | ❌             | ✅      |
-| `links/empty`                   | 🔍   | ✅            | ❌             | ❌      |
+| `links/empty`                   | 🔍   | ✅            | ❌             | ✅      |
 | `links/notation`                | 🎨   | ❌            | ❌             | ✅      |
 | `links/path`                    | 🎨   | ❌            | ❌             | ✅      |
 | `links/undefined-reference`     | 🔍   | ✅            | ❌             | ❌      |
-| `links/unused-definition`       | 🔍   | ✅            | ❌             | ❌      |
+| `links/unused-definition`       | 🔍   | ✅            | ❌             | ✅      |
 | `links/valid`                   | 🔍   | ✅ (error)    | ❌             | ❌      |
 | `obsidian/block-reference`      | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `obsidian/callout-marker`       | 🎨   | ❌            | ✅             | ❌      |
@@ -262,13 +262,21 @@ Follow the [installation steps](install.md).
 ## `links/empty`
 
 **Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+`ignoredDefinitions`.
 
 Reports a link or image whose destination is empty, as in `[guide]()`, or only
 `#`, which leads to the top of the page. Both are usually placeholders that were
 never filled in. A reference definition with such a destination is reported
 once, at the definition, rather than at each reference to it. Obsidian wikilinks
 are not checked.
+
+A definition written as a comment, as in `[//]: # (comment)`, is not reported:
+the renderers show nothing for it. `ignoredDefinitions` lists the labels of such
+comments, as [`links/unused-definition`](#linksunused-definition)'s option of
+the same name does, with the same default, `["//"]`, and the same matching. Each
+rule reads only its own option, so give both the same list when comments use
+other labels. A definition whose label a reference uses is a link, and is
+reported if its destination is empty or only `#`.
 
 Reported:
 
@@ -409,12 +417,24 @@ See the [installation guide][Setup] and press [Enter].
 ## `links/unused-definition`
 
 **Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+`ignoredDefinitions`.
 
 Reports a reference definition or footnote that no reference in the document
 uses. A definition that only a shortcut reference `[label]` uses counts as used.
 A second definition of the same label is reported too, because the renderers use
 the first. GitHub leaves footnotes that nothing references off the page.
+
+`ignoredDefinitions` is an array of labels whose definitions are comments rather
+than links, as in `[//]: # (comment)`, which the renderers do not show. Its
+default, `["//"]`, covers that common form. A configured array replaces the
+default, so include `"//"` to keep it; with `[]`, no label is a comment. Labels
+match as the renderers match them, without regard to case or to how much blank
+space separates words; backslash escapes count as written, so `[\/\/]` is
+another label. Such definitions are not reported, however many there are, while
+no reference uses their label. A reference such as `[//]` makes them links,
+which are reported as any others are. The option applies to link definitions,
+not footnotes: a footnote shows its text, so an unreferenced one is reported
+whatever its label. [`links/empty`](#linksempty) takes the same option.
 
 Reported, at `[old-setup]`:
 
@@ -432,6 +452,7 @@ See the [guide][setup] and the [changelog].
 
 [setup]: install.md
 [changelog]: CHANGELOG.md
+[//]: # (Update the changelog link at each release.)
 ```
 
 ## `links/valid`
@@ -1069,6 +1090,10 @@ turns a heading underlined with `===` or `---` into a `#` heading of the same
 level, and removes the closing sequence of a `#` heading with the blank space
 around it.
 
+After 0.5.0, ATX headings use one space between their opening hashes and text,
+including when a tab separated them. Empty headings need no separator. This also
+applies to headings kept in ATX form with `setext` or `consistent`.
+
 | Option    | Values                              | Default    |
 | --------- | ----------------------------------- | ---------- |
 | `style`   | `"atx"`, `"setext"`, `"consistent"` | `"atx"`    |
@@ -1078,7 +1103,8 @@ around it.
   and 2 and keeps `#` for deeper levels, which cannot be underlined.
   `consistent` follows the document's first heading: `setext` when it is
   underlined, otherwise `atx`.
-- `closing`: `keep` leaves the closing sequences of `#` headings as written.
+- `closing`: `keep` retains existing closing sequences. After 0.5.0, their
+  separator from the text becomes one space; no absent sequence is added.
 
 Before:
 
@@ -1086,7 +1112,7 @@ Before:
 Installation
 ------------
 
-## Usage ##
+##  Usage  ##
 ```
 
 After:
@@ -1107,7 +1133,9 @@ Underlined headings of more than one line, those inside lists or block quotes,
 and one directly below TOML front matter, whose lines renderers without TOML
 front matter read as part of the heading, are left as written. On Forgejo and
 Gitea, a closing sequence after an attribute block such as `{#id}` stays,
-because Gitea before 1.26 reads the block only when the sequence follows it.
+because Gitea before 1.26 reads the block only when the sequence follows it. The
+block and its suffix, including the spacing before that sequence, retain their
+existing protection; the opening separator can still be normalized.
 
 With `setext`, a `#` heading is underlined only where its text can stand on a
 line of its own as the same heading: at the start of a line of the document, not

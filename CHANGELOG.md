@@ -12,6 +12,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `links/unused-definition` and `links/empty` take `ignoredDefinitions`, the
+  labels of definitions written as comments, which default to `["//"]`.
+  `recommended` no longer reports `[//]: # (comment)` while no reference uses
+  its label; footnotes are still reported
+  ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
+
 - Three report-only rules, in no preset, cover markdownlint's MD026, MD036, and
   MD059 with their options: `structure/heading-punctuation` reports a heading
   that ends with sentence punctuation, `structure/emphasis-heading` a paragraph
@@ -39,6 +45,12 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- `style/heading` writes one space between ATX heading hashes and text,
+  including tabs and retained closing sequences. Empty headings need no
+  separator. Protected Forgejo and Gitea attribute suffixes stay as written
+  ([#676](https://github.com/viell-dev/slop-markdown-tools/issues/676),
+  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678)).
 
 - The [comparison with Prettier and
   markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)

@@ -1,13 +1,24 @@
+import { HtmlRenderer, Parser } from "commonmark";
+import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
-import { format, lint, presets } from "../../src/index.js";
+import { createWorkspace, dialects, format, lint, presets } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
 
 /**
  * The findings of one problem rule, which formatting reports too without
  * changing the document, and which no other rule makes.
  */
-function check(source: string, rule: string, dialect: Dialect = "github") {
-  const config: Config = { extends: [], dialect, rules: { [rule]: "warn" } };
+function check(
+  source: string,
+  rule: string,
+  dialect: Dialect = "github",
+  options?: Record<string, unknown>,
+) {
+  const config: Config = {
+    extends: [],
+    dialect,
+    rules: { [rule]: options ? ["warn", options] : "warn" },
+  };
   const diagnostics = lint(source, { config });
   const result = format(source, { config });
   expect(result.output).toBe(source);
@@ -165,6 +176,23 @@ describe("links/unused-definition", () => {
   ])("accepts %j", (source) => {
     expect(check(source, rule)).toEqual([]);
   });
+  // markdownlint reported these definitions as unused (issues 1734, 571 and 691 of
+  // DavidAnson/markdownlint, and 2178 for `[foo]` in raw HTML, which the renderers link).
+  it.each(dialects)("accepts the definitions that references use, in %s", (dialect) => {
+    for (const source of [
+      "$n million [^12]. $m million.\n\n[^12]: Note.\n",
+      "<code>Object.create(<var>proxy</var>)[foo]</code>\n\n[foo]: foo.md\n",
+      "[![Binder]](test)\n\n[Binder]: badge.svg\n",
+      "[![GitHub][icon]](https://example.com/)\n\n[icon]: icon.svg\n",
+    ])
+      expect(check(source, rule, dialect), source).toEqual([]);
+  });
+  it("reports a repeated definition even where it matches the first", () => {
+    // Renderers use the first; the second is never used, unlike a request to allow it
+    // (issue 2043 of DavidAnson/markdownlint).
+    const source = "- By [@user].\n\n[@user]: user.md\n\n- By [@user].\n\n[@user]: user.md\n";
+    expect(check(source, rule).map((item) => item.line)).toEqual([7]);
+  });
   it("keeps link and footnote labels apart", () => {
     // A link label that starts with `^` is no footnote's label.
     expect(check("[^1]\n\n[ ^1]: a.md\n[^1]: Note.\n", rule).map((item) => item.line)).toEqual([3]);
@@ -318,6 +346,108 @@ describe("links/descriptive-text", () => {
     expect(() =>
       lint("", { config: { extends: [], rules: { [rule]: ["warn", options] } } }),
     ).toThrow(`Invalid options for ${rule}`);
+  });
+});
+
+describe("comment definitions in links/unused-definition and links/empty", () => {
+  const rules = ["links/unused-definition", "links/empty"];
+  const renders = (source: string) => [
+    new HtmlRenderer().render(new Parser().parse(source)),
+    new MarkdownIt().render(source),
+  ];
+  it("show nothing unless a reference uses their label", () => {
+    expect(renders("Text.\n\n[//]: # (comment)\n")).toEqual(["<p>Text.</p>\n", "<p>Text.</p>\n"]);
+    const link = '<p>See <a href="#" title="comment">//</a>.</p>\n';
+    expect(renders("See [//].\n\n[//]: # (comment)\n")).toEqual([link, link]);
+    // Escapes count as written: `[\/\/]` is another label.
+    const text = "<p>See [//].</p>\n";
+    expect(renders("See [\\/\\/].\n\n[//]: # (comment)\n")).toEqual([text, text]);
+  });
+  it.each(dialects)("are not reported by default in %s", (dialect) => {
+    for (const comment of [
+      "[//]: # (comment)",
+      '[//]: # "comment"',
+      "[//]: # 'comment'",
+      "[//]: <> (comment)",
+      "[//]: #",
+      "> [//]: # (quoted)",
+      "- [//]: # (in a list)",
+    ])
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const source = ["Text.", "", comment, "", "[//]: # (another one)", ""].join(newline);
+        for (const rule of rules) expect(check(source, rule, dialect), source).toEqual([]);
+      }
+  });
+  it.each(dialects)("leave the idiom alone under recommended in %s", (dialect) => {
+    const long = "A comment that is longer than the wrapping width of the preset. ".repeat(3);
+    const source = `# Notes\n\nText.\n\n[//]: # (${long.trim()})\n[//]: <> (Another.)\n`;
+    const process = {
+      config: { extends: ["recommended"], dialect },
+      path: "note.md",
+      workspace: createWorkspace({ "note.md": source }),
+    };
+    expect(lint(source, process)).toEqual([]);
+    expect(format(source, process)).toMatchObject({ output: source, changed: false });
+  });
+  it("report a comment label that a reference uses, which makes it a link", () => {
+    const source = "See [//].\n\n[//]: # (one)\n[//]: # (two)\n";
+    expect(check(source, "links/unused-definition").map((item) => item.message)).toEqual([
+      "Definition [//] repeats an earlier one, which references use instead.",
+    ]);
+    expect(check(source, "links/empty").map((item) => item.line)).toEqual([3, 4]);
+    expect(check("![//]\n\n[//]: <>\n", "links/empty").map((item) => item.message)).toEqual([
+      "Destination of definition [//] is empty.",
+    ]);
+  });
+  it.each(rules)("%s matches labels as the renderers do", (rule) => {
+    const options = { ignoredDefinitions: ["Note  To\tSelf"] };
+    const source = "Text.\n\n[note to self]: # (one)\n[NOTE\nTO SELF]: <> (two)\n";
+    expect(check(source, rule, "github", options)).toEqual([]);
+    expect(check(source, rule)).toHaveLength(2);
+    const escaped = "Text.\n\n[\\/\\/]: # (comment)\n";
+    expect(check(escaped, rule)).toHaveLength(1);
+    expect(check(escaped, rule, "github", { ignoredDefinitions: ["\\/\\/"] })).toEqual([]);
+  });
+  it.each(rules)("%s takes its labels in place of the default", (rule) => {
+    const source = "Text.\n\n[//]: # (one)\n[comment]: # (two)\n";
+    expect(
+      check(source, rule, "github", { ignoredDefinitions: ["comment"] }).map((item) => item.line),
+    ).toEqual([3]);
+    expect(check(source, rule, "github", { ignoredDefinitions: [] })).toHaveLength(2);
+  });
+  it("applies to link definitions, not footnotes", () => {
+    const rule = "links/unused-definition";
+    const options = { ignoredDefinitions: ["//", "^note"] };
+    // A footnote shows its text, so an unreferenced one is reported whatever its label.
+    expect(
+      check("Text.\n\n[^//]: Shown.\n[^note]: Shown.\n", rule, "github", options),
+    ).toHaveLength(2);
+    // CommonMark has no footnotes: `[^note]: #` is a link definition there.
+    const source = "Text.\n\n[^note]: # (comment)\n";
+    for (const each of rules) {
+      expect(check(source, each, "commonmark", options)).toEqual([]);
+      expect(check(source, each, "commonmark")).toHaveLength(1);
+    }
+  });
+  it("are configured for each rule on its own", () => {
+    const source = "Text.\n\n[comment]: # (comment)\n";
+    const config: Config = {
+      extends: ["recommended"],
+      rules: { "links/unused-definition": ["warn", { ignoredDefinitions: ["comment"] }] },
+    };
+    expect(lint(source, { config }).map((item) => item.rule)).toEqual(["links/empty"]);
+  });
+  it.each(rules)("%s rejects invalid labels", (rule) => {
+    for (const options of [
+      { ignoredDefinitions: "//" },
+      { ignoredDefinitions: [""] },
+      { ignoredDefinitions: [" \t"] },
+      { ignoredDefinitions: [1] },
+      { ignored_definitions: ["//"] },
+    ])
+      expect(() =>
+        lint("", { config: { extends: [], rules: { [rule]: ["warn", options] } } }),
+      ).toThrow(`Invalid options for ${rule}`);
   });
 });
 
