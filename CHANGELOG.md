@@ -230,6 +230,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Fix competitor fallback comments losing scoped override provenance after
+  `configure-file`, shared-check suppressions, pragmas after front matter, and
+  disabled markdownlint options overriding Prettier's surviving choices
+  ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
+
 - In Obsidian, rules no longer change a list item that starts on a footnote's
   label line, as in `[^1]: - item`, below a run of three or more backticks that
   nothing closes. Live Preview shows such an item as code carried from the run

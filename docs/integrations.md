@@ -177,14 +177,28 @@ run, with a tracking issue where available.
 
 Each rule retains its enabled competitor origins outside the configuration.
 Disabling a markdownlint check leaves Prettier's choice active at warning
-severity. When several markdownlint checks share one mdrefine rule, it remains
-active while any of its checks is enabled. Prettier's `ignore` preserves the
-next parsed node; `ignore-start` and `ignore-end` preserve a top-level range,
-with blank lines before the comments. They prevent edits in that source even
-from a shared rule, while markdownlint findings still report without edits.
-`requirePragma: true` limits Prettier formatting to documents beginning with
-`<!-- @format -->` or `<!-- @prettier -->`; markdownlint checks still run.
-`insertPragma` is not carried over.
+severity, using Prettier's own options in that region. Stated markdownlint
+options still win where both sources are active. Shared markdownlint rules
+handle suppression as follows:
+
+- `style/block-spacing` (MD022, MD031, MD032, MD058) attributes each finding to
+  its named block: heading, fenced code block, list, or table. Only that check
+  controls the finding.
+- `structure/unspaced-heading` (MD018, MD020) distinguishes ordinary and closed
+  ATX heading candidates in its findings. Only the matching check reports.
+- `style/heading` (MD003, MD019, MD021, MD023), `style/list-indent` (MD005,
+  MD007, MD030), and `style/table` (MD055, MD060) combine checks without
+  attributing individual findings. If any enabled contributing check is
+  suppressed, their markdownlint findings and edits in that region are held
+  conservatively. Prettier can still apply its own choices there.
+
+Prettier's `ignore` preserves the next parsed node; `ignore-start` and
+`ignore-end` preserve a top-level range, with blank lines before the comments.
+They prevent edits in that source even from a shared rule, while markdownlint
+findings still report without edits. `requirePragma: true` limits Prettier
+formatting to documents beginning with `<!-- @format -->` or
+`<!-- @prettier -->`, also immediately after front matter; markdownlint checks
+still run. `insertPragma` is not carried over.
 
 ### markdownlint rules
 

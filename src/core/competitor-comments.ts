@@ -1,5 +1,6 @@
 import { Minimatch } from "minimatch";
 import { convertConfig, competitorMappings } from "../config/convert.js";
+import { resolveConfig } from "../config/resolve.js";
 import { range } from "../syntax/parse.js";
 import { lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
@@ -90,7 +91,26 @@ export function configuredComments(document: Document, options: ProcessOptions):
   return {
     ...options,
     config: { ...options.config, rules: report.config.rules ?? {} },
-    compatibility: { ...report.compatibility, pragmaOverrides: compat.pragmaOverrides ?? [] },
+    compatibility: {
+      ...report.compatibility,
+      origins: Object.fromEntries(
+        [
+          ...new Set([
+            ...Object.keys(compat.origins),
+            ...Object.keys(report.compatibility.origins),
+          ]),
+        ].map((rule) => [
+          rule,
+          [
+            ...new Set([
+              ...(report.compatibility.origins[rule] ?? []),
+              ...(compat.origins[rule] ?? []).filter((id) => !id.startsWith("MD")),
+            ]),
+          ],
+        ]),
+      ),
+      pragmaOverrides: compat.pragmaOverrides ?? [],
+    },
   };
 }
 type CompatibleFinding = Finding & { compatibilitySeverity?: "warn" };
@@ -117,7 +137,28 @@ function intersects(intervals: Interval[], start: number, end: number): boolean 
 }
 export function competitorComments(document: Document, options: ProcessOptions) {
   const compat = options.compatibility;
-  if (!compat) return (_rule: string, finding: Finding): CompatibleFinding | undefined => finding;
+  const emptyRules: ReturnType<typeof resolveConfig>["rules"] = {};
+  if (!compat)
+    return Object.assign(
+      (_rule: string, finding: Finding): CompatibleFinding | undefined => finding,
+      { prettierRules: emptyRules },
+    );
+  // Reconvert without markdownlint so disabled source options cannot leak into
+  // the surviving formatter. Retain file-scoped Prettier patches from the loader.
+  const prettierRules = compat.prettier
+    ? resolveConfig({
+        config: {
+          ...convertConfig({ prettier: compat.prettier }).config,
+          ...(options.config?.overrides ? { overrides: options.config.overrides } : {}),
+        },
+        ...(options.path ? { path: options.path } : {}),
+      }).rules
+    : {};
+  const effectiveRules = resolveConfig({
+    config: options.config ?? {},
+    ...(options.path ? { path: options.path } : {}),
+    ...(options.plugins ? { plugins: options.plugins } : {}),
+  }).rules;
   const source = document.source;
   const starts = lineStarts(source);
   const lineAt = (offset: number) => {
@@ -136,7 +177,21 @@ export function competitorComments(document: Document, options: ProcessOptions) 
   for (const override of compat.pragmaOverrides ?? [])
     if (override.files.some((p) => new Minimatch(p, { dot: true }).match(options.path ?? "")))
       requirePragma = override.requirePragma;
-  if (requirePragma && !/^\s*<!--\s*@(format|prettier)\s*-->/.test(source))
+  // Prettier recognizes YAML (including ... closers) and TOML before a pragma.
+  const header = /^(---|\+\+\+)([^\r\n]*)\r?\n/.exec(source);
+  let body = source;
+  if (header) {
+    const marker = header[1]!;
+    const language = header[2]!.trim() || (marker === "---" ? "yaml" : "toml");
+    const closing = new RegExp(
+      `\\r?\\n(?:${marker === "---" ? "---" : "\\+\\+\\+"}${language === "yaml" ? "|\\.\\.\\." : ""})[^\\S\\r\\n]*(?:\\r?\\n|$)`,
+    );
+    const end = closing.exec(source.slice(header[0].length - 1));
+    if (end) body = source.slice(header[0].length - 1 + end.index + end[0].length);
+  }
+  const pragma =
+    /^(?:<!--\s*@(format|prettier)\s*-->|<!--[^\n]*\n[\s\S]*?(?:^|\n)[^\S\n]*@(format|prettier)[^\S\n]*(?:$|\n)[\s\S]*?\n[^\n]*-->)/m;
+  if (requirePragma && body.trimStart().match(pragma)?.index !== 0)
     prettierRanges.push({ start: 0, end: source.length });
   let open: number | undefined;
   for (const comment of found) {
@@ -242,25 +297,69 @@ export function competitorComments(document: Document, options: ProcessOptions) 
     }
     return intersects(intervals, position, end);
   }
-  return (rule: string, finding: Finding): CompatibleFinding | undefined => {
-    const origins = compat.origins[rule];
-    if (!origins) return finding;
-    const markdownlint = origins.some(
-      (id) => id.startsWith("MD") && !suppressed(id, finding.start),
-    );
-    const fromPrettier = origins.some((id) => !id.startsWith("MD"));
-    const start = finding.edit?.start ?? finding.start;
-    const end = finding.edit?.end ?? finding.end ?? start;
-    const ignored = !!compat.prettier && intersects(prettier, start, end);
-    if (!markdownlint && (!fromPrettier || ignored)) return undefined;
-    const positional = finding.edit && intersects(positionalRanges, start, end);
-    const editSuppressed =
-      !fromPrettier && !origins.some((id) => id.startsWith("MD") && !suppressed(id, start, end));
-    if ((ignored || positional || editSuppressed) && finding.edit) {
-      const retained = { ...finding };
-      delete retained.edit;
-      return retained;
-    }
-    return markdownlint ? finding : { ...finding, compatibilitySeverity: "warn" };
-  };
+  return Object.assign(
+    (rule: string, finding: Finding, prettierOnly = false): CompatibleFinding | undefined => {
+      // Missing provenance in compatibility mode must never bypass an ignore.
+      const origins = compat.origins[rule] ?? (compat.prettier ? ["unknown prettier origin"] : []);
+      let checks = origins.filter((id) => id.startsWith("MD"));
+      // MD022 also raises the blank-line maximum to keep its requested spacing.
+      // That dependent option survives while the heading check is active.
+      const spacing = effectiveRules["style/block-spacing"];
+      const spacingOptions = (Array.isArray(spacing) ? spacing[1] : undefined) as
+        Readonly<Record<string, unknown>> | undefined;
+      const headingCount = Math.max(
+        1,
+        ...[spacingOptions?.linesAbove, spacingOptions?.linesBelow].flatMap((v) =>
+          Array.isArray(v) ? (v as number[]) : typeof v === "number" ? [v] : [],
+        ),
+      );
+      if (
+        rule === "style/blank-lines" &&
+        headingCount > 1 &&
+        compat.origins["style/block-spacing"]?.includes("MD022")
+      )
+        checks.push("MD022");
+      const shared = competitorMappings.filter(
+        (row) => row.rule === rule && row.source.startsWith("MD"),
+      );
+      if (rule === "style/block-spacing") {
+        const check = /the heading/.test(finding.message)
+          ? "MD022"
+          : /the fenced code block/.test(finding.message)
+            ? "MD031"
+            : /the list/.test(finding.message)
+              ? "MD032"
+              : /the table/.test(finding.message)
+                ? "MD058"
+                : undefined;
+        checks = checks.filter((id) => id === check);
+      } else if (rule === "structure/unspaced-heading") {
+        const check = finding.message.includes("add spaces inside the hashes") ? "MD020" : "MD018";
+        checks = checks.filter((id) => id === check);
+      } else if (shared.length > 1 && checks.some((id) => suppressed(id, finding.start))) {
+        // These rules do not attribute findings to individual source checks.
+        // Hold their markdownlint behavior when any contributing check is disabled.
+        checks = [];
+      }
+      const markdownlint = checks.some((id) => !suppressed(id, finding.start));
+      const alternate =
+        prettierRules[rule] !== undefined &&
+        JSON.stringify(prettierRules[rule]) !== JSON.stringify(effectiveRules[rule]);
+      if (prettierOnly ? markdownlint : !markdownlint && alternate) return undefined;
+      const fromPrettier = origins.some((id) => !id.startsWith("MD"));
+      const start = finding.edit?.start ?? finding.start;
+      const end = finding.edit?.end ?? finding.end ?? start;
+      const ignored = !!compat.prettier && intersects(prettier, start, end);
+      if (!markdownlint && (!fromPrettier || ignored)) return undefined;
+      const positional = finding.edit && intersects(positionalRanges, start, end);
+      const editSuppressed = !fromPrettier && !checks.some((id) => !suppressed(id, start, end));
+      if ((ignored || positional || editSuppressed) && finding.edit) {
+        const retained = { ...finding };
+        delete retained.edit;
+        return retained;
+      }
+      return markdownlint ? finding : { ...finding, compatibilitySeverity: "warn" };
+    },
+    { prettierRules },
+  );
 }

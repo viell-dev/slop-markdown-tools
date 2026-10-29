@@ -139,7 +139,7 @@ function inspect(
     const enabled = setting(value);
     const rule = rules[name]!;
     if (enabled.severity === "off" || !include(rule)) continue;
-    let findings: Finding[] = [];
+    let findings: (Finding & { prettierOnly?: boolean })[] = [];
     let problem: string | undefined;
     try {
       const returned: unknown = rule.check({
@@ -151,7 +151,23 @@ function inspect(
       // not escape the synchronous rule failure. Do not await eventual findings.
       if (!Array.isArray(returned)) void Promise.resolve(returned).catch(() => undefined);
       problem = findingsProblem(returned, document.source.length);
-      if (!problem) findings = returned as Finding[];
+      if (!problem) {
+        findings = [...(returned as Finding[])];
+        const alternative = competitor.prettierRules[name];
+        if (alternative && JSON.stringify(alternative) !== JSON.stringify(value)) {
+          const extra: unknown = rule.check({
+            document,
+            options: setting(alternative).options,
+            ...(workspace ? { workspace } : {}),
+          });
+          if (!Array.isArray(extra)) void Promise.resolve(extra).catch(() => undefined);
+          problem = findingsProblem(extra, document.source.length);
+          if (!problem)
+            findings.push(
+              ...(extra as Finding[]).map((finding) => ({ ...finding, prettierOnly: true })),
+            );
+        }
+      }
     } catch (error) {
       if (hostErrors.has(error)) throw error;
       problem = `failed (${failure(error)})`;
@@ -165,8 +181,8 @@ function inspect(
       );
       continue;
     }
-    for (const original of findings) {
-      const compatibleFinding = competitor(name, original);
+    for (const { prettierOnly, ...original } of findings) {
+      const compatibleFinding = competitor(name, original, prettierOnly);
       if (!compatibleFinding) continue;
       const { compatibilitySeverity, ...finding } = compatibleFinding;
       if (suppressed(name, original) || protectedVitePress(document, name, original)) continue;
