@@ -139,8 +139,71 @@ describe("content/emphasis-spacing", () => {
     "Some *a ** b * text.\n",
     // Runs of four or more.
     "**** a ****\n",
+    // Wildcard patterns, whose text does not start and end as words do.
+    "glob *.md * notes\n",
+    "Match *.txt * here.\n",
+    "*.txt *\n",
+    "src/* *.js\n",
+    "Run ** -v ** or __ --help __ for more.\n",
+    "Sum ** a + **, then ** + b **.\n",
   ])("leaves %j alone", (source) => {
     expect(check(source, rule)).toEqual([]);
+  });
+  it.each([
+    ["Some ** bold ** text.\n", "** bold **"],
+    ["Some *text * here.\n", "*text *"],
+    ["A (** a **) b.\n", "** a **"],
+    ['A "** a **" b.\n', "** a **"],
+    ["Item ** 1 ** here.\n", "** 1 **"],
+    ["Say ** “quoted” ** and stop.\n", "** “quoted” **"],
+    ["Stop ** now! ** please.\n", "** now! **"],
+    ["See ** ![an image](a.png) ** here.\n", "** ![an image](a.png) **"],
+  ])("reports text that starts and ends as words do: %j", (source, span) => {
+    expect(spans(source, check(source, rule))).toEqual([span]);
+  });
+  it("leaves the labels of collapsed and shortcut references alone", () => {
+    // Without the spaces the label would name another definition, or none.
+    expect(
+      check("See [** a **] and [** b **][].\n\n[** a **]: a.md\n[** b **]: b.md\n", rule),
+    ).toEqual([]);
+    // A full reference's text is not its label.
+    const full = "See [** a **][r].\n\n[r]: a.md\n";
+    expect(spans(full, check(full, rule))).toEqual(["** a **"]);
+  });
+  it.each(["\n", "\r\n"])(
+    "reads the document once, without a block that the edits change (%j)",
+    (ending) => {
+      // Without its spaces, the second paragraph becomes a definition, which
+      // the other paragraphs' readings must not see: with it, `[a**]` in the
+      // last one would be a link, and its markers could not pair across it.
+      const source = [
+        "See ** a ** here.",
+        "",
+        "[a**]:",
+        "** b **",
+        "",
+        "See ** x [a**] y, *d * too.",
+        "",
+      ].join(ending);
+      expect(spans(source, check(source, rule))).toEqual(["** a **", "** x [a**", "*d *"]);
+      // A definition in a list item is not root-level; each paragraph is read
+      // with it.
+      const nested = `- [x]: https://example.com${ending}${ending}${"See [x] and ** b ** here.".concat(ending, ending).repeat(3)}`;
+      expect(check(nested, rule)).toHaveLength(3);
+    },
+  );
+  it("keeps the other pairs of a paragraph whose start would become a definition", () => {
+    // Without its spaces, `*b *` would make the first line a definition; the
+    // second pair still makes strong text on its own.
+    const source = "[a]: *b *\nmore ** c ** here.\n";
+    for (const dialect of dialects)
+      expect(spans(source, check(source, rule, dialect))).toEqual(["** c **"]);
+  });
+  it("reports emphasis at the start of a task list item", () => {
+    // The item's paragraph starts after the task marker where its first node
+    // is text, and at the marker where it is strong text.
+    const source = "- [x] ** done ** now\n- [ ] *open * later\n";
+    expect(spans(source, check(source, rule))).toEqual(["** done **", "*open *"]);
   });
   it("reports only markers that make emphasis once the spaces are gone", () => {
     // The markers pass every test of the text but cannot pair across the

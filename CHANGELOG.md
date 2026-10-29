@@ -19,9 +19,10 @@ prereleases' notes there are longer than their entries here.
   space at the ends of a code span that renderers show as part of the code; and
   `links/text-spacing` reports blank space at the ends of link text. They leave
   alone a single `*` or `_` with spaces on both sides, as in `a * b * c`,
-  arithmetic, markers inside words, identifiers, emoji codes, the content of
-  inline HTML elements such as `<code>`, JSX comments, and code whose blank
-  space shows syntax or indentation, as in `- `, or keeps a backtick apart
+  arithmetic, markers inside words, wildcard patterns such as `*.md *`,
+  identifiers, emoji codes, the content of inline HTML elements such as
+  `<code>`, JSX comments, and code whose blank space shows syntax or
+  indentation, as in `- `, or keeps a backtick apart
   ([#689](https://github.com/viell-dev/slop-markdown-tools/issues/689),
   [#690](https://github.com/viell-dev/slop-markdown-tools/issues/690),
   [#691](https://github.com/viell-dev/slop-markdown-tools/issues/691)).

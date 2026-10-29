@@ -1,8 +1,8 @@
-import type { Nodes, RootContent } from "mdast";
+import type { Nodes, Root } from "mdast";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
 import { codeSpanContent, labelEnd, parse, range } from "../syntax/parse.js";
-import { countBelow, escaped, lineEnd, lineStart, lineStarts } from "../syntax/source.js";
+import { countBelow, escaped, lineEnd, lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { giteaPyLine, goldmarkForges, inForgeMath } from "./protections.js";
 import { inlineBlocks, optionsSchema } from "./shared.js";
@@ -12,6 +12,11 @@ interface Run {
   start: number;
   end: number;
   line: number;
+  /**
+   * Whether the run lies in the label of a collapsed or shortcut reference,
+   * which names the definition that the reference uses.
+   */
+  label: boolean;
 }
 
 /** HTML elements without an end tag. */
@@ -35,14 +40,27 @@ const voidElements = new Set([
  * whole runs, none of whose characters it paired or a backslash escapes, and
  * none in an autolink or in the content of an inline HTML element such as
  * `<code>` or `<kbd>`, which readers take for literal text even where
- * renderers read Markdown inside it.
+ * renderers read Markdown inside it. Also where the block's other inline
+ * nodes, such as code spans and links, start and end.
  */
-function textRuns(document: Document, block: Nodes, starts: number[]): Run[] {
+function textRuns(document: Document, block: Nodes, starts: number[]) {
   const { source } = document;
   const runs: Run[] = [];
+  const nodeStarts = new Set<number>();
+  const nodeEnds = new Set<number>();
   const elements: string[] = [];
   let autolinkEnd = -1;
+  let labelEnd = -1;
   walk(block, (node) => {
+    if (node !== block && node.type !== "text") {
+      nodeStarts.add(range(node)[0]);
+      nodeEnds.add(range(node)[1]);
+    }
+    if (
+      (node.type === "linkReference" || node.type === "imageReference") &&
+      node.referenceType !== "full"
+    )
+      labelEnd = range(node)[1];
     if (node.type === "html") {
       const close = /^<\/([A-Za-z][\w-]*)\s*>$/.exec(node.value);
       const open = /^<([A-Za-z][\w-]*)(?:\s[^]*)?>$/.exec(node.value);
@@ -62,10 +80,15 @@ function textRuns(document: Document, block: Nodes, starts: number[]): Run[] {
       const to = from + match[0].length;
       const marker = match[0][0];
       if (source[from - 1] === marker || source[to] === marker || escaped(source, from)) continue;
-      runs.push({ start: from, end: to, line: countBelow(starts, from + 1) - 1 });
+      runs.push({
+        start: from,
+        end: to,
+        line: countBelow(starts, from + 1) - 1,
+        label: from < labelEnd,
+      });
     }
   });
-  return runs;
+  return { runs, nodeStarts, nodeEnds };
 }
 
 /**
@@ -76,6 +99,14 @@ function textRuns(document: Document, block: Nodes, starts: number[]): Run[] {
  * comment, belong to other notations.
  */
 const outside = /[\s\p{Ps}\p{Pe}\p{Pi}\p{Pf}"'.,;:!?、。，：；！？]/u;
+/**
+ * What may start and end text that was meant as emphasis: a letter or digit,
+ * the brackets and quotation marks that open or close a phrase, and the
+ * punctuation that ends a sentence. Other text, such as the `.md` of the
+ * pattern `*.md *`, is a wildcard or another notation.
+ */
+const textFirst = /^[\p{L}\p{N}\p{Ps}\p{Pi}"'¿¡]/u;
+const textLast = /[\p{L}\p{N}\p{M}\p{Pe}\p{Pf}"'.!?…。！？]$/u;
 /** A number or a single letter, such as the operands of `a * b` or `2 * 3`. */
 const operand = /^[+\-−]?(?:\p{L}|\p{N}+(?:[.,]\p{N}+)*)$/u;
 /** An operator between operands. */
@@ -95,77 +126,133 @@ interface Candidate {
   edit: Edit;
   /** The node types that the markers would make without the spaces. */
   types: string[];
+  /** The root-level block that holds the markers. */
+  block: number;
+}
+/** A block, or an inline block without its content. */
+interface Shape {
+  /** Its type, start, end, and identifier, with the offsets given. */
+  key: string;
+  type: string;
+  /** Where it lies in its tree's own text. */
+  start: number;
+  end: number;
+}
+/** The blocks of a tree, and its inline blocks, with the offsets that `offset` gives. */
+function blockShape(tree: Root, offset: (at: number) => number): Shape[] {
+  const parts: Shape[] = [];
+  const step = (node: Nodes, task: boolean) => {
+    const [start, end] = range(node);
+    const identifier = "identifier" in node ? node.identifier : "";
+    // A task list item's paragraph starts after the task marker where its
+    // first node is text, and at the marker where it is emphasis.
+    const from = task && node.type === "paragraph" ? "" : offset(start);
+    const key = `${node.type}:${from}:${offset(end)}:${identifier}`;
+    parts.push({ key, type: node.type, start, end });
+    if (!inlineBlocks.has(node.type) && "children" in node)
+      for (const child of node.children)
+        step(child, node.type === "listItem" && typeof node.checked === "boolean");
+  };
+  step(tree, false);
+  return parts;
 }
 /**
- * Which candidates of a root-level block the parser reads as emphasis once
- * all their spaces are taken out: a node of one of their types from the start
- * of the opening marker to the end of the closing one. The candidates are in
- * order and do not overlap. The block is read again on its own, with the
- * root-level definitions that its references use; where that reading of the
- * block differs from the document's, the whole document is read again instead.
+ * Which candidates the parser reads as emphasis once the spaces of all of them
+ * are taken out: a node of one of their types from the start of the opening
+ * marker to the end of the closing one. The candidates are in order and do not
+ * overlap, and none takes spaces out of a reference's label, which would change
+ * the definition it matches.
+ *
+ * The whole document is read once with every edit. Each edit lies within one
+ * line of an inline block and takes out only blank space next to a marker, so
+ * it changes neither a line's start nor a line's end, and the blocks mostly
+ * stay as they were. A paragraph whose text becomes a definition, as in `[a]:`
+ * followed by `** b **` on the next line, does not, and a new definition can
+ * change how references in other blocks read. A block holds the same inline
+ * reading whatever the other blocks hold, as long as the definitions stay the
+ * same, so a reading in which every block and definition is where it was reads
+ * each block as its own edits alone would. Where the reading has a definition
+ * that the document lacks, the candidates whose edits lie in it are dropped;
+ * where a block moved or changed otherwise, the candidates of the root-level
+ * block that holds the change are. The document is then read again without
+ * them.
  */
-function inlineReading(document: Document) {
+function inlineReading(document: Document, candidates: Candidate[]): boolean[] {
   const { source, tree } = document;
-  const read = (text: string) =>
-    parse(text, document.dialect, document.path, [], document.vitepress).tree;
-  // Root-level definitions by the kind of reference and identifier.
-  const definitions = new Map<string, string>();
-  for (const node of tree.children)
-    if (node.type === "definition" || node.type === "footnoteDefinition")
-      definitions.set(
-        `${node.type} ${node.identifier}`,
-        `\n\n${source.slice(lineStart(source, range(node)[0]), range(node)[1])}`,
-      );
-  /** The definitions that the references in a block use. */
-  const used = (block: Nodes) => {
-    const keys = new Set<string>();
-    walk(block, (node) => {
-      if (node.type === "linkReference" || node.type === "imageReference")
-        keys.add(`definition ${node.identifier}`);
-      else if (node.type === "footnoteReference") keys.add(`footnoteDefinition ${node.identifier}`);
-    });
-    return [...keys].map((key) => definitions.get(key) ?? "").join("");
-  };
-  /** The shape of a subtree, with offsets from `base`. */
-  const shape = (node: Nodes, base: number) => {
-    const parts: string[] = [];
-    walk(node, (child) => {
-      const [start, end] = range(child);
-      parts.push(`${child.type}:${start - base}:${end - base}`);
-    });
-    return parts.join(" ");
-  };
-  return (block: RootContent, candidates: Candidate[]): boolean[] => {
-    let from = lineStart(source, range(block)[0]);
-    let to = lineEnd(source, range(block)[1]);
-    let suffix = used(block);
-    const first = read(source.slice(from, to) + suffix).children[0];
-    if (!first || shape(first, 0) !== shape(block, from)) {
-      from = 0;
-      to = source.length;
-      suffix = "";
-    }
-    // Where each candidate lies in the edited text.
+  const blockStarts = tree.children.map((child) => range(child)[0]);
+  const found = new Set<Candidate>();
+  let remaining = candidates;
+  while (remaining.length) {
+    // Where each edit ends, in the source and in the edited text, and how
+    // many characters the edits up to it have taken out.
+    const sourceEnds: number[] = [];
+    const editedEnds: number[] = [];
+    const removed: number[] = [];
     const expected = new Map<string, Candidate>();
     let edited = "";
-    let cursor = from;
-    let shift = from;
-    for (const candidate of candidates) {
+    let cursor = 0;
+    let shift = 0;
+    for (const candidate of remaining) {
       const { edit } = candidate;
       edited += source.slice(cursor, edit.start) + edit.text;
       cursor = edit.end;
-      const removed = edit.end - edit.start - edit.text.length;
-      expected.set(`${candidate.start - shift} ${candidate.end - shift - removed}`, candidate);
-      shift += removed;
+      const count = edit.end - edit.start - edit.text.length;
+      expected.set(`${candidate.start - shift} ${candidate.end - shift - count}`, candidate);
+      shift += count;
+      sourceEnds.push(edit.end);
+      editedEnds.push(edit.end - shift);
+      removed.push(shift);
     }
-    edited += source.slice(cursor, to) + suffix;
-    const found = new Set<Candidate>();
-    walk(read(edited), (node) => {
-      const candidate = expected.get(`${node.position?.start.offset} ${node.position?.end.offset}`);
-      if (candidate?.types.includes(node.type)) found.add(candidate);
+    edited += source.slice(cursor);
+    const reading = parse(edited, document.dialect, document.path, [], document.vitepress).tree;
+    // Offsets of the source in the edited text, and back; no block starts
+    // or ends inside the spaces taken out.
+    const forward = (offset: number) =>
+      offset - (removed[countBelow(sourceEnds, offset + 1) - 1] ?? 0);
+    const back = (offset: number) =>
+      offset + (removed[countBelow(editedEnds, offset + 1) - 1] ?? 0);
+    // The blocks of either reading that the other lacks, by count.
+    const unmatched = new Map<string, number[]>();
+    for (const { key, start } of blockShape(tree, forward)) {
+      const starts = unmatched.get(key);
+      if (starts) starts.push(start);
+      else unmatched.set(key, [start]);
+    }
+    const changed = new Set<number>();
+    const blame = (offset: number) => changed.add(countBelow(blockStarts, offset + 1) - 1);
+    // New definitions, by where they lie in the source.
+    const defined: [number, number][] = [];
+    for (const { key, type, start, end } of blockShape(reading, (offset) => offset)) {
+      const starts = unmatched.get(key);
+      if (starts?.length) starts.pop();
+      else {
+        blame(back(start));
+        if (type === "definition" || type === "footnoteDefinition")
+          defined.push([back(start), back(end)]);
+      }
+    }
+    for (const starts of unmatched.values()) for (const start of starts) blame(start);
+    if (!changed.size) {
+      walk(reading, (node) => {
+        const candidate = expected.get(
+          `${node.position?.start.offset} ${node.position?.end.offset}`,
+        );
+        if (candidate?.types.includes(node.type)) found.add(candidate);
+      });
+      break;
+    }
+    const definedStarts = defined.sort((a, b) => a[0] - b[0]).map(([start]) => start);
+    let kept = remaining.filter(({ edit }) => {
+      const [, end] = defined[countBelow(definedStarts, edit.end) - 1] ?? [];
+      return end === undefined || edit.start >= end;
     });
-    return candidates.map((candidate) => found.has(candidate));
-  };
+    if (kept.length === remaining.length)
+      kept = remaining.filter((candidate) => !changed.has(candidate.block));
+    // A change outside every block that holds a candidate leaves nothing to
+    // blame, and nothing is reported.
+    remaining = kept.length < remaining.length ? kept : [];
+  }
+  return candidates.map((candidate) => found.has(candidate));
 }
 
 /** What a marker of each length makes, and what the text would then be. */
@@ -190,12 +277,11 @@ export const spacingRules: Record<string, Rule> = {
       const findings: Finding[] = [];
       const starts = lineStarts(source);
       const misread = protectedEdit(document);
-      const reading = inlineReading(document);
-      for (const block of document.tree.children) {
-        const candidates: (Candidate & { message: string })[] = [];
+      const candidates: (Candidate & { message: string })[] = [];
+      for (const [index, block] of document.tree.children.entries()) {
         walk(block, (node) => {
           if (!inlineBlocks.has(node.type)) return;
-          const runs = textRuns(document, node, starts);
+          const { runs, nodeStarts, nodeEnds } = textRuns(document, node, starts);
           // The next run of the same marker on the line, by run.
           const next = new Map<Run, Run>();
           const last = new Map<string, Run>();
@@ -220,6 +306,15 @@ export const spacingRules: Record<string, Rule> = {
             const after = /[ \t]*$/.exec(inner)![0];
             const text = inner.slice(before.length, inner.length - after.length);
             if ((!before && !after) || !/[\p{L}\p{N}]/u.test(text)) continue;
+            // Text that starts or ends with another inline node, such as a
+            // code span or a link, starts or ends as that node does.
+            const textStart = opening.end + before.length;
+            const textEnd = closing.start - after.length;
+            if (!nodeStarts.has(textStart) && !textFirst.test(text)) continue;
+            if (!nodeEnds.has(textEnd) && !textLast.test(text)) continue;
+            // Taking spaces out of a reference's label would change the
+            // definition that it names.
+            if ((opening.label && before) || (closing.label && after)) continue;
             // Text with as long a run of the marker, such as one that the
             // parser paired with another, leaves open which markers belong
             // together, as in `"** a **" b, (** c **)`.
@@ -258,6 +353,7 @@ export const spacingRules: Record<string, Rule> = {
               end: closing.end,
               edit,
               types: kind.types,
+              block: index,
               message: `Spaces just inside the "${marker}" markers keep them from making ${kind.name}, so they show as text; remove the spaces if the text should be ${kind.text}.`,
             });
           }
@@ -271,11 +367,10 @@ export const spacingRules: Record<string, Rule> = {
             reach = Math.max(reach, candidate.end);
           }
         });
-        if (!candidates.length) continue;
-        const read = reading(block, candidates);
-        for (const [index, { start, end, message }] of candidates.entries())
-          if (read[index]) findings.push({ start, end, message });
       }
+      const read = inlineReading(document, candidates);
+      for (const [index, { start, end, message }] of candidates.entries())
+        if (read[index]) findings.push({ start, end, message });
       return findings;
     },
   },

@@ -138,7 +138,21 @@ not reported, in favor of missing a mistake over reporting text that is right:
   `"** a **" b, (** c **)`, where the parser pairs the inner runs as strong
   text, and pairs of different markers that overlap. Which markers belong
   together is not known there.
+- Text that starts with something other than a letter, a digit, an opening
+  bracket or quotation mark, or ends with something other than a letter, a
+  digit, a closing bracket or quotation mark, or `.`, `!`, or `?`, unless a code
+  span, link, or other inline element starts or ends it there. Emphasis that was
+  meant starts and ends with a word, unlike the wildcard patterns of
+  `glob *.md * notes` or `*.txt *`.
+- Markers in the label of a collapsed or shortcut reference, as in `[** a **]`,
+  where removing the spaces would change the definition that the label names.
 - Runs of four or more markers, and pairs whose text spans lines.
+
+The document is read once with the spaces of every remaining pair removed. Where
+that makes text into a definition, as when `[a]:` followed by `** b **` on the
+next line becomes one, the pairs in it are not reported, and the document is
+read again without them. Where it changes a block in another way, no pair in the
+top-level block that holds the change is reported.
 
 Reported:
 
