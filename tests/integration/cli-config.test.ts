@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { fixture, run } from "../support/cli.js";
@@ -135,6 +135,27 @@ describe("paths and configuration files that cannot be used", () => {
       ["lint"],
       `Configuration file is not a file: ${path.join(folder, "mdrefine.config.jsonc")}`,
     );
+  });
+  it("refuses blank lines around headings that style/blank-lines would remove", async () => {
+    const source = "Text\n# H\n";
+    const spacing = { "style/block-spacing": ["warn", { linesAbove: [1, 2] }] };
+    const root = await fixture({
+      "mdrefine.config.json": JSON.stringify({ rules: spacing }),
+      "allowed.json": JSON.stringify({
+        rules: { ...spacing, "style/blank-lines": ["warn", { maximum: 2 }] },
+      }),
+      "note.md": source,
+    });
+    for (const args of [["lint"], ["format", "--write"]])
+      fails(
+        root,
+        args,
+        'Invalid options for style/block-spacing: "linesAbove" asks for 2 blank lines at heading level 2, but style/blank-lines removes blank lines beyond 1 in a row; set its "maximum" to at least 2, or lower "linesAbove"',
+      );
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    const allowed = run(root, ["format", "--write", "--config", "allowed.json"]);
+    expect(allowed.status, allowed.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("Text\n\n# H\n");
   });
   it("finds JavaScript configuration files and loads them as Node.js reads them", async () => {
     const esm = 'export default { rules: { "style/emphasis": "off" } };\n';

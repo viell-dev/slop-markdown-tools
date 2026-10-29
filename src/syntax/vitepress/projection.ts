@@ -240,8 +240,8 @@ export function vitepressWhitespaceLiterals(document: Document): [number, number
 /** Whether a finding targets syntax deliberately kept opaque to ordinary rules. */
 export function protectedVitePress(document: Document, name: string, finding: Finding): boolean {
   if (document.dialect !== "vitepress") return false;
-  // Reporting literal tabs cannot alter protected syntax, including indented code.
-  if (name === "style/no-tabs" && !finding.edit) return false;
+  // Report-only tab and code-form findings cannot alter protected syntax.
+  if ((name === "style/no-tabs" || name === "style/code-block") && !finding.edit) return false;
   const start = finding.edit?.start ?? finding.start;
   const end = finding.edit?.end ?? finding.end ?? start;
   return (readings.get(document.tree)?.protected ?? []).some(

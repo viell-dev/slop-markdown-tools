@@ -104,7 +104,7 @@ rule that no preset in your configuration enables, such as
 
 | markdownlint                             | mdrefine                                                                                                                                                                                                                                |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MD001 `heading-increment`                | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart. Not yet a front-matter title ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699))                               |
+| MD001 `heading-increment`                | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart, and `frontMatterTitle`, off by default                                                                                           |
 | MD003 `heading-style`                    | [`style/heading`](rules.md#styleheading), whose default converts underlined headings; `closing: "add"` writes closed ATX styles                                                                                                         |
 | MD004 `ul-style`                         | [`style/list-marker`](rules.md#stylelist-marker), with `consistent` and `sublist`                                                                                                                                                       |
 | MD005 `list-indent`                      | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                                                                                        |
@@ -119,7 +119,7 @@ rule that no preset in your configuration enables, such as
 | MD019 `no-multiple-space-atx`            | [`style/heading`](rules.md#styleheading)                                                                                                                                                                                                |
 | MD020 `no-missing-space-closed-atx`      | [`structure/unspaced-heading`](rules.md#structureunspaced-heading), for paragraph text such as `#Heading#`                                                                                                                              |
 | MD021 `no-multiple-space-closed-atx`     | [`style/heading`](rules.md#styleheading); removes closing `#` by default or normalizes retained separators                                                                                                                              |
-| MD022 `blanks-around-headings`           | [`style/block-spacing`](rules.md#styleblock-spacing). Not yet `lines_above` and `lines_below` ([#679](https://github.com/viell-dev/slop-markdown-tools/issues/679))                                                                     |
+| MD022 `blanks-around-headings`           | [`style/block-spacing`](rules.md#styleblock-spacing), with `linesAbove`, `linesBelow`, and `includeFrontMatter`; counts that `style/blank-lines` would remove are refused                                                               |
 | MD023 `heading-start-left`               | [`style/heading`](rules.md#styleheading); preserves container prefixes                                                                                                                                                                  |
 | MD024 `no-duplicate-heading`             | [`structure/duplicate-heading`](rules.md#structureduplicate-heading); `siblingsOnly` defaults to `true`                                                                                                                                 |
 | MD025 `single-title`                     | [`structure/single-title`](rules.md#structuresingle-title)                                                                                                                                                                              |
@@ -143,7 +143,7 @@ rule that no preset in your configuration enables, such as
 | MD043 `required-headings`                | None yet ([#692](https://github.com/viell-dev/slop-markdown-tools/issues/692))                                                                                                                                                          |
 | MD044 `proper-names`                     | None yet ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693))                                                                                                                                                          |
 | MD045 `no-alt-text`                      | [`content/image-alt`](rules.md#contentimage-alt), also HTML `<img>` without `alt`; `alt=""` marks a decorative image, and `aria-hidden="true"` counts outside GitHub                                                                    |
-| MD046 `code-block-style`                 | [`style/code-fence`](rules.md#stylecode-fence) formats fences. Not yet choosing between fenced and indented blocks ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695))                                                |
+| MD046 `code-block-style`                 | [`style/code-block`](rules.md#stylecode-block), with `consistent`, `fenced`, or `indented`; indented blocks are fenced where that is safe, outside VitePress, and other findings are reported only                                      |
 | MD047 `single-trailing-newline`          | [`style/final-newline`](rules.md#stylefinal-newline)                                                                                                                                                                                    |
 | MD048 `code-fence-style`                 | [`style/code-fence`](rules.md#stylecode-fence)                                                                                                                                                                                          |
 | MD049 `emphasis-style`                   | [`style/emphasis`](rules.md#styleemphasis). Includes `marker: "consistent"`                                                                                                                                                             |
@@ -166,17 +166,23 @@ its custom rules to [plugins](plugins.md).
 
 For the heading checks, markdownlint's `level`, `allow_preamble`, and
 `front_matter_title` choices correspond to mdrefine's `level`, `allowPreamble`,
-and `frontMatterTitle`. For duplicate headings, use `siblingsOnly`; its default
-is `true`, so set it to `false` for whole-outline checking. For fenced-code
-languages, use `allowedLanguages` and `languageOnly`, corresponding to
-`allowed_languages` and `language_only`. For unused definitions, use
-`ignoredDefinitions`, corresponding to `ignored_definitions` with the same
-default, `["//"]`, for comments written as `[//]: # (comment)`; `links/empty`
-takes it too, so that it does not report such a comment's `#`. These are option
-mappings, not a promise of identical defaults or behavior: initial-heading's
-metadata-title recognition is off by default, and the heading checks use
-Markdown headings with independent quote and footnote outlines. See each rule's
-reference for its exact contract.
+and `frontMatterTitle`. MD001 reads a front-matter title by default;
+`structure/heading-increment` does so with `frontMatterTitle: true`, off by
+default because the renderers that mdrefine supports do not show that title as a
+heading. MD022's `lines_above`, `lines_below`, and `include_front_matter` are
+`linesAbove`, `linesBelow`, and `includeFrontMatter`, with the same counts;
+mdrefine refuses counts that `style/blank-lines` would remove, where
+markdownlint leaves MD022 and MD012 to disagree. For duplicate headings, use
+`siblingsOnly`; its default is `true`, so set it to `false` for whole-outline
+checking. For fenced-code languages, use `allowedLanguages` and `languageOnly`,
+corresponding to `allowed_languages` and `language_only`. For unused
+definitions, use `ignoredDefinitions`, corresponding to `ignored_definitions`
+with the same default, `["//"]`, for comments written as `[//]: # (comment)`;
+`links/empty` takes it too, so that it does not report such a comment's `#`.
+These are option mappings, not a promise of identical defaults or behavior:
+initial-heading's and heading-increment's metadata-title recognition is off by
+default, and the heading checks use Markdown headings with independent quote and
+footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
 

@@ -11,13 +11,30 @@ import { codeFence } from "../syntax/fences.js";
 import { countBelow } from "../syntax/source.js";
 import { type Range } from "./shared.js";
 import { misreadTable } from "./protections.js";
-import { lineBounds, lineEnd, lineEnding } from "../syntax/source.js";
+import { lineBounds, lineEnd, lineEnding, lineStart } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 /** A line holding nothing but block quote markers and blank space. */
 const blankLine = /^[ \t>]*$/;
 
 const blockContainers = ["blockquote", "list", "listItem", "footnoteDefinition"];
+
+/**
+ * The lines of blank space and quote markers that end at the line break at
+ * `at` and the ones directly above them, nearest first, as source ranges
+ * without their line endings; at most `limit` of them.
+ */
+function separators(source: string, at: number, limit: number): Range[] {
+  const lines: Range[] = [];
+  while (lines.length < limit) {
+    const from = lineStart(source, at);
+    if (!blankLine.test(source.slice(from, at))) break;
+    lines.push([from, at]);
+    if (from === 0) break;
+    at = from - (source.startsWith("\r\n", from - 2) ? 2 : 1);
+  }
+  return lines;
+}
 
 /** The innermost last block of a container, where its text ends. */
 function lastBlock(node: RootContent): RootContent {
@@ -90,25 +107,85 @@ function definitionAbove(parent: Root | Blockquote, index: number): boolean {
   return false;
 }
 
-/** The block that needs separating from its neighbor, with its name in findings. */
+/**
+ * The blank lines that a heading needs above or below it: one count, or one
+ * per heading level, where levels left out keep the default of one. `0` and
+ * `-1`, which markdownlint's MD022 uses for any number, need none.
+ */
+type HeadingLines = number | readonly number[];
+const headingLinesSchema = {
+  anyOf: [
+    { type: "integer", minimum: -1 },
+    { type: "array", items: { type: "integer", minimum: -1 }, minItems: 1, maxItems: 6 },
+  ],
+};
+function linesFor(setting: HeadingLines | undefined, depth: number): number {
+  const lines = typeof setting === "object" ? setting[depth - 1] : setting;
+  return lines ?? 1;
+}
+
+/**
+ * The block that needs separating from its neighbor, with its name in
+ * findings and the blank lines it needs. A heading takes the configured
+ * counts; a list, fence, or table needs one.
+ */
 function subjectOf(
   document: Document,
   parent: Root | Blockquote,
   index: number,
-): { node: RootContent; kind: string } | undefined {
+  options: { linesAbove?: HeadingLines; linesBelow?: HeadingLines },
+): { node: RootContent; kind: string; lines: number } | undefined {
   const before = parent.children[index - 1]!;
   const after = parent.children[index]!;
-  const block = [after, before].find((node) => node.type === "heading" || node.type === "list");
-  if (block) return { node: block, kind: block.type };
+  const subjects: { node: RootContent; kind: string; lines: number }[] = [];
+  for (const node of [after, before])
+    if (node.type === "heading")
+      subjects.push({
+        node,
+        kind: "heading",
+        lines: linesFor(node === after ? options.linesAbove : options.linesBelow, node.depth),
+      });
+    else if (node.type === "list") subjects.push({ node, kind: "list", lines: 1 });
   // Fences can interrupt a paragraph, and the line after a closing fence
   // starts a block, so their neighbors keep their reading (#684).
-  for (const node of [after, before])
-    if (closedFence(document, node)) return { node, kind: "fenced code block" };
+  const fence = [after, before].find((node) => closedFence(document, node));
+  if (fence) subjects.push({ node: fence, kind: "fenced code block", lines: 1 });
   // A table ends only before a block that interrupts it; text below it is
-  // another row. Above it, the parser's reading decides (#697).
-  if (before.type === "table" && endsTable(document, after)) return { node: before, kind: "table" };
-  if (after.type === "table" && precedesTable(document, before) && !definitionAbove(parent, index))
-    return { node: after, kind: "table" };
+  // another row. Above it, the parser's reading decides (#697). A heading
+  // ends a table and starts a block, as it always has as the subject.
+  if (before.type === "table" && (after.type === "heading" || endsTable(document, after)))
+    subjects.push({ node: before, kind: "table", lines: 1 });
+  else if (
+    after.type === "table" &&
+    (before.type === "heading" || precedesTable(document, before)) &&
+    !definitionAbove(parent, index)
+  )
+    subjects.push({ node: after, kind: "table", lines: 1 });
+  // The neighbor that needs the most; on a tie, in the order above: a
+  // heading or list below, then above, then a fence, then a table.
+  let subject = subjects[0];
+  for (const other of subjects) if (other.lines > subject!.lines) subject = other;
+  return subject && subject.lines > 0 ? subject : undefined;
+}
+
+/**
+ * What `style/blank-lines` would refuse in `style/block-spacing`'s options:
+ * a heading count above its `maximum`, which would have one rule add the
+ * blank lines that the other removes.
+ */
+export function blankLinesConflict(
+  spacing: Readonly<Record<string, unknown>>,
+  blankLines: Readonly<Record<string, unknown>>,
+): string | undefined {
+  const maximum = typeof blankLines.maximum === "number" ? blankLines.maximum : 1;
+  for (const name of ["linesAbove", "linesBelow"]) {
+    const setting = spacing[name] as HeadingLines | undefined;
+    for (let depth = 1; depth <= 6; depth++) {
+      const lines = linesFor(setting, depth);
+      if (lines > maximum)
+        return `"${name}" asks for ${lines} blank lines${typeof setting === "object" ? ` at heading level ${depth}` : ""}, but style/blank-lines removes blank lines beyond ${maximum} in a row; set its "maximum" to at least ${lines}, or lower "${name}"`;
+    }
+  }
   return undefined;
 }
 
@@ -123,6 +200,7 @@ function together(
   parent: Root | Blockquote,
   index: number,
   directiveLines: Set<number>,
+  includeFrontMatter: boolean,
 ): boolean {
   const before = parent.children[index - 1]!;
   const after = parent.children[index]!;
@@ -177,8 +255,10 @@ function together(
     )
       return true;
   }
-  // Front matter is not part of the document's text.
-  if (["yaml", "toml"].includes(before.type)) return true;
+  // Front matter is not part of the document's text, unless the heading
+  // below it is configured to keep its distance from it too.
+  if (["yaml", "toml"].includes(before.type) && !(includeFrontMatter && after.type === "heading"))
+    return true;
   // An unclosed HTML comment or block at the end of a list would take in the
   // blank line, and so would an unclosed code fence there on the renderers.
   if (takesLines(before) || endsInOpenFence(source, before)) return true;
@@ -253,11 +333,17 @@ const blockSpacing: Rule = {
     "Separate headings, lists, fenced code blocks, and tables from neighboring blocks with a blank line.",
   kind: "style",
   phase: "block",
-  schema: optionsSchema({}),
-  check({ document }) {
+  schema: optionsSchema({
+    linesAbove: headingLinesSchema,
+    linesBelow: headingLinesSchema,
+    includeFrontMatter: { type: "boolean", default: false },
+  }),
+  check({ document, options }) {
     const { source } = document;
     const findings: Finding[] = [];
     const newline = lineEnding(source);
+    const counts = options as { linesAbove?: HeadingLines; linesBelow?: HeadingLines };
+    const includeFrontMatter = options.includeFrontMatter === true;
     // These parsed headings continue as paragraph text in an Obsidian view
     // (#383, #397). Keep the boundary after their underline too (#434).
     const paragraphHeadingEnds = new Set(
@@ -333,9 +419,15 @@ const blockSpacing: Rule = {
             position?.start.offset !== undefined && position.end.offset !== undefined,
         );
         if (!located) continue;
-        const subject = subjectOf(document, parent, index);
-        if (!subject || together(document, parent, index, directiveLines)) continue;
-        const end = range(before)[1];
+        const subject = subjectOf(document, parent, index, counts);
+        if (!subject || together(document, parent, index, directiveLines, includeFrontMatter))
+          continue;
+        let end = range(before)[1];
+        // VitePress's front matter takes in the line ending of its closing
+        // line, which stays as written: new lines go after it.
+        const frontMatter = ["yaml", "toml"].includes(before.type);
+        if (frontMatter && (source[end - 1] === "\n" || source[end - 1] === "\r"))
+          end -= source.startsWith("\r\n", end - 2) ? 2 : 1;
         const start = range(after)[0];
         const lineStart = lineBounds(source, start, start)[0];
         const breakStart = lineStart - (source.startsWith("\r\n", lineStart - 2) ? 2 : 1);
@@ -343,21 +435,54 @@ const blockSpacing: Rule = {
         if (before.type === "heading" && paragraphHeadingEnds.has(breakStart)) continue;
         if (continuesAt(lineStart)) continue;
         if (splitsPlainText(breakStart, lineStart)) continue;
-        // A blank line, or one with only quote markers, already separates them.
-        const previous = source.slice(lineBounds(source, breakStart, breakStart)[0], breakStart);
-        if (blankLine.test(previous)) continue;
         // The block's own line holds the quote markers that the new line needs.
         const prefix = source.slice(lineStart, start);
         if (!blankLine.test(prefix)) continue;
+        const line = prefix.replace(/[ \t]+$/, "");
+        // In a block quote, the parser counts the lines below a list or
+        // footnote toward it, and reads the list as loose when two or more
+        // follow: one blank line is all that keeps its reading.
+        const lines =
+          parent.type === "blockquote" &&
+          (before.type === "list" || before.type === "footnoteDefinition")
+            ? 1
+            : subject.lines;
+        // Blank lines, or lines with only quote markers, that already separate them.
+        const existing = separators(source, breakStart, lines);
+        const missing = lines - existing.length;
+        if (missing <= 0) continue;
+        // More blank lines go only after plain ones of this block's own
+        // quote: a line that the block above ends with, such as one that the
+        // parser counts toward a list in a quote, decides whether that list
+        // is loose; a line of other markers ends a quote; and Obsidian's views
+        // read a line of blank space below HTML, or one with a tab, as text.
+        if (
+          existing.length &&
+          ((before.type === "heading" && paragraphHeadingEnds.has(end)) ||
+            existing.some(
+              ([from, to]) =>
+                from <= end ||
+                (document.dialect === "obsidian"
+                  ? source.slice(from, to) !== line
+                  : source.slice(from, to).replace(/[ \t]+$/, "") !== line),
+            ))
+        )
+          continue;
         const below = subject.node === after;
+        const where = `${below ? "before" : "after"} the ${subject.kind}`;
         findings.push({
           start: below ? start : end,
-          message: `Add a blank line ${below ? "before" : "after"} the ${subject.kind}.`,
-          edit: {
-            start: breakStart,
-            end: lineStart,
-            text: source.slice(breakStart, lineStart) + prefix.replace(/[ \t]+$/, "") + newline,
-          },
+          message:
+            lines === 1
+              ? `Add a blank line ${where}.`
+              : `Use ${lines} blank lines ${where}; add ${missing}.`,
+          edit: frontMatter
+            ? { start: lineStart, end: lineStart, text: (line + newline).repeat(missing) }
+            : {
+                start: breakStart,
+                end: lineStart,
+                text: source.slice(breakStart, lineStart) + (line + newline).repeat(missing),
+              },
         });
       }
     });
