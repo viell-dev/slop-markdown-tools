@@ -124,6 +124,13 @@ without TypeScript's additional unchecked-index option. Integration tests
 validate CLI JSON before using it; the shared readers in `tests/support/json.ts`
 keep the original payload, so assertions still catch unexpected keys.
 
+ESLint also rejects a regular expression literal with the `u` flag in which a
+bracketed class stands right before the end-of-input `$` without a start anchor,
+because Node.js 26 does not match a surrogate pair there (#743). Test the whole
+code point with a start-anchored pattern, quantify the class, or use the `v`
+flag instead; `tests/integration/lint-guards.test.ts` checks the shapes it
+covers.
+
 The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
 `npm run schema` writes it to `config.schema.json`, which the package ships and
 the site serves; a test fails when the two differ.
