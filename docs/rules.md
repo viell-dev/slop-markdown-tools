@@ -36,14 +36,14 @@ presets, dialects, and options.
 | `obsidian/strict-line-breaks`   | 🔍   | ❌            | ✅             | ❌      |
 | `structure/duplicate-heading`   | 🔍   | ❌            | ❌             | ✅      |
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌             | ✅      |
-| `structure/heading-increment`   | 🔍   | ✅            | ❌             | ❌      |
+| `structure/heading-increment`   | 🔍   | ✅            | ❌             | ✅      |
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌             | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌             | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌             | ✅      |
 | `structure/split-quote`         | 🔍   | ❌            | ❌             | ❌      |
 | `structure/unspaced-heading`    | 🔍   | ❌            | ❌             | ❌      |
 | `style/blank-lines`             | 🎨   | ✅            | ❌             | ✅      |
-| `style/block-spacing`           | 🎨   | ✅            | ❌             | ❌      |
+| `style/block-spacing`           | 🎨   | ✅            | ❌             | ✅      |
 | `style/code-fence`              | 🎨   | ✅            | ❌             | ✅      |
 | `style/emphasis`                | 🎨   | ✅            | ❌             | ✅      |
 | `style/final-newline`           | 🎨   | ✅            | ❌             | ❌      |
@@ -745,17 +745,31 @@ Run the installer.
 ## `structure/heading-increment`
 
 **Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+`frontMatterTitle`.
 
 Reports a heading more than one level deeper than the heading before it, such as
 a level-3 heading directly after a level-1 heading. Readers who move through a
 document by its headings, with a screen reader or a table of contents, rely on
-the levels to show how sections nest. The first heading may have any level.
+the levels to show how sections nest. The first heading may have any level,
+unless `frontMatterTitle`, described below, counts a title before it.
 
 The headings of a block quote, which is also how callouts and alerts are
 written, and of a footnote are checked among themselves: a callout can start
 with a level-3 heading under any heading, and its headings do not count for the
 document's.
+
+After 0.5.0, `frontMatterTitle` treats a title in YAML or TOML front matter as a
+level-1 heading before the document's first heading, which may then be at most
+level 2, as for a site generator that shows the title as the page's heading. It
+takes the values and matching contract of
+[`structure/initial-heading`](#structureinitial-heading)'s: `true` for a
+top-level `title` key, a regular-expression string for another field, and
+`false` or `""` for none. The default is `false`, because GitHub, Forgejo,
+Gitea, Obsidian, and VitePress do not show a front-matter title as a heading in
+the document, so its outline starts at the first heading. The title belongs to
+the document's own outline, not to its quotes and footnotes. Counting level-1
+headings below a title is [`structure/single-title`](#structuresingle-title)'s
+check.
 
 Reported:
 
@@ -850,7 +864,8 @@ regular-expression string such as `"^page_name\\s*[:=]"` to recognize a
 different field. The pattern matches the front matter's contents, without its
 delimiters, in multiline mode; it does not match the body. An invalid pattern is
 a configuration error. `false` or `""` disables title recognition. The same
-setting is available on `structure/single-title`, with a different default.
+setting is available on `structure/single-title`, with a different default, and
+after 0.5.0 on `structure/heading-increment`, with the same default.
 
 The default detector matches a literal `title` key, optionally quoted: in column
 1 for YAML, or before the first table header in TOML, where indentation is
@@ -1008,6 +1023,11 @@ ones are removed the same way. In the Obsidian dialect, a line of blank space
 that holds a tab, or that lies directly below an HTML block, is not blank:
 Obsidian's Reading view reads it as more of the paragraph or block above it.
 
+After 0.5.0, a configuration whose [`style/block-spacing`](#styleblock-spacing)
+asks for more blank lines around a heading than `maximum` allows is refused when
+it is read, unless one of the two rules is off: each rule would undo the other's
+edits.
+
 Before, with three blank lines between the blocks and two at the end:
 
 ```markdown
@@ -1050,7 +1070,7 @@ paragraph still permits blank-line cleanup and inline preferences.
 ## `style/block-spacing`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
-Options: none.
+Options: `linesAbove`, `linesBelow`, `includeFrontMatter`.
 
 Separates every heading and every list from the blocks before and after it with
 a blank line, in the document and in block quotes at any depth. After 0.5.0, it
@@ -1120,6 +1140,70 @@ npx mdrefine format
 
 > It reads the configuration file.
 ````
+
+After 0.5.0, options set the blank lines around headings:
+
+| Option               | Values                                               | Default |
+| -------------------- | ---------------------------------------------------- | ------- |
+| `linesAbove`         | An integer of at least -1, or an array of one to six | `1`     |
+| `linesBelow`         | An integer of at least -1, or an array of one to six | `1`     |
+| `includeFrontMatter` | A boolean                                            | `false` |
+
+`linesAbove` and `linesBelow` set how many blank lines a heading needs above and
+below it, as markdownlint's MD022 `lines_above` and `lines_below` do. A number
+applies to every level; an array gives the counts for levels 1 to 6 in order,
+and a level that it leaves out needs one. The counts are minimums: the rule adds
+the blank lines that are missing and keeps any more that are there, which
+[`style/blank-lines`](#styleblank-lines) limits. `0` and `-1` need none, so that
+only a list, a fenced code block, or a table next to such a heading still gets
+its own blank line. Between two headings, the larger count applies. A
+configuration whose counts exceed `style/blank-lines`' `maximum` is refused when
+it is read, so set both, as in:
+
+```jsonc
+{
+  "rules": {
+    "style/blank-lines": ["warn", { "maximum": 2 }],
+    "style/block-spacing": ["warn", { "linesAbove": [2, 1] }],
+  },
+}
+```
+
+With `includeFrontMatter: true`, a heading directly below YAML or TOML front
+matter gets its `linesAbove` blank lines too; other blocks there stay as
+written. In the VitePress dialect, which reads front matter itself, nothing is
+added directly against the closing line; blank lines that are already there can
+be added to.
+
+The places listed below stay as written whatever the counts, and a second blank
+line is added only where it keeps the document's meaning. Below a list or a
+footnote definition in a block quote, the rule adds at most one, because the
+parser counts the blank lines there toward the list and reads it as loose when
+two or more follow. Existing blank lines are added to only when they hold the
+same quote markers as the new ones, and in the Obsidian dialect only when they
+are empty, because Obsidian can read a line of blank space as text.
+
+With the options above, before:
+
+```markdown
+Read this first.
+# Setup
+Install the package.
+## Usage
+```
+
+After:
+
+```markdown
+Read this first.
+
+
+# Setup
+
+Install the package.
+
+## Usage
+```
 
 Nothing is added at the start or the end of a document, and these places are
 left as written, because a blank line there would change what the document means
