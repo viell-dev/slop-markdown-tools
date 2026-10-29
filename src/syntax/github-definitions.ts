@@ -58,20 +58,24 @@ export function githubDefinitionSyntax(offsets: ReadonlySet<number>): Extension 
  * whether any were dropped.
  */
 export function keepUnderlinedDefinitions(tree: Root, offsets: Set<number>): boolean {
-  let dropped = false;
+  // Such headings, in document order: their ranges ascend and do not overlap.
+  const headings: [number, number][] = [];
   function visit(node: Nodes) {
     if (node.type === "heading" && offsets.has(node.position!.start.offset!)) {
-      for (const offset of offsets)
-        if (offset >= node.position!.start.offset! && offset < node.position!.end.offset!) {
-          offsets.delete(offset);
-          dropped = true;
-        }
+      headings.push([node.position!.start.offset!, node.position!.end.offset!]);
       return;
     }
     if ("children" in node) for (const child of node.children) visit(child);
   }
   visit(tree);
-  return dropped;
+  if (!headings.length) return false;
+  const sorted = [...offsets].sort((a, b) => a - b);
+  let at = 0;
+  for (const [start, end] of headings) {
+    while (at < sorted.length && sorted[at]! < start) at++;
+    while (at < sorted.length && sorted[at]! < end) offsets.delete(sorted[at++]!);
+  }
+  return true;
 }
 
 const visibleDefinitions = new WeakSet<Nodes>();
