@@ -1545,9 +1545,9 @@ default because they match the usual Markdown title notation.
 When the preferred delimiter occurs unescaped inside a title, its existing
 delimiters stay rather than adding escapes. Existing escapes, entities,
 backslashes, and line breaks inside titles remain exact. Empty titles use the
-same delimiter choice. Definitions containing tabs or lacking whitespace after
-the colon stay as written, since reference parsers disagree about their
-recognition. Forgejo and Gitea heading titles stay as written where their source
+same delimiter choice. Definitions containing tabs stay as written, because
+commonmark.js reads a tab-separated definition as text where GitHub and
+markdown-it read a definition. Forgejo and Gitea heading titles stay as written where their source
 contributes to an anchor or attribute block. This optional source style is
 outside `recommended`, preserving existing default formatting.
 
