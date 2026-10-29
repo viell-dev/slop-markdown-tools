@@ -178,19 +178,19 @@ run, with a tracking issue where available.
 Each rule retains its enabled competitor origins outside the configuration.
 Disabling a markdownlint check leaves Prettier's choice active at warning
 severity, using Prettier's own options in that region. Stated markdownlint
-options still win where both sources are active. Shared markdownlint rules
-handle suppression as follows:
+options still win where both sources are active. Each distinct set of active
+checks is converted with Prettier's choices and the same file override patches.
+The engine evaluates each distinct rule setting once per document and selects
+its findings in the corresponding regions. This also recalculates dependent
+options: disabling MD022 restores MD012's own blank-line maximum.
 
-- `style/block-spacing` (MD022, MD031, MD032, MD058) attributes each finding to
-  its named block: heading, fenced code block, list, or table. Only that check
-  controls the finding.
-- `structure/unspaced-heading` (MD018, MD020) distinguishes ordinary and closed
-  ATX heading candidates in its findings. Only the matching check reports.
-- `style/heading` (MD003, MD019, MD021, MD023), `style/list-indent` (MD005,
-  MD007, MD030), and `style/table` (MD055, MD060) combine checks without
-  attributing individual findings. If any enabled contributing check is
-  suppressed, their markdownlint findings and edits in that region are held
-  conservatively. Prettier can still apply its own choices there.
+Shared destinations retain the active checks: `style/heading` (MD003, MD019,
+MD021, MD023), `style/list-indent` (MD005, MD007, MD030), and `style/table`
+(MD055, MD060) use the converted regional setting. `style/block-spacing` (MD022,
+MD031, MD032, MD058) additionally attributes findings to their named block, and
+`structure/unspaced-heading` (MD018, MD020) distinguishes ordinary and closed
+ATX candidates. Every proposal still passes the ordinary edit and semantic
+safety checks.
 
 Prettier's `ignore` preserves the next parsed node; `ignore-start` and
 `ignore-end` preserve a top-level range, with blank lines before the comments.

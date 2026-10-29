@@ -231,8 +231,9 @@ prereleases' notes there are longer than their entries here.
 ### Fixed
 
 - Fix competitor fallback comments losing scoped override provenance after
-  `configure-file`, shared-check suppressions, pragmas after front matter, and
-  disabled markdownlint options overriding Prettier's surviving choices
+  `configure-file`, pragmas after front matter, and shared-check suppressions by
+  converting the checks active in each region, including dependent blank-line
+  limits and Prettier's surviving choices
   ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's

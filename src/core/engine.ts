@@ -139,7 +139,7 @@ function inspect(
     const enabled = setting(value);
     const rule = rules[name]!;
     if (enabled.severity === "off" || !include(rule)) continue;
-    let findings: (Finding & { prettierOnly?: boolean })[] = [];
+    let findings: (Finding & { variant?: typeof value })[] = [];
     let problem: string | undefined;
     try {
       const returned: unknown = rule.check({
@@ -153,8 +153,8 @@ function inspect(
       problem = findingsProblem(returned, document.source.length);
       if (!problem) {
         findings = [...(returned as Finding[])];
-        const alternative = competitor.prettierRules[name];
-        if (alternative && JSON.stringify(alternative) !== JSON.stringify(value)) {
+        for (const alternative of competitor.variants[name] ?? []) {
+          if (setting(alternative).severity === "off") continue;
           const extra: unknown = rule.check({
             document,
             options: setting(alternative).options,
@@ -162,10 +162,10 @@ function inspect(
           });
           if (!Array.isArray(extra)) void Promise.resolve(extra).catch(() => undefined);
           problem = findingsProblem(extra, document.source.length);
-          if (!problem)
-            findings.push(
-              ...(extra as Finding[]).map((finding) => ({ ...finding, prettierOnly: true })),
-            );
+          if (problem) break;
+          findings.push(
+            ...(extra as Finding[]).map((finding) => ({ ...finding, variant: alternative })),
+          );
         }
       }
     } catch (error) {
@@ -181,8 +181,8 @@ function inspect(
       );
       continue;
     }
-    for (const { prettierOnly, ...original } of findings) {
-      const compatibleFinding = competitor(name, original, prettierOnly);
+    for (const { variant, ...original } of findings) {
+      const compatibleFinding = competitor(name, original, variant);
       if (!compatibleFinding) continue;
       const { compatibilitySeverity, ...finding } = compatibleFinding;
       if (suppressed(name, original) || protectedVitePress(document, name, original)) continue;

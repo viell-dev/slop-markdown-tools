@@ -4,7 +4,7 @@ import { resolveConfig } from "../config/resolve.js";
 import { range } from "../syntax/parse.js";
 import { lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
-import type { Document, Finding, ProcessOptions } from "./types.js";
+import type { Document, Finding, ProcessOptions, RuleSetting } from "./types.js";
 
 function names(name: string) {
   const key = name.toLowerCase();
@@ -137,23 +137,12 @@ function intersects(intervals: Interval[], start: number, end: number): boolean 
 }
 export function competitorComments(document: Document, options: ProcessOptions) {
   const compat = options.compatibility;
-  const emptyRules: ReturnType<typeof resolveConfig>["rules"] = {};
+  const emptyVariants: Record<string, RuleSetting[]> = {};
   if (!compat)
     return Object.assign(
       (_rule: string, finding: Finding): CompatibleFinding | undefined => finding,
-      { prettierRules: emptyRules },
+      { variants: emptyVariants },
     );
-  // Reconvert without markdownlint so disabled source options cannot leak into
-  // the surviving formatter. Retain file-scoped Prettier patches from the loader.
-  const prettierRules = compat.prettier
-    ? resolveConfig({
-        config: {
-          ...convertConfig({ prettier: compat.prettier }).config,
-          ...(options.config?.overrides ? { overrides: options.config.overrides } : {}),
-        },
-        ...(options.path ? { path: options.path } : {}),
-      }).rules
-    : {};
   const effectiveRules = resolveConfig({
     config: options.config ?? {},
     ...(options.path ? { path: options.path } : {}),
@@ -297,31 +286,89 @@ export function competitorComments(document: Document, options: ProcessOptions) 
     }
     return intersects(intervals, position, end);
   }
+  // Partition at suppression transitions, then convert each distinct active set
+  // once. Dependencies (such as MD022's blank-line maximum) are recalculated by
+  // the converter rather than copied from the fully enabled configuration.
+  const ids = [
+    ...new Set(
+      Object.values(compat.origins)
+        .flat()
+        .filter((id) => id.startsWith("MD")),
+    ),
+  ];
+  for (const id of ids) suppressed(id, 0);
+  const boundaries = [
+    ...new Set([
+      0,
+      ...[...cache.values()].flatMap((ranges) =>
+        ranges.flatMap(({ start, end }) => [start, end + 1]),
+      ),
+    ]),
+  ]
+    .filter((at) => at <= source.length)
+    .sort((a, b) => a - b);
+  const converted = new Map<string, typeof effectiveRules>();
+  const regions = boundaries.map((start) => {
+    const disabled = ids.filter((id) => suppressed(id, start));
+    const key = disabled.join(" ");
+    let rules = converted.get(key);
+    if (!rules) {
+      rules = disabled.length
+        ? resolveConfig({
+            config: {
+              ...convertConfig({
+                ...(compat.markdownlint
+                  ? {
+                      markdownlint: {
+                        ...Object.fromEntries(
+                          Object.entries(compat.markdownlint).filter(
+                            ([id]) => !disabled.includes(id),
+                          ),
+                        ),
+                        ...Object.fromEntries(disabled.map((id) => [id, false])),
+                      },
+                    }
+                  : {}),
+                ...(compat.prettier ? { prettier: compat.prettier } : {}),
+              }).config,
+              ...(options.config?.overrides ? { overrides: options.config.overrides } : {}),
+            },
+            ...(options.path ? { path: options.path } : {}),
+            ...(options.plugins ? { plugins: options.plugins } : {}),
+          }).rules
+        : effectiveRules;
+      converted.set(key, rules);
+    }
+    return { start, rules };
+  });
+  function rulesAt(position: number) {
+    let low = 0;
+    let high = regions.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (regions[mid]!.start <= position) low = mid + 1;
+      else high = mid;
+    }
+    return regions[Math.max(0, low - 1)]!.rules;
+  }
+  const variants: Record<string, RuleSetting[]> = {};
+  for (const rules of converted.values())
+    for (const [rule, value] of Object.entries(rules)) {
+      if (JSON.stringify(value) === JSON.stringify(effectiveRules[rule])) continue;
+      const values = (variants[rule] ??= []);
+      if (!values.some((v) => JSON.stringify(v) === JSON.stringify(value))) values.push(value);
+    }
   return Object.assign(
-    (rule: string, finding: Finding, prettierOnly = false): CompatibleFinding | undefined => {
+    (
+      rule: string,
+      finding: Finding,
+      variant = effectiveRules[rule],
+    ): CompatibleFinding | undefined => {
+      if (JSON.stringify(rulesAt(finding.start)[rule]) !== JSON.stringify(variant))
+        return undefined;
       // Missing provenance in compatibility mode must never bypass an ignore.
       const origins = compat.origins[rule] ?? (compat.prettier ? ["unknown prettier origin"] : []);
       let checks = origins.filter((id) => id.startsWith("MD"));
-      // MD022 also raises the blank-line maximum to keep its requested spacing.
-      // That dependent option survives while the heading check is active.
-      const spacing = effectiveRules["style/block-spacing"];
-      const spacingOptions = (Array.isArray(spacing) ? spacing[1] : undefined) as
-        Readonly<Record<string, unknown>> | undefined;
-      const headingCount = Math.max(
-        1,
-        ...[spacingOptions?.linesAbove, spacingOptions?.linesBelow].flatMap((v) =>
-          Array.isArray(v) ? (v as number[]) : typeof v === "number" ? [v] : [],
-        ),
-      );
-      if (
-        rule === "style/blank-lines" &&
-        headingCount > 1 &&
-        compat.origins["style/block-spacing"]?.includes("MD022")
-      )
-        checks.push("MD022");
-      const shared = competitorMappings.filter(
-        (row) => row.rule === rule && row.source.startsWith("MD"),
-      );
       if (rule === "style/block-spacing") {
         const check = /the heading/.test(finding.message)
           ? "MD022"
@@ -336,16 +383,8 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       } else if (rule === "structure/unspaced-heading") {
         const check = finding.message.includes("add spaces inside the hashes") ? "MD020" : "MD018";
         checks = checks.filter((id) => id === check);
-      } else if (shared.length > 1 && checks.some((id) => suppressed(id, finding.start))) {
-        // These rules do not attribute findings to individual source checks.
-        // Hold their markdownlint behavior when any contributing check is disabled.
-        checks = [];
       }
       const markdownlint = checks.some((id) => !suppressed(id, finding.start));
-      const alternate =
-        prettierRules[rule] !== undefined &&
-        JSON.stringify(prettierRules[rule]) !== JSON.stringify(effectiveRules[rule]);
-      if (prettierOnly ? markdownlint : !markdownlint && alternate) return undefined;
       const fromPrettier = origins.some((id) => !id.startsWith("MD"));
       const start = finding.edit?.start ?? finding.start;
       const end = finding.edit?.end ?? finding.end ?? start;
@@ -360,6 +399,6 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       }
       return markdownlint ? finding : { ...finding, compatibilitySeverity: "warn" };
     },
-    { prettierRules },
+    { variants },
   );
 }

@@ -117,10 +117,11 @@ it.each([
   [{ MD003: true, MD019: true }, "MD003", "#  Heading\n"],
   [{ MD005: true, MD030: true }, "MD030", "-   one\n"],
   [{ MD055: true, MD060: { style: "aligned" } }, "MD055", "a|b\n---|---\nx|y\n"],
-] as const)("round2 holds unattributed shared checks %j", (checks, disabled, body) => {
+] as const)("round2 reconverts shared checks %j", (checks, disabled, body) => {
   const o = options({ markdownlint: { default: false, ...checks } });
   const source = `<!-- markdownlint-disable ${disabled} -->\n\n${body}`;
-  expect(format(source, o).output).toBe(source);
+  const surviving = options({ markdownlint: { default: false, ...checks, [disabled]: false } });
+  expect(format(source, o).output).toBe(format(source, surviving).output);
   expect(format(body, o).output).not.toBe(body);
 });
 it("round2 missing provenance fails safe under a Prettier ignore", () => {
