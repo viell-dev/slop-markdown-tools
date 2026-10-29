@@ -5,12 +5,11 @@ the second number plays the part of the first: a minor release such as 0.3.0 may
 change what 0.2 does, and the [changelog](changelog.md) says how, while a patch
 release such as 0.2.1 only fixes defects.
 
-The agreed 0.4.x transition introduced the `mdrefine` command, configuration
-filenames and suppression comments while retaining all previous `mdtools` forms
-as deprecated aliases. It included the conservative Obsidian boundary policy and
-visible held-edit findings. These scoped changes are an explicit exception to
-the usual patch-release policy. Version 0.5.0 removes all old naming forms;
-follow the [CLI migration steps](cli.md#earlier-names) before upgrading.
+The 0.4.x patch releases are an agreed exception to this policy: they brought
+the `mdrefine` names beside the deprecated `mdtools` forms, the conservative
+Obsidian boundary policy, and visible held-edit findings. The changelog lists
+them, and the [CLI migration steps](cli.md#earlier-names) replace the old names,
+which 0.5.0 does not accept.
 
 ## What a version number covers
 
@@ -44,10 +43,9 @@ change reaches your documents.
 
 ## Releases and channels
 
-From 0.2.0, the first stable release, npm's `latest` tag names the newest stable
-release. Release candidates and betas are published under the tags `rc` and
-`beta` and leave `latest` alone. Only the newest release line receives fixes;
-see the [security
+npm's `latest` tag names the newest stable release. Release candidates and betas
+are published under the tags `rc` and `beta` and leave `latest` alone. Only the
+newest release line receives fixes; see the [security
 policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/SECURITY.md).
 This site describes the newest stable release.
 

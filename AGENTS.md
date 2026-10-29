@@ -466,12 +466,13 @@ only and remove superseded transition notes.
   accumulation points. Fix an unsafe edit rather than weakening a guard or
   removing historical protections during an unrelated extraction. Obsidian
   wrapping needs verified strict line breaks.
-- `docs.test.ts` compares the examples page, the rule index, the preset table,
-  the library pages, the installation commands, and the changelog with the code,
-  and `benchmarks.test.ts` the benchmark page's headings and row labels. Each
-  example workspace's `after/` tree is exactly what `format --write` makes of
-  `before/`: regenerate it when formatting changes on purpose, and treat an
-  unexpected difference as a regression.
+- `docs.test.ts` compares the examples page, the rule index and each rule
+  section's presets, the preset table, the library pages, the installation
+  commands, and the changelog with the code, and rejects version annotations in
+  the pages; `benchmarks.test.ts` compares the benchmark page's headings and row
+  labels. Each example workspace's `after/` tree is exactly what
+  `format --write` makes of `before/`: regenerate it when formatting changes on
+  purpose, and treat an unexpected difference as a regression.
 - Replace the benchmark page's results only from a run of the Benchmark
   workflow; a local report names its machine's processor and is never published.
   Judge a change by the ratio columns or by runs before and after on one

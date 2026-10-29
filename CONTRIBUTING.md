@@ -995,8 +995,9 @@ npm run docs:build && npm run docs:preview
 The preview's address includes the `/slop-markdown-tools/` base path. The site
 build fails on a link to a page that does not exist, and the tool's lint fails
 on a heading fragment that does not. The integration tests compare the examples
-page, the rule index, and the benchmark page with the code, so update them with
-the behavior they describe. CI builds the site for every pull request. The site
+page, the rule index and each rule section's facts, and the benchmark page with
+the code, and reject version annotations in the pages, so update them with the
+behavior they describe. CI builds the site for every pull request. The site
 describes the newest stable release: the Pages workflow deploys it from that
 release's tag after the Release workflow publishes it, as
 [RELEASING.md](RELEASING.md) describes. A correction to that release's
@@ -1004,6 +1005,35 @@ documentation goes to `main` and to the release's `site-VERSION` branch, which
 RELEASING.md also describes, so that the site never describes unreleased
 behavior. The deployed site's `version.json` names the commit it was built from.
 GitHub Pages must use GitHub Actions as its source.
+
+A page describes the behavior of the version it documents, without version
+history: no notes such as "after 0.4.0", "since", "added in", or "unreleased".
+The site is built from a release tag, so it never shows unreleased behavior, and
+the changelog's `Unreleased` section lists what `main` adds; a page on `main`
+describes `main`. History belongs in `CHANGELOG.md` and in migration steps such
+as the CLI's [earlier names](docs/cli.md#earlier-names). The versioning policy,
+the version a benchmark measured, and the versions of renderers and other tools
+are not history. The docs tests reject version annotations outside a short list
+of such passages; add to that list only a passage of those kinds.
+
+Each rule's section in `docs/rules.md` follows one order:
+
+1. One or two plain sentences on what the rule checks or changes, and why it
+   matters where that is not obvious.
+2. The facts: kind and whether `format` fixes it, each preset with the severity
+   it gives the rule, as in "`recommended` (warn)", or "none", the dialects, and
+   the options.
+3. A short example: before and after, or reported and not reported.
+4. The options: a table where there are several, then a point for each.
+5. The details, in paragraphs or short lists that open with a bold label:
+   **Details:**, **Not checked:**, **Left as written:**, **Reported without a
+   fix:**, a dialect such as **In Obsidian:**, and **With other rules:**. Labels
+   rather than headings keep the page's outline to the rules and the anchors of
+   the rule index stable.
+
+The rule index gives the severity at which each preset enables a rule and names
+the dialect presets. The docs tests compare the index and each section's facts
+with the presets in code.
 
 ## Pull requests
 

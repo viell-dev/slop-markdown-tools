@@ -20,6 +20,39 @@ prereleases' notes there are longer than their entries here.
   destinations remain excluded
   ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693)).
 
+- Three report-only rules, in no preset, cover markdownlint's MD037, MD038, and
+  MD039: `content/emphasis-spacing` reports emphasis or strong markers with
+  blank space just inside them, as in `** bold **`, where the parser reads
+  emphasis once the spaces are gone; `content/inline-code-spacing` reports blank
+  space at the ends of a code span that renderers show as part of the code; and
+  `links/text-spacing` reports blank space at the ends of link text. They leave
+  alone a single `*` or `_` with spaces on both sides, as in `a * b * c`,
+  arithmetic, markers inside words, wildcard patterns such as `*.md *`,
+  identifiers, emoji codes, the content of inline HTML elements such as
+  `<code>`, JSX comments, and code whose blank space shows syntax or
+  indentation, as in `- `, or keeps a backtick apart
+  ([#689](https://github.com/viell-dev/slop-markdown-tools/issues/689),
+  [#690](https://github.com/viell-dev/slop-markdown-tools/issues/690),
+  [#691](https://github.com/viell-dev/slop-markdown-tools/issues/691)).
+
+- Opt-in `content/line-length` reports heading, code and table overflow with
+  per-kind limits, switches and display-column measurement
+  ([#673](https://github.com/viell-dev/slop-markdown-tools/issues/673)).
+- `style/wrap` takes `mode: "never"` to join paragraphs onto one line with the
+  same safety protections as wrapping; preset defaults remain unchanged
+  ([#711](https://github.com/viell-dev/slop-markdown-tools/issues/711)).
+
+- Opt-in `style/link-title` normalizes link, image, and definition title
+  delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
+  It retains source escapes and line breaks and never changes destinations
+  ([#716](https://github.com/viell-dev/slop-markdown-tools/issues/716)).
+
+- Opt-in `style/definition-spacing` writes one space after a reference
+  definition's colon and before its title, also where the colon has none.
+  Multiline definitions, tabbed definitions, footnotes, and Obsidian spacing
+  stay as written
+  ([#717](https://github.com/viell-dev/slop-markdown-tools/issues/717)).
+
 - Opt-in `links/reversed` reports likely reversed links such as
   `(text)[https://example.com]`, without a fix, since a fix would turn text into
   a link. Citations, versions, numbers, call syntax and defined labels are not
@@ -141,6 +174,12 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- The documentation describes the behavior of the version it belongs to, without
+  version notes; this changelog keeps the history. Each rule section opens with
+  what the rule does, then states the severity that each preset gives it, as the
+  rule index does
+  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
 
 - `style/heading` removes heading-owned indentation, including Setext text and
   underlines, while retaining container prefixes. Its new `closing: "add"`
