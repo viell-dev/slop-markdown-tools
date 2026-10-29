@@ -3,7 +3,9 @@ import type { Nodes, Root } from "mdast";
 import type { Dialect, Document, Finding, Rule } from "../core/types.js";
 import { parse, range } from "../syntax/parse.js";
 import { changesForgeHeading } from "../workspace/heading-attributes.js";
-import { escaped } from "../syntax/source.js";
+import { rendererProtections } from "../syntax/renderer-protections.js";
+import { vitepressTokens } from "../syntax/vitepress/projection.js";
+import { escaped, lineStarts } from "../syntax/source.js";
 import { inlineBlocks, located, type Range } from "./shared.js";
 import { calloutTitles, goldmarkForges, inForgeMath, giteaPyLine } from "./protections.js";
 import { optionsSchema } from "./shared.js";
@@ -260,6 +262,39 @@ function blocksWithLooseMarkers(document: Document): Range[] {
   return blocks;
 }
 
+/** Index renderer HTML regions once; marker pairs cannot cross their boundaries. */
+function htmlPairProtection(document: Document): (start: number, end: number) => boolean {
+  const regions: Range[] = [];
+  if (document.dialect === "vitepress") {
+    const starts = lineStarts(document.source);
+    for (const token of vitepressTokens(document))
+      if (token.block && token.map && (token.type === "html_block" || token.type === "html_inline"))
+        regions.push([
+          starts[token.map[0]] ?? document.source.length,
+          starts[token.map[1]] ?? document.source.length,
+        ]);
+  }
+  if (document.dialect === "obsidian") {
+    regions.push(...Array.from(rendererProtections(document).htmlText, range));
+  }
+  const ranges: Range[] = [];
+  for (const [start, end] of regions.sort((a, b) => a[0] - b[0])) {
+    const last = ranges.at(-1);
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else ranges.push([start, end]);
+  }
+  return (start, end) => {
+    let low = 0;
+    let high = ranges.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (ranges[middle]![1] <= start) low = middle + 1;
+      else high = middle;
+    }
+    return low < ranges.length && ranges[low]![0] < end;
+  };
+}
+
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
     description: `Choose ${type} delimiters without reprinting their contents.`,
@@ -284,6 +319,7 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
       const marker = (selected ?? (preference === "consistent" ? fallback : preference)).repeat(
         size,
       );
+      const protectedPair = htmlPairProtection(document);
       const labels = markerLabels(document.tree);
       const titles = calloutTitles(document);
       const loose = document.dialect === "obsidian" ? blocksWithLooseMarkers(document) : [];
@@ -293,6 +329,10 @@ function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
         const [start, end] = range(node);
         const original = source.slice(start, end);
         if (original.startsWith(marker)) return;
+        // Both delimiters must belong to the same editable reading. Filtering
+        // them separately can leave only the opener editable in Obsidian;
+        // VitePress can instead read a component as a block between them.
+        if (protectedPair(start, end)) return;
         // Obsidian's Reading view could pair a new marker with a `*` or `_`
         // that is text, or an old one that it paired with one, otherwise.
         if (loose.some(([a, b]) => start >= a && end <= b)) return;

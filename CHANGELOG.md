@@ -231,6 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
+  or VitePress component blocks without proposing refused edits
+  ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
+  [#768](https://github.com/viell-dev/slop-markdown-tools/issues/768)).
+
 - A lazy line below a list item's or block quote's paragraph that could start an
   HTML block of the kind that cannot interrupt a paragraph, such as `<b>` alone
   on its line, now continues the paragraph, as CommonMark, Forgejo, Gitea,

@@ -4,6 +4,17 @@ import { URL } from "node:url";
 /** Boundary regressions shared by the unit suite and the real-Obsidian comparison. */
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
+  ...[
+    "a *b\n<i>\nc* d\n",
+    "- a *b\n  <i>\n  c* d\n",
+    "- a *b\n<i>\nc* d\n",
+    "> a *b\n> <i>\n> c* d\n",
+    "> a *b\n<i>\nc* d\n",
+  ].map((source, index) => ({
+    issue: 766,
+    name: `emphasis crossing HTML line ${index}`,
+    source,
+  })),
   { issue: 582, name: "bullet lists across a quote", source: "* a\n> b\n- c\n" },
   { issue: 582, name: "same-marker quote tightness", source: "- a\n> b\n- c\n" },
   { issue: 590, name: "quote-only line keeps native list tightness", source: "- a\n> b\n>\n- c\n" },
