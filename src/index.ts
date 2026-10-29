@@ -21,3 +21,6 @@ export { unifiedDiff } from "./cli/diff.js";
 export type { LookupResult, WorkspaceOptions, WorkspaceSource } from "./workspace/index.js";
 export type * from "./core/types.js";
 export type { ObsidianComment, ObsidianHighlight, WikiLink } from "./syntax/obsidian.js";
+
+export { convertConfig, competitorMappings } from "./config/convert.js";
+export type { ConversionReport, CompetitorMapping } from "./config/convert.js";

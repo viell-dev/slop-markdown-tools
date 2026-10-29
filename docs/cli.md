@@ -29,6 +29,7 @@ migration notice is also removed. The npm package and library imports stay
 | `lint [paths…]`         | Reports the findings of the enabled rules. Never writes.                                                       |
 | `format [paths…]`       | Formats documents: prints a diff (the default), checks with `--check`, or writes with `--write`.               |
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
+| `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it exclusively.                      |
 | `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
@@ -56,6 +57,7 @@ and exclude one another.
 | Option                    | Meaning                                                                                                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--root <directory>`      | The workspace root. Without it, the configuration file's directory; else the Git repository or vault where the search for one stopped; else the current directory. |
+| `--no-competitor-config`  | Disable competitor configuration fallback.                                                                                                                         |
 | `--config <file>`         | Use this configuration file instead of searching for one.                                                                                                          |
 | `--dialect <name>`        | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                        |
 | `--exclude <path>`        | Leave out a file or a directory. Repeat it for more.                                                                                                               |
@@ -334,3 +336,15 @@ that matter in version control or a backup. A program that reads the file at
 that moment can see it half written too. A crash during the trial write can
 leave the trial file behind; it is named `.mdrefine-` followed by a random name
 and `.tmp`, holds no document text, and can be deleted.
+
+### Conversion reports
+
+`config convert` writes JSON configuration to stdout and its sources, conflicts,
+omissions with issue numbers, and suggestions to stderr. With `--write` it
+creates `mdrefine.config.jsonc` and prints only the report. An existing
+destination is an error (exit code `2`).
+
+With fallback settings, `config explain` adds a `conversion` object containing
+`config`, `sources`, `omitted`, `conflicts`, and `suggestions`. Ordinary lint
+and format JSON reports keep their existing structure; conversion notices use
+stderr once per invocation.

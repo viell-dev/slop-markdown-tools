@@ -88,16 +88,41 @@ Turn off in one tool what the other covers; the tables below list the overlaps.
 
 ## Coming from Prettier or markdownlint
 
-mdrefine is meant to replace these tools for Markdown, but it does not yet cover
-everything they do. The tables below list every rule of markdownlint 0.42 and
-every Markdown option and formatting choice of Prettier 3.9, with the mdrefine
-rule that covers each. "None yet" and "Not yet" link the issue that tracks the
-missing part; keep the other tool for that check until it is done. The issues
-follow each check's documented purpose, not the other tool's known defects.
+Run `mdrefine config convert` to print an `mdrefine.config.jsonc`, or add
+`--write` to create it. An existing destination is refused. The report on stderr
+lists sources, omissions with tracking issues, resolved conflicts, and suggested
+extra checks. Review the result before replacing your existing tools.
+
+Without an mdrefine configuration, the same conversion runs in memory. Use
+`--no-competitor-config` to disable this fallback. `config explain <file>` shows
+its sources and converted settings. The search stops at the same repository or
+vault boundary as the ordinary configuration search.
+
+The result uses no preset. markdownlint's enabled checks map to their
+counterparts, including its default rule set unless `default: false` is set.
+Prettier enables its fixed styles; wrapping is enabled only for
+`proseWrap: "always"`. Explicit markdownlint choices win fixed Prettier styles;
+Prettier options win the settings they control. Missing behavior is reported.
+The mapping follows intended behavior and retains mdrefine's safety guards.
+
+Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
+markdownlint-cli2 `config`, Prettier's `package.json` key, Markdown overrides,
+and relevant `.editorconfig` values. JavaScript and TypeScript configurations
+are named without executing them; the explicit convert command loads them
+through Node.js. TOML is reported as unsupported. `.prettierignore` and
+markdownlint-cli2 `ignores` and `globs` become `ignore`. Negated
+`.prettierignore` patterns are reported for manual migration.
+
+Competitor inline suppression comments and formatting pragmas are outside
+configuration conversion
+([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)). They have
+no effect with a written mdrefine configuration. Use mdrefine's own [suppression
+comments](configuration.md#suppression-comments).
 
 ### markdownlint rules
 
-markdownlint enables every rule by default. mdrefine's presets enable fewer: a
+markdownlint enables its default rule set; template, proper-name, notation, and
+column-style checks require configuration. mdrefine's presets enable fewer: a
 rule that no preset in your configuration enables, such as
 `structure/heading-punctuation`, needs an entry under `rules`. Each rule's
 [section](rules.md) names its presets.
@@ -185,6 +210,15 @@ default, and the heading checks use Markdown headings with independent quote and
 footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
+
+Language-only options such as `semi`, `trailingComma`, `quoteProps`,
+`jsxSingleQuote`, `bracketSpacing`, `bracketSameLine`, `arrowParens`,
+`htmlWhitespaceSensitivity`, `vueIndentScriptAndStyle`, `objectWrap`,
+`experimentalTernaries`, and `experimentalOperatorPosition` do not select a
+Markdown rule. External embedded-code formatting needs explicit code tools.
+Parser, plugin, range, and file-context settings are reported rather than
+executed or used to change dialect detection
+([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
 
 | Prettier                                         | mdrefine                                                                                                                                                                                              |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

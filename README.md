@@ -74,6 +74,12 @@ and with `--check` fails when a document would change.
 
 ## Configure
 
+To adopt an existing markdownlint or Prettier setup, run
+`npx mdrefine config convert --write`. Without an mdrefine configuration,
+competitor settings are converted in memory; `--no-competitor-config` disables
+that fallback. See [conversion
+details](docs/integrations.md#coming-from-prettier-or-markdownlint).
+
 `mdrefine.config.jsonc` at the root of the documents:
 
 ```jsonc

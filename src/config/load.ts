@@ -12,10 +12,20 @@ import { isVault } from "../workspace/vault.js";
 import { splitByteOrderMark } from "../syntax/parse.js";
 import { lineBreaks } from "../syntax/source.js";
 
+import { loadCompetitorConfig } from "./competitors.js";
+import type { ConversionReport } from "./convert.js";
+
+/** A loaded configuration, its workspace, plugins, and optional conversion provenance. */
 export interface LoadedConfig {
+  /** Report when competitor fallback supplied the configuration. */
+  conversion?: ConversionReport;
+  /** Validated configuration data. */
   config: Config;
+  /** Plugin objects loaded from an mdrefine configuration. */
   plugins: Plugin[];
+  /** Absolute workspace root. */
   root: string;
+  /** Absolute mdrefine configuration filename, absent for fallback. */
   file?: string;
 }
 /** The names of the configuration files that the search finds; one directory may hold one. */
@@ -63,12 +73,19 @@ function syntaxProblem(text: string, error: ParseError): string {
     return `${JSON.stringify(text.slice(error.offset, error.offset + Math.min(error.length, 40)))} is not valid JSON here`;
   return syntaxProblems[code] ?? code;
 }
-export async function loadConfig(start: string, explicit?: string): Promise<LoadedConfig> {
+/** Search for and load mdrefine settings; optionally convert competitor data without executing it. */
+export async function loadConfig(
+  start: string,
+  explicit?: string,
+  competitorFallback = true,
+): Promise<LoadedConfig> {
+  const directories: string[] = [];
   let file = explicit ? path.resolve(explicit) : undefined;
   let fallbackRoot = path.resolve(start);
   if (!file) {
     let directory = path.resolve(start);
     for (;;) {
+      directories.push(directory);
       const found: string[] = [];
       let boundary: boolean;
       try {
@@ -99,6 +116,13 @@ export async function loadConfig(start: string, explicit?: string): Promise<Load
       }
       if (path.dirname(directory) === directory) break;
       directory = path.dirname(directory);
+    }
+  }
+  if (!file && competitorFallback) {
+    const conversion = await loadCompetitorConfig(directories);
+    if (conversion) {
+      validateConfig(conversion.config);
+      return { config: conversion.config, plugins: [], root: fallbackRoot, conversion };
     }
   }
   // The file as the user named it, or where the search found it.

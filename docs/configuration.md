@@ -1,8 +1,8 @@
 # Configuration
 
-One configuration controls both `lint` and `format`. Without a configuration
-file, the `recommended` preset applies and the dialect is
-[assumed](dialects.md#the-assumed-dialect).
+One configuration controls both `lint` and `format`. Without an mdrefine or
+competitor configuration file, the `recommended` preset applies and the dialect
+is [assumed](dialects.md#the-assumed-dialect).
 
 ## Configuration files
 
@@ -17,6 +17,23 @@ the workspace root unless `--root` names another; without a configuration file,
 it is the repository or vault where the search stopped, or else the current
 directory. Configuration files do not cascade: a file in a subdirectory is not
 merged with one above it.
+
+### Competitor configuration fallback
+
+When no mdrefine configuration is found, the CLI converts discovered
+markdownlint and Prettier settings in memory. It names sources and omitted
+settings on stderr once per run. `--no-competitor-config` disables this
+behavior; an explicit `--config` also bypasses it. The Node API's
+`loadConfig(start, explicit, competitorFallback)` accepts `false` as its third
+argument to disable it. Portable `convertConfig({ markdownlint, prettier })`
+converts objects without reading files. Neither changes dialect detection.
+
+`mdrefine config convert` prints a configuration and `--write` creates
+`mdrefine.config.jsonc` in the current directory (or `--root`). It refuses an
+existing file. The explicit command may execute competitor JavaScript settings;
+fallback loading never does. See the [conversion behavior and
+comparison](integrations.md#coming-from-prettier-or-markdownlint) for
+precedence, formats, and remaining coverage gaps.
 
 ### Earlier names
 
