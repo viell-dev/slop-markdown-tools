@@ -24,6 +24,7 @@ column, ✅ is yes and ❌ no.
 | `content/image-alt`             | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `content/inline-code-spacing`   | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/line-length`           | 🔍   | ❌            | ❌                                                              | ✅      |
+| `content/proper-names`          | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/table-columns`         | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | `error` in `forgejo`, `gitea`                                   | ❌      |
@@ -45,14 +46,16 @@ column, ✅ is yes and ❌ no.
 | `obsidian/strict-line-breaks`   | 🔍   | ❌            | `warn` in `obsidian`                                            | ❌      |
 | `structure/duplicate-heading`   | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌                                                              | ✅      |
-| `structure/heading-increment`   | 🔍   | `warn`        | ❌                                                              | ❌      |
+| `structure/heading-increment`   | 🔍   | `warn`        | ❌                                                              | ✅      |
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌                                                              | ✅      |
+| `structure/heading-template`    | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/split-quote`         | 🔍   | ❌            | ❌                                                              | ❌      |
 | `structure/unspaced-heading`    | 🔍   | ❌            | ❌                                                              | ❌      |
 | `style/blank-lines`             | 🎨   | `warn`        | ❌                                                              | ✅      |
-| `style/block-spacing`           | 🎨   | `warn`        | ❌                                                              | ❌      |
+| `style/block-spacing`           | 🎨   | `warn`        | ❌                                                              | ✅      |
+| `style/code-block`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/code-fence`              | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/definition-spacing`      | 🎨   | ❌            | ❌                                                              | ❌      |
 | `style/emphasis`                | 🎨   | `warn`        | ❌                                                              | ✅      |
@@ -342,6 +345,65 @@ strict checking, lines that hold only a link.
 and `stern` here apply only to headings, code, and tables, and do not imply its
 `reportUnreflowed` or `reportUnbreakable`, which judge where prose can safely
 break and which pieces cannot be split, not raw blank space.
+
+## `content/proper-names`
+
+Reports other capitalization of configured names in prose, link labels, and
+image alt text: with `JavaScript` configured, `javascript` is reported. Changing
+a name changes text, so the rule never fixes it.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: `names`,
+`codeBlocks`, `htmlElements`.
+
+With `{ "names": ["JavaScript", "Node.js"] }`, reported:
+
+```markdown
+Write the plugin in javascript for node.js.
+```
+
+Not reported:
+
+```markdown
+Write the plugin in JavaScript for Node.js; run `node.js --version`.
+```
+
+| Option         | Values                        | Default |
+| -------------- | ----------------------------- | ------- |
+| `names`        | An array of non-empty strings | `[]`    |
+| `codeBlocks`   | `true` or `false`             | `false` |
+| `htmlElements` | `true` or `false`             | `true`  |
+
+- `names`: literal names with their accepted capitalization. `[]` checks
+  nothing. Several configured spellings of the same name are all accepted.
+- `codeBlocks`: with `true`, the bodies of fenced and indented code blocks are
+  checked too; turn it on to check prose examples written in fences.
+- `htmlElements`: with `true`, the visible text of HTML is checked; tags,
+  attributes, and comments are not. With `false`, a prose block containing
+  inline HTML is left out as a whole, and other prose is still checked.
+
+For example, in the configuration:
+
+```json
+{
+  "rules": {
+    "content/proper-names": ["warn", { "names": ["JavaScript", "Node.js"] }]
+  }
+}
+```
+
+**Details:** names match literal punctuation and spaces, as in `Node.js`, `C++`,
+and `GitHub Actions`. A Unicode letter, combining mark, number, or connector
+punctuation next to a name prevents a match: neither `myjavascript` nor
+`javascripts` matches `JavaScript`, and the same boundary applies in non-Latin
+scripts. Punctuation outside a name separates it from the text around it. A
+longer name takes precedence over a shorter one that overlaps it. An explicit
+wikilink alias is prose.
+
+**Not checked:** inline code, because a command or identifier often needs its
+exact spelling, and code blocks by default for the same reason; the bodies of
+HTML `script`, `style`, `code`, and `pre` elements; link destinations,
+autolinks, bare URLs and email addresses, image sources, front matter, math,
+comments, and wikilink targets.
 
 ## `content/shell-prompt`
 
@@ -1222,7 +1284,7 @@ document by its headings, with a screen reader or a table of contents, rely on
 the levels to show how sections nest.
 
 **Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all.
-Options: none.
+Options: `frontMatterTitle`.
 
 Reported:
 
@@ -1244,10 +1306,25 @@ Not reported:
 > ### Older versions
 ```
 
-**Details:** the first heading may have any level. The headings of a block
-quote, which is also how callouts and alerts are written, and of a footnote are
-checked among themselves: a callout can start with a level-3 heading under any
-heading, and its headings do not count for the document's.
+`frontMatterTitle` treats a title in YAML or TOML front matter as a level-1
+heading before the document's first heading, which may then be at most level 2,
+as for a site generator that shows the title as the page's heading. It takes the
+values and matching of
+[`structure/initial-heading`](#structureinitial-heading)'s option of that name:
+`true` for a top-level `title` key, a regular-expression string for another
+field, and `false` or `""` for none. The default is `false`, because GitHub,
+Forgejo, Gitea, Obsidian, and VitePress do not show a front-matter title as a
+heading in the document, so its outline starts at the first heading.
+
+**Details:** the first heading may have any level, unless `frontMatterTitle`
+counts a title before it. The headings of a block quote, which is also how
+callouts and alerts are written, and of a footnote are checked among themselves:
+a callout can start with a level-3 heading under any heading, and its headings
+do not count for the document's. A front-matter title belongs to the document's
+own outline, not to its quotes and footnotes.
+
+**With other rules:** counting the level-1 headings below a title is
+[`structure/single-title`](#structuresingle-title)'s check.
 
 ## `structure/heading-punctuation`
 
@@ -1296,6 +1373,83 @@ an Obsidian embed, nor these endings:
   `Corp.`, `Jr.`, and `Sr.`, in any case. Use a [suppression
   comment](configuration.md#suppression-comments) for another abbreviation.
 
+## `structure/heading-template`
+
+Requires the document's headings to follow a configured sequence, such as a
+guide's required sections. It reports the first heading that cannot continue a
+match, or the end of the document when a required heading is missing, with the
+heading or headings expected there, and never inserts, removes, or renames a
+heading.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`headings`, `matchCase`.
+
+With `{ "headings": ["# Guide", "*", "## Notes"] }`, reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Usage
+```
+
+Not reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Notes
+```
+
+| Option      | Values                                     | Default |
+| ----------- | ------------------------------------------ | ------- |
+| `headings`  | An array of `#` headings and `*`, `+`, `?` | Unset   |
+| `matchCase` | `true` or `false`                          | `false` |
+
+- `headings`: the sequence. A heading entry is written as an ATX heading with
+  its level, such as `## Notes`. `*` matches zero or more headings of any text,
+  `+` one or more, and `?` exactly one. Unset turns the check off; `[]` requires
+  that the document have no headings.
+- `matchCase`: with `true`, capitalization must match too.
+
+Use [overrides](configuration.md#overrides) to apply a template to one group of
+files:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["guides/**/*.md"],
+      "rules": {
+        "structure/heading-template": [
+          "error",
+          { "headings": ["# Guide", "*", "## Notes"], "matchCase": false }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Details:** the sequence follows the document's own outline, including headings
+in lists. Block quotes and footnotes have outlines of their own and do not take
+part, so a quoted example or a footnote need not follow the page's template.
+Headings are compared by their rendered text, with whitespace collapsed and
+inline Markdown, escapes, and character references read; closing `#` sequences
+are syntax. Wildcards are matched by tracking the possible positions in the
+template rather than by backtracking, so the time grows with the template's
+length times the number of headings.
+
+**In Forgejo, Gitea, and VitePress:** a trailing attribute block such as
+`{#setup}` is not part of the heading's text where the dialect reads it as the
+heading's attributes. In other dialects it stays text.
+
+**In Obsidian:** a block identifier such as `^setup` is not part of the
+heading's text.
+
 ## `structure/initial-heading`
 
 Requires the first block of a document, after optional YAML or TOML front
@@ -1341,7 +1495,8 @@ title: Notes
   front matter's contents, without its delimiters, in multiline mode; it does
   not match the body. An invalid pattern is a configuration error. `false` or
   `""` disables title recognition. The same setting is available on
-  `structure/single-title`, with a different default.
+  `structure/single-title`, with a different default, and on
+  `structure/heading-increment`, with the same default.
 
 **Details:** an empty document is reported. Comments and other content before
 the title are not skipped. A heading inside a list or quote does not supply the
@@ -1539,17 +1694,23 @@ opened by a Tab directly after `>` or `> ` stay too: Reading view reads those
 blocks and their blank rows as one literal code block. A later ordinary quoted
 paragraph still permits blank-line cleanup and inline preferences.
 
-**With other rules:** [`style/final-newline`](#stylefinal-newline) adds the line
-break at the end where it is missing.
+**With other rules:**
+
+- [`style/final-newline`](#stylefinal-newline) adds the line break at the end
+  where it is missing.
+- A configuration whose [`style/block-spacing`](#styleblock-spacing) asks for
+  more blank lines around a heading than `maximum` allows is refused when it is
+  read, unless one of the two rules is off: each rule would undo the other's
+  edits.
 
 ## `style/block-spacing`
 
 Separates every heading, list, fenced code block, and table from the blocks
 before and after it with a blank line, in the document and in block quotes at
-any depth.
+any depth. Options can ask for more blank lines around headings.
 
 **Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
-Options: none.
+Options: `linesAbove`, `linesBelow`, `includeFrontMatter`.
 
 Before:
 
@@ -1600,10 +1761,69 @@ npx mdrefine format
 
 To keep compact spacing, set `"rules": { "style/block-spacing": "off" }`.
 
-**Details:** the rule adds one blank line where there is none and keeps the
-blank lines that are already there; nothing is added at the start or the end of
-a document. Inside a block quote, the new line holds the quote's `>` markers. A
-fenced code block counts when it has its closing fence.
+| Option               | Values                                               | Default |
+| -------------------- | ---------------------------------------------------- | ------- |
+| `linesAbove`         | An integer of at least -1, or an array of one to six | `1`     |
+| `linesBelow`         | An integer of at least -1, or an array of one to six | `1`     |
+| `includeFrontMatter` | `true` or `false`                                    | `false` |
+
+- `linesAbove` and `linesBelow`: how many blank lines a heading needs above and
+  below it, as markdownlint's MD022 `lines_above` and `lines_below` set. A
+  number applies to every level; an array gives the counts for levels 1 to 6 in
+  order, and a level that it leaves out needs one. The counts are minimums: the
+  rule adds the blank lines that are missing and keeps any more that are there,
+  which [`style/blank-lines`](#styleblank-lines) limits. `0` and `-1` need none,
+  so that only a list, a fenced code block, or a table next to such a heading
+  still gets its own blank line. Between two headings, the larger count applies.
+- `includeFrontMatter`: with `true`, a heading directly below YAML or TOML front
+  matter gets its `linesAbove` blank lines too; other blocks there stay as
+  written.
+
+A configuration whose counts exceed the `maximum` of `style/blank-lines` is
+refused when it is read, unless one of the two rules is off, so set both, as in:
+
+```jsonc
+{
+  "rules": {
+    "style/blank-lines": ["warn", { "maximum": 2 }],
+    "style/block-spacing": ["warn", { "linesAbove": [2, 1] }],
+  },
+}
+```
+
+With these options, before:
+
+```markdown
+Read this first.
+# Setup
+Install the package.
+## Usage
+```
+
+After:
+
+```markdown
+Read this first.
+
+
+# Setup
+
+Install the package.
+
+## Usage
+```
+
+**Details:** the rule adds the blank lines that are missing, one by default, and
+keeps the blank lines that are already there; nothing is added at the start or
+the end of a document. Inside a block quote, the new line holds the quote's `>`
+markers. A fenced code block counts when it has its closing fence.
+
+**More than one blank line:** the places left as written below stay so whatever
+the counts, and a second blank line is added only where it keeps the document's
+meaning. Below a list or a footnote definition in a block quote, the rule adds
+at most one, because the parser counts the blank lines there toward the list and
+reads it as loose when two or more follow. Existing blank lines are added to
+only when they hold the same quote markers as the new ones.
 
 **Tables:** a table is separated where every renderer reads the same blocks:
 from text, a code block, a thematic break, or an HTML block directly above it,
@@ -1620,7 +1840,8 @@ means or what a comment applies to:
 
 - Blocks inside a list item or a footnote definition. A blank line between the
   blocks of a list item makes the list loose, which changes how it renders.
-- Front matter and the block below it.
+- Front matter and the block below it, apart from a heading with
+  `includeFrontMatter`.
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
@@ -1665,9 +1886,14 @@ paragraph.
 description, as in `Term`, `: Description`, and a table below them, stays there.
 Those renderers put the table in the description.
 
-**In Obsidian:** a table is separated only from a heading above it: Live Preview
-shows the rows of a table directly below another block as text. These places are
-also left as written:
+**In VitePress:** the site generator reads front matter itself, so with
+`includeFrontMatter` nothing is added directly against the closing line; blank
+lines that are already there can be added to.
+
+**In Obsidian:** existing blank lines are added to only when they are empty,
+because Obsidian can read a line of blank space as text. A table is separated
+only from a heading above it: Live Preview shows the rows of a table directly
+below another block as text. These places are also left as written:
 
 - After an underlined heading that a view reads as paragraph text, such as a
   multiline level-1 heading, one beginning with a reference-like line, or one
@@ -1710,6 +1936,60 @@ also left as written:
   together, and a line below a table that one of its views reads as part of the
   table. The [boundary policy](obsidian.md#visible-boundary-refusals) reports
   these places without changing them.
+
+## `style/code-block`
+
+Writes code blocks in one form, fenced or indented, and reports those in the
+other. It converts indented code to fences where the dialect permits that
+change; other findings are reported only. No preset enables it, so default
+formatting stays the same.
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`style`.
+
+With `{ "style": "fenced" }`, before:
+
+```markdown
+    npm test
+```
+
+After:
+
+````markdown
+```
+npm test
+```
+````
+
+| Option  | Values                             | Default      |
+| ------- | ---------------------------------- | ------------ |
+| `style` | `consistent`, `fenced`, `indented` | `consistent` |
+
+- `style`: `consistent` takes the form of the document's first parsed code
+  block, `fenced` requires fences, and `indented` requires indentation.
+
+**Details:** a conversion keeps the code, including its tabs and the blank lines
+inside it, and the block's list or quote container. The new backtick fence is
+longer than any run of backticks in the code.
+
+**Reported without a fix:**
+
+- A fenced block where the indented form is required: indentation cannot keep a
+  language or metadata, and can change blank lines or where an adjacent
+  paragraph ends.
+- An indented block in a container whose prefix holds a tab, because removing
+  indentation can change its tab stops.
+- An indented block that a renderer protects.
+
+**Not checked:** continuation paragraphs in list items and footnotes, which are
+text, not code blocks.
+
+**In VitePress:** indented blocks are reported without conversion, which keeps
+the protection of opaque code and VitePress's distinct rendering of fenced code.
+Line highlighting and `::: code-group` syntax stay intact.
+
+**With other rules:** [`style/code-fence`](#stylecode-fence) chooses the marker
+and length of existing fences, independently of this rule.
 
 ## `style/code-fence`
 
