@@ -231,8 +231,9 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Accept mixed-case `user-content-` prefixes in GitHub file fragments, and
-  report their lowercase spelling with `links/valid`'s `exactCase` option
+- `links/valid` accepts a GitHub file fragment whose `user-content-` prefix is
+  not lowercase, such as `#User-Content-setup`, as GitHub's file view does, and
+  its `exactCase` option reports the lowercase spelling
   ([#739](https://github.com/viell-dev/slop-markdown-tools/issues/739)).
 
 - Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
