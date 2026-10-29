@@ -191,12 +191,12 @@ describe("competitor conversion (#669)", () => {
       prettier: { requirePragma: true, insertPragma: true, endOfLine: "crlf", plugin: "untrusted" },
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
-    expect(result.omitted.join("\n")).toContain("#723");
+    expect(result.compatibility.prettier?.requirePragma).toBe(true);
     expect(result.config.rules?.["style/line-ending"]).toEqual(["warn", { endOfLine: "crlf" }]);
     // Competitor pragmas never apply with an mdrefine configuration, so the
     // report must not suggest that a written configuration will honor them.
     expect(result.omitted).toContain(
-      "Prettier requirePragma: has no effect with an mdrefine configuration; honoring it during the fallback is #723.",
+      "Prettier requirePragma: applies during fallback only; has no effect with a written mdrefine configuration.",
     );
     expect(result.omitted).toContain(
       "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
@@ -355,7 +355,9 @@ describe("competitor conversion (#669)", () => {
       if (!/None yet|Not yet/.test(line)) expect(row.issue).toBeUndefined();
     }
     expect(docs).toContain("mdrefine is meant to replace these tools");
-    expect(docs).toContain('"None yet" and "Not yet" link the issue');
+    expect(docs).toContain("with the mdrefine rule that covers each and where it behaves");
+    // The introduction must not claim a gap that no row shows.
+    if (!/^\|.*(?:None yet|Not yet)/m.test(docs)) expect(docs).not.toContain("does not yet cover");
     expect(docs).toContain("### Configuration conversion and fallback");
   });
   it("normalizes enabled, case, alias order and tags before formatting", () => {

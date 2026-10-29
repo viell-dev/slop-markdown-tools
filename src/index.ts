@@ -23,4 +23,8 @@ export type * from "./core/types.js";
 export type { ObsidianComment, ObsidianHighlight, WikiLink } from "./syntax/obsidian.js";
 
 export { convertConfig, competitorMappings } from "./config/convert.js";
-export type { ConversionReport, CompetitorMapping } from "./config/convert.js";
+export type {
+  ConversionReport,
+  CompetitorMapping,
+  CompetitorCompatibility,
+} from "./config/convert.js";

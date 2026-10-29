@@ -1,3 +1,4 @@
+import { attributed, compatibilityRun } from "../core/source-checks.js";
 import { lineEndingRule } from "./line-ending.js";
 
 import { codeBlock } from "./code-block.js";
@@ -189,44 +190,68 @@ const styleRules: Record<string, Rule> = {
           : headingIndentation(document, node);
         if (indentation.length) {
           for (const [start, end] of indentation)
-            findings.push({
-              start,
-              end,
-              message: "Remove the heading's indentation.",
-              edit: { start, end, text: "" },
-            });
-          // Reparse before conversion so source offsets and container prefixes stay exact.
-          return;
+            findings.push(
+              attributed(
+                {
+                  start,
+                  end,
+                  message: "Remove the heading's indentation.",
+                  edit: { start, end, text: "" },
+                },
+                ["MD023"],
+              ),
+            );
+          // Ordinary runs reparse before conversion. Compatibility also needs
+          // independent diagnostics when indentation itself is suppressed.
+          if (!compatibilityRun()) return;
         }
         // An ATX heading is one line, a Setext heading also has its underline.
         if (!/[\r\n]/.test(source.slice(headingStart, end))) {
           const edit = underlined ? underlineEdit(document, node) : undefined;
           if (edit) {
-            findings.push({
-              start: edit.start,
-              end: edit.end,
-              message: "Use an underlined heading.",
-              edit,
-            });
+            findings.push(
+              attributed(
+                {
+                  start: edit.start,
+                  end: edit.end,
+                  message: "Use an underlined heading.",
+                  edit,
+                },
+                ["MD003"],
+                undefined,
+                [
+                  "MD003",
+                  ...(indentation.length ? ["MD023"] : []),
+                  ...(/^#{1,6}[ \t]{2,}/.test(source.slice(headingStart, end))
+                    ? [/[ \t]+#+[ \t]*$/.test(source.slice(headingStart, end)) ? "MD021" : "MD019"]
+                    : []),
+                ],
+              ),
+            );
             return;
           }
+          const closed = /[ \t]+#+[ \t]*$/.test(source.slice(headingStart, end));
           const opening = /^#{1,6}([ \t]+)/.exec(source.slice(headingStart, end));
           if (opening) {
             const start = headingStart + opening[0].length - opening[1]!.length;
             const text = first || /#/.test(source.slice(start, end)) ? " " : "";
             if (opening[1] !== text)
-              findings.push({
-                start,
-                end: start + opening[1]!.length,
-                message: "Use one space after the opening # sequence.",
-                edit: { start, end: start + opening[1]!.length, text },
-              });
+              findings.push(
+                attributed(
+                  {
+                    start,
+                    end: start + opening[1]!.length,
+                    message: "Use one space after the opening # sequence.",
+                    edit: { start, end: start + opening[1]!.length, text },
+                  },
+                  [closed ? "MD021" : "MD019"],
+                ),
+              );
           }
           const textEnd = last
             ? range(last)[1]
             : headingStart + /^#*/.exec(source.slice(headingStart))![0].length;
           const lineEnd = lineBounds(source, textEnd, textEnd)[1];
-          const closed = /^[ \t]+#+[ \t]*$/.test(source.slice(textEnd, lineEnd));
           // Gitea before 1.26 reads an attribute block that a closing sequence
           // follows, and Forgejo and later Gitea versions do not.
           if (
@@ -238,12 +263,17 @@ const styleRules: Record<string, Rule> = {
           if (options.closing === "add") {
             const text = ` ${"#".repeat(node.depth)}`;
             if (source.slice(textEnd, lineEnd) !== text)
-              findings.push({
-                start: textEnd,
-                end: lineEnd,
-                message: "Use a matching closing # sequence.",
-                edit: { start: textEnd, end: lineEnd, text },
-              });
+              findings.push(
+                attributed(
+                  {
+                    start: textEnd,
+                    end: lineEnd,
+                    message: "Use a matching closing # sequence.",
+                    edit: { start: textEnd, end: lineEnd, text },
+                  },
+                  [closed ? "MD021" : "MD003"],
+                ),
+              );
             return;
           }
           if (!closed) return;
@@ -252,20 +282,30 @@ const styleRules: Record<string, Rule> = {
             if (!first) return;
             const separator = /^[ \t]+/.exec(source.slice(textEnd, lineEnd))![0];
             if (separator !== " ")
-              findings.push({
-                start: textEnd,
-                end: textEnd + separator.length,
-                message: "Use one space before the closing # sequence.",
-                edit: { start: textEnd, end: textEnd + separator.length, text: " " },
-              });
+              findings.push(
+                attributed(
+                  {
+                    start: textEnd,
+                    end: textEnd + separator.length,
+                    message: "Use one space before the closing # sequence.",
+                    edit: { start: textEnd, end: textEnd + separator.length, text: " " },
+                  },
+                  ["MD021"],
+                ),
+              );
             return;
           }
-          findings.push({
-            start: textEnd,
-            end: lineEnd,
-            message: "Remove the closing # sequence.",
-            edit: { start: textEnd, end: lineEnd, text: "" },
-          });
+          findings.push(
+            attributed(
+              {
+                start: textEnd,
+                end: lineEnd,
+                message: "Remove the closing # sequence.",
+                edit: { start: textEnd, end: lineEnd, text: "" },
+              },
+              ["MD003"],
+            ),
+          );
           return;
         }
         if (underlined || !first || !last) return;
@@ -292,16 +332,21 @@ const styleRules: Record<string, Rule> = {
           text =
             text.slice(0, block.start).replace(/(^|\s)(#+)(\s*)$/, "$1\\$2$3") +
             text.slice(block.start);
-        findings.push({
-          start,
-          end,
-          message: "Use an ATX heading.",
-          edit: {
-            start,
-            end,
-            text: `${"#".repeat(node.depth)} ${text}${options.closing === "add" && !block ? ` ${"#".repeat(node.depth)}` : ""}`,
-          },
-        });
+        findings.push(
+          attributed(
+            {
+              start,
+              end,
+              message: "Use an ATX heading.",
+              edit: {
+                start,
+                end,
+                text: `${"#".repeat(node.depth)} ${text}${options.closing === "add" && !block ? ` ${"#".repeat(node.depth)}` : ""}`,
+              },
+            },
+            ["MD003"],
+          ),
+        );
       });
       return findings;
     },

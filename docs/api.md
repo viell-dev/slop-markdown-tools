@@ -328,13 +328,18 @@ which the supported Node.js versions allow for ES modules.
 The portable entry exports `convertConfig({ markdownlint, prettier })` and the
 `competitorMappings` table. Conversion takes configuration objects and returns
 `ConversionReport`: `config`, `sources`, `omitted`, `conflicts`, and
-`suggestions`. It never reads files or executes configuration code.
+`suggestions`, and portable runtime `compatibility` provenance. Only `config` is
+written during conversion. It never reads files or executes configuration code.
 
 `mdrefine/node` exports `loadConfig(start, explicit?, competitorFallback?)` and
 `loadCompetitorConfig(directories, executeScripts?)`. The latter takes search
 directories nearest first; script execution defaults to `false`. `loadConfig`
 returns `LoadedConfig`, including an optional `conversion` report when fallback
-was used. See [configuration
+was used, and `compatibility` for the engine. Pass `loaded.compatibility` along
+with `loaded.config` and `loaded.plugins` to `lint` or `format`; passing only
+the configuration uses native mdrefine behavior. `onCompatibilityWarning` in
+processing options receives comment notices; a host can deduplicate messages
+across documents as the CLI does. See [configuration
 conversion](configuration.md#competitor-configuration-fallback).
 
 ```js
@@ -344,6 +349,10 @@ const loaded = await loadConfig(process.cwd(), undefined, false);
 const conversion = await loadCompetitorConfig([process.cwd()]);
 console.log(loaded.root, conversion?.sources, competitorFiles.prettier);
 ```
+
+`CompetitorCompatibility` carries the original competitor data, enabled rule
+origins, and scoped pragma choices. It is serializable and is never part of the
+configuration schema.
 
 `CompetitorMapping` describes each row's source, destination, defaults, option
 names, coverage issue, and whether markdownlint disables it by default.

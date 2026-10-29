@@ -1,3 +1,4 @@
+import { attributed, attributionOf } from "../core/source-checks.js";
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
 import type { Nodes, Table } from "mdast";
@@ -193,13 +194,63 @@ const table: Rule = {
             (text, row, i) => text + document.source.slice(lines[i - 1]![1], lines[i]![0]) + row,
           )
         : rendered.join(newline);
-      if (replacement !== document.source.slice(start, end))
-        findings.push({
-          start,
-          end,
-          message: "Format table padding and pipes.",
-          edit: { start, end, text: replacement },
-        });
+      if (replacement !== document.source.slice(start, end)) {
+        const ranges =
+          lines ??
+          (() => {
+            const result: [number, number][] = [];
+            let at = start;
+            while (at < end) {
+              const to = Math.min(end, lineEnd(document.source, at));
+              result.push([at, to]);
+              at = to;
+              if (document.source[at] === "\r") at++;
+              if (document.source[at] === "\n") at++;
+            }
+            return result;
+          })();
+        const parts: Finding[] = [];
+        const inner = (row: string) => {
+          let text = row.trim();
+          if (text.startsWith("|")) {
+            text = text.slice(1);
+            if (text.startsWith(" ")) text = text.slice(1);
+          }
+          if (/(?<!\\)(?:\\\\)*\|$/.test(text)) {
+            text = text.slice(0, -1);
+            if (text.endsWith(" ")) text = text.slice(0, -1);
+          }
+          return text;
+        };
+        for (const [i, [a, b]] of ranges.entries()) {
+          const before = document.source.slice(a, b).trim();
+          const after = rendered[i]!;
+          const checks: string[] = [];
+          if (
+            before.startsWith("|") !== after.startsWith("|") ||
+            /(?<!\\)(?:\\\\)*\|$/.test(before) !== /(?<!\\)(?:\\\\)*\|$/.test(after)
+          )
+            checks.push("MD055");
+          if (inner(before) !== inner(after) || (!checks.includes("MD055") && before !== after))
+            checks.push("MD060");
+          if (checks.length)
+            parts.push(
+              attributed({ start: a, end: b, message: "Format table padding and pipes." }, checks),
+            );
+        }
+        findings.push(
+          attributed(
+            {
+              start,
+              end,
+              message: "Format table padding and pipes.",
+              edit: { start, end, text: replacement },
+            },
+            [...new Set(parts.flatMap((part) => attributionOf(part)!.checks))],
+            parts,
+          ),
+        );
+      }
     });
     return findings;
   },
