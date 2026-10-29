@@ -346,6 +346,21 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Bare `format` on files prints a diff and exits `1` when formatting would
+  change a document. Scripts needing an exit-`0` preview should use
+  `format --diff`. `--check --diff` prints the diff and fails on changes.
+  Remaining errors still exit `1`, and operational failures take precedence with
+  exit `2`. Stdin keeps its formatted output and exit behavior
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- `lint` and `format` read stdin when `--stdin-filepath` is given without paths,
+  and reject it with paths other than `-`. Help includes examples, workspace
+  scope and exit codes; nested configuration help selects the named subcommand.
+  Mistaken `check`/`fix` commands and lint modes suggest `format`. `rules`
+  accepts `--root`; empty selections print a notice on stderr, and formatting
+  previews name `--write` as the next step
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
 - `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
   without an `alt` attribute, where renderers certainly show it. `alt=""`, which
   marks a decorative image, is accepted, and so are images hidden by

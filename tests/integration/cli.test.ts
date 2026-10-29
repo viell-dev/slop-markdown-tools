@@ -46,7 +46,7 @@ describe("CLI", () => {
   it("previews, writes, then verifies formatting without changing unrelated syntax", async () => {
     const root = await fixture({ "note.md": "A *small* note.\n" });
     const preview = run(root, ["format", "."]);
-    expect(preview.status, preview.stderr).toBe(0);
+    expect(preview.status, preview.stderr).toBe(1);
     expect(preview.stdout).toContain("+A _small_ note.");
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A *small* note.\n");
     expect(run(root, ["format", "--check", "."]).status).toBe(1);
@@ -230,7 +230,7 @@ describe("CLI", () => {
       "note.md": source,
     });
     const preview = run(root, ["format", "--json", "note.md"]);
-    expect(preview.status, preview.stderr).toBe(0);
+    expect(preview.status, preview.stderr).toBe(1);
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
     const applied = run(root, ["format", "--write", "--json", "note.md"]);
     expect(applied.status, applied.stderr).toBe(0);

@@ -405,6 +405,7 @@ node dist/cli/main.js format --root examples/plugin --diff
  Ask for a review.
 examples/plugin/notes/release-checklist.md:3:25: error house/no-placeholder: Replace the placeholder "TODO" before publishing.
 1 file(s) processed; 1 would change.
+Use --write to apply formatting changes.
 ```
 
 ## Call the library

@@ -293,7 +293,8 @@ describe("reports for scripts and agents", () => {
     );
     expect(previewed.stderr).toBe(
       "note.md:1:17: error links/valid: Missing local target: absent.md.\n" +
-        "1 file(s) processed; 1 would change.\n",
+        "1 file(s) processed; 1 would change.\n" +
+        "Use --write to apply formatting changes.\n",
     );
     expect(run(root, ["format", "--check"]).stdout).toBe("");
   });
@@ -315,7 +316,9 @@ describe("reports for scripts and agents", () => {
     };
     const previewed = await fixture(files);
     const preview = run(previewed, ["format", "--diff"]);
-    expect(preview.stderr).toBe("4 file(s) processed; 4 would change.\n");
+    expect(preview.stderr).toBe(
+      "4 file(s) processed; 4 would change.\nUse --write to apply formatting changes.\n",
+    );
     const patched = await fixture(files);
     for (const args of [["init", "-q", "."], ["apply", "--check"], ["apply"]]) {
       const done = spawnSync("git", args, {
@@ -686,10 +689,10 @@ describe("commands that must not write", () => {
     for (const [command, status, stream, printed] of [
       [["lint"], 0, "stderr", "a.md:1:3: warn style/emphasis"],
       [["lint", "--json"], 0, "stdout", '"mode": "lint"'],
-      [["format"], 0, "stdout", "+A _note_."],
+      [["format"], 1, "stdout", "+A _note_."],
       [["format", "--diff"], 0, "stdout", "+- [x] done"],
       [["format", "--check"], 1, "stderr", "2 file(s) processed; 2 would change."],
-      [["format", "--json"], 0, "stdout", '"changed": true'],
+      [["format", "--json"], 1, "stdout", '"changed": true'],
       [["config", "explain", "a.md"], 0, "stdout", '"dialect": "github"'],
     ] as const) {
       const result = run(root, [...command]);

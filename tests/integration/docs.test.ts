@@ -358,11 +358,6 @@ describe("version annotations", () => {
    */
   const allowed: [file: string, text: string, reason: string][] = [
     [
-      "docs/cli.md",
-      "Version 0.5.0 removes the names deprecated in 0.4.x.",
-      "the migration steps for the earlier names",
-    ],
-    [
       "docs/configuration.md",
       "Version 0.5.0 no longer discovers",
       "the migration note for the earlier names",
@@ -374,11 +369,6 @@ describe("version annotations", () => {
     ],
     [
       "docs/quick-start.md",
-      "When upgrading from 0.4.x, complete the naming migration before installing 0.5.0.",
-      "an upgrade instruction that points to the migration steps",
-    ],
-    [
-      "README.md",
       "When upgrading from 0.4.x, complete the naming migration before installing 0.5.0.",
       "an upgrade instruction that points to the migration steps",
     ],
