@@ -231,6 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/wrap`, `content/emphasis-spacing`, `style/line-ending` and
+  `structure/heading-template` read changed text again with the configuration's
+  syntax plugins, as the document is read, rather than without them
+  ([#752](https://github.com/viell-dev/slop-markdown-tools/issues/752)).
+
 - Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
   or VitePress component blocks without proposing refused edits
   ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),

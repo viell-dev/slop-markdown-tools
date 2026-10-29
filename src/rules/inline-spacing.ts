@@ -1,7 +1,7 @@
 import type { Nodes, Root } from "mdast";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
-import { codeSpanContent, codeSpanText, labelEnd, parse, range } from "../syntax/parse.js";
+import { codeSpanContent, codeSpanText, labelEnd, range, reread } from "../syntax/parse.js";
 import { countBelow, escaped, lineEnd, lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { giteaPyLine, goldmarkForges, inForgeMath } from "./protections.js";
@@ -210,7 +210,7 @@ function inlineReading(document: Document, candidates: Candidate[]): boolean[] {
       removed.push(shift);
     }
     edited += source.slice(cursor);
-    const reading = parse(edited, document.dialect, document.path, [], document.vitepress).tree;
+    const reading = reread(document, edited).tree;
     // Offsets of the source in the edited text, and back; no block starts
     // or ends inside the spaces taken out.
     const forward = (offset: number) =>

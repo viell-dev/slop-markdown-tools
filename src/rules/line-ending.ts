@@ -1,6 +1,6 @@
 import type { Finding, Rule } from "../core/types.js";
 import { semanticFingerprint } from "../core/semantics.js";
-import { otherReading, parse, range } from "../syntax/parse.js";
+import { otherReading, range, reread } from "../syntax/parse.js";
 import { lineEnding } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { vitepressWhitespaceLiterals } from "../syntax/vitepress/projection.js";
@@ -68,7 +68,7 @@ export const lineEndingRule: Rule = {
       at = finding.end!;
     }
     pieces.push(source.slice(at));
-    const tried = parse(pieces.join(""), document.dialect, document.path, [], document.vitepress);
+    const tried = reread(document, pieces.join(""));
     if (semanticFingerprint(tried, workspace) !== semanticFingerprint(document, workspace))
       return findings.map((finding) => ({
         start: finding.start,
