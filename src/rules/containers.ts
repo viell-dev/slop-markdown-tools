@@ -227,9 +227,11 @@ const quoteMarkerRule: Rule = {
  * else could start a block, a heading's underline, or a table row inside the
  * container, which the lazy line does not. Digits go only through the number
  * alternative: renderers differ on which ordered markers start a list inside
- * a container, so no marker counts as text.
+ * a container, so any number followed by `.` or `)` and blank space or the
+ * end counts as a marker, while `2.5` or `2026.10` reads as text.
  */
-const continuing = /^(?:[^\s\d!-/:-@[-`{-~]|\d+(?![\d.)])|[*_](?=[^\s*_])|`{1,2}(?!`)|!?\[|[("'])/u;
+const continuing =
+  /^(?:[^\s\d!-/:-@[-`{-~]|\d+(?!\d|[.)](?:\s|$))|[*_](?=[^\s*_])|`{1,2}(?!`)|!?\[|[("'])/u;
 /** A link reference or footnote definition, which reads otherwise in some renderers. */
 const definitionLike = /^\[[^\]]*\]:/;
 

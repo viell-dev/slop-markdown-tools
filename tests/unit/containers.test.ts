@@ -291,6 +291,25 @@ describe("style/lazy-continuation", () => {
       expect(formatted("> a\n    2nd b\n", only(lazy, dialect))).toBe(
         dialect === "obsidian" ? "> a\n    2nd b\n" : "> a\n> 2nd b\n",
       );
+      // A decimal or a version is no marker: such a line is handled like words,
+      // while `3) x` is one and stays as written.
+      for (const lead of ["2.5 litres", "2026.10 release", "3) x"]) {
+        const words = (source: string, rules: Record<string, "warn">) =>
+          formatted(source.replace("{}", "plain words"), only(rules, dialect)).replace(
+            "plain words",
+            lead,
+          );
+        const keepsLikeWords = (source: string, rules: Record<string, "warn">) =>
+          lead === "3) x"
+            ? expect(formatted(source.replace("{}", lead), only(rules, dialect))).toBe(
+                source.replace("{}", lead),
+              )
+            : expect(formatted(source.replace("{}", lead), only(rules, dialect))).toBe(
+                words(source, rules),
+              );
+        keepsLikeWords("> a\n{}\n", lazy);
+        keepsLikeWords("> a\n>     {}\n", quote);
+      }
     },
   );
   it("finds each lazy line and says what it lacks", () => {
