@@ -196,13 +196,13 @@ links to other issues and PRs.
 
 ## Requests for people
 
-The maintaining agents own verification as well as the code. Human usability
-testing is required before the first stable release and after substantial
-interface or workflow changes, as
-[RELEASING.md](RELEASING.md#human-release-testing) describes. Agents prepare and
-track that work; the owner does not take over engineering, regression testing,
-or code review. Other requests cover decisions on direction or scope, identity
-or access, and unavailable observations.
+The maintaining agents own verification as well as the code. For this project,
+which has no graphical interface, independent agent reviews of the command
+line's design take the place of human usability testing, as
+[RELEASING.md](RELEASING.md#human-release-testing) records; agents run and
+triage them. The owner does not take over engineering, regression testing, or
+code review. Other requests cover decisions on direction or scope, identity or
+access, and unavailable observations.
 
 Make such a request an issue, or reuse the issue that already owns the question,
 so that it can be answered on GitHub without a checkout or a conversation. State

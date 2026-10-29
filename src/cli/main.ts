@@ -46,6 +46,7 @@ const program = new Command()
   .version(manifest.version, "-V, --version", "Print the version")
   .helpOption("-h, --help", "Print help for the command")
   .helpCommand("help [command]", "Print help for a command")
+  .configureHelp({ helpWidth: 80 })
   // Commander starts its messages with "error: ", the tool with its name.
   .configureOutput({
     outputError: (text, write) => write(`mdrefine: ${text.replace(/^error: /, "")}`),
@@ -102,7 +103,10 @@ function common(command: Command): Command {
         "--no-warn-ignored",
         "Do not warn about named files and directories that are skipped as ignored",
       )
-      .option("--stdin-filepath <file>", "Filename context for stdin")
+      .option(
+        "--stdin-filepath <file>",
+        "Read stdin as this file, for its configuration and reports",
+      )
       .option(
         "--max-warnings <count>",
         "Fail when warning count exceeds this nonnegative integer",
@@ -260,8 +264,17 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
         ? "unknown option '--fix': lint never changes files; 'mdrefine format --write' applies the fixes."
         : "unknown option '--fix': format writes its changes with --write.",
     );
-  if ([flags.check, flags.diff, flags.write].filter(Boolean).length > 1)
-    throw new Error("Choose only one of --check, --diff, and --write.");
+  if (mode === "lint" && (flags.write || flags.check))
+    throw new Error(
+      `lint never changes files; use 'mdrefine format --${flags.write ? "write" : "check"}' instead.`,
+    );
+  if (flags.write && (flags.check || flags.diff))
+    throw new Error("--write cannot be combined with --check or --diff.");
+  if (flags.stdinFilepath !== undefined) {
+    if (inputs.some((input) => input !== "-"))
+      throw new Error("Use --stdin-filepath with no paths or with - to read stdin.");
+    if (inputs.length === 0) inputs = ["-"];
+  }
   if (inputs.includes("-") && flags.exclude?.length)
     throw new Error("--exclude cannot be combined with stdin.");
   const { root, ...loaded } = await workspace(flags);
@@ -300,6 +313,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     process.cwd(),
     flags.stdinFilepath !== undefined,
   );
+  // Skipped inputs and stdin already say what happened, and JSON reports an empty
+  // file list; the notice explains only a selection that silently came up empty.
+  if (
+    discovery.selected.length === 0 &&
+    discovery.skipped.length === 0 &&
+    !flags.json &&
+    !inputs.includes("-")
+  )
+    process.stderr.write("mdrefine: No documents selected.\n");
   const compatibilityWarnings = new Set<string>();
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
@@ -438,7 +460,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     // that an editor that replaces its text with the output loses nothing.
     if (stdin && mode === "format" && !flags.check && !flags.diff)
       process.stdout.write(reports[0]?.output ?? Object.values(documents ?? {})[0] ?? "");
-    else if (mode === "format" && !flags.check && !flags.write)
+    else if (mode === "format" && (!flags.check || flags.diff) && !flags.write)
       for (const change of changes)
         process.stdout.write(
           unifiedDiff(
@@ -454,7 +476,7 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
           `${shown(report.path)}:${item.line}:${item.column}: ${item.severity} ${item.rule}: ${item.message}\n`,
         );
     // The files to fix when a check fails, as Prettier's --check lists them.
-    if (mode === "format" && flags.check && !stdin)
+    if (mode === "format" && flags.check && !flags.diff && !stdin)
       for (const change of changes) process.stderr.write(`${shown(change.file)}\n`);
     if (!stdin) {
       // Lint changes nothing, so its summary counts what it reported instead.
@@ -469,12 +491,17 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       );
     }
   }
+  if (mode === "format" && !flags.write && (!flags.check || flags.diff) && !stdin && !flags.json)
+    process.stderr.write("Use --write to apply formatting changes.\n");
   const errors = count("error") > 0;
   const tooManyWarnings = flags.maxWarnings !== undefined && count("warn") > flags.maxWarnings;
   process.exitCode =
     failed || unwritten.length > 0
       ? 2
-      : errors || tooManyWarnings || (flags.check && changes.length > 0)
+      : errors ||
+          tooManyWarnings ||
+          ((flags.check || (mode === "format" && !stdin && !flags.write && !flags.diff)) &&
+            changes.length > 0)
         ? 1
         : 0;
 }
@@ -484,15 +511,17 @@ common(
     .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 )
   .description("Report the findings of the enabled rules; never writes")
+  .addOption(new Option("--write").hideHelp())
+  .addOption(new Option("--check").hideHelp())
   .action((inputs: string[], flags: Flags) => run("lint", inputs, flags));
 common(
   program
     .command("format")
     .argument("[paths...]", "Files, directories, or glob patterns to select, or - for stdin"),
 )
-  .description("Format documents: print a diff (the default), check, or write")
+  .description("Format documents: check with a diff (default), list changes, or write")
   .option("--check", "Fail if formatting changes would be needed, and name the files")
-  .option("--diff", "Preview the complete diff (default for file inputs)")
+  .option("--diff", "Preview the diff; changes alone exit 0 (with --check, exit 1)")
   .option("--write", "Write validated formatting changes")
   .action((inputs: string[], flags: Flags) => run("format", inputs, flags));
 // The options belong to `config`, which reads them before or after `explain`;
@@ -607,9 +636,15 @@ program
   .description("List the built-in rules and those of the configuration's plugins")
   .option(...configOption)
   .option(...competitorOption)
+  .option("--root <directory>", "Directory to search for configuration")
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {
-    const loaded = await loadConfig(path.resolve("."), flags.config, flags.competitorConfig);
+    if (flags.root !== undefined) await checkRoot(flags.root);
+    const loaded = await loadConfig(
+      path.resolve(flags.root ?? "."),
+      flags.config,
+      flags.competitorConfig,
+    );
     const { plugins } = loaded;
     const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
       id,
@@ -624,8 +659,84 @@ program
           `${rule.id}\t${rule.kind}\t${rule.description.replace(/\s+/g, " ")}\n`,
         );
   });
+// Keep the selection scope, exit codes and short examples available without
+// opening the docs. Each footer stays within 80 columns.
+const selection = `Without paths, the whole workspace is selected, including documents outside the
+current directory. Read stdin with - or with --stdin-filepath <file> alone.`;
+const footers: Record<string, string> = {
+  "": `
+Start with mdrefine lint and mdrefine format; mdrefine help <command> describes
+each command. Configuration: mdrefine config explain <file> and config convert.`,
+  lint: `
+${selection}
+
+Exit codes: 0 no errors; 1 errors, or more warnings than --max-warnings;
+2 usage, configuration or run failure.
+
+Examples:
+  mdrefine lint                      Report the findings in every document
+  mdrefine lint docs README.md       Only these paths
+  mdrefine lint --max-warnings 0     Also fail on warnings`,
+  format: `
+${selection}
+Stdin prints the formatted document unless --check or --diff is given.
+--json reports the results without the diff. Formatting also reports problem
+rules; errors that remain exit 1.
+
+Exit codes: 0 nothing to change, or the changes were written, previewed with
+--diff, or printed from stdin; 1 changes needed, errors remain, or more
+warnings than --max-warnings; 2 usage, configuration or run failure.
+
+Examples:
+  mdrefine format                    Check every document and show the diff
+  mdrefine format --write            Apply the changes
+  mdrefine format --check            List the documents that would change
+  mdrefine format --stdin-filepath a.md  Format stdin as a.md`,
+  rules: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Examples:
+  mdrefine rules                     List the rules
+  mdrefine rules --json              The same list as JSON`,
+  config: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Examples:
+  mdrefine config explain notes/a.md  Show one document's configuration
+  mdrefine config convert --write     Convert other tools' settings`,
+  explain: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Example:
+  mdrefine config explain notes/a.md`,
+  convert: `
+Exit codes: 0 success; 2 usage or configuration failure, or nothing to convert.
+
+Examples:
+  mdrefine config convert            Print the converted configuration
+  mdrefine config convert --write    Create the configuration file`,
+};
+program.addHelpText("after", footers[""]!);
+for (const command of [...program.commands, ...configCommand.commands]) {
+  const footer = footers[command.name()];
+  if (footer) command.addHelpText("after", footer);
+}
 try {
-  await program.parseAsync();
+  const args = process.argv.slice(2);
+  if (args[0] === "check" || args[0] === "fix")
+    throw new Error(
+      `Unknown command '${args[0]}'; use 'mdrefine format --${args[0] === "check" ? "check" : "write"}' instead.`,
+    );
+  // Commander routes only one level of its implicit help command.
+  if (args[0] === "help" && args.length > 2) {
+    let command = program;
+    for (const name of args.slice(1)) {
+      const child = command.commands.find((child) => child.name() === name);
+      if (!child) throw new Error(`Unknown help command: ${args.slice(1).join(" ")}`);
+      command = child;
+    }
+    command.help();
+  } else await program.parseAsync();
 } catch (error) {
   // Commander has printed the help, the version, or what is wrong with the
   // command line. Help and the version succeed; a usage error ends with code 2,

@@ -27,10 +27,14 @@ of their checks have a rule here so far.
 
 ```sh
 npx mdrefine lint
+npx mdrefine format
 npx mdrefine format --diff
 npx mdrefine format --write
 npx mdrefine format --check
 ```
+
+Bare `format` prints a diff and fails when files would change. Use `--diff` for
+a preview whose changes alone exit `0`, or `--write` to apply them.
 
 [Get started](quick-start.md), browse the [rules](rules.md), or see
 [examples](examples.md) of documents before and after formatting.

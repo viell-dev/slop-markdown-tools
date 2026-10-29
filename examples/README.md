@@ -21,6 +21,10 @@ Copy one to the root of your documents as `mdrefine.config.jsonc`.
 | [`gitea.jsonc`](gitea.jsonc)       | Gitea instances                                 |
 | [`obsidian.jsonc`](obsidian.jsonc) | Obsidian vaults, with vault-relative link paths |
 
+Bare `format` prints a diff and exits `1` when a file would change. The `--diff`
+examples below preview changes without failing merely on differences; remaining
+errors, such as the examples' broken links, still exit `1`.
+
 ## Workspaces before and after formatting
 
 Each workspace has a `before/` tree as someone might have written it and an
