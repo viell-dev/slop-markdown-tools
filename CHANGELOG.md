@@ -232,8 +232,10 @@ prereleases' notes there are longer than their entries here.
   after the tag, and the item lost its last line. GitHub reads it otherwise: it
   ends the containers there and shows the tag and the lines below it, up to a
   blank line, as HTML, with Markdown such as `*` as literal text. In the GitHub
-  dialect, rules now leave those containers and lines as written. HTML that may
-  interrupt a paragraph, such as `<div>` or a comment, still ends the paragraph
+  dialect, rules now leave those containers and lines as written, also where
+  CommonMark reads the paragraph text as a Setext heading or as link definitions
+  before the tag line. HTML that may interrupt a paragraph, such as `<div>` or a
+  comment, still ends the paragraph
   ([#762](https://github.com/viell-dev/slop-markdown-tools/issues/762)).
 
 - In Obsidian, rules no longer change a list item that starts on a footnote's

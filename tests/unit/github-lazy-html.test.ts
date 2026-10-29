@@ -72,6 +72,65 @@ describe("GitHub's reading of a lazy line that starts a type 7 HTML block (#762)
     }
   });
 
+  // The lazy line extends the paragraph text, which CommonMark can then read as
+  // a Setext heading or as link definitions before a paragraph or heading.
+  it.each([
+    "- a *words\n<b>\nmore* after\n  ---\n",
+    "> a *words\n<b>\nmore* after\n> ===\n",
+    "- > a *w\n<b>\nx* y\n  > ---\n",
+    "- [x]: /url\n<b>\n*words*\n",
+    "- [x]: /u\n[y]: /v\n<b>\n*w*\n",
+    "> [x]: /u\n> [y]: /v\n<b>\n*w*\n",
+    "- > [x]: /u\n<b>\n*w*\n",
+    "> - [x]: /u\n<b>\n*w*\n",
+    "- [x]: /u\n<b>\nmore *w*\n  ---\n",
+    // The tag line is the definition's destination or inside its title.
+    "- [x]:\n<b>\n*w*\n",
+    '- [x]: /u "a\n<b>\nc"\n*w*\n',
+    // A table's attempt leaves the tag line as HTML inside the item.
+    '- a\n<b title="|">\n  |-|-|\n*w*\n',
+  ])("leaves %j as written", (source) => {
+    for (const input of [source, crlf(source)]) {
+      for (const config of configurations) expect(checked(input, config)).toBe(input);
+      expect(regions(input).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("protects the paragraph text's region after a heading or definitions", () => {
+    for (const source of [
+      "- a *words\n<b>\nmore* after\n  ---\n\nAfter *y*.\n",
+      "- [x]: /u\n[y]: /v\n<b>\n*w*\n\nAfter *y*.\n",
+    ])
+      for (const input of [source, crlf(source)]) {
+        const after = input.indexOf("After");
+        expect(regions(input)).toEqual([[0, after]]);
+        expect(checked(input, configurations[1]!)).toBe(
+          `${input.slice(0, after)}After _y_.${input.slice(after + 10)}`,
+        );
+      }
+  });
+
+  it.each([
+    // A blank line ends the paragraph text; the tag starts an ordinary block.
+    ["- [x]: /url\n\n<b>\n*words*\n", "- [x]: /url\n\n<b>\n*words*\n"],
+    ["- a *w\n  ---\n\n<b>\n*w*\n", "- a *w\n  ---\n\n<b>\n*w*\n"],
+    // The tag line continues the item, as GitHub reads it too.
+    ["- [x]: /url\n  <b>\n  *words*\n", "- [x]: /url\n  <b>\n  _words_\n"],
+    ["- a *w\n  <b>\n  x* y\n  ---\n", "- a _w\n  <b>\n  x_ y\n  ---\n"],
+    ["> [x]: /u\n> <b>\n> *w*\n", "> [x]: /u\n> <b>\n> _w_\n"],
+    // An ATX heading takes no lazy line; the tag line is a block of its own.
+    ["- # h *x*\n<b>\n*w*\n", "- # h _x_\n<b>\n*w*\n"],
+    ["- # h\n  <b>\n  *w*\n", "- # h\n  <b>\n  *w*\n"],
+  ])("formats %j after a heading or definition where GitHub reads alike", (source, expected) => {
+    for (const [input, output] of [
+      [source, expected],
+      [crlf(source), crlf(expected)],
+    ] as const) {
+      expect(regions(input)).toEqual([]);
+      expect(checked(input, configurations[1]!)).toBe(output);
+    }
+  });
+
   it("protects from GitHub's first ended container through the blank line", () => {
     const source = "Intro *x*.\n\n- a\n- b\n<b>\n*w*\n\nAfter *y*.\n\n> q\n</b>\n*w*\n";
     const list = source.indexOf("- a");
@@ -136,10 +195,27 @@ describe("GitHub's reading of a lazy line that starts a type 7 HTML block (#762)
       format("- a\n<b>\n*w*\n", { config: { extends: ["recommended"], dialect: "forgejo" } })
         .output,
     ).toBe("- a\n<b>\n_w_\n");
+    // Forgejo and Gitea keep the tag line after a definition in the item too;
+    // markdown-it ends the item there, which VitePress's own reading keeps.
+    const definition = "- [x]: /url\n<b>\n*words*\n";
+    for (const dialect of ["commonmark", "forgejo", "gitea", "vitepress"] as const)
+      expect([...rendererProtections(parse(definition, dialect)).boundaryText]).toEqual([]);
+    for (const dialect of ["forgejo", "gitea"] as const)
+      expect(format(definition, { config: { extends: ["recommended"], dialect } }).output).toBe(
+        "- [x]: /url\n<b>\n  _words_\n",
+      );
+    expect(
+      format(definition, { config: { extends: ["recommended"], dialect: "vitepress" } }).output,
+    ).toBe(definition);
   });
 
   it("leaves the native fixtures' GitHub regions as written", () => {
-    for (const name of ["lazy-html-line", "lazy-html-emphasis", "lazy-html-markers"]) {
+    for (const name of [
+      "lazy-html-line",
+      "lazy-html-emphasis",
+      "lazy-html-markers",
+      "lazy-html-paragraph-text",
+    ]) {
       const { source } = commonFixtures.find((fixture) => fixture.name === name)!;
       const output = checked(source, configurations[0]!);
       // Formatting changes the fixture outside the regions, so the native

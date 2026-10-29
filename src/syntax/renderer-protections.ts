@@ -232,10 +232,11 @@ export interface RendererProtections {
    * paragraph lazily; retain that complete boundary too (#336).
    * GitHub also ends a list item, block quote or footnote definition at a lazy
    * line that starts an HTML block of kind 7, such as `<b>` alone, which the
-   * primary reading keeps in the paragraph, and reads HTML to the next blank
-   * line. The range runs from the outermost container that GitHub ends, its
-   * list for an item, through that blank line and any top-level block that
-   * starts before it (#762).
+   * primary reading keeps in the paragraph text, whether that text then forms
+   * a paragraph, a Setext heading or link definitions, and reads HTML to the
+   * next blank line. The range runs from the outermost container that GitHub
+   * ends, its list for an item, through that blank line and any top-level
+   * block that starts before it (#762).
    * A quoted block opened after a Tab immediately after `>` or `> ` keeps its
    * whole physical source too: Reading view can read literal code where the
    * primary parser reads a list, heading or inline text (#597). Same-block

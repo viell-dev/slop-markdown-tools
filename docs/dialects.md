@@ -50,7 +50,8 @@ as more of the paragraph, and so does the tool in every dialect. GitHub ends the
 list item, block quote, or footnote definition there and shows the tag and the
 lines below it, up to a blank line, as HTML, where Markdown such as `*` is
 literal text. In the GitHub dialect, formatting leaves that list, quote, or
-footnote and those lines as written.
+footnote and those lines as written, also where CommonMark reads the paragraph
+text as a Setext heading or as link definitions before the tag line.
 
 ## The assumed dialect
 

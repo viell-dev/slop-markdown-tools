@@ -444,11 +444,23 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
   it.each(["forgejo", "gitea", "vitepress", "commonmark"] as const)(
     "formats the authored renderer fixtures in %s as CommonMark's renderers show them",
     (dialect) => {
-      for (const name of ["lazy-html-line", "lazy-html-emphasis", "lazy-html-markers"]) {
+      for (const name of [
+        "lazy-html-line",
+        "lazy-html-emphasis",
+        "lazy-html-markers",
+        "lazy-html-paragraph-text",
+      ]) {
         const { source } = forgeFixtures.find((fixture) => fixture.name === name)!;
         const output = formatted(source, { extends: ["recommended"], dialect });
         expect(output, name).not.toBe(source);
-        expect(rendered(output), name).toEqual(rendered(source));
+        const [commonmark, markdownIt] = rendered(output);
+        const [commonmarkBefore, markdownItBefore] = rendered(source);
+        expect(commonmark, name).toEqual(commonmarkBefore);
+        // markdown-it ends a link definition at its line, so a tag line below
+        // one starts HTML there; VitePress's own reading keeps those lines, and
+        // Forgejo and Gitea read them as CommonMark does.
+        if (dialect === "vitepress" || name !== "lazy-html-paragraph-text")
+          expect(markdownIt, name).toEqual(markdownItBefore);
       }
     },
   );

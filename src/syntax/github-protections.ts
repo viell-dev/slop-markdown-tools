@@ -51,7 +51,7 @@ export function collectGithubMathProtections(document: Document): Set<Nodes> {
  * A complete open or closing tag alone on its line, apart from spaces and tabs:
  * the start of a CommonMark HTML block of kind 7. Unlike the specification,
  * GitHub starts one at `</pre>` too, so the raw-text names are not excluded.
- * Kind 6 names cannot reach a paragraph's later line.
+ * Kind 6 names cannot reach a line of paragraph text after its first.
  */
 const tagLine =
   /^(?:<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][\w.:-]*(?:[ \t]*=[ \t]*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^ \t\r\n"'=<>`]+))?)*[ \t]*\/?>|<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/;
@@ -138,43 +138,68 @@ export function collectGithubLazyHtmlProtections(
   const regions: [Nodes, number, number][] = [];
   // Lines of one stretch share the next blank line; search each stretch once.
   let searched: [number, number] = [-1, -1];
-  // Paragraphs come in source order, so one forward search finds each `<`.
+  // Lines are checked in source order, so one forward search finds each `<`.
   let nextTag = -1;
+  /** Checks the line from `from` against `chain`; returns where the line ends. */
+  const scanLine = (from: number, chain: Open[]): number => {
+    if (nextTag < from) {
+      nextTag = source.indexOf("<", from);
+      if (nextTag < 0) nextTag = source.length;
+    }
+    let to = from;
+    while (to < source.length && source[to] !== "\n" && source[to] !== "\r") to++;
+    if (nextTag >= to) return to;
+    const ended = endedBy(from, to, chain);
+    if (!ended) return to;
+    if (!(from >= searched[0] && from < searched[1])) {
+      blankLine.lastIndex = to;
+      const blank = blankLine.exec(source);
+      searched = [from, blank ? blank.index + blank[0].length : source.length];
+    }
+    // Later tag lines of one stretch usually repeat its range.
+    const unitStart = ended.unit.position!.start.offset!;
+    const last = regions.at(-1);
+    if (last?.[1] !== unitStart || last[2] !== searched[1])
+      regions.push([ended.unit, unitStart, searched[1]]);
+    return to;
+  };
+  /**
+   * Lazy lines only ever continue paragraph text, and CommonMark derives more
+   * than paragraphs from it: a Setext heading (never an ATX heading, a single
+   * line) and leading link definitions, whose following paragraph or heading
+   * can then start at a lazy line.
+   */
+  const paragraphText = (node: Nodes) =>
+    node.type === "paragraph" ||
+    node.type === "definition" ||
+    (node.type === "heading" && node.position!.end.line > node.position!.start.line);
   const visit = (parent: Parents, chain: Open[]) => {
+    let previous: Nodes | undefined;
     for (const node of parent.children) {
       const start = node.position?.start.offset;
       const end = node.position?.end.offset;
       if (start === undefined || end === undefined) continue;
-      if (node.type === "paragraph" && chain.length) {
-        for (let at = start; at < end; at++) {
-          if (source[at] !== "\n" && source[at] !== "\r") continue;
-          if (source[at] === "\r" && source[at + 1] === "\n") at++;
-          const from = at + 1;
-          if (nextTag < from) {
-            nextTag = source.indexOf("<", from);
-            if (nextTag < 0) nextTag = source.length;
-          }
-          let to = from;
-          while (to < source.length && source[to] !== "\n" && source[to] !== "\r") to++;
-          if (nextTag >= to) {
-            at = Math.min(to, end) - 1;
-            continue;
-          }
-          const ended = endedBy(from, to, chain);
-          at = Math.min(to, end) - 1;
-          if (!ended) continue;
-          if (!(from >= searched[0] && from < searched[1])) {
-            blankLine.lastIndex = to;
-            const blank = blankLine.exec(source);
-            searched = [from, blank ? blank.index + blank[0].length : source.length];
-          }
-          // Later tag lines of one stretch usually repeat its range.
-          const unitStart = ended.unit.position!.start.offset!;
-          const last = regions.at(-1);
-          if (last?.[1] !== unitStart || last[2] !== searched[1])
-            regions.push([ended.unit, unitStart, searched[1]]);
+      if (chain.length) {
+        // A block right below a paragraph or definition in the same container
+        // starts on a line that the open paragraph text could take lazily: a
+        // following paragraph or heading after definitions, or the HTML that
+        // a table's attempt leaves inside the container.
+        if (
+          (previous?.type === "paragraph" || previous?.type === "definition") &&
+          previous.position?.end.line === node.position!.start.line - 1
+        ) {
+          let from = start;
+          while (from > 0 && source[from - 1] !== "\n" && source[from - 1] !== "\r") from--;
+          scanLine(from, chain);
         }
+        if (paragraphText(node))
+          for (let at = start; at < end; at++) {
+            if (source[at] !== "\n" && source[at] !== "\r") continue;
+            if (source[at] === "\r" && source[at + 1] === "\n") at++;
+            at = Math.min(scanLine(at + 1, chain), end) - 1;
+          }
       }
+      previous = node;
       if ("children" in node && !leaves.has(node.type)) {
         let open: Open | undefined;
         if (node.type === "blockquote") open = { unit: node, column: ">" };

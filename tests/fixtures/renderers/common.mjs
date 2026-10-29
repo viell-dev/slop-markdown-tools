@@ -69,6 +69,13 @@ export const commonFixtures = [
     source:
       "An *introduction* that formatting changes.\n\n1. A step\n<span>\nwith *emphasis*, __strong__, `code` and [a link](https://example.com)\n# A heading *below*\n- An item *below*\n\n- > A quoted item\n<i>\n*after* the tag\n\n> - A listed quote\n> <b>\n> *after* the tag\n>\n> - A later *item*\n\nA *closing* paragraph.\n",
   },
+  // CommonMark reads the paragraph text that takes the tag line as a Setext
+  // heading, or as definitions before the paragraph that starts at the tag.
+  {
+    name: "lazy-html-paragraph-text",
+    source:
+      "An *introduction* that formatting changes.\n\n- An item with *words\n<b>\nmore* after the tag\n  ---\n\n> A quote with *words\n<span>\nmore* after the tag\n> ===\n\n- [one]: https://example.com/one\n<i>\n*after* the definition\n\n> [two]: https://example.com/two\n> [three]: https://example.com/three\n</b>\n*after* the definitions\n\nA *closing* paragraph.\n",
+  },
 ];
 
 export const githubFixtures = [
