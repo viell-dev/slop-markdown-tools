@@ -239,6 +239,11 @@ prereleases' notes there are longer than their entries here.
   definitions as text
   ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
 
+- `links/valid` accepts a GitHub file fragment whose `user-content-` prefix is
+  not lowercase, such as `#User-Content-setup`, as GitHub's file view does, and
+  its `exactCase` option reports the lowercase spelling
+  ([#739](https://github.com/viell-dev/slop-markdown-tools/issues/739)).
+
 - `style/wrap`, `content/emphasis-spacing`, `style/line-ending` and
   `structure/heading-template` read changed text again with the configuration's
   syntax plugins, as the document is read, rather than without them
