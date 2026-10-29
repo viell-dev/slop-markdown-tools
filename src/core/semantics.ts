@@ -25,6 +25,18 @@ export function semanticFingerprintWithCode(
 ): string {
   return JSON.stringify(semanticTree(document, workspace, undefined, values));
 }
+/** Internal host guard: trust only the selected metadata value, never its surroundings. */
+export function semanticFingerprintWithFrontMatter(
+  document: Document,
+  node: Nodes,
+  value: string,
+  source: string,
+  workspace?: Workspace,
+): string {
+  return JSON.stringify(
+    semanticTree(document, workspace, undefined, undefined, { node, value, source }),
+  );
+}
 /**
  * The document's meaning as plain data whose keys are in sorted order. With
  * `origins`, each object of the result that stands for a node of the document
@@ -35,6 +47,7 @@ function semanticTree(
   workspace?: Workspace,
   origins?: Map<unknown, Nodes>,
   codeValues?: WeakMap<Code, string>,
+  frontMatter?: { node: Nodes; value: string; source: string },
 ): unknown {
   const githubHeadings = new Map<Nodes, string[]>();
   const githubSources = new Map<Nodes, string>();
@@ -129,6 +142,7 @@ function semanticTree(
           normalize(child, index === 0 && (node.type === "blockquote" || calloutHeader)),
         );
       } else if (key === "url" && typeof value === "string") result[key] = canonicalUrl(value);
+      else if (key === "value" && node === frontMatter?.node) result[key] = frontMatter.value;
       else if (key === "value" && node.type === "code" && codeValues?.has(node))
         result[key] = codeValues.get(node);
       else if (key === "value" && node.type === "text") {
@@ -154,7 +168,7 @@ function semanticTree(
   }
   const result = normalize(document.tree) as Record<string, unknown>;
   if (document.dialect === "vitepress")
-    result.vitepress = vitepressSemantics(document, workspace, codeValues);
+    result.vitepress = vitepressSemantics(document, workspace, codeValues, frontMatter?.source);
   // Where front matter would end inside a code block, an HTML block, or
   // display math, the document is read without it, and renderers read TOML
   // front matter as a paragraph. An edit has to keep the meaning of both

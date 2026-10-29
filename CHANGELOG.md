@@ -20,6 +20,15 @@ prereleases' notes there are longer than their entries here.
   `mergeRuleOptions` and `ruleOptions`
   ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
 
+- Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with
+  `endOfLine`, preserving hard breaks and literal content bytes
+  ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)).
+- External formatter entries can select YAML and TOML `frontMatter` bodies, with
+  the existing command limits and a guard for surrounding Markdown. Metadata
+  semantics remain the configured tool's responsibility; no YAML or TOML printer
+  is bundled
+  ([#718](https://github.com/viell-dev/slop-markdown-tools/issues/718)).
+
 - Opt-in `content/html-element` reports HTML elements, once each at the opening
   tag, in HTML blocks and inline HTML, with markdownlint's MD033 options
   `allowedElements` and `tableAllowedElements`, compared without letter case.

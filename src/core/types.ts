@@ -251,12 +251,14 @@ export interface Override {
   /** Replace configured code tools for these documents; false disables them. */
   readonly codeFormatters?: readonly CodeFormatter[] | false;
 }
-/** A trusted external command that formats the contents of selected code fences. */
+/** A trusted external command that formats selected fenced code or front matter bodies. */
 export interface CodeFormatter {
   /** A unique, lowercase name used in operational diagnostics. */
   readonly id: string;
-  /** Exact, case-sensitive fence languages, or ["*"] as the single fallback. */
+  /** Exact, case-sensitive fence languages, ["*"] as the fallback, or [] for front matter only. */
   readonly languages: readonly string[];
+  /** Explicit front matter routes, independent of fence languages and fallback. */
+  readonly frontMatter?: readonly ("yaml" | "toml")[];
   /** Executable name or path. It is never taken from Markdown or passed as a shell string. */
   readonly command: string;
   /** Arguments; {filepath} is replaced with the absolute document filename. */

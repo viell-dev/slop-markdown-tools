@@ -242,8 +242,8 @@ It takes the same options as `format`, plus `cwd`, the tool working directory
 and local executable context. Without `cwd`, it uses `process.cwd()`.
 `{filepath}` is resolved against that directory. A discovery host should pass
 `cwd: discovery.root` alongside `discovery.options(name)`, as the CLI does. No
-command runs unless `codeFormatters` selects a block; synchronous `format` and
-`lint` never execute these tools.
+command runs unless `codeFormatters` selects a block or front matter;
+synchronous `format` and `lint` never execute these tools.
 
 Widened range scope and suppression comments apply to code formatting too, and
 `scope` moves with accepted code edits. The guard permits only the selected code
@@ -256,6 +256,11 @@ returns an `engine/code-formatter` error diagnostic, retains that block, and
 keeps other safe edits. Only complete, valid UTF-8 output within the configured
 limit is inserted. Commands are trusted programs running with the caller's
 permissions, not an operating-system sandbox.
+
+Entries can also select YAML and TOML bodies with `frontMatter`; see [front
+matter formatters](configuration.md#front-matter-formatters). The Node host
+applies the same process limits and surrounding-Markdown guard, while metadata
+semantics remain the configured formatter's responsibility.
 
 ## Other exports
 
