@@ -187,6 +187,16 @@ prereleases' notes there are longer than their entries here.
   rule index does
   ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
 
+- `style/table` formats tables inside lists and block quotes with all of its
+  options, as Prettier aligns them, where it used to leave them as written. Each
+  row keeps the quote markers, indentation, and line ending before it, and
+  widths are measured after them, so a second run changes nothing. A header on
+  its list item's marker line keeps its leading pipe or its lack of one, because
+  markdown-it reads `- a | b` above an indented delimiter row as a table outside
+  the list. Tables in footnote definitions, indented tables outside containers,
+  and tables that renderer protections hold stay as written
+  ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
+
 - `style/heading` removes heading-owned indentation, including Setext text and
   underlines, while retaining container prefixes. Its new `closing: "add"`
   option writes matching closing hash sequences on ATX headings, including the

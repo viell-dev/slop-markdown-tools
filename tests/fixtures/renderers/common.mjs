@@ -21,6 +21,22 @@ export const commonFixtures = [
   },
   // Text below a table is another row; the forges read the indented line as one too.
   { name: "table-row-text", source: "| Name | Value |\n| --- | --- |\nmore text\n    indented\n" },
+  // Tables in lists and block quotes keep each row's container prefix (#710).
+  {
+    name: "table-in-quote",
+    source: "> | Name | Value |\n> | :-- | --: |\n> | *First* | 1 |\n>| `a \\| b` | 漢字 |\n",
+  },
+  {
+    name: "table-in-list",
+    source:
+      "- | Name | Value |\n  |---|---|\n  | x | y |\n- An item\n\n  Name | Value\n  --- | :-:\n  longer | z\n",
+  },
+  {
+    name: "table-in-quoted-list",
+    source: "> 1. A step\n>\n>    | a | b |\n>    |---|---|\n>    | ccc | d |\n",
+  },
+  { name: "table-on-marker-line", source: "- Name | Value\n  --- | ---\n  x | y\n" },
+  { name: "table-in-quote-lazy-text", source: "> | a | b |\n> | - | - |\n> | c | d |\nlazy text\n" },
 ];
 
 export const githubFixtures = [
