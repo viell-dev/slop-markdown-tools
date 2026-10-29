@@ -1,3 +1,4 @@
+import { lineEndingRule } from "./line-ending.js";
 import { linkTitle, definitionSpacing } from "./link-format.js";
 import { noTabs, proseSpace } from "./prose-whitespace.js";
 import { walk } from "../syntax/walk.js";
@@ -18,6 +19,7 @@ import { lineBounds, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
 
 const styleRules: Record<string, Rule> = {
+  "style/line-ending": lineEndingRule,
   "style/link-title": linkTitle,
   "style/definition-spacing": definitionSpacing,
   "style/wrap": wrap,

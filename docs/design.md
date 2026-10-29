@@ -29,10 +29,11 @@ this one when the edits that were kept changed it.
 
 The opt-in [code formatter pipeline](configuration.md#code-formatters) runs
 after these phases. It compares each tool result against a fingerprint with only
-that code value replaced, including matching code in alternative readings. The
-surrounding Markdown must keep its meaning. Ordinary Markdown formatting and its
-fingerprint still compare code values exactly; the code tool is responsible for
-its programming-language semantics.
+the selected code or front matter value replaced. Matching code values in
+alternative readings are included; front matter changes must preserve those
+readings. The surrounding Markdown must keep its meaning. Ordinary Markdown
+formatting still compares these literal values exactly; the configured tool is
+responsible for program or metadata semantics.
 
 Obsidian's structural rules also apply a general conservative [boundary
 policy](obsidian.md#visible-boundary-refusals). Held style edits produce a
@@ -183,9 +184,10 @@ Formatting:
   destinations and multiline layout.
 - Embedded code is formatted only by explicitly configured [external
   tools](configuration.md#code-formatters). Their output is checked for changes
-  to surrounding Markdown, not for preservation of program semantics. There is
-  no change of front matter or other metadata, no generation of documents, and
-  no renaming of files.
+  to surrounding Markdown, not for preservation of program semantics. Explicitly
+  configured front matter tools can also change metadata bodies, under the same
+  surrounding-Markdown guard; metadata semantics remain the external tool's
+  responsibility. There is no generation of documents or renaming of files.
 
 Files:
 

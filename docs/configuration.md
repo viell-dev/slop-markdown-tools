@@ -153,11 +153,11 @@ is [assumed](dialects.md#the-assumed-dialect).
 
 ## Code formatters
 
-`codeFormatters` lets `format` send fenced code to commands you choose. Install
-those tools yourself; no preset enables one. `lint` checks Markdown rules, so
-use `format --check` to check code formatting. The portable, synchronous library
-`format` never executes commands; library hosts use
-[`formatWithCode`](api.md#formatting-embedded-code) from `mdrefine/node`.
+`codeFormatters` lets `format` send fenced code and selected front matter to
+commands you choose. Install those tools yourself; no preset enables one. `lint`
+checks Markdown rules, so use `format --check` to check code formatting. The
+portable, synchronous library `format` never executes commands; library hosts
+use [`formatWithCode`](api.md#formatting-embedded-code) from `mdrefine/node`.
 
 ```jsonc
 {
@@ -218,6 +218,45 @@ that block's content and reports `engine/code-formatter`. The CLI exits with
 `2`, and other safe edits remain available. Partial stdout is never inserted.
 Configured commands, including commands in JSON files, run with your
 permissions; use configurations and tools you trust.
+
+### Front matter formatters
+
+An entry's optional `frontMatter` array selects `"yaml"`, `"toml"`, or both,
+independently of its fence `languages`. Use `languages: []` for metadata only; a
+fence fallback never selects metadata. Duplicate front matter routes are
+configuration errors.
+
+```jsonc
+{
+  "codeFormatters": [
+    {
+      "id": "yaml-properties",
+      "languages": [],
+      "frontMatter": ["yaml"],
+      "command": "prettier",
+      "args": ["--parser", "yaml", "--stdin-filepath", "{filepath}.yaml"],
+    },
+  ],
+}
+```
+
+The tool receives the body without delimiters, including comments and Obsidian
+properties, and returns the complete body on stdout. mdrefine preserves the
+opening and closing delimiters and their position, restoring the document's line
+endings. Configure a TOML-capable formatter with `frontMatter: ["toml"]` to
+handle TOML; mdrefine bundles no YAML or TOML printer. VitePress recognizes YAML
+front matter only, so TOML-like text there is not sent to a formatter.
+
+The same exclusions, range selection, suppressions, timeouts, output limits, and
+failure diagnostics apply as for fenced code. The guard permits only the
+selected metadata value to change, and checks the surrounding Markdown and
+alternative readings. TOML also renders as ordinary Markdown in several hosts: a
+tool result that changes that reading is refused. Delimiter injection and
+changes to the boundary are refused. The guard cannot prove that a formatter
+preserves YAML or TOML meaning, comments, property types, or
+application-specific metadata semantics; select a formatter that preserves them.
+Ordinary Markdown formatting still compares metadata exactly. Only the Node host
+executes these commands; the portable entry never does.
 
 ## Overrides
 

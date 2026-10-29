@@ -12,6 +12,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with
+  `endOfLine`, preserving hard breaks and literal content bytes
+  ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)).
+- External formatter entries can select YAML and TOML `frontMatter` bodies, with
+  the existing command limits and a guard for surrounding Markdown. Metadata
+  semantics remain the configured tool's responsibility; no YAML or TOML printer
+  is bundled
+  ([#718](https://github.com/viell-dev/slop-markdown-tools/issues/718)).
+
 - Three report-only rules, in no preset, cover markdownlint's MD037, MD038, and
   MD039: `content/emphasis-spacing` reports emphasis or strong markers with
   blank space just inside them, as in `** bold **`, where the parser reads
