@@ -440,7 +440,15 @@ export function convertConfig(input: {
     for (const row of competitorMappings.filter((r) => !r.source.startsWith("MD"))) {
       if (row.defaults || (row.rule && !row.options && !["singleQuote"].includes(row.source)))
         set(row, row.defaults ?? {});
-      if (row.issue && (row.source in p || row.defaults !== undefined))
+      if (row.source === "requirePragma" && p.requirePragma === true)
+        report.omitted.push(
+          `Prettier requirePragma: has no effect with an mdrefine configuration; honoring it during the fallback is #${row.issue}.`,
+        );
+      else if (row.source === "insertPragma" && p.insertPragma === true)
+        report.omitted.push(
+          "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
+        );
+      else if (row.issue && !row.source.endsWith("Pragma") && (row.source in p || row.defaults))
         report.omitted.push(`Prettier ${row.source}: incomplete; #${row.issue}.`);
     }
     const rowFor = (source: string) => competitorMappings.find((row) => row.source === source)!;

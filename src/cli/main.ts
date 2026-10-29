@@ -477,7 +477,7 @@ configCommand
     ])
       process.stderr.write(`mdrefine: ${message}\n`);
     process.stderr.write(
-      "mdrefine: competitor inline comments and pragmas are not converted (#723).\n",
+      "mdrefine: competitor inline comments and pragmas are not converted and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
     );
   });
 program

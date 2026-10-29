@@ -88,10 +88,12 @@ Turn off in one tool what the other covers; the tables below list the overlaps.
 
 ## Coming from Prettier or markdownlint
 
-mdrefine is meant to replace these tools for Markdown. The tables below list
-every rule and formatting choice, including differences and remaining gaps.
-"None yet" and "Not yet" link the issue tracking missing behavior; keep the
-other tool for that check until it is covered.
+mdrefine is meant to replace these tools for Markdown, but it does not yet cover
+everything they do. The tables below list every rule of markdownlint 0.42 and
+every Markdown option and formatting choice of Prettier 3.9, with the mdrefine
+rule that covers each. "None yet" and "Not yet" link the issue that tracks the
+missing part; keep the other tool for that check until it is done. The issues
+follow each check's documented purpose, not the other tool's known defects.
 
 ### Configuration conversion and fallback
 
@@ -129,10 +131,11 @@ and JSON5 are reported as unsupported. `.prettierignore` and markdownlint-cli2
 `ignores` and `globs` become `ignore`. Negated `.prettierignore` patterns are
 reported for manual migration.
 
-Competitor inline suppression comments and formatting pragmas are outside
-configuration conversion
-([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)). They have
-no effect with a written mdrefine configuration. Use mdrefine's own [suppression
+Competitor inline suppression comments and formatting pragmas have no effect;
+honoring them during the fallback is
+[#723](https://github.com/viell-dev/slop-markdown-tools/issues/723). With an
+mdrefine configuration, including one that `config convert` writes, they never
+apply: use mdrefine's own [suppression
 comments](configuration.md#suppression-comments).
 
 ### markdownlint rules

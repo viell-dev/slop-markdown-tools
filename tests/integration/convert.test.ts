@@ -70,7 +70,9 @@ describe("competitor configuration CLI (#669)", () => {
     const printed = run(root, ["config", "convert"]);
     expect(printed.status, printed.stderr).toBe(0);
     expect(parseConfig(printed.stdout).rules?.["style/wrap"]).toEqual(["warn", { width: 90 }]);
-    expect(printed.stderr).toContain("inline comments and pragmas are not converted");
+    expect(printed.stderr).toContain(
+      "inline comments and pragmas are not converted and have no effect",
+    );
     expect(run(root, ["config", "explain", "note.md"]).stdout).toContain('"conversion"');
     const write = run(root, ["config", "convert", "--write"]);
     expect(write.status, write.stderr).toBe(0);

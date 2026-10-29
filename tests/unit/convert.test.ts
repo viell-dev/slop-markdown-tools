@@ -181,6 +181,14 @@ describe("competitor conversion (#669)", () => {
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
     for (const issue of [723, 712]) expect(result.omitted.join("\n")).toContain(`#${issue}`);
+    // Competitor pragmas never apply with an mdrefine configuration, so the
+    // report must not suggest that a written configuration will honor them.
+    expect(result.omitted).toContain(
+      "Prettier requirePragma: has no effect with an mdrefine configuration; honoring it during the fallback is #723.",
+    );
+    expect(result.omitted).toContain(
+      "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
+    );
     expect(result.omitted.join("\n")).toContain("strict");
     expect(result.config.rules?.["content/html-element"]).toEqual(["error", {}]);
   });
