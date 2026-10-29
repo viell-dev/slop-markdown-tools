@@ -131,6 +131,7 @@ const quoteMarkerRule: Rule = {
     const blocks = blocksByLine(document);
     const findings: Finding[] = [];
     const obsidian = document.dialect === "obsidian";
+    let continued: Map<number, Nodes> | undefined;
     for (let line = 0; line < lines.length; line++) {
       const { start: lineStart, end: lineEnd } = lines[line]!;
       if (!source.slice(lineStart, lineEnd).includes(">")) continue;
@@ -186,6 +187,11 @@ const quoteMarkerRule: Rule = {
           if (chain.length !== index + 1 || kept.has(line)) continue;
           const block = blocks.get(line);
           if (!block || !spacedBlocks.has(block.type)) continue;
+          // Four or more spaces can be what keeps a paragraph's later line
+          // from starting a block, as a missing marker keeps a lazy line's,
+          // so the spaces go only where the text starts no block without them.
+          continued ??= continuationLines(document);
+          if (continued.has(line) && !startsNoBlock(content)) continue;
           // Site generators read their containers and template tags by line,
           // and the lines between them as their content; the VitePress
           // dialect's tree holds only that content.
@@ -219,11 +225,28 @@ const quoteMarkerRule: Rule = {
  * that starts no block, a number that is no list marker, emphasis, a code
  * span, a link or image, or an opening bracket or quotation mark. Anything
  * else could start a block, a heading's underline, or a table row inside the
- * container, which the lazy line does not.
+ * container, which the lazy line does not. Digits go only through the number
+ * alternative: renderers differ on which ordered markers start a list inside
+ * a container, so no marker counts as text.
  */
-const continuing = /^(?:[^\s!-/:-@[-`{-~]|\d+(?![\d.)])|[*_](?=[^\s*_])|`{1,2}(?!`)|!?\[|[("'])/u;
+const continuing = /^(?:[^\s\d!-/:-@[-`{-~]|\d+(?![\d.)])|[*_](?=[^\s*_])|`{1,2}(?!`)|!?\[|[("'])/u;
 /** A link reference or footnote definition, which reads otherwise in some renderers. */
 const definitionLike = /^\[[^\]]*\]:/;
+
+/**
+ * Whether a paragraph's later line, with its indentation removed or its
+ * containers' prefixes written, still continues the paragraph: the line's
+ * spaces or missing prefixes are what keep a heading, a fence, a list
+ * marker, or HTML there from starting a block.
+ */
+function startsNoBlock(text: string): boolean {
+  return (
+    continuing.test(text) &&
+    !definitionLike.test(text) &&
+    !siteSyntax.test(text) &&
+    !text.includes("|")
+  );
+}
 
 /** The lines, by index, that continue a paragraph or an underlined heading's text. */
 function continuationLines(document: Document): Map<number, Nodes> {
@@ -307,14 +330,7 @@ function lazyLine(
   if (structuralTab(source, lineStart, lineEnd)) return undefined;
   let textStart = level.start;
   while (source[textStart] === " ") textStart++;
-  const text = source.slice(textStart, lineEnd);
-  if (
-    !continuing.test(text) ||
-    definitionLike.test(text) ||
-    siteSyntax.test(text) ||
-    text.includes("|")
-  )
-    return undefined;
+  if (!startsNoBlock(source.slice(textStart, lineEnd))) return undefined;
   let prefix = lazyPrefix(analysis, chain, from);
   if (prefix === undefined) return undefined;
   // Directly after a `>` with no space, the quote would take the first

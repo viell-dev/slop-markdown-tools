@@ -2,6 +2,7 @@ import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
 import { normalizeHtml } from "../../scripts/rendering.mjs";
+import { forgeFixtures } from "../fixtures/renderers/forges.mjs";
 import {
   createWorkspace,
   format,
@@ -140,6 +141,42 @@ describe("style/quote-marker", () => {
         expect(formatted(">  a\n>b\n\n>>c\n", only(quote, dialect))).toBe("> a\n> b\n\n> > c\n");
       },
     );
+    it.each(["github", "forgejo", "gitea", "vitepress", "commonmark", "obsidian"] as const)(
+      "keeps the spaces that keep a paragraph's later line from starting a block in %s",
+      (dialect) => {
+        const settings = only(quote, dialect);
+        // Without the spaces, each line would start a heading, a break, a
+        // fence, a list, HTML, an underline, a quote, a table row, or a
+        // definition.
+        for (const line of [
+          "# Heading",
+          "---",
+          "```",
+          "~~~",
+          "1. b",
+          "2. b",
+          "1) b",
+          "- b",
+          "+ b",
+          "<div>",
+          "===",
+          "> b",
+          "| b |",
+          "[b]: /url",
+        ]) {
+          const source = `> a\n>     ${line}\n`;
+          expect(formatted(source, settings)).toBe(source);
+          expect(formatted(`> > a\n> >      ${line}\n`, settings)).toBe(
+            `> > a\n> >      ${line}\n`,
+          );
+        }
+        // Text that starts no block loses them.
+        expect(formatted("> a\n>     b\n>     2nd\n", settings)).toBe("> a\n> b\n> 2nd\n");
+        expect(formatted("> Title\n>     more\n> ===\n", settings)).toBe(
+          "> Title\n> more\n> ===\n",
+        );
+      },
+    );
     it("follows Obsidian's boundary policy like the list rules", () => {
       // A paragraph directly above a nested quote is a block boundary there.
       const source = ">  a\n>b\n>>c\n";
@@ -232,6 +269,30 @@ describe("style/lazy-continuation", () => {
   ])("keeps %j", (source) => {
     expect(formatted(source, config)).toBe(source);
   });
+  it.each(["github", "forgejo", "gitea", "vitepress", "commonmark", "obsidian"] as const)(
+    "keeps a lazy line that could start a list inside its containers in %s",
+    (dialect) => {
+      // Renderers differ on which ordered markers start a list inside a
+      // container, and markdown-it reads an indented one below a nested quote
+      // as code, so no marker gets the prefixes.
+      for (const source of [
+        "> a\n    1. b\n",
+        "> a\n    2. b\n",
+        "> a\n    1) b\n",
+        "> a\n    10. b\n",
+        "> > a\n    2. b\n",
+        "> > a\n    1. b\n",
+        "10. a\n  2. b\n",
+        "- > a\n    2. b\n",
+      ])
+        expect(formatted(source, only(lazy, dialect))).toBe(source);
+      // A number that is no marker is text; the engine's Obsidian protections
+      // hold an indented lazy line whatever its text.
+      expect(formatted("> a\n    2nd b\n", only(lazy, dialect))).toBe(
+        dialect === "obsidian" ? "> a\n    2nd b\n" : "> a\n> 2nd b\n",
+      );
+    },
+  );
   it("finds each lazy line and says what it lacks", () => {
     expect(messages("> a\nb\n\n- c\nd\n\n- > e\nf\n", config)).toEqual([
       "style/lazy-continuation: Add the block quote marker to the lazy continuation line.",
@@ -312,4 +373,15 @@ describe("the presets", () => {
       "> text lazy\n",
     );
   });
+  it.each(["forgejo", "gitea"] as const)(
+    "format the authored forge fixture for #665 in %s as the forges were shown it",
+    (dialect) => {
+      const { source } = forgeFixtures.find(({ name }) => name === "quoted-stray-markers")!;
+      const output = formatted(source, { extends: ["recommended", dialect], dialect });
+      // The quote's lines move the stray `~` to the next physical line.
+      expect(output).toContain(
+        "> > candle __kettle__ fabric harbor delta meadow pebble zephyr *xba_a`x.~x.*ab ~\n> > ~ .** engine",
+      );
+    },
+  );
 });

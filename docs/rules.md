@@ -1536,11 +1536,12 @@ opening parenthesis, or a quotation mark, and that holds no `|` and does not
 look like a link reference or footnote definition. A line of `===` below a lazy
 line, for example, is text, and inside a quote it would underline the text above
 it as a heading; `2. Step`, `- item`, `# Title`, `<span>`, and a table row are
-others. Lazy lines also stay inside a code span or other inline syntax that
-keeps the spaces at the start of its lines, with a tab among their containers'
-prefixes, as a lazy first line below a link reference definition, in paragraphs
-with site-generator syntax such as `:::` or `{{` at the start of a line, and, in
-VitePress, in documents with a custom container's fence on a quote's line.
+others, also after the spaces that a lazy line starts with. Lazy lines also stay
+inside a code span or other inline syntax that keeps the spaces at the start of
+its lines, with a tab among their containers' prefixes, as a lazy first line
+below a link reference definition, in paragraphs with site-generator syntax such
+as `:::` or `{{` at the start of a line, and, in VitePress, in documents with a
+custom container's fence on a quote's line.
 
 In Obsidian, the rule writes only the prefixes observed to leave both views
 unchanged: a quote's `>` where the lazy line lacks every `>` of its quotes, and
@@ -1798,6 +1799,11 @@ These are left as written:
 - Indented code, which five or more spaces after `>` start, and the lines of
   fenced code and HTML, whose spaces beyond the quote's one are content; a space
   is still added after a `>` that has none there, which moves nothing.
+- A paragraph's later line whose spaces keep its text from starting a block:
+  below a quoted paragraph, `>     # Title` is text, which one space after `>`
+  would make a heading. The spaces become one only before text that
+  [`style/lazy-continuation`](#stylelazy-continuation) would also prefix on a
+  lazy line.
 - A quote line with nothing after its spaces, whose spaces are trailing space
   for [`style/trailing-space`](#styletrailing-space), and the spaces on the
   other lines of a list item, which belong to the item.
