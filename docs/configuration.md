@@ -29,9 +29,10 @@ argument to disable it. Portable `convertConfig({ markdownlint, prettier })`
 converts objects without reading files. Neither changes dialect detection.
 
 `mdrefine config convert` prints a configuration and `--write` creates
-`mdrefine.config.jsonc` in the current directory (or `--root`). It refuses an
-existing file. The explicit command may execute competitor JavaScript settings;
-fallback loading never does. See the [conversion behavior and
+`mdrefine.config.jsonc` in the current directory (or `--root`). It refuses any
+existing mdrefine configuration in that directory. The explicit command may
+execute competitor JavaScript settings; fallback loading never does. See the
+[conversion behavior and
 comparison](integrations.md#coming-from-prettier-or-markdownlint) for
 precedence, formats, and remaining coverage gaps.
 

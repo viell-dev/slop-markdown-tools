@@ -340,9 +340,10 @@ and `.tmp`, holds no document text, and can be deleted.
 ### Conversion reports
 
 `config convert` writes JSON configuration to stdout and its sources, conflicts,
-omissions with issue numbers, and suggestions to stderr. With `--write` it
-creates `mdrefine.config.jsonc` and prints only the report. An existing
-destination is an error (exit code `2`).
+omissions with reasons and applicable issue numbers, and suggestions to stderr.
+With `--write` it creates `mdrefine.config.jsonc` and prints only the report.
+Any existing mdrefine configuration in the destination directory is an error
+(exit code `2`).
 
 With fallback settings, `config explain` adds a `conversion` object containing
 `config`, `sources`, `omitted`, `conflicts`, and `suggestions`. Ordinary lint

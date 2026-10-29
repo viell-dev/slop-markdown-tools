@@ -21,7 +21,7 @@ describe("competitor configuration CLI (#669)", () => {
       "other.md": "text",
     });
     const result = run(root, ["lint", "--json"]);
-    expect(result.status, result.stderr).toBe(0);
+    expect(result.status, result.stderr).toBe(1);
     expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(["docs/note.md"]);
     expect(result.stderr).toContain("base.yaml");
   });
@@ -56,7 +56,7 @@ describe("competitor configuration CLI (#669)", () => {
     });
     const result = run(root, ["config", "convert"]);
     expect(result.status, result.stderr).toBe(0);
-    expect(parseConfig(result.stdout).rules).toEqual({ "style/final-newline": ["warn", {}] });
+    expect(parseConfig(result.stdout).rules).toEqual({ "style/final-newline": ["error", {}] });
     const empty = await fixture({ ".prettierrc.yaml": "", "note.md": "text\n" });
     const converted = run(empty, ["config", "convert"]);
     expect(converted.status, converted.stderr).toBe(0);
@@ -85,6 +85,7 @@ describe("competitor configuration CLI (#669)", () => {
     async (name) => {
       const script = /\.[cm]?[jt]s$/.test(name);
       const toml = name.endsWith(".toml");
+      const json5 = name.endsWith(".json5");
       const root = await fixture({
         [name]: script ? 'throw new Error("EXECUTED")' : toml ? 'proseWrap = "always"' : "{}",
         "note.md": "*text*\n",
@@ -93,6 +94,7 @@ describe("competitor configuration CLI (#669)", () => {
       expect(result.status, result.stderr).toBe(0);
       expect(result.stderr).toContain(name);
       if (script) expect(result.stderr).toContain("not executed");
+      if (json5) expect(result.stderr).toContain("JSON5 is unsupported");
       if (toml) expect(result.stderr).toContain("TOML is unsupported");
       expect(run(root, ["config", "explain", "note.md", "--no-competitor-config"]).stderr).toBe("");
     },
@@ -120,6 +122,7 @@ describe("competitor configuration CLI (#669)", () => {
   });
   it("reads editorconfig indentation without executing script configs", async () => {
     const root = await fixture({
+      ".prettierrc": "{}",
       ".editorconfig": "root = true\n[*.md]\nindent_size = 4\n",
       "note.md": "text\n",
     });
@@ -129,5 +132,91 @@ describe("competitor configuration CLI (#669)", () => {
       "warn",
       expect.objectContaining({ nestedIndent: 4 }),
     ]);
+  });
+  it.each([undefined, '{"default":false,"MD047":true}'])(
+    "ignores editorconfig without Prettier (%s)",
+    async (markdownlint) => {
+      const root = await fixture({
+        ".editorconfig": "[*]\nindent_size = 4\n",
+        "note.md": "*text*\n",
+        ...(markdownlint ? { ".markdownlint.json": markdownlint } : {}),
+      });
+      const result = run(root, ["config", "explain", "note.md"]);
+      expect(result.stderr).not.toContain(".editorconfig");
+      if (markdownlint)
+        expect(parseExplanation(result.stdout).effective.rules).not.toHaveProperty(
+          "style/list-indent",
+        );
+      else {
+        expect(result.stdout).not.toContain('"conversion"');
+        expect(Object.keys(parseExplanation(result.stdout).effective.rules).length).toBeGreaterThan(
+          1,
+        );
+      }
+    },
+  );
+  it.each(["json", "jsonc", "mjs", "js", "cjs"])(
+    "refuses a second mdrefine configuration beside %s",
+    async (extension) => {
+      const root = await fixture({ ["mdrefine.config." + extension]: "{}", ".prettierrc": "{}" });
+      expect(run(root, ["config", "convert", "--write"]).status).toBe(2);
+    },
+  );
+  it("uses package precedence and filters sections for other languages", async () => {
+    const root = await fixture({
+      "package.json": '{"prettier":{"tabWidth":5}}',
+      "package.yaml": "prettier: {tabWidth: 6}",
+      ".prettierrc": '{"tabWidth":7}',
+      "note.md": "text\n",
+    });
+    expect(
+      parseConfig(run(root, ["config", "convert"]).stdout).rules?.["style/list-indent"],
+    ).toEqual(["warn", expect.objectContaining({ nestedIndent: 5 })]);
+    const other = await fixture({
+      "package.yaml":
+        "prettier:\n  tabWidth: 6\n  overrides:\n    - files: '*.{ts,tsx}'\n      options: {tabWidth: 9}\n    - files: '*.md'\n      options: {tabWidth: 3}",
+      ".editorconfig":
+        "[*.js]\nindent_size=8\n[*.{ts,tsx}]\nindent_size=7\n[*.md]\nindent_size=4\n",
+      "note.md": "text\n",
+    });
+    const config = parseConfig(run(other, ["config", "convert"]).stdout);
+    expect(config.rules?.["style/list-indent"]).toEqual([
+      "warn",
+      expect.objectContaining({ nestedIndent: 6 }),
+    ]);
+    expect(config.overrides).toHaveLength(2);
+  });
+  it("shares the fallback boundary when .obsidian is a file rather than a vault", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"tabWidth":4}',
+      "sub/.obsidian": "not a directory",
+      "sub/note.md": "text\n",
+    });
+    const directory = path.join(root, "sub");
+    const converted = parseConfig(run(directory, ["config", "convert"]).stdout);
+    const effective = parseExplanation(
+      run(directory, ["config", "explain", "note.md"]).stdout,
+    ).effective;
+    expect(converted.rules?.["style/list-indent"]).toEqual(effective.rules["style/list-indent"]);
+    expect(converted.rules?.["style/list-indent"]).toEqual([
+      "warn",
+      expect.objectContaining({ nestedIndent: 4 }),
+    ]);
+  });
+  it("uses Prettier's yml before yaml and js before cjs", async () => {
+    const root = await fixture({
+      ".prettierrc.yml": "tabWidth: 3",
+      ".prettierrc.yaml": "tabWidth: 4",
+    });
+    expect(
+      parseConfig(run(root, ["config", "convert"]).stdout).rules?.["style/list-indent"],
+    ).toEqual(["warn", expect.objectContaining({ nestedIndent: 3 })]);
+    const scripts = await fixture({
+      ".prettierrc.cjs": "module.exports={tabWidth:3}",
+      "prettier.config.js": "module.exports={tabWidth:4}",
+    });
+    expect(
+      parseConfig(run(scripts, ["config", "convert"]).stdout).rules?.["style/list-indent"],
+    ).toEqual(["warn", expect.objectContaining({ nestedIndent: 4 })]);
   });
 });

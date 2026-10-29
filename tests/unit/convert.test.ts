@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { format as prettierFormat } from "prettier";
 import { describe, expect, it } from "vitest";
 import { competitorMappings, convertConfig, builtInRules, format } from "../../src/index.js";
 
@@ -51,6 +52,7 @@ describe("competitor conversion (#669)", () => {
       urlInline: false,
       prohibitedTexts: ["here"],
       alignedDelimiter: true,
+      listItems: false,
     };
     const docs = readFileSync("docs/integrations.md", "utf8");
     for (const row of competitorMappings) {
@@ -83,7 +85,7 @@ describe("competitor conversion (#669)", () => {
         );
         const setting = result.config.rules?.[row.rule!];
         expect(setting, `${row.source}.${source}`).toEqual([
-          "warn",
+          "error",
           expect.objectContaining({
             [target]:
               source === "ignore_case"
@@ -106,6 +108,8 @@ describe("competitor conversion (#669)", () => {
     for (const row of rows) {
       const line = docs.split("\n").find((line) => line.startsWith(`| ${row.source} `));
       expect(line, row.source).toBeDefined();
+      if (row.issue) expect(line, row.source).toContain(`#${row.issue}`);
+      if (!/None yet|Not yet/.test(line!)) expect(row.issue, row.source).toBeUndefined();
       if (row.rule) {
         expect(line, row.source).toContain(row.rule);
         expect(builtInRules).toHaveProperty(row.rule);
@@ -117,6 +121,7 @@ describe("competitor conversion (#669)", () => {
     (row) => {
       const result = convertConfig({ markdownlint: { default: false, [row.source]: true } });
       expect(() => format("", { config: result.config })).not.toThrow();
+      expect(result.omitted.join("\n")).not.toContain("outside the mdrefine option range");
       if (row.rule) expect(result.config.rules).toHaveProperty(row.rule);
       else expect(result.omitted.join("\n")).toContain(`#${row.issue}`);
       expect(
@@ -129,39 +134,39 @@ describe("competitor conversion (#669)", () => {
     expect(result.config.extends).toEqual([]);
     expect(result.config.rules?.["style/wrap"]).toBeUndefined();
     expect(result.config.rules?.["structure/duplicate-heading"]).toEqual([
-      "warn",
+      "error",
       { siblingsOnly: false },
     ]);
     expect(
       convertConfig({ markdownlint: { default: false, "emphasis-style": { style: "asterisk" } } })
         .config.rules,
-    ).toEqual({ "style/emphasis": ["warn", { marker: "*" }] });
+    ).toEqual({ "style/emphasis": ["error", { marker: "*" }] });
   });
   it("lets explicit markdownlint choices win fixed styles, and Prettier options win their choices", () => {
     const result = convertConfig({
       markdownlint: { default: false, MD049: { style: "asterisk" }, MD007: { indent: 4 } },
       prettier: { proseWrap: "always", printWidth: 99, tabWidth: 3 },
     });
-    expect(result.config.rules?.["style/emphasis"]).toEqual(["warn", { marker: "*" }]);
+    expect(result.config.rules?.["style/emphasis"]).toEqual(["error", { marker: "*" }]);
     expect(result.config.rules?.["style/wrap"]).toEqual(["warn", { width: 99 }]);
     expect(result.config.rules?.["style/list-indent"]).toEqual([
-      "warn",
+      "error",
       expect.objectContaining({ nestedIndent: 3 }),
     ]);
     expect(result.conflicts.join("\n")).toContain("MD049 wins");
     expect(result.conflicts.join("\n")).toContain("tabWidth wins");
   });
-  it("honors an explicit disable of a Prettier fixed choice", () => {
-    const result = convertConfig({ markdownlint: { default: false, MD049: false }, prettier: {} });
-    expect(result.config.rules?.["style/emphasis"]).toBe("off");
-    expect(result.conflicts.join("\n")).toContain("explicit disable wins");
+  it.each(["MD004", "MD049"])("retains Prettier when markdownlint disables %s", (source) => {
+    const result = convertConfig({
+      markdownlint: { default: false, [source]: false },
+      prettier: {},
+    });
+    expect(result.config.rules?.["style/emphasis"]).toEqual(["warn", { marker: "_" }]);
+    expect(result.conflicts.join("\n")).toContain("leaves Prettier");
   });
-  it.each([{}, { proseWrap: "preserve" }, { proseWrap: "never" }])(
-    "does not enable wrapping for %j",
-    (prettier) => {
-      expect(convertConfig({ prettier }).config.rules?.["style/wrap"]).toBeUndefined();
-    },
-  );
+  it.each([{}, { proseWrap: "preserve" }])("does not enable wrapping for %j", (prettier) => {
+    expect(convertConfig({ prettier }).config.rules?.["style/wrap"]).toBeUndefined();
+  });
   it("does not report absent optional Prettier settings as conversion gaps", () => {
     const omitted = convertConfig({ prettier: {} }).omitted.join("\n");
     for (const name of ["parser", "plugins", "rangeStart", "requirePragma"])
@@ -173,8 +178,150 @@ describe("competitor conversion (#669)", () => {
       prettier: { requirePragma: true, insertPragma: true, endOfLine: "crlf", plugin: "untrusted" },
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
-    for (const issue of [723, 712, 685, 702])
-      expect(result.omitted.join("\n")).toContain(`#${issue}`);
+    for (const issue of [723, 712, 685]) expect(result.omitted.join("\n")).toContain(`#${issue}`);
     expect(result.omitted.join("\n")).toContain("strict");
+  });
+  it("keeps enabled markdownlint defaults behind Prettier choices but raises severity", () => {
+    const result = convertConfig({ prettier: {}, markdownlint: { MD049: true } });
+    expect(result.config.rules?.["style/emphasis"]).toEqual(["error", { marker: "_" }]);
+    expect(result.conflicts.join("\n")).not.toContain("explicit markdownlint choice");
+    expect(result.conflicts.join("\n")).not.toContain("tabWidth wins");
+  });
+  it("converts never and reports MD013 paragraph limits without enabling reflow", () => {
+    expect(
+      convertConfig({ prettier: { proseWrap: "never" } }).config.rules?.["style/wrap"],
+    ).toEqual(["warn", { mode: "never" }]);
+    const result = convertConfig({ markdownlint: { MD013: { line_length: 97 } } });
+    expect(result.omitted.join("\n")).toContain("paragraph lines are not checked");
+    expect(result.suggestions.join("\n")).toContain("width 97");
+    expect(result.config.rules?.["style/wrap"]).toBeUndefined();
+  });
+  it("maps MD009 code blocks and explains strict and MD031's safety limit without closed issues", () => {
+    const result = convertConfig({
+      markdownlint: {
+        default: false,
+        MD009: { strict: true, code_blocks: true },
+        MD031: true,
+        MD060: { style: "any" },
+      },
+    });
+    expect(result.config.rules?.["style/trailing-space"]).toEqual([
+      "error",
+      expect.objectContaining({ codeBlocks: true }),
+    ]);
+    expect(result.omitted.join("\n")).toContain("always strict");
+    expect(result.omitted.join("\n")).toContain("inside list items");
+    expect(result.omitted.join("\n")).not.toMatch(/#(702|684|709|669)/);
+  });
+  it.each([{ prettier: {} }, { markdownlint: {} }])(
+    "accepts all converted default option values: %j",
+    (input) => {
+      expect(convertConfig(input).omitted.join("\n")).not.toContain(
+        "outside the mdrefine option range",
+      );
+    },
+  );
+  it.each([{}, { proseWrap: "always" as const, printWidth: 36 }, { proseWrap: "never" as const }])(
+    "formats the documented common behavior like Prettier: %j",
+    async (prettier) => {
+      const input = [
+        "# Title",
+        "",
+        "## Closed ##",
+        "",
+        "* *emphasis* and __strong__",
+        "* second",
+        "  * nested",
+        "",
+        "1. one",
+        "2. two",
+        "",
+        "~~~txt",
+        "literal",
+        "~~~",
+        "",
+        "***",
+        "",
+        "| a | longer |",
+        "| --- | --- |",
+        "| long cell | b |",
+        "",
+        "trailing space   ",
+        "hard break  ",
+        "next line.",
+        "",
+        "",
+        "",
+        "A ``code`` span and [reference][r].",
+        "",
+        '[r]:   https://example.com   "Title"',
+        "",
+        ">  quoted text",
+        "> continuation",
+        "lazy continuation",
+        "",
+        "a paragraph whose words fill more than the selected width",
+        "and continue on another physical line",
+      ].join("\n");
+      const config = convertConfig({ prettier }).config;
+      const result = format(input, { config: { ...config, dialect: "github" } });
+      expect(result.output).toBe(await prettierFormat(input, { ...prettier, parser: "markdown" }));
+      expect(format(result.output, { config: { ...config, dialect: "github" } }).output).toBe(
+        result.output,
+      );
+    },
+  );
+
+  it("documents the Setext difference instead of claiming Prettier changes it", async () => {
+    const input = "Title\n=====\n";
+    expect(await prettierFormat(input, { parser: "markdown" })).toBe(input);
+    expect(format(input, { config: convertConfig({ prettier: {} }).config }).output).toBe(
+      "# Title\n",
+    );
+    expect(readFileSync("docs/integrations.md", "utf8")).toContain(
+      "Prettier keeps Setext headings",
+    );
+  });
+  it.each([
+    "leading_and_trailing",
+    "leading_only",
+    "trailing_only",
+    "no_leading_or_trailing",
+    "per_table",
+  ])("maps markdownlint's table enum %s", (style) => {
+    const report = convertConfig({ markdownlint: { default: false, MD055: { style } } });
+    expect(report.omitted).toEqual([]);
+    expect(() => format("", { config: report.config })).not.toThrow();
+  });
+  it("maps markdownlint's one_or_ordered numbering", () => {
+    expect(
+      convertConfig({ markdownlint: { default: false, MD029: { style: "one_or_ordered" } } }).config
+        .rules?.["style/ordered-list"],
+    ).toEqual(["error", { numbering: "auto", delimiter: "consistent" }]);
+  });
+  it("ties every reported Prettier issue to its own comparison row", () => {
+    const docs = readFileSync("docs/integrations.md", "utf8");
+    const labels: Record<string, string> = {
+      endOfLine: "`endOfLine`",
+      embeddedLanguageFormatting: "`embeddedLanguageFormatting`",
+      requirePragma: "`requirePragma`",
+      insertPragma: "`requirePragma`",
+      tables: "Aligned tables",
+      "front matter": "YAML front matter",
+    };
+    for (const row of competitorMappings.filter((row) => !row.source.startsWith("MD"))) {
+      const label = labels[row.source];
+      if (!label) {
+        expect(row.issue, row.source).toBeUndefined();
+        continue;
+      }
+      const line = docs.split("\n").find((line) => line.startsWith("|") && line.includes(label))!;
+      expect(line, row.source).toBeDefined();
+      if (row.issue) expect(line).toContain(`#${row.issue}`);
+      if (!/None yet|Not yet/.test(line)) expect(row.issue).toBeUndefined();
+    }
+    expect(docs).toContain("mdrefine is meant to replace these tools");
+    expect(docs).toContain('"None yet" and "Not yet" link the issue');
+    expect(docs).toContain("### Configuration conversion and fallback");
   });
 });

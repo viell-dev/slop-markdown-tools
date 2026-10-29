@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { lint, ruleRegistry } from "../core/engine.js";
 import { formatWithCode } from "../code/format.js";
 import { loadCompetitorConfig } from "../config/competitors.js";
-import { loadConfig } from "../config/load.js";
+import { loadConfig, searchConfig, configFiles } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
 import { isIgnoredInput, skippedMessage } from "../workspace/files.js";
 import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/writes.js";
@@ -451,19 +451,15 @@ workspaceOptions(
 configCommand
   .command("convert")
   .description("Convert markdownlint and Prettier configurations to mdrefine.config.jsonc")
-  .option("--write", "Create mdrefine.config.jsonc; refuse an existing file")
+  .option("--write", "Create mdrefine.config.jsonc; refuse any existing mdrefine configuration")
   .action(async (_flags: unknown, command: Command) => {
     const flags = command.optsWithGlobals<Flags>();
-    const directories: string[] = [];
-    for (let directory = path.resolve(flags.root ?? "."); ; directory = path.dirname(directory)) {
-      directories.push(directory);
-      if (
-        (await exists(path.join(directory, ".git"))) ||
-        (await exists(path.join(directory, ".obsidian"))) ||
-        directory === path.dirname(directory)
-      )
-        break;
-    }
+    const root = path.resolve(flags.root ?? ".");
+    const { directories } = await searchConfig(root);
+    if (flags.write)
+      for (const name of configFiles)
+        if (await exists(path.join(root, name)))
+          throw new Error(`Existing mdrefine configuration: ${name}`);
     const report = await loadCompetitorConfig(directories, true);
     if (!report) throw new Error("No markdownlint or Prettier configuration found.");
     resolveConfig({ config: report.config });

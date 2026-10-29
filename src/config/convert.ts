@@ -60,8 +60,11 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     alias: "no-trailing-spaces",
     rule: "style/trailing-space",
     defaults: { hardBreakSpaces: 2, listItemEmptyLines: false },
-    options: { br_spaces: "hardBreakSpaces", list_item_empty_lines: "listItemEmptyLines" },
-    issue: 702,
+    options: {
+      br_spaces: "hardBreakSpaces",
+      list_item_empty_lines: "listItemEmptyLines",
+      code_blocks: "codeBlocks",
+    },
   },
   {
     source: "MD010",
@@ -107,7 +110,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     source: "MD022",
     alias: "blanks-around-headings",
     rule: "style/block-spacing",
-    defaults: { linesAbove: 1, linesBelow: 1, includeFrontMatter: true },
+    defaults: { linesAbove: 1, linesBelow: 1, includeFrontMatter: false },
     options: {
       lines_above: "linesAbove",
       lines_below: "linesBelow",
@@ -135,7 +138,12 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     rule: "structure/heading-punctuation",
     options: { punctuation: "punctuation" },
   },
-  { source: "MD027", alias: "no-multiple-space-blockquote", issue: 682 },
+  {
+    source: "MD027",
+    alias: "no-multiple-space-blockquote",
+    rule: "style/quote-marker",
+    options: { list_items: "listItems" },
+  },
   { source: "MD028", alias: "no-blanks-blockquote", rule: "structure/split-quote" },
   {
     source: "MD029",
@@ -160,7 +168,6 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     alias: "blanks-around-fences",
     rule: "style/block-spacing",
     options: {},
-    issue: 684,
   },
   { source: "MD032", alias: "blanks-around-lists", rule: "style/block-spacing" },
   { source: "MD033", alias: "no-inline-html", issue: 685 },
@@ -251,6 +258,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD052",
+    defaults: { ignoredLabels: ["x"] },
     alias: "reference-links-images",
     rule: "links/undefined-reference",
     options: { shortcut_syntax: "shortcutSyntax", ignored_labels: "ignoredLabels" },
@@ -283,7 +291,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     options: { style: "pipeStyle" },
   },
   { source: "MD056", alias: "table-column-count", rule: "content/table-columns" },
-  { source: "MD058", alias: "blanks-around-tables", rule: "style/block-spacing", issue: 697 },
+  { source: "MD058", alias: "blanks-around-tables", rule: "style/block-spacing" },
   {
     source: "MD059",
     alias: "descriptive-link-text",
@@ -313,14 +321,14 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   { source: "experimentalTernaries" },
   { source: "experimentalOperatorPosition" },
   { source: "objectWrap" },
-  { source: "parser", issue: 669 },
-  { source: "filepath", issue: 669 },
-  { source: "rangeStart", issue: 669 },
-  { source: "rangeEnd", issue: 669 },
-  { source: "plugins", issue: 669 },
-  { source: "checkIgnorePragma", issue: 669 },
+  { source: "parser" },
+  { source: "filepath" },
+  { source: "rangeStart" },
+  { source: "rangeEnd" },
+  { source: "plugins" },
+  { source: "checkIgnorePragma" },
   { source: "endOfLine", issue: 712, defaults: {} },
-  { source: "embeddedLanguageFormatting", issue: 718, defaults: {} },
+  { source: "embeddedLanguageFormatting" },
   { source: "singleQuote", rule: "style/link-title" },
   { source: "requirePragma", issue: 723 },
   { source: "insertPragma", issue: 723 },
@@ -338,8 +346,8 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     rule: "style/list-indent",
     defaults: { bulletSpaces: 1, orderedSpaces: 1 },
   },
-  { source: "fences", rule: "style/code-fence", defaults: { marker: "`" } },
-  { source: "thematic breaks", rule: "style/thematic-break", defaults: { style: "---" } },
+  { source: "fences", rule: "style/code-fence", defaults: { marker: "```" } },
+  { source: "thematic breaks", rule: "style/thematic-break", defaults: { marker: "---" } },
   {
     source: "tables",
     rule: "style/table",
@@ -351,8 +359,8 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   { source: "block spacing", rule: "style/block-spacing" },
   { source: "final newline", rule: "style/final-newline" },
   { source: "code spans", rule: "style/inline-code" },
-  { source: "quote spacing", defaults: {}, issue: 682 },
-  { source: "lazy continuations", defaults: {}, issue: 713 },
+  { source: "quote spacing", rule: "style/quote-marker" },
+  { source: "lazy continuations", rule: "style/lazy-continuation" },
   { source: "definitions", rule: "style/definition-spacing" },
   { source: "front matter", defaults: {}, issue: 718 },
   { source: "prose spacing", rule: "style/prose-space" },
@@ -364,7 +372,7 @@ export interface ConversionReport {
   config: Config;
   /** Configuration files read by the Node loader; empty for object conversion. */
   sources: string[];
-  /** Settings not fully carried over, with tracking issues. */
+  /** Settings not fully carried over, with reasons and applicable tracking issues. */
   omitted: string[];
   /** Conflicting settings and the choice made. */
   conflicts: string[];
@@ -403,16 +411,24 @@ export function convertConfig(input: {
         });
       } catch {
         report.omitted.push(
-          `${row.source}.${key}: value ${JSON.stringify(merged[key])} is outside the mdrefine option range; #${row.issue ?? 669}.`,
+          `${row.source}.${key}: value ${JSON.stringify(merged[key])} is outside the mdrefine option range; ${row.issue ? `#${row.issue}.` : "No equivalent option value."}`,
         );
         delete merged[key];
       }
     }
-    rules[row.rule] = ["warn", merged];
+    rules[row.rule] = [
+      row.source.startsWith("MD") || (Array.isArray(previous) && previous[0] === "error")
+        ? "error"
+        : "warn",
+      merged,
+    ];
     owners.set(row.rule, row.source);
   };
   if (input.prettier) {
     const p = input.prettier;
+    report.omitted.push(
+      "Prettier headings: Setext headings become ATX; mixed heading-style preservation has no counterpart.",
+    );
     for (const row of competitorMappings.filter((r) => !r.source.startsWith("MD"))) {
       if (row.defaults || (row.rule && !row.options && !["singleQuote"].includes(row.source)))
         set(row, row.defaults ?? {});
@@ -423,15 +439,31 @@ export function convertConfig(input: {
     set(rowFor("singleQuote"), { delimiter: p.singleQuote === true ? "single" : "double" });
     set(rowFor("tabWidth"), { bulletSpaces: 1, orderedSpaces: 1, nestedIndent: p.tabWidth ?? 2 });
     if (p.proseWrap === "always") set(rowFor("proseWrap"), { width: p.printWidth ?? 80 });
+    if ("embeddedLanguageFormatting" in p)
+      report.omitted.push(
+        "Prettier embeddedLanguageFormatting: configure code formatters explicitly; plugins are not executed by conversion.",
+      );
     const known = new Set([
       "printWidth",
       "overrides",
       ...competitorMappings.filter((r) => !r.source.startsWith("MD")).map((r) => r.source),
     ]);
     for (const key of Object.keys(p))
-      if (!known.has(key)) report.omitted.push(`Prettier ${key}: no Markdown mapping; #669.`);
-    if (p.proseWrap === "never")
-      report.omitted.push('Prettier proseWrap: "never": not carried over; #711.');
+      if (!known.has(key))
+        report.omitted.push(`Prettier ${key}: no Markdown mapping; requires manual migration.`);
+    if (p.proseWrap === "never") set(rowFor("proseWrap"), { mode: "never" });
+    for (const key of [
+      "parser",
+      "filepath",
+      "rangeStart",
+      "rangeEnd",
+      "plugins",
+      "checkIgnorePragma",
+    ])
+      if (key in p)
+        report.omitted.push(
+          `Prettier ${key}: file-context or plugin behavior requires manual migration.`,
+        );
   }
   if (input.markdownlint) {
     const m = { ...input.markdownlint };
@@ -449,7 +481,10 @@ export function convertConfig(input: {
         for (const [key, value] of Object.entries(setting)) {
           const target = row.options?.[key];
           if (target) options[target] = key === "ignore_case" ? !value : value;
-          else report.omitted.push(`${row.source}.${key}: not carried over; #${row.issue ?? 669}.`);
+          else if (!["MD009.strict", "MD031.list_items"].includes(`${row.source}.${key}`))
+            report.omitted.push(
+              `${row.source}.${key}: not carried over; ${row.issue ? `#${row.issue}.` : "No equivalent option value."}`,
+            );
         }
       }
       if (row.source === "MD003") {
@@ -470,18 +505,60 @@ export function convertConfig(input: {
               tilde: "~~~",
             } as Values
           )[String(options.marker)] ?? options.marker;
+      if (row.source === "MD055" && typeof options.pipeStyle === "string")
+        options.pipeStyle = options.pipeStyle.replace(
+          /_([a-z])/g,
+          (_match: string, letter: string) => letter.toUpperCase(),
+        );
+      if (row.source === "MD029" && options.numbering === "one_or_ordered")
+        options.numbering = "auto";
+      if (row.source === "MD060" && options.style === undefined) options.style = "any";
       if (row.source === "MD029")
         options.numbering = ["one", "zero"].includes(String(options.numbering))
           ? "same"
           : options.numbering;
       if (row.source === "MD060" && options.style === "any") {
         delete options.style;
-        report.omitted.push("MD060 style:any: a formatter needs a target style; #709.");
+        report.omitted.push("MD060 style:any: a formatter needs a target style.");
       }
-      // Competitor defaults enable checks, while explicit choices resolve style conflicts.
-      if (input.prettier && setting === undefined && row.rule && rules[row.rule]) continue;
+      // Only stated option values override Prettier; enabled checks still retain error severity.
+      if (input.prettier && row.rule && rules[row.rule]) {
+        for (const key of Object.keys(options)) {
+          const stated =
+            setting &&
+            typeof setting === "object" &&
+            Object.keys(setting).some(
+              (source) =>
+                row.options?.[source] === key ||
+                (row.source === "MD003" && key === "closing" && source === "style"),
+            );
+          if (!stated) delete options[key];
+        }
+      }
+      if (row.source === "MD009")
+        report.omitted.push(
+          "MD009.strict: cleanup is always strict outside preserved hard breaks; no separate switch.",
+        );
+      if (
+        row.source === "MD031" &&
+        (!(setting && typeof setting === "object") || (setting as Values).list_items !== false)
+      )
+        report.omitted.push(
+          "MD031.list_items: true: spacing inside list items is left as written for safety.",
+        );
+      if (row.source === "MD013" && !rules["style/wrap"]) {
+        report.omitted.push(
+          "MD013: paragraph lines are not checked; content/line-length checks headings, code and tables only.",
+        );
+        report.suggestions.push(
+          `Consider style/wrap with width ${Number(options.lineLength ?? 80)} to reflow paragraph lines.`,
+        );
+      }
       if (row.source === "MD007" && input.prettier) {
-        if (options.nestedIndent !== (input.prettier.tabWidth ?? 2))
+        if (
+          options.nestedIndent !== undefined &&
+          options.nestedIndent !== (input.prettier.tabWidth ?? 2)
+        )
           report.conflicts.push(
             "style/list-indent.nestedIndent: Prettier tabWidth wins over MD007.",
           );
@@ -503,18 +580,19 @@ export function convertConfig(input: {
       );
       if (another)
         report.omitted.push(
-          `${row.source}: disabled, but ${row.rule} also implements another enabled check; #669.`,
+          `${row.source}: disabled, but ${row.rule} also implements another enabled check.`,
         );
-      else {
-        rules[row.rule] = "off";
+      else if (input.prettier && rules[row.rule]) {
         report.conflicts.push(
-          `${row.source}: explicit disable wins over Prettier's fixed ${row.rule} choice.`,
+          `${row.source}: disabled markdownlint check leaves Prettier's ${row.rule} choice enabled.`,
         );
-      }
+      } else rules[row.rule] = "off";
     }
     for (const key of Object.keys(m))
       if (key !== "default" && !competitorMappings.some((r) => r.source === key))
-        report.omitted.push(`markdownlint ${key}: unknown rule or option; #669.`);
+        report.omitted.push(
+          `markdownlint ${key}: unknown rule or option; requires manual migration.`,
+        );
   }
   const spacing = rules["style/block-spacing"];
   const blanks = rules["style/blank-lines"];
@@ -528,7 +606,7 @@ export function convertConfig(input: {
       ),
     );
     if (count > Number(blankOptions.maximum ?? 1)) {
-      rules["style/blank-lines"] = ["warn", { ...blankOptions, maximum: count }];
+      rules["style/blank-lines"] = [blanks[0], { ...blankOptions, maximum: count }];
       report.conflicts.push(`MD022 heading spacing wins over MD012: maximum raised to ${count}.`);
     }
   }

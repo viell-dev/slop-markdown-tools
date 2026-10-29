@@ -1,3 +1,4 @@
+import { Minimatch } from "minimatch";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -35,25 +36,40 @@ export const competitorFiles = {
   prettier: [
     ".prettierrc",
     ".prettierrc.json",
-    ".prettierrc.jsonc",
-    ".prettierrc.yaml",
     ".prettierrc.yml",
-    ".prettierrc.toml",
+    ".prettierrc.yaml",
+    ".prettierrc.json5",
     ".prettierrc.js",
-    ".prettierrc.mjs",
-    ".prettierrc.cjs",
-    ".prettierrc.ts",
-    ".prettierrc.mts",
-    ".prettierrc.cts",
     "prettier.config.js",
-    "prettier.config.mjs",
-    "prettier.config.cjs",
+    ".prettierrc.ts",
     "prettier.config.ts",
+    ".prettierrc.mjs",
+    "prettier.config.mjs",
+    ".prettierrc.mts",
     "prettier.config.mts",
+    ".prettierrc.cjs",
+    "prettier.config.cjs",
+    ".prettierrc.cts",
     "prettier.config.cts",
+    ".prettierrc.toml",
+    ".prettierrc.jsonc",
   ],
 } as const;
 
+/** Reject globs whose final path component can only name another language. */
+function markdownPattern(pattern: string): boolean {
+  const matcher = new Minimatch(pattern);
+  return matcher.set.some((parts) => {
+    const last = parts.at(-1);
+    if (typeof last === "string") return /\.(md|markdown)$/i.test(last);
+    if (last instanceof RegExp) {
+      // A literal extension remains decidable even when the basename is a glob.
+      const extension = /\.([a-zA-Z0-9]+)$/.exec((last as RegExp & { _glob: string })._glob);
+      return !extension || /^(md|markdown)$/i.test(extension[1]!);
+    }
+    return true;
+  });
+}
 /** Read competitors only in directories the mdrefine search already visited, nearest first. */
 export async function loadCompetitorConfig(
   directories: readonly string[],
@@ -70,13 +86,13 @@ export async function loadCompetitorConfig(
     if (/\.[cm]?[jt]s$/.test(file)) {
       if (!executeScripts) {
         unread.add(file);
-        omitted.push(`${file}: JavaScript/TypeScript configuration was not executed; #669.`);
+        omitted.push(`${file}: JavaScript/TypeScript configuration was not executed.`);
         return {};
       }
       value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
-    } else if (file.endsWith(".toml")) {
+    } else if (/\.(toml|json5)$/.test(file)) {
       unread.add(file);
-      omitted.push(`${file}: TOML is unsupported; #669.`);
+      omitted.push(`${file}: ${file.endsWith(".toml") ? "TOML" : "JSON5"} is unsupported.`);
       return {};
     } else {
       const text = await readFile(file, "utf8");
@@ -124,19 +140,24 @@ export async function loadCompetitorConfig(
   let markdownlint = markdownFile ? await read(markdownFile) : undefined;
   let prettier: Values | undefined;
   for (const directory of directories) {
-    if (prettierFile && path.dirname(prettierFile) === directory) {
-      prettier = await read(prettierFile);
-      break;
-    }
-    const file = path.join(directory, "package.json");
-    if (!(await exists(file))) continue;
-    const pkg = object(JSON.parse(await readFile(file, "utf8")) as unknown);
-    if (pkg.prettier !== undefined) {
+    for (const name of ["package.json", "package.yaml"]) {
+      const file = path.join(directory, name);
+      if (!(await exists(file))) continue;
+      const text = await readFile(file, "utf8");
+      const pkg = object(
+        name.endsWith("json") ? (JSON.parse(text) as unknown) : (yaml(text) as unknown),
+      );
+      if (pkg.prettier === undefined) continue;
       sources.push(file);
       prettier =
         typeof pkg.prettier === "string"
           ? await read(createRequire(file).resolve(pkg.prettier))
           : object(pkg.prettier);
+      break;
+    }
+    if (prettier) break;
+    if (prettierFile && path.dirname(prettierFile) === directory) {
+      prettier = await read(prettierFile);
       break;
     }
   }
@@ -168,24 +189,27 @@ export async function loadCompetitorConfig(
     }
     for (const key of Object.keys(wrapper))
       if (!["config", "ignores", "globs"].includes(key))
-        omitted.push(`${cli2File}: ${key} not carried over; #669.`);
+        omitted.push(`${cli2File}: ${key} not carried over.`);
   }
   const editors: { file: string; text: string }[] = [];
-  for (const directory of directories) {
+  for (const directory of prettier ? directories : []) {
     const file = path.join(directory, ".editorconfig");
     if (!(await exists(file))) continue;
     const text = await readFile(file, "utf8");
     editors.push({ file, text });
     if (/^\s*root\s*=\s*true\s*$/im.test(text)) break;
   }
-  const editor = editors.length > 0;
+
   const overrides: Override[] = [];
   for (const { file, text } of editors.reverse()) {
     sources.push(file);
     let patterns: string[] = [];
     let values: Values = {};
     const flush = () => {
-      if (!patterns.length || !Object.keys(values).length) return;
+      if (!patterns.length || !Object.keys(values).length || !patterns.some(markdownPattern)) {
+        values = {};
+        return;
+      }
       const converted = convertConfig({
         prettier: { ...values, ...prettier },
         ...(markdownlint ? { markdownlint } : {}),
@@ -225,7 +249,7 @@ export async function loadCompetitorConfig(
     }
     flush();
   }
-  if (!markdownlint && !prettier && !editor && !sources.length) return undefined;
+  if (!markdownlint && !prettier && !sources.length) return undefined;
   const report = convertConfig({
     ...(markdownlint ? { markdownlint } : {}),
     ...(prettier ? { prettier } : {}),
@@ -236,8 +260,8 @@ export async function loadCompetitorConfig(
       const files = typeof item.files === "string" ? [item.files] : item.files;
       if (!Array.isArray(files) || !files.every((file): file is string => typeof file === "string"))
         throw new Error("Invalid Prettier override files");
-      if (item.excludeFiles)
-        omitted.push("Prettier overrides.excludeFiles: not carried over; #669.");
+      if (!files.some(markdownPattern)) continue;
+      if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
       const converted = convertConfig({
         prettier: { ...prettier, ...object(item.options) },
         ...(markdownlint ? { markdownlint } : {}),
@@ -262,7 +286,7 @@ export async function loadCompetitorConfig(
         .flatMap((line) => {
           if (line.startsWith("!")) {
             omitted.push(
-              `${ignoreFile}: negated pattern ${line} cannot be represented by independent ignore globs; #669.`,
+              `${ignoreFile}: negated pattern ${line} cannot be represented by independent ignore globs.`,
             );
             return [];
           }

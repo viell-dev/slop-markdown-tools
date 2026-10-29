@@ -88,10 +88,18 @@ Turn off in one tool what the other covers; the tables below list the overlaps.
 
 ## Coming from Prettier or markdownlint
 
+mdrefine is meant to replace these tools for Markdown. The tables below list
+every rule and formatting choice, including differences and remaining gaps.
+"None yet" and "Not yet" link the issue tracking missing behavior; keep the
+other tool for that check until it is covered.
+
+### Configuration conversion and fallback
+
 Run `mdrefine config convert` to print an `mdrefine.config.jsonc`, or add
-`--write` to create it. An existing destination is refused. The report on stderr
-lists sources, omissions with tracking issues, resolved conflicts, and suggested
-extra checks. Review the result before replacing your existing tools.
+`--write` to create it. Any existing mdrefine configuration in that directory is
+refused. The report on stderr lists sources, omissions with reasons and
+applicable tracking issues, resolved conflicts, and suggested extra checks.
+Review the result before replacing your existing tools.
 
 Without an mdrefine configuration, the same conversion runs in memory. Use
 `--no-competitor-config` to disable this fallback. `config explain <file>` shows
@@ -100,18 +108,26 @@ vault boundary as the ordinary configuration search.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.
-Prettier enables its fixed styles; wrapping is enabled only for
-`proseWrap: "always"`. Explicit markdownlint choices win fixed Prettier styles;
-Prettier options win the settings they control. Missing behavior is reported.
-The mapping follows intended behavior and retains mdrefine's safety guards.
+Prettier enables its fixed styles. `proseWrap: "always"` enables wrapping at
+`printWidth` (80 by default), `"never"` joins paragraph lines, and `"preserve"`
+leaves wrapping off. Only stated markdownlint option values win fixed Prettier
+styles; Prettier options win the settings they control. Missing behavior is
+reported. Enabled markdownlint checks use `error`, matching its failing exit
+status. Rules enabled only by Prettier use `warn`; `format --check` fails
+regardless of severity. A markdownlint disable keeps an overlapping Prettier
+style enabled. MD013 does not enable reflow: without Prettier wrapping,
+paragraph lines are reported as unchecked, with a suggestion to enable
+`style/wrap` at that width. The mapping follows intended behavior and retains
+mdrefine's safety guards.
 
 Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
-markdownlint-cli2 `config`, Prettier's `package.json` key, Markdown overrides,
-and relevant `.editorconfig` values. JavaScript and TypeScript configurations
-are named without executing them; the explicit convert command loads them
-through Node.js. TOML is reported as unsupported. `.prettierignore` and
-markdownlint-cli2 `ignores` and `globs` become `ignore`. Negated
-`.prettierignore` patterns are reported for manual migration.
+markdownlint-cli2 `config`, Prettier's `package.json` or `package.yaml` key,
+Markdown overrides, and relevant `.editorconfig` values only when a Prettier
+configuration exists. JavaScript and TypeScript configurations are named without
+executing them; the explicit convert command loads them through Node.js. TOML
+and JSON5 are reported as unsupported. `.prettierignore` and markdownlint-cli2
+`ignores` and `globs` become `ignore`. Negated `.prettierignore` patterns are
+reported for manual migration.
 
 Competitor inline suppression comments and formatting pragmas are outside
 configuration conversion
@@ -211,14 +227,18 @@ footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
 
+Prettier keeps Setext headings; conversion uses `style/heading` to normalize
+them to ATX. mdrefine has no mode that keeps mixed Setext and ATX styles while
+normalizing heading spacing. Wrapping also leaves paragraphs with hard line
+breaks as written, where Prettier can wrap their individual lines.
+
 Language-only options such as `semi`, `trailingComma`, `quoteProps`,
 `jsxSingleQuote`, `bracketSpacing`, `bracketSameLine`, `arrowParens`,
 `htmlWhitespaceSensitivity`, `vueIndentScriptAndStyle`, `objectWrap`,
 `experimentalTernaries`, and `experimentalOperatorPosition` do not select a
 Markdown rule. External embedded-code formatting needs explicit code tools.
 Parser, plugin, range, and file-context settings are reported rather than
-executed or used to change dialect detection
-([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
+executed or used to change dialect detection.
 
 | Prettier                                         | mdrefine                                                                                                                                                                                              |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -230,7 +250,7 @@ executed or used to change dialect detection
 | `endOfLine`                                      | None yet ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)); each document keeps its line endings                                                                                  |
 | `embeddedLanguageFormatting`                     | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                                                                                                                |
 | `singleQuote` and other title delimiters         | [`style/link-title`](rules.md#stylelink-title): double, single, parentheses, or consistent; keeps delimiters where conversion would need escapes                                                      |
-| `requirePragma` and `insertPragma`               | None yet ([#721](https://github.com/viell-dev/slop-markdown-tools/issues/721))                                                                                                                        |
+| `requirePragma` and `insertPragma`               | None yet ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723))                                                                                                                        |
 | `<!-- prettier-ignore -->` and its start and end | [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments) and its relatives                                                                                                                |
 | `_` for emphasis, `**` for strong text           | [`style/emphasis`](rules.md#styleemphasis), [`style/strong`](rules.md#stylestrong)                                                                                                                    |
 | `#` headings without closing `#`                 | [`style/heading`](rules.md#styleheading), with one space after `#` and no heading-owned indentation                                                                                                   |
