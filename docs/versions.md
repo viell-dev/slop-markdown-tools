@@ -5,12 +5,6 @@ the second number plays the part of the first: a minor release such as 0.3.0 may
 change what 0.2 does, and the [changelog](changelog.md) says how, while a patch
 release such as 0.2.1 only fixes defects.
 
-The 0.4.x patch releases are an agreed exception to this policy: they brought
-the `mdrefine` names beside the deprecated `mdtools` forms, the conservative
-Obsidian boundary policy, and visible held-edit findings. The changelog lists
-them, and the [CLI migration steps](cli.md#earlier-names) replace the old names,
-which 0.5.0 does not accept.
-
 ## What a version number covers
 
 - the `mdrefine` commands, their options, and their exit codes;

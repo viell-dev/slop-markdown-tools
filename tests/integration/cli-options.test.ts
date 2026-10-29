@@ -22,7 +22,7 @@ describe("the command line", () => {
       ],
       [
         ["format", "--check", "--write"],
-        "mdrefine: Choose only one of --check, --diff, and --write.\n",
+        "mdrefine: --write cannot be combined with --check or --diff.\n",
       ],
     ] as const) {
       const result = run(root, [...args]);
@@ -79,6 +79,7 @@ describe("the command line", () => {
     expect(options(help("rules"))).toEqual([
       "--config",
       "--no-competitor-config",
+      "--root",
       "--json",
       "--help",
     ]);

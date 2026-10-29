@@ -37,17 +37,22 @@ scripts can read, or `--max-warnings 0` to fail on warnings too.
 ## Preview and write
 
 ```sh
+npx mdrefine format
 npx mdrefine format --diff
 npx mdrefine format --write
 npx mdrefine format --check
 ```
 
-`--diff` prints what formatting would change, and is also what `format` does
-without an option. `--write` writes the changes. `--check` writes nothing, names
-each document that would change, and then exits with code `1`, which is the
-check to run in CI. `format` changes only what its rules target, and refuses any
-change that would alter what a document means. It can still report problems that
-need a person, such as a broken link.
+Bare `format` prints what formatting would change and exits `1` when any file
+would change. `--diff` prints the same preview with exit `0` when there are no
+remaining errors. `--check --diff` prints the diff and fails on changes.
+`--write` writes the changes. `--check` writes nothing, names each document that
+would change, and then exits with code `1`, which is the check to run in CI.
+`format` changes only what its rules target, and refuses any change that would
+alter what a document means. It can still report problems that need a person,
+such as a broken link; remaining errors exit `1` in every mode. Operational
+failures exit `2`. Stdin prints the formatted document by default and does not
+fail merely because formatting changed it.
 
 ## Choose a preset and a dialect
 
