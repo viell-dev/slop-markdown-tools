@@ -1,7 +1,7 @@
 import type { Emphasis, Heading, Nodes, PhrasingContent, Root, RootContent, Strong } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { parse, range, startsWithMarker, textContent } from "../syntax/parse.js";
+import { range, reread, startsWithMarker, textContent } from "../syntax/parse.js";
 import { lineEnd, lineStart } from "../syntax/source.js";
 import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { walk } from "../syntax/walk.js";
@@ -302,7 +302,7 @@ export const structureRules: Record<string, Rule> = {
       };
       const expected = template.map((item) => {
         if (item === "*" || item === "?") return item;
-        const doc = parse(item, document.dialect, undefined, [], document.vitepress);
+        const doc = reread(document, item);
         const heading = doc.tree.children[0];
         return heading?.type === "heading" ? visible(heading, doc) : normalize(item);
       });
