@@ -88,6 +88,22 @@ const specs = {
         "Remove compaction after an adopted equivalent correction passes data-event identity, repeated undefined-reference work and public parse checks. Keep or replace audited resolver registration while homogeneous batching needs it.",
     },
   },
+  htmlFlow: {
+    name: "micromark-core-commonmark",
+    version: "2.0.4",
+    relative: "lib/html-flow.js",
+    hash: "d32bc5869302bb4b54bd6c5c9c25b3004bd97a2155e0d9cdeb53fbd08510e7d8",
+
+    provenance:
+      "mdrefine#762: read a lazy type 7 HTML line as CommonMark does; GitHub's renderer differs and is protected separately",
+    tracking: {
+      dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/762"],
+      owner: "mdrefine maintaining agents",
+      removalCondition:
+        "Remove after an adopted micromark-core-commonmark release keeps a lazy type 7 HTML line in the container's paragraph, as CommonMark, commonmark.js, markdown-it, Forgejo, Gitea and Obsidian read it, while lazy type 1-6 starts still interrupt it, across lists, quotes, nesting and LF/CRLF. GitHub's protection for its own reading (src/syntax/github-protections.ts) stays either way.",
+    },
+  },
   code: {
     name: "micromark-core-commonmark",
     version: "2.0.4",
@@ -239,6 +255,16 @@ function repair(kind, source) {
       source,
       'tailEvent[1].type === "listItemIndent")',
       'tailEvent[1].type === "listItemIndent" || tailEvent[1].type === "gfmFootnoteDefinitionIndent")',
+    );
+  // Upstream lets complete (type 7) HTML interrupt a paragraph on a lazy line,
+  // which ends the container there; the specification does not (#762). GitHub's
+  // renderer ends the container too but reads HTML to the next blank line, so
+  // a renderer protection, not this reading, covers the GitHub dialect.
+  if (kind === "htmlFlow")
+    return once(
+      source,
+      "return self.interrupt && !self.parser.lazy[self.now().line] ? nok(code)",
+      "return self.interrupt ? nok(code)",
     );
   if (kind === "text") {
     const at = source.indexOf("function resolveAllText");

@@ -185,10 +185,10 @@ advisory filter. Fixes confined to unshipped build/test code still follow the
 policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
 The independently managed Obsidian harness is a separate dependency tree.
 
-`scripts/parser-patches.mjs` pins the ten corrected source modules by package,
-version and SHA-256, with exact source anchors. Its existing per-kind guards
-also own each correction's rationale, links to the permanent dependency index
-[#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) and
+`scripts/parser-patches.mjs` pins the eleven corrected source modules by
+package, version and SHA-256, with exact source anchors. Its existing per-kind
+guards also own each correction's rationale, links to the permanent dependency
+index [#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) and
 dedicated issues, mdrefine maintainer ownership, and removal/revisit evidence.
 The generated manifest derives that tracking from the guards; it is not a second
 issue inventory. Upstream source merges, published fixes and verified local

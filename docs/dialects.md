@@ -43,6 +43,16 @@ An alert's or callout's marker is read from the text, as GitHub reads it, so
 such a marker as written in every dialect; whether Forgejo, Gitea, and Obsidian
 render these forms was not observed.
 
+GitHub also differs at a lazy continuation line, one without its quote's `>` or
+its list item's indentation, that holds only a complete HTML tag such as `<b>`
+or `</span>`. CommonMark, Forgejo, Gitea, Obsidian, and VitePress read the line
+as more of the paragraph, and so does the tool in every dialect. GitHub ends the
+list item, block quote, or footnote definition there and shows the tag and the
+lines below it, up to a blank line, as HTML, where Markdown such as `*` is
+literal text. In the GitHub dialect, formatting leaves that list, quote, or
+footnote and those lines as written, also where CommonMark reads the paragraph
+text as a Setext heading or as link definitions before the tag line.
+
 ## The assumed dialect
 
 When neither the configuration, its presets and overrides, nor `--dialect` names

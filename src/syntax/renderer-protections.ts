@@ -2,7 +2,10 @@ import type { List, Nodes, Root } from "mdast";
 import type { Document } from "../core/types.js";
 import { protectionSource } from "./protection-source.js";
 import { collectListProtections } from "./list-protections.js";
-import { collectGithubMathProtections } from "./github-protections.js";
+import {
+  collectGithubLazyHtmlProtections,
+  collectGithubMathProtections,
+} from "./github-protections.js";
 import { collectForgeProtections } from "./forge-protections.js";
 import { collectObsidianProtections } from "./obsidian-protections.js";
 
@@ -227,6 +230,13 @@ export interface RendererProtections {
    * heading form one native heading, so the complete range stays together.
    * A heading after a container ending in math can instead continue its native
    * paragraph lazily; retain that complete boundary too (#336).
+   * GitHub also ends a list item, block quote or footnote definition at a lazy
+   * line that starts an HTML block of kind 7, such as `<b>` alone, which the
+   * primary reading keeps in the paragraph text, whether that text then forms
+   * a paragraph, a Setext heading or link definitions, and reads HTML to the
+   * next blank line. The range runs from the outermost container that GitHub
+   * ends, its list for an item, through that blank line and any top-level
+   * block that starts before it (#762).
    * A quoted block opened after a Tab immediately after `>` or `> ` keeps its
    * whole physical source too: Reading view can read literal code where the
    * primary parser reads a list, heading or inline text (#597). Same-block
@@ -265,6 +275,7 @@ export function rendererProtections(document: Document): RendererProtections {
   const positions = protectionSource(document.source);
   const { text, nested, next, descriptions } = collectListProtections(document, positions);
   const boundaryText = collectGithubMathProtections(document);
+  collectGithubLazyHtmlProtections(document, boundaryText);
   const {
     unclosedCode,
     htmlCodeToEnd,
