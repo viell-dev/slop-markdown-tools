@@ -281,8 +281,8 @@ executes these commands; the portable entry never does.
 
 ## Overrides
 
-Each entry of `overrides` applies its `dialect`, `rules`, and `codeFormatters`
-to the documents that match one of its `files` patterns:
+Each entry of `overrides` applies its `dialect`, `rules`, `ruleUpdates`, and
+`codeFormatters` to the documents that match one of its `files` patterns:
 
 ```jsonc
 {
@@ -296,13 +296,33 @@ to the documents that match one of its `files` patterns:
 }
 ```
 
-By default, each `rules` entry replaces the earlier setting for that rule. Set
-`mergeRuleOptions: true` on an override to merge tuple options instead, keeping
-earlier option values that the tuple does not name. Its severity still replaces
-the earlier severity. `ruleOptions` merges individual options after `rules`
-without changing severity; a rule absent so far stays off. The converter uses
-these fields so overlapping Prettier overrides accumulate, including a width
-specified before wrapping is enabled.
+`ruleUpdates` patches individual rules: it keeps their severity unless specified
+and merges the named options into their current options.
+
+```jsonc
+{
+  "extends": [],
+  "overrides": [
+    {
+      "files": ["**/*.md"],
+      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
+    },
+    {
+      "files": ["docs/**/*.md"],
+      "ruleUpdates": { "style/wrap": { "severity": "warn" } },
+    },
+  ],
+}
+```
+
+The first override stores a width without turning wrapping on; the second turns
+it on for `docs/`, using that width. A rule absent so far starts off. Setting
+severity to `off` keeps its options, so a later patch can enable it again.
+Options merge shallowly: a nested object replaces the earlier nested object.
+Each override applies its `rules` first as whole-setting replacements, then its
+`ruleUpdates`. Matching overrides run in order, with presets' overrides before
+local overrides. Enabled rules validate the final merged options when they run;
+a partial patch need not supply every required option by itself.
 
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names

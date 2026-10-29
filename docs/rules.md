@@ -3007,9 +3007,9 @@ when the first node cannot safely change.
 
 ## `style/table`
 
-Formats tables: by default it pads every cell to its column's width and writes
-the delimiter row to match, keeping each column's alignment. Cell text and each
-row's number of cells stay as written.
+Formats tables, also inside lists and block quotes: by default it pads every
+cell to its column's width and writes the delimiter row to match, keeping each
+column's alignment. Cell text and each row's number of cells stay as written.
 
 **Style rule**, fixed by `format`. Presets: `recommended` (warn), `github`
 (warn), `forgejo` (warn), `gitea` (warn), `obsidian` (warn), `vitepress` (warn).
@@ -3083,10 +3083,29 @@ border when a row's last cell is empty, which would otherwise vanish. Without a
 trailing border, the last cell gets no padding, so no line ends in blank space.
 A preferred form that would change meaning stays as written.
 
+**In lists and block quotes:** each row keeps the quote markers, list
+indentation, and line ending before it as written, and column widths are
+measured after them, so the rows line up when their prefixes have the same
+width; [`style/list-indent`](#stylelist-indent) and the other container rules
+format the prefixes. Every option applies as it does elsewhere:
+
+```markdown
+> | Sensor      | Unit |
+> | :---------- | ---: |
+> | Temperature | °C   |
+```
+
+A header written on its list item's marker line keeps its leading pipe, or its
+lack of one: markdown-it, which VitePress uses, reads `- Sensor | Unit` above an
+indented delimiter row as a table outside the list, with the marker in its first
+cell. Such a header without a leading pipe has none added, and its table stays
+as written when a row needs one.
+
 **Left as written:**
 
-- Tables inside lists or block quotes, and tables with more cells in a row than
-  in the header.
+- Tables with more cells in a row than in the header.
+- Tables in footnote definitions, and indented tables outside lists and block
+  quotes.
 - A table containing a standalone colon-container boundary such as `:::` or
   `:::tip`: site generators use it to open or close a container, where GFM reads
   another row. Cells written with table borders, such as `| ::: |`, are
@@ -3107,6 +3126,10 @@ A preferred form that would change meaning stays as written.
 - A table directly after a list item's closing code fence keeps its literal
   rows: Live Preview shows them as source text. A table after a heading,
   indented code, a root fence, or a blank line still formats.
+- In a list or block quote, the same protections apply: a table directly below a
+  line of text, including a callout's title line, or a table whose container
+  prefixes hold a Tab, stays as written. A blank line below the callout's title
+  lets the table format.
 
 ## `style/thematic-break`
 

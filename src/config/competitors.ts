@@ -1,4 +1,4 @@
-import { Minimatch } from "minimatch";
+import { GLOBSTAR, Minimatch } from "minimatch";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -7,7 +7,7 @@ import { parse as json, type ParseError } from "jsonc-parser";
 import { parse as yaml } from "yaml";
 import { exists } from "../workspace/access.js";
 import { convertConfig, type ConversionReport } from "./convert.js";
-import type { Config, Override, RuleSetting } from "../core/types.js";
+import type { Config, Override } from "../core/types.js";
 
 type Values = Record<string, unknown>;
 const object = (value: unknown): Values => {
@@ -70,19 +70,151 @@ function markdownPattern(pattern: string): boolean {
     return true;
   });
 }
+/** Preserve glob metacharacters that Minimatch parsed as literal filename characters. */
+function literalPattern(value: string): string {
+  return value.replace(/[?*[\]{}()!+@\\]/g, "\\$&");
+}
+
+/** Intersect component globs exactly when one component contains the other. */
+function intersectPatterns(left: string, right: string): string[] {
+  const results: string[] = [];
+  for (const a of new Minimatch(left, { dot: true }).set)
+    for (const b of new Minimatch(right, { dot: true }).set) {
+      const visit = (i: number, j: number): string[][] => {
+        if (i === a.length && j === b.length) return [[]];
+        const x = a[i],
+          y = b[j];
+        if (x === GLOBSTAR && y === GLOBSTAR)
+          return visit(i + 1, j)
+            .concat(visit(i, j + 1))
+            .map((tail) => ["**", ...tail]);
+        if (x === GLOBSTAR) {
+          const tails = visit(i + 1, j);
+          if (y !== undefined)
+            tails.push(
+              ...visit(i, j + 1).map((tail) => [
+                y === GLOBSTAR ? "**" : typeof y === "string" ? literalPattern(y) : y._glob!,
+                ...tail,
+              ]),
+            );
+          return tails;
+        }
+        if (y === GLOBSTAR) {
+          const tails = visit(i, j + 1);
+          if (x !== undefined)
+            tails.push(
+              ...visit(i + 1, j).map((tail) => [
+                typeof x === "string" ? literalPattern(x) : x._glob!,
+                ...tail,
+              ]),
+            );
+          return tails;
+        }
+        if (x === undefined || y === undefined) return [];
+        let component: string;
+        if (typeof x === "string") {
+          if (typeof y === "string" ? x !== y : !y.test(x)) return [];
+          component = literalPattern(x);
+        } else if (typeof y === "string") {
+          if (!x.test(y)) return [];
+          component = literalPattern(y);
+        } else if (x._glob === y._glob || y._glob === "*") component = x._glob!;
+        else if (x._glob === "*") component = y._glob!;
+        else throw new Error("Unrepresentable glob intersection");
+        return visit(i + 1, j + 1).map((tail) => [component, ...tail]);
+      };
+      results.push(
+        ...visit(0, 0).map((parts) =>
+          parts.filter((part, i) => part !== "**" || parts[i - 1] !== "**").join("/"),
+        ),
+      );
+    }
+  return [...new Set(results.filter(Boolean))];
+}
+
+/** Derive Prettier options only after EditorConfig keys and removals accumulate. */
+function editorOptions(raw: Values): Values {
+  const state = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== "unset"));
+  const number = (key: string) =>
+    typeof state[key] === "string" && /^\d+$/.test(state[key]) && Number(state[key]) > 0
+      ? Number(state[key])
+      : undefined;
+  const indent = number("indent_size");
+  // EditorConfig infers tab_width only when the source key is absent. An
+  // explicit unset blocks that inference, even though Prettier ignores its value.
+  const tab = "tab_width" in raw ? number("tab_width") : indent;
+  const useTabs =
+    state.indent_style === "space"
+      ? false
+      : state.indent_style === "tab" || state.indent_size === "tab";
+  return {
+    ...("indent_style" in raw || "indent_size" in raw ? { useTabs } : {}),
+    ...("indent_size" in raw || "tab_width" in raw || "indent_style" in raw
+      ? { tabWidth: (!useTabs && state.indent_style === "space" ? indent : undefined) ?? tab ?? 2 }
+      : {}),
+    ...("max_line_length" in raw ? { printWidth: number("max_line_length") ?? 80 } : {}),
+    ...("end_of_line" in raw ? { endOfLine: state.end_of_line ?? "lf" } : {}),
+  };
+}
+
 /** Read competitors only in directories the mdrefine search already visited, nearest first. */
 export async function loadCompetitorConfig(
   directories: readonly string[],
   executeScripts = false,
   destination = directories.at(-1)!,
 ): Promise<ConversionReport | undefined> {
-  const rebase = (pattern: string, file: string) => {
-    const prefix = path.relative(destination, path.dirname(file)).split(path.sep).join("/");
-    const local = pattern.replace(/^\//, "");
-    return prefix ? `${prefix}/${local}` : local;
-  };
   const sources: string[] = [];
   const omitted: string[] = [];
+  const rebase = (pattern: string, file: string): string[] => {
+    const source = path.dirname(file);
+    const prefix = path.relative(destination, source).split(path.sep).join("/");
+    const local = pattern.replace(/^\//, "");
+    if (prefix !== ".." && !prefix.startsWith("../"))
+      return [prefix ? `${prefix}/${local}` : local];
+    const subtree = path.relative(source, destination).split(path.sep).join("/");
+    if (subtree === ".." || subtree.startsWith("../")) {
+      omitted.push(`${file}: pattern ${pattern} not carried over: unrelated source directory.`);
+      return [];
+    }
+    // Consume the destination's literal path in the glob's finite-state matcher.
+    // A globstar can consume a component or leave it for the following component.
+    const results: string[] = [];
+    const matcher = new Minimatch(local, { dot: true });
+    if (matcher.negate || matcher.comment) {
+      omitted.push(
+        `${file}: pattern ${pattern} not carried over: cannot express its subtree intersection.`,
+      );
+      return [];
+    }
+    for (const parts of matcher.set) {
+      let states = new Set([0]);
+      const closure = () => {
+        for (const index of states) if (parts[index] === GLOBSTAR) states.add(index + 1);
+      };
+      closure();
+      for (const segment of subtree.split("/")) {
+        const next = new Set<number>();
+        for (const index of states) {
+          const part = parts[index];
+          if (part === GLOBSTAR) next.add(index);
+          else if (typeof part === "string" ? part === segment : part?.test(segment))
+            next.add(index + 1);
+        }
+        states = next;
+        closure();
+      }
+      for (const index of states) {
+        const rest = parts
+          .slice(index)
+          .map((part) =>
+            part === GLOBSTAR ? "**" : typeof part === "string" ? literalPattern(part) : part._glob,
+          )
+          .join("/");
+        if (rest) results.push(rest);
+      }
+    }
+    return [...new Set(results)];
+  };
   const unread = new Set<string>();
   const read = async (file: string, chain: string[] = []): Promise<Values> => {
     if (chain.includes(file))
@@ -196,7 +328,7 @@ export async function loadCompetitorConfig(
           if (typeof pattern !== "string") continue;
           if (name === "ignores" || pattern.startsWith("!")) {
             const local = rebase(name === "ignores" ? pattern : pattern.slice(1), cli2File);
-            ignore.push(local, `${local.replace(/\/$/, "")}/**`);
+            ignore.push(...local.flatMap((p) => [p, `${p.replace(/\/$/, "")}/**`]));
           }
         }
     }
@@ -204,12 +336,16 @@ export async function loadCompetitorConfig(
       const positive = wrapper.globs.filter(
         (p): p is string => typeof p === "string" && !p.startsWith("!"),
       );
-      if (positive.length)
+      if (positive.length) {
+        const rebased = positive.flatMap((p) => rebase(p, cli2File));
         ignore.push(
-          positive.length === 1
-            ? `!${rebase(positive[0]!, cli2File)}`
-            : `!{${positive.map((p) => rebase(p, cli2File)).join(",")}}`,
+          rebased.length === 0
+            ? "**"
+            : rebased.length === 1
+              ? `!${rebased[0]}`
+              : `!{${rebased.join(",")}}`,
         );
+      }
     }
     for (const key of Object.keys(wrapper))
       if (!["config", "ignores", "globs"].includes(key))
@@ -231,34 +367,40 @@ export async function loadCompetitorConfig(
       prettier: { ...prettier, ...values },
       ...(markdownlint ? { markdownlint } : {}),
     });
-    const ruleOptions: Record<string, Values> = {};
-    const rules: Record<string, RuleSetting> = {};
+    const optionDeltas: Record<string, Values> = {};
+    const ruleUpdates: Record<string, { severity?: "off" | "warn"; options?: Values }> = {};
     const options = (id: string) => {
       const setting = converted.config.rules?.[id];
       return Array.isArray(setting) ? (setting[1] as Values) : {};
     };
     if ("tabWidth" in values)
-      ruleOptions["style/list-indent"] = {
+      optionDeltas["style/list-indent"] = {
         nestedIndent: options("style/list-indent").nestedIndent,
       };
-    if ("singleQuote" in values) ruleOptions["style/link-title"] = options("style/link-title");
-    if ("printWidth" in values) ruleOptions["style/wrap"] = { width: values.printWidth };
+    if ("singleQuote" in values) optionDeltas["style/link-title"] = options("style/link-title");
+    if ("printWidth" in values) optionDeltas["style/wrap"] = { width: values.printWidth };
     if (
       typeof values.endOfLine === "string" &&
       ["lf", "crlf", "cr", "auto"].includes(values.endOfLine)
     )
-      ruleOptions["style/line-ending"] = { endOfLine: values.endOfLine };
+      optionDeltas["style/line-ending"] = { endOfLine: values.endOfLine };
     if ("proseWrap" in values) {
       const setting = converted.config.rules?.["style/wrap"];
-      rules["style/wrap"] = [
-        setting ? "warn" : "off",
-        { mode: values.proseWrap === "never" ? "never" : "always" },
-      ];
+      ruleUpdates["style/wrap"] = {
+        severity: setting ? "warn" : "off",
+        options: { mode: values.proseWrap === "never" ? "never" : "always" },
+      };
     }
-    overrides.push({ files, mergeRuleOptions: true, rules, ruleOptions });
+    for (const [id, options] of Object.entries(optionDeltas))
+      ruleUpdates[id] = {
+        ...ruleUpdates[id],
+        options: { ...ruleUpdates[id]?.options, ...options },
+      };
+    if (files.length) overrides.push({ files, ruleUpdates });
     omitted.push(...converted.omitted);
     overrideConflicts.push(...converted.conflicts);
   };
+  const editorStates = new Map<string, Values>();
   for (const { file, text } of editors.reverse()) {
     sources.push(file);
     let patterns: string[] = [];
@@ -268,10 +410,30 @@ export async function loadCompetitorConfig(
         values = {};
         return;
       }
-      const effective = Object.fromEntries(
-        Object.entries(values).filter(([key]) => !(key in (prettier ?? {}))),
-      );
-      addOverride(patterns, effective);
+      const additions = new Map<string, Values>();
+      for (const pattern of patterns) {
+        additions.set(pattern, values);
+        for (const [previous, state] of editorStates) {
+          try {
+            for (const intersection of intersectPatterns(previous, pattern))
+              additions.set(intersection, { ...state, ...values });
+          } catch {
+            omitted.push(
+              `${file}: overlapping EditorConfig sections ${previous} and ${pattern} not carried over exactly.`,
+            );
+          }
+        }
+      }
+      for (const [pattern, state] of additions) {
+        // Keep resolved states in emission order, including when a later section
+        // updates an existing scope. Its intersections must win over older states.
+        editorStates.delete(pattern);
+        editorStates.set(pattern, state);
+        const effective = editorOptions(state);
+        for (const key of Object.keys(effective))
+          if (key in (prettier ?? {})) delete effective[key];
+        addOverride([pattern], effective);
+      }
       values = {};
     };
     for (const line of text.split(/\r?\n/)) {
@@ -279,20 +441,20 @@ export async function loadCompetitorConfig(
       if (section) {
         flush();
         const pattern = section[1]!;
-        const local = pattern.includes("/") ? pattern.replace(/^\//, "") : `**/${pattern}`;
-        patterns = [rebase(local, file)];
+        patterns = rebase(
+          pattern.includes("/") ? pattern.replace(/^\//, "") : `**/${pattern}`,
+          file,
+        );
         continue;
       }
       const entry = /^\s*([^#;=\s]+)\s*=\s*([^#;]+?)\s*$/.exec(line);
       if (!entry) continue;
-      const [, key, value] = entry;
-      if (["indent_size", "tab_width"].includes(key!) && /^\d+$/.test(value!))
-        values.tabWidth = Number(value);
-      if (key === "indent_style") values.useTabs = value === "tab";
-      if (key === "max_line_length" && (/^\d+$/.test(value!) || value === "unset"))
-        values.printWidth = value === "unset" ? 80 : Number(value);
-      if (["indent_size", "tab_width"].includes(key!) && value === "unset") values.tabWidth = 2;
-      if (key === "end_of_line") values.endOfLine = value;
+      const key = entry[1]!.toLowerCase();
+      const value = entry[2]!.toLowerCase();
+      if (
+        ["indent_size", "tab_width", "indent_style", "max_line_length", "end_of_line"].includes(key)
+      )
+        values[key] = value;
     }
     flush();
   }
@@ -310,7 +472,7 @@ export async function loadCompetitorConfig(
       if (!files.some(markdownPattern)) continue;
       if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
       addOverride(
-        files.map((file) => rebase(file.includes("/") ? file : `**/${file}`, prettierSource!)),
+        files.flatMap((file) => rebase(file.includes("/") ? file : `**/${file}`, prettierSource!)),
         object(item.options),
       );
     }
@@ -332,8 +494,8 @@ export async function loadCompetitorConfig(
           const pattern = line.replace(/^\//, "").replace(/\/$/, "");
           const prefix = !rooted && !pattern.includes("/") ? "**/" : "";
           return [
-            rebase(`${prefix}${pattern}`, ignoreFile),
-            rebase(`${prefix}${pattern}/**`, ignoreFile),
+            ...rebase(`${prefix}${pattern}`, ignoreFile),
+            ...rebase(`${prefix}${pattern}/**`, ignoreFile),
           ];
         }),
     );

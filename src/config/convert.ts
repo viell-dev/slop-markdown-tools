@@ -469,7 +469,6 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     source: "tables",
     rule: "style/table",
     defaults: { style: "aligned", padding: "alignment", pipeStyle: "leadingAndTrailing" },
-    issue: 710,
   },
   { source: "trailing spaces", rule: "style/trailing-space", defaults: { hardBreakSpaces: 2 } },
   { source: "blank lines", rule: "style/blank-lines" },

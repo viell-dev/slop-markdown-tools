@@ -240,10 +240,16 @@ export interface Override {
   readonly vitepress?: VitePressOptions;
   /** Glob patterns, matched against paths relative to the workspace root, with forward slashes. */
   readonly files: readonly string[];
-  /** Merge tuple options with earlier settings instead of replacing them. */
-  readonly mergeRuleOptions?: boolean;
-  /** Merge individual options after rules, retaining severity (off when absent). */
-  readonly ruleOptions?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /** Patch rules after replacements; omitted severity is retained, absent rules start off. */
+  readonly ruleUpdates?: Readonly<
+    Record<
+      string,
+      {
+        readonly severity?: "off" | "warn" | "error";
+        readonly options?: Readonly<Record<string, unknown>>;
+      }
+    >
+  >;
   /** The dialect of the matching documents. */
   readonly dialect?: DialectName;
   /** Rule settings for the matching documents, applied after the configuration's own. */

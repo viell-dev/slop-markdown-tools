@@ -189,12 +189,18 @@ export const configSchema: JsonSchemaObject = deepFreeze({
             ...strings,
             minItems: 1,
           },
-          mergeRuleOptions: { type: "boolean" },
-          ruleOptions: {
+          ruleUpdates: {
             description:
-              "Merge individual rule options after rules, retaining severity; absent rules stay off.",
+              "Patch rules after rules: retain omitted severity (off when absent) and shallowly merge options, including while off.",
             type: "object",
-            additionalProperties: { type: "object" },
+            additionalProperties: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                severity: { $ref: "#/definitions/severity" },
+                options: { type: "object" },
+              },
+            },
           },
           dialect: { $ref: "#/definitions/dialect" },
           vitepress: { $ref: "#/definitions/vitepress" },
@@ -477,28 +483,13 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     if (override.files.some((pattern) => overridePattern(pattern)(document))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       if (override.vitepress) result.vitepress = { ...result.vitepress, ...override.vitepress };
-      if (override.mergeRuleOptions) {
-        for (const [id, value] of Object.entries(override.rules ?? {})) {
-          const previous = Object.hasOwn(result.rules, id) ? result.rules[id] : undefined;
-          addRules(result.rules, {
-            [id]: Array.isArray(value)
-              ? [
-                  value[0],
-                  {
-                    ...(Array.isArray(previous) ? previous[1] : {}),
-                    ...value[1],
-                  },
-                ]
-              : value,
-          });
-        }
-      } else addRules(result.rules, override.rules);
-      for (const [id, delta] of Object.entries(override.ruleOptions ?? {})) {
+      addRules(result.rules, override.rules);
+      for (const [id, patch] of Object.entries(override.ruleUpdates ?? {})) {
         const previous = Object.hasOwn(result.rules, id) ? result.rules[id]! : "off";
         addRules(result.rules, {
           [id]: [
-            Array.isArray(previous) ? previous[0] : previous,
-            { ...(Array.isArray(previous) ? previous[1] : {}), ...delta },
+            patch.severity ?? (Array.isArray(previous) ? previous[0] : previous),
+            { ...(Array.isArray(previous) ? previous[1] : {}), ...patch.options },
           ],
         });
       }

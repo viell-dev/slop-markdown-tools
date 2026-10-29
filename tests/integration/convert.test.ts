@@ -118,7 +118,10 @@ describe("competitor configuration CLI (#669)", () => {
     expect(result.status, result.stderr).toBe(0);
     const config = parseConfig(result.stdout);
     expect(config.ignore).toEqual(["**/generated", "**/generated/**"]);
-    expect(config.overrides?.[0]?.ruleOptions?.["style/wrap"]).toEqual({ width: 70 });
+    expect(config.overrides?.[0]?.ruleUpdates?.["style/wrap"]?.options).toEqual({
+      mode: "always",
+      width: 70,
+    });
     expect(result.stderr).toContain("base.yaml");
     await writeFile(path.join(root, "base.yaml"), 'extends: "./.markdownlint.json"');
     expect(run(root, ["config", "convert"]).stderr).toContain("Cyclic");
@@ -131,9 +134,9 @@ describe("competitor configuration CLI (#669)", () => {
     });
     const result = run(root, ["config", "convert"]);
     expect(result.status, result.stderr).toBe(0);
-    expect(parseConfig(result.stdout).overrides?.[0]?.ruleOptions?.["style/list-indent"]).toEqual(
-      expect.objectContaining({ nestedIndent: 4 }),
-    );
+    expect(
+      parseConfig(result.stdout).overrides?.[0]?.ruleUpdates?.["style/list-indent"]?.options,
+    ).toEqual(expect.objectContaining({ nestedIndent: 4 }));
   });
   it("carries an editorconfig line ending to style/line-ending, as Prettier reads it", async () => {
     const root = await fixture({
@@ -370,4 +373,112 @@ describe("competitor configuration CLI (#669)", () => {
       .rules;
     expect(rules["style/wrap"]).toEqual(["warn", { width: reference?.printWidth ?? 80 }]);
   });
+});
+
+describe("ancestor conversion and EditorConfig resolution", () => {
+  it.each(["prettier", "editorconfig", "prettierignore", "globs", "ignores"])(
+    "writes and reads ancestor %s patterns in a child",
+    async (family) => {
+      const files: Record<string, string> = {
+        "sub/README.md": "text\n",
+        "sub/skip.md": "text\n",
+        "outside.md": "text\n",
+      };
+      if (family === "globs" || family === "ignores")
+        files[".markdownlint-cli2.jsonc"] = JSON.stringify({
+          config: { default: false },
+          [family]: family === "globs" ? ["sub/**/*.md", "other/**/*.md"] : ["sub/skip.md"],
+        });
+      else {
+        files[".prettierrc"] = JSON.stringify(
+          family === "prettier"
+            ? {
+                overrides: [
+                  { files: "*.md", options: { proseWrap: "always", printWidth: 37 } },
+                  { files: "sub/README.md", options: { printWidth: 39 } },
+                  { files: "other/*.md", options: { printWidth: 99 } },
+                ],
+              }
+            : { proseWrap: "always" },
+        );
+        if (family === "editorconfig")
+          files[".editorconfig"] =
+            "root = true\n[*.md]\nmax_line_length = 37\n[sub/README.md]\nmax_line_length = 39\n";
+        if (family === "prettierignore") files[".prettierignore"] = "/sub/skip.md\n/other.md\n";
+      }
+      const root = await fixture(files),
+        child = path.join(root, "sub");
+      const written = run(child, ["config", "convert", "--write"]);
+      expect(written.status, written.stderr).toBe(0);
+      expect(await readFile(path.join(child, "mdrefine.config.jsonc"), "utf8")).not.toContain(
+        "../",
+      );
+      if (family === "prettier" || family === "editorconfig") {
+        const explained = run(child, ["config", "explain", "README.md"]);
+        expect(parseExplanation(explained.stdout).effective.rules["style/wrap"]).toEqual([
+          "warn",
+          expect.objectContaining({ width: 39 }),
+        ]);
+      } else {
+        const selected = run(child, ["lint", "--json"]);
+        expect(selected.status, selected.stderr).toBe(0);
+        expect(parseReport(selected.stdout).files.map((f) => f.path)).toEqual(
+          family === "globs" ? ["README.md", "skip.md"] : ["README.md"],
+        );
+      }
+    },
+  );
+  it.each(["end_of_line", "max_line_length", "indent_style", "indent_size", "tab_width"])(
+    "matches Prettier when unsetting %s in sections and nested files",
+    async (key) => {
+      for (const nested of [false, true])
+        for (const reverse of [false, true]) {
+          const initial = `indent_style = space\n${reverse ? "tab_width = 8\nindent_size = 4" : "indent_size = 4\ntab_width = 8"}\nend_of_line = crlf\nmax_line_length = 44\n`;
+          const root = await fixture({
+            ".prettierrc": '{"proseWrap":"always"}',
+            ".editorconfig": `root = true\n[*]\n${initial}${nested ? "" : `[README.md]\n${key} = unset\n`}`,
+            ...(nested ? { "sub/.editorconfig": `[README.md]\n${key} = unset\n` } : {}),
+            [nested ? "sub/README.md" : "README.md"]: "text\n",
+          });
+          const child = nested ? path.join(root, "sub") : root;
+          const reference = await prettierResolve(path.join(child, "README.md"), {
+            editorconfig: true,
+          });
+          expect(run(child, ["config", "convert", "--write"]).status).toBe(0);
+          const result = run(child, ["config", "explain", "README.md"]);
+          const rules = parseExplanation(result.stdout).effective.rules;
+          expect(rules["style/list-indent"]).toEqual([
+            "warn",
+            expect.objectContaining({ nestedIndent: reference?.tabWidth ?? 2 }),
+          ]);
+          expect(rules["style/line-ending"]).toEqual([
+            "warn",
+            { endOfLine: reference?.endOfLine ?? "lf" },
+          ]);
+          expect(rules["style/wrap"]).toEqual([
+            "warn",
+            expect.objectContaining({ width: reference?.printWidth ?? 80 }),
+          ]);
+        }
+    },
+  );
+});
+
+it("accumulates indentation removals across several overlapping EditorConfig sections", async () => {
+  const root = await fixture({
+    ".prettierrc": "{}",
+    ".editorconfig":
+      "root = true\n[*]\nindent_style = space\nindent_size = 4\ntab_width = 8\n[README.md]\nindent_size = unset\n[*.md]\ntab_width = 6\n[docs/**]\nindent_size = 3\n[**/README.md]\ntab_width = unset\n[docs/*.md]\nindent_style = unset\n",
+    "README.md": "text\n",
+    "docs/README.md": "text\n",
+  });
+  expect(run(root, ["config", "convert", "--write"]).status).toBe(0);
+  for (const file of ["README.md", "docs/README.md"]) {
+    const reference = await prettierResolve(path.join(root, file), { editorconfig: true });
+    const result = run(root, ["config", "explain", file]);
+    expect(parseExplanation(result.stdout).effective.rules["style/list-indent"]).toEqual([
+      "warn",
+      expect.objectContaining({ nestedIndent: reference?.tabWidth ?? 2 }),
+    ]);
+  }
 });

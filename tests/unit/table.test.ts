@@ -1,4 +1,6 @@
+import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
+import { normalizeHtml } from "../../scripts/rendering.mjs";
 import { format, lint, parse, semanticFingerprint } from "../../src/index.js";
 import type { Dialect } from "../../src/index.js";
 
@@ -100,18 +102,12 @@ describe("table style options", () => {
     const input = "a |\n--- |\nb |\n";
     expect(check(input, { style: "tight" }, "obsidian")).toBe(input);
   });
-  it.each(["compact", "tight", "aligned"])("keeps nested and oversized tables with %s", (style) => {
-    for (const prefix of ["> ", "- "]) {
-      const input =
-        source
-          .split("\n")
-          .slice(0, -1)
-          .map((line, i) => (prefix === "- " && i ? "  " : prefix) + line)
-          .join("\n") + "\n";
-      expect(check(input, { style, pipeStyle: "noLeadingOrTrailing" })).toBe(input);
-    }
-    const input = "| a | b |\n| --- | --- |\n| x | y | z |\n";
-    expect(check(input, { style })).toBe(input);
+  it.each(["compact", "tight", "aligned"])("keeps oversized tables with %s", (style) => {
+    for (const input of [
+      "| a | b |\n| --- | --- |\n| x | y | z |\n",
+      "> | a | b |\n> | --- | --- |\n> | x | y | z |\n",
+    ])
+      expect(check(input, { style })).toBe(input);
   });
   it("allows an unbordered short body row without adding cells", () => {
     expect(
@@ -155,5 +151,166 @@ describe("table style options", () => {
         lint(source, { config: { extends: [], rules: { "style/table": ["warn", options] } } }),
       ).toThrow("Invalid options for style/table");
     }
+  });
+});
+
+const markdownIt = new MarkdownIt({ html: true });
+describe("tables in lists and block quotes (#710)", () => {
+  const formatted = "| a   | b   |\n| --- | --- |\n| ccc | d   |";
+  /** The table in `formatted`, written loosely, after the given prefixes. */
+  const nested = (first: string, rest: string, table = "| a | b |\n|---|---|\n| ccc | d |") =>
+    table
+      .split("\n")
+      .map((line, i) => (i ? rest : first) + line)
+      .join("\n") + "\n";
+  const shapes = [
+    ["a block quote", "> ", "> "],
+    ["a block quote without spaces", ">", ">"],
+    ["a list item's marker line", "- ", "  "],
+    ["an ordered item's marker line", "10. ", "    "],
+    ["a quoted list item", "> - ", ">   "],
+    ["a list item in a quote in a list", "1. > ", "   > "],
+    ["nested block quotes", "> > ", "> > "],
+    ["tab prefixes", ">\t", ">\t"],
+  ] as const;
+  it.each(["github", "forgejo", "gitea", "vitepress"] as const)(
+    "formats each shape after its own prefixes in %s",
+    (dialect) => {
+      for (const [, first, rest] of shapes)
+        for (const eol of ["\n", "\r\n"])
+          expect(check(nested(first, rest).replaceAll("\n", eol), {}, dialect)).toBe(
+            nested(first, rest, formatted).replaceAll("\n", eol),
+          );
+    },
+  );
+  it("formats the same shapes in Obsidian, except where its views read the rows otherwise", () => {
+    for (const [name, first, rest] of shapes)
+      expect(check(nested(first, rest), {}, "obsidian")).toBe(
+        name === "tab prefixes" ? nested(first, rest) : nested(first, rest, formatted),
+      );
+  });
+  it("leaves CommonMark's paragraphs as written", () => {
+    for (const [, first, rest] of shapes)
+      expect(check(nested(first, rest), {}, "commonmark")).toBe(nested(first, rest));
+  });
+  it("keeps each row's own markers and indentation, measuring widths after them", () => {
+    expect(check("- x\n\n   | a | b |\n  |---|---|\n    | ccc | d |\n", {})).toBe(
+      "- x\n\n   | a   | b   |\n  | --- | --- |\n    | ccc | d   |\n",
+    );
+    expect(check(">| a | b |\n> |---|---|\n>  | 漢字 | d |\n", {})).toBe(
+      ">| a    | b   |\n> | ---- | --- |\n>  | 漢字 | d   |\n",
+    );
+  });
+  it.each(["compact", "tight", "aligned"])(
+    "applies every option inside a block quote with %s",
+    (style) => {
+      for (const pipeStyle of ["leadingAndTrailing", "leadingOnly", "trailingOnly"])
+        for (const alignedDelimiter of [false, true])
+          for (const padding of ["right", "alignment"]) {
+            const options = { style, pipeStyle, alignedDelimiter, padding };
+            const root = "| Alpha | Beta |\n| :-- | --: |\n| x | 漢字 |\n";
+            const expected = check(root, options).trimEnd().split("\n");
+            const quoted = root.trimEnd().replaceAll(/^/gm, "> ") + "\n";
+            expect(check(quoted, options)).toBe(
+              expected.map((line) => "> " + line).join("\n") + "\n",
+            );
+          }
+    },
+  );
+  it("takes a nested header's borders for consistent pipes", () => {
+    expect(
+      check("> a | b\n> --|--\n\n| c | d |\n|---|---|\n", {
+        style: "tight",
+        pipeStyle: "consistent",
+      }),
+    ).toBe("> a|b\n> ---|---\n\nc|d\n---|---\n");
+  });
+  // Prettier formats an indented table differently on a second run (prettier/prettier#19847).
+  it("formats idempotently with CRLF, escaped pipes, code spans and wide characters", () => {
+    const input =
+      "1. Step\r\n\r\n   | Name | Value |\r\n   |:-:|--:|\r\n   | `a \\| b` | 漢字 |\r\n   | \\| | 👩‍💻 `code` |\r\n";
+    for (const style of ["aligned", "compact", "tight"])
+      for (const padding of ["right", "alignment"]) {
+        const config = {
+          extends: [],
+          dialect: "github",
+          rules: { "style/table": ["warn", { style, padding }] },
+        } as const;
+        const once = check(input, { style, padding });
+        expect(once).not.toBe(input);
+        expect(once.split("\r\n").every((line) => line === "" || /^ {3}|^1\. /.test(line))).toBe(
+          true,
+        );
+        expect(format(format(once, { config }).output, { config }).output).toBe(once);
+      }
+    expect(check(input, { padding: "alignment" })).toBe(
+      "1. Step\r\n\r\n   |   Name   |     Value |\r\n   | :------: | --------: |\r\n   | `a \\| b` |      漢字 |\r\n   |    \\|    | 👩‍💻 `code` |\r\n",
+    );
+  });
+  it("keeps the leading pipe of a header on its list item's marker line", () => {
+    // markdown-it reads `- a | b` above an indented delimiter as a table outside the list.
+    expect(check("- a | b\n  --|--\n  | c | d |\n", {}, "vitepress")).toBe(
+      "- a   | b   |\n  --- | --- |\n  c   | d   |\n",
+    );
+    expect(
+      check("- | a | b |\n  |--|--|\n", { pipeStyle: "noLeadingOrTrailing" }, "vitepress"),
+    ).toBe("- | a   | b\n  | --- | ---\n");
+    // A row that needs a leading pipe keeps the table as written.
+    for (const dialect of ["github", "vitepress"] as const) {
+      const input = "- a | b\n  --|--\n  | | d |\n";
+      expect(check(input, {}, dialect)).toBe(input);
+    }
+    expect(check("1. a |\n   --|\n   b |\n", {}, "vitepress")).toBe(
+      "1. a   |\n   --- |\n   b   |\n",
+    );
+  });
+  it("leaves lazy lines, other containers and indented top-level tables as written", () => {
+    expect(check("> | a | b |\n> |---|---|\nlazy text\n", {})).toBe(
+      "> | a   | b   |\n> | --- | --- |\nlazy text\n",
+    );
+    for (const input of [
+      "[^1]: | a | b |\n    |---|---|\n    | c | d |\n\nText[^1].\n",
+      "  | a | b |\n  |---|---|\n  | c | d |\n",
+      "> | a | b |\n> |---|---|\n> | ::: |\n> :::\n",
+    ])
+      expect(check(input, {})).toBe(input);
+  });
+  it("holds a whole table that an Obsidian protection holds, with one finding", () => {
+    const input = "-\t| a | b |\n\t|---|---|\n\t| c | d |\n";
+    const config = { extends: [], dialect: "obsidian", rules: { "style/table": "warn" } } as const;
+    const result = format(input, { config });
+    expect(result.output).toBe(input);
+    expect(result.diagnostics.map((item) => [item.rule, item.line])).toEqual([["style/table", 1]]);
+    expect(lint("> | a | b |\n> |---|---|\n> | c | d |\n", { config })).toHaveLength(1);
+  });
+  it.each(["github", "forgejo", "gitea", "obsidian", "vitepress", "commonmark"] as const)(
+    "agrees with the recommended rules around nested tables in %s",
+    (dialect) => {
+      const config = { extends: ["recommended"], dialect } as const;
+      for (const input of [
+        "> Text above\n> | a | b |\n> |---|---|\n> | c | d |\n> Text below\n",
+        "- Item with a long line that wraps at eighty columns because it is long enough to wrap.\n  | a | b |\n  |---|---|\n* | a | b |\n  |---|---|\n",
+        "> [!NOTE]\n> Title\n>\n> | a | b |\n> |---|---|\n>Below.\n",
+        "1. | a | b |\n   |---|---|\n   | ccc | d |\n10. Next\n",
+      ]) {
+        const result = format(input, { config });
+        expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+        expect(format(result.output, { config }).output).toBe(result.output);
+        expect(semanticFingerprint(parse(result.output, dialect))).toBe(
+          semanticFingerprint(parse(input, dialect)),
+        );
+      }
+    },
+  );
+  it("keeps markdown-it's reading of nested tables, as VitePress renders them", () => {
+    const render = (text: string) => normalizeHtml(markdownIt.render(text));
+    for (const input of [
+      ...shapes.map(([, first, rest]) => nested(first, rest)),
+      "- a | b\n  --|--\n  - x | d\n",
+      "- a | b\n  --|--\n  c | d\n",
+      "> | a | b |\n> |---|---|\nlazy | text\n",
+    ])
+      for (const pipeStyle of ["leadingAndTrailing", "noLeadingOrTrailing", "leadingOnly"])
+        expect(render(check(input, { pipeStyle }, "vitepress"))).toBe(render(input));
   });
 });
