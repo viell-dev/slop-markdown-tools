@@ -114,11 +114,25 @@ describe("CLI defaults and discovery (#788)", () => {
       for (const json of [false, true]) {
         const result = run(root, [command, ...(json ? ["--json"] : [])]);
         expect(result.status).toBe(0);
-        expect(result.stderr).toContain("No documents selected.");
-        if (json) expect(parseReport(result.stdout).files).toEqual([]);
-        else expect(result.stdout).toBe("");
+        // JSON reports the empty file list itself and keeps stderr clean.
+        if (json) {
+          expect(parseReport(result.stdout).files).toEqual([]);
+          expect(result.stderr).toBe("");
+        } else {
+          expect(result.stderr).toContain("No documents selected.");
+          expect(result.stdout).toBe("");
+        }
       }
     }
+  });
+  it("leaves the notice out when skipped inputs or stdin explain the empty selection", async () => {
+    const root = await fixture({ ".gitignore": "*.md\n", "a.md": "# A\n" });
+    const named = run(root, ["lint", "a.md"]);
+    expect(named.stderr).toContain("Skipped ignored input: a.md");
+    expect(named.stderr).not.toContain("No documents selected.");
+    const stdin = run(root, ["format", "--stdin-filepath", "a.md"], "# A\n");
+    expect(stdin.status).toBe(0);
+    expect(stdin.stderr).not.toContain("No documents selected.");
   });
   it("gives contextual help within 80 columns including nested help routes", async () => {
     const root = await fixture({});

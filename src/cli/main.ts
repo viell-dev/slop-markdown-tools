@@ -241,7 +241,15 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     process.cwd(),
     flags.stdinFilepath !== undefined,
   );
-  if (discovery.selected.length === 0) process.stderr.write("mdrefine: No documents selected.\n");
+  // Skipped inputs and stdin already say what happened, and JSON reports an empty
+  // file list; the notice explains only a selection that silently came up empty.
+  if (
+    discovery.selected.length === 0 &&
+    discovery.skipped.length === 0 &&
+    !flags.json &&
+    !inputs.includes("-")
+  )
+    process.stderr.write("mdrefine: No documents selected.\n");
   const compatibilityWarnings = new Set<string>();
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
