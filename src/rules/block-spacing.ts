@@ -3,6 +3,7 @@ import type { Blockquote, Nodes, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
+import { tagLine } from "../syntax/github-protections.js";
 import { rendererProtections } from "../syntax/renderer-protections.js";
 import { continuesListBlock } from "../syntax/list-protections.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
@@ -424,6 +425,14 @@ function together(
     misreadTable(source.slice(afterStart, afterEnd))
   )
     return true;
+  // A table can take a complete tag alone on its line, such as `<b title="|">`,
+  // as its header row directly below text, but after a blank line that line
+  // starts an HTML block in every reading (#770).
+  if (
+    after.type === "table" &&
+    tagLine.test(source.slice(afterStart, lineEnd(source, afterStart)).trimStart())
+  )
+    return true;
   // In a block quote, the parser counts a line of quote markers below a list
   // that ends in an empty footnote definition as part of the list item, which
   // makes the item loose.
@@ -546,6 +555,14 @@ const blockSpacing: Rule = {
         // The block's own line holds the quote markers that the new line needs.
         const prefix = source.slice(lineStart, start);
         if (!blankLine.test(prefix)) continue;
+        // A table's header row can be a lazy line, with fewer quote markers
+        // than the quote's blocks have; a line of those would end the quote.
+        if (parent.type === "blockquote") {
+          const [from] = range(before);
+          const markers = (text: string) => text.split(">").length - 1;
+          if (markers(prefix) < markers(source.slice(lineBounds(source, from, from)[0], from)))
+            continue;
+        }
         const line = prefix.replace(/[ \t]+$/, "");
         const above = after.position!.start.line - 1;
         if (!others.every((other) => other.keeps(above, line))) continue;

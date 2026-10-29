@@ -76,6 +76,19 @@ export const commonFixtures = [
     source:
       "An *introduction* that formatting changes.\n\n- An item with *words\n<b>\nmore* after the tag\n  ---\n\n> A quote with *words\n<span>\nmore* after the tag\n> ===\n\n- [one]: https://example.com/one\n<i>\n*after* the definition\n\n> [two]: https://example.com/two\n> [three]: https://example.com/three\n</b>\n*after* the definitions\n\nA *closing* paragraph.\n",
   },
+  // A table takes a complete tag alone on its line below text as its header
+  // row (#770), at the top level, in a list item, a block quote and a quote's
+  // list, and lazily, where GitHub reads HTML and the forges a lazy body row.
+  {
+    name: "table-tag-header",
+    source:
+      'An *introduction* that formatting changes.\n<b title="|">\n|-|-|\n*first* row\n\n- An item\n  <i title="|">\n  |-|-|\n  *row*\n\n> A quote\n> <span title="|">\n> |-|:-|\n> *row* | b\n\n> - A listed quote\n>   <b title="x">\n>   |-|\n\nA *closing* paragraph.\n',
+  },
+  {
+    name: "table-tag-header-lazy",
+    source:
+      'An *introduction* that formatting changes.\n\n- An item\n<b title="|">\n  |-|-|\n*lazy* row\n\n> A quote\n<i title="|">\n> |-|-|\n\nA *closing* paragraph.\n',
+  },
 ];
 
 export const githubFixtures = [

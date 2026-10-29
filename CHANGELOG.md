@@ -236,6 +236,19 @@ prereleases' notes there are longer than their entries here.
   ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
   [#768](https://github.com/viell-dev/slop-markdown-tools/issues/768)).
 
+- A table whose header row is a complete HTML tag alone on its line, directly
+  below text, as in `<b title="|">` above `|-|-|`, is now read as a table, as
+  GitHub, Forgejo, Gitea and VitePress read it, instead of as HTML. Rules
+  formatted it by the wrong reading. `style/block-spacing` leaves such a table
+  directly below its text, where a blank line would make the tag line HTML, and
+  adds no blank line that would end a block quote above a lazy header line. In
+  Forgejo and Gitea, rules leave a table in a list item or block quote as
+  written where the lines below it continue it lazily, which those renderers
+  read as more rows. In VitePress, `style/table` formats only the tables that
+  VitePress reads on the same lines and leaves the others, such as a one-column
+  table whose header has no pipe, as written
+  ([#770](https://github.com/viell-dev/slop-markdown-tools/issues/770)).
+
 - A lazy line below a list item's or block quote's paragraph that could start an
   HTML block of the kind that cannot interrupt a paragraph, such as `<b>` alone
   on its line, now continues the paragraph, as CommonMark, Forgejo, Gitea,

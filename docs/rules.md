@@ -1959,7 +1959,11 @@ and Forgejo and Gitea read an indented line there as one, so nothing is added
 before a block that does not end a table in every renderer, such as indented
 code, a footnote definition, or display math. Whether text directly above a
 table is a paragraph of its own follows the dialect's parser: in CommonMark,
-which has no tables, it is all one paragraph.
+which has no tables, it is all one paragraph. A table whose header row is a
+complete HTML tag alone on its line, as in `<b title="|">` above `|-|-|`, stays
+directly below its text: after a blank line, that line would start an HTML
+block. A header row written as a lazy line in a block quote, without the quote's
+markers, gets no blank line above it, which would end the quote.
 
 **Left as written:** places where a blank line would change what the document
 means or what a comment applies to:
@@ -3121,6 +3125,9 @@ as written when a row needs one.
   `:::tip`: site generators use it to open or close a container, where GFM reads
   another row. Cells written with table borders, such as `| ::: |`, are
   formatted normally.
+- In VitePress, a table that markdown-it reads on other lines or not at all,
+  such as a one-column table whose header has no pipe, or a header written as a
+  lazy line in a block quote.
 
 **In Obsidian:**
 

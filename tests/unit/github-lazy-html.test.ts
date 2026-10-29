@@ -87,7 +87,7 @@ describe("GitHub's reading of a lazy line that starts a type 7 HTML block (#762)
     // The tag line is the definition's destination or inside its title.
     "- [x]:\n<b>\n*w*\n",
     '- [x]: /u "a\n<b>\nc"\n*w*\n',
-    // A table's attempt leaves the tag line as HTML inside the item.
+    // The parser reads a table in the item whose header row is the tag line (#770).
     '- a\n<b title="|">\n  |-|-|\n*w*\n',
   ])("leaves %j as written", (source) => {
     for (const input of [source, crlf(source)]) {

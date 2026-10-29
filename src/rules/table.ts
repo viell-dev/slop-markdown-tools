@@ -6,6 +6,7 @@ import type { Finding, Rule } from "../core/types.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
 import { range } from "../syntax/parse.js";
 import { lineEnd, lineEnding, lineStart } from "../syntax/source.js";
+import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { optionsSchema } from "./shared.js";
 
 /**
@@ -75,7 +76,20 @@ const table: Rule = {
     let firstBorders: readonly [boolean, boolean] | undefined;
     const newline = lineEnding(document.source);
     const contained = containedTables(document.tree);
+    // markdown-it, which VitePress uses, reads some tables on other lines or
+    // not at all, such as a lazy header line in a block quote or a one-column
+    // header without a pipe, which can be a tag line (#770). Only a table that
+    // it reads on the same lines is formatted; the others stay as written.
+    let vitepressTables: Set<string> | undefined;
+    if (document.dialect === "vitepress") {
+      vitepressTables = new Set();
+      for (const token of vitepressTokens(document))
+        if (token.type === "table_open" && token.map)
+          vitepressTables.add(`${token.map[0] + 1}:${token.map[1]}`);
+    }
     walk(document.tree, "table", (node) => {
+      const { start: first, end: last } = node.position!;
+      if (vitepressTables && !vitepressTables.has(`${first.line}:${last.line}`)) return;
       const [start, end] = range(node);
       const header = document.source.slice(...range(node.children[0]!)).trim();
       const borders = [header.startsWith("|"), /(?<!\\)(?:\\\\)*\|$/.test(header)] as const;

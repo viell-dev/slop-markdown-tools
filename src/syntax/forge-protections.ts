@@ -89,24 +89,23 @@ export function collectForgeProtections(
       const end = node.position?.end.offset;
       if (start === undefined || end === undefined) continue;
       if (node.type === "table" && start >= tableUntil) {
-        const next = parent.children[index + 1];
-        // GFM already owns ordinary body rows. The divergence starts when it
-        // opens a list that cannot interrupt Goldmark's paragraph-backed table.
-        if (next?.type === "list" && next.position?.start.line === node.position!.end.line + 1) {
-          let until = end;
-          for (let after = end; after < source.length;) {
-            const from = after + (source.startsWith("\r\n", after) ? 2 : 1);
-            if (from >= source.length) break;
-            const to = lineAround(from)[1];
-            const row = content(source.slice(from, to), container);
-            if (interrupts(row.text, row.indent)) break;
-            until = to;
-            after = to;
-          }
-          if (until > end) {
-            tableText.add(region(node, lineStart(start), until));
-            tableUntil = until;
-          }
+        // GFM already owns ordinary body rows. The divergence starts at a line
+        // that would continue Goldmark's paragraph-backed table: a list that
+        // cannot interrupt it, or a lazy line below a table that ends a list
+        // item or quote, which GFM ends the container at (#770).
+        let until = end;
+        for (let after = end; after < source.length;) {
+          const from = after + (source.startsWith("\r\n", after) ? 2 : 1);
+          if (from >= source.length) break;
+          const to = lineAround(from)[1];
+          const row = content(source.slice(from, to), container);
+          if (interrupts(row.text, row.indent)) break;
+          until = to;
+          after = to;
+        }
+        if (until > end) {
+          tableText.add(region(node, lineStart(start), until));
+          tableUntil = until;
         }
       }
       if (node.type === "paragraph") {
