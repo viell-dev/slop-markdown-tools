@@ -6,6 +6,7 @@ import { blockIdentifier } from "../syntax/block-identifier.js";
 import { rendererProtections } from "../syntax/renderer-protections.js";
 import { continuesListBlock } from "../syntax/list-protections.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
+import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { codeFence } from "../syntax/fences.js";
 import { countBelow } from "../syntax/source.js";
@@ -34,6 +35,102 @@ function separators(source: string, at: number, limit: number): Range[] {
     at = from - (source.startsWith("\r\n", from - 2) ? 2 : 1);
   }
   return lines;
+}
+
+/** The blocks of another reading that a separator between their lines would split. */
+const splitBlocks = new Set([
+  "paragraph",
+  "heading",
+  "code",
+  "math",
+  "html",
+  "table",
+  "list",
+  "footnoteDefinition",
+  "definition",
+  "yaml",
+  "toml",
+]);
+/** markdown-it's tokens for those blocks, as VitePress reads them. */
+const splitTokens = new Set([
+  "paragraph_open",
+  "heading_open",
+  "fence",
+  "code_block",
+  "html_block",
+  "math_block",
+  "table_open",
+  "bullet_list_open",
+  "ordered_list_open",
+]);
+
+/**
+ * Where the blocks of another reading continue below a line, by 1-based line:
+ * whether a block that a separator would split continues onto the next line,
+ * and how many block quotes do. A separator line keeps that reading only when
+ * it holds one quote marker for each of those quotes.
+ */
+class Continuations {
+  private readonly split: Int32Array;
+  private readonly quotes: Int32Array;
+  constructor(lines: number) {
+    this.split = new Int32Array(lines + 2);
+    this.quotes = new Int32Array(lines + 2);
+  }
+  /** A block from line `first` to line `last`, both 1-based and included. */
+  add(first: number, last: number, quote: boolean): void {
+    last = Math.min(last, this.split.length - 1);
+    if (last <= first) return;
+    const counts = quote ? this.quotes : this.split;
+    counts[first]!++;
+    counts[last]!--;
+  }
+  /** Sum the counts once all blocks are added. */
+  finish(): this {
+    for (const counts of [this.split, this.quotes])
+      for (let line = 1; line < counts.length; line++) counts[line]! += counts[line - 1]!;
+    return this;
+  }
+  /** Whether a separator line `line` below line `above` keeps this reading. */
+  keeps(above: number, line: string): boolean {
+    if (above < 1 || above >= this.split.length) return true;
+    return this.split[above] === 0 && this.quotes[above] === (line.match(/>/g)?.length ?? 0);
+  }
+}
+
+/**
+ * The other readings that a separator has to keep: the reading without TOML
+ * front matter, or with the front matter that the parser left out, where one
+ * paragraph can continue through several blocks of the document's reading
+ * (#426) and a block quote through the end of a list (#748); and VitePress's
+ * own reading, where markdown-it continues a paragraph lazily over a line
+ * that the parser starts a block with, or a table and an unclosed fence that
+ * it reads before a list (#748).
+ */
+function otherContinuations(document: Document): Continuations[] {
+  const lines = document.tree.position?.end.line ?? 1;
+  const found: Continuations[] = [];
+  const other = otherReading(document.tree);
+  if (other) {
+    const continuations = new Continuations(lines);
+    walk(other, (node) => {
+      const quote = node.type === "blockquote";
+      if ((quote || splitBlocks.has(node.type)) && node.position)
+        continuations.add(node.position.start.line, node.position.end.line, quote);
+    });
+    found.push(continuations.finish());
+  }
+  if (document.dialect === "vitepress") {
+    const continuations = new Continuations(lines);
+    for (const token of vitepressTokens(document)) {
+      if (!token.map) continue;
+      const quote = token.type === "blockquote_open" || token.type === "vitepress_alert_open";
+      if (quote || splitTokens.has(token.type))
+        continuations.add(token.map[0] + 1, token.map[1], quote);
+    }
+    found.push(continuations.finish());
+  }
+  return found;
 }
 
 /** The innermost last block of a container, where its text ends. */
@@ -370,33 +467,9 @@ const blockSpacing: Rule = {
       const next = joined[countBelow(ends, point + 1)];
       return next !== undefined && next[0] <= point;
     };
-    // Without TOML front matter, one paragraph can continue through several
-    // blocks of the front-matter reading, such as empty and numbered lists
-    // (#426). A separator inside that paragraph would create a new block.
-    const plainText: Range[] = [];
-    if (document.tree.children[0]?.type === ("toml" as string)) {
-      const plain = otherReading(document.tree);
-      if (plain)
-        walk(plain, (node) => {
-          if (
-            (node.type === "paragraph" || node.type === "heading") &&
-            node.position?.start.offset !== undefined &&
-            node.position.end.offset !== undefined
-          )
-            plainText.push(range(node));
-        });
-    }
-    const splitsPlainText = (from: number, to: number) => {
-      let low = 0;
-      let high = plainText.length;
-      while (low < high) {
-        const middle = (low + high) >> 1;
-        if (plainText[middle]![1] <= from) low = middle + 1;
-        else high = middle;
-      }
-      const block = plainText[low];
-      return block !== undefined && block[0] <= from && to < block[1];
-    };
+    // A separator has to keep the other readings too, where a block of the
+    // document's reading can be part of a block above it (#426, #748).
+    const others = otherContinuations(document);
     const directiveLines = new Set<number>();
     if (source.includes("mdrefine-"))
       walk(document.tree, "html", (node) => {
@@ -434,11 +507,12 @@ const blockSpacing: Rule = {
         if (breakStart < end) continue;
         if (before.type === "heading" && paragraphHeadingEnds.has(breakStart)) continue;
         if (continuesAt(lineStart)) continue;
-        if (splitsPlainText(breakStart, lineStart)) continue;
         // The block's own line holds the quote markers that the new line needs.
         const prefix = source.slice(lineStart, start);
         if (!blankLine.test(prefix)) continue;
         const line = prefix.replace(/[ \t]+$/, "");
+        const above = after.position!.start.line - 1;
+        if (!others.every((other) => other.keeps(above, line))) continue;
         // In a block quote, the parser counts the lines below a list or
         // footnote toward it, and reads the list as loose when two or more
         // follow: one blank line is all that keeps its reading.

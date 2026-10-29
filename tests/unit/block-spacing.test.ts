@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
-import { only, formatted } from "../support/rules.js";
+import { only, formatted, refusals } from "../support/rules.js";
 describe("style/block-spacing", () => {
   const rule = { "style/block-spacing": "warn" } as const;
   /** Format with the rule alone, and require the parsed meaning to stay the same. */
@@ -295,6 +295,82 @@ describe("style/block-spacing", () => {
       expect(spaced(source, dialect)).toBe("+++\ntitle = 1\n+++\n1.\n\n2) b\n\n# Heading\n");
     },
   );
+  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
+    "keeps a block quote of the reading without TOML front matter in the %s dialect (#748)",
+    (dialect) => {
+      // Without TOML front matter, `> - $$` continues the quote above, which a
+      // blank line would end; the reading with it has a list and a new quote.
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const bom of ["", String.fromCharCode(0xfeff)])
+          for (const config of [
+            only(rule, dialect),
+            { extends: ["recommended"], dialect, rules: rule },
+          ]) {
+            const source = bom + "+++\n+++\n-   \n  > Quoted\n> - $$\n".replaceAll("\n", newline);
+            const result = format(source, { config });
+            expect(refusals(result), JSON.stringify(source)).toEqual([]);
+            expect(format(result.output, { config }).output).toBe(result.output);
+            expect(
+              lint(source, { config }).filter((item) => item.rule === "style/block-spacing"),
+            ).toEqual([]);
+          }
+    },
+  );
+  // Obsidian keeps the blocks of a quote as written on its own account (#436).
+  it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
+    "still separates the blocks of a quote that both readings share in the %s dialect (#748)",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n"]) {
+        const source = "+++\nt = 1\n+++\n> - a\n> # H\n".replaceAll("\n", newline);
+        expect(spaced(source, dialect)).toBe(
+          "+++\nt = 1\n+++\n> - a\n>\n> # H\n".replaceAll("\n", newline),
+        );
+      }
+    },
+  );
+  describe("VitePress's own reading (#748)", () => {
+    it.each([
+      // markdown-it reads a table before the list, and the unclosed fence
+      // below it runs to the end of the document.
+      "- a | b\n  --|--\n  ```\n- * A\n> : Description\n",
+      // markdown-it continues the item's paragraph lazily over `<b>`.
+      "text\n\n- a\n<b>\nmore\n",
+      // ... and the quote's paragraph over the footnote definition.
+      "- > a\n[^b]: note\n",
+    ])("adds no separator inside a block that VitePress continues in %j", (body) => {
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const config of [
+          only(rule, "vitepress"),
+          { extends: ["recommended", "vitepress"], rules: rule } satisfies Config,
+        ]) {
+          const source = body.replaceAll("\n", newline);
+          const result = format(source, { config });
+          expect(
+            result.diagnostics.filter(
+              (item) =>
+                item.rule === "engine/unsafe-format" &&
+                item.message.includes("style/block-spacing"),
+            ),
+            JSON.stringify(source),
+          ).toEqual([]);
+          expect(
+            lint(source, { config }).filter((item) => item.rule === "style/block-spacing"),
+          ).toEqual([]);
+          expect(format(result.output, { config }).output).toBe(result.output);
+        }
+      expect(formatted(body, only(rule, "vitepress"))).toBe(body);
+    });
+    it("still separates the blocks that VitePress reads as separate", () => {
+      expect(spaced("> - a\n> # H\n", "vitepress")).toBe("> - a\n>\n> # H\n");
+      expect(spaced("- a\n<div>\nmore\n", "vitepress")).toBe("- a\n\n<div>\nmore\n");
+      expect(spaced("text\n- a\n# H\n", "vitepress")).toBe("text\n\n- a\n\n# H\n");
+      expect(spaced("```\ncode\n```\n- a\n", "vitepress")).toBe("```\ncode\n```\n\n- a\n");
+    });
+    it("separates the list above another quote in GitHub, where the item holds the table", () => {
+      const source = "- a | b\n  --|--\n  ```\n- * A\n> : Description\n";
+      expect(spaced(source, "github")).toBe(source.replace("- * A\n", "- * A\n\n"));
+    });
+  });
   it.each([
     "[r]: a b\n===\nText.\n",
     "[r]: a b\n---\nText.\n",
