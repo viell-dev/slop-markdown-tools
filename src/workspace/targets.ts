@@ -296,6 +296,7 @@ export function createTargetIndex(
     if (!group) return undefined;
     target.github = group;
     const anchors = dialect === "github" ? group.file : group.markdown;
+    if (dialect === "github") anchor = fragment.replace(/^user-content-/i, "");
     const folded = anchor.toLowerCase();
     if (anchors.slugs.has(folded) || anchors.explicit.has(folded)) return true;
     return anchors.complete ? false : "incomplete";
@@ -356,12 +357,20 @@ export function createTargetIndex(
     }
     if (dialect === "forgejo" || dialect === "gitea" || !target.github) return undefined;
     const anchors = dialect === "github" ? target.github.file : target.github.markdown;
+    if (dialect === "github") anchor = fragment.replace(/^user-content-/i, "");
     // GitHub's anchors are lowercase, and its page script lowercases a fragment it cannot find.
-    if (anchors.slugs.has(anchor) || anchors.explicit.has(anchor)) return undefined;
+    if (
+      (dialect !== "github" ||
+        !/^user-content-/i.test(fragment) ||
+        fragment.startsWith("user-content-")) &&
+      (anchors.slugs.has(anchor) || anchors.explicit.has(anchor))
+    )
+      return undefined;
     return () => {
       const folded = anchor.toLowerCase();
       if (!anchors.slugs.has(folded) && !anchors.explicit.has(folded)) return undefined;
-      return fragment.slice(0, fragment.length - anchor.length) + folded;
+      const prefix = fragment.slice(0, fragment.length - anchor.length);
+      return (dialect === "github" ? prefix.toLowerCase() : prefix) + folded;
     };
   }
   // Vaults of their own, deepest first, so that a note belongs to the nearest one.
