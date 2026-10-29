@@ -814,4 +814,327 @@ describe("style/block-spacing", () => {
       { numRuns: 300, seed: 20261017 },
     );
   });
+  describe("blank lines around headings (#679)", () => {
+    type Counts = Record<string, unknown>;
+    /** Format with the rule and these options alone, and require the parsed meaning to stay. */
+    function counted(source: string, options: Counts, dialect: Dialect = "github") {
+      const output = formatted(source, only({ "style/block-spacing": ["warn", options] }, dialect));
+      expect(semanticFingerprint(parse(output, dialect))).toBe(
+        semanticFingerprint(parse(source, dialect)),
+      );
+      return output;
+    }
+    it.each<[string, Counts, string]>([
+      // At least the configured number, counting the blank lines already there.
+      ["Text\n# H\n", { linesAbove: 2 }, "Text\n\n\n# H\n"],
+      ["Text\n\n# H\n", { linesAbove: 2 }, "Text\n\n\n# H\n"],
+      ["# H\nText\n", { linesBelow: 2 }, "# H\n\n\nText\n"],
+      ["# H\n\nText\n", { linesBelow: 3 }, "# H\n\n\n\nText\n"],
+      // Counts per level; levels left out need one.
+      ["Text\n# A\nText\n## B\n", { linesAbove: [2, 1] }, "Text\n\n\n# A\n\nText\n\n## B\n"],
+      ["Text\n## B\nText\n", { linesAbove: [3] }, "Text\n\n## B\n\nText\n"],
+      ["Text\n###### F\n", { linesAbove: [1, 1, 1, 1, 1, 2] }, "Text\n\n\n###### F\n"],
+      // Between two headings, the larger count applies.
+      ["# A\n## B\n", { linesAbove: [1, 3] }, "# A\n\n\n\n## B\n"],
+      ["# A\n## B\n", { linesBelow: [2, 1], linesAbove: 0 }, "# A\n\n\n## B\n"],
+      ["Title\n===\nText\n", { linesBelow: 2 }, "Title\n===\n\n\nText\n"],
+      // A list, a fence, or a table next to a heading still needs one.
+      ["Text\n# A\n- List\n", { linesAbove: -1, linesBelow: -1 }, "Text\n# A\n\n- List\n"],
+      ["```\nx\n```\n# A\n", { linesAbove: 0 }, "```\nx\n```\n\n# A\n"],
+      ["# A\n| a |\n| - |\n", { linesBelow: 0 }, "# A\n\n| a |\n| - |\n"],
+      ["| a |\n| - |\n# A\n", { linesAbove: 0 }, "| a |\n| - |\n\n# A\n"],
+      // Block quotes at any depth, with their markers on the new lines.
+      ["> Text\n> # A\n", { linesAbove: 2 }, "> Text\n>\n>\n> # A\n"],
+      ["> Text\n>\n> # A\n", { linesAbove: 2 }, "> Text\n>\n>\n> # A\n"],
+      ["> > Text\n> > # A\n", { linesAbove: 2 }, "> > Text\n> >\n> >\n> > # A\n"],
+      ["> > Text\n>\n> # A\n", { linesAbove: 2 }, "> > Text\n>\n>\n> # A\n"],
+      ["- > # A\n  > Text\n", { linesBelow: 2 }, "- > # A\n  >\n  >\n  > Text\n"],
+      // In a quote, below a list or footnote, one line, which keeps the list tight.
+      ["> - a\n> # A\n", { linesAbove: 2 }, "> - a\n>\n> # A\n"],
+      ["> [^1]: x\n> # A\n", { linesAbove: 2 }, "> [^1]: x\n>\n> # A\n"],
+      ["- a\n# A\n", { linesAbove: 2 }, "- a\n\n\n# A\n"],
+      // The document's line ending.
+      ["Text\r\n# A\r\n", { linesAbove: 2 }, "Text\r\n\r\n\r\n# A\r\n"],
+      ["Text\r\n\r\n# A\r\n", { linesAbove: 2 }, "Text\r\n\r\n\r\n# A\r\n"],
+      ["> Text\r\n> # A\r\n", { linesAbove: 2 }, "> Text\r\n>\r\n>\r\n> # A\r\n"],
+      ["Text\r# A\r", { linesAbove: 2 }, "Text\r\r\r# A\r"],
+    ])("separates %j with %j", (source, options, output) => {
+      expect(counted(source, options)).toBe(output);
+    });
+    it.each<[string, Counts]>([
+      // Minimums: more blank lines than needed stay, and 0 or -1 need none.
+      ["Text\n\n\n\n# H\n", { linesAbove: 2 }],
+      ["Text\n# A\nText\n", { linesAbove: 0, linesBelow: 0 }],
+      ["Text\n# A\nText\n", { linesAbove: -1, linesBelow: -1 }],
+      ["Text\n# A\n\n\nText\n", { linesAbove: [0], linesBelow: [-1] }],
+      // Blocks inside a list item or a footnote definition.
+      ["- A\n  # H\n  Text\n", { linesAbove: 2, linesBelow: 2 }],
+      ["[^1]: Text\n    # H\n", { linesAbove: 2, linesBelow: 2 }],
+      // Front matter, unless `includeFrontMatter` asks for it.
+      ["---\ntitle: T\n---\n# H\n", { linesAbove: 2 }],
+      ["---\ntitle: T\n---\n\n# H\n", { linesAbove: 2 }],
+      // Comments, directives, callout titles, and misread text.
+      ["<!-- note -->\n# H\n", { linesAbove: 2 }],
+      ["<!-- note -->\n\n# H\n", { linesAbove: 2 }],
+      ["<!-- mdrefine-disable-next-line style/emphasis -->\n# *A*\n", { linesAbove: 2 }],
+      ["> [!tip] Title\n> # H\n", { linesAbove: 2 }],
+      ["Text\n> 2. a\n>    # H\n", { linesAbove: 2 }],
+      ["- d\n  ```\n# H\n", { linesAbove: 2 }],
+      // A list in a quote that the blank line below it belongs to.
+      ["> - a\n>\n> # A\n", { linesAbove: 2 }],
+      // A blank quote line belongs to its quote, not to the blocks of another.
+      ["> Text\n>\n# H\n", { linesAbove: 2 }],
+      ["> > Text\n> >\n> # H\n", { linesAbove: 2 }],
+    ])("leaves %j with %j as written", (source, options) => {
+      expect(counted(source, options)).toBe(source);
+      expect(lint(source, { config: only({ "style/block-spacing": ["warn", options] }) })).toEqual(
+        [],
+      );
+    });
+    it("leaves lines of blank space that Obsidian reads as text alone", () => {
+      for (const source of ["Text\n\t\n# H\n", "<div>\n</div>\n  \n# H\n", "Text\n  \n# H\n"])
+        expect(counted(source, { linesAbove: 2 }, "obsidian")).toBe(source);
+      // Other dialects read them as blank lines.
+      expect(counted("Text\n  \n# H\n", { linesAbove: 2 })).toBe("Text\n  \n\n# H\n");
+      expect(counted("Text\n\n# H\n", { linesAbove: 2 }, "obsidian")).toBe("Text\n\n\n# H\n");
+    });
+    it.each(dialects)("counts the same blank lines in the %s dialect", (dialect) => {
+      const options = { linesAbove: 2, linesBelow: [1, 3] };
+      expect(counted("Text\n# A\nText\n## B\nText\n", options, dialect)).toBe(
+        "Text\n\n\n# A\n\nText\n\n\n## B\n\n\n\nText\n",
+      );
+    });
+    it("keeps the default spacing with the default counts", () => {
+      const defaults = { linesAbove: 1, linesBelow: [1, 1, 1, 1, 1, 1], includeFrontMatter: false };
+      for (const source of [
+        "# Setup\nInstall the package.\n- Run the command.\n",
+        "> # H\n> Text\n> - A\n",
+        "---\ntitle: T\n---\n# H\n",
+        "Text\n\n\n# H\n",
+        "> - a\n> # A\n",
+      ])
+        expect(counted(source, defaults)).toBe(spaced(source));
+    });
+    describe("includeFrontMatter", () => {
+      const bom = String.fromCharCode(0xfeff);
+      // VitePress reads YAML front matter itself, and its guard keeps the
+      // source directly against the closing line; it reads no TOML.
+      it.each([
+        ["---\ntitle: T\n---\n# H\n", {}, "---\ntitle: T\n---\n\n# H\n", true],
+        ["---\ntitle: T\n---\n\n# H\n", { linesAbove: 2 }, "---\ntitle: T\n---\n\n\n# H\n", false],
+        ["+++\ntitle = 1\n+++\n# H\n", {}, "+++\ntitle = 1\n+++\n\n# H\n", false],
+        ["---\r\ntitle: T\r\n---\r\n# H\r\n", {}, "---\r\ntitle: T\r\n---\r\n\r\n# H\r\n", true],
+        [`${bom}---\ntitle: T\n---\n# H\n`, {}, `${bom}---\ntitle: T\n---\n\n# H\n`, true],
+      ])("separates the heading below front matter in %j", (source, options, output, guarded) => {
+        for (const dialect of dialects)
+          expect(counted(source, { includeFrontMatter: true, ...options }, dialect)).toBe(
+            dialect === "vitepress" && guarded ? source : output,
+          );
+      });
+      it("tells the edit apart from the front matter's own lines", () => {
+        expect(
+          lint("---\ntitle: T\n---\n# H\n", {
+            config: only({ "style/block-spacing": ["warn", { includeFrontMatter: true }] }),
+          }),
+        ).toMatchObject([
+          {
+            line: 4,
+            message: "Add a blank line before the heading.",
+            edit: { start: 17, end: 17, text: "\n" },
+          },
+        ]);
+      });
+      it.each([
+        // Only headings: other blocks below front matter stay as written.
+        ["---\ntitle: T\n---\n- A\n", {}],
+        ["---\ntitle: T\n---\nText\n", {}],
+        ["---\ntitle: T\n---\n# H\n", { linesAbove: 0 }],
+        ["---\ntitle: T\n---\n# H\n", { linesAbove: [0] }],
+        // Without TOML front matter, its lines are the text of this heading.
+        ["+++\ntitle = 1\n+++\nTitle\n===\n", {}],
+      ])("leaves %j with %j as written", (source, options) => {
+        for (const dialect of dialects)
+          expect(counted(source, { includeFrontMatter: true, ...options }, dialect)).toBe(source);
+      });
+    });
+    it("reports the blank lines that are missing", () => {
+      const config = only({ "style/block-spacing": ["warn", { linesAbove: 2 }] });
+      expect(lint("Text\n# H\n", { config })).toEqual([
+        {
+          rule: "style/block-spacing",
+          severity: "warn",
+          line: 2,
+          column: 1,
+          start: 5,
+          message: "Use 2 blank lines before the heading; add 2.",
+          edit: { start: 4, end: 5, text: "\n\n\n" },
+        },
+      ]);
+      expect(lint("> Text\n>\n> # H\n", { config })).toMatchObject([
+        {
+          line: 3,
+          message: "Use 2 blank lines before the heading; add 1.",
+          edit: { start: 8, end: 9, text: "\n>\n" },
+        },
+      ]);
+      expect(
+        lint("# H\nText\n", {
+          config: only({ "style/block-spacing": ["warn", { linesBelow: 1 }] }),
+        }),
+      ).toMatchObject([{ line: 1, message: "Add a blank line after the heading." }]);
+    });
+    describe("with style/blank-lines", () => {
+      const both = (spacing: Counts, maximum?: number): Config => ({
+        extends: [],
+        dialect: "github",
+        rules: {
+          "style/block-spacing": ["warn", spacing],
+          "style/blank-lines": maximum === undefined ? "warn" : ["warn", { maximum }],
+        },
+      });
+      it.each<[Counts, number | undefined, string]>([
+        [
+          { linesAbove: 2 },
+          undefined,
+          'Invalid options for style/block-spacing: "linesAbove" asks for 2 blank lines, but style/blank-lines removes blank lines beyond 1 in a row; set its "maximum" to at least 2, or lower "linesAbove"',
+        ],
+        [
+          { linesBelow: [1, 1, 3] },
+          2,
+          'Invalid options for style/block-spacing: "linesBelow" asks for 3 blank lines at heading level 3, but style/blank-lines removes blank lines beyond 2 in a row; set its "maximum" to at least 3, or lower "linesBelow"',
+        ],
+      ])("refuses %j with a maximum of %j", (spacing, maximum, message) => {
+        const config = both(spacing, maximum);
+        expect(() => lint("# H\n", { config })).toThrow(new Error(message));
+        expect(() => format("# H\n", { config })).toThrow(new Error(message));
+        // Presets enable style/blank-lines with its default maximum, 1.
+        expect(() =>
+          lint("# H\n", {
+            config: {
+              extends: ["recommended"],
+              rules: { "style/block-spacing": ["warn", spacing] },
+            },
+          }),
+        ).toThrow("Invalid options for style/block-spacing");
+      });
+      it("accepts counts that the maximum allows, or with either rule off", () => {
+        const source = "Text\n# A\n\n\n\n\n## B\nText\n";
+        const config = both({ linesAbove: [2, 3], linesBelow: 0 }, 3);
+        expect(formatted(source, config)).toBe("Text\n\n\n# A\n\n\n\n## B\nText\n");
+        expect(lint("# H\n", { config: both({ linesAbove: 2 }, 2) })).toEqual([]);
+        for (const config of [
+          only({ "style/block-spacing": ["warn", { linesAbove: 5 }], "style/blank-lines": "off" }),
+          only({ "style/block-spacing": ["off", { linesAbove: 5 }], "style/blank-lines": "warn" }),
+          both({ linesAbove: [1, -1, 0] }),
+        ])
+          expect(lint("# H\n", { config })).toEqual([]);
+      });
+      it("checks the settings that apply to each document after overrides", () => {
+        const config: Config = {
+          ...both({ linesAbove: 2 }, 2),
+          overrides: [{ files: ["compact/**"], rules: { "style/blank-lines": "warn" } }],
+        };
+        expect(lint("# H\n", { config, path: "a.md" })).toEqual([]);
+        expect(() => lint("# H\n", { config, path: "compact/a.md" })).toThrow(
+          "Invalid options for style/block-spacing",
+        );
+      });
+    });
+    it.each<Counts>([
+      { linesAbove: -2 },
+      { linesAbove: 1.5 },
+      { linesAbove: "2" },
+      { linesBelow: [] },
+      { linesBelow: [1, 1, 1, 1, 1, 1, 1] },
+      { linesBelow: [1, null] },
+      { includeFrontMatter: "yes" },
+      { lines_above: 2 },
+    ])("rejects invalid options %j", (options) => {
+      expect(() =>
+        lint("# H\n", { config: only({ "style/block-spacing": ["warn", options] }) }),
+      ).toThrow("Invalid options for style/block-spacing");
+    });
+    it("keeps the meaning of randomly assembled documents with counted blank lines", () => {
+      const blocks = fc.constantFrom(
+        "# Heading",
+        "### Deeper",
+        "Title\n=====",
+        "Sub\n---",
+        "Text.",
+        "Two\nlines.",
+        "- Item",
+        "1. First",
+        "- 2. Step",
+        "-",
+        "```\ncode\n```",
+        "```\nunclosed",
+        "    code",
+        "<div>\nhtml",
+        "<!-- comment -->",
+        "$$\nx\n$$",
+        "| a |\n| - |",
+        "***",
+        "> Quoted",
+        "> [!NOTE]\n> - Item",
+        "[a]: https://example.com",
+        "[^1]: Note.",
+        "^block-id",
+        "::: tip\nText\n:::",
+        "{{ value }}",
+        "Term\n: Description",
+        "lazy",
+        "\t",
+      );
+      const containers = fc.constantFrom(
+        ["", ""],
+        ["> ", "> "],
+        ["> > ", "> > "],
+        ["- ", "  "],
+        ["> - ", ">   "],
+      );
+      const group = fc.tuple(
+        containers,
+        fc.array(fc.tuple(blocks, fc.integer({ min: 0, max: 2 })), { minLength: 1, maxLength: 6 }),
+      );
+      const counts = fc.oneof(
+        fc.integer({ min: -1, max: 3 }),
+        fc.array(fc.integer({ min: -1, max: 3 }), { minLength: 1, maxLength: 6 }),
+      );
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...dialects),
+          fc.constantFrom("", "---\ntitle: T\n---\n", "+++\ntitle = 1\n+++\n"),
+          fc.array(group, { minLength: 1, maxLength: 3 }),
+          fc.constantFrom("\n", "\r\n"),
+          counts,
+          counts,
+          fc.boolean(),
+          (dialect, front, groups, newline, linesAbove, linesBelow, includeFrontMatter) => {
+            const lines: string[] = front ? front.trimEnd().split("\n") : [];
+            for (const [[first, rest], items] of groups)
+              items.forEach(([block, blanks], index) => {
+                if (index > 0) for (let n = 0; n < blanks; n++) lines.push(rest.trimEnd());
+                block.split("\n").forEach((line, at) => {
+                  lines.push((index === 0 && at === 0 ? first : rest) + line);
+                });
+              });
+            const source = lines.join(newline) + newline;
+            const options = { linesAbove, linesBelow, includeFrontMatter };
+            counted(source, options, dialect);
+            // With style/blank-lines at a maximum that allows the counts, the
+            // two rules settle together.
+            formatted(source, {
+              extends: [],
+              dialect,
+              rules: {
+                "style/block-spacing": ["warn", options],
+                "style/blank-lines": ["warn", { maximum: 3 }],
+              },
+            });
+          },
+        ),
+        { numRuns: 400, seed: 20261029 },
+      );
+    });
+  });
 });
