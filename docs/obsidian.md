@@ -68,10 +68,10 @@ boundary; otherwise holding only one list marker could split a list whose
 markers are safe to change together.
 
 [`style/lazy-continuation`](rules.md#stylelazy-continuation) removes some lazy
-continuation margins instead of keeping them: it writes a
-quote's `>` and list items' indentation on the lazy lines where both views were
-observed to show the same, after which the paragraph is no longer lazy for the
-structural rules. It holds the other lazy lines itself, with the finding below.
+continuation margins instead of keeping them: it writes a quote's `>` and list
+items' indentation on the lazy lines where both views were observed to show the
+same, after which the paragraph is no longer lazy for the structural rules. It
+holds the other lazy lines itself, with the finding below.
 [`style/quote-marker`](rules.md#stylequote-marker) follows this policy like the
 list rules.
 

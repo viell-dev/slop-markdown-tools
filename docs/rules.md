@@ -59,14 +59,14 @@ column, ✅ is yes and ❌ no.
 | `style/final-newline`           | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/heading`                 | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/inline-code`             | 🎨   | ❌            | ❌                                                              | ❌      |
-| `style/lazy-continuation`       | 🎨   | `warn`            | ❌             | ❌      |
+| `style/lazy-continuation`       | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/link-title`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/list-indent`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/list-marker`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/no-tabs`                 | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/ordered-list`            | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/prose-space`             | 🎨   | ❌            | ❌                                                              | ❌      |
-| `style/quote-marker`            | 🎨   | `warn`            | ❌             | ✅      |
+| `style/quote-marker`            | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/strong`                  | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/table`                   | 🎨   | `warn`        | `warn` in `github`, `forgejo`, `gitea`, `obsidian`, `vitepress` | ✅      |
 | `style/thematic-break`          | 🎨   | `warn`        | ❌                                                              | ✅      |
@@ -2117,7 +2117,8 @@ its outer quote's, so these lazy lines, and the combinations not observed, stay
 as written with a finding whose message starts with
 `Left as written to preserve Obsidian rendering`. So does a list item's lazy
 line with more blocks after it in the item, which Live Preview reads outside the
-list ([issue #376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
+list ([issue
+#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
 
 **With other rules:** [`style/wrap`](#stylewrap) joins a lazy line onto the line
 before it when it reflows the paragraph, and writes the containers' prefixes on
