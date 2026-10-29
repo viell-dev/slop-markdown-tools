@@ -231,6 +231,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub link checks and workspace indexes read definitions directly above an
+  interrupting table as visible text, including in lists and quotes, while
+  keeping formatting from hiding that text. A Setext underline line such as
+  `===` directly below the definitions keeps them, as on GitHub, and
+  `style/wrap` no longer joins it with the next line, which made GitHub show the
+  definitions as text
+  ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
+
 - `links/valid` accepts a GitHub file fragment whose `user-content-` prefix is
   not lowercase, such as `#User-Content-setup`, as GitHub's file view does, and
   its `exactCase` option reports the lowercase spelling
