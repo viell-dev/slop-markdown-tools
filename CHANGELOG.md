@@ -231,6 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
+  or VitePress component blocks without proposing refused edits
+  ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
+  [#768](https://github.com/viell-dev/slop-markdown-tools/issues/768)).
+
 - A table whose header row is a complete HTML tag alone on its line, directly
   below text, as in `<b title="|">` above `|-|-|`, is now read as a table, as
   GitHub, Forgejo, Gitea and VitePress read it, instead of as HTML. Rules
