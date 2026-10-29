@@ -88,12 +88,12 @@ Turn off in one tool what the other covers; the tables below list the overlaps.
 
 ## Coming from Prettier or markdownlint
 
-mdrefine is meant to replace these tools for Markdown, but it does not yet cover
-everything they do. The tables below list every rule of markdownlint 0.42 and
-every Markdown option and formatting choice of Prettier 3.9, with the mdrefine
-rule that covers each. "None yet" and "Not yet" link the issue that tracks the
-missing part; keep the other tool for that check until it is done. The issues
-follow each check's documented purpose, not the other tool's known defects.
+mdrefine is meant to replace these tools for Markdown. The tables below list
+every rule of markdownlint 0.42 and every Markdown option and formatting choice
+of Prettier 3.9, with the mdrefine rule that covers each and where it behaves
+differently. Each row follows the check's documented purpose, not the other
+tool's known defects. A row that says "None yet" or "Not yet" links the issue
+that tracks a missing part; keep the other tool for that check until it is done.
 
 ### Configuration conversion and fallback
 
