@@ -96,7 +96,7 @@ function wikiTarget(url: string): string | undefined {
  * collapsed and trimmed. This is how the parser computes the `identifier` of
  * definitions and references, so the two compare equal.
  */
-function normalizeLabel(label: string): string {
+export function normalizeLabel(label: string): string {
   return label
     .replace(/[\t\n\r ]+/g, " ")
     .replace(/^ | $/g, "")
@@ -199,7 +199,7 @@ const voidElements = new Set([
  * `<span/>`, which leaves the element open; only Vue, which renders VitePress's
  * HTML, closes any element with it.
  */
-function insideInlineHtml(block: Nodes, vue: boolean): [number, number][] {
+export function insideInlineHtml(block: Nodes, vue: boolean): [number, number][] {
   const ranges: [number, number][] = [];
   const open: string[] = [];
   let from = 0;

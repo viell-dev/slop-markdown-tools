@@ -213,9 +213,35 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
 export function vitepressTokens(document: Document): Token[] {
   return readings.get(document.tree)?.tokens ?? readVitePress(document.source, document.vitepress);
 }
+/** Whitespace rules must keep projection syntax and Vue expressions literal.
+ * The projection has no positioned Vue expression tokens; conservatively keep
+ * mustaches, including unfinished expressions, through their closing delimiter.
+ */
+export function vitepressWhitespaceLiterals(document: Document): [number, number][] {
+  if (document.dialect !== "vitepress") return [];
+  return [
+    ...(readings.get(document.tree)?.protected ?? [])
+      .filter((part) => !part.wrapOnly)
+      .map((part): [number, number] => [part.start, part.end]),
+    ...Array.from(
+      document.source.matchAll(/\{\{[\s\S]*?(?:\}\}|$)/g),
+      (match): [number, number] => [match.index, match.index + match[0].length],
+    ),
+    // The container plugin requires a space after its name. Replacing a tab
+    // can turn a paragraph into a container, so protect candidates too. Each
+    // repetition starts with a marker, so blank space has one way to match;
+    // accepting a list marker without its space only protects more lines.
+    ...Array.from(
+      document.source.matchAll(/^[ \t]*(?:(?:>|[-+*]|\d+[.)])[ \t]*)*:{3,}[^\r\n]*/gm),
+      (match): [number, number] => [match.index, match.index + match[0].length],
+    ),
+  ];
+}
 /** Whether a finding targets syntax deliberately kept opaque to ordinary rules. */
 export function protectedVitePress(document: Document, name: string, finding: Finding): boolean {
   if (document.dialect !== "vitepress") return false;
+  // Reporting literal tabs cannot alter protected syntax, including indented code.
+  if (name === "style/no-tabs" && !finding.edit) return false;
   const start = finding.edit?.start ?? finding.start;
   const end = finding.edit?.end ?? finding.end ?? start;
   return (readings.get(document.tree)?.protected ?? []).some(

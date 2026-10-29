@@ -44,6 +44,21 @@ const fixtures = [
   "Image ![wide](./a.png){width=200 height=100} and text.\n",
 ];
 
+it("preserves actual VitePress heading IDs when bracketing literal addresses", async () => {
+  const render = await renderer({});
+  const config: Config = {
+    extends: [],
+    dialect: "vitepress",
+    rules: { "links/bare-url": "warn" },
+  };
+  for (const source of ["# https://e.com\n", "https://e.com\n===\n", "# *https://e.com*\n"]) {
+    const result = format(source, { config });
+    expect(result.output).toBe(source.replace("https://e.com", "<https://e.com>"));
+    expect(await render(result.output)).toBe(await render(source));
+    expect(format(result.output, { config }).output).toBe(result.output);
+  }
+});
+
 async function renderer(options: VitePressOptions) {
   const root = await fixture({ "a.png": "synthetic" });
   const md = await createMarkdownRenderer(root, {
