@@ -95,13 +95,16 @@ const specs = {
     hash: "d32bc5869302bb4b54bd6c5c9c25b3004bd97a2155e0d9cdeb53fbd08510e7d8",
 
     provenance:
-      "mdrefine#762: read a lazy type 7 HTML line as CommonMark does; GitHub's renderer differs and is protected separately",
+      "mdrefine#762: read a lazy type 7 HTML line as CommonMark does; GitHub's renderer differs and is protected separately. mdrefine#770: no type 7 start directly below paragraph text, so a table whose header row is a tag line stays a table",
     tracking: {
       dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
-      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/762"],
+      issues: [
+        "https://github.com/viell-dev/slop-markdown-tools/issues/762",
+        "https://github.com/viell-dev/slop-markdown-tools/issues/770",
+      ],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove after an adopted micromark-core-commonmark release keeps a lazy type 7 HTML line in the container's paragraph, as CommonMark, commonmark.js, markdown-it, Forgejo, Gitea and Obsidian read it, while lazy type 1-6 starts still interrupt it, across lists, quotes, nesting and LF/CRLF. GitHub's protection for its own reading (src/syntax/github-protections.ts) stays either way.",
+        "Remove the lazy-line part after an adopted micromark-core-commonmark release keeps a lazy type 7 HTML line in the container's paragraph, as CommonMark, commonmark.js, markdown-it, Forgejo, Gitea and Obsidian read it, while lazy type 1-6 starts still interrupt it, across lists, quotes, nesting and LF/CRLF. GitHub's protection for its own reading (src/syntax/github-protections.ts) stays either way. Remove the after-content part after an adopted micromark-core-commonmark or micromark-extension-gfm-table release reads a GFM table whose header row is a type 7 tag line directly below paragraph text, as GitHub, Forgejo, Gitea and markdown-it do, at the top level, in list items (continued and lazy) and quotes, LF/CRLF, while a tag line after a blank line or at the document start stays HTML.",
     },
   },
   code: {
@@ -260,11 +263,24 @@ function repair(kind, source) {
   // which ends the container there; the specification does not (#762). GitHub's
   // renderer ends the container too but reads HTML to the next blank line, so
   // a renderer protection, not this reading, covers the GitHub dialect.
+  // Complete HTML cannot interrupt a paragraph, but upstream starts it on the
+  // line that another construct's interrupt check ended the paragraph at, so a
+  // GFM table whose header row is a tag line became HTML (#770). The flow start
+  // that directly follows content now refuses kind 7, and the interrupter that
+  // ended the paragraph takes the line, as renderers read it.
   if (kind === "htmlFlow")
-    return once(
-      source,
-      "return self.interrupt && !self.parser.lazy[self.now().line] ? nok(code)",
-      "return self.interrupt ? nok(code)",
+    return (
+      once(
+        once(
+          source,
+          "function tokenizeHtmlFlow(effects, ok, nok) {\n  const self = this;\n",
+          "function tokenizeHtmlFlow(effects, ok, nok) {\n  const self = this;\n  const mdrefineAfterContent = mdrefineFollowsContent(self.events);\n",
+        ),
+        "return self.interrupt && !self.parser.lazy[self.now().line] ? nok(code)",
+        "return self.interrupt || mdrefineAfterContent ? nok(code)",
+      ) +
+      "\n" +
+      parserAdaptationSource("html-flow")
     );
   if (kind === "text") {
     const at = source.indexOf("function resolveAllText");

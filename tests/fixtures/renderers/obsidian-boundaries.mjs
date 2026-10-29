@@ -1714,4 +1714,13 @@ export const boundaryFixtures = [
     name: "hyphen break below a table",
     source: "| a   | b   |\n| --- | --- |\n| c   | d   |\n---\n",
   },
+  // Both views read one paragraph with inline HTML where the parser reads a
+  // table whose header row is the tag line, at the top level and in a list.
+  // The text above stays editable; the table's lines stay as written.
+  {
+    issue: 770,
+    name: "tag line as a table header below text",
+    source: 'Text *a*\n<b title="|">\n|-|-|\n*w*\n\n- Item\n  <i title="|">\n  |-|-|\n',
+    preserve: false,
+  },
 ];

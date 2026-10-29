@@ -51,7 +51,9 @@ list item, block quote, or footnote definition there and shows the tag and the
 lines below it, up to a blank line, as HTML, where Markdown such as `*` is
 literal text. In the GitHub dialect, formatting leaves that list, quote, or
 footnote and those lines as written, also where CommonMark reads the paragraph
-text as a Setext heading or as link definitions before the tag line.
+text as a Setext heading or as link definitions before the tag line, or where
+the tag line is the header row of a table, as in `<b title="|">` above `|-|-|`,
+which Forgejo and Gitea read as a table in the container.
 
 ## The assumed dialect
 
@@ -205,8 +207,12 @@ discovers limits without becoming a release gate.
 
 Formatting retains native table rows that the primary parser reads as ordered
 lists, table headers and bodies hidden inside quoted paragraphs, and a single
-backslash hard break immediately after a literal URL. These protections apply to
-Forgejo and Gitea; GitHub reads that URL backslash as part of the link instead.
+backslash hard break immediately after a literal URL. Forgejo and Gitea also
+read a lazy line below a table in a list item or block quote, such as `*w*`
+without the item's indentation, as one more row, where GitHub ends the
+container; formatting leaves that table and those lines as written. These
+protections apply to Forgejo and Gitea; GitHub reads that URL backslash as part
+of the link instead.
 
 Generated stray-marker text can still change emphasis or strikethrough pairing
 when wrapping moves markers across quoted lines. The observed case preserves
