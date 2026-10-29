@@ -439,7 +439,12 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   { source: "rangeEnd" },
   { source: "plugins" },
   { source: "checkIgnorePragma" },
-  { source: "endOfLine", issue: 712, defaults: {} },
+  {
+    source: "endOfLine",
+    rule: "style/line-ending",
+    defaults: { endOfLine: "lf" },
+    options: { endOfLine: "endOfLine" },
+  },
   { source: "embeddedLanguageFormatting" },
   { source: "singleQuote", rule: "style/link-title" },
   { source: "requirePragma", issue: 723 },
@@ -474,7 +479,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   { source: "quote spacing", rule: "style/quote-marker" },
   { source: "lazy continuations", rule: "style/lazy-continuation" },
   { source: "definitions", rule: "style/definition-spacing" },
-  { source: "front matter", defaults: {}, issue: 718 },
+  { source: "front matter" },
   { source: "prose spacing", rule: "style/prose-space" },
 ];
 
@@ -557,6 +562,10 @@ export function convertConfig(input: {
     }
     const rowFor = (source: string) => competitorMappings.find((row) => row.source === source)!;
     set(rowFor("singleQuote"), { delimiter: p.singleQuote === true ? "single" : "double" });
+    if (typeof p.endOfLine === "string") set(rowFor("endOfLine"), { endOfLine: p.endOfLine });
+    report.omitted.push(
+      "Prettier front matter: configure a front matter formatter (codeFormatters with frontMatter) to format it; mdrefine bundles no YAML printer.",
+    );
     set(rowFor("tabWidth"), { bulletSpaces: 1, orderedSpaces: 1, nestedIndent: p.tabWidth ?? 2 });
     if (p.proseWrap === "always") set(rowFor("proseWrap"), { width: p.printWidth ?? 80 });
     if ("embeddedLanguageFormatting" in p)

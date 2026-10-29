@@ -173,14 +173,26 @@ describe("competitor conversion (#669)", () => {
     const omitted = convertConfig({ prettier: {} }).omitted.join("\n");
     for (const name of ["parser", "plugins", "rangeStart", "requirePragma"])
       expect(omitted).not.toContain(`Prettier ${name}:`);
-    expect(omitted).toContain("Prettier endOfLine:");
+    expect(omitted).toContain("Prettier front matter: configure a front matter formatter");
+  });
+  it("enables LF line endings as Prettier does, or the configured ending", () => {
+    expect(convertConfig({ prettier: {} }).config.rules?.["style/line-ending"]).toEqual([
+      "warn",
+      { endOfLine: "lf" },
+    ]);
+    for (const endOfLine of ["crlf", "cr", "auto"])
+      expect(
+        convertConfig({ prettier: { endOfLine } }).config.rules?.["style/line-ending"],
+      ).toEqual(["warn", { endOfLine }]);
+    expect(convertConfig({ markdownlint: {} }).config.rules?.["style/line-ending"]).toBeUndefined();
   });
   it("reports unsupported options and gaps, without claiming comment compatibility", () => {
     const result = convertConfig({
       prettier: { requirePragma: true, insertPragma: true, endOfLine: "crlf", plugin: "untrusted" },
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
-    for (const issue of [723, 712]) expect(result.omitted.join("\n")).toContain(`#${issue}`);
+    expect(result.omitted.join("\n")).toContain("#723");
+    expect(result.config.rules?.["style/line-ending"]).toEqual(["warn", { endOfLine: "crlf" }]);
     // Competitor pragmas never apply with an mdrefine configuration, so the
     // report must not suggest that a written configuration will honor them.
     expect(result.omitted).toContain(

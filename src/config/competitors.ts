@@ -243,6 +243,11 @@ export async function loadCompetitorConfig(
       };
     if ("singleQuote" in values) ruleOptions["style/link-title"] = options("style/link-title");
     if ("printWidth" in values) ruleOptions["style/wrap"] = { width: values.printWidth };
+    if (
+      typeof values.endOfLine === "string" &&
+      ["lf", "crlf", "cr", "auto"].includes(values.endOfLine)
+    )
+      ruleOptions["style/line-ending"] = { endOfLine: values.endOfLine };
     if ("proseWrap" in values) {
       const setting = converted.config.rules?.["style/wrap"];
       rules["style/wrap"] = [

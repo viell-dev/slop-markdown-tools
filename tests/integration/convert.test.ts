@@ -135,6 +135,21 @@ describe("competitor configuration CLI (#669)", () => {
       expect.objectContaining({ nestedIndent: 4 }),
     );
   });
+  it("carries an editorconfig line ending to style/line-ending, as Prettier reads it", async () => {
+    const root = await fixture({
+      ".prettierrc": "{}",
+      ".editorconfig": "root = true\n[*.md]\nend_of_line = crlf\n",
+      "note.md": "text\n",
+    });
+    const reference = await prettierResolve(path.join(root, "note.md"), { editorconfig: true });
+    expect(reference?.endOfLine).toBe("crlf");
+    const result = run(root, ["config", "explain", "note.md"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout).effective.rules["style/line-ending"]).toEqual([
+      "warn",
+      { endOfLine: "crlf" },
+    ]);
+  });
   it.each([undefined, '{"default":false,"MD047":true}'])(
     "ignores editorconfig without Prettier (%s)",
     async (markdownlint) => {
