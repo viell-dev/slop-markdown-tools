@@ -21,6 +21,7 @@ column, ✅ is yes and ❌ no.
 | ------------------------------- | :--: | :-----------: | --------------------------------------------------------------- | :-----: |
 | `content/code-language`         | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/image-alt`             | 🔍   | `warn`        | ❌                                                              | ❌      |
+| `content/line-length`           | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/table-columns`         | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | `error` in `forgejo`, `gitea`                                   | ❌      |
@@ -50,10 +51,12 @@ column, ✅ is yes and ❌ no.
 | `style/blank-lines`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/block-spacing`           | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/code-fence`              | 🎨   | `warn`        | ❌                                                              | ✅      |
+| `style/definition-spacing`      | 🎨   | ❌            | ❌                                                              | ❌      |
 | `style/emphasis`                | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/final-newline`           | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/heading`                 | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/inline-code`             | 🎨   | ❌            | ❌                                                              | ❌      |
+| `style/link-title`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/list-indent`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/list-marker`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/no-tabs`                 | 🎨   | ❌            | ❌                                                              | ✅      |
@@ -146,6 +149,79 @@ Not reported:
 **In Obsidian:** a size after `|`, as in `![|100](chart.png)`, is not text, and
 embeds such as `![[chart.png]]` are not reported, because they have no place for
 text.
+
+## `content/line-length`
+
+Reports lines in headings, code blocks, and tables that are longer than a limit,
+80 columns by default. It never edits, because splitting these lines can change
+their meaning; paragraphs are left to [`style/wrap`](#stylewrap), which reflows
+them.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`lineLength`, `headingLineLength`, `codeBlockLineLength`, `headings`,
+`codeBlocks`, `tables`, `strict`, `stern`, `measure`.
+
+With `{ "lineLength": 40 }`, reported:
+
+```markdown
+## Configuring the formatter and the linter for a large workspace
+```
+
+Not reported, because it is a paragraph:
+
+```markdown
+Configuring the formatter and the linter for a large workspace takes one file.
+```
+
+| Option                | Values                                       | Default      |
+| --------------------- | -------------------------------------------- | ------------ |
+| `lineLength`          | Nonnegative integer; zero disables the limit | `80`         |
+| `headingLineLength`   | Nonnegative integer                          | `lineLength` |
+| `codeBlockLineLength` | Nonnegative integer                          | `lineLength` |
+| `headings`            | Boolean                                      | `true`       |
+| `codeBlocks`          | Boolean                                      | `true`       |
+| `tables`              | Boolean                                      | `true`       |
+| `strict`              | Boolean                                      | `false`      |
+| `stern`               | Boolean                                      | `false`      |
+| `measure`             | `"columns"` or `"codepoints"`                | `"columns"`  |
+
+- `lineLength`: the limit for every checked line, and for tables the only one.
+  Zero turns the limit off.
+- `headingLineLength`, `codeBlockLineLength`: separate limits for headings and
+  for code blocks; zero turns that limit off.
+- `headings`, `codeBlocks`, `tables`: with `false`, lines of that kind are not
+  checked.
+- `strict`, `stern`: by default a line is not reported when only its last word,
+  which holds no blank space, crosses the limit. `stern` reports such a line
+  when it has more than one word; `strict` reports every long line and takes
+  precedence.
+- `measure`: as in `style/wrap`, `columns` counts display columns, so CJK
+  characters and combining marks are measured as they show, and `codepoints`
+  counts Unicode code points, for policies about the source. Tabs count up to
+  the next multiple of four columns.
+
+```jsonc
+{
+  "rules": {
+    "content/line-length": ["warn", { "lineLength": 100, "codeBlocks": false }],
+  },
+}
+```
+
+**Details:** each physical line of ATX and Setext headings, fenced and indented
+code blocks, fence lines included, and parsed tables is measured whole, so list
+and block quote markers count toward the width.
+
+**Not checked:** paragraphs, front matter, HTML, math, reference definitions,
+thematic breaks, and every other block. A table in a dialect without table
+syntax is a paragraph, so it is not checked either. Markdownlint's MD013 checks
+HTML and math lines too, but skips front matter and definitions, and, outside
+strict checking, lines that hold only a link.
+
+**With other rules:** `style/wrap` keeps its own paragraph findings. `strict`
+and `stern` here apply only to headings, code, and tables, and do not imply its
+`reportUnreflowed` or `reportUnbreakable`, which judge where prose can safely
+break and which pieces cannot be split, not raw blank space.
 
 ## `content/shell-prompt`
 
@@ -1516,6 +1592,42 @@ have one.
 **With other rules:** [`content/code-language`](#contentcode-language) reports a
 fence without a language; neither rule adds one.
 
+## `style/definition-spacing`
+
+Writes one space after a link reference definition's colon and one before its
+title, without changing the label, destination, or title. A definition with no
+space after the colon, such as `[guide]:guide.md`, gets one. It is an optional
+source style, so no preset enables it and default formatting stays the same.
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all but Obsidian.
+Options: none.
+
+Before:
+
+```markdown
+[guide]:   <guide.md>   "Guide"
+```
+
+After:
+
+```markdown
+[guide]: <guide.md> "Guide"
+```
+
+**Left as written:**
+
+- a multiline definition, including a multiline label or title: joining could
+  change wrapping or how a container reads it;
+- a footnote, or a label that starts with `^`, also in CommonMark;
+- a definition containing a tab, because commonmark.js reads a tab-separated
+  definition as text where GitHub and markdown-it read a definition.
+
+**In Obsidian:** definitions keep their spacing, since Live Preview styles these
+lines separately from Reading view.
+
+**With other rules:** independent of [`links/path`](#linkspath), which needs a
+workspace and changes destinations.
+
 ## `style/emphasis`
 
 Writes emphasis with one marker, `_` by default.
@@ -1762,6 +1874,52 @@ protections](obsidian.md#boundary-protections) describe the conservative cases.
 **With other rules:** [`style/wrap`](#stylewrap) joins such a code span only in
 a paragraph that it wraps, and this rule also elsewhere, such as in a paragraph
 with a hard line break.
+
+## `style/link-title`
+
+Writes the titles of inline links, images, and link reference definitions with
+one kind of delimiter, double quotes by default. Destinations, including angle
+brackets and balanced parentheses, stay byte for byte as written. It is an
+optional source style, so no preset enables it and default formatting stays the
+same.
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`delimiter`.
+
+Before:
+
+```markdown
+[guide](guide(v2).md 'Guide') ![map](<map.png> (Map))
+```
+
+After:
+
+```markdown
+[guide](guide(v2).md "Guide") ![map](<map.png> "Map")
+```
+
+| Option      | Values                                          | Default  |
+| ----------- | ----------------------------------------------- | -------- |
+| `delimiter` | `double`, `single`, `parentheses`, `consistent` | `double` |
+
+- `delimiter`: `double` uses double quotes, `single` single quotes, and
+  `parentheses` parentheses. `consistent` follows the first parsed title in the
+  document, so an existing document keeps its convention. Double quotes are the
+  default because they match the usual Markdown title notation. Empty titles
+  follow the same choice.
+
+**Left as written:**
+
+- a title's delimiters, when the preferred delimiter occurs unescaped inside it,
+  rather than adding escapes;
+- escapes, entities, backslashes, and line breaks inside a title;
+- a definition containing a tab, because commonmark.js reads a tab-separated
+  definition as text where GitHub and markdown-it read a definition.
+
+**Not checked:** wikilinks and Obsidian embeds, which have no titles.
+
+**On Forgejo and Gitea:** a title in a heading stays as written where its source
+contributes to the heading's anchor or attribute block.
 
 ## `style/list-indent`
 
@@ -2335,11 +2493,12 @@ definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)` math.
 ## `style/wrap`
 
 Reflows each paragraph so that its lines fill the width, 80 columns by default,
-without exceeding it. A line break inside a paragraph renders as a space, so the
-rendered text stays the same, and short lines keep diffs small.
+without exceeding it, or, with `mode: "never"`, joins each paragraph onto one
+line. A line break inside a paragraph renders as a space, so the rendered text
+stays the same, and short lines keep diffs small.
 
 **Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
-Options: `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
+Options: `mode`, `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
 
 With `{ "width": 40 }`, before:
 
@@ -2357,11 +2516,19 @@ small diff.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
+| `mode`              | `"always"` or `"never"`       | `"always"`  |
 | `width`             | An integer from 20 to 500     | `80`        |
 | `measure`           | `"columns"` or `"codepoints"` | `"columns"` |
 | `reportUnreflowed`  | `true` or `false`             | `false`     |
 | `reportUnbreakable` | `true` or `false`             | `false`     |
 
+- `mode`: `always` wraps at `width`. `never` joins each paragraph onto one line,
+  so `First line` followed by `second line` becomes `First line second line`. It
+  leaves the same paragraphs, inline pieces, and containers as written as
+  wrapping does, and ignores `width`, `reportUnreflowed`, and
+  `reportUnbreakable`, since the long lines are intended.
+  [`content/line-length`](#contentline-length) can still check headings, code,
+  and tables.
 - `width`: the longest line, in the unit of `measure`.
 - `measure`: `columns` counts display columns, so a wide character such as `漢`
   counts two. `codepoints` counts Unicode code points: a character outside the
@@ -2438,7 +2605,7 @@ joined or broken, that is, one that:
 
 [Forgejo and Gitea](dialects.md#forgejo-and-gitea) add their own cases.
 
-**In Obsidian:** the rule wraps only with the vault's [strict line
+**In Obsidian:** the rule wraps or joins only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). Lines are also broken with Live Preview in
 mind:
 
