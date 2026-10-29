@@ -395,3 +395,27 @@ it.each(["keep", "backslash"] as const)(
     expect(await render("a\t  \nb\n")).not.toBe(await render("a\nb\n"));
   },
 );
+
+it("keeps marker pairs across component block boundaries (#768)", async () => {
+  const render = await renderer({});
+  for (const [prefix, continuation] of [
+    ["", ""],
+    ["- ", "  "],
+    ["- ", ""],
+    ["> ", "> "],
+    ["> ", ""],
+  ]) {
+    for (const marker of ["*", "__"]) {
+      const source = `${prefix}Alpha ${marker}words\n${continuation}<custom-tag/>\n${continuation}more${marker} words after\n`;
+      const config: Config = {
+        extends: [],
+        dialect: "vitepress",
+        rules: { "style/emphasis": "warn", "style/strong": "warn" },
+      };
+      const result = format(source, { config });
+      expect(result.diagnostics).toEqual([]);
+      expect(await render(result.output)).toBe(await render(source));
+      expect(format(result.output, { config }).output).toBe(result.output);
+    }
+  }
+});

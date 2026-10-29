@@ -1793,7 +1793,7 @@ describe("Obsidian boundaries read differently by its views", () => {
     for (const [, source] of boundaries.filter(
       // Open HTML and code regions keep later blocks literal through EOF.
       ([issue, , name]) =>
-        ![488, 494, 519, 524, 529, 548, 556, 567, 584].includes(issue) &&
+        ![488, 494, 519, 524, 529, 548, 556, 567, 584, 766].includes(issue) &&
         !name.startsWith("HTML item coherence:") &&
         ![
           "short reset exposes an unclosed long run in an inline comment",

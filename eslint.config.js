@@ -19,6 +19,21 @@ export default defineConfig(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          // Node.js 26's V8 does not match a surrogate pair with a bracketed class that stands
+          // right before the end-of-input `$` under the `u` flag (#743). A start anchor
+          // without alternatives avoids it; the shape is rejected whatever the other flags are.
+          selector: String.raw`Literal[regex.flags=/u/][regex.pattern=/(?<!\\)\](?:\{\d+\})?\)*\$(?![^|)])/]:not([regex.pattern=/^\^[^|]*$/])`,
+          message:
+            "Node.js 26 misses a surrogate pair matched by a bracketed class right before `$` under the `u` flag (#743): test the code point with a start-anchored pattern, quantify the class, or use the `v` flag.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
     extends: [tseslint.configs.recommendedTypeCheckedOnly],
     languageOptions: {
