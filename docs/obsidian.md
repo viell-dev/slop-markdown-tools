@@ -56,19 +56,19 @@ title that is too long is reported by `reportUnbreakable`.
 
 ### Visible boundary refusals
 
-Version 0.4.1 applies one conservative policy before the existing
-renderer-specific protections. Structural rules keep an adjacent paragraph and
-list, block quote, HTML block, table, fence, or definition together when there
-is no blank line between them. They also keep lazy continuation margins, a Tab
-after a container marker, and non-one ordered markers directly below text.
+Structural rules apply one conservative policy before the [renderer-specific
+protections](#renderer-specific-protections): they keep an adjacent paragraph
+and list, block quote, HTML block, table, fence, or definition together when
+there is no blank line between them. They also keep lazy continuation margins, a
+Tab after a container marker, and non-one ordered markers directly below text.
 Properly indented nested blocks and a callout's explicit title/body boundary
 remain eligible. Ordinary ATX headings beside paragraphs still get spacing. Text
 already protected as literal block HTML does not seed a Markdown continuation
 boundary; otherwise holding only one list marker could split a list whose
 markers are safe to change together.
 
-After 0.5.0, [`style/lazy-continuation`](rules.md#stylelazy-continuation)
-removes some lazy continuation margins instead of keeping them: it writes a
+[`style/lazy-continuation`](rules.md#stylelazy-continuation) removes some lazy
+continuation margins instead of keeping them: it writes a
 quote's `>` and list items' indentation on the lazy lines where both views were
 observed to show the same, after which the paragraph is no longer lazy for the
 structural rules. It holds the other lazy lines itself, with the finding below.
@@ -84,7 +84,7 @@ fail the check directly. Safe independent edits still apply. This does not
 create findings where a rule does not propose an edit, and it does not guarantee
 every unusual source form renders identically in both Obsidian views.
 
-### Existing protections
+### Renderer-specific protections
 
 Obsidian's Reading view and Live Preview read some Markdown otherwise than
 CommonMark, and otherwise than each other. Where formatting would change what a
@@ -114,9 +114,9 @@ note shows there, the tool keeps the text as written:
   Preview shows them as code too, across blank lines and out of a list item, up
   to a run of the same length outside an indented code block, a fenced code
   block, or a list item. No rule changes them, nor a table that holds such a
-  run. **Unreleased:** a list that starts on a footnote's label line, as in
-  `[^1]: - item`, does not end that code, because Live Preview reads the line as
-  the footnote, and its blocks stay as written too.
+  run. A list that starts on a footnote's label line, as in `[^1]: - item`, does
+  not end that code, because Live Preview reads the line as the footnote, and
+  its blocks stay as written too.
 - A paragraph with a later line that starts a list item in Obsidian, where
   CommonMark reads more of the paragraph: Live Preview starts a list at a number
   other than 1 with text after it, as in `3. Step`, except in a block quote, and
@@ -219,19 +219,19 @@ note shows there, the tool keeps the text as written:
   row. Reading view reads a line with a pipe above a delimiter row that starts
   with `- `, as in `Name | Value` and `- | -` below it, as a table, where
   CommonMark reads a paragraph and a list. No rule changes such a table, those
-  rows, or that line and list. **Unreleased:** Live Preview also shows the rows
-  of a table directly below a fenced code block, a thematic break, or an HTML
-  block as text, where Reading view shows a table, so `style/block-spacing` adds
-  no blank line there.
+  rows, or that line and list. Live Preview also shows the rows of a table
+  directly below a fenced code block, a thematic break, or an HTML block as
+  text, where Reading view shows a table, so `style/block-spacing` adds no blank
+  line there.
 
 These protections also apply to the reading of TOML front matter (`+++`) as
 paragraph text: a table or footnote definition directly below its closing fence
 is more of that text in Obsidian, so it stays as written. A separating blank
 line or a block that interrupts a paragraph still starts a block of its own.
 
-### Boundary protections since 0.4.1
+### Boundary protections
 
-Version 0.4.1 adds these protections:
+These protections cover further boundaries between Obsidian's two views:
 
 - Lists connected through an adjacent quote, table or display formula keep both
   original marker and indentation units. Their adjacent separating boundary
@@ -252,7 +252,7 @@ Version 0.4.1 adds these protections:
   hide the opener from the primary inline parse. Later text conservatively stays
   unformatted because the views can pair later fences differently; earlier
   independent text still formats. Ordinary inline backticks, escaped list
-  markers and backticks in fence info keep their previous behavior.
+  markers and backticks in fence info keep their ordinary behavior.
 - Display math immediately below a list keeps its separating boundary. Reading
   view keeps the formula inside the final item even after a heading or code
   block, and inserting a blank would move it outside. The separator before an
@@ -386,11 +386,11 @@ Version 0.4.1 adds these protections:
   list keeps its separator and both participating lists keep their markers and
   indentation, because changing them can alter list tightness or merge runs.
   Safe inline formatting in the following list still applies.
-- After 0.4.0, a list directly after another list's final secondary paragraph or
-  indented code block keeps its separator: a new blank splits text that Live
-  Preview groups together. Numbering, markers and inline styles remain eligible.
-  A sole first paragraph, final heading, closed fence or existing blank still
-  permits independent block spacing.
+- A list directly after another list's final secondary paragraph or indented
+  code block keeps its separator: a new blank splits text that Live Preview
+  groups together. Numbering, markers and inline styles remain eligible. A sole
+  first paragraph, final heading, closed fence or existing blank still permits
+  independent block spacing.
 - Top-level HTML continued across whitespace-only lines keeps literal quote
   markers and the source below them until a physically empty line, including
   empty quotes. Bare `>` or `>>` lines within that raw source do not end Reading
@@ -513,12 +513,12 @@ image size in their label. [`links/path`](rules.md#linkspath) and
 
 ## Review the result
 
-After 0.4.0, maintenance uses existing regressions and realistic documents at
-fixed seeds in both Obsidian views. Adversarial generated cases are a separate
-discovery queue. Meaningful rendering changes in plausible authored syntax get
-fixes; exotic constructions and stray-marker styling can remain documented
-limits. A report from real use can reopen those limits. The check does not claim
-to model every interaction between Obsidian's two renderers.
+Maintenance uses existing regressions and realistic documents at fixed seeds in
+both Obsidian views. Adversarial generated cases are a separate discovery queue.
+Meaningful rendering changes in plausible authored syntax get fixes; exotic
+constructions and stray-marker styling can remain documented limits. A report
+from real use can reopen those limits. The check does not claim to model every
+interaction between Obsidian's two renderers.
 
 Preview with `--diff` before `--write`, and look at complex notes in Obsidian
 afterwards, especially with community plugins whose syntax the tool does not

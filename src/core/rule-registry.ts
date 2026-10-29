@@ -13,6 +13,7 @@ import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { containerRules } from "../rules/containers.js";
+import { spacingRules } from "../rules/inline-spacing.js";
 import type { JsonSchema, Plugin, ProcessOptions, Rule } from "./types.js";
 
 /**
@@ -30,6 +31,7 @@ export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze
   "content/line-length": lineLength,
   ...listRules,
   ...containerRules,
+  ...spacingRules,
 });
 export const phases = ["inline", "block", "document"] as const;
 /** What is wrong with a plugin's rule, or undefined when it has the shape of a `Rule`. */
