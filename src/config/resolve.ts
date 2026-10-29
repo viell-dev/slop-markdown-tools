@@ -229,6 +229,10 @@ export const configSchema: JsonSchemaObject = deepFreeze({
       type: "object",
       additionalProperties: false,
       required: ["id", "languages", "command", "args"],
+      anyOf: [
+        { required: ["frontMatter"] },
+        { properties: { languages: { type: "array", minItems: 1 } } },
+      ],
       properties: {
         id: { type: "string", pattern: "^[a-z][a-z0-9-]*$" },
         languages: {
@@ -237,10 +241,16 @@ export const configSchema: JsonSchemaObject = deepFreeze({
             {
               type: "array",
               items: { type: "string", pattern: "^[^\\s*]+$" },
-              minItems: 1,
+              minItems: 0,
               uniqueItems: true,
             },
           ],
+        },
+        frontMatter: {
+          type: "array",
+          items: { enum: ["yaml", "toml"] },
+          minItems: 1,
+          uniqueItems: true,
         },
         command: { type: "string", minLength: 1 },
         args: strings,
@@ -282,10 +292,16 @@ function formatterProblem(
   if (!formatters) return undefined;
   const ids = new Set<string>();
   const languages = new Set<string>();
+  const frontMatter = new Set<string>();
   for (const formatter of formatters) {
     if (ids.has(formatter.id))
       return `${where} has duplicate formatter id ${JSON.stringify(formatter.id)}`;
     ids.add(formatter.id);
+    for (const language of formatter.frontMatter ?? []) {
+      if (frontMatter.has(language))
+        return `${where} has more than one formatter for front matter ${language}`;
+      frontMatter.add(language);
+    }
     for (const language of formatter.languages) {
       if (languages.has(language))
         return language === "*"
@@ -426,6 +442,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
           ...entry,
           languages: [...entry.languages],
           args: [...entry.args],
+          ...(entry.frontMatter ? { frontMatter: [...entry.frontMatter] } : {}),
           ...(entry.exclude ? { exclude: [...entry.exclude] } : {}),
         }));
   const overrides: NonNullable<Config["overrides"]>[number][] = [];

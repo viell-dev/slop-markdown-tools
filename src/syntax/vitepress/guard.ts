@@ -14,6 +14,7 @@ export function vitepressSemantics(
   document: Document,
   workspace?: Workspace,
   approved?: WeakMap<Code, string>,
+  approvedFrontMatter?: string,
 ): unknown {
   const values = new Map<number, string>();
   if (approved)
@@ -118,7 +119,11 @@ export function vitepressSemantics(
   }
   const end = frontmatterEnd(document.source);
   return {
-    frontmatter: newline(document.source.slice(0, end)),
+    frontmatter: newline(
+      end > 0 && approvedFrontMatter !== undefined
+        ? approvedFrontMatter
+        : document.source.slice(0, end),
+    ),
     tokens: vitepressTokens(document).map(tokenValue),
   };
 }

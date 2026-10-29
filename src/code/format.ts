@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Code } from "mdast";
+import type { Code, Yaml } from "mdast";
 import { Minimatch } from "minimatch";
 import {
   format,
@@ -8,6 +8,10 @@ import {
   semanticFingerprint,
   semanticFingerprintWithCode,
 } from "../core/engine.js";
+import { semanticFingerprintWithFrontMatter } from "../core/semantics.js";
+import type { Toml } from "./front-matter.js";
+import { frontmatterEnd } from "../syntax/vitepress/reader.js";
+import { frontMatterEdits, frontMatterBody } from "./front-matter.js";
 import { diagnostic, sortDiagnostics } from "../core/diagnostics.js";
 import { resolveConfig, setting } from "../config/resolve.js";
 import type { Diagnostic, Document, Edit, FormatResult, ProcessOptions } from "../core/types.js";
@@ -27,9 +31,11 @@ export interface CodeFormatOptions extends ProcessOptions {
 }
 const engineRule = "engine/code-formatter";
 const isEngine = (item: Diagnostic) => item.rule.startsWith("engine/");
-function blocks(document: Document): Code[] {
-  const found: Code[] = [];
-  walk(document.tree, "code", (node) => found.push(node));
+function blocks(document: Document): (Code | Yaml | Toml)[] {
+  const found: (Code | Yaml | Toml)[] = [];
+  walk(document.tree, (node) => {
+    if (node.type === "code" || node.type === "yaml" || node.type === "toml") found.push(node);
+  });
   return found;
 }
 function approvedValues(document: Document, node: Code, value: string): WeakMap<Code, string> {
@@ -50,6 +56,10 @@ function approvedValues(document: Document, node: Code, value: string): WeakMap<
     });
   }
   return approved;
+}
+function frontMatterSource(document: Document, edits: Edit[]): string {
+  const source = applyEdits(document.source, edits);
+  return source.slice(0, frontmatterEnd(source));
 }
 /** An engine finding moved by one accepted whole-block replacement. */
 function movedDiagnostic(item: Diagnostic, edit: Edit): Diagnostic {
@@ -101,10 +111,14 @@ export async function formatWithCode(
   const normalizeFence = setting(config.rules["style/code-fence"] ?? "off").severity !== "off";
   for (let index = 0; index < nodes.length; index++) {
     const node = nodes[index]!;
-    const language = node.lang;
-    const fence = codeFence(document.source, node);
-    if (!fence || fence.marker === "$" || !language || /\s/.test(language)) continue;
-    const selected = route(language);
+    const metadata = node.type !== "code";
+    const language = metadata ? node.type : node.lang;
+    const fence = metadata ? undefined : codeFence(document.source, node);
+    if ((!metadata && (!fence || fence.marker === "$")) || !language || /\s/.test(language))
+      continue;
+    const selected = metadata
+      ? routes.find(({ formatter }) => formatter.frontMatter?.includes(node.type))
+      : route(language);
     if (!selected || selected.excluded) continue;
     const [start, end] = range(node);
     const extent = { start: start + mark.length, end: end + mark.length, text: "" };
@@ -125,7 +139,7 @@ export async function formatWithCode(
     try {
       formatted = await runFormatter(
         selected.formatter,
-        node.value + lineEnding(document.source),
+        (metadata ? frontMatterBody(document, node) : node.value) + lineEnding(document.source),
         cwd,
         filename,
       );
@@ -133,24 +147,34 @@ export async function formatWithCode(
       fail(error instanceof Error ? error.message : String(error));
       continue;
     }
-    const candidate = codeEdits(
-      document,
-      node,
-      formatted,
-      normalizeFence &&
-        !suppressed("style/code-fence", {
-          start,
-          end,
-          edit: { start, end, text: "" },
-          message: "",
-        }),
-    );
+    const candidate = metadata
+      ? frontMatterEdits(document, node, formatted)
+      : codeEdits(
+          document,
+          node,
+          formatted,
+          normalizeFence &&
+            !suppressed("style/code-fence", {
+              start,
+              end,
+              edit: { start, end, text: "" },
+              message: "",
+            }),
+        );
     if (!candidate || candidate.value === node.value) continue;
-    const expected = semanticFingerprintWithCode(
-      document,
-      approvedValues(document, node, candidate.value),
-      options.workspace,
-    );
+    const expected = metadata
+      ? semanticFingerprintWithFrontMatter(
+          document,
+          node,
+          candidate.value,
+          frontMatterSource(document, candidate.choices[0]!),
+          options.workspace,
+        )
+      : semanticFingerprintWithCode(
+          document,
+          approvedValues(document, node, candidate.value),
+          options.workspace,
+        );
     let accepted = false;
     for (const edits of candidate.choices) {
       const bare = applyEdits(document.source, edits);
