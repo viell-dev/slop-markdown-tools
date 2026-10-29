@@ -231,9 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
-- Keep quoted list continuation indentation stable when a quote marker directly
-  precedes the list marker, including above a thematic break. Wrapping no longer
-  oscillates with lazy-continuation indentation
+- `style/wrap` indents a quoted list item's continuation lines to the item's
+  content where the quote marker directly precedes the list marker, as in
+  `>10) text`. It indented them one column short, and `style/lazy-continuation`
+  then added the column back, so formatting oscillated and left the document
+  unchanged
   ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
 
 - GitHub link checks and workspace indexes read definitions directly above an
