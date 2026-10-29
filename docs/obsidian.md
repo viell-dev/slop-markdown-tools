@@ -67,6 +67,14 @@ already protected as literal block HTML does not seed a Markdown continuation
 boundary; otherwise holding only one list marker could split a list whose
 markers are safe to change together.
 
+After 0.5.0, [`style/lazy-continuation`](rules.md#stylelazy-continuation)
+removes some lazy continuation margins instead of keeping them: it writes a
+quote's `>` and list items' indentation on the lazy lines where both views were
+observed to show the same, after which the paragraph is no longer lazy for the
+structural rules. It holds the other lazy lines itself, with the finding below.
+[`style/quote-marker`](rules.md#stylequote-marker) follows this policy like the
+list rules.
+
 When a proposed style edit is held by this policy or an existing native
 protection, `lint` and `format` report
 `Left as written to preserve Obsidian rendering` under the original rule ID and

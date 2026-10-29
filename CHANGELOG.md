@@ -12,6 +12,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Two style rules in `recommended` write the prefixes of block quotes and their
+  contents. `style/quote-marker` writes one space after each `>`, removing extra
+  spaces and adding a missing one, and takes markdownlint's MD027 `listItems`
+  option, under which it moves a list that starts a quote's line with its lines.
+  `style/lazy-continuation` writes a quote's `>` and a list item's or footnote
+  definition's indentation on lazy continuation lines, keeping a footnote's
+  first line on its label's line. Both leave the source as written where the
+  preferred form could read otherwise: indented code, a lazy line that could
+  start a block, and, in Obsidian, a tag directly after `>`, a callout's marker
+  after two spaces, and the lazy lines whose prefixes change Live Preview, which
+  are reported as left as written
+  ([#682](https://github.com/viell-dev/slop-markdown-tools/issues/682),
+  [#713](https://github.com/viell-dev/slop-markdown-tools/issues/713)).
+
 - `links/valid` takes `ignoredFragments`, a regular expression for fragments not
   to check, validated when the configuration is read, and `exactCase`, which
   also reports a fragment that reaches its anchor only because the renderer

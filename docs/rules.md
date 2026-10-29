@@ -49,9 +49,11 @@ presets, dialects, and options.
 | `style/final-newline`           | 🎨   | ✅            | ❌             | ❌      |
 | `style/heading`                 | 🎨   | ✅            | ❌             | ✅      |
 | `style/inline-code`             | 🎨   | ❌            | ❌             | ❌      |
+| `style/lazy-continuation`       | 🎨   | ✅            | ❌             | ❌      |
 | `style/list-indent`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/list-marker`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/ordered-list`            | 🎨   | ✅            | ❌             | ✅      |
+| `style/quote-marker`            | 🎨   | ✅            | ❌             | ✅      |
 | `style/strong`                  | 🎨   | ✅            | ❌             | ✅      |
 | `style/table`                   | 🎨   | ✅            | ✅             | ✅      |
 | `style/thematic-break`          | 🎨   | ✅            | ❌             | ✅      |
@@ -1485,6 +1487,73 @@ After:
 Run `npm run build` before the tests.
 ```
 
+## `style/lazy-continuation`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: none.
+
+After 0.5.0, writes the markers and indentation of a paragraph's containers on
+its lazy continuation lines: lines that continue the paragraph of a block quote,
+a list item, or a footnote definition without the quote's `>` or the item's or
+definition's indentation. The renderers read such a line as part of the
+paragraph either way, so the text stays the same, and the document's structure
+shows in its source. A quote gets its `>`, indented as on the quote's first line
+and with one space after it; a list item gets the columns up to its text; a
+footnote definition gets four spaces; nested containers get all of theirs. The
+spaces that a lazy line starts with are replaced, not added to, and a footnote
+definition's first line stays on the line of its label.
+
+Before:
+
+```markdown
+> Back up the database
+before the migration.
+
+- Unpack the board
+and check the cables.
+```
+
+After:
+
+```markdown
+> Back up the database
+> before the migration.
+
+- Unpack the board
+  and check the cables.
+```
+
+[`style/wrap`](#stylewrap) joins a lazy line onto the line before it when it
+reflows the paragraph, and writes the containers' prefixes on the lines that it
+breaks, so the two rules agree. This rule also changes the paragraphs that
+wrapping leaves as written, such as one with a hard line break.
+
+A paragraph's lazy lines stay as written, all of them, where one of them could
+read otherwise inside its containers. The rule writes a prefix only on a line
+that starts with a letter or another character that is not ASCII punctuation, a
+number not followed by `.` or `)`, emphasis, a code span, a link or image, an
+opening parenthesis, or a quotation mark, and that holds no `|` and does not
+look like a link reference or footnote definition. A line of `===` below a lazy
+line, for example, is text, and inside a quote it would underline the text above
+it as a heading; `2. Step`, `- item`, `# Title`, `<span>`, and a table row are
+others. Lazy lines also stay inside a code span or other inline syntax that
+keeps the spaces at the start of its lines, with a tab among their containers'
+prefixes, as a lazy first line below a link reference definition, in paragraphs
+with site-generator syntax such as `:::` or `{{` at the start of a line, and, in
+VitePress, in documents with a custom container's fence on a quote's line.
+
+In Obsidian, the rule writes only the prefixes observed to leave both views
+unchanged: a quote's `>` where the lazy line lacks every `>` of its quotes, and
+list items' indentation where that is all it lacks. Live Preview shows the line
+otherwise once a footnote definition's lazy line is indented, once a quote
+inside a list item gets its `>`, and once a nested quote's `>` is written after
+its outer quote's, so these lazy lines, and the combinations not observed, stay
+as written with a finding whose message starts with
+`Left as written to preserve Obsidian rendering`. So does a list item's lazy
+line with more blocks after it in the item, which Live Preview reads outside the
+list ([issue
+#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
+
 ## `style/list-indent`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
@@ -1521,7 +1590,9 @@ After 0.5.0, with `startIndented: true`, the first level of lists starts
 `startIndent` columns into its container. For example,
 `{ "startIndented": true, "startIndent": 2 }` writes `- item` as `  - item`,
 moving its continuation lines too. Nested lists still use `nestedIndent`. Both
-bullet and ordered lists follow this preference. Four or more columns would make
+bullet and ordered lists follow this preference. A list that starts a block
+quote's line is indented too; set [`style/quote-marker`](#stylequote-marker)'s
+`listItems` to `false` with it. Four or more columns would make
 code, so the rule keeps lists as written for those values. A first-level list
 directly below nonblank text also stays, because indentation can make it
 continue that text.
@@ -1684,6 +1755,70 @@ After:
 2. Connect the sensor.
 3. Power it on.
 ```
+
+## `style/quote-marker`
+
+**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+Options: `listItems`.
+
+After 0.5.0, writes one space after each block quote marker, `>`, where the line
+has text after it: more spaces become one, and a space is added where there is
+none, also between nested markers, as in `>>` and `>  >`. The quote takes one
+space after its marker as part of the marker, so the text keeps its place in the
+quote.
+
+| Option      | Values    | Default |
+| ----------- | --------- | ------- |
+| `listItems` | A boolean | `true`  |
+
+- `listItems`: as in markdownlint's MD027, whether lines that start a list item
+  count. The spaces between `>` and a list marker are the list's indentation, so
+  the rule moves the list to one space after `>` with the lines of its items, as
+  [`style/list-indent`](#stylelist-indent) moves a list, and leaves it as
+  written where that would move a line into or out of an item. With
+  `style/list-indent`'s `startIndented`, which indents such a list, set
+  `listItems` to `false`, or the two rules undo each other's edits.
+
+Before:
+
+```markdown
+>  Back up the database.
+>>The backup takes an hour.
+```
+
+After:
+
+```markdown
+> Back up the database.
+> > The backup takes an hour.
+```
+
+These are left as written:
+
+- Indented code, which five or more spaces after `>` start, and the lines of
+  fenced code and HTML, whose spaces beyond the quote's one are content; a space
+  is still added after a `>` that has none there, which moves nothing.
+- A quote line with nothing after its spaces, whose spaces are trailing space
+  for [`style/trailing-space`](#styletrailing-space), and the spaces on the
+  other lines of a list item, which belong to the item.
+- A tab after `>` or among a line's markers, which counts to the next tab stop.
+- The later lines of a code span or other inline syntax that keeps the spaces at
+  the start of its lines, and quotes with site-generator syntax such as `:::` or
+  `{{` at the start of a line. In VitePress, quotes of a document with a custom
+  container's fence on a quote's line stay too.
+- A quote that the next line follows without a blank line or a `>`. Renderers
+  can read that line as more of the quote where the parser starts another block,
+  as with a numbered item that does not start at 1.
+- In Obsidian, a tag directly after `>`, as in `>#tag`, which Live Preview reads
+  as text and would read as a tag after a space ([issue
+  #409](https://github.com/viell-dev/slop-markdown-tools/issues/409)), and a
+  callout's marker after two or more spaces, as in `>  [!tip]`, which is text
+  there and one space would make a callout (see
+  [`obsidian/callout-marker`](#obsidiancallout-marker)). Elsewhere the spaces do
+  not change how the marker reads; GitHub shows an alert after any number of
+  them. Like the list rules, the rule follows Obsidian's [boundary
+  policy](obsidian.md#visible-boundary-refusals): an edit at a boundary between
+  text and a list, quote, or other block stays as written with a finding.
 
 ## `style/strong`
 

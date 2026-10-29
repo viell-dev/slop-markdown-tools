@@ -468,6 +468,8 @@ describe("list items that Live Preview ends at a lazy line", () => {
   ])("leaves %j as written", (source) => {
     expect(formatted(source, { config, workspace })).toBe(source);
   });
+  // The lazy line stays when nothing writes its prefix (#713).
+  const lazy: Config = { ...config, rules: { "style/lazy-continuation": "off" } };
   it.each([
     // Without a lazy line, or without blocks after it in the item.
     ["2. a\n   b\n\n    c *d*\n", "2. a b\n\n    c _d_\n"],
@@ -476,6 +478,15 @@ describe("list items that Live Preview ends at a lazy line", () => {
     // A lazy line in a block quote changes nothing that Live Preview shows.
     ["> a\nb\n\n> c *d*\n", "> a\nb\n\n> c _d_\n"],
   ])("still formats %j", (source, output) => {
+    expect(formatted(source, { config: lazy, workspace })).toBe(output);
+  });
+  it.each([
+    // Once `style/lazy-continuation` writes the prefix, Live Preview shows the
+    // same, and the paragraph is no longer lazy for `style/wrap` (#713).
+    ["- a *x*\nb\n", "- a _x_ b\n"],
+    ["- a\nb\n- c *d*\n", "- a b\n- c _d_\n"],
+    ["> a\nb\n\n> c *d*\n", "> a b\n\n> c _d_\n"],
+  ])("writes the prefix of the lazy line in %j", (source, output) => {
     expect(formatted(source, { config, workspace })).toBe(output);
   });
   it("formats such items in the other dialects", () => {
