@@ -44,7 +44,7 @@ it("keeps inline literals' line endings and still converts the prose around them
     // A code span's bytes are kept, as the docs promise for literal content.
     ["Text `code\r\nspan` end.\r\n", "Text `code\r\nspan` end.\n"],
     ['[a](u "t\r\nx") end.\r\n\r\nNext.\r\n', '[a](u "t\r\nx") end.\n\nNext.\n'],
-  ]) {
+  ] as const) {
     const result = format(source, { config });
     expect(result.output, source).toBe(expected);
     expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
