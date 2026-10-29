@@ -79,3 +79,23 @@ for (const dialect of [
     }
   });
 }
+it.each([
+  ["*a <b>x</b> c*\n", "_a <b>x</b> c_\n"],
+  ["a *b <i>x</i>* c\n", "a _b <i>x</i>_ c\n"],
+  ["- *a <span>x</span> b*\n", "- _a <span>x</span> b_\n"],
+  ["> *q <b>x</b>*\n", "> _q <b>x</b>_\n"],
+])(
+  "still converts Obsidian emphasis around a complete element on one line: %j",
+  (source, expected) => {
+    // Only a pair whose delimiters fall on different sides of an HTML region's
+    // edge is kept; a pair around a whole element pairs in both views.
+    const config: Config = {
+      extends: [],
+      dialect: "obsidian",
+      rules: { "style/emphasis": "warn" },
+    };
+    const result = format(source, { config });
+    expect(result.output).toBe(expected);
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+  },
+);

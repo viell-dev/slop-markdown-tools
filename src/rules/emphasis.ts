@@ -262,7 +262,13 @@ function blocksWithLooseMarkers(document: Document): Range[] {
   return blocks;
 }
 
-/** Index renderer HTML regions once; marker pairs cannot cross their boundaries. */
+/**
+ * Index renderer HTML regions once; a marker pair must not cross their
+ * boundaries. In VitePress such a region is a block that ends the paragraph,
+ * so no pair may enclose one. In Obsidian it is inline HTML whose protection
+ * can extend over a later delimiter, so the two delimiters must lie in the
+ * same region or both outside: a pair around a complete element still pairs.
+ */
 function htmlPairProtection(document: Document): (start: number, end: number) => boolean {
   const regions: Range[] = [];
   if (document.dialect === "vitepress") {
@@ -283,15 +289,26 @@ function htmlPairProtection(document: Document): (start: number, end: number) =>
     if (last && start <= last[1]) last[1] = Math.max(last[1], end);
     else ranges.push([start, end]);
   }
-  return (start, end) => {
+  // The first range that ends after `at`.
+  const after = (at: number) => {
     let low = 0;
     let high = ranges.length;
     while (low < high) {
       const middle = (low + high) >> 1;
-      if (ranges[middle]![1] <= start) low = middle + 1;
+      if (ranges[middle]![1] <= at) low = middle + 1;
       else high = middle;
     }
-    return low < ranges.length && ranges[low]![0] < end;
+    return low;
+  };
+  const containing = (at: number) => {
+    const index = after(at);
+    return index < ranges.length && ranges[index]![0] <= at ? index : -1;
+  };
+  if (document.dialect === "obsidian")
+    return (start, end) => containing(start) !== containing(end - 1);
+  return (start, end) => {
+    const index = after(start);
+    return index < ranges.length && ranges[index]![0] < end;
   };
 }
 
