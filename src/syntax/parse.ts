@@ -31,8 +31,8 @@ import { projectVitePress, recordVitePress, vitepressCodeText } from "./vitepres
 // GFM's tree transform performs GitHub's second, transform-time autolink pass
 // (`[www.example.com]` or a Forgejo shortlink's `|https://` in files), but its
 // nodes carry no source positions, which made the engine refuse whole documents.
-// No built-in rule acts on literal autolinks, so output is unchanged without it;
-// plugins inspecting link nodes do not see those autolinks.
+// The link style rules use only positioned literal autolinks;
+// plugins inspecting link nodes do not see transform-time autolinks.
 const gfmTree = gfmFromMarkdown().map((extension) => {
   const copy = { ...extension };
   delete copy.transforms;

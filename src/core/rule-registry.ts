@@ -1,3 +1,4 @@
+import { lineLength } from "../rules/line-length.js";
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
 import { deepFreeze } from "./frozen.js";
@@ -7,6 +8,7 @@ import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
+import { linkStyleRules } from "../rules/link-style.js";
 import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
@@ -22,8 +24,10 @@ export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze
   ...blockRules,
   ...dialectRules,
   ...linkRules,
+  ...linkStyleRules,
   ...structureRules,
   ...contentRules,
+  "content/line-length": lineLength,
   ...listRules,
   ...spacingRules,
 });
