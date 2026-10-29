@@ -1154,4 +1154,4 @@ const wrap: Rule = {
     return findings;
   },
 };
-export { wrap };
+export { wrap, siteSyntax };

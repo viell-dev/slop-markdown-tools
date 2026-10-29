@@ -29,7 +29,7 @@ import { lineBreaks } from "../syntax/source.js";
  * rule leaves the list as written.
  */
 
-type Container = Blockquote | ListItem | FootnoteDefinition;
+export type Container = Blockquote | ListItem | FootnoteDefinition;
 
 /** A physical line of the source, without its line break. */
 interface Line {
@@ -37,7 +37,7 @@ interface Line {
   end: number;
 }
 
-interface Item {
+export interface Item {
   node: ListItem;
   list: ListGroup;
   index: number;
@@ -94,7 +94,7 @@ interface ContainerInfo {
  * continues a paragraph. `unsupported`: a tab spans the prefix's end, or the
  * source does not have the expected shape.
  */
-interface Level {
+export interface Level {
   node: Container;
   kind: "content" | "blank" | "lazy" | "unsupported";
   start: number;
@@ -108,7 +108,7 @@ interface Matched {
   chain: Container[];
   levels: Level[];
 }
-interface Analysis {
+export interface Analysis {
   source: string;
   lines: Line[];
   units: Unit[];
@@ -168,7 +168,7 @@ export function headingIndentation(document: Document, node: Heading): [number, 
   return result;
 }
 /** The lists of a document and the means to read their lines, shared by the list rules. */
-function analyze(document: Document): Analysis {
+export function analyze(document: Document): Analysis {
   const known = analyses.get(document);
   if (known) return known;
   const { source } = document;
@@ -497,7 +497,7 @@ function analyze(document: Document): Analysis {
 }
 
 /** A tab among the whitespace and container markers that start the rest of a line. */
-function structuralTab(source: string, from: number, to: number): boolean {
+export function structuralTab(source: string, from: number, to: number): boolean {
   const prefix = /^(?:[ \t>]|(?:[-+*]|\d{1,9}[.)])(?=[ \t]|$))*/.exec(source.slice(from, to))![0];
   return prefix.includes("\t");
 }
@@ -1098,6 +1098,65 @@ const listIndent: Rule = {
     return findings;
   },
 };
+
+/**
+ * The findings that move each list starting a block quote's line to the
+ * quote's content, one space after its `>`, with the lines of its items: the
+ * spaces between `>` and the marker are the list's indentation. A list whose
+ * lines cannot move without changing what they belong to stays as written, as
+ * `style/list-indent` leaves it.
+ */
+export function quoteListIndentation(document: Document, message: string): Finding[] {
+  const analysis = analyze(document);
+  const { source, lines } = analysis;
+  const { indentLists } = rendererProtections(document);
+  const findings: Finding[] = [];
+  for (const unit of analysis.units) {
+    if (!unit.valid || unit.lists.some(({ node }) => indentLists.has(node))) continue;
+    const ops: Op[] = [];
+    const delta = new Map<Item, number>();
+    for (const list of unit.lists) {
+      if (list.parent?.type !== "blockquote") continue;
+      for (const item of list.items) analysis.match(item.first);
+      const marks: Op[] = [];
+      const changes = new Map<Item, number>();
+      let possible = true;
+      for (const item of list.items) {
+        if (item.width === undefined || item.start === undefined) {
+          possible = false;
+          break;
+        }
+        if (!item.offset) continue;
+        if (
+          !onlySpaces(source, item.start, item.marker) ||
+          structuralTab(source, item.start, lines[item.first]!.end)
+        ) {
+          possible = false;
+          break;
+        }
+        marks.push({ start: item.start, end: item.marker, text: "", message });
+        changes.set(item, -item.offset);
+      }
+      // As in `style/list-indent`: the fewest columns that an item can need
+      // once the list rules are done, its marker at the quote's content.
+      const minimum = (item: Item) =>
+        (!list.node.ordered ? 1 : item.index ? 2 : item.digits.length + 1) +
+        (item.blankFirst || item.spacing >= 5 ? 1 : item.spacing);
+      if (
+        !possible ||
+        !marks.length ||
+        !feasible(analysis, list, changes, "start", minimum, "move")
+      )
+        continue;
+      for (const op of marks) ops.push(op);
+      for (const [item, change] of changes) delta.set(item, change);
+    }
+    for (const op of shiftOps(analysis, unit, delta, "start")) ops.push(op);
+    const finding = unitFinding(source, ops);
+    if (finding) findings.push(finding);
+  }
+  return findings;
+}
 
 export const listRules: Record<string, Rule> = {
   "style/list-indent": listIndent,
