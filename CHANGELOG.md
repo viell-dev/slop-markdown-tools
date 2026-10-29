@@ -224,6 +224,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- A lazy line below a list item's or block quote's paragraph that could start an
+  HTML block of the kind that cannot interrupt a paragraph, such as `<b>` alone
+  on its line, now continues the paragraph, as the renderers read it, instead of
+  ending the container. Rules formatted it by the wrong reading:
+  `style/block-spacing` added a blank line after the tag, and the item lost its
+  last line. HTML that may interrupt a paragraph, such as `<div>` or a comment,
+  still ends the paragraph
+  ([#762](https://github.com/viell-dev/slop-markdown-tools/issues/762)).
+
 - In Obsidian, rules no longer change a list item that starts on a footnote's
   label line, as in `[^1]: - item`, below a run of three or more backticks that
   nothing closes. Live Preview shows such an item as code carried from the run

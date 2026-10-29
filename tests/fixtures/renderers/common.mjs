@@ -50,6 +50,12 @@ export const commonFixtures = [
     source:
       "> A quoted paragraph\ncontinued *lazily*.\n\n- An item\ncontinued *lazily*.\n\n> - A quoted item\n> continued *lazily*.\n\nA useful note[^1].\n\n[^1]: More detail\ncontinued *lazily*.\n",
   },
+  // A lazy line that could start a type 7 HTML block continues the paragraph (#762).
+  {
+    name: "lazy-html-line",
+    source:
+      "* An item with *emphasis*\n<b>\nbold words\n</b>\nand more.\n* A second item\n\n> A quote with *emphasis*\n<span>\nspanned words\n</span>\n\n- > A quoted item\n<i>\nitalic words\n</i>\n",
+  },
 ];
 
 export const githubFixtures = [

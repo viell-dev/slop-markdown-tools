@@ -83,6 +83,13 @@ export const fixtures = [
     source: "* <div> a\n*b*\n</div>\n*c*\n\nAfter *d*.\n",
   },
   {
+    // #762: both views read a lazy line that could start a type 7 HTML block as more of the
+    // container's paragraph, as CommonMark does.
+    name: "lazy type 7 HTML lines in containers",
+    source:
+      "- Some *words* in an item, enough for the text to wrap at thirty columns,\n<span>\nmore *words* after the tag, also enough to wrap.\n</span>\n\n1. Some *words* in an ordered item, enough to wrap at thirty columns,\n<i>\nmore *words*.\n</i>\n- Another *item* follows it here.\n\n- > Some *words* in a quoted item, enough to wrap at thirty columns,\n<b>\nmore *words*.\n</b>\n\n> - Some *words* in a listed quote, enough to wrap at thirty columns,\n<i>\nmore *words*.\n</i>\n",
+  },
+  {
     name: "unclosed HTML continued outside a quote",
     source: "> <div> a\n*b*\n\nAfter *c*.\n",
   },

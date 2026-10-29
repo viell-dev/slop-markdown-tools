@@ -19,6 +19,7 @@ const kinds = {
   footnote: "footnote",
   labelEnd: "labelEnd",
   footnoteSyntax: "footnoteSyntax",
+  htmlFlow: "htmlFlow",
   cjk: "cjk",
 };
 const observerSource = `export const workStats = { reads: 0, writes: 0 };
@@ -157,7 +158,7 @@ export async function readReviewedSource(kind) {
   const micromark = await packageRoot(
     createRequire(path.join(from.directory, "index.js")).resolve("micromark"),
   );
-  const parent = ["editMap", "code", "attention", "labelEnd"].includes(kind)
+  const parent = ["editMap", "code", "attention", "labelEnd", "htmlFlow"].includes(kind)
     ? createRequire(path.join(micromark.directory, "index.js"))
     : here;
   const spec = sourceGuards[kinds[kind]];

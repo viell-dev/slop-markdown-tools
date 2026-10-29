@@ -404,3 +404,48 @@ describe("the presets", () => {
     },
   );
 });
+
+describe("a lazy line that could start a type 7 HTML block (#762)", () => {
+  // The line continues the container's paragraph, so no rule may separate it
+  // from the lines around it. Obsidian's Reading view and Live Preview read
+  // these as CommonMark does too, so its rendering is checked the same way.
+  const sources = [
+    "- a\n<b>\nmore\n",
+    "* a\n<b>\nmore\n",
+    "1) a\n<b>\nmore\n",
+    "> a\n<b>\nmore\n",
+    ">a\n</b>\nmore\n",
+    "- > a\n<b>\nmore\n",
+    "> - a\n<b>\n> more\n",
+    "- a\n  b\n<b>\n<i>\nmore\n- c\n",
+    "- a\n<b>\nmore\n\nAfter.\n",
+    "- a\r\n<b>\r\nmore\r\n",
+    // Upstream's test expects the quote to close here; renderers keep it open.
+    "> a\n<a>\n",
+    // Types 1 to 6 still interrupt the paragraph and end the containers.
+    "- a\n<div>\nmore\n",
+    "> a\n<!-- c -->\nmore\n",
+  ];
+  it.each(["github", "commonmark", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+    "keeps what the renderers show with recommended in %s",
+    (dialect) => {
+      for (const source of sources) {
+        const output = formatted(source, { extends: ["recommended"], dialect });
+        expect(rendered(output), JSON.stringify(source)).toEqual(rendered(source));
+      }
+      // The issue's input: no blank line ends the item after the tag.
+      expect(formatted("- a\n<b>\nmore\n", { extends: ["recommended"], dialect })).toBe(
+        "- a\n<b>\nmore\n",
+      );
+    },
+  );
+  it.each(["github", "forgejo", "gitea", "vitepress", "commonmark"] as const)(
+    "formats the authored renderer fixture in %s as the renderers show it",
+    (dialect) => {
+      const { source } = forgeFixtures.find(({ name }) => name === "lazy-html-line")!;
+      const output = formatted(source, { extends: ["recommended"], dialect });
+      expect(output).not.toBe(source);
+      expect(rendered(output)).toEqual(rendered(source));
+    },
+  );
+});
