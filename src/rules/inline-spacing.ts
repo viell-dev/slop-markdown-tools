@@ -1,7 +1,7 @@
 import type { Nodes, Root } from "mdast";
 import type { Document, Edit, Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
-import { codeSpanContent, labelEnd, parse, range } from "../syntax/parse.js";
+import { codeSpanContent, codeSpanText, labelEnd, parse, range } from "../syntax/parse.js";
 import { countBelow, escaped, lineEnd, lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { giteaPyLine, goldmarkForges, inForgeMath } from "./protections.js";
@@ -391,6 +391,10 @@ export const spacingRules: Record<string, Rule> = {
         const content = codeSpanContent(node);
         // A span of blank space only keeps all of it.
         if (!/[^ \t]/.test(content)) return;
+        // VitePress renders markdown-it's reading, which keeps the indentation of
+        // a span's continuation lines; report only where the two readings agree.
+        const shown = /^ [^]* $/.test(content) ? content.slice(1, -1) : content;
+        if (codeSpanText(node) !== shown) return;
         const leading = /^[ \t]*/.exec(content)![0];
         const trailing = /[ \t]*$/.exec(content)![0];
         const code = content.slice(leading.length, content.length - trailing.length);

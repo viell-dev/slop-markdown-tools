@@ -290,6 +290,16 @@ describe("content/inline-code-spacing", () => {
     expect(spans(source, check(source, rule))).toEqual(["`code\n`"]);
     expect(check(source, rule, "obsidian")).toEqual([]);
   });
+  it("reports in VitePress only where markdown-it reads the span the same", () => {
+    // markdown-it keeps a continuation line's indentation inside the span, so
+    // VitePress shows four spaces before `code` here, which the rule treats as
+    // indentation, where the parser reads one space and would report it.
+    const indented = "a `\n   code` b\n";
+    expect(check(indented, rule)).toHaveLength(1);
+    expect(check(indented, rule, "vitepress")).toEqual([]);
+    const plain = "a ` code` b\n";
+    expect(spans(plain, check(plain, rule, "vitepress"))).toEqual(["` code`"]);
+  });
   it.each(["\n", "\r\n"])("locates findings with %j line endings", (ending) => {
     const source = ["Text.", "Run ` npm test` now."].join(ending) + ending;
     expect(check(source, rule).map((item) => [item.line, item.column])).toEqual([[2, 5]]);

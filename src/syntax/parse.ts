@@ -134,8 +134,10 @@ export function codeSpanText(node: InlineCode): string {
   return /^ [^]* $/.test(content) && /[^ ]/.test(content) ? content.slice(1, -1) : content;
 }
 /**
- * The content of a code span as `codeSpanText` reads it, on one line, before
- * the one space comes off each end: what lies between its backticks.
+ * The content of a code span as the primary parser reads it, on one line, before
+ * the one space comes off each end: what lies between its backticks. In
+ * VitePress, `codeSpanText` prefers markdown-it's reading, which can differ for a
+ * span across lines; compare the two before relying on this one there.
  */
 export function codeSpanContent(node: InlineCode): string {
   const { padding = [], lazy = {} } = codeSpanSources.get(node) ?? {};
