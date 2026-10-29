@@ -231,6 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Keep quoted list continuation indentation stable when a quote marker directly
+  precedes the list marker, including above a thematic break. Wrapping no longer
+  oscillates with lazy-continuation indentation
+  ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
+
 - GitHub link checks and workspace indexes read definitions directly above an
   interrupting table as visible text, including in lists and quotes, while
   keeping formatting from hiding that text. A Setext underline line such as

@@ -3374,6 +3374,11 @@ them fail a check, set the rule to `error` or pass `--max-warnings 0`;
   and so does its paragraph. Whitespace inside code spans otherwise follows
   their own joining rules.
 
+List continuations keep the item's content indentation, including the space a
+quote consumes when its opening marker directly precedes a list marker, as in
+`>10) text`. Wrapping and explicit lazy-continuation indentation therefore
+agree.
+
 **Words kept off the start of a line:**
 
 - A word that would start a block at the start of a line, such as a list marker,

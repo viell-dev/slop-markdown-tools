@@ -1,3 +1,5 @@
+import { HtmlRenderer, Parser } from "commonmark";
+import MarkdownIt from "markdown-it";
 import fc from "fast-check";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -27,6 +29,47 @@ function verify(source: string, config: Config, workspace?: Workspace) {
   return result;
 }
 describe("wrapping controls", () => {
+  it("preserves reference rendering above a break after a quoted list", () => {
+    const source = `>10) ${"word ".repeat(18)}end\n---\n`;
+    const output = verify(source, { extends: ["recommended"], dialect: "commonmark" }).output;
+    const parser = new Parser();
+    const renderer = new HtmlRenderer();
+    const markdownIt = new MarkdownIt("commonmark");
+    for (const render of [
+      (text: string) => renderer.render(parser.parse(text)),
+      (text: string) => markdownIt.render(text),
+    ]) {
+      expect(render(output).replace(/\s+/g, " ")).toBe(render(source).replace(/\s+/g, " "));
+      expect(render(output)).toContain("<hr");
+      expect(render(output)).not.toContain("<h2");
+    }
+  });
+  it.each(dialects)("keeps quoted list continuation indentation stable in %s", (dialect) => {
+    const workspace = createWorkspace({}, { dialect, strictLineBreaks: true });
+    const config: Config = { extends: ["recommended"], dialect };
+    const reported =
+      ">10) [ember](page.md) `orchard delta` **birch** engine birch https://example.com/walnut iris `orchardharbor`\n---\n";
+    for (const source of [reported, `>10) ${"word ".repeat(18)}end\n---\n`]) {
+      const result = verify(source, config, workspace);
+      expect(result.changed).toBe(true);
+      if (dialect !== "vitepress" || source !== reported)
+        expect(result.output).toContain("\n>     ");
+      expect(verify(result.output, config, workspace).changed).toBe(false);
+    }
+    for (const prefix of [">1) ", ">- ", ">>10) ", "> 10) ", "- >10) "]) {
+      const source = `${prefix}${"word ".repeat(18)}end\n`;
+      expect(verify(source, config, workspace).changed).toBe(true);
+    }
+    for (const suffix of ["---", "***"]) {
+      const source = `${"word ".repeat(18)}end\n${suffix}\n`;
+      expect(verify(source, config, workspace).changed).toBe(true);
+    }
+    const isolated = { extends: [], dialect, rules: { "style/wrap": "warn" } } satisfies Config;
+    expect(verify(`>10) ${"word ".repeat(18)}end\n---\n`, isolated, workspace).output).toContain(
+      "\n>     ",
+    );
+    expect(format(reported, { config: { extends: [], dialect }, workspace }).output).toBe(reported);
+  });
   it.each(["2015.", "-", "#", ">", "1)", "***"])("moves the preceding word with %s", (marker) => {
     const source = `aaaa aaaa aaaa aaaa aaaa aaaa aaaa bbbb ${marker} Its move is Happy Hour.\n`;
     const result = verify(source, wrap());
