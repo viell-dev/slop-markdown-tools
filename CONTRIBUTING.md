@@ -451,7 +451,8 @@ rule leaves the source as written. Inline and heading rules have
 `block-spacing.test.ts`, list rules have `lists.test.ts`, and quote markers and
 lazy continuation lines have `containers.test.ts`. Code fences, thematic breaks
 and blank space are in `blocks.test.ts`, problem rules in `references.test.ts`,
-`structure.test.ts` and `content.test.ts`, wrapping in `wrap.test.ts` and
+`structure.test.ts` and `content.test.ts`, the shared reading of HTML elements
+and its rules in `html-elements.test.ts`, wrapping in `wrap.test.ts` and
 `callout-wrap.test.ts`, link rules in `link-rules.test.ts`, and workspace
 resolution in `links.test.ts`. That resolution suite keeps its shared
 heading-attribute mock and cache assertions together. Dollar math is in
