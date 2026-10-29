@@ -330,7 +330,9 @@ outside a table, a `<select>`, or a `<template>`, or outside a paragraph, list
 item, or table cell of the Markdown, and a start tag such as `<li>` can close a
 `<p>` before its end tag. In `<div hidden><table></div><img src="x">`, the image
 stays inside the hidden `<div>`. An end tag that closes the innermost open
-element, or that comes while nothing hides, does not stop the check.
+element, or that comes while nothing hides, does not stop the check. Nor is an
+HTML image checked after an `<html>`, `<head>`, or `<body>` tag: whether such a
+tag and its attributes apply depends on how the page embeds the rendered HTML.
 
 **On GitHub:** the sanitizer removes `aria-hidden`, `hidden`, `inert`, and
 `style` and keeps the image, so an image hidden only by them is reported.

@@ -523,6 +523,9 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
       const name = tag.name.toLowerCase();
       // A browser ignores the end tag of an element that is not open.
       if (tag.close) return close(named.get(name)?.at(-1));
+      // Whether `<html>`, `<head>` or `<body>` and their attributes apply depends
+      // on how the page embeds the rendered HTML, so nothing after one is certain.
+      if (name === "html" || name === "head" || name === "body") lost = true;
       const at = tag.attributes && map(tag.from, tag.to);
       if (tag.attributes && at)
         into.push({

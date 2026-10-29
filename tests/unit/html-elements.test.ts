@@ -186,6 +186,10 @@ describe("content/image-alt with HTML images", () => {
     // A formatting element that an end tag closed comes back around what follows.
     '<p><b hidden>x</p><img src="x">\n',
     'Text <b hidden>bold\n\n<img src="x.png">\n',
+    // Whether `<html>` or `<body>` applies depends on how the page embeds the
+    // HTML: parsed as a document, the image stays inside the hidden body.
+    '<body hidden></body><img src="x">\n',
+    '<html hidden></html><img src="x">\n',
   ])("keeps hiding after an end tag that a browser may ignore: %j", (source) => {
     // GitHub's sanitizer removes `hidden`.
     for (const dialect of dialects.filter((name) => name !== "github"))
