@@ -6,6 +6,7 @@ import { lineBreak } from "../syntax/source.js";
 import { hiddenBy, htmlStartTags, vueSyntax } from "./html-elements.js";
 import type { HtmlStartTag } from "./html-elements.js";
 import { optionsSchema } from "./shared.js";
+import { properNames } from "./proper-names.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
 const obsidianSize = /\|\d+(?:x\d+)?$/;
@@ -109,6 +110,8 @@ export const contentRules: Record<string, Rule> = {
       return findings;
     },
   },
+
+  "content/proper-names": properNames,
   "content/image-alt": {
     description: "Report images, Markdown or HTML, without alternative text.",
     kind: "problem",

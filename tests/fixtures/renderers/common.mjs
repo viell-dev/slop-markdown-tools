@@ -21,6 +21,18 @@ export const commonFixtures = [
   },
   // Text below a table is another row; the forges read the indented line as one too.
   { name: "table-row-text", source: "| Name | Value |\n| --- | --- |\nmore text\n    indented\n" },
+  // One space after quote markers, also before an alert's marker and a list (#682).
+  {
+    name: "quote-marker-spacing",
+    source:
+      ">  [!NOTE]\n>  Some *useful advice*.\n\n>A quote without a space.\n>>A nested quote.\n\n>  - A quoted item\n>    continued.\n",
+  },
+  // Container prefixes on lazy continuation lines, also a footnote's (#713).
+  {
+    name: "lazy-continuation",
+    source:
+      "> A quoted paragraph\ncontinued *lazily*.\n\n- An item\ncontinued *lazily*.\n\n> - A quoted item\n> continued *lazily*.\n\nA useful note[^1].\n\n[^1]: More detail\ncontinued *lazily*.\n",
+  },
 ];
 
 export const githubFixtures = [

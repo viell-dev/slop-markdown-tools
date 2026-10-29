@@ -28,6 +28,13 @@ export const forgeFixtures = [
   { name: "math", source: "A formula $x^2$ in prose.\n\n$$\nx = y\n$$\n\n~~~math\nz = w\n~~~\n" },
   { name: "frontmatter", source: "---\ntitle: Example\n---\n\n# *Heading*\n\nSome __words__.\n" },
   { name: "html", source: "<details>\n<summary>More</summary>\n\nSome *detail*.\n\n</details>\n" },
+  // The observed stray-marker case of #665: formatting moves a `~` between quoted
+  // lines, which Forgejo and Gitea showed the same for the current output.
+  {
+    name: "quoted-stray-markers",
+    source:
+      "+++\ntitle = 1\n+++\n\n> [!WARNING] walnut\n> >candle __kettle__ fabric harbor delta meadow pebble\nzephyr *xba_a`x.~x.*ab ~  ~ .**  engine\nvalley*. ~b**!.. *_! a*!_ meadow\n\n~~~~sh\nconst zephyr = 79;\n~~~~\n  \n*anchor amber* ~~meadow~~ __harbor__ juniper saddle  \n__juniper__ *meadow kettle* zephyr saddle *zephyr timber* timber _grove_ quarry walnut \n**orchard** _anchor_ _delta_ \\ ~~~ `amber glacier` needle | engine cedar *meadow glacier* _amber_ ~~pebble~~ *saddle delta* ~~lantern~~ delta fabric(x!__b)~~fabric lantern lantern _timber_ *iris engine*",
+  },
 ];
 export const fileFixtures = [
   {
