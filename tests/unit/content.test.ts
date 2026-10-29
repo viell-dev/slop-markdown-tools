@@ -43,7 +43,7 @@ describe("content/image-alt", () => {
     ["![Sales][chart]\n\n[chart]: chart.png\n", "github"],
     ["[![Build status](badge.svg)](https://example.com/ci)\n", "github"],
     ["`![](chart.png)`\n\n```md\n![](chart.png)\n```\n", "github"],
-    ['<img src="chart.png">\n', "github"],
+    // HTML images are in html-elements.test.ts.
     // Outside Obsidian, `|100` is text.
     ["![|100](chart.png)\n", "github"],
     ["![Sales|100](chart.png)\n", "obsidian"],

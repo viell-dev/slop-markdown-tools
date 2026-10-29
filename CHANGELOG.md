@@ -12,6 +12,16 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `content/html-element` reports HTML elements, once each at the opening
+  tag, in HTML blocks and inline HTML, with markdownlint's MD033 options
+  `allowedElements` and `tableAllowedElements`, compared without letter case.
+  Comments, mdrefine's suppression comments included, autolinks such as
+  `<user@example.com>`, code, and the text of raw-text elements are not
+  elements. VitePress components count as elements; VitePress HTML blocks stay
+  opaque. Where the reading of the HTML becomes uncertain, as after an unclosed
+  comment, the rest is not reported
+  ([#685](https://github.com/viell-dev/slop-markdown-tools/issues/685)).
+
 - Two style rules in `recommended` write the prefixes of block quotes and their
   contents. `style/quote-marker` writes one space after each `>`, removing extra
   spaces and adding a missing one, and takes markdownlint's MD027 `listItems`
@@ -207,6 +217,18 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
+  without an `alt` attribute, where renderers certainly show it. `alt=""`, which
+  marks a decorative image, is accepted, and so are images hidden by
+  `aria-hidden="true"`, `hidden`, `inert`, or a hiding style outside GitHub,
+  whose sanitizer removes those attributes. Blank Markdown alternative text is
+  still reported, because Markdown cannot mark an image as decorative. Images in
+  content that may not be shown, such as `<template>` or `<video>`, after HTML
+  whose reading is uncertain, after an end tag that a browser may ignore inside
+  a hidden element, in unused footnote definitions, and in VitePress near Vue
+  syntax are not reported
+  ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
 
 - The documentation describes the behavior of the version it belongs to, without
   version notes; this changelog keeps the history. Each rule section opens with
