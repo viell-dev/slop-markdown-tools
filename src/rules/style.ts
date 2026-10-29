@@ -1,3 +1,4 @@
+import { noTabs, proseSpace } from "./prose-whitespace.js";
 import { walk } from "../syntax/walk.js";
 import type { Finding, Rule } from "../core/types.js";
 import { protectedEdit } from "../core/protection-edits.js";
@@ -17,6 +18,8 @@ import { optionsSchema } from "./shared.js";
 
 const styleRules: Record<string, Rule> = {
   "style/wrap": wrap,
+  "style/no-tabs": noTabs,
+  "style/prose-space": proseSpace,
   "style/inline-code": {
     description: "Use minimal backticks and join code spans using their CommonMark rendered value.",
     kind: "style",
