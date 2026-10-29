@@ -34,16 +34,16 @@ surrounding Markdown must keep its meaning. Ordinary Markdown formatting and its
 fingerprint still compare code values exactly; the code tool is responsible for
 its programming-language semantics.
 
-Since 0.4.1, Obsidian's structural rules also apply a general conservative
-[boundary policy](obsidian.md#visible-boundary-refusals). Held style edits
-produce a finding under their original rule and severity. Existing renderer
-protections remain; a new difference is fixed only for plausibly authored
-CommonMark or documented dialect syntax that changes visible content. Exotic
-generated cases are recorded as limits and reconsidered when a real document
-demonstrates their impact. Fixed realistic corpora and regression fixtures gate
-delivery; adversarial generation is discovery only. These checks provide
-evidence for their inputs, not a complete specification of either closed-source
-Obsidian renderer.
+Obsidian's structural rules also apply a general conservative [boundary
+policy](obsidian.md#visible-boundary-refusals). Held style edits produce a
+finding under their original rule and severity. Existing renderer protections
+remain; a new difference is fixed only for plausibly authored CommonMark or
+documented dialect syntax that changes visible content. Exotic generated cases
+are recorded as limits and reconsidered when a real document demonstrates their
+impact. Fixed realistic corpora and regression fixtures gate delivery;
+adversarial generation is discovery only. These checks provide evidence for
+their inputs, not a complete specification of either closed-source Obsidian
+renderer.
 
 The comparison is only as good as the parser's reading:
 
@@ -200,12 +200,12 @@ Files:
 
 Syntax:
 
-- After 0.4.0, renderer maintenance targets plausible authored CommonMark and
-  documented dialect syntax whose displayed content or meaningful structure
-  changes during formatting. Exotic generated constructions and stray-marker
-  styling can remain documented limits, reopenable with evidence from real use.
-  Fixed regression documents remain protected. A clean fixed realistic corpus is
-  bounded evidence, not a claim to reproduce every renderer quirk.
+- Renderer maintenance targets plausible authored CommonMark and documented
+  dialect syntax whose displayed content or meaningful structure changes during
+  formatting. Exotic generated constructions and stray-marker styling can remain
+  documented limits, reopenable with evidence from real use. Fixed regression
+  documents remain protected. A clean fixed realistic corpus is bounded
+  evidence, not a claim to reproduce every renderer quirk.
 - On Forgejo and Gitea, wrapping generated stray-marker runs across quoted lines
   can change emphasis/strikethrough pairing while retaining text and block
   structure. The exact observed case is retained in discovery checks
@@ -214,11 +214,11 @@ Syntax:
 - Obsidian inline comments that span several paragraphs are not fully read;
   suppress formatting around them or use comment blocks. A comment on lines of
   its own directly above text is read as a block before a paragraph, where
-  Obsidian reads one paragraph. After 0.4.0, formatting retains that boundary so
-  it cannot split the native paragraph, and retains directly adjacent Setext
-  underlines since conversion can change Reading view. Following inline style
-  edits remain available. Heading nesting paths in links, property aliases, PDF
-  subpaths, and the syntax of community plugins are not supported.
+  Obsidian reads one paragraph. Formatting retains that boundary so it cannot
+  split the native paragraph, and retains directly adjacent Setext underlines
+  since conversion can change Reading view. Following inline style edits remain
+  available. Heading nesting paths in links, property aliases, PDF subpaths, and
+  the syntax of community plugins are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
   and shortlinks, is protected rather than read, and shortlinks are not checked
   as links. Only the anchor of a heading that starts a definition description is
