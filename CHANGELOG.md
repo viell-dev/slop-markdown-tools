@@ -238,6 +238,32 @@ prereleases' notes there are longer than their entries here.
   unchanged
   ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
 
+- In VitePress, rules leave as written a list item whose first line markdown-it
+  reads as a table header, as in `* a | b` above `  --|--`: markdown-it tries a
+  table before a list, so it shows a table whose first cell holds the marker.
+  `style/list-marker` and `style/list-indent` proposed edits there that the
+  engine refused, and `style/table` formatted the table by the list's reading.
+  The list rules also keep a list whose item's table markdown-it reads only
+  because of its indentation, as in `*   a | b` above `    --|--`, and the lists
+  next to such a list, which another marker would join to it
+  ([#763](https://github.com/viell-dev/slop-markdown-tools/issues/763)).
+
+- `style/heading` keeps the indentation of a heading line that is `---` or `+++`
+  alone, such as an underline `  ---`, below a first line of the same fence that
+  no line closes, where removing it would close front matter and make the lines
+  above it front matter. It proposed that edit, which the engine refused, in
+  GitHub, Forgejo, Gitea and CommonMark
+  ([#764](https://github.com/viell-dev/slop-markdown-tools/issues/764)).
+
+- In VitePress, a list item or paragraph that a component line such as
+  `<MyComponent />` ends is left as written, as other blocks with a component
+  that mdast cannot represent are. VitePress ends the paragraph at the component
+  line, so `style/lazy-continuation` proposed indenting a lazy line below it,
+  which would move that line into the list item, and the engine refused it. The
+  list rules keep a list directly beside such a list as written, because another
+  marker would join the two
+  ([#769](https://github.com/viell-dev/slop-markdown-tools/issues/769)).
+
 - GitHub link checks and workspace indexes read definitions directly above an
   interrupting table as visible text, including in lists and quotes, while
   keeping formatting from hiding that text. A Setext underline line such as

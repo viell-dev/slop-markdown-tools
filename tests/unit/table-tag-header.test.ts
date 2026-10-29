@@ -101,8 +101,9 @@ describe("a table whose header row is a complete tag alone on its line (#770)", 
     // Forgejo and Gitea read `*w*` as a lazy body row of the item's table.
     for (const dialect of ["github", "forgejo", "gitea"] as const)
       formats(lazy, preset(dialect), lazy);
-    // markdown-it reads the lazy line's table outside the list.
-    formats(lazy, preset("vitepress"), '- a\n<b title="|">\n  |-|-|\n_w_\n');
+    // markdown-it reads the lazy line's table outside the list, which stays
+    // as written (#763).
+    formats(lazy, preset("vitepress"), lazy);
     const quote = '> a\n<b title="|">\n> |-|-|\n';
     formats(quote, preset("github"), quote);
     for (const dialect of ["forgejo", "gitea"] as const)

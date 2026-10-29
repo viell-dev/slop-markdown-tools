@@ -86,6 +86,53 @@ it("reads the blocks that style/block-spacing keeps together as VitePress does (
   }
 });
 
+it("leaves the lists and lazy lines that VitePress reads otherwise as written (#763, #769)", async () => {
+  const render = await renderer({});
+  const config: Config = { extends: ["recommended", "vitepress"], dialect: "vitepress" };
+  // Each source, with the edit that a rule would make there by mdast's reading.
+  for (const [source, edited] of [
+    // A table whose first cell holds the marker, not a list.
+    ["* a | b\n  --|--\n", "- a | b\n  --|--\n"],
+    ["+ a | b\n  --|--\n+ c\n", "- a | b\n  --|--\n- c\n"],
+    ["- outer\n  * a | b\n    --|--\n", "- outer\n  - a   | b   |\n    --- | --- |\n"],
+    // Another marker joins the lists, and the table moves into the item.
+    ["+ x\n- a | b\n  --|--\n", "- x\n- a | b\n  --|--\n"],
+    // Less indentation makes the item's table a table outside the list.
+    ["*   a | b\n    :-|-:\n    c | d\n", "* a | b\n  :-|-:\n  c | d\n"],
+    // The component ends the item's paragraph; an indented line continues the item.
+    [
+      "- Alpha words\n    <MyComponent />\nmore words after\n",
+      "- Alpha words\n    <MyComponent />\n  more words after\n",
+    ],
+    [
+      "- Alpha words\n\t<MyComponent />\nmore words after\n",
+      "- Alpha words\n\t<MyComponent />\n  more words after\n",
+    ],
+  ] as const) {
+    const result = format(source, { config, path: "page.md" });
+    expect(
+      result.diagnostics.filter((item) => item.rule.startsWith("engine/")),
+      source,
+    ).toEqual([]);
+    expect(await render(result.output), source).toBe(await render(source));
+    expect(format(result.output, { config }).output, source).toBe(result.output);
+    expect(await render(edited), source).not.toBe(await render(source));
+  }
+  // Ordinary lists, tables and lazy lines are still formatted.
+  for (const [source, output] of [
+    ["* one\n* two\n", "- one\n- two\n"],
+    ["- x\n\n  a | b\n  --|--\n", "- x\n\n  | a   | b   |\n  | --- | --- |\n"],
+    ["- Alpha\n  <span>x</span>\nlazy\n", "- Alpha\n  <span>x</span>\n  lazy\n"],
+  ] as const) {
+    const result = format(source, {
+      config: { ...config, rules: { "style/wrap": "off" } },
+      path: "page.md",
+    });
+    expect(result.output, source).toBe(output);
+    expect(await render(result.output), source).toBe(await render(source));
+  }
+});
+
 it("preserves actual VitePress heading IDs when bracketing literal addresses", async () => {
   const render = await renderer({});
   const config: Config = {

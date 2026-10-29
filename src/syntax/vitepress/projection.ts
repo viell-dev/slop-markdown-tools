@@ -1,4 +1,4 @@
-import type { Root, RootContent, InlineCode } from "mdast";
+import type { Root, RootContent, InlineCode, Nodes } from "mdast";
 import type Token from "markdown-it/lib/token.mjs";
 import type { Document, Finding } from "../../core/types.js";
 import { lineStarts } from "../source.js";
@@ -14,6 +14,14 @@ interface Projection {
 }
 const readings = new WeakMap<Root, Projection>();
 const codeTexts = new WeakMap<InlineCode, string>();
+const hiddenLists = new WeakSet<RootContent>();
+/**
+ * Whether `node` is a block left opaque for a component that holds a list at
+ * either end, which another marker on a list beside it would join (#769).
+ */
+export function hidesList(node: RootContent): boolean {
+  return hiddenLists.has(node);
+}
 /** markdown-it keeps indentation in multiline spans that GitHub removes. */
 export function vitepressCodeText(node: InlineCode): string | undefined {
   return codeTexts.get(node);
@@ -142,6 +150,38 @@ export function projectVitePress(document: Document): Projection {
   projected += source.slice(previous);
   return { source: projected, literals, protected: protectedParts, tokens };
 }
+/** markdown-it's container tokens, without `_open` or `_close`, by mdast's names. */
+const containerKinds = new Map([
+  ["blockquote", "blockquote"],
+  ["vitepress_alert", "blockquote"],
+  ["list_item", "listItem"],
+  ["footnote", "footnoteDefinition"],
+]);
+const mdastContainers = new Set(containerKinds.values());
+/**
+ * The tables of a tree by the line they start on, each by the containers that
+ * hold it, outermost first, as in `"listItem blockquote"`.
+ */
+function tablePlacements(tree: Root): Map<number, Set<string>> {
+  const placements = new Map<number, Set<string>>();
+  const containers: string[] = [];
+  const visit = (node: Nodes) => {
+    if (node.type === "table") {
+      const line = node.position!.start.line;
+      const found = placements.get(line) ?? new Set<string>();
+      found.add(containers.join(" "));
+      placements.set(line, found);
+      return;
+    }
+    if (!("children" in node)) return;
+    const container = mdastContainers.has(node.type);
+    if (container) containers.push(node.type);
+    for (const child of node.children) visit(child);
+    if (container) containers.pop();
+  };
+  visit(tree);
+  return placements;
+}
 /** Attach the secondary reading to the finished, positioned tree. */
 export function recordVitePress(tree: Root, projection: Projection, source: string): void {
   // Keep ordinary HTML's list/quote parents. A component mdast reads inline
@@ -161,13 +201,29 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
   });
   const starts = lineStarts(source);
   const opaque: { first: number; last: number }[] = [];
+  const tables = tablePlacements(tree);
+  // markdown-it's containers around each block token: its list items, block
+  // quotes and footnote definitions, as mdast names them.
+  const containers: string[] = [];
   for (const token of projection.tokens) {
-    if (
-      token.type !== "html_block" ||
-      !token.map ||
-      html.get(token.map[0])?.has(normalize(token.content))
-    )
-      continue;
+    const kind = containerKinds.get(token.type.replace(/_(?:open|close)$/, ""));
+    if (kind && token.nesting === 1) containers.push(kind);
+    else if (kind && token.nesting === -1) containers.pop();
+    if (!token.map) continue;
+    let table: boolean;
+    // A component that the component plugin reads as a block, alone on its
+    // line, also as a line that interrupts a paragraph and ends it, which
+    // mdast reads as a paragraph's inline HTML (#769).
+    if (token.type === "html_block" || token.type === "html_inline") {
+      if (html.get(token.map[0])?.has(normalize(token.content))) continue;
+      table = false;
+    } else if (token.type === "table_open") {
+      // markdown-it tries a table before a list or block quote, so it reads
+      // `* a | b` above `  --|--` as a table whose first cell holds the
+      // marker, where mdast reads a list item holding a table (#763).
+      if (tables.get(token.map[0] + 1)?.has(containers.join(" "))) continue;
+      table = true;
+    } else continue;
     const start = starts[token.map[0]] ?? source.length;
     const end = starts[token.map[1]] ?? source.length;
     let low = 0;
@@ -179,7 +235,18 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
     }
     const first = low;
     while (low < tree.children.length && tree.children[low]!.position!.start.offset! < end) low++;
-    if (first < low) opaque.push({ first, last: low - 1 });
+    if (first === low) continue;
+    // The blocks stay in the tree, so that the list rules still see the lists
+    // beside them, which another marker would join to them, and keep those
+    // as written too (vitepress/lists.ts).
+    if (table)
+      projection.protected.push({
+        start: tree.children[first]!.position!.start.offset!,
+        end: tree.children[low - 1]!.position!.end.offset!,
+        wrapOnly: false,
+        reason: "VitePress table",
+      });
+    else opaque.push({ first, last: low - 1 });
   }
   opaque.sort((a, b) => a.first - b.first || a.last - b.last);
   const merged: typeof opaque = [];
@@ -195,11 +262,14 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
     while (previous < part.first) children.push(original[previous++]!);
     const start = original[part.first]!.position!.start;
     const end = original[part.last]!.position!.end;
-    children.push({
+    const replacement: RootContent = {
       type: "html",
       value: source.slice(start.offset, end.offset),
       position: { start, end },
-    });
+    };
+    children.push(replacement);
+    if (original[part.first]!.type === "list" || original[part.last]!.type === "list")
+      hiddenLists.add(replacement);
     projection.protected.push({
       start: start.offset!,
       end: end.offset!,

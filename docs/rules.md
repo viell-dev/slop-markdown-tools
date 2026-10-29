@@ -2384,6 +2384,9 @@ After:
 - The form of underlined headings of more than one line, those inside lists or
   block quotes, and one directly below TOML front matter, whose lines renderers
   without TOML front matter read as part of the heading.
+- Below a first line of `---` or `+++` that no line closes, the indentation of
+  an underline or text line that is that fence alone, as in `  ---`, because
+  without it the line would close front matter.
 
 **With `setext`:** a `#` heading is underlined only where its text can stand on
 a line of its own as the same heading: at the start of a line of the document,
@@ -2546,7 +2549,9 @@ lines also stay:
   a line.
 
 **In VitePress:** lazy lines also stay in documents with a custom container's
-fence on a quote's line.
+fence on a quote's line, and below a component line such as `<MyComponent />`,
+which ends the paragraph there, so that a line without the item's indentation
+starts a paragraph after the list.
 
 **In Obsidian:** the rule writes only the prefixes observed to leave both views
 unchanged: a quote's `>` where the lazy line lacks every `>` of its quotes, and
@@ -2727,6 +2732,15 @@ After:
   list right after them, and the lists next to it (see [how it
   works](design.md#safety-model)).
 
+**In VitePress:** a list with an item whose first line is a table's header row,
+as `*   a | b` above `    --|--` is, keeps its markers and indentation, and so
+do the lists next to it. markdown-it tries a table before a list, so with less
+indentation, or with a marker that joins it to the list above, it reads that row
+as a table above the list, with the marker in its first cell. A list directly
+beside a list that a component line leaves as written (see
+[VitePress](vitepress.md#preservation)) keeps its markers and indentation too,
+because another marker would join the two.
+
 **In Obsidian:** a document-level list that ends in a nested list keeps its
 indentation, and so does the opening list in the following quote when its marker
 has exactly two spaces after `>`. Live Preview carries the earlier indentation
@@ -2788,6 +2802,9 @@ only because its marker differs, so it gets the next marker in the order `-`,
   would with `-`, and the lists next to it.
 - A list directly below TOML front matter whose first item starts with a blank
   line, as for [`style/list-indent`](#stylelist-indent).
+- In VitePress, a list with an item whose first line is a table's header row,
+  and the lists next to it, and a list directly beside a list that a component
+  line leaves as written, as for [`style/list-indent`](#stylelist-indent).
 
 ## `style/no-tabs`
 
@@ -3144,9 +3161,11 @@ as written when a row needs one.
   `:::tip`: site generators use it to open or close a container, where GFM reads
   another row. Cells written with table borders, such as `| ::: |`, are
   formatted normally.
-- In VitePress, a table that markdown-it reads on other lines or not at all,
-  such as a one-column table whose header has no pipe, or a header written as a
-  lazy line in a block quote.
+- In VitePress, a table that markdown-it reads on other lines, in other
+  containers, or not at all, such as a one-column table whose header has no
+  pipe, a header written as a lazy line in a block quote, or a header on its
+  list item's marker line above a delimiter row indented less than four columns,
+  which markdown-it reads outside the list.
 
 **In Obsidian:**
 
