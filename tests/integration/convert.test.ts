@@ -71,9 +71,7 @@ describe("competitor configuration CLI (#669)", () => {
     const printed = run(root, ["config", "convert"]);
     expect(printed.status, printed.stderr).toBe(0);
     expect(parseConfig(printed.stdout).rules?.["style/wrap"]).toEqual(["warn", { width: 90 }]);
-    expect(printed.stderr).toContain(
-      "inline comments and pragmas are not converted and have no effect",
-    );
+    expect(printed.stderr).toContain("inline comments and pragmas apply during fallback only");
     expect(run(root, ["config", "explain", "note.md"]).stdout).toContain('"conversion"');
     const write = run(root, ["config", "convert", "--write"]);
     expect(write.status, write.stderr).toBe(0);
@@ -739,4 +737,51 @@ describe("round-six pattern boundaries", () => {
       ]);
     },
   );
+});
+
+it("honors inline comments only through fallback, including the Node loading path", async () => {
+  const source = "<!-- markdownlint-disable -->\n\n*one*\n";
+  const root = await fixture({
+    ".markdownlint.json": '{"default":false,"MD049":{"style":"underscore"}}',
+    "note.md": source,
+  });
+  expect(run(root, ["format", "--check"]).status).toBe(0);
+  const { loadConfig } = await import("../../src/config/load.js");
+  const { format } = await import("../../src/index.js");
+  expect(format(source, await loadConfig(root)).output).toBe(source);
+  expect(run(root, ["format", "--check", "--no-competitor-config"]).status).toBe(1);
+  expect(run(root, ["config", "convert", "--write"]).status).toBe(0);
+  expect(run(root, ["format", "--check"]).status).toBe(1);
+  await writeFile(
+    path.join(root, "mdrefine.config.jsonc"),
+    '{"extends":[],"rules":{"style/emphasis":"warn"}}',
+  );
+  expect(run(root, ["format", "--check"]).status).toBe(1);
+});
+it("honors Prettier ignores and pragma overrides and deduplicates comment notices", async () => {
+  const root = await fixture({
+    ".prettierrc":
+      '{"requirePragma":true,"overrides":[{"files":"marked.md","options":{"requirePragma":false}}]}',
+    "note.md": "*one*\n",
+    "marked.md": "*two*\n",
+  });
+  expect(run(root, ["format", "note.md", "--check"]).status).toBe(0);
+  expect(run(root, ["format", "marked.md", "--check"]).status).toBe(1);
+  await writeFile(
+    path.join(root, "note.md"),
+    "<!-- @format -->\n\n<!-- prettier-ignore -->\n\n*one*\n",
+  );
+  expect(run(root, ["format", "note.md", "--check"]).status).toBe(0);
+});
+
+it("reports a repeated unknown comment name only once across files", async () => {
+  const source = "<!-- markdownlint-disable UNKNOWN -->\n\n*one*\n";
+  const root = await fixture({
+    ".markdownlint.json": '{"default":false,"MD049":{"style":"underscore"}}',
+    "a.md": source,
+    "b.md": source,
+  });
+  const result = run(root, ["lint", "--json"]);
+  expect(result.status).toBe(1);
+  expect(result.stderr.match(/markdownlint comment UNKNOWN:/g)).toHaveLength(1);
 });

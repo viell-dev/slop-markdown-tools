@@ -438,7 +438,10 @@ export async function loadCompetitorConfig(
 
   const overrides: Override[] = [];
   const overrideConflicts: string[] = [];
+  const pragmaOverrides: { files: string[]; requirePragma: boolean }[] = [];
   const addOverride = (files: string[], values: Values) => {
+    if (typeof values.requirePragma === "boolean")
+      pragmaOverrides.push({ files, requirePragma: values.requirePragma });
     const converted = convertConfig({
       prettier: { ...prettier, ...values },
       ...(markdownlint ? { markdownlint } : {}),
@@ -588,6 +591,9 @@ export async function loadCompetitorConfig(
         "style/wrap": ["off", { width: prettier.printWidth ?? 80, mode: "always" }],
       },
     };
+  report.compatibility.pragmaOverrides = pragmaOverrides;
+  // A scoped proseWrap override can enable wrapping absent from the base.
+  if (prettier) report.compatibility.origins["style/wrap"] ??= ["proseWrap"];
   report.conflicts.push(...overrideConflicts);
   report.sources = [...new Set(sources)];
   report.omitted = [...new Set([...report.omitted, ...omitted])];
