@@ -231,6 +231,13 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/wrap` indents a quoted list item's continuation lines to the item's
+  content where the quote marker directly precedes the list marker, as in
+  `>10) text`. It indented them one column short, and `style/lazy-continuation`
+  then added the column back, so formatting oscillated and left the document
+  unchanged
+  ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
+
 - In VitePress, rules leave as written a list item whose first line markdown-it
   reads as a table header, as in `* a | b` above `  --|--`: markdown-it tries a
   table before a list, so it shows a table whose first cell holds the marker.
