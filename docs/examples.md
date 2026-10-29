@@ -369,9 +369,9 @@ Searching the notes with `grep TODO` is not reported: code is not prose.
 Ask for a review.
 ```
 
-Linting reports both, but not the `TODO` inside the code span. After 0.5.0, the
-built-in `style/heading` also reports the separator; the custom rule remains an
-example of proposing an edit from a plugin.
+Linting reports both, but not the `TODO` inside the code span. The built-in
+`style/heading` also reports the separator; the custom rule remains an example
+of proposing an edit from a plugin.
 
 ```sh
 node dist/cli/main.js lint --root examples/plugin
