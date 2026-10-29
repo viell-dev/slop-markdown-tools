@@ -24,10 +24,13 @@ presets, dialects, and options.
 | `forgejo/heading-id`            | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `github/alert-marker`           | 🎨   | ❌            | ✅             | ❌      |
 | `github/task-marker`            | 🎨   | ❌            | ✅             | ❌      |
+| `links/allowed-notation`        | 🎨   | ❌            | ❌             | ✅      |
+| `links/bare-url`                | 🎨   | ❌            | ❌             | ❌      |
 | `links/descriptive-text`        | 🔍   | ❌            | ❌             | ✅      |
 | `links/empty`                   | 🔍   | ✅            | ❌             | ✅      |
 | `links/notation`                | 🎨   | ❌            | ❌             | ✅      |
 | `links/path`                    | 🎨   | ❌            | ❌             | ✅      |
+| `links/reversed`                | 🔍   | ❌            | ❌             | ❌      |
 | `links/undefined-reference`     | 🔍   | ✅            | ❌             | ✅      |
 | `links/unused-definition`       | 🔍   | ✅            | ❌             | ✅      |
 | `links/valid`                   | 🔍   | ✅ (error)    | ❌             | ✅      |
@@ -271,6 +274,91 @@ After:
 - [x] Write the guide
 ```
 
+## `links/allowed-notation`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`autolink`, `inline`, `full`, `collapsed`, `shortcut`, `urlInline`.
+
+Added after 0.5.0. Reports disallowed Markdown link and image forms. This is
+separate from `links/notation`, which converts verified Obsidian targets between
+wikilinks and Markdown. It does not add or remove reference definitions. Bare
+addresses belong to `links/bare-url`; wikilinks remain governed by
+`links/notation`.
+
+| Option      | Form                                         | Default |
+| ----------- | -------------------------------------------- | ------- |
+| `autolink`  | `<https://example.com>`                      | `true`  |
+| `inline`    | `[text](target)` or `![alt](target)`         | `true`  |
+| `full`      | `[text][label]` or `![alt][label]`           | `true`  |
+| `collapsed` | `[label][]` or `![label][]`                  | `true`  |
+| `shortcut`  | `[label]` or `![label]`                      | `true`  |
+| `urlInline` | `[https://example.com](https://example.com)` | `true`  |
+
+`urlInline: false` reports only an inline link whose displayed text equals its
+URL; `inline: false` reports all inline links and images. References are read by
+the parser, matching defined labels with Unicode case folding and collapsed
+spaces, tabs, and line endings. Undefined references remain literal text.
+
+An inline URL-as-text link can become an autolink when `autolink` is allowed, it
+has no title, and its source text and destination are exactly the same unescaped
+HTTP or HTTPS URL. Fixes use a conservative ASCII subset: letters, digits,
+`@%+._~:/?#=-`, without trailing punctuation or `_-`. Entities, escapes, spaces,
+angle brackets, ampersands, parentheses, and formatted labels stay as written.
+Other disallowed forms report without a fix.
+
+With `urlInline: false`, before:
+
+```markdown
+[https://example.com](https://example.com)
+```
+
+After:
+
+```markdown
+<https://example.com>
+```
+
+## `links/bare-url`
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
+
+Added after 0.5.0. Reports bare HTTP and HTTPS URLs, `www.` addresses, and email
+addresses in prose. Code, math, HTML, front matter, authored links and images,
+definitions (including a definition followed by an HTML comment), and
+angle-delimited addresses, including attempts with spaces, are left alone.
+
+CommonMark shows bare addresses as text, so this rule only reports there.
+GitHub, Forgejo, Gitea, Obsidian, and the VitePress projection already link
+literal addresses. Fixes bracket only the exact parsed literal extent, with
+unchanged text and destination, using the conservative character subset of
+`links/allowed-notation`. Other addresses report without a fix, including `www.`
+addresses whose displayed text differs from their destination. Trailing
+punctuation excluded from a literal link stays outside the brackets.
+
+An address directly after a backslash or `<`, or directly before `>`, reports
+without a fix: adjacent source characters can escape or combine with the new
+brackets. Headings also report without a fix in Obsidian, which accepts source
+heading names, and Forgejo/Gitea, which support versions with source-based
+heading IDs. GitHub builds anchors from rendered heading text; VitePress uses
+inline token content. Bracketing these exact literal links preserves both, so
+headings remain fixable in those two dialects.
+
+VitePress also retains addresses next to a preceding letter, digit, `_` or `+`,
+a following `_` or `~`, or ending in `#`, `%` or `@`: its linkifier can read
+these boundaries differently from the literal-link parser.
+
+Before, in GitHub:
+
+```markdown
+See https://example.com.
+```
+
+After:
+
+```markdown
+See <https://example.com>.
+```
+
 ## `links/descriptive-text`
 
 **Problem rule**, reported only. Presets: none. Dialects: all. Options:
@@ -431,6 +519,42 @@ After:
 
 ```markdown
 See the [guide](./docs/guide.md#setup).
+```
+
+## `links/reversed`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Added after 0.5.0. Reports likely reversed links such as
+`(text)[https://example.com]`. Fixing one would turn literal text into a link,
+so there is no automatic repair. The bracketed part must contain no whitespace
+or brackets and look like a destination: a scheme followed by `://`, `mailto:`,
+an email-like address, a slash anywhere, a leading `#`, or a final dot extension
+of one to ten ASCII letters or digits, starting with a letter (optionally
+followed by a query or fragment). A parenthesis immediately after an identifier
+character (a Unicode letter, number or combining mark, `_`, or `$`) is treated
+as call/subscript syntax and excluded.
+
+Defined labels are excluded using the renderer's Unicode case folding and
+whitespace normalization. Citations such as `(Smith 2020)[1]`, cross-references
+such as `(see above)[note]`, versions such as `(see)[v1.2]`, numeric references
+such as `(see)[p.12]` and `(1, 2)[0.5]`, calls such as `f(x)[i.j]`, footnotes,
+wikilinks, task markers, code, math, HTML, text inside authored links and
+destinations, and parentheses inside a bare URL, such as
+`https://example.com/(a)[b.md]`, are not reported.
+
+Reported:
+
+```markdown
+See (the guide)[./guide.md].
+```
+
+Not reported:
+
+```markdown
+See (the guide)[guide].
+
+[guide]: ./guide.md
 ```
 
 ## `links/undefined-reference`
