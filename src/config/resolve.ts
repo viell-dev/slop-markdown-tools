@@ -72,6 +72,8 @@ export const presets: Readonly<Record<string, Readonly<Config>>> = {
       "style/list-marker": ["warn", { marker: "-" }],
       "style/ordered-list": ["warn", { delimiter: ".", numbering: "auto" }],
       "style/list-indent": "warn",
+      "style/quote-marker": "warn",
+      "style/lazy-continuation": "warn",
       "links/valid": "error",
       "links/undefined-reference": "warn",
       "links/unused-definition": "warn",

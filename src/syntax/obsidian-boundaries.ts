@@ -13,6 +13,7 @@ const structural = new Set([
   "style/list-indent",
   "style/list-marker",
   "style/ordered-list",
+  "style/quote-marker",
   "style/table",
   "style/heading",
   "style/wrap",
