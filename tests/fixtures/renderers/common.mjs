@@ -50,6 +50,32 @@ export const commonFixtures = [
     source:
       "> A quoted paragraph\ncontinued *lazily*.\n\n- An item\ncontinued *lazily*.\n\n> - A quoted item\n> continued *lazily*.\n\nA useful note[^1].\n\n[^1]: More detail\ncontinued *lazily*.\n",
   },
+  // A lazy line that could start a type 7 HTML block continues the paragraph in
+  // CommonMark and on the forges; GitHub ends the containers and reads HTML to
+  // the next blank line, where `*` stays literal (#762). The introductions change,
+  // so GitHub compares the documents too.
+  {
+    name: "lazy-html-line",
+    source:
+      "An *introduction* that formatting changes.\n\n* An item with *emphasis*\n<b>\nbold words\n</b>\nand more.\n* A second item\n\n> A quote with *emphasis*\n<span>\nspanned words\n</span>\n\n- > A quoted item\n<i>\nitalic words\n</i>\n",
+  },
+  {
+    name: "lazy-html-emphasis",
+    source:
+      "An *introduction* that formatting changes.\n\n- An item with *words\n<b>\nmore* after the tag\n- A second *item*\n\n> A quote with *words\n</b>\nmore* after the closing tag\n\n1. A step with __strong\n<span>\nwords__ across the tag\n\nA *closing* paragraph.\n",
+  },
+  {
+    name: "lazy-html-markers",
+    source:
+      "An *introduction* that formatting changes.\n\n1. A step\n<span>\nwith *emphasis*, __strong__, `code` and [a link](https://example.com)\n# A heading *below*\n- An item *below*\n\n- > A quoted item\n<i>\n*after* the tag\n\n> - A listed quote\n> <b>\n> *after* the tag\n>\n> - A later *item*\n\nA *closing* paragraph.\n",
+  },
+  // CommonMark reads the paragraph text that takes the tag line as a Setext
+  // heading, or as definitions before the paragraph that starts at the tag.
+  {
+    name: "lazy-html-paragraph-text",
+    source:
+      "An *introduction* that formatting changes.\n\n- An item with *words\n<b>\nmore* after the tag\n  ---\n\n> A quote with *words\n<span>\nmore* after the tag\n> ===\n\n- [one]: https://example.com/one\n<i>\n*after* the definition\n\n> [two]: https://example.com/two\n> [three]: https://example.com/three\n</b>\n*after* the definitions\n\nA *closing* paragraph.\n",
+  },
 ];
 
 export const githubFixtures = [

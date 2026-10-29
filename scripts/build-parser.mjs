@@ -267,12 +267,13 @@ export async function bundleParser(options = {}) {
       code: 1,
       footnote: 1,
       footnoteSyntax: 1,
+      htmlFlow: 1,
       labelEnd: 1,
       strike: 1,
       text: 1,
     });
     assert.equal(redirected.size, 1);
-    assert.equal(transformed.size, 9);
+    assert.equal(transformed.size, 10);
     assert.deepEqual(editMapImporters.sort(compare), expectedImporters);
 
     const modules = Object.keys(chunk.modules);

@@ -224,6 +224,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- A lazy line below a list item's or block quote's paragraph that could start an
+  HTML block of the kind that cannot interrupt a paragraph, such as `<b>` alone
+  on its line, now continues the paragraph, as CommonMark, Forgejo, Gitea,
+  VitePress and Obsidian read it, instead of ending the container. Rules
+  formatted it by the wrong reading: `style/block-spacing` added a blank line
+  after the tag, and the item lost its last line. GitHub reads it otherwise: it
+  ends the containers there and shows the tag and the lines below it, up to a
+  blank line, as HTML, with Markdown such as `*` as literal text. In the GitHub
+  dialect, rules now leave those containers and lines as written, also where
+  CommonMark reads the paragraph text as a Setext heading or as link definitions
+  before the tag line. HTML that may interrupt a paragraph, such as `<div>` or a
+  comment, still ends the paragraph
+  ([#762](https://github.com/viell-dev/slop-markdown-tools/issues/762)).
+
 - In Obsidian, rules no longer change a list item that starts on a footnote's
   label line, as in `[^1]: - item`, below a run of three or more backticks that
   nothing closes. Live Preview shows such an item as code carried from the run

@@ -23,8 +23,10 @@ import { githubHeadingLimit } from "../workspace/github-heading-source.js";
  * text or code (issues #378, #379, and #390), for the tables that it reads
  * otherwise (issue #359), and for the HTML blocks that it keeps inside a list
  * item, with the blocks and list markers that then stay as written (issue
- * #399), and for inline HTML comments that Live Preview carries across blocks
- * from paragraphs, headings, and table cells (issue #408). Only the part of the
+ * #399), for inline HTML comments that Live Preview carries across blocks
+ * from paragraphs, headings, and table cells (issue #408), and for the
+ * containers that GitHub ends at a lazy line holding only an HTML tag, with the
+ * lines it then reads as HTML (issue #762). Only the part of the
  * edit that changes the text counts, so that an edit that copies such text,
  * such as a list rule's, can still apply.
  */

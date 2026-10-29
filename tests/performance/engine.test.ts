@@ -1,7 +1,9 @@
+import type { Nodes } from "mdast";
 import { expect, it } from "vitest";
 import { applyEdits, format, lint, parse, resolveConfig } from "../../src/index.js";
 import type { Config, Document, Plugin, ProcessOptions } from "../../src/index.js";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
+import { collectGithubLazyHtmlProtections } from "../../src/syntax/github-protections.js";
 import { scaling } from "./scaling.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
@@ -327,3 +329,47 @@ it("applies edits with linear scaling", () => {
     ),
   ).toBeLessThan(10);
 });
+
+it.each([
+  {
+    name: "separate containers",
+    prefix: "",
+    unit: "- item *a*\n<b>\n*w*\n\n> quote\n</b>\n*w*\n\nText.\n\n",
+    regions: (count: number) => 2 * count,
+  },
+  { name: "one paragraph", prefix: "- a\n", unit: "<b>\nwords *a*\n", regions: () => 1 },
+  { name: "lines without tags", prefix: "- a <i>\n", unit: "words and more\n", regions: () => 0 },
+  {
+    name: "headings and definitions",
+    prefix: "",
+    unit: "- [x]: /u\n[y]: /v\n<b>\n*w*\n\n> a *w\n<i>\nx* y\n> ===\n\nText.\n\n",
+    regions: (count: number) => 2 * count,
+  },
+  { name: "one item's definitions", prefix: "- [a]: /u\n", unit: "[b]: </v>\n", regions: () => 0 },
+])(
+  "finds GitHub's lazy HTML ranges in $name proportionally (#762)",
+  ({ prefix, unit, regions }) => {
+    // Each paragraph line is read once; a stretch's lines share one search for
+    // the next blank line, and one forward search finds each `<`.
+    const sizes: [number, number] = [2000, 8000];
+    const templates = new Map(
+      sizes.map((count) => [count, parse(prefix + unit.repeat(count), "github")] as const),
+    );
+    expect(
+      scaling(
+        sizes,
+        (count) => ({ document: templates.get(count)!, count }),
+        ({ document }) => {
+          const found = new Set<Nodes>();
+          collectGithubLazyHtmlProtections(document, found);
+          return found;
+        },
+        (found, { document, count }) => {
+          expect(found.size).toBe(regions(count));
+          for (const node of found)
+            expect(node.position!.end.offset).toBeLessThanOrEqual(document.source.length);
+        },
+      ),
+    ).toBeLessThan(10);
+  },
+);
