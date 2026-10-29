@@ -208,9 +208,13 @@ Syntax:
   evidence, not a claim to reproduce every renderer quirk.
 - On Forgejo and Gitea, wrapping generated stray-marker runs across quoted lines
   can change emphasis/strikethrough pairing while retaining text and block
-  structure. The exact observed case is retained in discovery checks
-  ([#665](https://github.com/viell-dev/slop-markdown-tools/issues/665)); it does
-  not excuse a failure in the authored or realistic regression gates.
+  structure
+  ([#665](https://github.com/viell-dev/slop-markdown-tools/issues/665)). With
+  `style/quote-marker`, the observed document's output shows the same on both
+  forges, and the document is one of the authored forge fixtures, which every
+  forge check compares, rather than a known difference of the discovery checks.
+  The limit does not excuse a failure in the authored or realistic regression
+  gates.
 - Obsidian inline comments that span several paragraphs are not fully read;
   suppress formatting around them or use comment blocks. A comment on lines of
   its own directly above text is read as a block before a paragraph, where

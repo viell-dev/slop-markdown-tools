@@ -13,6 +13,18 @@ import { boundaryFixtures } from "./obsidian-boundaries.mjs";
 export const fixtures = [
   ...boundaryFixtures,
   {
+    // #682: one space after quote markers; a tag and a callout's marker keep theirs.
+    name: "quote marker spacing",
+    source:
+      ">  Some *words* in a quote, enough for the text to wrap at thirty columns.\n\n>Some *words* without a space, enough for the text to wrap at thirty columns.\n\n>#tag stays text directly after the marker, enough to wrap at thirty columns.\n\n>  [!tip] Two spaces keep this text\n> Some *words* below it.\n",
+  },
+  {
+    // #713: prefixes where both views stay the same, and the held lazy lines.
+    name: "lazy continuation lines",
+    source:
+      "> Some *words* in a quote, enough for the text\nto wrap at thirty columns.\n\n- Some *words* in an item, enough for the text\nto wrap at thirty columns.\n\n> - Some *words* in a quoted item, enough\n> to wrap at thirty columns.\n\nA note[^1].\n\n[^1]: Some *words* in a footnote, enough\nto wrap at thirty columns.\n\n> > Some *words* in a nested quote, enough\n> to wrap at thirty columns.\n",
+  },
+  {
     // #441: the empty marker needs a separator to retain Live Preview's list styling.
     name: "empty bullet marker before lazy text",
     source: "- \nSome *words* after the marker, enough for the text to wrap at thirty columns.\n",
