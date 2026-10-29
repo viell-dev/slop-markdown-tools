@@ -15,7 +15,9 @@ prereleases' notes there are longer than their entries here.
 - `config convert` translates markdownlint and Prettier settings into a
   configuration, with exclusive `--write`, source and conflict reporting, and
   in-memory fallback when no mdrefine configuration exists. Disable fallback
-  with `--no-competitor-config`; fallback never executes competitor scripts
+  with `--no-competitor-config`; fallback never executes competitor scripts and
+  preserves source-relative patterns. Converted overrides accumulate through
+  `mergeRuleOptions` and `ruleOptions`
   ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
 
 - Opt-in `content/html-element` reports HTML elements, once each at the opening

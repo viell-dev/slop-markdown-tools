@@ -349,3 +349,7 @@ With fallback settings, `config explain` adds a `conversion` object containing
 `config`, `sources`, `omitted`, `conflicts`, and `suggestions`. Ordinary lint
 and format JSON reports keep their existing structure; conversion notices use
 stderr once per invocation.
+
+`rules` accepts `--no-competitor-config` too. Its list describes the available
+rules rather than the effective settings, so it does not print fallback notices;
+use `config explain` to inspect conversion and its report.

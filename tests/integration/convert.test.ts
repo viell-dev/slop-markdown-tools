@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { resolveConfig as prettierResolve, getFileInfo } from "prettier";
 import { describe, expect, it } from "vitest";
 import { competitorFiles } from "../../src/config/competitors.js";
 import { fixture, run } from "../support/cli.js";
@@ -21,7 +22,7 @@ describe("competitor configuration CLI (#669)", () => {
       "other.md": "text",
     });
     const result = run(root, ["lint", "--json"]);
-    expect(result.status, result.stderr).toBe(1);
+    expect(result.status, result.stderr).toBe(0);
     expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(["docs/note.md"]);
     expect(result.stderr).toContain("base.yaml");
   });
@@ -117,7 +118,7 @@ describe("competitor configuration CLI (#669)", () => {
     expect(result.status, result.stderr).toBe(0);
     const config = parseConfig(result.stdout);
     expect(config.ignore).toEqual(["**/generated", "**/generated/**"]);
-    expect(config.overrides?.[0]?.rules?.["style/wrap"]).toEqual(["warn", { width: 70 }]);
+    expect(config.overrides?.[0]?.ruleOptions?.["style/wrap"]).toEqual({ width: 70 });
     expect(result.stderr).toContain("base.yaml");
     await writeFile(path.join(root, "base.yaml"), 'extends: "./.markdownlint.json"');
     expect(run(root, ["config", "convert"]).stderr).toContain("Cyclic");
@@ -130,10 +131,9 @@ describe("competitor configuration CLI (#669)", () => {
     });
     const result = run(root, ["config", "convert"]);
     expect(result.status, result.stderr).toBe(0);
-    expect(parseConfig(result.stdout).overrides?.[0]?.rules?.["style/list-indent"]).toEqual([
-      "warn",
+    expect(parseConfig(result.stdout).overrides?.[0]?.ruleOptions?.["style/list-indent"]).toEqual(
       expect.objectContaining({ nestedIndent: 4 }),
-    ]);
+    );
   });
   it.each([undefined, '{"default":false,"MD047":true}'])(
     "ignores editorconfig without Prettier (%s)",
@@ -220,5 +220,139 @@ describe("competitor configuration CLI (#669)", () => {
     expect(
       parseConfig(run(scripts, ["config", "convert"]).stdout).rules?.["style/list-indent"],
     ).toEqual(["warn", expect.objectContaining({ nestedIndent: 4 })]);
+  });
+  it("accumulates matching overrides on editorconfig, including unset", async () => {
+    const root = await fixture({
+      ".prettierrc": JSON.stringify({
+        proseWrap: "preserve",
+        overrides: [
+          { files: "*.md", options: { proseWrap: "always" } },
+          { files: "README.md", options: { tabWidth: 4 } },
+        ],
+      }),
+      ".editorconfig": "root=true\n[*]\nmax_line_length=40\n[README.md]\nmax_line_length=unset\n",
+      "README.md": "text\n",
+      "note.md": "text\n",
+    });
+    for (const name of ["README.md", "note.md"]) {
+      const reference = await prettierResolve(path.join(root, name), { editorconfig: true });
+      const result = run(root, ["config", "explain", name]);
+      expect(result.status, result.stderr).toBe(0);
+      const effective = parseExplanation(result.stdout).effective.rules;
+      expect(effective["style/wrap"]).toEqual([
+        "warn",
+        { mode: "always", width: reference?.printWidth ?? 80 },
+      ]);
+      expect(effective["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: reference?.tabWidth ?? 2 }),
+      ]);
+    }
+  });
+  it("rebases source patterns for fallback and written conversion", async () => {
+    const root = await fixture({
+      "sub/.prettierrc": JSON.stringify({
+        overrides: [{ files: "docs/*.md", options: { proseWrap: "always", printWidth: 40 } }],
+      }),
+      "sub/.prettierignore": "/skip.md\n",
+      "sub/docs/a.md": "text\n",
+      "sub/skip.md": "text\n",
+      "skip.md": "text\n",
+    });
+    const sub = path.join(root, "sub");
+    expect(
+      (
+        await getFileInfo(path.join(sub, "skip.md"), {
+          ignorePath: path.join(sub, ".prettierignore"),
+        })
+      ).ignored,
+    ).toBe(true);
+    const selected = run(sub, ["lint", "--json"]);
+    expect(parseReport(selected.stdout).files.map((f) => f.path)).toEqual([
+      "skip.md",
+      "sub/docs/a.md",
+    ]);
+    const before = parseExplanation(run(sub, ["config", "explain", "docs/a.md"]).stdout).effective
+      .rules;
+    expect(before["style/wrap"]).toEqual(["warn", { mode: "always", width: 40 }]);
+    expect(run(sub, ["config", "convert", "--write"]).status).toBe(0);
+    expect(
+      parseExplanation(run(sub, ["config", "explain", "docs/a.md"]).stdout).effective.rules,
+    ).toEqual(before);
+    expect(parseReport(run(sub, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual([
+      "docs/a.md",
+    ]);
+  });
+  it("uses cli2 replacement precedence and relative inheritance", async () => {
+    const root = await fixture({
+      ".markdownlint.json": JSON.stringify({ extends: "base.json", MD049: { style: "asterisk" } }),
+      "base.json": '{"default":false}',
+      ".markdownlint-cli2.jsonc": JSON.stringify({
+        config: { default: false, MD049: { style: "underscore" }, MD047: true },
+      }),
+      "note.md": "*text*\n",
+    });
+    const effective = parseExplanation(run(root, ["config", "explain", "note.md"]).stdout).effective
+      .rules;
+    expect(effective["style/emphasis"]).toEqual(["error", { marker: "*" }]);
+    expect(effective).not.toHaveProperty("style/final-newline");
+  });
+  it("rebases cli2 globs and ignores directories through actual selection", async () => {
+    const root = await fixture({
+      "sub/.markdownlint-cli2.jsonc": JSON.stringify({
+        config: { default: false, MD047: true },
+        globs: ["**/*.md"],
+        ignores: ["generated"],
+      }),
+      "sub/generated/a.md": "text",
+      "sub/note.md": "text",
+      "note.md": "text",
+    });
+    const result = run(path.join(root, "sub"), ["lint", "--json"]);
+    expect(parseReport(result.stdout).files.map((f) => f.path)).toEqual(["sub/note.md"]);
+  });
+  it.each(["lint", "format", "rules", "config explain"])(
+    "supports opt-out for %s with malformed package metadata",
+    async (command) => {
+      const root = await fixture({ "package.json": "{bad", "note.md": "text\n" });
+      const args = command.split(" ");
+      if (command === "config explain") args.push("note.md");
+      expect(run(root, [...args, "--no-competitor-config"]).status).toBe(0);
+      expect(run(root, args).status).not.toBe(2);
+    },
+  );
+  it("replaces cli2 config instead of merging standalone settings", async () => {
+    const root = await fixture({
+      ".markdownlint.json": '{"default":false,"MD049":{"style":"asterisk"}}',
+      ".markdownlint-cli2.jsonc":
+        '{"config":{"default":false,"MD049":{"style":"underscore"},"MD047":true}}',
+      "note.md": "*text*\n",
+    });
+    const rules = parseExplanation(run(root, ["config", "explain", "note.md"]).stdout).effective
+      .rules;
+    expect(rules["style/emphasis"]).toEqual(["error", { marker: "*" }]);
+    expect(rules).not.toHaveProperty("style/final-newline");
+  });
+  it("excludes cli2 directory descendants at the source root", async () => {
+    const root = await fixture({
+      ".markdownlint-cli2.jsonc":
+        '{"config":{"default":false,"MD047":true},"ignores":["generated"]}',
+      "generated/a.md": "text",
+      "note.md": "text",
+    });
+    expect(parseReport(run(root, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual([
+      "note.md",
+    ]);
+  });
+  it("clears inherited EditorConfig width with unset", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always"}',
+      ".editorconfig": "root=true\n[*]\nmax_line_length=40\n[README.md]\nmax_line_length=unset\n",
+      "README.md": "text\n",
+    });
+    const reference = await prettierResolve(path.join(root, "README.md"), { editorconfig: true });
+    const rules = parseExplanation(run(root, ["config", "explain", "README.md"]).stdout).effective
+      .rules;
+    expect(rules["style/wrap"]).toEqual(["warn", { width: reference?.printWidth ?? 80 }]);
   });
 });

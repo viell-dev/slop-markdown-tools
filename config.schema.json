@@ -56,6 +56,12 @@
             "items": { "type": "string" },
             "minItems": 1
           },
+          "mergeRuleOptions": { "type": "boolean" },
+          "ruleOptions": {
+            "description": "Merge individual rule options after rules, retaining severity; absent rules stay off.",
+            "type": "object",
+            "additionalProperties": { "type": "object" }
+          },
           "dialect": { "$ref": "#/definitions/dialect" },
           "vitepress": { "$ref": "#/definitions/vitepress" },
           "rules": { "$ref": "#/definitions/rules" },

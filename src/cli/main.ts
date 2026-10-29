@@ -460,7 +460,7 @@ configCommand
       for (const name of configFiles)
         if (await exists(path.join(root, name)))
           throw new Error(`Existing mdrefine configuration: ${name}`);
-    const report = await loadCompetitorConfig(directories, true);
+    const report = await loadCompetitorConfig(directories, true, root);
     if (!report) throw new Error("No markdownlint or Prettier configuration found.");
     resolveConfig({ config: report.config });
     const text = JSON.stringify(report.config, null, 2) + "\n";
@@ -483,6 +483,7 @@ configCommand
 program
   .command("rules")
   .description("List the built-in rules and those of the configuration's plugins")
+  .option("--no-competitor-config", "Ignore competitor configurations")
   .option(...configOption)
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {

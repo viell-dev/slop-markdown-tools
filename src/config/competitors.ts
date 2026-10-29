@@ -7,7 +7,7 @@ import { parse as json, type ParseError } from "jsonc-parser";
 import { parse as yaml } from "yaml";
 import { exists } from "../workspace/access.js";
 import { convertConfig, type ConversionReport } from "./convert.js";
-import type { Config, Override } from "../core/types.js";
+import type { Config, Override, RuleSetting } from "../core/types.js";
 
 type Values = Record<string, unknown>;
 const object = (value: unknown): Values => {
@@ -74,7 +74,13 @@ function markdownPattern(pattern: string): boolean {
 export async function loadCompetitorConfig(
   directories: readonly string[],
   executeScripts = false,
+  destination = directories.at(-1)!,
 ): Promise<ConversionReport | undefined> {
+  const rebase = (pattern: string, file: string) => {
+    const prefix = path.relative(destination, path.dirname(file)).split(path.sep).join("/");
+    const local = pattern.replace(/^\//, "");
+    return prefix ? `${prefix}/${local}` : local;
+  };
   const sources: string[] = [];
   const omitted: string[] = [];
   const unread = new Set<string>();
@@ -99,7 +105,10 @@ export async function loadCompetitorConfig(
       if (/\.jsonc?$/.test(file)) {
         const errors: ParseError[] = [];
         value = json(text, errors, { allowTrailingComma: true });
-        if (errors.length) throw new Error(`Invalid competitor JSON in ${file}`);
+        if (errors.length)
+          throw new Error(
+            `Invalid competitor JSON in ${file}; use --no-competitor-config to bypass conversion.`,
+          );
       } else value = text.trim() ? (yaml(text) as unknown) : {};
     }
     const result = object(value);
@@ -111,7 +120,7 @@ export async function loadCompetitorConfig(
       for (const name of names) {
         if (typeof name !== "string") throw new Error(`Invalid extends in ${file}`);
         const resolved =
-          name.startsWith(".") || path.isAbsolute(name)
+          (await exists(path.resolve(path.dirname(file), name))) || path.isAbsolute(name)
             ? path.resolve(path.dirname(file), name)
             : createRequire(file).resolve(name);
         base = { ...base, ...(await read(resolved, [...chain, file])) };
@@ -139,16 +148,23 @@ export async function loadCompetitorConfig(
   const prettierFile = await find(competitorFiles.prettier);
   let markdownlint = markdownFile ? await read(markdownFile) : undefined;
   let prettier: Values | undefined;
+  let prettierSource = prettierFile;
   for (const directory of directories) {
     for (const name of ["package.json", "package.yaml"]) {
       const file = path.join(directory, name);
       if (!(await exists(file))) continue;
-      const text = await readFile(file, "utf8");
-      const pkg = object(
-        name.endsWith("json") ? (JSON.parse(text) as unknown) : (yaml(text) as unknown),
-      );
+      let pkg: Values;
+      try {
+        const text = await readFile(file, "utf8");
+        pkg = object(
+          name.endsWith("json") ? (JSON.parse(text) as unknown) : (yaml(text) as unknown),
+        );
+      } catch {
+        continue;
+      }
       if (pkg.prettier === undefined) continue;
       sources.push(file);
+      prettierSource = file;
       prettier =
         typeof pkg.prettier === "string"
           ? await read(createRequire(file).resolve(pkg.prettier))
@@ -166,18 +182,22 @@ export async function loadCompetitorConfig(
   const ignore: string[] = [];
   if (cli2File) {
     const wrapper = await read(cli2File);
-    if (!unread.has(cli2File))
-      markdownlint = {
-        ...markdownlint,
-        ...(wrapper.config === undefined ? {} : object(wrapper.config)),
-      };
+    if (
+      !unread.has(cli2File) &&
+      (!markdownFile ||
+        directories.indexOf(path.dirname(cli2File)) <
+          directories.indexOf(path.dirname(markdownFile)))
+    )
+      markdownlint = wrapper.config === undefined ? markdownlint : object(wrapper.config);
     for (const name of ["ignores", "globs"]) {
       const patterns = wrapper[name];
       if (Array.isArray(patterns))
         for (const pattern of patterns) {
           if (typeof pattern !== "string") continue;
-          if (name === "ignores") ignore.push(pattern);
-          else if (pattern.startsWith("!")) ignore.push(pattern.slice(1));
+          if (name === "ignores" || pattern.startsWith("!")) {
+            const local = rebase(name === "ignores" ? pattern : pattern.slice(1), cli2File);
+            ignore.push(local, `${local.replace(/\/$/, "")}/**`);
+          }
         }
     }
     if (Array.isArray(wrapper.globs)) {
@@ -185,7 +205,11 @@ export async function loadCompetitorConfig(
         (p): p is string => typeof p === "string" && !p.startsWith("!"),
       );
       if (positive.length)
-        ignore.push(positive.length === 1 ? `!${positive[0]}` : `!{${positive.join(",")}}`);
+        ignore.push(
+          positive.length === 1
+            ? `!${rebase(positive[0]!, cli2File)}`
+            : `!{${positive.map((p) => rebase(p, cli2File)).join(",")}}`,
+        );
     }
     for (const key of Object.keys(wrapper))
       if (!["config", "ignores", "globs"].includes(key))
@@ -201,6 +225,35 @@ export async function loadCompetitorConfig(
   }
 
   const overrides: Override[] = [];
+  const overrideConflicts: string[] = [];
+  const addOverride = (files: string[], values: Values) => {
+    const converted = convertConfig({
+      prettier: { ...prettier, ...values },
+      ...(markdownlint ? { markdownlint } : {}),
+    });
+    const ruleOptions: Record<string, Values> = {};
+    const rules: Record<string, RuleSetting> = {};
+    const options = (id: string) => {
+      const setting = converted.config.rules?.[id];
+      return Array.isArray(setting) ? (setting[1] as Values) : {};
+    };
+    if ("tabWidth" in values)
+      ruleOptions["style/list-indent"] = {
+        nestedIndent: options("style/list-indent").nestedIndent,
+      };
+    if ("singleQuote" in values) ruleOptions["style/link-title"] = options("style/link-title");
+    if ("printWidth" in values) ruleOptions["style/wrap"] = { width: values.printWidth };
+    if ("proseWrap" in values) {
+      const setting = converted.config.rules?.["style/wrap"];
+      rules["style/wrap"] = [
+        setting ? "warn" : "off",
+        { mode: values.proseWrap === "never" ? "never" : "always" },
+      ];
+    }
+    overrides.push({ files, mergeRuleOptions: true, rules, ruleOptions });
+    omitted.push(...converted.omitted);
+    overrideConflicts.push(...converted.conflicts);
+  };
   for (const { file, text } of editors.reverse()) {
     sources.push(file);
     let patterns: string[] = [];
@@ -210,19 +263,10 @@ export async function loadCompetitorConfig(
         values = {};
         return;
       }
-      const converted = convertConfig({
-        prettier: { ...values, ...prettier },
-        ...(markdownlint ? { markdownlint } : {}),
-      });
-      const rules = Object.fromEntries(
-        Object.entries(converted.config.rules ?? {}).filter(
-          ([rule]) =>
-            (rule === "style/list-indent" && "tabWidth" in values) ||
-            (rule === "style/wrap" && "printWidth" in values),
-        ),
+      const effective = Object.fromEntries(
+        Object.entries(values).filter(([key]) => !(key in (prettier ?? {}))),
       );
-      overrides.push({ files: patterns, rules });
-      omitted.push(...converted.omitted);
+      addOverride(patterns, effective);
       values = {};
     };
     for (const line of text.split(/\r?\n/)) {
@@ -230,12 +274,8 @@ export async function loadCompetitorConfig(
       if (section) {
         flush();
         const pattern = section[1]!;
-        const prefix = path
-          .relative(directories.at(-1)!, path.dirname(file))
-          .split(path.sep)
-          .join("/");
         const local = pattern.includes("/") ? pattern.replace(/^\//, "") : `**/${pattern}`;
-        patterns = [prefix ? `${prefix}/${local}` : local];
+        patterns = [rebase(local, file)];
         continue;
       }
       const entry = /^\s*([^#;=\s]+)\s*=\s*([^#;]+?)\s*$/.exec(line);
@@ -244,7 +284,9 @@ export async function loadCompetitorConfig(
       if (["indent_size", "tab_width"].includes(key!) && /^\d+$/.test(value!))
         values.tabWidth = Number(value);
       if (key === "indent_style") values.useTabs = value === "tab";
-      if (key === "max_line_length" && /^\d+$/.test(value!)) values.printWidth = Number(value);
+      if (key === "max_line_length" && (/^\d+$/.test(value!) || value === "unset"))
+        values.printWidth = value === "unset" ? 80 : Number(value);
+      if (["indent_size", "tab_width"].includes(key!) && value === "unset") values.tabWidth = 2;
       if (key === "end_of_line") values.endOfLine = value;
     }
     flush();
@@ -262,19 +304,10 @@ export async function loadCompetitorConfig(
         throw new Error("Invalid Prettier override files");
       if (!files.some(markdownPattern)) continue;
       if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
-      const converted = convertConfig({
-        prettier: { ...prettier, ...object(item.options) },
-        ...(markdownlint ? { markdownlint } : {}),
-      });
-      overrides.push({
-        files: files.map((file) => (file.includes("/") ? file : `**/${file}`)),
-        rules: {
-          ...converted.config.rules,
-          "style/wrap": converted.config.rules?.["style/wrap"] ?? "off",
-        },
-      });
-      omitted.push(...converted.omitted);
-      report.conflicts.push(...converted.conflicts);
+      addOverride(
+        files.map((file) => rebase(file.includes("/") ? file : `**/${file}`, prettierSource!)),
+        object(item.options),
+      );
     }
   const ignoreFile = await find([".prettierignore"]);
   if (ignoreFile && prettier) {
@@ -293,10 +326,22 @@ export async function loadCompetitorConfig(
           const rooted = line.startsWith("/");
           const pattern = line.replace(/^\//, "").replace(/\/$/, "");
           const prefix = !rooted && !pattern.includes("/") ? "**/" : "";
-          return [`${prefix}${pattern}`, `${prefix}${pattern}/**`];
+          return [
+            rebase(`${prefix}${pattern}`, ignoreFile),
+            rebase(`${prefix}${pattern}/**`, ignoreFile),
+          ];
         }),
     );
   }
+  if (prettier && overrides.length && !report.config.rules?.["style/wrap"])
+    report.config = {
+      ...report.config,
+      rules: {
+        ...report.config.rules,
+        "style/wrap": ["off", { width: prettier.printWidth ?? 80, mode: "always" }],
+      },
+    };
+  report.conflicts.push(...overrideConflicts);
   report.sources = [...new Set(sources)];
   report.omitted = [...new Set([...report.omitted, ...omitted])];
   report.config = {

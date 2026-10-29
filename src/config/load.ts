@@ -131,7 +131,7 @@ export async function loadConfig(
   }
 
   if (!file && competitorFallback) {
-    const conversion = await loadCompetitorConfig(directories);
+    const conversion = await loadCompetitorConfig(directories, false, fallbackRoot);
     if (conversion) {
       validateConfig(conversion.config);
       return { config: conversion.config, plugins: [], root: fallbackRoot, conversion };

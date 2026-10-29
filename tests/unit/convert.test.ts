@@ -346,4 +346,54 @@ describe("competitor conversion (#669)", () => {
     expect(docs).toContain('"None yet" and "Not yet" link the issue');
     expect(docs).toContain("### Configuration conversion and fallback");
   });
+  it("normalizes enabled, case, alias order and tags before formatting", () => {
+    const disabled = convertConfig({
+      markdownlint: { default: false, MD049: { enabled: false, style: "underscore" } },
+    });
+    expect(format("*text*\n", { config: disabled.config }).output).toBe("*text*\n");
+    const combined = convertConfig({
+      prettier: {},
+      markdownlint: { default: false, MD049: { enabled: false } },
+    });
+    expect(format("*text*\n", { config: combined.config }).output).toBe("_text_\n");
+    for (const markdownlint of [
+      { default: false, md049: { style: "asterisk" } },
+      { default: false, "emphasis-style": { style: "underscore" }, MD049: { style: "asterisk" } },
+      { default: false, emphasis: false, md049: { style: "asterisk" } },
+    ]) {
+      const result = convertConfig({ markdownlint });
+      expect(format("_text_\n", { config: result.config }).output).toBe("*text*\n");
+      expect(result.omitted).toEqual([]);
+    }
+    const tagged = convertConfig({
+      markdownlint: { default: false, HEADINGS: true, MD003: false },
+    });
+    expect(tagged.config.rules).toHaveProperty("structure/heading-increment");
+    expect(tagged.config.rules).toHaveProperty("structure/single-title");
+  });
+  it("preserves mixed Setext/closed ATX intent", () => {
+    const headings = convertConfig({
+      markdownlint: { default: false, MD003: { style: "setext_with_atx_closed" } },
+    });
+    expect(format("Title\n=====\n\n### Sub ###\n", { config: headings.config }).output).toBe(
+      "Title\n=====\n\n### Sub ###\n",
+    );
+  });
+  it.each(["one", "zero"])("reports unsupported MD029 start %s without changing it", (style) => {
+    const lists = convertConfig({ markdownlint: { default: false, MD029: { style } } });
+    expect(lists.omitted.join(" ")).toContain("required start number");
+    expect(format("3. a\n3. b\n", { config: lists.config }).output).toBe("3. a\n3. b\n");
+  });
+  it("expands every documented tag in source order", () => {
+    for (const tag of new Set(competitorMappings.flatMap((row) => row.tags ?? []))) {
+      const rows = competitorMappings.filter((row) => row.tags?.includes(tag));
+      const expanded = Object.fromEntries(rows.map((row) => [row.source, true]));
+      expect(
+        convertConfig({ markdownlint: { default: false, [tag.toUpperCase()]: true } }).config,
+      ).toEqual(convertConfig({ markdownlint: { default: false, ...expanded } }).config);
+    }
+    expect(convertConfig({ markdownlint: { default: false, "single-h1": true } }).config).toEqual(
+      convertConfig({ markdownlint: { default: false, MD025: true } }).config,
+    );
+  });
 });

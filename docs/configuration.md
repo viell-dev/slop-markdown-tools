@@ -254,6 +254,14 @@ to the documents that match one of its `files` patterns:
 }
 ```
 
+By default, each `rules` entry replaces the earlier setting for that rule. Set
+`mergeRuleOptions: true` on an override to merge tuple options instead, keeping
+earlier option values that the tuple does not name. Its severity still replaces
+the earlier severity. `ruleOptions` merges individual options after `rules`
+without changing severity; a rule absent so far stays off. The converter uses
+these fields so overlapping Prettier overrides accumulate, including a width
+specified before wrapping is enabled.
+
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names
 start with a dot, too. Patterns match letter case exactly on every system, so

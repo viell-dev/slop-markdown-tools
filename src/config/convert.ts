@@ -9,6 +9,10 @@ export interface CompetitorMapping {
   source: string;
   /** Long markdownlint rule name accepted in configuration. */
   alias?: string;
+  /** Additional historical markdownlint rule names. */
+  aliases?: readonly string[];
+  /** markdownlint tags, from its 0.42 rule documentation. */
+  tags?: readonly string[];
   /** Destination mdrefine rule, when available. */
   rule?: string;
   /** Competitor defaults expressed as mdrefine options. */
@@ -24,6 +28,7 @@ export interface CompetitorMapping {
 export const competitorMappings: readonly CompetitorMapping[] = [
   {
     source: "MD001",
+    tags: ["headings"],
     alias: "heading-increment",
     rule: "structure/heading-increment",
     defaults: { frontMatterTitle: true },
@@ -31,6 +36,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD003",
+    tags: ["headings"],
     alias: "heading-style",
     rule: "style/heading",
     defaults: { style: "consistent", closing: "keep" },
@@ -38,14 +44,21 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD004",
+    tags: ["bullet", "ul"],
     alias: "ul-style",
     rule: "style/list-marker",
     defaults: { marker: "consistent" },
     options: { style: "marker" },
   },
-  { source: "MD005", alias: "list-indent", rule: "style/list-indent" },
+  {
+    source: "MD005",
+    tags: ["bullet", "indentation", "ul"],
+    alias: "list-indent",
+    rule: "style/list-indent",
+  },
   {
     source: "MD007",
+    tags: ["bullet", "indentation", "ul"],
     alias: "ul-indent",
     rule: "style/list-indent",
     defaults: { nestedIndent: 2, startIndented: false, startIndent: 2 },
@@ -57,6 +70,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD009",
+    tags: ["whitespace"],
     alias: "no-trailing-spaces",
     rule: "style/trailing-space",
     defaults: { hardBreakSpaces: 2, listItemEmptyLines: false },
@@ -68,6 +82,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD010",
+    tags: ["hard_tab", "whitespace"],
     alias: "no-hard-tabs",
     rule: "style/no-tabs",
     defaults: { codeBlocks: true, spacesPerTab: 1 },
@@ -77,9 +92,10 @@ export const competitorMappings: readonly CompetitorMapping[] = [
       spaces_per_tab: "spacesPerTab",
     },
   },
-  { source: "MD011", alias: "no-reversed-links", rule: "links/reversed" },
+  { source: "MD011", tags: ["links"], alias: "no-reversed-links", rule: "links/reversed" },
   {
     source: "MD012",
+    tags: ["blank_lines", "whitespace"],
     alias: "no-multiple-blanks",
     rule: "style/blank-lines",
     defaults: { maximum: 1 },
@@ -87,6 +103,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD013",
+    tags: ["line_length"],
     alias: "line-length",
     rule: "content/line-length",
     defaults: { measure: "codepoints" },
@@ -101,13 +118,34 @@ export const competitorMappings: readonly CompetitorMapping[] = [
       stern: "stern",
     },
   },
-  { source: "MD014", alias: "commands-show-output", rule: "content/shell-prompt" },
-  { source: "MD018", alias: "no-missing-space-atx", rule: "structure/unspaced-heading" },
-  { source: "MD019", alias: "no-multiple-space-atx", rule: "style/heading" },
-  { source: "MD020", alias: "no-missing-space-closed-atx", rule: "structure/unspaced-heading" },
-  { source: "MD021", alias: "no-multiple-space-closed-atx", rule: "style/heading" },
+  { source: "MD014", tags: ["code"], alias: "commands-show-output", rule: "content/shell-prompt" },
+  {
+    source: "MD018",
+    tags: ["atx", "headings", "spaces"],
+    alias: "no-missing-space-atx",
+    rule: "structure/unspaced-heading",
+  },
+  {
+    source: "MD019",
+    tags: ["atx", "headings", "spaces"],
+    alias: "no-multiple-space-atx",
+    rule: "style/heading",
+  },
+  {
+    source: "MD020",
+    tags: ["atx_closed", "headings", "spaces"],
+    alias: "no-missing-space-closed-atx",
+    rule: "structure/unspaced-heading",
+  },
+  {
+    source: "MD021",
+    tags: ["atx_closed", "headings", "spaces"],
+    alias: "no-multiple-space-closed-atx",
+    rule: "style/heading",
+  },
   {
     source: "MD022",
+    tags: ["blank_lines", "headings"],
     alias: "blanks-around-headings",
     rule: "style/block-spacing",
     defaults: { linesAbove: 1, linesBelow: 1, includeFrontMatter: false },
@@ -117,9 +155,15 @@ export const competitorMappings: readonly CompetitorMapping[] = [
       include_front_matter: "includeFrontMatter",
     },
   },
-  { source: "MD023", alias: "heading-start-left", rule: "style/heading" },
+  {
+    source: "MD023",
+    tags: ["headings", "spaces"],
+    alias: "heading-start-left",
+    rule: "style/heading",
+  },
   {
     source: "MD024",
+    tags: ["headings"],
     alias: "no-duplicate-heading",
     rule: "structure/duplicate-heading",
     defaults: { siblingsOnly: false },
@@ -127,26 +171,36 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD025",
+    tags: ["headings"],
     alias: "single-title",
+    aliases: ["single-h1"],
     rule: "structure/single-title",
     defaults: { frontMatterTitle: true },
     options: { level: "level", front_matter_title: "frontMatterTitle" },
   },
   {
     source: "MD026",
+    tags: ["headings"],
     alias: "no-trailing-punctuation",
     rule: "structure/heading-punctuation",
     options: { punctuation: "punctuation" },
   },
   {
     source: "MD027",
+    tags: ["blockquote", "indentation", "whitespace"],
     alias: "no-multiple-space-blockquote",
     rule: "style/quote-marker",
     options: { list_items: "listItems" },
   },
-  { source: "MD028", alias: "no-blanks-blockquote", rule: "structure/split-quote" },
+  {
+    source: "MD028",
+    tags: ["blockquote", "whitespace"],
+    alias: "no-blanks-blockquote",
+    rule: "structure/split-quote",
+  },
   {
     source: "MD029",
+    tags: ["ol"],
     alias: "ol-prefix",
     rule: "style/ordered-list",
     defaults: { numbering: "auto", delimiter: "consistent" },
@@ -154,6 +208,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD030",
+    tags: ["ol", "ul", "whitespace"],
     alias: "list-marker-space",
     rule: "style/list-indent",
     options: {
@@ -165,13 +220,20 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD031",
+    tags: ["blank_lines", "code"],
     alias: "blanks-around-fences",
     rule: "style/block-spacing",
     options: {},
   },
-  { source: "MD032", alias: "blanks-around-lists", rule: "style/block-spacing" },
+  {
+    source: "MD032",
+    tags: ["blank_lines", "bullet", "ol", "ul"],
+    alias: "blanks-around-lists",
+    rule: "style/block-spacing",
+  },
   {
     source: "MD033",
+    tags: ["html"],
     alias: "no-inline-html",
     rule: "content/html-element",
     options: {
@@ -179,9 +241,10 @@ export const competitorMappings: readonly CompetitorMapping[] = [
       table_allowed_elements: "tableAllowedElements",
     },
   },
-  { source: "MD034", alias: "no-bare-urls", rule: "links/bare-url" },
+  { source: "MD034", tags: ["links", "url"], alias: "no-bare-urls", rule: "links/bare-url" },
   {
     source: "MD035",
+    tags: ["hr"],
     alias: "hr-style",
     rule: "style/thematic-break",
     defaults: { marker: "consistent" },
@@ -189,21 +252,39 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD036",
+    tags: ["emphasis", "headings"],
     alias: "no-emphasis-as-heading",
     rule: "structure/emphasis-heading",
     options: { punctuation: "punctuation" },
   },
-  { source: "MD037", alias: "no-space-in-emphasis", rule: "content/emphasis-spacing" },
-  { source: "MD038", alias: "no-space-in-code", rule: "content/inline-code-spacing" },
-  { source: "MD039", alias: "no-space-in-links", rule: "links/text-spacing" },
+  {
+    source: "MD037",
+    tags: ["emphasis", "whitespace"],
+    alias: "no-space-in-emphasis",
+    rule: "content/emphasis-spacing",
+  },
+  {
+    source: "MD038",
+    tags: ["code", "whitespace"],
+    alias: "no-space-in-code",
+    rule: "content/inline-code-spacing",
+  },
+  {
+    source: "MD039",
+    tags: ["links", "whitespace"],
+    alias: "no-space-in-links",
+    rule: "links/text-spacing",
+  },
   {
     source: "MD040",
+    tags: ["code", "language"],
     alias: "fenced-code-language",
     rule: "content/code-language",
     options: { allowed_languages: "allowedLanguages", language_only: "languageOnly" },
   },
   {
     source: "MD041",
+    tags: ["headings"],
     alias: "first-line-heading",
     rule: "structure/initial-heading",
     defaults: { frontMatterTitle: true },
@@ -213,9 +294,10 @@ export const competitorMappings: readonly CompetitorMapping[] = [
       front_matter_title: "frontMatterTitle",
     },
   },
-  { source: "MD042", alias: "no-empty-links", rule: "links/empty" },
+  { source: "MD042", tags: ["links"], alias: "no-empty-links", rule: "links/empty" },
   {
     source: "MD043",
+    tags: ["headings"],
     alias: "required-headings",
     rule: "structure/heading-template",
     options: { headings: "headings", match_case: "matchCase" },
@@ -223,22 +305,35 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD044",
+    tags: ["spelling"],
     alias: "proper-names",
     rule: "content/proper-names",
     defaults: { codeBlocks: true },
     options: { names: "names", code_blocks: "codeBlocks", html_elements: "htmlElements" },
     disabled: true,
   },
-  { source: "MD045", alias: "no-alt-text", rule: "content/image-alt" },
+  {
+    source: "MD045",
+    tags: ["accessibility", "images"],
+    alias: "no-alt-text",
+    rule: "content/image-alt",
+  },
   {
     source: "MD046",
+    tags: ["code"],
     alias: "code-block-style",
     rule: "style/code-block",
     options: { style: "style" },
   },
-  { source: "MD047", alias: "single-trailing-newline", rule: "style/final-newline" },
+  {
+    source: "MD047",
+    tags: ["blank_lines"],
+    alias: "single-trailing-newline",
+    rule: "style/final-newline",
+  },
   {
     source: "MD048",
+    tags: ["code"],
     alias: "code-fence-style",
     rule: "style/code-fence",
     defaults: { marker: "consistent" },
@@ -246,6 +341,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD049",
+    tags: ["emphasis"],
     alias: "emphasis-style",
     rule: "style/emphasis",
     defaults: { marker: "consistent" },
@@ -253,6 +349,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD050",
+    tags: ["emphasis"],
     alias: "strong-style",
     rule: "style/strong",
     defaults: { marker: "consistent" },
@@ -260,12 +357,14 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD051",
+    tags: ["links"],
     alias: "link-fragments",
     rule: "links/valid",
     options: { ignored_pattern: "ignoredFragments", ignore_case: "exactCase" },
   },
   {
     source: "MD052",
+    tags: ["images", "links"],
     defaults: { ignoredLabels: ["x"] },
     alias: "reference-links-images",
     rule: "links/undefined-reference",
@@ -273,12 +372,14 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD053",
+    tags: ["images", "links"],
     alias: "link-image-reference-definitions",
     rule: "links/unused-definition",
     options: { ignored_definitions: "ignoredDefinitions" },
   },
   {
     source: "MD054",
+    tags: ["images", "links"],
     alias: "link-image-style",
     rule: "links/allowed-notation",
     options: {
@@ -293,21 +394,24 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   {
     source: "MD055",
+    tags: ["table"],
     alias: "table-pipe-style",
     rule: "style/table",
     defaults: { pipeStyle: "consistent" },
     options: { style: "pipeStyle" },
   },
-  { source: "MD056", alias: "table-column-count", rule: "content/table-columns" },
-  { source: "MD058", alias: "blanks-around-tables", rule: "style/block-spacing" },
+  { source: "MD056", tags: ["table"], alias: "table-column-count", rule: "content/table-columns" },
+  { source: "MD058", tags: ["table"], alias: "blanks-around-tables", rule: "style/block-spacing" },
   {
     source: "MD059",
+    tags: ["accessibility", "links"],
     alias: "descriptive-link-text",
     rule: "links/descriptive-text",
     options: { prohibited_texts: "prohibitedTexts" },
   },
   {
     source: "MD060",
+    tags: ["table"],
     alias: "table-column-style",
     rule: "style/table",
     options: { style: "style", aligned_delimiter: "alignedDelimiter" },
@@ -482,12 +586,26 @@ export function convertConfig(input: {
         );
   }
   if (input.markdownlint) {
-    const m = { ...input.markdownlint };
-    for (const row of competitorMappings)
-      if (row.alias && row.alias in m) {
-        m[row.source] = m[row.alias];
-        delete m[row.alias];
-      }
+    const m = Object.create(null) as Values;
+    for (const [rawKey, rawValue] of Object.entries(input.markdownlint)) {
+      const key = rawKey.toLowerCase();
+      const rows = competitorMappings.filter(
+        (row) =>
+          row.source.startsWith("MD") &&
+          (row.source.toLowerCase() === key ||
+            row.alias === key ||
+            row.aliases?.includes(key) ||
+            row.tags?.includes(key)),
+      );
+      const value =
+        rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
+          ? (rawValue as Values).enabled === false
+            ? false
+            : Object.fromEntries(Object.entries(rawValue).filter(([name]) => name !== "enabled"))
+          : rawValue;
+      if (rows.length) for (const row of rows) m[row.source] = value;
+      else m[key] = value;
+    }
     for (const row of competitorMappings.filter((r) => r.source.startsWith("MD"))) {
       const setting = m[row.source];
       if (setting === false || (setting === undefined && (m.default === false || row.disabled)))
@@ -504,10 +622,10 @@ export function convertConfig(input: {
         }
       }
       if (row.source === "MD003") {
-        if (["atx_closed", "setext_with_atx_closed"].includes(String(options.style)))
-          options.closing = "add";
-        if (String(options.style).includes("closed")) options.style = "atx";
-        if (String(options.style).startsWith("setext_with")) options.style = "setext";
+        const style = String(options.style);
+        if (["atx_closed", "setext_with_atx_closed"].includes(style)) options.closing = "add";
+        if (style.includes("closed")) options.style = "atx";
+        if (style.startsWith("setext_with")) options.style = "setext";
       }
       if (["MD004", "MD048", "MD049", "MD050"].includes(row.source))
         options.marker =
@@ -529,6 +647,10 @@ export function convertConfig(input: {
       if (row.source === "MD029" && options.numbering === "one_or_ordered")
         options.numbering = "auto";
       if (row.source === "MD060" && options.style === undefined) options.style = "any";
+      if (row.source === "MD029" && ["one", "zero"].includes(String(options.numbering)))
+        report.omitted.push(
+          `MD029 style:${String(options.numbering)}: the required start number is not carried over; existing list starts are preserved for rendering.`,
+        );
       if (row.source === "MD029")
         options.numbering = ["one", "zero"].includes(String(options.numbering))
           ? "same"
