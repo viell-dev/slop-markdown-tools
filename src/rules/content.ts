@@ -4,6 +4,7 @@ import { range } from "../syntax/parse.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
 import { lineBreak } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
+import { properNames } from "./proper-names.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
 const obsidianSize = /\|\d+(?:x\d+)?$/;
@@ -58,6 +59,7 @@ function promptOnly(code: string): string | undefined {
 }
 
 export const contentRules: Record<string, Rule> = {
+  "content/proper-names": properNames,
   "content/image-alt": {
     description: "Report images without alternative text.",
     kind: "problem",

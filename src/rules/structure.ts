@@ -1,7 +1,7 @@
 import type { Emphasis, Heading, Nodes, PhrasingContent, Root, RootContent, Strong } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
-import { range, startsWithMarker, textContent } from "../syntax/parse.js";
+import { parse, range, startsWithMarker, textContent } from "../syntax/parse.js";
 import { lineEnd, lineStart } from "../syntax/source.js";
 import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { walk } from "../syntax/walk.js";
@@ -248,6 +248,99 @@ const numberReference = /^#\p{N}+(?![\p{L}\p{N}])/u;
 const closingRun = /(?:^|[^\\#])#+$/;
 
 export const structureRules: Record<string, Rule> = {
+  "structure/heading-template": {
+    description: "Require the document outline to match a configured heading template.",
+    kind: "problem",
+    schema: optionsSchema({
+      headings: {
+        type: "array",
+        items: { type: "string", pattern: "^(?:[\\*+?]|#{1,6}(?: .*)?)$" },
+      },
+      matchCase: { type: "boolean", default: false },
+    }),
+    check({ document, options }) {
+      if (!options.headings) return [];
+      const configured = options.headings as string[];
+      // Expand + to one required heading followed by zero or more. The NFA
+      // retains at most template.length states, rather than backtracking.
+      const template = configured.flatMap((item) => (item === "+" ? ["?", "*"] : [item]));
+      const normalize = (text: string) => (options.matchCase ? text : text.toLowerCase());
+      const attributes =
+        document.dialect === "forgejo" || document.dialect === "gitea"
+          ? headingAttributes(document)
+          : undefined;
+      const attributed = new Map<Document, Set<number>>();
+      const visible = (heading: Heading, doc: Document) => {
+        const attrs =
+          doc === document
+            ? attributes
+            : doc.dialect === "forgejo" || doc.dialect === "gitea"
+              ? headingAttributes(doc)
+              : undefined;
+        const shown = attrs?.get(heading)?.heading ?? heading;
+        const rendered = (node: Nodes): string => {
+          if (node.type === "html" || node.type === "footnoteReference") return "";
+          if (node.type === "image" || node.type === "imageReference") return node.alt ?? "";
+          return "children" in node ? node.children.map(rendered).join("") : textContent(node);
+        };
+        let text = rendered(shown).replace(/\s+/gu, " ").trim();
+        if (doc.dialect === "obsidian" && blockIdentifier(doc.source, heading))
+          text = text.replace(/\s+\^[A-Za-z0-9-]+$/u, "");
+        if (doc.dialect === "vitepress" && doc.vitepress?.attrs !== false) {
+          let lines = attributed.get(doc);
+          if (!lines) {
+            lines = new Set<number>();
+            for (const token of vitepressTokens(doc))
+              if (token.type === "heading_open" && token.attrs?.length && token.map)
+                lines.add(token.map[0]);
+            attributed.set(doc, lines);
+          }
+          if (lines.has(heading.position!.start.line - 1))
+            text = text.replace(/\s*\{[^{}]*\}$/u, "");
+        }
+        return normalize(`${"#".repeat(heading.depth)} ${text}`.trimEnd());
+      };
+      const expected = template.map((item) => {
+        if (item === "*" || item === "?") return item;
+        const doc = parse(item, document.dialect, undefined, [], document.vitepress);
+        const heading = doc.tree.children[0];
+        return heading?.type === "heading" ? visible(heading, doc) : normalize(item);
+      });
+      const close = (states: Set<number>) => {
+        for (let i = 0; i < template.length; i++)
+          if (states.has(i) && template[i] === "*") states.add(i + 1);
+        return states;
+      };
+      let states = close(new Set([0]));
+      const message = () => {
+        const choices = [...states]
+          .filter((i) => template[i] !== "*")
+          .map((i) =>
+            i === template.length
+              ? "the end of the outline"
+              : template[i] === "?"
+                ? "one heading"
+                : JSON.stringify(template[i]),
+          );
+        return `Heading template mismatch; expected ${choices.join(" or ")}.`;
+      };
+      // Quotes and footnotes have independent outlines; page templates apply
+      // only to the document's own outline, including headings in lists.
+      for (const heading of outlines(document.tree)[0]!) {
+        const text = visible(heading, document);
+        const next = new Set<number>();
+        for (const i of states) {
+          if (template[i] === "*") next.add(i);
+          else if (template[i] === "?" || expected[i] === text) next.add(i + 1);
+        }
+        if (!next.size) return [{ start: range(heading)[0], message: message() }];
+        states = close(next);
+      }
+      return states.has(template.length)
+        ? []
+        : [{ start: document.source.length, message: message() }];
+    },
+  },
   "structure/initial-heading": {
     description: "Require an initial heading at the configured level.",
     kind: "problem",
