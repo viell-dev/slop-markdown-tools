@@ -5,7 +5,14 @@ import type { Paragraph, Parents } from "mdast";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
-import { labelEnd, lazyIndentation, parse, range, startsWithMarker } from "../syntax/parse.js";
+import {
+  frontMatterReading,
+  labelEnd,
+  lazyIndentation,
+  parse,
+  range,
+  startsWithMarker,
+} from "../syntax/parse.js";
 import { type Range, located, holds, obsidianTag } from "./shared.js";
 import { obsidianOpaque, obsidianTabBreak, goldmarkForges, misreadTable } from "./protections.js";
 import { capturedLineBreak, lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
@@ -458,7 +465,7 @@ function atomAt(atoms: InlineAtom[], at: number): InlineAtom | undefined {
  * The width of a line or line prefix, with a tab advancing to the next
  * multiple of four columns, the tab stop that CommonMark uses for indentation.
  */
-function lineWidth(text: string, measure: (text: string) => number): number {
+export function lineWidth(text: string, measure: (text: string) => number): number {
   if (!text.includes("\t")) return measure(text);
   let width = 0;
   for (const part of text.split(/(\t)/)) width += part === "\t" ? 4 - (width % 4) : measure(part);
@@ -914,6 +921,12 @@ function wrapParagraph(
 ): void {
   const { document, options, width, measure, unit, newline } = context;
 
+  // The alternative reading can treat apparent prose as literal YAML/TOML.
+  // Joining it would change that metadata even if the primary prose tree agrees.
+  if (options.mode === "never") {
+    const metadata = frontMatterReading(document.tree)?.children[0];
+    if (metadata && range(node)[0] < range(metadata)[1]) return;
+  }
   const prepared = prepareParagraph(node, index, parent, context, findings);
   if (!prepared) return;
   const { start, end, original, forge, calloutHeader, belowHeader, prefix, continuation } =
@@ -1051,10 +1064,24 @@ function wrapParagraph(
       (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
   )
     atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
-  let output = fillLines(atoms, 1, prefix, continuation, width, measure);
+  let output =
+    options.mode === "never"
+      ? [atoms.join(" ")]
+      : fillLines(atoms, 1, prefix, continuation, width, measure);
   // A paragraph that starts like a link reference definition becomes one
   // when a line ends after the definition's destination or title. Keep
   // words on the first line until the lines read as one paragraph again.
+  // Joining can make one too: `[a]: <u` and `1>` below it are text, but
+  // `[a]: <u 1>` defines `a`, since an angle destination may hold a space.
+  if (
+    options.mode === "never" &&
+    atoms[0]!.startsWith("[") &&
+    definitionStart.test(output[0]!) &&
+    !oneParagraph(output[0]!, document.dialect)
+  ) {
+    reportSkipped("joined lines that would read as a link reference definition");
+    return;
+  }
   if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
     let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
     while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
@@ -1077,7 +1104,10 @@ function wrapParagraph(
     findings.push({
       start,
       end,
-      message: `Reflow paragraph to ${width} ${unit}.`,
+      message:
+        options.mode === "never"
+          ? "Join paragraph onto one line."
+          : `Reflow paragraph to ${width} ${unit}.`,
       edit: { start, end, text: replacement },
     });
   if (
@@ -1092,6 +1122,7 @@ const wrap: Rule = {
   kind: "style",
   phase: "block",
   schema: optionsSchema({
+    mode: { enum: ["always", "never"] },
     width: { type: "integer", minimum: 20, maximum: 500 },
     measure: { enum: ["columns", "codepoints"] },
     reportUnreflowed: { type: "boolean" },
@@ -1099,6 +1130,8 @@ const wrap: Rule = {
   }),
   check({ document, options, workspace }) {
     if (document.dialect === "obsidian" && workspace?.strictLineBreaks !== true) return [];
+    if (options.mode === "never")
+      options = { ...options, reportUnreflowed: false, reportUnbreakable: false };
     const findings: Finding[] = [];
     const width = Number(options.width ?? 80);
     const measure =

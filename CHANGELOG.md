@@ -17,6 +17,13 @@ prereleases' notes there are longer than their entries here.
   reporting other mismatches without losing code or metadata
   ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)).
 
+- Opt-in `content/line-length` reports heading, code and table overflow with
+  per-kind limits, switches and display-column measurement
+  ([#673](https://github.com/viell-dev/slop-markdown-tools/issues/673)).
+- `style/wrap` takes `mode: "never"` to join paragraphs onto one line with the
+  same safety protections as wrapping; preset defaults remain unchanged
+  ([#711](https://github.com/viell-dev/slop-markdown-tools/issues/711)).
+
 - Opt-in `style/link-title` normalizes link, image, and definition title
   delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
   It retains source escapes and line breaks and never changes destinations
