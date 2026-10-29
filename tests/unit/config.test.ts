@@ -463,3 +463,152 @@ describe("a default dialect supplied by the caller", () => {
     expect(github.output).toContain("Shopping list Milk and eggs\n");
   });
 });
+
+describe("override ruleUpdates", () => {
+  it.each(["error", ["error"], "off", ["off"]] as const)(
+    "patches after replacement %j",
+    (setting) => {
+      const config: Config = {
+        extends: [],
+        rules: { "style/wrap": ["warn", { width: 42, mode: "never" }] },
+        overrides: [
+          {
+            files: ["**/*.md"],
+            rules: { "style/wrap": setting },
+            ruleUpdates: { "style/wrap": { options: { width: 60 } } },
+          },
+        ],
+      };
+      expect(resolveConfig({ config }).rules["style/wrap"]).toEqual([
+        typeof setting === "string" ? setting : setting[0],
+        { width: 60 },
+      ]);
+    },
+  );
+  it("keeps options while off and enables absent rules only on request", () => {
+    const config: Config = {
+      extends: [],
+      overrides: [
+        { files: ["**/*.md"], ruleUpdates: { "style/wrap": { options: { width: 42 } } } },
+        { files: ["docs/**"], ruleUpdates: { "style/wrap": { severity: "warn" } } },
+        { files: ["docs/**"], ruleUpdates: { "style/wrap": { severity: "off" } } },
+        { files: ["docs/README.md"], ruleUpdates: { "style/wrap": { severity: "error" } } },
+      ],
+    };
+    expect(resolveConfig({ config, path: "note.md" }).rules["style/wrap"]).toEqual([
+      "off",
+      { width: 42 },
+    ]);
+    expect(resolveConfig({ config, path: "docs/note.md" }).rules["style/wrap"]).toEqual([
+      "off",
+      { width: 42 },
+    ]);
+    expect(resolveConfig({ config, path: "docs/README.md" }).rules["style/wrap"]).toEqual([
+      "error",
+      { width: 42 },
+    ]);
+  });
+  it("orders preset overrides before local patches and replaces nested objects shallowly", () => {
+    const plugins = [
+      {
+        name: "test",
+        presets: {
+          base: {
+            extends: [],
+            rules: { "test/pair": ["warn", { a: 1, nested: { old: 1 } }] },
+            overrides: [
+              { files: ["**/*.md"], ruleUpdates: { "test/pair": { options: { a: 3 } } } },
+            ],
+          },
+        },
+      },
+    ] as const;
+    const config: Config = {
+      extends: ["test/base"],
+      overrides: [
+        { files: ["**/*.md"], ruleUpdates: { "test/pair": { options: { nested: { next: 2 } } } } },
+        {
+          files: ["**/*.md"],
+          ruleUpdates: { "test/pair": { severity: "error", options: { b: 4 } } },
+        },
+      ],
+    };
+    expect(resolveConfig({ config, plugins }).rules["test/pair"]).toEqual([
+      "error",
+      { a: 3, b: 4, nested: { next: 2 } },
+    ]);
+  });
+  it("validates patch shape and checks final options only when enabled", () => {
+    for (const patch of [{ severity: "bad" }, { options: [] }, { unknown: true }])
+      expect(() =>
+        validateConfig({ overrides: [{ files: ["*.md"], ruleUpdates: { "style/wrap": patch } }] }),
+      ).toThrow();
+    const config: Config = {
+      extends: [],
+      overrides: [
+        { files: ["**/*.md"], ruleUpdates: { "style/wrap": { options: { width: "bad" } } } },
+      ],
+    };
+    expect(lint("text\n", { config })).toEqual([]);
+    const enabled: Config = {
+      ...config,
+      overrides: [
+        ...config.overrides!,
+        { files: ["**/*.md"], ruleUpdates: { "style/wrap": { severity: "warn" } } },
+      ],
+    };
+    expect(() => lint("text\n", { config: enabled })).toThrow(/width/);
+    const repaired: Config = {
+      ...enabled,
+      overrides: [
+        ...enabled.overrides!,
+        { files: ["**/*.md"], ruleUpdates: { "style/wrap": { options: { width: 40 } } } },
+      ],
+    };
+    expect(() => lint("text\n", { config: repaired })).not.toThrow();
+  });
+});
+
+describe("patch option schema at execution", () => {
+  it("validates required plugin options after patches have accumulated", () => {
+    const plugins = [
+      {
+        name: "test",
+        rules: {
+          pair: {
+            kind: "problem",
+            description: "pair",
+            schema: {
+              type: "object",
+              properties: { a: { type: "number" }, b: { type: "number" } },
+              required: ["a", "b"],
+              additionalProperties: false,
+            },
+            check: () => [],
+          },
+        },
+      },
+    ] as const;
+    const config: Config = {
+      extends: [],
+      overrides: [
+        { files: ["**/*.md"], ruleUpdates: { "test/pair": { options: { a: 1 } } } },
+        {
+          files: ["**/*.md"],
+          ruleUpdates: { "test/pair": { severity: "error", options: { b: 2 } } },
+        },
+      ],
+    };
+    expect(() => lint("text\n", { config, plugins })).not.toThrow();
+    for (const options of [{ b: "bad" }, { c: 3 }]) {
+      const invalid: Config = {
+        ...config,
+        overrides: [
+          ...config.overrides!,
+          { files: ["**/*.md"], ruleUpdates: { "test/pair": { options } } },
+        ],
+      };
+      expect(() => lint("text\n", { config: invalid, plugins })).toThrow(/Invalid options/);
+    }
+  });
+});

@@ -95,9 +95,82 @@ rule that covers each. "None yet" and "Not yet" link the issue that tracks the
 missing part; keep the other tool for that check until it is done. The issues
 follow each check's documented purpose, not the other tool's known defects.
 
+### Configuration conversion and fallback
+
+Run `mdrefine config convert` to print an `mdrefine.config.jsonc`, or add
+`--write` to create it. Any existing mdrefine configuration in that directory is
+refused. The report on stderr lists sources, omissions with reasons and
+applicable tracking issues, resolved conflicts, and suggested extra checks.
+Review the result before replacing your existing tools.
+
+Without an mdrefine configuration, the same conversion runs in memory. Use
+`--no-competitor-config` to disable this fallback. `config explain <file>` shows
+its sources and converted settings. The search stops at the same repository or
+vault boundary as the ordinary configuration search.
+
+The result uses no preset. markdownlint's enabled checks map to their
+counterparts, including its default rule set unless `default: false` is set.
+Prettier enables its fixed styles. `proseWrap: "always"` enables wrapping at
+`printWidth` (80 by default), `"never"` joins paragraph lines, and `"preserve"`
+leaves wrapping off. Only stated markdownlint option values win fixed Prettier
+styles; Prettier options win the settings they control. Missing behavior is
+reported. Enabled markdownlint checks use `error`, matching its failing exit
+status. Rules enabled only by Prettier use `warn`; `format --check` fails
+regardless of severity. A markdownlint disable keeps an overlapping Prettier
+style enabled. MD013 does not enable reflow: without Prettier wrapping,
+paragraph lines are reported as unchecked, with a suggestion to enable
+`style/wrap` at that width. The mapping follows intended behavior and retains
+mdrefine's safety guards.
+
+Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
+markdownlint-cli2 `config`, Prettier's `package.json` or `package.yaml` key,
+Markdown overrides, and relevant `.editorconfig` values only when a Prettier
+configuration exists. JavaScript and TypeScript configurations are named without
+executing them; the explicit convert command loads them through Node.js. TOML
+and JSON5 are reported as unsupported. `.prettierignore` and markdownlint-cli2
+`ignores` and `globs` become `ignore`. Negated `.prettierignore` patterns are
+reported for manual migration.
+
+Pattern conversion is bounded by source dialect. Prettier overrides,
+EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,
+`?`, and whole-component `**`. Brace alternatives must be flat comma lists,
+without nesting, empty alternatives, ranges, or `**` inside. Accepted escapes
+are backslash followed by another backslash or one of `#`, `?`, `!`, `*`, `[`,
+`]`, `{`, `}`, `(`, `)`, `+`, or `@`. Other escapes, character classes,
+unescaped parentheses, quoted patterns, and whole-pattern complements are
+reported with their source and pattern for manual migration rather than emitted.
+Prettier brace patterns also retain their literal spelling, and terminal `/**`
+also matches the file before that suffix. CLI2 negative globs are directory
+exclusions, and their descendants are expanded before rebasing. When several
+CLI2 positive globs need a combined selection, a literal comma outside braces or
+a brace alternative cannot be represented in that union: the selection is
+reported and omitted. A single positive glob keeps its ordinary meaning.
+
+`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`, the
+same accepted escapes, root anchors, and directory suffixes; braces and
+parentheses stay literal. Character classes, trailing whitespace, and negated
+entries are reported rather than emitted. Prettier matches ignore patterns
+without regard to letter case; converted patterns match case exactly. Conversion
+reports this approximation once per `.prettierignore` file.
+
+All subsets reject `.`, `..`, and empty path components, and absolute paths,
+including Windows drive and UNC spellings on every platform. A leading `/` in
+EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
+`.prettierignore` marks a directory; these are permitted boundaries rather than
+empty components. Every emitted pattern is rebased into the destination subtree;
+unrepresentable intersections are also reported for manual migration.
+
+Competitor inline suppression comments and formatting pragmas have no effect;
+honoring them during the fallback is
+[#723](https://github.com/viell-dev/slop-markdown-tools/issues/723). With an
+mdrefine configuration, including one that `config convert` writes, they never
+apply: use mdrefine's own [suppression
+comments](configuration.md#suppression-comments).
+
 ### markdownlint rules
 
-markdownlint enables every rule by default. mdrefine's presets enable fewer: a
+markdownlint enables its default rule set; template, proper-name, notation, and
+column-style checks require configuration. mdrefine's presets enable fewer: a
 rule that no preset in your configuration enables, such as
 `structure/heading-punctuation`, needs an entry under `rules`. Each rule's
 [section](rules.md) names its presets.
@@ -126,7 +199,7 @@ rule that no preset in your configuration enables, such as
 | MD026 `no-trailing-punctuation`          | [`structure/heading-punctuation`](rules.md#structureheading-punctuation), which reads headings as renderers show them and leaves abbreviations, ellipses, and emoji shortcodes alone                                                    |
 | MD027 `no-multiple-space-blockquote`     | [`style/quote-marker`](rules.md#stylequote-marker), with `listItems`                                                                                                                                                                    |
 | MD028 `no-blanks-blockquote`             | [`structure/split-quote`](rules.md#structuresplit-quote), except before an alert or callout                                                                                                                                             |
-| MD029 `ol-prefix`                        | [`style/ordered-list`](rules.md#styleordered-list); `same` stands for `one` and `zero` in lists that start at 1 or 0, because the first number is never changed                                                                         |
+| MD029 `ol-prefix`                        | [`style/ordered-list`](rules.md#styleordered-list); `same` repeats the existing start; conversion reports that `one` and `zero` start-number checks are not carried over, because the rendered first number is preserved                |
 | MD030 `list-marker-space`                | [`style/list-indent`](rules.md#stylelist-indent), with the same four spacings                                                                                                                                                           |
 | MD031 `blanks-around-fences`             | [`style/block-spacing`](rules.md#styleblock-spacing); outside list items and footnote definitions, as with `list_items: false`                                                                                                          |
 | MD032 `blanks-around-lists`              | [`style/block-spacing`](rules.md#styleblock-spacing)                                                                                                                                                                                    |
@@ -184,35 +257,48 @@ footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
 
-| Prettier                                         | mdrefine                                                                                                                                                                                                              |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `proseWrap: "always"` and `printWidth`           | [`style/wrap`](rules.md#stylewrap) and its `width`                                                                                                                                                                    |
-| `proseWrap: "preserve"`, the default             | Turn `style/wrap` off and enable [`style/prose-space`](rules.md#styleprose-space)                                                                                                                                     |
-| `proseWrap: "never"`                             | [`style/wrap`](rules.md#stylewrap) with `mode: "never"`, preserving the same safety exceptions as wrapping                                                                                                            |
-| `tabWidth`, for nested lists                     | [`style/list-indent`](rules.md#stylelist-indent)'s `nestedIndent`                                                                                                                                                     |
-| `useTabs`                                        | Nothing to set: Prettier indents Markdown with spaces either way                                                                                                                                                      |
-| `endOfLine`                                      | [`style/line-ending`](rules.md#styleline-ending), opt-in; literal content keeps its bytes                                                                                                                             |
-| `embeddedLanguageFormatting`                     | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                                                                                                                                |
-| `singleQuote` and other title delimiters         | [`style/link-title`](rules.md#stylelink-title): double, single, parentheses, or consistent; keeps delimiters where conversion would need escapes                                                                      |
-| `requirePragma` and `insertPragma`               | Under competitor compatibility only, `requirePragma` applies ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)); `insertPragma` is not carried over. No pragma applies with mdrefine configuration |
-| `<!-- prettier-ignore -->` and its start and end | [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments) and its relatives                                                                                                                                |
-| `_` for emphasis, `**` for strong text           | [`style/emphasis`](rules.md#styleemphasis), [`style/strong`](rules.md#stylestrong)                                                                                                                                    |
-| `#` headings without closing `#`                 | [`style/heading`](rules.md#styleheading), with one space after `#` and no heading-owned indentation                                                                                                                   |
-| `-` for bullets, alternating for adjacent lists  | [`style/list-marker`](rules.md#stylelist-marker)                                                                                                                                                                      |
-| `1.` and numbering                               | [`style/ordered-list`](rules.md#styleordered-list); `auto` repeats a number when the first two items share it, where Prettier counts up unless the second number is 1                                                 |
-| One space after list markers, list indentation   | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                                                                      |
-| Backtick fences as short as the code allows      | [`style/code-fence`](rules.md#stylecode-fence), which also removes space before the info string                                                                                                                       |
-| `---` for thematic breaks                        | [`style/thematic-break`](rules.md#stylethematic-break)                                                                                                                                                                |
-| Aligned tables                                   | [`style/table`](rules.md#styletable), with `padding: "alignment"` and display-column widths, also in lists and block quotes, formatting the same on a second run                                                      |
-| Trailing spaces removed, hard breaks kept        | [`style/trailing-space`](rules.md#styletrailing-space), with `hardBreakSpaces: 2` for exact two-space breaks                                                                                                          |
-| Repeated blank lines collapsed                   | [`style/blank-lines`](rules.md#styleblank-lines)                                                                                                                                                                      |
-| Blank lines around blocks                        | [`style/block-spacing`](rules.md#styleblock-spacing), for headings, lists, fences, and tables                                                                                                                         |
-| Final newline                                    | [`style/final-newline`](rules.md#stylefinal-newline)                                                                                                                                                                  |
-| Code spans with the fewest backticks             | [`style/inline-code`](rules.md#styleinline-code)                                                                                                                                                                      |
-| One space after `>`                              | [`style/quote-marker`](rules.md#stylequote-marker)                                                                                                                                                                    |
-| Markers on lazy continuation lines               | [`style/lazy-continuation`](rules.md#stylelazy-continuation); footnote definitions keep their first line on the label's line                                                                                          |
-| One space in link reference definitions          | [`style/definition-spacing`](rules.md#styledefinition-spacing); keeps multiline definitions and Obsidian spacing                                                                                                      |
-| YAML front matter                                | Covered by configuring an external [front matter formatter](configuration.md#front-matter-formatters)                                                                                                                 |
+Prettier keeps Setext headings; conversion uses `style/heading` to normalize
+them to ATX. mdrefine has no mode that keeps mixed Setext and ATX styles while
+normalizing heading spacing. Wrapping also leaves paragraphs with hard line
+breaks as written, where Prettier can wrap their individual lines.
+
+Language-only options such as `semi`, `trailingComma`, `quoteProps`,
+`jsxSingleQuote`, `bracketSpacing`, `bracketSameLine`, `arrowParens`,
+`htmlWhitespaceSensitivity`, `vueIndentScriptAndStyle`, `objectWrap`,
+`experimentalTernaries`, and `experimentalOperatorPosition` do not select a
+Markdown rule. External embedded-code formatting needs explicit code tools.
+Parser, plugin, range, and file-context settings are reported rather than
+executed or used to change dialect detection.
+
+| Prettier                                         | mdrefine                                                                                                                                                                                                         |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proseWrap: "always"` and `printWidth`           | [`style/wrap`](rules.md#stylewrap) and its `width`                                                                                                                                                               |
+| `proseWrap: "preserve"`, the default             | Turn `style/wrap` off and enable [`style/prose-space`](rules.md#styleprose-space)                                                                                                                                |
+| `proseWrap: "never"`                             | [`style/wrap`](rules.md#stylewrap) with `mode: "never"`, preserving the same safety exceptions as wrapping                                                                                                       |
+| `tabWidth`, for nested lists                     | [`style/list-indent`](rules.md#stylelist-indent)'s `nestedIndent`                                                                                                                                                |
+| `useTabs`                                        | Nothing to set: Prettier indents Markdown with spaces either way                                                                                                                                                 |
+| `endOfLine`                                      | [`style/line-ending`](rules.md#styleline-ending), opt-in; literal content keeps its bytes                                                                                                                        |
+| `embeddedLanguageFormatting`                     | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                                                                                                                           |
+| `singleQuote` and other title delimiters         | [`style/link-title`](rules.md#stylelink-title): double, single, parentheses, or consistent; keeps delimiters where conversion would need escapes                                                                 |
+| `requirePragma` and `insertPragma`               | None yet for `requirePragma` during the fallback ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)); `insertPragma` is not carried over, and no pragma applies with an mdrefine configuration |
+| `<!-- prettier-ignore -->` and its start and end | [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments) and its relatives                                                                                                                           |
+| `_` for emphasis, `**` for strong text           | [`style/emphasis`](rules.md#styleemphasis), [`style/strong`](rules.md#stylestrong)                                                                                                                               |
+| `#` headings without closing `#`                 | [`style/heading`](rules.md#styleheading), with one space after `#` and no heading-owned indentation                                                                                                              |
+| `-` for bullets, alternating for adjacent lists  | [`style/list-marker`](rules.md#stylelist-marker)                                                                                                                                                                 |
+| `1.` and numbering                               | [`style/ordered-list`](rules.md#styleordered-list); `auto` repeats a number when the first two items share it, where Prettier counts up unless the second number is 1                                            |
+| One space after list markers, list indentation   | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                                                                 |
+| Backtick fences as short as the code allows      | [`style/code-fence`](rules.md#stylecode-fence), which also removes space before the info string                                                                                                                  |
+| `---` for thematic breaks                        | [`style/thematic-break`](rules.md#stylethematic-break)                                                                                                                                                           |
+| Aligned tables                                   | [`style/table`](rules.md#styletable), with `padding: "alignment"` and display-column widths                                                                                                                      |
+| Trailing spaces removed, hard breaks kept        | [`style/trailing-space`](rules.md#styletrailing-space), with `hardBreakSpaces: 2` for exact two-space breaks                                                                                                     |
+| Repeated blank lines collapsed                   | [`style/blank-lines`](rules.md#styleblank-lines)                                                                                                                                                                 |
+| Blank lines around blocks                        | [`style/block-spacing`](rules.md#styleblock-spacing), for headings, lists, fences, and tables                                                                                                                    |
+| Final newline                                    | [`style/final-newline`](rules.md#stylefinal-newline)                                                                                                                                                             |
+| Code spans with the fewest backticks             | [`style/inline-code`](rules.md#styleinline-code)                                                                                                                                                                 |
+| One space after `>`                              | [`style/quote-marker`](rules.md#stylequote-marker)                                                                                                                                                               |
+| Markers on lazy continuation lines               | [`style/lazy-continuation`](rules.md#stylelazy-continuation); footnote definitions keep their first line on the label's line                                                                                     |
+| One space in link reference definitions          | [`style/definition-spacing`](rules.md#styledefinition-spacing); keeps multiline definitions and Obsidian spacing                                                                                                 |
+| YAML front matter                                | Covered by configuring an external [front matter formatter](configuration.md#front-matter-formatters)                                                                                                            |
 
 Prettier keeps line breaks by default (`proseWrap: "preserve"`), while
 `recommended` wraps at 80 columns. `style/wrap` keeps the lines of

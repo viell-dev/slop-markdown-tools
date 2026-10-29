@@ -5,3 +5,7 @@ export type { DiscoverOptions, WorkspaceDiscovery } from "./workspace/discovery.
 export type { Skipped } from "./workspace/files.js";
 export { formatWithCode } from "./code/format.js";
 export type { CodeFormatOptions } from "./code/format.js";
+
+export { loadConfig } from "./config/load.js";
+export type { LoadedConfig } from "./config/load.js";
+export { loadCompetitorConfig, competitorFiles } from "./config/competitors.js";

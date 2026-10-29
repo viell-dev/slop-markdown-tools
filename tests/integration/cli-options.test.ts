@@ -66,15 +66,25 @@ describe("the command line", () => {
     const commands = help().split("Commands:\n")[1]!;
     for (const name of ["lint", "format", "config", "rules", "help"])
       expect(commands, name).toMatch(new RegExp(`^  ${name} .*\\S  +[A-Z]`, "m"));
-    expect(help("config").split("Commands:\n")[1]).toMatch(/^ {2}explain .*\S {2,}[A-Z]/m);
+    for (const name of ["explain", "convert"])
+      expect(help("config").split("Commands:\n")[1], name).toMatch(
+        new RegExp(`^ {2}${name} .*\\S {2,}[A-Z]`, "m"),
+      );
     const options = (text: string) =>
       [...text.matchAll(/^ {2}(?:-\w, )?(--[a-z-]+)/gm)].map((match) => match[1]);
-    const workspace = ["--config", "--root", "--dialect", "--help"];
+    const workspace = ["--config", "--no-competitor-config", "--root", "--dialect", "--help"];
     expect(options(help("config"))).toEqual(workspace);
     expect(options(help("config", "explain"))).toEqual(workspace);
-    expect(options(help("rules"))).toEqual(["--config", "--json", "--help"]);
+    expect(options(help("config", "convert"))).toEqual(["--root", "--write", "--help"]);
+    expect(options(help("rules"))).toEqual([
+      "--config",
+      "--no-competitor-config",
+      "--json",
+      "--help",
+    ]);
     expect(options(help("lint"))).toEqual([
       "--config",
+      "--no-competitor-config",
       "--root",
       "--dialect",
       "--exclude",

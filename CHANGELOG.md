@@ -12,6 +12,18 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `config convert` translates markdownlint and Prettier settings into a
+  configuration, with exclusive `--write`, source and conflict reporting, and
+  in-memory fallback when no mdrefine configuration exists. Disable fallback
+  with `--no-competitor-config`; fallback never executes competitor scripts and
+  preserves source-relative patterns within documented dialect subsets,
+  reporting unsupported patterns for manual migration. Directory exclusions
+  retain their descendants when converting inside an excluded directory.
+  Prettier brace literals and terminal globstars retain their matching branches;
+  ignore conversion reports its case-sensitive approximation. Converted
+  overrides accumulate through `ruleUpdates`
+  ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
+
 - Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with
   `endOfLine`, preserving hard breaks and literal content bytes
   ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)).

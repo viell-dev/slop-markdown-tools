@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
-import { readFile, realpath } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { lint, ruleRegistry } from "../core/engine.js";
 import { formatWithCode } from "../code/format.js";
-import { loadConfig } from "../config/load.js";
+import { loadCompetitorConfig } from "../config/competitors.js";
+import { loadConfig, searchConfig, configFiles } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
 import { isIgnoredInput, skippedMessage } from "../workspace/files.js";
 import { replacementFailure, replacementProblem, writeFormatted } from "../workspace/writes.js";
 import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.js";
 import { enclosingVault } from "../workspace/vault.js";
-import { refusal, refusalText } from "../workspace/access.js";
+import { exists, refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
 import { unifiedDiff } from "./diff.js";
 import type { Diagnostic, DialectName } from "../core/types.js";
 
 interface Flags {
+  competitorConfig?: boolean;
   config?: string;
   root?: string;
   dialect?: DialectName;
@@ -52,6 +54,10 @@ const configOption = [
   "--config <file>",
   "Use this JSON, JSONC, or JavaScript configuration file instead of searching for one",
 ] as const;
+const competitorOption = [
+  "--no-competitor-config",
+  "Do not fall back to markdownlint and Prettier configurations when no mdrefine configuration is found",
+] as const;
 /** The dialects, each with its other names, as in "forgejo (alias: codeberg)". */
 const dialectList = dialects
   .map((dialect) => {
@@ -65,6 +71,7 @@ const dialectList = dialects
 function workspaceOptions(command: Command): Command {
   return command
     .option(...configOption)
+    .option(...competitorOption)
     .option(
       "--root <directory>",
       "Workspace root (default: the configuration file's directory; without one, the Git repository or vault where the search stopped, else the current directory)",
@@ -116,7 +123,18 @@ async function workspace(flags: Flags) {
   // Without this check the first thing to fail would be the search for a
   // configuration file in the root, with a message about a file the user never named.
   if (flags.root !== undefined) await checkRoot(flags.root);
-  const loaded = await loadConfig(path.resolve(flags.root ?? "."), flags.config);
+  const loaded = await loadConfig(
+    path.resolve(flags.root ?? "."),
+    flags.config,
+    flags.competitorConfig,
+  );
+  if (loaded.conversion) {
+    process.stderr.write(
+      `mdrefine: using competitor configuration: ${loaded.conversion.sources.join(", ")}\n`,
+    );
+    for (const message of [...loaded.conversion.omitted, ...loaded.conversion.conflicts])
+      process.stderr.write(`mdrefine: ${message}\n`);
+  }
   return {
     ...loaded,
     root: path.resolve(flags.root ?? loaded.root),
@@ -397,14 +415,17 @@ common(
   .action((inputs: string[], flags: Flags) => run("format", inputs, flags));
 // The options belong to `config`, which reads them before or after `explain`;
 // `explain` repeats them so that its help lists them.
+const configCommand = workspaceOptions(
+  program.command("config").description("Inspect or convert the configuration"),
+);
 workspaceOptions(
-  workspaceOptions(program.command("config").description("Inspect the configuration"))
+  configCommand
     .command("explain")
     .description("Print, as JSON, the configuration in effect for one document")
     .argument("<file>", "The document, which need not exist"),
 ).action(async (file: string, _flags: unknown, command: Command) => {
   const flags = command.optsWithGlobals<Flags>();
-  const { root, config, plugins, file: source } = await workspace(flags);
+  const { root, config, plugins, conversion, file: source } = await workspace(flags);
   const name = await workspacePath(root, file);
   if (name === undefined) throw new Error(`Input is outside the workspace: ${file}`);
   // The search for the document's vault starts from the root's real path too.
@@ -414,6 +435,7 @@ workspaceOptions(
       {
         root,
         config: source ?? null,
+        ...(conversion ? { conversion } : {}),
         path: name,
         effective: resolveConfig({
           config,
@@ -427,13 +449,50 @@ workspaceOptions(
     ) + "\n",
   );
 });
+configCommand
+  .command("convert")
+  .description("Convert markdownlint and Prettier configurations to mdrefine.config.jsonc")
+  .option(
+    "--root <directory>",
+    "Directory to search from and to write to (default: the current directory)",
+  )
+  .option("--write", "Create mdrefine.config.jsonc; refuse any existing mdrefine configuration")
+  .action(async (_flags: unknown, command: Command) => {
+    const flags = command.optsWithGlobals<Flags>();
+    const root = path.resolve(flags.root ?? ".");
+    const { directories } = await searchConfig(root);
+    if (flags.write)
+      for (const name of configFiles)
+        if (await exists(path.join(root, name)))
+          throw new Error(`Existing mdrefine configuration: ${name}`);
+    const report = await loadCompetitorConfig(directories, true, root);
+    if (!report) throw new Error("No markdownlint or Prettier configuration found.");
+    resolveConfig({ config: report.config });
+    const text = JSON.stringify(report.config, null, 2) + "\n";
+    if (flags.write)
+      await writeFile(path.join(path.resolve(flags.root ?? "."), "mdrefine.config.jsonc"), text, {
+        flag: "wx",
+      });
+    else process.stdout.write(text);
+    for (const message of [
+      ...report.sources,
+      ...report.omitted,
+      ...report.conflicts,
+      ...report.suggestions,
+    ])
+      process.stderr.write(`mdrefine: ${message}\n`);
+    process.stderr.write(
+      "mdrefine: competitor inline comments and pragmas are not converted and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
+    );
+  });
 program
   .command("rules")
   .description("List the built-in rules and those of the configuration's plugins")
   .option(...configOption)
+  .option(...competitorOption)
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {
-    const loaded = await loadConfig(path.resolve("."), flags.config);
+    const loaded = await loadConfig(path.resolve("."), flags.config, flags.competitorConfig);
     const { plugins } = loaded;
     const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
       id,
