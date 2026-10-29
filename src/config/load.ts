@@ -17,7 +17,10 @@ import type { CompetitorCompatibility, ConversionReport } from "./convert.js";
 
 /** A loaded configuration, its workspace, plugins, and optional conversion provenance. */
 export interface LoadedConfig {
-  /** Report when competitor fallback supplied the configuration. */
+  /**
+   * Report when the competitor fallback found competitor configuration. When
+   * none of it could be used, its `sources` is empty and the defaults apply.
+   */
   conversion?: ConversionReport;
   /** Pass to lint/format to honor competitor comments during fallback. */
   compatibility?: CompetitorCompatibility;
@@ -134,7 +137,15 @@ export async function loadConfig(
 
   if (!file && competitorFallback) {
     const conversion = await loadCompetitorConfig(directories, false, fallbackRoot);
+    // Files that were found but could not be used contribute nothing, and the defaults apply.
+    if (conversion && !conversion.sources.length)
+      return { config: {}, plugins: [], root: fallbackRoot, conversion };
     if (conversion) {
+      const problem = configProblem(conversion.config);
+      if (problem)
+        throw new Error(
+          `Invalid configuration converted from ${conversion.sources.map((source) => path.relative(fallbackRoot, source).split(path.sep).join("/")).join(", ")}: ${problem}`,
+        );
       validateConfig(conversion.config);
       return {
         config: conversion.config,

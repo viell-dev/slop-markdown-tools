@@ -567,3 +567,23 @@ describe("changelog", () => {
     expect(result.stderr).toContain("CHANGELOG.md has no section for 0.0.0-none.0");
   });
 });
+
+describe("competitor fallback (#788)", () => {
+  const prose = (file: string) => read(file).replace(/\s+/g, " ");
+  it("does not promise the recommended preset to every workspace without a configuration", () => {
+    const quickStart = prose("docs/quick-start.md");
+    expect(quickStart).not.toContain("Without a configuration file, the `recommended` rules apply");
+    expect(quickStart).toContain("--no-competitor-config");
+    expect(quickStart).toContain("configuration.md#competitor-configuration-fallback");
+    expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
+  });
+  it("tells those upgrading how to keep the defaults", () => {
+    const unreleased = prose("CHANGELOG.md")
+      .split("## Unreleased")[1]!
+      .split(/ ## \d/)[0]!;
+    const changed = unreleased.split("### Changed")[1]!.split(/ ### /)[0]!;
+    expect(changed).toContain("instead of the `recommended` preset");
+    expect(changed).toContain("--no-competitor-config");
+    expect(changed).toContain("mdrefine config convert --write");
+  });
+});

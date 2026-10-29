@@ -29,7 +29,13 @@ prereleases' notes there are longer than their entries here.
   Prettier brace literals and terminal globstars retain their matching branches;
   ignore conversion reports its case-sensitive approximation. Converted
   overrides accumulate through `ruleUpdates`
-  ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
+  ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)). Without
+  `--root`, `--write` creates the configuration where `lint` looks for the
+  workspace's configuration and prints its path; `--config`, `--dialect`,
+  `--no-competitor-config`, and a `--root` that is not a directory are usage
+  errors. An extensionless `.prettierrc` is read as YAML, as Prettier reads it,
+  and errors in competitor configuration files name the file
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with
   `endOfLine`, preserving hard breaks and literal content bytes
@@ -345,6 +351,28 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- A workspace with a markdownlint or Prettier configuration and no mdrefine
+  configuration now gets the settings converted from them instead of the
+  `recommended` preset, so `lint` and `format` can report other rules, at other
+  severities, ignore other files, and exit differently than in 0.5.0. Upgrading:
+  to keep the `recommended` preset, create an mdrefine configuration, for
+  example with `"extends": ["recommended"]`, or pass `--no-competitor-config`;
+  to adopt the converted settings, write them with
+  `mdrefine config convert --write`. Files that the fallback cannot use apply
+  nothing, and without a usable one the `recommended` preset applies as before:
+  JavaScript and TypeScript configurations, which it never runs, TOML and JSON5
+  ones, and a Prettier configuration whose `.prettierignore` excludes all
+  Markdown, so that the coexistence setup in the integration guide keeps
+  checking documents. The fallback prints one line on stderr for the settings it
+  uses and one for each file it leaves out, with paths from the workspace root,
+  and none with `--quiet`; `config explain` lists the files left out under
+  `conversion.unused`
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- An error about a rule setting that cannot be used, such as an unknown rule or
+  invalid options, names the configuration file that holds it
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
   without an `alt` attribute, where renderers certainly show it. `alt=""`, which

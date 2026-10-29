@@ -1,8 +1,10 @@
 # Configuration
 
-One configuration controls both `lint` and `format`. Without an mdrefine or
-competitor configuration file, the `recommended` preset applies and the dialect
-is [assumed](dialects.md#the-assumed-dialect).
+One configuration controls both `lint` and `format`. Without an mdrefine
+configuration file, the settings of a markdownlint or Prettier configuration
+apply, [converted](#competitor-configuration-fallback); without one of those
+either, the `recommended` preset applies. Either way, the dialect is
+[assumed](dialects.md#the-assumed-dialect).
 
 ## Configuration files
 
@@ -20,19 +22,30 @@ merged with one above it.
 
 ### Competitor configuration fallback
 
-When no mdrefine configuration is found, the CLI converts discovered
-markdownlint and Prettier settings in memory. It names sources and omitted
-settings on stderr once per run. `--no-competitor-config` disables this
-behavior; an explicit `--config` also bypasses it. The Node API's
+When no mdrefine configuration is found, the CLI converts the markdownlint and
+Prettier configurations that the same search finds, in memory, and uses the
+result in place of the `recommended` preset. The result uses no preset: it
+enables what those tools check. `--no-competitor-config` turns this fallback
+off; an explicit `--config` also bypasses it. The Node API's
 `loadConfig(start, explicit, competitorFallback)` accepts `false` as its third
-argument to disable it. Portable `convertConfig({ markdownlint, prettier })`
+argument to turn it off. Portable `convertConfig({ markdownlint, prettier })`
 converts objects without reading files. Neither changes dialect detection.
 
-`mdrefine config convert` prints a configuration and `--write` creates
-`mdrefine.config.jsonc` in the current directory (or `--root`). It refuses any
-existing mdrefine configuration in that directory. The explicit command may
-execute competitor JavaScript settings; fallback loading never does. See the
-[conversion behavior and
+A file that the fallback cannot read contributes nothing: a JavaScript or
+TypeScript configuration, which it never runs, and a TOML or JSON5 one. Neither
+does a Prettier configuration in a workspace whose `.prettierignore` [excludes
+all Markdown](integrations.md#next-to-prettier-or-markdownlint), because
+Prettier does not format Markdown there. When no file found can be used, the
+`recommended` preset applies, as without any of them. The CLI names each file
+that it does not use, and why, on stderr, with a line for the settings that
+apply; see [fallback notices](cli.md#competitor-fallback-notices).
+
+`mdrefine config convert` prints the converted configuration, and `--write`
+creates `mdrefine.config.jsonc` where `lint` looks for the workspace's
+configuration, or in the directory that `--root` names. The explicit command may
+execute competitor JavaScript settings; fallback loading never does. See
+[convert a configuration](cli.md#convert-a-configuration) for its options, and
+the [conversion behavior and
 comparison](integrations.md#coming-from-prettier-or-markdownlint) for
 precedence, formats, and remaining coverage gaps.
 
@@ -425,4 +438,8 @@ inside the workspace.
 npx mdrefine config explain notes/example.md
 ```
 
-It reads `--config`, `--root`, and `--dialect`, before or after `explain`.
+It reads `--config`, `--no-competitor-config`, `--root`, and `--dialect`, before
+or after `explain`. When the settings come from the [competitor
+fallback](#competitor-configuration-fallback), the JSON also has a `conversion`
+object, with the converted settings, the files used and not used, and what was
+not carried over; see [fallback notices](cli.md#competitor-fallback-notices).

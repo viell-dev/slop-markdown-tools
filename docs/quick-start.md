@@ -28,9 +28,9 @@ npx mdrefine lint
 ```
 
 `lint` reports what the enabled rules find and never changes a file. Without
-paths it checks every document of the workspace: each file ending in `.md` below
-the configuration file's directory, or else below the Git repository or vault
-you run it in; see [which files are
+paths it checks every document of the workspace: each file ending in `.md` or
+`.markdown` below the configuration file's directory, or else below the Git
+repository or vault you run it in; see [which files are
 processed](cli.md#which-files-are-processed). Add `--json` for a report that
 scripts can read, or `--max-warnings 0` to fail on warnings too.
 
@@ -78,10 +78,15 @@ rendered and so their [dialect](dialects.md): replace `github` with `forgejo`
 [renderer options](vitepress.md#renderer-options) explicitly. For plain
 CommonMark, keep only `recommended` and add `"dialect": "commonmark"`.
 
-Without a configuration file, the `recommended` rules apply, and documents are
-read as GitHub Markdown, or as Obsidian notes inside a vault. A configuration
-file is still worth creating: it enables the rules for your renderer and makes
-the dialect explicit.
+Without a configuration file, documents are read as GitHub Markdown, or as
+Obsidian notes inside a vault. The rules then come from a markdownlint or
+Prettier configuration in the workspace, if there is one that mdrefine can read:
+it [converts](configuration.md#competitor-configuration-fallback) their settings
+and says so on stderr. Pass `--no-competitor-config` to leave them out. Without
+such a configuration, the `recommended` rules apply. A configuration file is
+still worth creating: it enables the rules for your renderer and makes the
+dialect explicit. `npx mdrefine config convert --write` creates one from the
+markdownlint or Prettier settings.
 
 Change a rule under `rules`:
 

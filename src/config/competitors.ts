@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
+import gitignore from "ignore";
 import { parse as json, type ParseError } from "jsonc-parser";
 import { parse as yaml } from "yaml";
 import { exists } from "../workspace/access.js";
@@ -10,11 +11,45 @@ import { convertConfig, type ConversionReport } from "./convert.js";
 import type { Config, Override } from "../core/types.js";
 
 type Values = Record<string, unknown>;
-const object = (value: unknown): Values => {
+const object = (value: unknown, where: string): Values => {
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Expected a configuration object");
+    throw new Error(`Expected a configuration object in ${where}`);
   return value as Values;
 };
+/** The text of an error, for a message that adds where it happened. */
+const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** Paths that stand for `.md` files at the root and in nested directories. */
+const markdownProbes = ["", "mdrefine-probe/", "mdrefine-probe/nested/"].map(
+  (directory) => `${directory}mdrefine-probe.md`,
+);
+/**
+ * Whether a `.prettierignore` leaves Markdown to another tool. Prettier reads
+ * it with the `ignore` package, as gitignore rules without regard to letter
+ * case, so it is evaluated that way against `.md` paths at several depths and
+ * against the paths that its negated entries name, `.markdown` ones included.
+ * `.markdown` files are not required to be ignored as well: an entry for `.md`
+ * files alone is the usual way to leave Markdown to another tool, and taking it
+ * for Prettier's Markdown setup would ignore every document. A negated entry
+ * whose path cannot be derived, such as one with a character class, could
+ * re-include a document, so the answer is then no.
+ */
+export function ignoresAllMarkdown(text: string): boolean {
+  const matcher = gitignore({ allowRelativePaths: true }).add(text);
+  const probes = [...markdownProbes];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("!")) continue;
+    const named = line.slice(1).trim().replace(/^\//, "").replace(/\/$/, "");
+    if (!named || /[[\]\\]/.test(named)) return false;
+    const sample = named
+      .replace(/\*\*/g, "mdrefine-probe")
+      .replace(/\*/g, "mdrefine-probe")
+      .replace(/\?/g, "x");
+    if (/\.(?:md|markdown)$/i.test(sample)) probes.push(sample);
+    else probes.push(`${sample}.md`, `${sample}/mdrefine-probe.md`);
+  }
+  return probes.every((probe) => matcher.ignores(probe));
+}
 /** Recognized competitor configuration filenames, in search precedence order. */
 export const competitorFiles = {
   markdownlint: [
@@ -204,6 +239,15 @@ export async function loadCompetitorConfig(
 ): Promise<ConversionReport | undefined> {
   const sources: string[] = [];
   const omitted: string[] = [];
+  /** Files found and not used, with the reason, in the order they were found. */
+  const unused = new Map<string, string>();
+  /** A file from the destination, the workspace root, with forward slashes, when it lies inside. */
+  const shown = (file: string) => {
+    const relative = path.relative(destination, file);
+    return relative && !relative.startsWith("..") && !path.isAbsolute(relative)
+      ? relative.split(path.sep).join("/")
+      : file;
+  };
   const rebase = (
     pattern: string,
     file: string,
@@ -213,7 +257,7 @@ export async function loadCompetitorConfig(
     const translated = translatePattern(pattern, dialect);
     if (translated === undefined) {
       omitted.push(
-        `${file}: pattern ${pattern} not carried over: outside the supported ${dialect} subset.`,
+        `${shown(file)}: pattern ${pattern} not carried over: outside the supported ${dialect} subset.`,
       );
       return [];
     }
@@ -235,7 +279,9 @@ export async function loadCompetitorConfig(
       return [prefix ? `${prefix}/${local}` : local];
     const subtree = path.relative(source, destination).split(path.sep).join("/");
     if (subtree === ".." || subtree.startsWith("../")) {
-      omitted.push(`${file}: pattern ${pattern} not carried over: unrelated source directory.`);
+      omitted.push(
+        `${shown(file)}: pattern ${pattern} not carried over: unrelated source directory.`,
+      );
       return [];
     }
     // Consume the destination's literal path in the glob's finite-state matcher.
@@ -244,7 +290,7 @@ export async function loadCompetitorConfig(
     const matcher = new Minimatch(local, { dot: true });
     if (matcher.negate || matcher.comment) {
       omitted.push(
-        `${file}: pattern ${pattern} not carried over: cannot express its subtree intersection.`,
+        `${shown(file)}: pattern ${pattern} not carried over: cannot express its subtree intersection.`,
       );
       return [];
     }
@@ -278,45 +324,84 @@ export async function loadCompetitorConfig(
     return [...new Set(results)];
   };
   const unread = new Set<string>();
+  const bypass = "; use --no-competitor-config to bypass conversion.";
+  /** The module that a configuration names by package, as Node.js would require it from `file`. */
+  const required = (name: string, file: string) => {
+    try {
+      return createRequire(file).resolve(name);
+    } catch (error) {
+      throw new Error(`Cannot resolve "${name}" named in ${shown(file)}${bypass}`, {
+        cause: error,
+      });
+    }
+  };
   const read = async (file: string, chain: string[] = []): Promise<Values> => {
     if (chain.includes(file))
-      throw new Error(`Cyclic competitor extends: ${[...chain, file].join(" -> ")}`);
+      throw new Error(`Cyclic competitor extends: ${[...chain, file].map(shown).join(" -> ")}`);
     sources.push(file);
     let value: unknown;
     if (/\.[cm]?[jt]s$/.test(file)) {
       if (!executeScripts) {
         unread.add(file);
-        omitted.push(`${file}: JavaScript/TypeScript configuration was not executed.`);
+        unused.set(
+          file,
+          'the fallback does not run JavaScript or TypeScript; "mdrefine config convert" can convert it',
+        );
         return {};
       }
-      value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
+      try {
+        value = ((await import(pathToFileURL(file).href)) as { default: unknown }).default;
+      } catch (error) {
+        throw new Error(`Cannot load ${shown(file)}: ${reason(error)}`, { cause: error });
+      }
     } else if (/\.(toml|json5)$/.test(file)) {
       unread.add(file);
-      omitted.push(`${file}: ${file.endsWith(".toml") ? "TOML" : "JSON5"} is unsupported.`);
+      unused.set(
+        file,
+        `${file.endsWith(".toml") ? "TOML" : "JSON5"} is not supported; write these settings as JSON or YAML`,
+      );
       return {};
     } else {
       const text = await readFile(file, "utf8");
       if (/\.jsonc?$/.test(file)) {
         const errors: ParseError[] = [];
         value = json(text, errors, { allowTrailingComma: true });
-        if (errors.length)
+        if (errors.length) throw new Error(`Invalid competitor JSON in ${shown(file)}${bypass}`);
+      } else {
+        // Prettier reads an extensionless .prettierrc as YAML too, with the same
+        // parser, so JSON reads as JSON there, and a JSON comment joins the key after it.
+        try {
+          value = text.trim() ? (yaml(text) as unknown) : {};
+        } catch (error) {
           throw new Error(
-            `Invalid competitor JSON in ${file}; use --no-competitor-config to bypass conversion.`,
+            `Invalid competitor YAML in ${shown(file)}: ${reason(error).split("\n")[0]!.replace(/:$/, "")}${bypass}`,
+            { cause: error },
           );
-      } else value = text.trim() ? (yaml(text) as unknown) : {};
+        }
+      }
     }
-    const result = object(value);
+    const result = object(value, shown(file));
+    if (path.basename(file) === ".prettierrc")
+      for (const key of Object.keys(result))
+        if (/^\s*(?:\/\/|\/\*)/.test(key)) {
+          omitted.push(
+            `${shown(file)}: ${JSON.stringify(key)} is not a Prettier option: Prettier reads this file as YAML, where a JSON comment becomes part of the key after it, and ignores it; not carried over.`,
+          );
+          delete result[key];
+        }
     const nested =
-      file.includes("-cli2.") && result.config !== undefined ? object(result.config) : result;
+      file.includes("-cli2.") && result.config !== undefined
+        ? object(result.config, `the config of ${shown(file)}`)
+        : result;
     if (nested.extends !== undefined) {
       const names = Array.isArray(nested.extends) ? nested.extends : [nested.extends];
       let base: Values = {};
       for (const name of names) {
-        if (typeof name !== "string") throw new Error(`Invalid extends in ${file}`);
+        if (typeof name !== "string") throw new Error(`Invalid extends in ${shown(file)}`);
         const resolved =
           (await exists(path.resolve(path.dirname(file), name))) || path.isAbsolute(name)
             ? path.resolve(path.dirname(file), name)
-            : createRequire(file).resolve(name);
+            : required(name, file);
         base = { ...base, ...(await read(resolved, [...chain, file])) };
       }
       delete nested.extends;
@@ -342,7 +427,10 @@ export async function loadCompetitorConfig(
   const prettierFile = await find(competitorFiles.prettier);
   let markdownlint = markdownFile ? await read(markdownFile) : undefined;
   let prettier: Values | undefined;
-  let prettierSource = prettierFile;
+  let prettierSource: string | undefined;
+  // The file that holds the Prettier options, which a package key can name.
+  let prettierData: string | undefined;
+  let prettierKey: unknown;
   for (const directory of directories) {
     for (const name of ["package.json", "package.yaml"]) {
       const file = path.join(directory, name);
@@ -352,27 +440,45 @@ export async function loadCompetitorConfig(
         const text = await readFile(file, "utf8");
         pkg = object(
           name.endsWith("json") ? (JSON.parse(text) as unknown) : (yaml(text) as unknown),
+          name,
         );
       } catch {
         continue;
       }
       if (pkg.prettier === undefined) continue;
-      sources.push(file);
       prettierSource = file;
-      prettier =
-        typeof pkg.prettier === "string"
-          ? await read(createRequire(file).resolve(pkg.prettier))
-          : object(pkg.prettier);
+      prettierKey = pkg.prettier;
       break;
     }
-    if (prettier) break;
+    if (prettierSource) break;
     if (prettierFile && path.dirname(prettierFile) === directory) {
-      prettier = await read(prettierFile);
+      prettierSource = prettierData = prettierFile;
       break;
     }
   }
+  const ignoreFile = await find([".prettierignore"]);
+  const ignoreText = ignoreFile ? await readFile(ignoreFile, "utf8") : undefined;
+  if (prettierSource && ignoreText !== undefined && ignoresAllMarkdown(ignoreText))
+    // Prettier leaves Markdown to another tool here, so its settings are not this workspace's
+    // Markdown style, and its ignore patterns do not describe which documents to check.
+    unused.set(
+      prettierSource,
+      `${shown(ignoreFile!)} excludes all Markdown, so Prettier does not format Markdown here`,
+    );
+  else if (prettierSource === prettierFile && prettierFile) prettier = await read(prettierFile);
+  else if (prettierSource) {
+    sources.push(prettierSource);
+    if (typeof prettierKey === "string") {
+      prettierData = required(prettierKey, prettierSource);
+      prettier = await read(prettierData);
+    } else prettier = object(prettierKey, `the prettier key of ${shown(prettierSource)}`);
+  }
   if (markdownFile && unread.has(markdownFile)) markdownlint = undefined;
-  if (prettierFile && unread.has(prettierFile)) prettier = undefined;
+  if (prettierData && unread.has(prettierData)) {
+    prettier = undefined;
+    // The package key only names the file that could not be read.
+    if (prettierData !== prettierSource) sources.splice(sources.indexOf(prettierSource!), 1);
+  }
   const ignore: string[] = [];
   if (cli2File) {
     const wrapper = await read(cli2File);
@@ -382,7 +488,10 @@ export async function loadCompetitorConfig(
         directories.indexOf(path.dirname(cli2File)) <
           directories.indexOf(path.dirname(markdownFile)))
     )
-      markdownlint = wrapper.config === undefined ? markdownlint : object(wrapper.config);
+      markdownlint =
+        wrapper.config === undefined
+          ? markdownlint
+          : object(wrapper.config, `the config of ${shown(cli2File)}`);
     for (const name of ["ignores", "globs"]) {
       const patterns = wrapper[name];
       if (Array.isArray(patterns))
@@ -411,7 +520,7 @@ export async function loadCompetitorConfig(
             : [];
         for (const pattern of unsafeUnion)
           omitted.push(
-            `${cli2File}: pattern ${pattern} not carried over: unrepresentable combined selection.`,
+            `${shown(cli2File)}: pattern ${pattern} not carried over: unrepresentable combined selection.`,
           );
         if (!unsafeUnion.length && positive.every((p) => translatePattern(p, "cli2") !== undefined))
           ignore.push(
@@ -425,7 +534,7 @@ export async function loadCompetitorConfig(
     }
     for (const key of Object.keys(wrapper))
       if (!["config", "ignores", "globs"].includes(key))
-        omitted.push(`${cli2File}: ${key} not carried over.`);
+        omitted.push(`${shown(cli2File)}: ${key} not carried over.`);
   }
   const editors: { file: string; text: string }[] = [];
   for (const directory of prettier ? directories : []) {
@@ -498,7 +607,7 @@ export async function loadCompetitorConfig(
               additions.set(intersection, { ...state, ...values });
           } catch {
             omitted.push(
-              `${file}: overlapping EditorConfig sections ${previous} and ${pattern} not carried over exactly.`,
+              `${shown(file)}: overlapping EditorConfig sections ${previous} and ${pattern} not carried over exactly.`,
             );
           }
         }
@@ -534,42 +643,55 @@ export async function loadCompetitorConfig(
     }
     flush();
   }
-  if (!markdownlint && !prettier && !sources.length) return undefined;
+  const used = sources.filter((file) => !unread.has(file));
+  if (!used.length) {
+    if (!unused.size) return undefined;
+    // Nothing that was found can be used: the caller applies its defaults, and
+    // the report says which files were found and why each was left out.
+    return {
+      ...convertConfig({}),
+      config: {},
+      sources: [],
+      omitted: [],
+      suggestions: [],
+      unused: [...unused].map(([file, why]) => ({ file, reason: why })),
+    };
+  }
   const report = convertConfig({
     ...(markdownlint ? { markdownlint } : {}),
     ...(prettier ? { prettier } : {}),
   });
   if (prettier && Array.isArray(prettier.overrides))
-    for (const raw of prettier.overrides) {
-      const item = object(raw);
+    for (const [index, raw] of prettier.overrides.entries()) {
+      const where = `Prettier overrides[${index}] in ${shown(prettierSource!)}`;
+      const item = object(raw, where);
       const files = typeof item.files === "string" ? [item.files] : item.files;
       if (!Array.isArray(files) || !files.every((file): file is string => typeof file === "string"))
-        throw new Error("Invalid Prettier override files");
+        throw new Error(`Invalid files in ${where}`);
       const rebased = files.flatMap((file) => rebase(file, prettierSource!, "prettier"));
       if (!rebased.some(markdownPattern)) continue;
       if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
-      addOverride(rebased, object(item.options));
+      addOverride(rebased, object(item.options, `the options of ${where}`));
     }
-  const ignoreFile = await find([".prettierignore"]);
-  if (ignoreFile && prettier) {
+  if (ignoreFile && ignoreText !== undefined && prettier) {
     sources.push(ignoreFile);
     omitted.push(
-      `${ignoreFile}: Prettier matches its patterns without regard to letter case; the converted patterns match case exactly.`,
+      `${shown(ignoreFile)}: Prettier matches its patterns without regard to letter case; the converted patterns match case exactly.`,
     );
     ignore.push(
-      ...(await readFile(ignoreFile, "utf8"))
+      ...ignoreText
         .split(/\r?\n/)
         .filter((line) => line && !line.startsWith("#"))
         .flatMap((line) => {
           if (line.startsWith("!")) {
             omitted.push(
-              `${ignoreFile}: negated pattern ${line} cannot be represented by independent ignore globs.`,
+              `${shown(ignoreFile)}: negated pattern ${line} cannot be represented by independent ignore globs.`,
             );
             return [];
           }
           if (translatePattern(line, "gitignore") === undefined) {
             omitted.push(
-              `${ignoreFile}: pattern ${line} not carried over: outside the supported gitignore subset.`,
+              `${shown(ignoreFile)}: pattern ${line} not carried over: outside the supported gitignore subset.`,
             );
             return [];
           }
@@ -595,7 +717,8 @@ export async function loadCompetitorConfig(
   // A scoped proseWrap override can enable wrapping absent from the base.
   if (prettier) report.compatibility.origins["style/wrap"] ??= ["proseWrap"];
   report.conflicts.push(...overrideConflicts);
-  report.sources = [...new Set(sources)];
+  report.sources = [...new Set(sources.filter((file) => !unread.has(file)))];
+  report.unused = [...unused].map(([file, why]) => ({ file, reason: why }));
   report.omitted = [...new Set([...report.omitted, ...omitted])];
   report.config = {
     ...report.config,

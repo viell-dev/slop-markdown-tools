@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { lint, ruleRegistry } from "../core/engine.js";
 import { formatWithCode } from "../code/format.js";
 import { loadCompetitorConfig } from "../config/competitors.js";
+import type { ConversionReport } from "../config/convert.js";
+import { prepare } from "../core/rule-registry.js";
 import { loadConfig, searchConfig, configFiles } from "../config/load.js";
 import { dialectAliases, dialects, resolveConfig } from "../config/resolve.js";
 import { isIgnoredInput, skippedMessage } from "../workspace/files.js";
@@ -15,7 +17,7 @@ import { enclosingVault } from "../workspace/vault.js";
 import { exists, refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
 import { unifiedDiff } from "./diff.js";
-import type { Diagnostic, DialectName } from "../core/types.js";
+import type { Config, Diagnostic, DialectName, Plugin } from "../core/types.js";
 
 interface Flags {
   competitorConfig?: boolean;
@@ -128,18 +130,88 @@ async function workspace(flags: Flags) {
     flags.config,
     flags.competitorConfig,
   );
-  if (loaded.conversion) {
-    process.stderr.write(
-      `mdrefine: using competitor configuration: ${loaded.conversion.sources.join(", ")}\n`,
-    );
-    for (const message of [...loaded.conversion.omitted, ...loaded.conversion.conflicts])
-      process.stderr.write(`mdrefine: ${message}\n`);
-  }
-  return {
-    ...loaded,
-    root: path.resolve(flags.root ?? loaded.root),
-    config: flags.dialect ? { ...loaded.config, dialect: flags.dialect } : loaded.config,
+  // Notices about the run, not findings: --quiet leaves them out, as it leaves out warnings.
+  if (loaded.conversion && !flags.quiet)
+    for (const line of competitorNotices(loaded.conversion, loaded.root))
+      process.stderr.write(`mdrefine: ${line}\n`);
+  const config = flags.dialect ? { ...loaded.config, dialect: flags.dialect } : loaded.config;
+  const converted = loaded.conversion?.sources.map((file) => fromRoot(loaded.root, file));
+  configuration = {
+    config,
+    plugins: loaded.plugins,
+    ...(loaded.file
+      ? { name: `in ${flags.config ?? loaded.file}` }
+      : converted?.length
+        ? { name: `converted from ${converted.join(", ")}` }
+        : {}),
   };
+  return { ...loaded, root: path.resolve(flags.root ?? loaded.root), config };
+}
+/** The configuration of the run, to name in an error that it causes later. */
+let configuration: { config: Config; plugins: Plugin[]; name?: string } | undefined;
+/**
+ * Whether `error` is the configuration's own problem, such as an unknown rule
+ * or invalid rule options, which surfaces when a document's settings are
+ * prepared. The configuration is prepared again, as a whole and with each
+ * override applied, to find the same message.
+ */
+function configurationFault(error: unknown): boolean {
+  if (!configuration?.name || !(error instanceof Error)) return false;
+  const { config, plugins } = configuration;
+  // A plugin's own invalid rule is the plugin's problem, which its message names.
+  try {
+    ruleRegistry(plugins);
+  } catch {
+    return false;
+  }
+  const variants = [
+    config,
+    ...(config.overrides ?? []).map((override) => ({
+      ...config,
+      overrides: [{ ...override, files: ["**"] }],
+    })),
+  ];
+  return variants.some((variant) => {
+    try {
+      prepare({ config: variant, plugins, path: "document.md" });
+      return false;
+    } catch (problem) {
+      return problem instanceof Error && problem.message === error.message;
+    }
+  });
+}
+/** A path from the workspace root with forward slashes, or as it is when it lies outside. */
+function fromRoot(root: string, file: string): string {
+  const name = path.relative(root, file);
+  return name && !name.startsWith("..") && !path.isAbsolute(name)
+    ? name.split(path.sep).join("/")
+    : file;
+}
+/**
+ * One line for each competitor configuration file found and not used, and one
+ * for the settings that apply; `config explain` prints the details.
+ */
+function competitorNotices(conversion: ConversionReport, root: string): string[] {
+  const lines = conversion.unused.map(
+    ({ file, reason }) => `not using ${fromRoot(root, file)}: ${reason}`,
+  );
+  if (!conversion.sources.length)
+    lines.push(
+      "no mdrefine configuration and no usable markdownlint or Prettier configuration, so the defaults apply (opt out of the search: --no-competitor-config)",
+    );
+  else {
+    const tools = [
+      (conversion.compatibility.markdownlint ||
+        conversion.sources.some((file) => path.basename(file).includes("markdownlint"))) &&
+        "markdownlint",
+      conversion.compatibility.prettier && "Prettier",
+    ].filter(Boolean);
+    const notes = conversion.omitted.length + conversion.conflicts.length;
+    lines.push(
+      `no mdrefine configuration; using ${tools.join(" and ")} settings from ${conversion.sources.map((file) => fromRoot(root, file)).join(", ")} (${notes} conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)`,
+    );
+  }
+  return lines;
 }
 /**
  * The real path of `file`, which need not exist: the real path of the nearest
@@ -464,28 +536,62 @@ configCommand
   .description("Convert markdownlint and Prettier configurations to mdrefine.config.jsonc")
   .option(
     "--root <directory>",
-    "Directory to search from and to write to (default: the current directory)",
+    "Directory to search from and to write to (default: search from the current directory, and write where lint looks for the workspace's configuration)",
   )
-  .option("--write", "Create mdrefine.config.jsonc; refuse any existing mdrefine configuration")
+  .option(
+    "--write",
+    "Create mdrefine.config.jsonc and print its path; an existing mdrefine configuration there is an error",
+  )
   .action(async (_flags: unknown, command: Command) => {
+    // The options of `config` choose the configuration that `explain` reads.
+    // Conversion reads only competitor configurations, so they would do nothing here.
+    const inherited = command.parent!.opts<Flags>();
+    const misplaced = [
+      inherited.config !== undefined && "--config",
+      inherited.dialect !== undefined && "--dialect",
+      inherited.competitorConfig === false && "--no-competitor-config",
+    ].filter(Boolean);
+    if (misplaced.length)
+      throw new Error(
+        `config convert does not take ${misplaced.join(", ")}: it reads only markdownlint and Prettier configurations. --config, --dialect, and --no-competitor-config are options of config explain.`,
+      );
     const flags = command.optsWithGlobals<Flags>();
-    const root = path.resolve(flags.root ?? ".");
-    const { directories } = await searchConfig(root);
+    if (flags.root !== undefined) await checkRoot(flags.root);
+    const start = path.resolve(flags.root ?? ".");
+    const search = await searchConfig(start);
+    // Without --root, the configuration goes where `lint` run from here looks for
+    // the workspace's configuration, so that it replaces the fallback it converts.
+    const destination =
+      flags.root !== undefined
+        ? start
+        : search.file
+          ? path.dirname(search.file)
+          : search.fallbackRoot;
+    // From the current directory, as the destination was found from it.
+    const shown = (file: string) =>
+      path.relative(process.cwd(), file).split(path.sep).join("/") || ".";
     if (flags.write)
       for (const name of configFiles)
-        if (await exists(path.join(root, name)))
-          throw new Error(`Existing mdrefine configuration: ${name}`);
-    const report = await loadCompetitorConfig(directories, true, root);
+        if (await exists(path.join(destination, name)))
+          throw new Error(
+            `Existing mdrefine configuration: ${shown(path.join(destination, name))}; config convert --write creates one only where there is none.`,
+          );
+    const report = await loadCompetitorConfig(search.directories, true, destination);
     if (!report) throw new Error("No markdownlint or Prettier configuration found.");
+    if (!report.sources.length)
+      throw new Error(
+        `No usable markdownlint or Prettier configuration: ${report.unused.map(({ file, reason }) => `not using ${fromRoot(destination, file)}: ${reason}`).join("; ")}.`,
+      );
     resolveConfig({ config: report.config });
     const text = JSON.stringify(report.config, null, 2) + "\n";
-    if (flags.write)
-      await writeFile(path.join(path.resolve(flags.root ?? "."), "mdrefine.config.jsonc"), text, {
-        flag: "wx",
-      });
+    const target = path.join(destination, "mdrefine.config.jsonc");
+    if (flags.write) await writeFile(target, text, { flag: "wx" });
     else process.stdout.write(text);
     for (const message of [
-      ...report.sources,
+      ...report.sources.map((file) => `converted ${fromRoot(destination, file)}`),
+      ...report.unused.map(
+        ({ file, reason }) => `not using ${fromRoot(destination, file)}: ${reason}`,
+      ),
       ...report.omitted,
       ...report.conflicts,
       ...report.suggestions,
@@ -494,6 +600,7 @@ configCommand
     process.stderr.write(
       "mdrefine: competitor inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
     );
+    if (flags.write) process.stderr.write(`mdrefine: created ${shown(target)}\n`);
   });
 program
   .command("rules")
@@ -525,7 +632,11 @@ try {
   // as in ESLint and Prettier, so that it does not pass for findings.
   if (error instanceof CommanderError) process.exitCode = error.exitCode === 0 ? 0 : 2;
   else {
-    process.stderr.write(`mdrefine: ${error instanceof Error ? error.message : String(error)}\n`);
+    // A rule setting that cannot be used is found while a document is processed.
+    const where = configurationFault(error) ? `Invalid configuration ${configuration!.name}: ` : "";
+    process.stderr.write(
+      `mdrefine: ${where}${error instanceof Error ? error.message : String(error)}\n`,
+    );
     process.exitCode = 2;
   }
 }

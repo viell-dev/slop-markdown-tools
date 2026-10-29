@@ -497,10 +497,17 @@ export interface CompetitorCompatibility {
 export interface ConversionReport {
   /** Runtime provenance; never written into an mdrefine configuration. */
   compatibility: CompetitorCompatibility;
-  /** Configuration with no implicit preset. */
+  /** Configuration with no implicit preset, or `{}` when no source could be used. */
   config: Config;
   /** Configuration files read by the Node loader; empty for object conversion. */
   sources: string[];
+  /**
+   * Configuration files the Node loader found and did not use, each with the
+   * reason: a format it does not read, or a Prettier configuration whose
+   * `.prettierignore` excludes all Markdown. With no source to use, `config`
+   * is empty, so the defaults apply, and `sources` is empty.
+   */
+  unused: { file: string; reason: string }[];
   /** Settings not fully carried over, with reasons and applicable tracking issues. */
   omitted: string[];
   /** Conflicting settings and the choice made. */
@@ -518,6 +525,7 @@ export function convertConfig(input: {
     compatibility: { ...input, origins: {} },
     config: { extends: [], rules },
     sources: [],
+    unused: [],
     omitted: [],
     conflicts: [],
     suggestions: [],

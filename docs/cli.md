@@ -337,19 +337,69 @@ that moment can see it half written too. A crash during the trial write can
 leave the trial file behind; it is named `.mdrefine-` followed by a random name
 and `.tmp`, holds no document text, and can be deleted.
 
-### Conversion reports
+## Configuration commands
 
-`config convert` writes JSON configuration to stdout and its sources, conflicts,
-omissions with reasons and applicable issue numbers, and suggestions to stderr.
-With `--write` it creates `mdrefine.config.jsonc` and prints only the report.
-Any existing mdrefine configuration in the destination directory is an error
-(exit code `2`).
+`config explain <file>` prints, as JSON, the configuration in effect for one
+document; [inspect the result](configuration.md#inspect-the-result) describes
+its fields. It reads `--config`, `--no-competitor-config`, `--root`, and
+`--dialect`, before or after `explain`.
 
-With fallback settings, `config explain` adds a `conversion` object containing
-`config`, `sources`, `omitted`, `conflicts`, and `suggestions`. Ordinary lint
-and format JSON reports keep their existing structure; conversion notices use
-stderr once per invocation.
+### Competitor fallback notices
+
+When `lint`, `format`, or `config explain` runs on the [competitor
+fallback](configuration.md#competitor-configuration-fallback), it prints notices
+on stderr, with paths from the workspace root: one line for each markdownlint or
+Prettier configuration file that it found and does not use, with the reason, and
+one line that names the files it uses and counts the conversion notes, as in:
+
+```text
+mdrefine: not using prettier.config.mjs: the fallback does not run JavaScript or TypeScript; "mdrefine config convert" can convert it
+mdrefine: no mdrefine configuration; using markdownlint settings from .markdownlint.json (3 conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)
+```
+
+When it uses none of the files it found, the last line says that the defaults
+apply instead. `--quiet` leaves the notices out. They never go to stdout, so the
+JSON report of `--json` is unchanged.
+
+With the fallback, `config explain` adds a `conversion` object to its JSON:
+
+| Field           | Meaning                                                                                                                                      |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`        | The converted settings, which use no preset; `{}` when no file could be used and the defaults apply.                                         |
+| `sources`       | The files whose settings were converted, as absolute paths.                                                                                  |
+| `unused`        | The files that were found and not used, each as `{ "file", "reason" }`.                                                                      |
+| `omitted`       | The settings that were not carried over or only in part, with the reason and any issue that tracks the missing part.                         |
+| `conflicts`     | The settings of the two tools that disagreed, and which one won.                                                                             |
+| `suggestions`   | mdrefine checks worth considering that the competitor configuration does not enable.                                                         |
+| `compatibility` | The original competitor settings and the competitor checks behind each converted rule, which the fallback uses to honor competitor comments. |
 
 `rules` accepts `--no-competitor-config` too. Its list describes the available
 rules rather than the effective settings, so it does not print fallback notices;
 use `config explain` to inspect conversion and its report.
+
+### Convert a configuration
+
+`config convert` converts the markdownlint and Prettier configurations that the
+search finds, as the fallback does, and prints the result on stdout as an
+`mdrefine.config.jsonc`. It runs JavaScript and TypeScript configurations, which
+the fallback never does. Its report goes to stderr: each file converted, each
+file not used and why, the settings not carried over with their reasons and the
+issues that track them, the conflicts it resolved, and suggested checks.
+
+| Option               | Meaning                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--root <directory>` | Search from this directory, and write the file there. Without it, the search starts from the current directory, and the file goes where `lint` run from there looks for the workspace's configuration: beside the mdrefine configuration that the search finds, else at the root of the Git repository or vault where the search stopped, else in the current directory. |
+| `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced.                                                                                                         |
+
+Without `--root`, the written configuration takes the place of the fallback that
+`lint` used from that directory, so it applies the same settings to the same
+documents. With `--root` naming a subdirectory, it is a configuration for that
+subtree, whose patterns are rebased into it, and `lint` finds it only from that
+directory or below.
+
+`config convert` does not take `--config`, `--dialect`, or
+`--no-competitor-config`, which choose the configuration that `config explain`
+reads. Given before or after `convert`, each is a usage error. So is a `--root`
+that does not exist or is not a directory. These errors, finding no
+configuration to convert, and finding only files that it cannot use end the
+command with exit code `2`.

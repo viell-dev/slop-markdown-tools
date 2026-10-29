@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { format as prettierFormat } from "prettier";
 import { describe, expect, it } from "vitest";
 import { competitorMappings, convertConfig, builtInRules, format } from "../../src/index.js";
+import { ignoresAllMarkdown } from "../../src/config/competitors.js";
 
 describe("competitor conversion (#669)", () => {
   it("maps every declared markdownlint option and checks Prettier coverage against the comparison", () => {
@@ -409,5 +410,35 @@ describe("competitor conversion (#669)", () => {
     expect(convertConfig({ markdownlint: { default: false, "single-h1": true } }).config).toEqual(
       convertConfig({ markdownlint: { default: false, MD025: true } }).config,
     );
+  });
+});
+
+describe("a .prettierignore that excludes all Markdown (#788)", () => {
+  it.each([
+    "**/*.md\n**/*.markdown\n",
+    "*.md\n*.markdown",
+    "*.md\r\n*.markdown\r\n",
+    "*\n",
+    "**\n",
+    "**/*.MD\n**/*.MARKDOWN\n",
+    "# comment\n\n*.md\n*.markdown\n!docs/\n",
+    "**/*.md\n",
+    "*.md\n",
+  ])("is recognized from what it ignores: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(true);
+  });
+  it.each([
+    "",
+    "*.markdown\n",
+    "**/*.md\n!notes/*.markdown\n",
+    "/*.md\n/*.markdown\n",
+    "docs/**\n",
+    "**/*.md\n**/*.markdown\n!README.md\n",
+    "**/*.md\n**/*.markdown\n!/docs/*.md\n",
+    "**/*.md\n**/*.markdown\n!keep*\n",
+    "**/*.md\n**/*.markdown\n![a-z]*.md\n",
+    "node_modules\n",
+  ])("is not assumed where Prettier may still format Markdown: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(false);
   });
 });
