@@ -167,6 +167,12 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- The documentation describes the behavior of the version it belongs to, without
+  version notes; this changelog keeps the history. Each rule section opens with
+  what the rule does, then states the severity that each preset gives it, as the
+  rule index does
+  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
+
 - `style/heading` removes heading-owned indentation, including Setext text and
   underlines, while retaining container prefixes. Its new `closing: "add"`
   option writes matching closing hash sequences on ATX headings, including the
