@@ -231,6 +231,10 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- Accept mixed-case `user-content-` prefixes in GitHub file fragments, and
+  report their lowercase spelling with `links/valid`'s `exactCase` option
+  ([#739](https://github.com/viell-dev/slop-markdown-tools/issues/739)).
+
 - Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
   or VitePress component blocks without proposing refused edits
   ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
