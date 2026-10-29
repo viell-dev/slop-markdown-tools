@@ -1,5 +1,5 @@
 import { walk } from "../syntax/walk.js";
-import type { Blockquote, Root, RootContent } from "mdast";
+import type { Blockquote, Nodes, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
@@ -45,8 +45,6 @@ const splitBlocks = new Set([
   "math",
   "html",
   "table",
-  "list",
-  "footnoteDefinition",
   "definition",
   "yaml",
   "toml",
@@ -60,15 +58,25 @@ const splitTokens = new Set([
   "html_block",
   "math_block",
   "table_open",
-  "bullet_list_open",
-  "ordered_list_open",
 ]);
+/** The containers whose items a blank line would split or make loose. */
+const listBlocks = new Set(["list", "footnoteDefinition"]);
+const listTokens = new Set(["bullet_list_open", "ordered_list_open"]);
+const quoteTokens = new Set(["blockquote_open", "vitepress_alert_open"]);
 
 /**
  * Where the blocks of another reading continue below a line, by 1-based line:
  * whether a block that a separator would split continues onto the next line,
  * and how many block quotes do. A separator line keeps that reading only when
  * it holds one quote marker for each of those quotes.
+ *
+ * A list or footnote definition is split by a blank line at its own level,
+ * but a line of quote markers inside a block quote that it holds continues
+ * that quote, and with it the list and its item, which stays tight (#748). A
+ * quote therefore takes back, over its own lines, the lists that hold it with
+ * no other quote in between. Those lists continue wherever the quote does,
+ * and such quotes in one list do not share lines, so a list still counts on
+ * exactly the lines where no quote inside it continues.
  */
 class Continuations {
   private readonly split: Int32Array;
@@ -77,13 +85,21 @@ class Continuations {
     this.split = new Int32Array(lines + 2);
     this.quotes = new Int32Array(lines + 2);
   }
-  /** A block from line `first` to line `last`, both 1-based and included. */
-  add(first: number, last: number, quote: boolean): void {
+  /**
+   * A block from line `first` to line `last`, both 1-based and included, that
+   * adds `count` blocks a separator would split, or one quote.
+   */
+  add(first: number, last: number, quote: boolean, count = 1): void {
     last = Math.min(last, this.split.length - 1);
-    if (last <= first) return;
+    if (last <= first || count === 0) return;
     const counts = quote ? this.quotes : this.split;
-    counts[first]!++;
-    counts[last]!--;
+    counts[first]! += count;
+    counts[last]! -= count;
+  }
+  /** A block quote over these lines, inside `lists` lists that it continues. */
+  quote(first: number, last: number, lists: number): void {
+    this.add(first, last, true);
+    this.add(first, last, false, -lists);
   }
   /** Sum the counts once all blocks are added. */
   finish(): this {
@@ -113,20 +129,40 @@ function otherContinuations(document: Document): Continuations[] {
   const other = otherReading(document.tree);
   if (other) {
     const continuations = new Continuations(lines);
-    walk(other, (node) => {
+    // `lists` counts the lists around a node up to the nearest quote.
+    const visit = (node: Nodes, lists: number): void => {
+      const position = node.position;
       const quote = node.type === "blockquote";
-      if ((quote || splitBlocks.has(node.type)) && node.position)
-        continuations.add(node.position.start.line, node.position.end.line, quote);
-    });
+      const list = listBlocks.has(node.type);
+      if (position) {
+        const { start, end } = position;
+        if (quote) continuations.quote(start.line, end.line, lists);
+        else if (list || splitBlocks.has(node.type)) continuations.add(start.line, end.line, false);
+      }
+      if ("children" in node) {
+        const inner = quote ? 0 : list ? lists + 1 : lists;
+        for (const child of node.children) visit(child, inner);
+      }
+    };
+    visit(other, 0);
     found.push(continuations.finish());
   }
   if (document.dialect === "vitepress") {
     const continuations = new Continuations(lines);
+    // The same count inside each open token: a list adds itself, and a quote
+    // starts again from none.
+    const lists = [0];
     for (const token of vitepressTokens(document)) {
-      if (!token.map) continue;
-      const quote = token.type === "blockquote_open" || token.type === "vitepress_alert_open";
-      if (quote || splitTokens.has(token.type))
-        continuations.add(token.map[0] + 1, token.map[1], quote);
+      const around = lists.at(-1)!;
+      const quote = quoteTokens.has(token.type);
+      const list = listTokens.has(token.type);
+      if (token.map) {
+        const [first, last] = [token.map[0] + 1, token.map[1]];
+        if (quote) continuations.quote(first, last, around);
+        else if (list || splitTokens.has(token.type)) continuations.add(first, last, false);
+      }
+      if (token.nesting === 1) lists.push(quote ? 0 : list ? around + 1 : around);
+      else if (token.nesting === -1 && lists.length > 1) lists.pop();
     }
     found.push(continuations.finish());
   }

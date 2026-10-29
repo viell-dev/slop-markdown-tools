@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { builtInRules, createWorkspace, parse } from "../../src/index.js";
+import { scaling } from "./scaling.js";
 const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
 
 it("reflows many paragraphs in linear time regardless of the line ending", () => {
@@ -69,3 +70,38 @@ it("groups consecutive definition-like labels in linear time (#415)", () => {
   // of the former refill loop. Paired batches alternate their measurement order.
   expect(fastest[1]! / fastest[0]!).toBeLessThan(10);
 }, 60_000);
+
+it("finds VitePress protection reasons for many attributed paragraphs in linear time (#755)", () => {
+  // Every short paragraph has its own protected attribute, and the last,
+  // wide one is kept and reported; the control has no attributes and wraps
+  // its last paragraph. A reason lookup that passed every earlier protected
+  // part grew with the square of the paragraph count.
+  const rule = builtInRules["style/wrap"]!;
+  const wide =
+    "Some words in a paragraph that goes on and on past the width of eighty columns here";
+  const growth = (attribute: string) =>
+    scaling(
+      [2000, 16000],
+      (count) =>
+        parse(
+          `Short paragraph${attribute}\n\n`.repeat(count) + `${wide}${attribute}\n`,
+          "vitepress",
+        ),
+      (document) => rule.check({ document, options: { width: 80, reportUnreflowed: true } }),
+      (findings) => {
+        expect(findings).toHaveLength(1);
+        if (attribute)
+          expect(findings[0]).toMatchObject({
+            message: "Paragraph not reflowed: VitePress attribute syntax (width 80 columns).",
+          });
+        else expect(findings[0]?.edit?.text).toContain("\n");
+      },
+      1,
+    );
+  const control = growth("");
+  const dense = growth(" {.note}");
+  // Eight times the paragraphs measured 8.4 to 8.7 times the time with the
+  // index, as the control did, and 32 to 35 times with the former scan. Twice
+  // the control's growth allows for a runner that is slow for both workloads.
+  expect(dense).toBeLessThan(Math.max(20, 2 * control));
+}, 120_000);

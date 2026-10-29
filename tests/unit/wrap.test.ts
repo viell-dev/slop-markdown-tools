@@ -1334,6 +1334,41 @@ describe("VitePress syntax that keeps a paragraph (#755)", () => {
       );
     }
   });
+  it("reports each kept paragraph of a long document with its own reason", () => {
+    const kept = [
+      "Some words in a paragraph that goes on past the width {.note}",
+      "Some words with a note^[a note] that go on past the width here.",
+      "Some words with `a` `b` in code that go on past the width here.",
+      "Plain words in a paragraph that go on past the width here.",
+    ];
+    const reasons = [
+      "VitePress attribute syntax",
+      "VitePress inline footnote",
+      "Vue whitespace between elements",
+    ];
+    const blocks = Array.from({ length: 300 }, (_, index) => kept[index % 4]!);
+    const source = blocks.join("\n\n") + "\n";
+    const findings = lint(source, { config: vitepress({ reportUnreflowed: true }) });
+    expect(
+      findings.filter(({ message }) => message.startsWith("Paragraph not reflowed")),
+    ).toMatchObject(
+      blocks.flatMap((_, index) =>
+        index % 4 === 3
+          ? []
+          : [
+              {
+                line: 2 * index + 1,
+                message: `Paragraph not reflowed: ${reasons[index % 4]} (width 40 columns).`,
+              },
+            ],
+      ),
+    );
+    expect(findings).toHaveLength(300);
+    const output = verify(source, vitepress()).output.split("\n\n");
+    output.forEach((block, index) =>
+      index % 4 === 3 ? expect(block).toContain("\n") : expect(block).toBe(blocks[index]),
+    );
+  });
   it("wraps an attribute block as text with VitePress's attrs off", () => {
     const config: Config = {
       ...vitepress({ reportUnreflowed: true }),

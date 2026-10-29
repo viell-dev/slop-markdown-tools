@@ -316,6 +316,28 @@ describe("style/block-spacing", () => {
           }
     },
   );
+  it.each(dialects.filter((dialect) => dialect !== "vitepress"))(
+    "keeps a list of the reading without TOML front matter in the %s dialect (#748)",
+    (dialect) => {
+      // Without TOML front matter, `- a` starts a list that takes in the
+      // closing line lazily and the indented blocks below it, where a blank
+      // line would make the list loose; no quote inside it continues there.
+      for (const newline of ["\n", "\r\n", "\r"])
+        for (const [body, includeFrontMatter] of [
+          ["+++\n- a\n+++\n  # H\n  text\n", false],
+          ["+++\n- a\n+++\n  # H\n  text\n", true],
+          ["+++\n- a\n+++\n  # H\n", true],
+          ["+++\n1. a\n+++\n   # H\n", true],
+        ] as const) {
+          const source = body.replaceAll("\n", newline);
+          const config = only({ "style/block-spacing": ["warn", { includeFrontMatter }] }, dialect);
+          const result = format(source, { config });
+          expect(refusals(result), JSON.stringify(source)).toEqual([]);
+          expect(result.output).toBe(source);
+          expect(lint(source, { config })).toEqual([]);
+        }
+    },
+  );
   // Obsidian keeps the blocks of a quote as written on its own account (#436).
   it.each(dialects.filter((dialect) => dialect !== "obsidian"))(
     "still separates the blocks of a quote that both readings share in the %s dialect (#748)",
@@ -328,6 +350,41 @@ describe("style/block-spacing", () => {
       }
     },
   );
+  // A line of quote markers inside a quote that a list holds continues the
+  // list and keeps it tight, in every reading that shares the quote (#748).
+  it.each(
+    dialects
+      .filter((dialect) => dialect !== "obsidian")
+      .flatMap((dialect): [Dialect, string][] => [
+        [dialect, ""],
+        [dialect, "+++\n+++\n\n"],
+        // VitePress reads these lines as a paragraph, which the list follows.
+        ...(dialect === "vitepress" ? [] : [[dialect, "+++\nt = 1\n+++\n"] as [Dialect, string]]),
+      ]),
+  )("separates the blocks of a quote inside a list in the %s dialect after %j", (dialect, head) => {
+    for (const [body, output] of [
+      ["- > a\n  > # Heading\n", "- > a\n  >\n  > # Heading\n"],
+      ["1. > a\n   > # Heading\n", "1. > a\n   >\n   > # Heading\n"],
+      ["- > # Heading\n  > a\n", "- > # Heading\n  >\n  > a\n"],
+      ["- > - a\n  > # Heading\n", "- > - a\n  >\n  > # Heading\n"],
+      ["- > > a\n  > > # Heading\n", "- > > a\n  > >\n  > > # Heading\n"],
+      ["- - > a\n    > # Heading\n", "- - > a\n    >\n    > # Heading\n"],
+      ["> - > a\n>   > # Heading\n", "> - > a\n>   >\n>   > # Heading\n"],
+      ["> - a\n>   b\n> # Heading\n", "> - a\n>   b\n>\n> # Heading\n"],
+      ["- a\n- > b\n  > # Heading\n", "- a\n- > b\n  >\n  > # Heading\n"],
+    ])
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const source = (head + body).replaceAll("\n", newline);
+        const config = only(rule, dialect);
+        expect(lint(source, { config }), JSON.stringify(source)).toHaveLength(1);
+        const result = format(source, { config });
+        expect(refusals(result), JSON.stringify(source)).toEqual([]);
+        expect(result.output, JSON.stringify(source)).toBe(
+          (head + output).replaceAll("\n", newline),
+        );
+        expect(format(result.output, { config }).output).toBe(result.output);
+      }
+  });
   describe("VitePress's own reading (#748)", () => {
     it.each([
       // markdown-it reads a table before the list, and the unclosed fence

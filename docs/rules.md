@@ -1970,8 +1970,10 @@ means or what a comment applies to:
   `includeFrontMatter`.
 - A boundary inside a block of the reading without TOML front matter, such as
   `1.` and `2) b` directly below its closing `+++` fence, where a blank line
-  would make a list from text, or a block quote that continues below a list
-  there. A new line keeps such a quote only when it holds the quote's markers.
+  would make a list from text, or a block quote or list that continues below the
+  fence there. A new line keeps such a quote only when it holds the quote's
+  markers, and such a list only inside a block quote of its item, where a line
+  of the quote's markers continues the item and keeps the list tight.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
@@ -2019,7 +2021,8 @@ lines that are already there can be added to. Nothing is added inside a block of
 VitePress's own reading either: a paragraph that it continues over a line that
 the parser starts a block with, such as `<b>` or `[^b]: note` below a list item,
 and a table, list, or unclosed code fence that it reads where the parser reads
-something else.
+something else. A line of quote markers inside a block quote that both readings
+place in a list item, as between `- > a` and `  > # Heading`, is still added.
 
 **In Obsidian:** existing blank lines are added to only when they are empty,
 because Obsidian can read a line of blank space as text. A table is separated

@@ -271,10 +271,80 @@ export function vitepressWhitespaceLiterals(document: Document): [number, number
     ),
   ];
 }
+export type Part = Projection["protected"][number];
+/**
+ * Protected parts sorted by start, in the order recorded on a tie, with the
+ * greatest end among each part and those before it.
+ */
+interface PartIndex {
+  parts: Part[];
+  reach: number[];
+}
+const indexes = new WeakMap<
+  Projection["protected"],
+  { size: number; all: PartIndex; kept: PartIndex }
+>();
+export function partIndex(parts: Part[]): PartIndex {
+  const sorted = parts.slice().sort((a, b) => a.start - b.start);
+  const reach: number[] = [];
+  let furthest = -Infinity;
+  for (const part of sorted) reach.push((furthest = Math.max(furthest, part.end)));
+  return { parts: sorted, reach };
+}
+/**
+ * The indexes of a document's protected parts, all of them and those outside
+ * wrapping alone, built once the reading is complete: a query then takes two
+ * binary searches instead of a pass over every part (#755).
+ */
+function protectedIndex(document: Document) {
+  const parts = readings.get(document.tree)?.protected;
+  if (!parts) return undefined;
+  let index = indexes.get(parts);
+  if (index?.size !== parts.length) {
+    index = {
+      size: parts.length,
+      all: partIndex(parts),
+      kept: partIndex(parts.filter((part) => !part.wrapOnly)),
+    };
+    indexes.set(parts, index);
+  }
+  return index;
+}
+/**
+ * The first part, by start, that overlaps `start` to `end`, or with `touching`
+ * that contains the point `start` = `end`, its ends included. Parts before the
+ * one found end before the query starts, as their greatest end shows.
+ */
+export function overlapping(
+  { parts, reach }: PartIndex,
+  start: number,
+  end: number,
+  touching: boolean,
+): Part | undefined {
+  let low = 0;
+  let high = parts.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    const from = parts[middle]!.start;
+    if (touching ? from <= end : from < end) low = middle + 1;
+    else high = middle;
+  }
+  const before = low;
+  low = 0;
+  high = before;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    const to = reach[middle]!;
+    if (touching ? to >= start : to > start) high = middle;
+    else low = middle + 1;
+  }
+  return low < before ? parts[low] : undefined;
+}
 /**
  * Why wrapping must keep the source from `start` to `end` as written, when
  * VitePress syntax that the projection protects overlaps it, so that
  * `style/wrap` can report the paragraph rather than lose it silently (#755).
+ * Of several such parts, the reason is that of the one that starts first.
  */
 export function vitepressProtection(
   document: Document,
@@ -282,8 +352,8 @@ export function vitepressProtection(
   end: number,
 ): string | undefined {
   if (document.dialect !== "vitepress") return undefined;
-  return readings.get(document.tree)?.protected.find((part) => start < part.end && end > part.start)
-    ?.reason;
+  const index = protectedIndex(document);
+  return index && overlapping(index.all, start, end, false)?.reason;
 }
 /** Whether a finding targets syntax deliberately kept opaque to ordinary rules. */
 export function protectedVitePress(document: Document, name: string, finding: Finding): boolean {
@@ -297,11 +367,10 @@ export function protectedVitePress(document: Document, name: string, finding: Fi
     return false;
   const start = finding.edit?.start ?? finding.start;
   const end = finding.edit?.end ?? finding.end ?? start;
-  return (readings.get(document.tree)?.protected ?? []).some(
-    (part) =>
-      (!part.wrapOnly || name === "style/wrap") &&
-      (start === end
-        ? start >= part.start && start <= part.end
-        : start < part.end && end > part.start),
+  const index = protectedIndex(document);
+  if (!index) return false;
+  return (
+    overlapping(name === "style/wrap" ? index.all : index.kept, start, end, start === end) !==
+    undefined
   );
 }
