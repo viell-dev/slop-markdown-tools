@@ -413,6 +413,28 @@ function livePreview(lines) {
         line = { ...line, runs: outdent(line.runs, lead) };
       } else if (content !== undefined) line = { ...line, runs: outdent(line.runs, content) };
     } else content = undefined;
+    // Normalize source-only list numbers before joining lines or removing punctuation
+    // (#735). Keep a canonical zero so the marker still contributes content.
+    // A plain number or numeric hashtag is content, not a list marker.
+    if (!code) {
+      let prefix = true;
+      line = {
+        ...line,
+        runs: line.runs.map(([classes, value]) => {
+          const eligible = prefix && (!classes || /\bcm-comment\b/.test(classes));
+          prefix &&= !value.trim() || /\bcm-formatting-quote\b/.test(classes);
+          return [
+            classes,
+            eligible
+              ? value.replace(
+                  /^[ \t]*(?:(?:>[ \t]*)|(?:(?:[-+*]|\d{1,9}[.)])(?:[ \t]+|$)))+/gm,
+                  (markers) => markers.replace(/\d{1,9}(?=[.)])/g, "0"),
+                )
+              : value,
+          ];
+        }),
+      };
+    }
     // Adjacent ordered and unordered lists are distinct blocks even without a
     // blank line (#440). Only an actual styled leading marker supplies that
     // distinction: unstyled `-` or `1.` in quotes or HTML remains paragraph text.
@@ -548,16 +570,14 @@ function livePreview(lines) {
         // Unstyled text shows the source as written, where Live Preview reads no syntax, such as
         // after an HTML tag, and so does what it styles as a comment where Reading view reads
         // none, such as after `<!--` that nothing closes. Their words count, the syntax
-        // characters that rules change do not, nor the case of a task's `x`, the number of a
-        // list item, or the case of a callout's type there, which `style/ordered-list` and the
-        // callout rule choose (#403). Code counts as shown, also after a backtick that nothing
+        // characters that rules change do not, nor the case of a task's `x` or a callout's type
+        // there (#403). Code counts as shown, also after a backtick that nothing
         // closes, which no rule changes (#362).
         if (!block.code && (!classes || /\bcm-comment\b/.test(classes))) {
           text = text
             .replace(/\[!([^\]\s]+)\]/g, (_, type) => `[!${type.toLowerCase()}]`)
             .replace(/[^\p{L}\p{N}\s]/gu, "")
             .replace(/(^|\s)X(?=\s|$)/g, "$1x")
-            .replace(/(^|\s)\d{1,9}(?=\s|$)/g, "$1#")
             .replace(/\s+/g, " ");
           if (classes) text = text.trim();
         }
