@@ -44,15 +44,15 @@ npx mdrefine format --check
 ```
 
 Bare `format` prints what formatting would change and exits `1` when any file
-would change. `--diff` prints the same preview with exit `0` when there are no
-remaining errors. `--check --diff` prints the diff and fails on changes.
-`--write` writes the changes. `--check` writes nothing, names each document that
-would change, and then exits with code `1`, which is the check to run in CI.
-`format` changes only what its rules target, and refuses any change that would
-alter what a document means. It can still report problems that need a person,
-such as a broken link; remaining errors exit `1` in every mode. Operational
-failures exit `2`. Stdin prints the formatted document by default and does not
-fail merely because formatting changed it.
+would change. `--diff` prints the same preview with exit `0` when no errors
+remain and `--max-warnings` is not exceeded. `--check --diff` prints the diff
+and fails on changes. `--write` writes the changes. `--check` writes nothing,
+names each document that would change, and then exits with code `1`, which is
+the check to run in CI. `format` changes only what its rules target, and refuses
+any change that would alter what a document means. It can still report problems
+that need a person, such as a broken link; remaining errors exit `1` in every
+mode. Operational failures exit `2`. Stdin prints the formatted document by
+default and does not fail merely because formatting changed it.
 
 ## Choose a preset and a dialect
 

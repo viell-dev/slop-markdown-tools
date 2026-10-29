@@ -59,10 +59,10 @@ block and keeping other safe edits.
 
 Bare `format` on files prints a unified diff and exits `1` if any document would
 change, or `0` if none would. Explicit `format --diff` is an exit-`0` preview
-when there are no remaining errors. `format --check --diff` prints the diff and
-fails on changes. `--check` alone lists the files instead. `--json` omits the
-diff and uses the same exit codes. Stdin keeps its own output and exit behavior,
-described below.
+when no errors remain and `--max-warnings` is not exceeded.
+`format --check --diff` prints the diff and fails on changes. `--check` alone
+lists the files instead. `--json` omits the diff and uses the same exit codes.
+Stdin keeps its own output and exit behavior, described below.
 
 `mdrefine check` and `mdrefine fix` are usage errors that suggest
 `format --check` and `format --write`. Likewise, `lint --check`, `lint --write`
@@ -144,8 +144,9 @@ nothing and `format -` prints the document unchanged, both with the
 `Skipped ignored input` warning, which `--no-warn-ignored` leaves out. A nested
 repository is no such rule: a path in one is read as that repository's document.
 `format -` prints the formatted document on stdout, or the diff with `--diff`,
-or nothing with `--check`; it cannot be combined with `--write`. `lint -` prints
-its findings. Neither prints a summary line. Stdin must be [UTF-8
+or nothing with `--check` alone, while `--check --diff` prints the diff and
+fails on changes; it cannot be combined with `--write`. `lint -` prints its
+findings. Neither prints a summary line. Stdin must be [UTF-8
 text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
 anything else stops the command with exit code `2` and a message such as
 `mdrefine: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.

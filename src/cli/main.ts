@@ -569,8 +569,8 @@ Stdin prints the formatted document unless --check or --diff is given.
 rules; errors that remain exit 1.
 
 Exit codes: 0 nothing to change, or the changes were written, previewed with
---diff, or printed from stdin; 1 changes needed or errors remain; 2 usage,
-configuration or run failure.
+--diff, or printed from stdin; 1 changes needed, errors remain, or more
+warnings than --max-warnings; 2 usage, configuration or run failure.
 
 Examples:
   mdrefine format                    Check every document and show the diff
