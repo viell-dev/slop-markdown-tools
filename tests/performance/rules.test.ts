@@ -160,3 +160,56 @@ it("verifies spaced emphasis in paragraphs that use a nested definition with lin
     ),
   ).toBeLessThan(10);
 });
+
+it.each(["github", "obsidian"] as const)(
+  "locates HTML images in block quotes with linear scaling in %s",
+  (dialect) => {
+    // Mapping each image's position by rebuilding the line index of its
+    // quoted HTML block took time that grew with the square of their number.
+    const { check } = builtInRules["content/image-alt"]!;
+    expect(
+      scaling(
+        [2000, 8000],
+        (count) => {
+          const block = Array.from({ length: count }, (_, line) => `> <img src="${line}.png">`);
+          const inline = Array.from(
+            { length: count },
+            (_, line) => `> Text <img src="i${line}.png">`,
+          );
+          const source = `> <div>\n${block.join("\n")}\n> </div>\n\n${inline.join("\n")}\n`;
+          return { count, source, document: parse(source, dialect) };
+        },
+        ({ document }) => check({ document, options: {} }),
+        (findings, { count, source }) => {
+          expect(findings).toHaveLength(2 * count);
+          expect(source.slice(findings.at(-1)!.start, findings.at(-1)!.end)).toBe(
+            `<img src="i${count - 1}.png">`,
+          );
+        },
+        1,
+      ),
+    ).toBeLessThan(10);
+  },
+);
+
+it("tracks open HTML elements with linear scaling", () => {
+  // Each end tag finds its element by name, and each element closes once,
+  // however deep the nesting and however many end tags match nothing innermost.
+  const { check } = builtInRules["content/html-element"]!;
+  expect(
+    scaling(
+      [2000, 8000],
+      (count) => {
+        const open = "<div><span>".repeat(count);
+        const close = "</div>".repeat(count);
+        const source = `<section>\n${open}\n${close}\n<img src="x.png">\n</section>\n\n${"- <b>x</i>\n".repeat(count)}`;
+        return { count, source, document: parse(source, "commonmark") };
+      },
+      ({ document }) => check({ document, options: {} }),
+      (findings, { count }) => {
+        expect(findings).toHaveLength(3 * count + 2);
+      },
+      1,
+    ),
+  ).toBeLessThan(10);
+});
