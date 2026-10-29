@@ -355,7 +355,9 @@ describe("competitor conversion (#669)", () => {
       if (!/None yet|Not yet/.test(line)) expect(row.issue).toBeUndefined();
     }
     expect(docs).toContain("mdrefine is meant to replace these tools");
-    expect(docs).toContain('"None yet" and "Not yet" link the issue');
+    expect(docs).toContain("with the mdrefine rule that covers each and where it behaves");
+    // The introduction must not claim a gap that no row shows.
+    if (!/^\|.*(?:None yet|Not yet)/m.test(docs)) expect(docs).not.toContain("does not yet cover");
     expect(docs).toContain("### Configuration conversion and fallback");
   });
   it("normalizes enabled, case, alias order and tags before formatting", () => {
