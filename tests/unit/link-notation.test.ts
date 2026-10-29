@@ -27,6 +27,8 @@ describe("link notation checks", () => {
       "(Smith 2020)[1]",
       "(see above)[note]",
       "(see)[p.12]",
+      "see https://example.com/(text)[file.md] here",
+      "see www.example.com/(text)[./file] here",
       "(see)[v1.2]",
       "(1, 2)[0.5]",
       "f(x)[i.j]",
@@ -59,15 +61,21 @@ describe("link notation checks", () => {
       expect(lint(source, { config })).toHaveLength(1);
       expect(formatted(source, config)).toBe(source);
     }
-    // Adjacent punctuation, emphasis and HTML must neither consume nor escape brackets.
-    for (const source of [
-      "(https://e.com).\n",
-      "*https://e.com*\n",
-      "https://e.com>\n",
-      "<https://e.com\n",
-      "https://e.com/</b>\n",
-    ]) {
-      formatted(source, config);
+    // Adjacent punctuation, emphasis and HTML must neither consume nor escape
+    // brackets: where the dialect links the address, only the link is bracketed;
+    // next to `<` or `>`, nothing is.
+    for (const [source, linked] of [
+      ["(https://e.com).\n", "(<https://e.com>).\n"],
+      ["*https://e.com*\n", "*<https://e.com>*\n"],
+      ["https://e.com>\n", "https://e.com>\n"],
+      ["<https://e.com\n", "<https://e.com\n"],
+      ["https://e.com/</b>\n", "<https://e.com/></b>\n"],
+    ] as const) {
+      const commonmark = dialect === "commonmark";
+      expect(formatted(source, config), source).toBe(commonmark ? source : linked);
+      expect(lint(source, { config }), source).toHaveLength(
+        commonmark && source.startsWith("<") ? 0 : 1,
+      );
     }
   });
   it.each(dialects)("preserves source-sensitive heading addresses (%s)", (dialect) => {

@@ -537,8 +537,9 @@ Defined labels are excluded using the renderer's Unicode case folding and
 whitespace normalization. Citations such as `(Smith 2020)[1]`, cross-references
 such as `(see above)[note]`, versions such as `(see)[v1.2]`, numeric references
 such as `(see)[p.12]` and `(1, 2)[0.5]`, calls such as `f(x)[i.j]`, footnotes,
-wikilinks, task markers, code, math, HTML, and text inside authored links and
-destinations are not reported.
+wikilinks, task markers, code, math, HTML, text inside authored links and
+destinations, and parentheses inside a bare URL, such as
+`https://example.com/(a)[b.md]`, are not reported.
 
 Reported:
 

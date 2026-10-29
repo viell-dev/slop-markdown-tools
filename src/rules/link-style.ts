@@ -68,9 +68,17 @@ export const linkStyleRules: Record<string, Rule> = {
       const definitions = new Set<string>();
       walk(document.tree, "definition", (node) => definitions.add(node.identifier));
       const readable = new Uint8Array(document.source.length);
+      // Inside a bare URL; the bracketed part may be one, as in `(text)[https://e.com]`,
+      // but the parenthesis that opens a reversed link may not, as in `https://e.com/(a)[b.md]`.
+      const inUrl = new Uint8Array(document.source.length);
       prose(document, (node, ignored) => {
         const [start, end] = range(node);
-        if (node.type === "link" && !literal(document.source.slice(start, end))) return;
+        if (node.type === "link") {
+          if (!literal(document.source.slice(start, end))) return;
+          inUrl.fill(1, start, end);
+        } else
+          for (const match of document.source.slice(start, end).matchAll(barePattern))
+            inUrl.fill(1, start + match.index, start + match.index + match[0].length);
         for (let i = start; i < end; i++) {
           if (document.source[i] === "\\") i++;
           else if (!ignored.some(([from, to]) => i >= from && i < to)) readable[i] = 1;
@@ -83,6 +91,7 @@ export const linkStyleRules: Record<string, Rule> = {
         const end = start + match[0].length;
         if (
           !readable.slice(start, end).every(Boolean) ||
+          inUrl[start] === 1 ||
           /^[\p{L}\p{N}\p{M}_$]/u.test(characterBefore(document.source, start)) ||
           document.source[end] === "]" ||
           definitions.has(normalizeLabel(label)) ||
