@@ -1198,6 +1198,8 @@ See the [guide](docs/guide.md#setup).
   VitePress, which passes a fragment through its slugger, only a fragment that
   differs from an anchor in case alone is reported. Anchors are still generated
   per dialect, as [heading anchors](dialects.md#heading-anchors) describes.
+  GitHub file links also ignore the case of the optional `user-content-` prefix;
+  `#User-Content-setup` reaches the same anchor as `#setup`.
 
 **Messages:**
 

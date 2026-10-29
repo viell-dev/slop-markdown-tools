@@ -2525,6 +2525,79 @@ describe("anchors from HTML in the document", () => {
   });
 });
 
+describe("GitHub file prefix case (#739)", () => {
+  for (const dialect of [
+    "github",
+    "commonmark",
+    "forgejo",
+    "gitea",
+    "obsidian",
+    "vitepress",
+  ] as const) {
+    it(`keeps prefix handling specific to ${dialect}`, () => {
+      const workspace = createWorkspace({ "page.md": "# Foo\n" }, { dialect });
+      for (const fragment of [
+        "foo",
+        "user-content-foo",
+        "User-Content-foo",
+        "USER-CONTENT-foo",
+        "Foo",
+        "user-content-Foo",
+      ]) {
+        const exists =
+          dialect === "github" ||
+          (dialect === "commonmark" &&
+            ["foo", "user-content-foo", "Foo", "user-content-Foo"].includes(fragment)) ||
+          (["forgejo", "gitea"].includes(dialect) &&
+            ["foo", "user-content-foo"].includes(fragment)) ||
+          (["obsidian", "vitepress"].includes(dialect) && ["foo", "Foo"].includes(fragment));
+        for (const url of [`#${fragment}`, `./page.md#${fragment}`]) {
+          expect(workspace.resolve("page.md", url, dialect).fragmentExists, url).toBe(exists);
+          expect(
+            lint(`[x](${url})\n`, {
+              path: "page.md",
+              workspace,
+              config: { extends: [], dialect, rules: { "links/valid": "error" } },
+            }).map((item) => item.message),
+            url,
+          ).toEqual(exists ? [] : [`Missing fragment in ${url}.`]);
+        }
+      }
+    });
+  }
+  it("reports the complete lowercase spelling with exactCase", () => {
+    const workspace = createWorkspace({ "page.md": "# Foo\n" });
+    for (const fragment of ["User-Content-foo", "USER-CONTENT-foo", "user-content-Foo"]) {
+      const url = `#${fragment}`;
+      expect(workspace.resolve("page.md", url, "github").fragmentAnchor).toBe("user-content-foo");
+      expect(
+        lint(`[x](${url})\n`, {
+          path: "page.md",
+          workspace,
+          config: {
+            extends: [],
+            dialect: "github",
+            rules: { "links/valid": ["error", { exactCase: true }] },
+          },
+        }).map((item) => item.message),
+      ).toEqual([
+        `Fragment in ${url} differs in letter case from its anchor, #user-content-foo; other renderers may not find it.`,
+      ]);
+    }
+    expect(
+      workspace.resolve("page.md", "#User-Content-user-content-foo", "github").fragmentExists,
+    ).toBe(false);
+  });
+  it("keeps VitePress mixed-case explicit IDs unreachable through normalized Markdown links", () => {
+    const workspace = createWorkspace(
+      { "page.md": "## Setup {#MyId}\n" },
+      { dialect: "vitepress" },
+    );
+    for (const url of ["#MyId", "#myid", "./page.md#MyId", "./page.md#myid"])
+      expect(workspace.resolve("page.md", url, "vitepress").fragmentExists).toBe(false);
+  });
+});
+
 describe("fragment case on GitHub", () => {
   // On github.com, `#Sponsors` scrolled to `## Sponsors`: the page script looks
   // for the anchor as written and then lowercased, and the file view lowercases

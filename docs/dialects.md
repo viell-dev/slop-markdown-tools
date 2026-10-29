@@ -180,7 +180,8 @@ tags that the renderer shows as text, such as `<script>`.
 On GitHub, Forgejo, and Gitea, more fragments are valid:
 
 - A fragment may carry the `user-content-` prefix that the renderers add to
-  every anchor.
+  every anchor. GitHub file links ignore the case of this prefix too; Forgejo
+  and Gitea require it in lowercase.
 - The `id` of any HTML element and the `name` of an `<a>`, such as
   `<a name="install"></a>`, are anchors. Their character references are decoded
   once as HTML attributes, so `<a id="a&#x2d;b"></a>` is reached by `#a-b`. HTML
