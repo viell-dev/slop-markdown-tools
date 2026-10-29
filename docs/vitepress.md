@@ -53,7 +53,8 @@ ordinary Markdown here. Components and other renderer-only blocks are preserved;
 where mdast cannot represent a component boundary, its containing block is left
 as written. Paragraphs with inline footnotes remain opaque. Findings and edits
 in opaque areas are omitted, because mdast does not describe their full reading;
-`style/wrap` still reports the paragraphs that it keeps as written there.
+with `reportUnreflowed: true`, `style/wrap` still reports a paragraph there that
+is too wide and that it keeps as written.
 
 With math enabled, `$` follows VitePress's inline conditions and `$$` may
 interrupt a paragraph or close on the same line. The tool never evaluates
