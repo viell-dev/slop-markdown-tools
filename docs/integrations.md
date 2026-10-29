@@ -131,6 +131,22 @@ and JSON5 are reported as unsupported. `.prettierignore` and markdownlint-cli2
 `ignores` and `globs` become `ignore`. Negated `.prettierignore` patterns are
 reported for manual migration.
 
+Pattern conversion is bounded by source dialect. Prettier overrides,
+EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,
+`?`, whole-component `**`, escaped glob punctuation, and flat comma brace
+alternatives; character classes, unescaped parentheses, brace ranges, nested
+braces, quoted patterns, absolute Prettier/CLI2 paths, and whole-pattern
+complements are reported with their source and pattern for manual migration
+rather than emitted. CLI2 negative globs are directory exclusions, and their
+descendants are expanded before rebasing into the destination.
+
+`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`,
+escaped glob punctuation, and directory exclusions; braces and parentheses stay
+literal. Character classes, trailing whitespace, and negated entries are
+reported rather than emitted. Every emitted pattern is rebased into the
+destination subtree; unrepresentable intersections are also reported for manual
+migration.
+
 Competitor inline suppression comments and formatting pragmas have no effect;
 honoring them during the fallback is
 [#723](https://github.com/viell-dev/slop-markdown-tools/issues/723). With an

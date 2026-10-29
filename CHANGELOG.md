@@ -16,8 +16,10 @@ prereleases' notes there are longer than their entries here.
   configuration, with exclusive `--write`, source and conflict reporting, and
   in-memory fallback when no mdrefine configuration exists. Disable fallback
   with `--no-competitor-config`; fallback never executes competitor scripts and
-  preserves source-relative patterns. Converted overrides accumulate through
-  `ruleUpdates`
+  preserves source-relative patterns within documented dialect subsets,
+  reporting unsupported patterns for manual migration. Directory exclusions
+  retain their descendants when converting inside an excluded directory.
+  Converted overrides accumulate through `ruleUpdates`
   ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
 
 - Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with

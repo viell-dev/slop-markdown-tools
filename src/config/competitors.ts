@@ -72,7 +72,36 @@ function markdownPattern(pattern: string): boolean {
 }
 /** Preserve glob metacharacters that Minimatch parsed as literal filename characters. */
 function literalPattern(value: string): string {
-  return value.replace(/[?*[\]{}()!+@\\]/g, "\\$&");
+  return value.replace(/[#?*[\]{}()!+@\\]/g, "\\$&");
+}
+
+type PatternDialect = "prettier" | "editorconfig" | "cli2" | "gitignore";
+
+/** Admit only syntax whose source meaning we can preserve in Minimatch. */
+function translatePattern(pattern: string, dialect: PatternDialect): string | undefined {
+  if (!pattern || /[\r\n\0]/.test(pattern) || pattern.startsWith("!")) return undefined;
+  if ((dialect === "prettier" || dialect === "cli2") && pattern.startsWith("/")) return undefined;
+  if (dialect !== "gitignore" && /["']/.test(pattern)) return undefined;
+  // Escapes of glob punctuation are portable; other escapes and character
+  // classes have dialect-dependent meanings and are deliberately excluded.
+  const syntax = pattern.replace(/\\[\\#?!*[\]{}()+@]/g, "x");
+  if (/[\\[\]]/.test(syntax)) return undefined;
+  if (
+    syntax
+      .split("/")
+      .some((part) => part === "." || part === ".." || (part.includes("**") && part !== "**"))
+  )
+    return undefined;
+  if (dialect === "gitignore") {
+    if (/\s$/.test(pattern)) return undefined;
+    return pattern.replace(/\\.|[{}()+@!#]/g, (part) => (part.length === 2 ? part : `\\${part}`));
+  }
+  if (/[()]/.test(syntax)) return undefined;
+  // Only flat comma alternatives, never ranges, nesting, or empty branches.
+  if (/\{[^{}]*\.\.[^{}]*\}/.test(syntax)) return undefined;
+  const braces = syntax.replace(/\{[^{},]+(?:,[^{},]+)+\}/g, "x");
+  if (/[{}]/.test(braces)) return undefined;
+  return pattern.replace(/^#/, "\\#");
 }
 
 /** Intersect component globs exactly when one component contains the other. */
@@ -165,7 +194,17 @@ export async function loadCompetitorConfig(
 ): Promise<ConversionReport | undefined> {
   const sources: string[] = [];
   const omitted: string[] = [];
-  const rebase = (pattern: string, file: string): string[] => {
+  const rebase = (pattern: string, file: string, dialect: PatternDialect = "cli2"): string[] => {
+    const translated = translatePattern(pattern, dialect);
+    if (translated === undefined) {
+      omitted.push(
+        `${file}: pattern ${pattern} not carried over: outside the supported ${dialect} subset.`,
+      );
+      return [];
+    }
+    pattern = translated;
+    if ((dialect === "prettier" || dialect === "editorconfig") && !pattern.includes("/"))
+      pattern = `**/${pattern}`;
     const source = path.dirname(file);
     const prefix = path.relative(destination, source).split(path.sep).join("/");
     const local = pattern.replace(/^\//, "");
@@ -327,8 +366,11 @@ export async function loadCompetitorConfig(
         for (const pattern of patterns) {
           if (typeof pattern !== "string") continue;
           if (name === "ignores" || pattern.startsWith("!")) {
-            const local = rebase(name === "ignores" ? pattern : pattern.slice(1), cli2File);
-            ignore.push(...local.flatMap((p) => [p, `${p.replace(/\/$/, "")}/**`]));
+            const local = name === "ignores" ? pattern : pattern.slice(1);
+            ignore.push(
+              ...rebase(local, cli2File),
+              ...rebase(`${local.replace(/\/$/, "")}/**`, cli2File),
+            );
           }
         }
     }
@@ -338,13 +380,14 @@ export async function loadCompetitorConfig(
       );
       if (positive.length) {
         const rebased = positive.flatMap((p) => rebase(p, cli2File));
-        ignore.push(
-          rebased.length === 0
-            ? "**"
-            : rebased.length === 1
-              ? `!${rebased[0]}`
-              : `!{${rebased.join(",")}}`,
-        );
+        if (positive.every((p) => translatePattern(p, "cli2") !== undefined))
+          ignore.push(
+            rebased.length === 0
+              ? "**"
+              : rebased.length === 1
+                ? `!${rebased[0]}`
+                : `!{${rebased.join(",")}}`,
+          );
       }
     }
     for (const key of Object.keys(wrapper))
@@ -441,10 +484,7 @@ export async function loadCompetitorConfig(
       if (section) {
         flush();
         const pattern = section[1]!;
-        patterns = rebase(
-          pattern.includes("/") ? pattern.replace(/^\//, "") : `**/${pattern}`,
-          file,
-        );
+        patterns = rebase(pattern, file, "editorconfig");
         continue;
       }
       const entry = /^\s*([^#;=\s]+)\s*=\s*([^#;]+?)\s*$/.exec(line);
@@ -469,12 +509,10 @@ export async function loadCompetitorConfig(
       const files = typeof item.files === "string" ? [item.files] : item.files;
       if (!Array.isArray(files) || !files.every((file): file is string => typeof file === "string"))
         throw new Error("Invalid Prettier override files");
-      if (!files.some(markdownPattern)) continue;
+      const rebased = files.flatMap((file) => rebase(file, prettierSource!, "prettier"));
+      if (!rebased.some(markdownPattern)) continue;
       if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
-      addOverride(
-        files.flatMap((file) => rebase(file.includes("/") ? file : `**/${file}`, prettierSource!)),
-        object(item.options),
-      );
+      addOverride(rebased, object(item.options));
     }
   const ignoreFile = await find([".prettierignore"]);
   if (ignoreFile && prettier) {
@@ -490,12 +528,18 @@ export async function loadCompetitorConfig(
             );
             return [];
           }
+          if (translatePattern(line, "gitignore") === undefined) {
+            omitted.push(
+              `${ignoreFile}: pattern ${line} not carried over: outside the supported gitignore subset.`,
+            );
+            return [];
+          }
           const rooted = line.startsWith("/");
           const pattern = line.replace(/^\//, "").replace(/\/$/, "");
           const prefix = !rooted && !pattern.includes("/") ? "**/" : "";
           return [
-            ...rebase(`${prefix}${pattern}`, ignoreFile),
-            ...rebase(`${prefix}${pattern}/**`, ignoreFile),
+            ...(!line.endsWith("/") ? rebase(`${prefix}${pattern}`, ignoreFile, "gitignore") : []),
+            ...rebase(`${prefix}${pattern}/**`, ignoreFile, "gitignore"),
           ];
         }),
     );

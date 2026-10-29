@@ -117,7 +117,7 @@ describe("competitor configuration CLI (#669)", () => {
     const result = run(root, ["config", "convert"]);
     expect(result.status, result.stderr).toBe(0);
     const config = parseConfig(result.stdout);
-    expect(config.ignore).toEqual(["**/generated", "**/generated/**"]);
+    expect(config.ignore).toEqual(["**/generated/**"]);
     expect(config.overrides?.[0]?.ruleUpdates?.["style/wrap"]?.options).toEqual({
       mode: "always",
       width: 70,
@@ -481,4 +481,118 @@ it("accumulates indentation removals across several overlapping EditorConfig sec
       expect.objectContaining({ nestedIndent: reference?.tabWidth ?? 2 }),
     ]);
   }
+});
+
+describe("bounded file-pattern translation", () => {
+  it("preserves hash residuals and omits extglobs without adding an OR exclusion leak", async () => {
+    const pattern = "sub/**/!(skip).md";
+    const root = await fixture({
+      ".prettierrc": JSON.stringify({
+        overrides: [
+          {
+            files: [pattern, "sub/deep/#README.md"],
+            options: { proseWrap: "always", printWidth: 37 },
+          },
+        ],
+      }),
+      "sub/deep/skip.md": "text\n",
+      "sub/deep/#README.md": "text\n",
+    });
+    const child = path.join(root, "sub/deep");
+    const written = run(child, ["config", "convert", "--write"]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(written.stderr).toContain(
+      `${path.join(root, ".prettierrc")}: pattern ${pattern} not carried over`,
+    );
+    for (const file of ["skip.md", "#README.md"]) {
+      const reference = await prettierResolve(path.join(child, file));
+      const rules = parseExplanation(run(child, ["config", "explain", file]).stdout).effective
+        .rules;
+      expect(rules["style/wrap"]).toEqual([
+        file === "skip.md" ? "off" : "warn",
+        expect.objectContaining({ width: reference?.printWidth ?? 80 }),
+      ]);
+    }
+  });
+  it.each([
+    "sub/[!a]*/**/*.md",
+    "sub/[a-z]*/**/*.md",
+    "sub/{1..3}/**/*.md",
+    "/sub/deep/README.md",
+    '"sub/deep/README.md"',
+  ])("reports unsupported Prettier pattern %s instead of emitting it", async (pattern) => {
+    const root = await fixture({
+      ".prettierrc": JSON.stringify({
+        overrides: [{ files: pattern, options: { proseWrap: "always", printWidth: 37 } }],
+      }),
+      "sub/deep/README.md": "text\n",
+    });
+    const child = path.join(root, "sub/deep");
+    const written = run(child, ["config", "convert", "--write"]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(written.stderr).toContain(
+      `${path.join(root, ".prettierrc")}: pattern ${pattern} not carried over`,
+    );
+    expect(await readFile(path.join(child, "mdrefine.config.jsonc"), "utf8")).not.toContain(
+      '"files"',
+    );
+    const ref = await prettierResolve(path.join(child, "README.md"));
+    const wrap = parseExplanation(run(child, ["config", "explain", "README.md"]).stdout).effective
+      .rules["style/wrap"];
+    expect(wrap).toBeUndefined();
+    if (pattern.includes("[!a]")) expect(ref?.printWidth).toBeUndefined();
+  });
+  it.each(["ignores", "globs"])(
+    "expands ancestor %s directories before rebasing",
+    async (family) => {
+      for (const pattern of ["sub", "sub/deep", "other"]) {
+        const root = await fixture({
+          ".markdownlint-cli2.jsonc": JSON.stringify({
+            config: { default: false },
+            [family]: family === "globs" ? ["**/*.md", `!${pattern}`] : [pattern],
+          }),
+          "sub/deep/README.md": "text\n",
+        });
+        const child = path.join(root, "sub/deep");
+        expect(run(child, ["config", "convert", "--write"]).status).toBe(0);
+        // cli2 directory exclusions include all descendants, in source coordinates.
+        const result = run(child, ["lint", "--json"]);
+        expect(result.status, result.stderr).toBe(0);
+        expect(parseReport(result.stdout).files.map((f) => f.path)).toEqual(
+          pattern === "other" ? ["README.md"] : [],
+        );
+      }
+    },
+  );
+  it.each(["sub/{deep,other}/", "sub/deep/", "sub/(deep)/", "sub/**/skip?.md", "sub/deep/a.md/"])(
+    "preserves gitignore membership for %s after write and read",
+    async (pattern) => {
+      const root = await fixture({
+        ".prettierrc": "{}",
+        ".prettierignore": `${pattern}\n`,
+        "sub/deep/a.md": "text\n",
+        "sub/deep/skip1.md": "text\n",
+        "sub/{deep,other}/a.md": "text\n",
+        "sub/(deep)/a.md": "text\n",
+      });
+      for (const destination of ["deep", "{deep,other}", "(deep)"]) {
+        const child = path.join(root, "sub", destination);
+        expect(run(child, ["config", "convert", "--write"]).status).toBe(0);
+        const expected: string[] = [];
+        for (const file of destination === "deep" ? ["a.md", "skip1.md"] : ["a.md"]) {
+          if (
+            !(
+              await getFileInfo(path.join(child, file), {
+                ignorePath: path.join(root, ".prettierignore"),
+              })
+            ).ignored
+          )
+            expected.push(file);
+        }
+        const result = run(child, ["lint", "--json"]);
+        expect(result.status, result.stderr).toBe(0);
+        expect(parseReport(result.stdout).files.map((f) => f.path)).toEqual(expected);
+      }
+    },
+  );
 });
