@@ -1857,9 +1857,14 @@ describe("escaping HTML keeps its originating list markers coherent (#399, #428)
     ["+ *a*\nlazy\n\n+ b\n", "+ _a_\nlazy\n\n+ b\n"],
     ["+ *prefix* <div> a\nlazy\n\n+ b\n", "+ _prefix_ <div> a\nlazy\n\n+ b\n"],
   ])("still permits safe edits to %j", (source, output) => {
+    // The lazy lines stay when nothing writes their prefix (#713).
+    const settings: Config = {
+      ...config,
+      rules: { ...config.rules, "style/lazy-continuation": "off" },
+    };
     for (const newline of ["\n", "\r\n", "\r"])
       for (const bom of ["", "\uFEFF"])
-        expect(checked(bom + source.replaceAll("\n", newline))).toBe(
+        expect(checked(bom + source.replaceAll("\n", newline), settings)).toBe(
           bom + output.replaceAll("\n", newline),
         );
   });

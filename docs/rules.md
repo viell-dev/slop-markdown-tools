@@ -24,6 +24,7 @@ column, ✅ is yes and ❌ no.
 | `content/image-alt`             | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `content/inline-code-spacing`   | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/line-length`           | 🔍   | ❌            | ❌                                                              | ✅      |
+| `content/proper-names`          | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/table-columns`         | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | `error` in `forgejo`, `gitea`                                   | ❌      |
@@ -47,18 +48,21 @@ column, ✅ is yes and ❌ no.
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/heading-increment`   | 🔍   | `warn`        | ❌                                                              | ✅      |
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌                                                              | ✅      |
+| `structure/heading-template`    | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/split-quote`         | 🔍   | ❌            | ❌                                                              | ❌      |
 | `structure/unspaced-heading`    | 🔍   | ❌            | ❌                                                              | ❌      |
 | `style/blank-lines`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/block-spacing`           | 🎨   | `warn`        | ❌                                                              | ✅      |
+| `style/code-block`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/code-fence`              | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/definition-spacing`      | 🎨   | ❌            | ❌                                                              | ❌      |
 | `style/emphasis`                | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/final-newline`           | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/heading`                 | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/inline-code`             | 🎨   | ❌            | ❌                                                              | ❌      |
+| `style/lazy-continuation`       | 🎨   | `warn`        | ❌                                                              | ❌      |
 | `style/line-ending`             | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/link-title`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/list-indent`             | 🎨   | `warn`        | ❌                                                              | ✅      |
@@ -66,6 +70,7 @@ column, ✅ is yes and ❌ no.
 | `style/no-tabs`                 | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/ordered-list`            | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/prose-space`             | 🎨   | ❌            | ❌                                                              | ❌      |
+| `style/quote-marker`            | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/strong`                  | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/table`                   | 🎨   | `warn`        | `warn` in `github`, `forgejo`, `gitea`, `obsidian`, `vitepress` | ✅      |
 | `style/thematic-break`          | 🎨   | `warn`        | ❌                                                              | ✅      |
@@ -341,6 +346,65 @@ strict checking, lines that hold only a link.
 and `stern` here apply only to headings, code, and tables, and do not imply its
 `reportUnreflowed` or `reportUnbreakable`, which judge where prose can safely
 break and which pieces cannot be split, not raw blank space.
+
+## `content/proper-names`
+
+Reports other capitalization of configured names in prose, link labels, and
+image alt text: with `JavaScript` configured, `javascript` is reported. Changing
+a name changes text, so the rule never fixes it.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: `names`,
+`codeBlocks`, `htmlElements`.
+
+With `{ "names": ["JavaScript", "Node.js"] }`, reported:
+
+```markdown
+Write the plugin in javascript for node.js.
+```
+
+Not reported:
+
+```markdown
+Write the plugin in JavaScript for Node.js; run `node.js --version`.
+```
+
+| Option         | Values                        | Default |
+| -------------- | ----------------------------- | ------- |
+| `names`        | An array of non-empty strings | `[]`    |
+| `codeBlocks`   | `true` or `false`             | `false` |
+| `htmlElements` | `true` or `false`             | `true`  |
+
+- `names`: literal names with their accepted capitalization. `[]` checks
+  nothing. Several configured spellings of the same name are all accepted.
+- `codeBlocks`: with `true`, the bodies of fenced and indented code blocks are
+  checked too; turn it on to check prose examples written in fences.
+- `htmlElements`: with `true`, the visible text of HTML is checked; tags,
+  attributes, and comments are not. With `false`, a prose block containing
+  inline HTML is left out as a whole, and other prose is still checked.
+
+For example, in the configuration:
+
+```json
+{
+  "rules": {
+    "content/proper-names": ["warn", { "names": ["JavaScript", "Node.js"] }]
+  }
+}
+```
+
+**Details:** names match literal punctuation and spaces, as in `Node.js`, `C++`,
+and `GitHub Actions`. A Unicode letter, combining mark, number, or connector
+punctuation next to a name prevents a match: neither `myjavascript` nor
+`javascripts` matches `JavaScript`, and the same boundary applies in non-Latin
+scripts. Punctuation outside a name separates it from the text around it. A
+longer name takes precedence over a shorter one that overlaps it. An explicit
+wikilink alias is prose.
+
+**Not checked:** inline code, because a command or identifier often needs its
+exact spelling, and code blocks by default for the same reason; the bodies of
+HTML `script`, `style`, `code`, and `pre` elements; link destinations,
+autolinks, bare URLs and email addresses, image sources, front matter, math,
+comments, and wikilink targets.
 
 ## `content/shell-prompt`
 
@@ -1310,6 +1374,83 @@ an Obsidian embed, nor these endings:
   `Corp.`, `Jr.`, and `Sr.`, in any case. Use a [suppression
   comment](configuration.md#suppression-comments) for another abbreviation.
 
+## `structure/heading-template`
+
+Requires the document's headings to follow a configured sequence, such as a
+guide's required sections. It reports the first heading that cannot continue a
+match, or the end of the document when a required heading is missing, with the
+heading or headings expected there, and never inserts, removes, or renames a
+heading.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`headings`, `matchCase`.
+
+With `{ "headings": ["# Guide", "*", "## Notes"] }`, reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Usage
+```
+
+Not reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Notes
+```
+
+| Option      | Values                                     | Default |
+| ----------- | ------------------------------------------ | ------- |
+| `headings`  | An array of `#` headings and `*`, `+`, `?` | Unset   |
+| `matchCase` | `true` or `false`                          | `false` |
+
+- `headings`: the sequence. A heading entry is written as an ATX heading with
+  its level, such as `## Notes`. `*` matches zero or more headings of any text,
+  `+` one or more, and `?` exactly one. Unset turns the check off; `[]` requires
+  that the document have no headings.
+- `matchCase`: with `true`, capitalization must match too.
+
+Use [overrides](configuration.md#overrides) to apply a template to one group of
+files:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["guides/**/*.md"],
+      "rules": {
+        "structure/heading-template": [
+          "error",
+          { "headings": ["# Guide", "*", "## Notes"], "matchCase": false }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Details:** the sequence follows the document's own outline, including headings
+in lists. Block quotes and footnotes have outlines of their own and do not take
+part, so a quoted example or a footnote need not follow the page's template.
+Headings are compared by their rendered text, with whitespace collapsed and
+inline Markdown, escapes, and character references read; closing `#` sequences
+are syntax. Wildcards are matched by tracking the possible positions in the
+template rather than by backtracking, so the time grows with the template's
+length times the number of headings.
+
+**In Forgejo, Gitea, and VitePress:** a trailing attribute block such as
+`{#setup}` is not part of the heading's text where the dialect reads it as the
+heading's attributes. In other dialects it stays text.
+
+**In Obsidian:** a block identifier such as `^setup` is not part of the
+heading's text.
+
 ## `structure/initial-heading`
 
 Requires the first block of a document, after optional YAML or TOML front
@@ -1797,6 +1938,60 @@ below another block as text. These places are also left as written:
   table. The [boundary policy](obsidian.md#visible-boundary-refusals) reports
   these places without changing them.
 
+## `style/code-block`
+
+Writes code blocks in one form, fenced or indented, and reports those in the
+other. It converts indented code to fences where the dialect permits that
+change; other findings are reported only. No preset enables it, so default
+formatting stays the same.
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`style`.
+
+With `{ "style": "fenced" }`, before:
+
+```markdown
+    npm test
+```
+
+After:
+
+````markdown
+```
+npm test
+```
+````
+
+| Option  | Values                             | Default      |
+| ------- | ---------------------------------- | ------------ |
+| `style` | `consistent`, `fenced`, `indented` | `consistent` |
+
+- `style`: `consistent` takes the form of the document's first parsed code
+  block, `fenced` requires fences, and `indented` requires indentation.
+
+**Details:** a conversion keeps the code, including its tabs and the blank lines
+inside it, and the block's list or quote container. The new backtick fence is
+longer than any run of backticks in the code.
+
+**Reported without a fix:**
+
+- A fenced block where the indented form is required: indentation cannot keep a
+  language or metadata, and can change blank lines or where an adjacent
+  paragraph ends.
+- An indented block in a container whose prefix holds a tab, because removing
+  indentation can change its tab stops.
+- An indented block that a renderer protects.
+
+**Not checked:** continuation paragraphs in list items and footnotes, which are
+text, not code blocks.
+
+**In VitePress:** indented blocks are reported without conversion, which keeps
+the protection of opaque code and VitePress's distinct rendering of fenced code.
+Line highlighting and `::: code-group` syntax stay intact.
+
+**With other rules:** [`style/code-fence`](#stylecode-fence) chooses the marker
+and length of existing fences, independently of this rule.
+
 ## `style/code-fence`
 
 Writes the fences of a fenced code block with one marker, and as long as its
@@ -2135,6 +2330,82 @@ with a hard line break.
 that renderers show at the ends of a span, which this rule leaves as written,
 because removing it would change the code.
 
+## `style/lazy-continuation`
+
+Writes the markers and indentation of a paragraph's containers on its lazy
+continuation lines: lines that continue the paragraph of a block quote, a list
+item, or a footnote definition without the quote's `>` or the item's or
+definition's indentation. The renderers read such a line as part of the
+paragraph either way, so the text stays the same, and the document's structure
+shows in its source.
+
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
+Options: none.
+
+Before:
+
+```markdown
+> Back up the database
+before the migration.
+
+- Unpack the board
+and check the cables.
+```
+
+After:
+
+```markdown
+> Back up the database
+> before the migration.
+
+- Unpack the board
+  and check the cables.
+```
+
+**Details:** a quote gets its `>`, indented as on the quote's first line and
+with one space after it; a list item gets the columns up to its text; a footnote
+definition gets four spaces; nested containers get all of theirs. The spaces
+that a lazy line starts with are replaced, not added to, and a footnote
+definition's first line stays on the line of its label.
+
+**Left as written:** a paragraph's lazy lines, all of them, where one of them
+could read otherwise inside its containers. The rule writes a prefix only on a
+line that starts with a letter or another character that is not ASCII
+punctuation, a number not followed by `.` or `)`, emphasis, a code span, a link
+or image, an opening parenthesis, or a quotation mark, and that holds no `|` and
+does not look like a link reference or footnote definition. A line of `===`
+below a lazy line, for example, is text, and inside a quote it would underline
+the text above it as a heading; `2. Step`, `- item`, `# Title`, `<span>`, and a
+table row are others, also after the spaces that a lazy line starts with. Lazy
+lines also stay:
+
+- inside a code span or other inline syntax that keeps the spaces at the start
+  of its lines;
+- with a tab among their containers' prefixes;
+- as a lazy first line below a link reference definition;
+- in paragraphs with site-generator syntax such as `:::` or `{{` at the start of
+  a line.
+
+**In VitePress:** lazy lines also stay in documents with a custom container's
+fence on a quote's line.
+
+**In Obsidian:** the rule writes only the prefixes observed to leave both views
+unchanged: a quote's `>` where the lazy line lacks every `>` of its quotes, and
+list items' indentation where that is all it lacks. Live Preview shows the line
+otherwise once a footnote definition's lazy line is indented, once a quote
+inside a list item gets its `>`, and once a nested quote's `>` is written after
+its outer quote's, so these lazy lines, and the combinations not observed, stay
+as written with a finding whose message starts with
+`Left as written to preserve Obsidian rendering`. So does a list item's lazy
+line with more blocks after it in the item, which Live Preview reads outside the
+list ([issue
+#376](https://github.com/viell-dev/slop-markdown-tools/issues/376)).
+
+**With other rules:** [`style/wrap`](#stylewrap) joins a lazy line onto the line
+before it when it reflows the paragraph, and writes the containers' prefixes on
+the lines that it breaks, so the two rules agree. This rule also changes the
+paragraphs that wrapping leaves as written, such as one with a hard line break.
+
 ## `style/line-ending`
 
 Writes one configured line ending outside literal content. It keeps the spaces
@@ -2262,8 +2533,10 @@ After:
 - `startIndented` and `startIndent`: with `startIndented: true`, the first level
   of bullet and ordered lists starts `startIndent` columns into its container.
   `{ "startIndented": true, "startIndent": 2 }` writes `- item` as `  - item`,
-  moving its continuation lines too. Nested lists still use `nestedIndent`. Four
-  or more columns would make code, so the rule keeps lists as written for those
+  moving its continuation lines too. Nested lists still use `nestedIndent`. A
+  list that starts a block quote's line is indented too; set
+  [`style/quote-marker`](#stylequote-marker)'s `listItems` to `false` with it.
+  Four or more columns would make code, so the rule keeps lists as written for those
   values. A first-level list directly below nonblank text also stays, because
   indentation can make it continue that text.
 
@@ -2509,6 +2782,76 @@ because changing heading text can change anchors and heading links.
 **In VitePress:** projection syntax and Vue `{{ }}` interpolations keep their
 spaces without a finding: expressions can contain whitespace-sensitive
 JavaScript strings.
+
+## `style/quote-marker`
+
+Writes one space after each block quote marker, `>`, where the line has text
+after it: more spaces become one, and a space is added where there is none, also
+between nested markers, as in `>>` and `>  >`. The quote takes one space after
+its marker as part of the marker, so the text keeps its place in the quote.
+
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
+Options: `listItems`.
+
+Before:
+
+```markdown
+>  Back up the database.
+>>The backup takes an hour.
+```
+
+After:
+
+```markdown
+> Back up the database.
+> > The backup takes an hour.
+```
+
+`listItems` is `true` or `false`; the default is `true`. As in markdownlint's
+MD027, it sets whether lines that start a list item count. The spaces between
+`>` and a list marker are the list's indentation, so the rule moves the list to
+one space after `>` with the lines of its items, as
+[`style/list-indent`](#stylelist-indent) moves a list, and leaves it as written
+where that would move a line into or out of an item.
+
+**Left as written:**
+
+- Indented code, which five or more spaces after `>` start, and the lines of
+  fenced code and HTML, whose spaces beyond the quote's one are content; a space
+  is still added after a `>` that has none there, which moves nothing.
+- A paragraph's later line whose spaces keep its text from starting a block:
+  below a quoted paragraph, `>     # Title` is text, which one space after `>`
+  would make a heading. The spaces become one only before text that
+  [`style/lazy-continuation`](#stylelazy-continuation) would also prefix on a
+  lazy line.
+- A quote line with nothing after its spaces, whose spaces are trailing space
+  for [`style/trailing-space`](#styletrailing-space), and the spaces on the
+  other lines of a list item, which belong to the item.
+- A tab after `>` or among a line's markers, which counts to the next tab stop.
+- The later lines of a code span or other inline syntax that keeps the spaces at
+  the start of its lines, and quotes with site-generator syntax such as `:::` or
+  `{{` at the start of a line.
+- A quote that the next line follows without a blank line or a `>`. Renderers
+  can read that line as more of the quote where the parser starts another block,
+  as with a numbered item that does not start at 1.
+
+**In VitePress:** the quotes of a document with a custom container's fence on a
+quote's line stay as written.
+
+**In Obsidian:** a tag directly after `>`, as in `>#tag`, stays as written,
+because Live Preview reads it as text and would read it as a tag after a space
+([issue #409](https://github.com/viell-dev/slop-markdown-tools/issues/409)). So
+does a callout's marker after two or more spaces, as in `>  [!tip]`, which is
+text there and one space would make a callout (see
+[`obsidian/callout-marker`](#obsidiancallout-marker)). Elsewhere the spaces do
+not change how the marker reads; GitHub shows an alert after any number of them.
+Like the list rules, the rule follows Obsidian's [boundary
+policy](obsidian.md#visible-boundary-refusals): an edit at a boundary between
+text and a list, quote, or other block stays as written with a finding.
+
+**With other rules:** with [`style/list-indent`](#stylelist-indent)'s
+`startIndented`, which indents a list that starts a quote's line, set
+`listItems` to `false`, or the two rules undo each other's edits.
 
 ## `style/strong`
 

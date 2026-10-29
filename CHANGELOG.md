@@ -21,6 +21,33 @@ prereleases' notes there are longer than their entries here.
   is bundled
   ([#718](https://github.com/viell-dev/slop-markdown-tools/issues/718)).
 
+- Two style rules in `recommended` write the prefixes of block quotes and their
+  contents. `style/quote-marker` writes one space after each `>`, removing extra
+  spaces and adding a missing one, and takes markdownlint's MD027 `listItems`
+  option, under which it moves a list that starts a quote's line with its lines.
+  `style/lazy-continuation` writes a quote's `>` and a list item's or footnote
+  definition's indentation on lazy continuation lines, keeping a footnote's
+  first line on its label's line. Both leave the source as written where the
+  preferred form could read otherwise: indented code, a lazy line that could
+  start a block, and, in Obsidian, a tag directly after `>`, a callout's marker
+  after two spaces, and the lazy lines whose prefixes change Live Preview, which
+  are reported as left as written
+  ([#682](https://github.com/viell-dev/slop-markdown-tools/issues/682),
+  [#713](https://github.com/viell-dev/slop-markdown-tools/issues/713)).
+
+- Opt-in `structure/heading-template` checks a configured heading sequence with
+  wildcards and optional case matching, using the document's independent outline
+  ([#692](https://github.com/viell-dev/slop-markdown-tools/issues/692)).
+- Opt-in `content/proper-names` reports incorrect capitalization of configured
+  names in prose, with optional code-block and HTML checking; inline code and
+  destinations remain excluded
+  ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693)).
+
+- Opt-in `style/code-block` checks `consistent`, `fenced`, or `indented` code
+  form, converting indented blocks to safe fences outside VitePress and
+  reporting other mismatches without losing code or metadata
+  ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)).
+
 - `style/block-spacing` takes `linesAbove` and `linesBelow`, the blank lines
   that a heading needs above and below it, as one count or one per level, and
   `includeFrontMatter`, which also separates a heading directly below front
