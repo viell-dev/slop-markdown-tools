@@ -278,6 +278,34 @@ export const fixtures = [
       "Name | Value\n--- | ---\nA cell | Another cell\n\nA paragraph below the table, with enough words to be reflowed at a narrow width.\n",
   },
   {
+    // #710: tables in lists, block quotes and callouts keep each row's container prefix.
+    name: "table in a block quote",
+    source:
+      "> | Name | Value |\n> | :-- | --: |\n> | *First* | 1 |\n>| `a \\| b` | 漢字 |\n\nA paragraph below the quote, with enough words to be reflowed at a narrow width.\n",
+  },
+  {
+    name: "table on a list item's marker line",
+    source:
+      "- | Name | Value |\n  |---|---|\n  | x | y |\n- An item with enough words to be reflowed at a narrow width, and more.\n",
+  },
+  {
+    name: "table below a paragraph in a list item",
+    source:
+      "1. A step with enough words to be reflowed at a narrow width, and more of them.\n\n   Name | Value\n   --- | :-:\n   longer | z\n",
+  },
+  {
+    name: "table in a callout",
+    source: "> [!note] A title\n>\n> | a | b |\n> |---|---|\n> | ccc | d |\n",
+  },
+  {
+    name: "table directly below a callout title",
+    source: "> [!tip]\n> | a | b |\n> |---|---|\n> | ccc | d |\n",
+  },
+  {
+    name: "table in a quoted list item",
+    source: "> - An item\n>\n>   | a | b |\n>   |---|---|\n>   | ccc | d |\n",
+  },
+  {
     // #403: after an HTML tag that nothing closes, Live Preview shows the source as written,
     // a callout's type included, which the callout rule writes in lowercase.
     name: "callout after an open HTML tag",

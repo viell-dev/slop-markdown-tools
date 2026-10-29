@@ -158,8 +158,6 @@ rule that no preset in your configuration enables, such as
 | MD059 `descriptive-link-text`            | [`links/descriptive-text`](rules.md#linksdescriptive-text), with `prohibited_texts` as `prohibitedTexts`, also for Obsidian wikilinks                                                                                                   |
 | MD060 `table-column-style`               | [`style/table`](rules.md#styletable), aligned, compact, or tight, with `alignedDelimiter`. A formatter selects a target style rather than accepting `any`                                                                               |
 
-`style/table` leaves tables inside lists and block quotes as written
-([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
 markdownlint's comments such as `<!-- markdownlint-disable -->` correspond to
 mdrefine's [suppression comments](configuration.md#suppression-comments), and
 its custom rules to [plugins](plugins.md).
@@ -205,7 +203,7 @@ footnote outlines. See each rule's reference for its exact contract.
 | One space after list markers, list indentation   | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                                                                      |
 | Backtick fences as short as the code allows      | [`style/code-fence`](rules.md#stylecode-fence), which also removes space before the info string                                                                                                                       |
 | `---` for thematic breaks                        | [`style/thematic-break`](rules.md#stylethematic-break)                                                                                                                                                                |
-| Aligned tables                                   | [`style/table`](rules.md#styletable), with `padding: "alignment"` and display-column widths. Not yet tables in lists and quotes ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710))                 |
+| Aligned tables                                   | [`style/table`](rules.md#styletable), with `padding: "alignment"` and display-column widths, also in lists and block quotes, formatting the same on a second run                                                      |
 | Trailing spaces removed, hard breaks kept        | [`style/trailing-space`](rules.md#styletrailing-space), with `hardBreakSpaces: 2` for exact two-space breaks                                                                                                          |
 | Repeated blank lines collapsed                   | [`style/blank-lines`](rules.md#styleblank-lines)                                                                                                                                                                      |
 | Blank lines around blocks                        | [`style/block-spacing`](rules.md#styleblock-spacing), for headings, lists, fences, and tables                                                                                                                         |
