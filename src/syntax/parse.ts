@@ -130,13 +130,22 @@ function codeSpanRecording(): { syntax: SyntaxExtension; tree: TreeExtension } {
 export function codeSpanText(node: InlineCode): string {
   const vitepress = vitepressCodeText(node);
   if (vitepress !== undefined) return vitepress;
+  const content = codeSpanContent(node);
+  return /^ [^]* $/.test(content) && /[^ ]/.test(content) ? content.slice(1, -1) : content;
+}
+/**
+ * The content of a code span as the primary parser reads it, on one line, before
+ * the one space comes off each end: what lies between its backticks. In
+ * VitePress, `codeSpanText` prefers markdown-it's reading, which can differ for a
+ * span across lines; compare the two before relying on this one there.
+ */
+export function codeSpanContent(node: InlineCode): string {
   const { padding = [], lazy = {} } = codeSpanSources.get(node) ?? {};
   let line = node.position?.start.line ?? 0;
-  const content = `${padding[0] ?? ""}${node.value}${padding[1] ?? ""}`.replace(
+  return `${padding[0] ?? ""}${node.value}${padding[1] ?? ""}`.replace(
     /(?:\r\n|\r|\n)([ \t]*)/g,
     (_, indentation: string) => (lazy[++line] ? ` ${indentation}` : " "),
   );
-  return /^ [^]* $/.test(content) && /[^ ]/.test(content) ? content.slice(1, -1) : content;
 }
 /**
  * Whether a code span goes on in a lazy continuation line that starts with
