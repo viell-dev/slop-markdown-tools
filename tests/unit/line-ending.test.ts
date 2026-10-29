@@ -22,6 +22,19 @@ it.each(dialects)("normalizes line endings safely and idempotently in %s", (dial
     expect(format(source, { config: { extends: [], dialect } }).output).toBe(source);
   }
 });
+it("names the line ending to use, also the first one for auto", () => {
+  const messages = (endOfLine: string, source: string) =>
+    lint(source, {
+      config: { extends: [], rules: { "style/line-ending": ["warn", { endOfLine }] } },
+    }).map((item) => item.message);
+  expect(messages("crlf", "A\nB\n")).toEqual(["Use CRLF line endings.", "Use CRLF line endings."]);
+  expect(messages("auto", "A\r\nB\n")).toEqual([
+    "Use CRLF line endings, as the document's first line does.",
+  ]);
+  expect(messages("auto", "A\nB\r\n")).toEqual([
+    "Use LF line endings, as the document's first line does.",
+  ]);
+});
 it.each(dialects)("preserves literal bytes and normalizes independent prose in %s", (dialect) => {
   const source =
     "---\r\ntitle: x\r\ntags: [a,b]\r\n---\r\n\r\n```js\r\na\r\nb\r\n```\r\n\r\n<div>\r\nx\r\n</div>\r\n\r\n$$\r\na\r\nb\r\n$$\r\n\r\nText.\r\n";

@@ -245,7 +245,10 @@ properties, and returns the complete body on stdout. mdrefine preserves the
 opening and closing delimiters and their position, restoring the document's line
 endings. Configure a TOML-capable formatter with `frontMatter: ["toml"]` to
 handle TOML; mdrefine bundles no YAML or TOML printer. VitePress recognizes YAML
-front matter only, so TOML-like text there is not sent to a formatter.
+front matter only, so TOML-like text there is not sent to a formatter. Front
+matter whose closing delimiter would fall inside a code block, an HTML block, or
+display math is not sent either, outside VitePress: renderers disagree whether
+it is metadata, so it stays as written.
 
 The same exclusions, range selection, suppressions, timeouts, output limits, and
 failure diagnostics apply as for fenced code. The guard permits only the

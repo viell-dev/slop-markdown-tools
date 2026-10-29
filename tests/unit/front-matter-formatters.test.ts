@@ -64,6 +64,25 @@ it.each(dialects)("keeps the alternative TOML reading in %s", async (dialect) =>
     dialect === "vitepress" ? undefined : "engine/code-formatter",
   );
 });
+it.each(dialects)(
+  "leaves front matter as written where renderers disagree whether it is metadata in %s",
+  async (dialect) => {
+    // The closing delimiter lies inside a code block for the reading without
+    // front matter, which the document is read as, so the YAML is not sent.
+    // VitePress takes front matter off before reading the Markdown, so there
+    // it is metadata.
+    const source = "---\ntitle:    x\n```js\n---\n```\n";
+    run.mockResolvedValue("title: x\n```js\n");
+    const result = await formatWithCode(source, { config: config(dialect) });
+    expect(result.diagnostics).toEqual([]);
+    if (dialect === "vitepress") {
+      expect(result.output).toBe(source.replace("title:    x", "title: x"));
+    } else {
+      expect(result.output).toBe(source);
+      expect(run).not.toHaveBeenCalled();
+    }
+  },
+);
 it("requires explicit front matter selection, respects exclusions, scopes and failures", async () => {
   const source = "---\ntitle:    x\n---\n\nText.\n";
   run.mockResolvedValue("title: x\n");

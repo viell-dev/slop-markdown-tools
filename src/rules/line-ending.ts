@@ -22,6 +22,7 @@ export const lineEndingRule: Rule = {
           : style === "cr"
             ? "\r"
             : "\n";
+    const name = ending === "\r\n" ? "CRLF" : ending === "\r" ? "CR" : "LF";
     const opaque: [number, number][] = vitepressWhitespaceLiterals(document);
     const alternative = otherReading(document.tree);
     for (const tree of alternative ? [document.tree, alternative] : [document.tree])
@@ -52,7 +53,10 @@ export const lineEndingRule: Rule = {
       findings.push({
         start: match.index,
         end: match.index + match[0].length,
-        message: `Use ${style.toUpperCase()} line endings.`,
+        message:
+          style === "auto"
+            ? `Use ${name} line endings, as the document's first line does.`
+            : `Use ${name} line endings.`,
         edit: { start: match.index, end: match.index + match[0].length, text },
       });
     }
