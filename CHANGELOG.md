@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `style/code-block` checks `consistent`, `fenced`, or `indented` code
+  form, converting indented blocks to safe fences outside VitePress and
+  reporting other mismatches without losing code or metadata
+  ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)).
+
 - `style/block-spacing` takes `linesAbove` and `linesBelow`, the blank lines
   that a heading needs above and below it, as one count or one per level, and
   `includeFrontMatter`, which also separates a heading directly below front
