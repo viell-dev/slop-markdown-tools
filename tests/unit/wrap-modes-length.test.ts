@@ -22,7 +22,7 @@ function lengths(source: string, options = {}, dialect: Dialect = "github") {
   const config: Config = {
     extends: [],
     dialect,
-    rules: { "problem/line-length": ["warn", { lineLength: 20, ...options }] },
+    rules: { "content/line-length": ["warn", { lineLength: 20, ...options }] },
   };
   expect(format(source, { config }).output).toBe(source);
   return lint(source, { config });

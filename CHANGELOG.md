@@ -12,7 +12,7 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
-- Opt-in `problem/line-length` reports heading, code and table overflow with
+- Opt-in `content/line-length` reports heading, code and table overflow with
   per-kind limits, switches and display-column measurement
   ([#673](https://github.com/viell-dev/slop-markdown-tools/issues/673)).
 - `style/wrap` takes `mode: "never"` to join paragraphs onto one line with the

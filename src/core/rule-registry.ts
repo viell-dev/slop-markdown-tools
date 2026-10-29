@@ -24,7 +24,7 @@ export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze
   ...linkRules,
   ...structureRules,
   ...contentRules,
-  "problem/line-length": lineLength,
+  "content/line-length": lineLength,
   ...listRules,
 });
 export const phases = ["inline", "block", "document"] as const;
