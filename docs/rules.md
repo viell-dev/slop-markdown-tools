@@ -24,6 +24,7 @@ column, ✅ is yes and ❌ no.
 | `content/image-alt`             | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `content/inline-code-spacing`   | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/line-length`           | 🔍   | ❌            | ❌                                                              | ✅      |
+| `content/proper-names`          | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/table-columns`         | 🔍   | `warn`        | ❌                                                              | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | `error` in `forgejo`, `gitea`                                   | ❌      |
@@ -47,6 +48,7 @@ column, ✅ is yes and ❌ no.
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/heading-increment`   | 🔍   | `warn`        | ❌                                                              | ✅      |
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌                                                              | ✅      |
+| `structure/heading-template`    | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌                                                              | ✅      |
 | `structure/split-quote`         | 🔍   | ❌            | ❌                                                              | ❌      |
@@ -341,6 +343,65 @@ strict checking, lines that hold only a link.
 and `stern` here apply only to headings, code, and tables, and do not imply its
 `reportUnreflowed` or `reportUnbreakable`, which judge where prose can safely
 break and which pieces cannot be split, not raw blank space.
+
+## `content/proper-names`
+
+Reports other capitalization of configured names in prose, link labels, and
+image alt text: with `JavaScript` configured, `javascript` is reported. Changing
+a name changes text, so the rule never fixes it.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: `names`,
+`codeBlocks`, `htmlElements`.
+
+With `{ "names": ["JavaScript", "Node.js"] }`, reported:
+
+```markdown
+Write the plugin in javascript for node.js.
+```
+
+Not reported:
+
+```markdown
+Write the plugin in JavaScript for Node.js; run `node.js --version`.
+```
+
+| Option         | Values                        | Default |
+| -------------- | ----------------------------- | ------- |
+| `names`        | An array of non-empty strings | `[]`    |
+| `codeBlocks`   | `true` or `false`             | `false` |
+| `htmlElements` | `true` or `false`             | `true`  |
+
+- `names`: literal names with their accepted capitalization. `[]` checks
+  nothing. Several configured spellings of the same name are all accepted.
+- `codeBlocks`: with `true`, the bodies of fenced and indented code blocks are
+  checked too; turn it on to check prose examples written in fences.
+- `htmlElements`: with `true`, the visible text of HTML is checked; tags,
+  attributes, and comments are not. With `false`, a prose block containing
+  inline HTML is left out as a whole, and other prose is still checked.
+
+For example, in the configuration:
+
+```json
+{
+  "rules": {
+    "content/proper-names": ["warn", { "names": ["JavaScript", "Node.js"] }]
+  }
+}
+```
+
+**Details:** names match literal punctuation and spaces, as in `Node.js`, `C++`,
+and `GitHub Actions`. A Unicode letter, combining mark, number, or connector
+punctuation next to a name prevents a match: neither `myjavascript` nor
+`javascripts` matches `JavaScript`, and the same boundary applies in non-Latin
+scripts. Punctuation outside a name separates it from the text around it. A
+longer name takes precedence over a shorter one that overlaps it. An explicit
+wikilink alias is prose.
+
+**Not checked:** inline code, because a command or identifier often needs its
+exact spelling, and code blocks by default for the same reason; the bodies of
+HTML `script`, `style`, `code`, and `pre` elements; link destinations,
+autolinks, bare URLs and email addresses, image sources, front matter, math,
+comments, and wikilink targets.
 
 ## `content/shell-prompt`
 
@@ -1309,6 +1370,83 @@ an Obsidian embed, nor these endings:
   and `etc.`, `et al.`, `cf.`, `vs.`, `viz.`, `approx.`, `Inc.`, `Ltd.`, `Co.`,
   `Corp.`, `Jr.`, and `Sr.`, in any case. Use a [suppression
   comment](configuration.md#suppression-comments) for another abbreviation.
+
+## `structure/heading-template`
+
+Requires the document's headings to follow a configured sequence, such as a
+guide's required sections. It reports the first heading that cannot continue a
+match, or the end of the document when a required heading is missing, with the
+heading or headings expected there, and never inserts, removes, or renames a
+heading.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`headings`, `matchCase`.
+
+With `{ "headings": ["# Guide", "*", "## Notes"] }`, reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Usage
+```
+
+Not reported:
+
+```markdown
+# Guide
+
+## Install
+
+## Notes
+```
+
+| Option      | Values                                     | Default |
+| ----------- | ------------------------------------------ | ------- |
+| `headings`  | An array of `#` headings and `*`, `+`, `?` | Unset   |
+| `matchCase` | `true` or `false`                          | `false` |
+
+- `headings`: the sequence. A heading entry is written as an ATX heading with
+  its level, such as `## Notes`. `*` matches zero or more headings of any text,
+  `+` one or more, and `?` exactly one. Unset turns the check off; `[]` requires
+  that the document have no headings.
+- `matchCase`: with `true`, capitalization must match too.
+
+Use [overrides](configuration.md#overrides) to apply a template to one group of
+files:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["guides/**/*.md"],
+      "rules": {
+        "structure/heading-template": [
+          "error",
+          { "headings": ["# Guide", "*", "## Notes"], "matchCase": false }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Details:** the sequence follows the document's own outline, including headings
+in lists. Block quotes and footnotes have outlines of their own and do not take
+part, so a quoted example or a footnote need not follow the page's template.
+Headings are compared by their rendered text, with whitespace collapsed and
+inline Markdown, escapes, and character references read; closing `#` sequences
+are syntax. Wildcards are matched by tracking the possible positions in the
+template rather than by backtracking, so the time grows with the template's
+length times the number of headings.
+
+**In Forgejo, Gitea, and VitePress:** a trailing attribute block such as
+`{#setup}` is not part of the heading's text where the dialect reads it as the
+heading's attributes. In other dialects it stays text.
+
+**In Obsidian:** a block identifier such as `^setup` is not part of the
+heading's text.
 
 ## `structure/initial-heading`
 

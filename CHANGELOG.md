@@ -12,6 +12,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `structure/heading-template` checks a configured heading sequence with
+  wildcards and optional case matching, using the document's independent outline
+  ([#692](https://github.com/viell-dev/slop-markdown-tools/issues/692)).
+- Opt-in `content/proper-names` reports incorrect capitalization of configured
+  names in prose, with optional code-block and HTML checking; inline code and
+  destinations remain excluded
+  ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693)).
+
 - Opt-in `style/code-block` checks `consistent`, `fenced`, or `indented` code
   form, converting indented blocks to safe fences outside VitePress and
   reporting other mismatches without losing code or metadata
