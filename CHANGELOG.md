@@ -12,6 +12,20 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- `style/block-spacing` takes `linesAbove` and `linesBelow`, the blank lines
+  that a heading needs above and below it, as one count or one per level, and
+  `includeFrontMatter`, which also separates a heading directly below front
+  matter. The counts are minimums, and the default stays one blank line. A
+  configuration whose counts exceed `style/blank-lines`' `maximum` is refused
+  when it is read, instead of leaving the two rules to undo each other
+  ([#679](https://github.com/viell-dev/slop-markdown-tools/issues/679)).
+
+- `structure/heading-increment` takes `frontMatterTitle`, with the values of
+  `structure/initial-heading`'s, which treats a front-matter title as a level-1
+  heading, so that the first heading may be at most level 2. It is off by
+  default, because the supported renderers do not show such a title as a heading
+  ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699)).
+
 - Three report-only rules, in no preset, cover markdownlint's MD037, MD038, and
   MD039: `content/emphasis-spacing` reports emphasis or strong markers with
   blank space just inside them, as in `** bold **`, where the parser reads

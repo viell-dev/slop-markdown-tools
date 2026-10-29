@@ -76,7 +76,14 @@ describe("configurable title headings", () => {
     ).toEqual([]);
     expect(check(`${front}\n## Section\n`, "structure/initial-heading", {})).toHaveLength(1);
     expect(check(`${front}\n## Section\n`, "structure/single-title", { level: 2 })).toHaveLength(1);
+    const increment = "structure/heading-increment";
+    expect(check(`${front}\n### Section\n`, increment, { frontMatterTitle: true })).toHaveLength(1);
+    expect(check(`${front}\n## Section\n`, increment, { frontMatterTitle: true })).toEqual([]);
+    expect(check(`${front}\n### Section\n`, increment, {})).toEqual([]);
     for (const disabled of [false, ""]) {
+      expect(check(`${front}\n### Section\n`, increment, { frontMatterTitle: disabled })).toEqual(
+        [],
+      );
       expect(
         check(`${front}\n# Page\n`, "structure/single-title", { frontMatterTitle: disabled }),
       ).toEqual([]);
@@ -93,6 +100,9 @@ describe("configurable title headings", () => {
   ])("does not mistake nested or longer keys for the default title: %j", (source) => {
     expect(check(source, "structure/initial-heading", { frontMatterTitle: true })).toHaveLength(1);
     expect(check(`${source}\n# Page\n`, "structure/single-title", {})).toEqual([]);
+    expect(
+      check(`${source}\n### Page\n`, "structure/heading-increment", { frontMatterTitle: true }),
+    ).toEqual([]);
   });
   it.each([
     ["---\nother: value\npage_name: Example\n---\n", "^page_name:"],
@@ -108,6 +118,9 @@ describe("configurable title headings", () => {
     expect(
       check("page_name: Body text\n", "structure/initial-heading", { frontMatterTitle: pattern }),
     ).toHaveLength(1);
+    const increment = "structure/heading-increment";
+    expect(check(`${front}\n### Page\n`, increment, { frontMatterTitle: pattern })).toHaveLength(1);
+    expect(check(`${front}\n### Page\n`, increment, { frontMatterTitle: "^missing:" })).toEqual([]);
   });
   it("keeps metadata titles out of quoted and footnote outlines", () => {
     const source =
@@ -116,6 +129,35 @@ describe("configurable title headings", () => {
       { line: 7, message: "Use one level-2 heading per document; the title is on line 5." },
       { line: 11, message: "Use one level-2 heading per document; the title is on line 9." },
     ]);
+  });
+  it("treats a metadata title as a level-1 heading before the document's own headings", () => {
+    const rule = "structure/heading-increment";
+    const options = { frontMatterTitle: true };
+    const source = "---\ntitle: Page\n---\n\n### Skips\n\n## Section\n\n#### Skips too\n";
+    expect(check(source, rule, options)).toMatchObject([
+      {
+        line: 5,
+        column: 1,
+        message:
+          "Heading level 3 follows the front matter's title, which counts as level 1; use at most level 2.",
+      },
+      { line: 9, message: "Heading level 4 follows level 2; use at most level 3." },
+    ]);
+    for (const eol of ["\r\n", "\r"])
+      expect(check(source.replaceAll("\n", eol), rule, options).map((item) => item.line)).toEqual([
+        5, 9,
+      ]);
+    // A level-1 heading may follow the title; counting titles is single-title's job.
+    expect(check("---\ntitle: Page\n---\n\n# Page\n\n## A\n", rule, options)).toEqual([]);
+    // Quotes, callouts, and footnotes keep outlines of their own.
+    const quoted =
+      "---\ntitle: Page\n---\n\n> ### Quoted\n\n[^n]: ### Footnote\n\n## Section\n\n[^n]\n";
+    expect(check(quoted, rule, options)).toEqual([]);
+    expect(
+      check("---\ntitle: Page\n---\n\n> ### Quoted\n\n### Own\n", rule, options),
+    ).toMatchObject([{ line: 7 }]);
+    // Without front matter, the first heading may have any level.
+    expect(check("### Start\n", rule, options)).toEqual([]);
   });
   it("keeps the default literal title forms and allows other forms through a pattern", () => {
     const front = "---\n  title: Page\n---\n";
@@ -140,6 +182,13 @@ describe("configurable title headings", () => {
         );
     },
   );
+  it("rejects invalid structure/heading-increment options before execution", () => {
+    const rule = "structure/heading-increment";
+    for (const options of [{ frontMatterTitle: "[" }, { frontMatterTitle: 42 }, { level: 2 }])
+      expect(() => lint("# Page\n", settings(rule, options))).toThrow(
+        `Invalid options for ${rule}`,
+      );
+  });
 });
 
 describe("duplicate heading scope", () => {
