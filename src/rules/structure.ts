@@ -372,19 +372,29 @@ export const structureRules: Record<string, Rule> = {
   "structure/heading-increment": {
     description: "Report headings more than one level deeper than the heading before them.",
     kind: "problem",
-    schema: optionsSchema({}),
-    check({ document }) {
+    schema: optionsSchema({ frontMatterTitle: { ...titleSchema, default: false } }),
+    check({ document, options }) {
       const findings: Finding[] = [];
-      for (const outline of outlines(document.tree))
-        for (let i = 1; i < outline.length; i++) {
-          const previous = outline[i - 1]!.depth;
+      // A recognized front-matter title stands for a level-1 heading before
+      // the document's own first heading; quotes and footnotes keep theirs.
+      const titled = frontMatterTitle(
+        document.tree,
+        (options.frontMatterTitle ?? false) as TitleSetting,
+      );
+      outlines(document.tree).forEach((outline, index) => {
+        const first = index === 0 && titled ? 0 : 1;
+        for (let i = first; i < outline.length; i++) {
+          const previous = i ? outline[i - 1]!.depth : 1;
           const heading = outline[i]!;
           if (heading.depth > previous + 1)
             findings.push({
               start: range(heading)[0],
-              message: `Heading level ${heading.depth} follows level ${previous}; use at most level ${previous + 1}.`,
+              message: i
+                ? `Heading level ${heading.depth} follows level ${previous}; use at most level ${previous + 1}.`
+                : `Heading level ${heading.depth} follows the front matter's title, which counts as level 1; use at most level 2.`,
             });
         }
+      });
       return findings;
     },
   },
