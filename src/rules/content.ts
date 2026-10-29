@@ -1,12 +1,26 @@
 import { walk } from "../syntax/walk.js";
-import type { Finding, Rule } from "../core/types.js";
+import type { Dialect, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { tableContainerBoundary } from "../syntax/site-generator.js";
 import { lineBreak } from "../syntax/source.js";
+import { hiddenBy, htmlStartTags, vueSyntax } from "./html-elements.js";
+import type { HtmlStartTag } from "./html-elements.js";
 import { optionsSchema } from "./shared.js";
 
 /** `|100` or `|100x50` at the end of an Obsidian image's text sets its size, not its text. */
 const obsidianSize = /\|\d+(?:x\d+)?$/;
+
+/**
+ * Whether an HTML `<img>` element gives alternative text, which any `alt`
+ * attribute does, `alt=""` included, which marks a decorative image, or is not
+ * certainly shown to readers. In VitePress, an image with Vue's attributes,
+ * such as `:alt` or `v-if`, is not checked.
+ */
+function describedImage(tag: HtmlStartTag, dialect: Dialect): boolean {
+  if (tag.attributes.has("alt")) return true;
+  if (dialect === "vitepress" && vueSyntax(tag.attributes)) return true;
+  return hiddenBy(tag.attributes, dialect);
+}
 
 /**
  * The languages of shell commands and of shell sessions, whose prompts mark
@@ -58,8 +72,45 @@ function promptOnly(code: string): string | undefined {
 }
 
 export const contentRules: Record<string, Rule> = {
+  "content/html-element": {
+    description: "Report HTML elements, apart from the allowed ones.",
+    kind: "problem",
+    schema: optionsSchema({
+      allowedElements: {
+        description: "Element names to allow, compared without letter case.",
+        type: "array",
+        items: { type: "string", minLength: 1 },
+        default: [],
+      },
+      tableAllowedElements: {
+        description:
+          "Element names to allow in Markdown tables, in place of allowedElements, compared without letter case.",
+        type: "array",
+        items: { type: "string", minLength: 1 },
+      },
+    }),
+    check({ document, options }) {
+      const names = (list: unknown) =>
+        new Set((list as string[] | undefined)?.map((name) => name.toLowerCase()));
+      const allowed = names(options.allowedElements);
+      const tables = options.tableAllowedElements !== undefined;
+      const tableAllowed = tables ? names(options.tableAllowedElements) : allowed;
+      const findings: Finding[] = [];
+      for (const tag of htmlStartTags(document)) {
+        const name = tag.name.toLowerCase();
+        if ((tag.table ? tableAllowed : allowed).has(name)) continue;
+        const option = tag.table && tables ? "tableAllowedElements" : "allowedElements";
+        findings.push({
+          start: tag.start,
+          end: tag.end,
+          message: `Write the HTML element <${tag.name}> in Markdown, or allow "${name}" in ${option}.`,
+        });
+      }
+      return findings;
+    },
+  },
   "content/image-alt": {
-    description: "Report images without alternative text.",
+    description: "Report images, Markdown or HTML, without alternative text.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -77,6 +128,16 @@ export const contentRules: Record<string, Rule> = {
           message: "Add alternative text to the image, for readers who cannot see it.",
         });
       });
+      for (const tag of htmlStartTags(document)) {
+        const img = document.dialect === "vitepress" ? tag.name === "img" : /^img$/i.test(tag.name);
+        if (!img || tag.hidden || describedImage(tag, document.dialect)) continue;
+        findings.push({
+          start: tag.start,
+          end: tag.end,
+          message:
+            'Add an alt attribute to the HTML image, for readers who cannot see it, or alt="" if it is decorative.',
+        });
+      }
       return findings;
     },
   },
