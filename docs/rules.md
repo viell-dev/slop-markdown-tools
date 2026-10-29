@@ -259,9 +259,10 @@ reporting what renderers do not read as one:
 
 Footnote definitions are read after the rest, where the page shows them, and
 only when nothing stopped the reading there. A definition that no reference
-outside footnotes uses is not shown, and not read. When reading one stops or
-leaves open an element that hides what follows, no definition is read, because
-the page orders them by their references.
+outside footnotes uses is not shown, and not read. When reading one stops,
+closes an element left open before the footnotes, or leaves open an element that
+hides what follows, no definition is read, because the page orders them by their
+references.
 
 **Not checked:** comments, mdrefine's suppression comments included,
 declarations such as `<!DOCTYPE html>`, and processing instructions, which are
@@ -322,6 +323,14 @@ elements such as `<textarea>`. HTML images are found where
 [`content/html-element`](#contenthtml-element) finds elements: not after HTML
 whose reading is uncertain, and not in footnote definitions that no reference
 uses. A report there could be about an image that readers never see.
+
+No HTML image is checked after an end tag that a browser may ignore while an
+element that hides is open. A browser ignores the end tag of an element opened
+outside a table, a `<select>`, or a `<template>`, or outside a paragraph, list
+item, or table cell of the Markdown, and a start tag such as `<li>` can close a
+`<p>` before its end tag. In `<div hidden><table></div><img src="x">`, the image
+stays inside the hidden `<div>`. An end tag that closes the innermost open
+element, or that comes while nothing hides, does not stop the check.
 
 **On GitHub:** the sanitizer removes `aria-hidden`, `hidden`, `inert`, and
 `style` and keeps the image, so an image hidden only by them is reported.

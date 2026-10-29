@@ -30,6 +30,8 @@ const spans = (source: string, findings: { start: number; end?: number }[]) =>
   findings.map((item) => source.slice(item.start, item.end));
 /** The dialects that render HTML blocks; VitePress keeps them, Vue templates, opaque. */
 const rendering = dialects.filter((name) => name !== "vitepress");
+/** The dialects that render HTML blocks and read them as the parser does. */
+const reading = rendering.filter((name) => name !== "obsidian");
 
 describe("content/image-alt with HTML images", () => {
   const rule = "content/image-alt";
@@ -165,6 +167,48 @@ describe("content/image-alt with HTML images", () => {
   ])("leaves HTML whose reading is uncertain unreported: %j", (source) => {
     for (const dialect of dialects) expect(check(source, rule, dialect), dialect).toEqual([]);
   });
+  it.each([
+    // A browser ignores an end tag in a table, a `<select>` or a `<template>`
+    // of an element opened outside it.
+    '<div hidden><table></div><img src="x">\n',
+    '<div hidden><select></div></select><img src="x">\n',
+    '<div hidden><template></div></template><img src="x">\n',
+    '<div hidden><table><tr><td></div></td></tr></table><img src="x">\n',
+    // An end tag of an element outside a block that the renderer writes, such
+    // as `<p>`, `<li>` or `<td>`.
+    '<span hidden>\n\nText </span> <img src="x.png">\n',
+    '<span hidden>\n\n- Item </span> <img src="x.png">\n',
+    '<div hidden>\n\n| a |\n| --- |\n| </div> <img src="x.png"> |\n',
+    // An element that a start tag closed: `<li>` closes the `<p>`, so the
+    // browser ignores `</p>` and keeps the `<li>`, which `</span>` cannot close.
+    '<span hidden><p><li></p></span><img src="x">\n',
+    '<span hidden><p></span><img src="x">\n',
+    // A formatting element that an end tag closed comes back around what follows.
+    '<p><b hidden>x</p><img src="x">\n',
+    'Text <b hidden>bold\n\n<img src="x.png">\n',
+  ])("keeps hiding after an end tag that a browser may ignore: %j", (source) => {
+    // GitHub's sanitizer removes `hidden`.
+    for (const dialect of dialects.filter((name) => name !== "github"))
+      expect(check(source, rule, dialect), dialect).toEqual([]);
+    // The tags are still elements, after the uncertain end tag too. Obsidian
+    // reads some of these blocks otherwise, and its reading stops before them.
+    const img = source.match(/<img[^>]*>/)![0];
+    for (const dialect of reading)
+      expect(spans(source, check(source, "content/html-element", dialect)), dialect).toContain(img);
+  });
+  it("reports images after uncertain end tags where nothing hides", () => {
+    for (const source of [
+      '<div><table></div><img src="x">\n',
+      '<div><p>Text</div>\n<img src="x.png">\n',
+      '<span>\n\nText </span> <img src="x.png">\n',
+      '<div hidden><span></span></div><img src="x">\n',
+      '<div hidden>\n\nText\n\n</div>\n\n<img src="x.png">\n',
+    ])
+      for (const dialect of reading)
+        expect(image(source, dialect), `${dialect}: ${source}`).toEqual([
+          source.match(/<img[^>]*>/)![0],
+        ]);
+  });
   it("reads footnote definitions after the rest of the page, when they are used", () => {
     const used = 'Text[^1]\n\n[^1]: Note <img src="f.png">\n\n[^2]: <img src="u.png">\n';
     // The footnote's unclosed textarea follows the body's image on the page.
@@ -181,6 +225,16 @@ describe("content/image-alt with HTML images", () => {
     }
     expect(image(open, "forgejo")).toEqual([]);
     expect(image(open, "github")).toEqual(['<img src="h.png">']);
+    // So does one with an end tag that a browser may ignore, and one that
+    // closes an element left open before the footnotes.
+    const ignored =
+      'Text[^1][^2]\n\n[^1]: <span hidden><p></span></p></span>\n\n[^2]: <img src="i.png">\n';
+    const closing = '<div>\n\nText[^1][^2]\n\n[^1]: Note </div><span>\n\n[^2]: <img src="c.png">\n';
+    for (const dialect of ["forgejo", "gitea", "obsidian"] as const) {
+      expect(image(ignored, dialect), dialect).toEqual([]);
+      expect(image(closing, dialect), dialect).toEqual([]);
+    }
+    expect(image(ignored, "github")).toEqual(['<img src="i.png">']);
   });
   it("stops at a region that Obsidian reads otherwise than the parser", () => {
     // A blank-space line continues the HTML block in Reading view, which then

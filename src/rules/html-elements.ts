@@ -111,6 +111,20 @@ const vueHtml = new Set(
 const vueAttribute = /^(?::|@|#|v-)/;
 /** CSS in a `style` attribute that hides the element. */
 const hidingStyle = /display\s*:\s*none|visibility\s*:\s*hidden|content-visibility/i;
+/**
+ * The Markdown nodes that renderers write as inline elements, such as `<em>`,
+ * which an end tag of the HTML around them closes with them. The others with
+ * content are written as blocks, such as `<p>`, `<li>` or `<td>`, which a
+ * browser may not close for such an end tag.
+ */
+const inlineNodes = new Set([
+  "delete",
+  "emphasis",
+  "link",
+  "linkReference",
+  "obsidianHighlight",
+  "strong",
+]);
 /** The blocks whose inline HTML a renderer writes into one element. */
 const phrasing = new Set(["paragraph", "heading", "tableCell"]);
 /** The blocks whose content lines can start with a prefix that the parser leaves out. */
@@ -325,6 +339,38 @@ interface Context {
   body: boolean;
 }
 
+/** An open element: its lowercase name, whether it hides its content, and its depth. */
+interface OpenElement {
+  name: string;
+  hides: boolean;
+  index: number;
+}
+
+/** The element that renderers write for a Markdown block with content. */
+function blockName(node: Nodes): string {
+  switch (node.type) {
+    case "paragraph":
+      return "p";
+    case "heading":
+      return `h${node.depth}`;
+    case "list":
+      return node.ordered ? "ol" : "ul";
+    case "listItem":
+    case "footnoteDefinition":
+      return "li";
+    case "blockquote":
+    case "table":
+      return node.type;
+    case "tableRow":
+      return "tr";
+    case "tableCell":
+      return "td";
+    default:
+      // Such as a container that a dialect writes as a `<div>`.
+      return "div";
+  }
+}
+
 const read = new WeakMap<Root, HtmlStartTag[]>();
 
 /**
@@ -340,6 +386,8 @@ const read = new WeakMap<Root, HtmlStartTag[]>();
  * parser and that holds a `<`; inline footnotes, which Obsidian and VitePress
  * move to the end; and in VitePress, a `{{ }}` interpolation that holds HTML
  * and a tag that only VitePress reads as HTML, such as one with `@click`.
+ * An end tag that does not close the innermost open element, which a browser
+ * may ignore, leaves every later tag hidden if something hides at that point.
  * Footnote definitions are read after the rest, each from the state that the
  * rest ends in, and only when nothing was uncertain: only those that a
  * reference outside footnotes uses, and none if one of them changes that
@@ -399,8 +447,51 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
   /** The raw-text element open at the end of the last node, and the block it is in. */
   let inside: string | undefined;
   let unit: Nodes | undefined;
-  /** Open elements that hide their content, by lowercase name, with same-name elements inside them. */
-  let hiding = new Map<string, number>();
+  /**
+   * The open elements, those written and those that renderers write for
+   * Markdown blocks, as a browser has them when it closes each element at its
+   * own end tag. An end tag of an open element that is not the innermost is
+   * uncertain: a browser can ignore it, as in a table cell, a `<select>`, a
+   * `<template>` or across a `<p>`, or close other elements, and a start tag
+   * may already have closed elements, as `<li>` closes a `<p>`. While
+   * something hides, such an end tag leaves everything after it hidden; while
+   * nothing hides, what it closes cannot show anything hidden.
+   */
+  const open: OpenElement[] = [];
+  /** The open elements by lowercase name, innermost last. */
+  const named = new Map<string, OpenElement[]>();
+  /** How many open elements hide their content. */
+  let hiding = 0;
+  /** Whether an uncertain end tag left everything after it hidden. */
+  let lost = false;
+  /** While footnotes are read: the elements that the rest leaves open, and whether one closed any. */
+  let floor = 0;
+  let changed = false;
+  const push = (name: string, hides: boolean): OpenElement => {
+    const element = { name, hides, index: open.length };
+    open.push(element);
+    const same = named.get(name);
+    if (same) same.push(element);
+    else named.set(name, [element]);
+    if (hides) hiding++;
+    return element;
+  };
+  /** Closes the element at `index` and those inside it. */
+  const closeTo = (index: number) => {
+    if (index < floor) changed = true;
+    while (open.length > index) {
+      const element = open.pop()!;
+      named.get(element.name)!.pop();
+      if (element.hides) hiding--;
+    }
+  };
+  /** Closes an element, if it is still open, at its end tag. */
+  const close = (element: OpenElement | undefined) => {
+    if (!element || open[element.index] !== element) return;
+    if (element.index === open.length - 1) closeTo(element.index);
+    else if (lost || hiding > 0) lost = true;
+    else closeTo(element.index);
+  };
   const hides = (tag: ScannedTag): boolean => {
     const name = tag.name.toLowerCase();
     if (hidingElements.has(name)) return true;
@@ -430,13 +521,8 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
     const map = sourceMapper(source, node, contained);
     const result = scan((node as { value: string }).value, inside, (tag) => {
       const name = tag.name.toLowerCase();
-      if (tag.close) {
-        const open = hiding.get(name);
-        if (open === undefined) return;
-        if (open > 1) hiding.set(name, open - 1);
-        else hiding.delete(name);
-        return;
-      }
+      // A browser ignores the end tag of an element that is not open.
+      if (tag.close) return close(named.get(name)?.at(-1));
       const at = tag.attributes && map(tag.from, tag.to);
       if (tag.attributes && at)
         into.push({
@@ -445,13 +531,11 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
           end: at[1],
           attributes: tag.attributes,
           table,
-          hidden: hiding.size > 0,
+          hidden: lost || hiding > 0,
         });
       // Vue closes any element written as `<x/>`; HTML only void elements.
       if (voidElements.has(name) || (vitepress && tag.selfClosing)) return;
-      const open = hiding.get(name);
-      if (open !== undefined) hiding.set(name, open + 1);
-      else if (hides(tag)) hiding.set(name, 1);
+      push(name, hides(tag));
     });
     inside = result.inside;
     if (!result.certain) stopped = true;
@@ -482,7 +566,11 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
     if (phrasing.has(node.type)) inner = { ...inner, owner: node };
     if (node.type === "table") inner = { ...inner, table: true };
     if (containers.has(node.type) && !inner.contained) inner = { ...inner, contained: true };
+    // The block's own element, such as `<p>`, which the renderer closes after its content.
+    const block =
+      node.type === "root" || inlineNodes.has(node.type) ? undefined : push(blockName(node), false);
     for (const child of node.children) visit(child, inner);
+    close(block);
   };
   const body: Context = {
     owner: undefined,
@@ -497,7 +585,7 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
   regions();
   if (stopAt !== Infinity) return tags;
   // Footnotes follow the rest of the page, each from the state it ends in.
-  const ending = hiding;
+  floor = open.length;
   const later: HtmlStartTag[] = [];
   const seen = new Set<string>();
   for (const footnote of footnotes) {
@@ -505,12 +593,9 @@ export function htmlStartTags(document: Document): HtmlStartTag[] {
     if (seen.has(identifier)) continue;
     seen.add(identifier);
     if (!used.has(identifier)) continue;
-    hiding = new Map(ending);
     unit = undefined;
     visit(footnote, { ...body, contained: true, into: later, body: false });
-    const changed =
-      hiding.size !== ending.size || [...hiding].some(([name, open]) => ending.get(name) !== open);
-    if (stopped || inside !== undefined || changed) return tags;
+    if (stopped || inside !== undefined || changed || open.length !== floor) return tags;
   }
   tags.push(...later);
   return tags;

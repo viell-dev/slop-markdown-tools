@@ -184,8 +184,9 @@ prereleases' notes there are longer than their entries here.
   whose sanitizer removes those attributes. Blank Markdown alternative text is
   still reported, because Markdown cannot mark an image as decorative. Images in
   content that may not be shown, such as `<template>` or `<video>`, after HTML
-  whose reading is uncertain, in unused footnote definitions, and in VitePress
-  near Vue syntax are not reported
+  whose reading is uncertain, after an end tag that a browser may ignore inside
+  a hidden element, in unused footnote definitions, and in VitePress near Vue
+  syntax are not reported
   ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
 
 - The documentation describes the behavior of the version it belongs to, without
