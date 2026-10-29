@@ -145,7 +145,7 @@ describe("competitor configuration CLI (#669)", () => {
     expect(reference?.endOfLine).toBe("crlf");
     const result = run(root, ["config", "explain", "note.md"]);
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout).effective.rules["style/line-ending"]).toEqual([
+    expect(parseExplanation(result.stdout).effective.rules["style/line-ending"]).toEqual([
       "warn",
       { endOfLine: "crlf" },
     ]);
