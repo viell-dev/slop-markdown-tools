@@ -1091,6 +1091,12 @@ See the [installation guide][Setup] and press [Enter].
 or to how much blank space separates words, also in `ignoredLabels`. A run of
 brackets such as `[a][b][c]` is reported once, at its start.
 
+**On GitHub:** definitions at the start of a paragraph directly interrupted by a
+table are visible text, including consecutive definitions and definitions alone
+above the table, also in lists and quotes. They do not define labels. A blank
+line before the table keeps them as definitions. Forgejo, Gitea, and VitePress
+retain the definitions without that blank line.
+
 **Not checked:** a shortcut reference, `[label]` alone, unless `shortcutSyntax`
 is on, because brackets in prose are usually just brackets. Neither are brackets
 directly after a letter, digit, `_`, or `)`, as in `matrix[i][j]`, which are
@@ -1158,6 +1164,12 @@ while no reference uses their label; a reference such as `[//]` makes them
 links, which are reported as any others are. The option applies to link
 definitions, not footnotes: a footnote shows its text, so an unreferenced one is
 reported whatever its label.
+
+**On GitHub:** definitions at the start of a paragraph directly interrupted by a
+table are visible text, including consecutive definitions and definitions alone
+above the table, also in lists and quotes. They do not define labels. A blank
+line before the table keeps them as definitions. Forgejo, Gitea, and VitePress
+retain the definitions without that blank line.
 
 **With other rules:** [`links/empty`](#linksempty) takes the same option.
 
@@ -1229,11 +1241,14 @@ See the [guide](docs/guide.md#setup).
 Outside the Obsidian dialect, neither is a destination that starts with `/` or
 contains `?`, which depends on the website.
 
-**On GitHub:** file fragments follow the native Markdown reading of dollar-math
-source. Heading IDs can include dollar-delimited lines above a Setext title, and
-inline markup or HTML inside such source can supply anchors too. Duplicate
-numbering uses that complete reading after the YAML front matter choice; the
-formatter's math reading stays the same.
+**On GitHub:** visible definition text above an interrupting table is not a link
+destination; see [undefined references](#linksundefined-reference).
+
+File fragments follow the native Markdown reading of dollar-math source. Heading
+IDs can include dollar-delimited lines above a Setext title, and inline markup
+or HTML inside such source can supply anchors too. Duplicate numbering uses that
+complete reading after the YAML front matter choice; the formatter's math
+reading stays the same.
 
 **In Obsidian:** links resolve as in Obsidian: a path that starts with `./` or
 `../` counts from the note; otherwise an exact path from the vault's root comes

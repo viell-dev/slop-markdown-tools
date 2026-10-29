@@ -108,6 +108,11 @@ The comparison is only as good as the parser's reading:
   where the parser does not, so `style/block-spacing` adds no blank line below
   such a list ([issue
   #350](https://github.com/viell-dev/slop-markdown-tools/issues/350)).
+- On GitHub, link reference definitions in content directly interrupted by a
+  table are read as visible paragraph text, including inline markup, also in
+  lists and quotes. Link checks and workspace anchors use that reading. Blank
+  lines that would turn this text into hidden definitions are kept out ([issue
+  #732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
 - Front matter needs a closing line. A first line of `---` or `+++` that no
   later line closes is read as renderers read it, as a thematic break or text,
   with the lists and block quotes below it; the parser's front matter extension

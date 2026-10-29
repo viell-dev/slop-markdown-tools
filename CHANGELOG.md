@@ -231,6 +231,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- GitHub link checks and workspace indexes read definitions directly above an
+  interrupting table as visible text, including in lists and quotes, while
+  keeping formatting from hiding that text
+  ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
+
 - Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
   or VitePress component blocks without proposing refused edits
   ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
