@@ -344,6 +344,19 @@ describe("content/html-element", () => {
     expect(elements("<div>\n<!-- start\n</div>\n\n<b>x</b>\n")).toEqual(["<div>"]);
     expect(elements('> <div\n> class="x">\n')).toEqual([]);
   });
+  it("finds a raw-text element's end tag in any ASCII letter case, after any text", () => {
+    // `İ` lowercases to two code units; searching a lowercased copy would put
+    // the end tag past the image that follows it.
+    const text = "İ".repeat(10);
+    expect(elements(`<script>${text}</sCRipt><img src="a.png">\n`)).toEqual([
+      "<script>",
+      '<img src="a.png">',
+    ]);
+    expect(elements(`<style>${text}</STYLE> <b>x</b>\n`)).toEqual(["<style>", "<b>"]);
+    // Only ASCII letters match: `ſ` uppercases to `S`, but a browser does not
+    // read `</ſcript>` as an end tag.
+    expect(elements("<script>a</ſcript><b>x</b>\n")).toEqual(["<script>"]);
+  });
   it("follows suppression comments, which it does not report", () => {
     const source =
       "<!-- mdrefine-disable-next-line content/html-element -->\n<b>x</b>\n\n<i>y</i>\n";

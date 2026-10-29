@@ -207,19 +207,20 @@ function scan(
   inside: string | undefined,
   emit: (tag: ScannedTag) => void,
 ): { certain: boolean; inside: string | undefined } {
-  let lower: string | undefined;
   let at = 0;
   while (at < html.length) {
     if (inside !== undefined) {
       if (inside === "plaintext") return { certain: false, inside };
-      lower ??= html.toLowerCase();
-      const pattern = new RegExp(String.raw`</${inside}(?=[\t\n\f\r />]|$)`, "g");
+      // Browsers compare tag names ASCII-case-insensitively, as the `i` flag
+      // does without `u`. Lowercasing the value instead would shift indexes
+      // after characters such as `İ`, whose lowercase is longer.
+      const pattern = new RegExp(String.raw`</${inside}(?=[\t\n\f\r />]|$)`, "gi");
       pattern.lastIndex = at;
-      const close = pattern.exec(lower)?.index ?? -1;
+      const close = pattern.exec(html)?.index ?? -1;
       // Script escapes depend on comments, and a renderer that removes
       // comments before the browser reads the page would also remove an end
       // tag inside one. Only the element's own text is searched.
-      if (lower.slice(at, close < 0 ? undefined : close).includes("<!--"))
+      if (html.slice(at, close < 0 ? undefined : close).includes("<!--"))
         return { certain: false, inside };
       if (close < 0) return { certain: true, inside };
       const end = tagEnd(html, close);
