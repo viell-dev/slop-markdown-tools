@@ -1,6 +1,6 @@
 import { Parser } from "commonmark";
 import type { Node } from "commonmark";
-import type { Html, Nodes, PhrasingContent } from "mdast";
+import type { Html, List, Nodes, PhrasingContent, Table } from "mdast";
 import { describe, expect, it } from "vitest";
 import { parse } from "../../src/index.js";
 import type { Dialect } from "../../src/index.js";
@@ -40,6 +40,8 @@ function structure(node: Nodes): string {
     return `${node.type}(${phrasing(node.children).replace(/\s+/g, " ").trim()})`;
   if (node.type === "html") return `html_block(${lines(node.value)})`;
   if (node.type === "code") return `code_block(${lines(node.value)})`;
+  if (node.type === "tableCell") return `cell(${phrasing(node.children)})`;
+  if (node.type === "tableRow") return `row(${node.children.map(structure).join(",")})`;
   const children = "children" in node ? (node.children as Nodes[]) : [];
   return `${blockNames[node.type] ?? node.type}(${children.map(structure).join(",")})`;
 }
@@ -152,6 +154,12 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
       for (const written of [source, crlf(source)])
         expect(read(written, dialect), JSON.stringify(written)).toBe(commonmark(written));
   });
+  it.each(dialects)("keeps a lazy tag line that a table cannot take as text in %s", (dialect) => {
+    // The delimiter row is lazy too, so no table starts (#770).
+    for (const source of ['- a\n<b title="|">\n|-|-|\n', '> a\n<b title="|">\n|-|-|\n'])
+      for (const written of [source, crlf(source)])
+        expect(read(written, dialect), JSON.stringify(written)).toBe(commonmark(written));
+  });
   it.each(dialects)("positions the inline HTML on the lazy line in %s", (dialect) => {
     for (const [source, start] of [
       ["- a\n<b>\nmore\n", 4],
@@ -164,6 +172,87 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
       expect(node?.position?.start).toMatchObject({ offset: start, column: 1, line: 2 });
       expect(node?.position?.end.offset).toBe(start + 3);
       expect(source.slice(start, start + 3)).toBe("<b>");
+    }
+  });
+});
+
+describe("a table whose header row is a complete tag alone on its line (#770)", () => {
+  // Complete (kind 7) HTML cannot interrupt a paragraph, so a GFM table can
+  // take such a line below paragraph text as its header row. GitHub's
+  // `gh api markdown` in both modes, Forgejo and Gitea, and markdown-it render
+  // each of these as a table with the header cells `<b title="` and `">`;
+  // upstream micromark read HTML there, once the table had ended the paragraph.
+  const header = 'row(cell(<b title="),cell(">))';
+  const tables: [string, string][] = [
+    ['a\n<b title="|">\n|-|-|\n*w*\n', `document(paragraph(a),table(${header},row(cell(w))))`],
+    [
+      '- a\n  <b title="|">\n  |-|-|\n  *w*\n',
+      `document(list(item(paragraph(a),table(${header},row(cell(w))))))`,
+    ],
+    [
+      '> a\n> <b title="|">\n> |-|-|\n> *w*\n',
+      `document(block_quote(paragraph(a),table(${header},row(cell(w)))))`,
+    ],
+    [
+      '> - a\n>   <b title="|">\n>   |-|-|\n',
+      `document(block_quote(list(item(paragraph(a),table(${header})))))`,
+    ],
+    ['a\n   <b title="|">\n|-|-|\n', `document(paragraph(a),table(${header}))`],
+    [
+      'a\nb\n<i title="|">\n|-|-|\n',
+      'document(paragraph(a b),table(row(cell(<i title="),cell(">))))',
+    ],
+    ['a\n<b title="|"/>\n|-|-|\n', 'document(paragraph(a),table(row(cell(<b title="),cell("/>))))'],
+    // One column needs no pipe in its header; the tag is the cell's HTML.
+    ['a\n<b title="x">\n|-|\n', 'document(paragraph(a),table(row(cell({<b title="x">}))))'],
+    // Forgejo and Gitea read a lazy header line in the container's table.
+    // GitHub ends the container there and reads HTML, which its renderer
+    // protection covers (github-lazy-html.test.ts), and markdown-it reads
+    // other blocks, which VitePress's own reading guards.
+    [
+      '- a\n<b title="|">\n  |-|-|\n*w*\n',
+      `document(list(item(paragraph(a),table(${header}))),paragraph(w))`,
+    ],
+    ['> a\n<b title="|">\n> |-|-|\n', `document(block_quote(paragraph(a),table(${header})))`],
+  ];
+  // Obsidian reads no table directly below paragraph text in either view, so
+  // the parser's table there keeps its protection (#697).
+  const gfm = ["github", "forgejo", "gitea", "obsidian", "vitepress"] as const;
+  it.each(gfm)("reads the table in %s", (dialect) => {
+    for (const [source, expected] of tables)
+      for (const written of [source, crlf(source)])
+        expect(read(written, dialect), JSON.stringify(written)).toBe(expected);
+  });
+  it("reads a paragraph without tables in commonmark", () => {
+    for (const [source] of tables)
+      for (const written of [source, crlf(source)])
+        expect(read(written, "commonmark"), JSON.stringify(written)).toBe(commonmark(written));
+  });
+  it.each(dialects)("keeps a tag line that starts its own block as HTML in %s", (dialect) => {
+    // At the document's start, after a blank line, or as a kind 6 start that
+    // may interrupt the paragraph, the line starts HTML in every reference;
+    // only markdown-it differs, which VitePress's own reading guards.
+    for (const source of [
+      '<b title="|">\n|-|-|\n',
+      'a\n\n<b title="|">\n|-|-|\n',
+      '- a\n\n  <b title="|">\n  |-|-|\n',
+      'a\n<div title="|">\n|-|-|\n',
+      "a\n<b>\nmore\n",
+    ])
+      for (const written of [source, crlf(source)])
+        expect(read(written, dialect), JSON.stringify(written)).toBe(commonmark(written));
+  });
+  it.each(gfm)("positions the header row on the tag line in %s", (dialect) => {
+    for (const source of [
+      '- a\n  <b title="|">\n  |-|-|\n',
+      '- a\r\n  <b title="|">\r\n  |-|-|\r\n',
+    ]) {
+      const tree = parse(source, dialect).tree;
+      const table = (tree.children[0] as List).children[0]!.children[1] as Table;
+      const at = source.indexOf("<b");
+      expect(table.position?.start).toMatchObject({ offset: at, line: 2, column: 3 });
+      expect(table.children[0]!.children[0]!.position?.start.offset).toBe(at);
+      expect(table.position?.end.offset).toBe(source.lastIndexOf("|") + 1);
     }
   });
 });

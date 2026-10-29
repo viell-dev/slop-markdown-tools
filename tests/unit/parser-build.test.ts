@@ -142,6 +142,7 @@ it("binds every local parser generator and maintained implementation source", as
     "scripts/parser-adaptations/compact-code.ts",
     "scripts/parser-adaptations/compact-text.ts",
     "scripts/parser-adaptations/footnote.ts",
+    "scripts/parser-adaptations/html-flow.ts",
     "scripts/parser-adaptations/strike.ts",
     "scripts/parser-adaptations/tsconfig.json",
     "scripts/parser-adaptations/types.ts",

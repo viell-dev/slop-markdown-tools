@@ -53,7 +53,7 @@ export function collectGithubMathProtections(document: Document): Set<Nodes> {
  * GitHub starts one at `</pre>` too, so the raw-text names are not excluded.
  * Kind 6 names cannot reach a line of paragraph text after its first.
  */
-const tagLine =
+export const tagLine =
   /^(?:<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][\w.:-]*(?:[ \t]*=[ \t]*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^ \t\r\n"'=<>`]+))?)*[ \t]*\/?>|<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/;
 /** The line break before the next line of only spaces and tabs, through that line's break. */
 const blankLine = /(?:\r\n|\r(?!\n)|\n)[ \t]*(?:\r\n|\r(?!\n)|\n|$)/g;
@@ -182,8 +182,8 @@ export function collectGithubLazyHtmlProtections(
       if (chain.length) {
         // A block right below a paragraph or definition in the same container
         // starts on a line that the open paragraph text could take lazily: a
-        // following paragraph or heading after definitions, or the HTML that
-        // a table's attempt leaves inside the container.
+        // following paragraph or heading after definitions, or a table whose
+        // header row is the tag line (#770).
         if (
           (previous?.type === "paragraph" || previous?.type === "definition") &&
           previous.position?.end.line === node.position!.start.line - 1
