@@ -50,8 +50,11 @@ attributes. Containers separate blocks, including the paragraphs immediately
 above and below their edges. Front matter follows gray-matter's boundaries and
 remains opaque; an unclosed opener protects the whole document. TOML fences are
 ordinary Markdown here. Components and other renderer-only blocks are preserved;
-where mdast cannot represent a component boundary, its containing block is left
-as written. Paragraphs with inline footnotes remain opaque. Findings and edits
+where mdast cannot represent a component boundary, such as a component line that
+ends a paragraph, its containing block is left as written. So is a block where
+markdown-it reads a table that mdast reads in other containers, such as
+`* a | b` above `  --|--`, a table whose first cell holds the marker rather than
+a list item. Paragraphs with inline footnotes remain opaque. Findings and edits
 in opaque areas are omitted, because mdast does not describe their full reading;
 with `reportUnreflowed: true`, `style/wrap` still reports a paragraph there that
 is too wide and that it keeps as written.

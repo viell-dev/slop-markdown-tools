@@ -10,7 +10,7 @@ import type {
 } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { rendererProtections } from "../syntax/renderer-protections.js";
-import { joinsTomlFrontMatter } from "../syntax/parse.js";
+import { joinsTomlFrontMatter, unclosedFrontMatter } from "../syntax/parse.js";
 import { optionsSchema } from "./shared.js";
 import { lineBreaks } from "../syntax/source.js";
 
@@ -153,6 +153,23 @@ const isContainer = (node: Nodes): node is Container =>
   node.type === "blockquote" || node.type === "listItem" || node.type === "footnoteDefinition";
 
 const analyses = new WeakMap<Document, Analysis>();
+const openers = new WeakMap<Document, { fence: string | undefined }>();
+/**
+ * The fence of front matter that the first line of a document opens and no
+ * line closes, as `unclosedFrontMatter` finds it, once per document. VitePress
+ * reads no TOML front matter, and `---` there opens front matter to the end of
+ * the document, which stays as written.
+ */
+function unclosedFence(document: Document): string | undefined {
+  let known = openers.get(document);
+  if (!known) {
+    known = {
+      fence: document.dialect === "vitepress" ? undefined : unclosedFrontMatter(document.source),
+    };
+    openers.set(document, known);
+  }
+  return known.fence;
+}
 /** Heading-owned spaces after every container's required prefix, including Setext underlines. */
 export function headingIndentation(document: Document, node: Heading): [number, number][] {
   const analysis = analyze(document);
@@ -162,9 +179,17 @@ export function headingIndentation(document: Document, node: Heading): [number, 
     if (analysis.sensitive.has(line)) continue;
     const { levels } = analysis.match(line);
     if (levels.some((level) => level.kind !== "content")) continue;
-    const start = levels.at(-1)?.end ?? analysis.lines[line]!.start;
-    const spaces = /^ {1,3}(?=\S)/.exec(document.source.slice(start, analysis.lines[line]!.end));
-    if (spaces) result.push([start, start + spaces[0].length]);
+    const { start: lineStart, end: lineEnd } = analysis.lines[line]!;
+    const start = levels.at(-1)?.end ?? lineStart;
+    const rest = document.source.slice(start, lineEnd);
+    const spaces = /^ {1,3}(?=\S)/.exec(rest);
+    if (!spaces) continue;
+    // Below a first line of `---` or `+++` that opens no front matter, a line
+    // of that fence alone would close it and make front matter of everything
+    // above, as an underline `  ---` would without its indentation (#278, #764).
+    const fence = /^(?:---|\+\+\+)(?=[ \t]*$)/.exec(rest.slice(spaces[0].length))?.[0];
+    if (fence && start === lineStart && unclosedFence(document) === fence) continue;
+    result.push([start, start + spaces[0].length]);
   }
   return result;
 }
