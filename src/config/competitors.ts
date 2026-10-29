@@ -87,10 +87,14 @@ function translatePattern(pattern: string, dialect: PatternDialect): string | un
   // classes have dialect-dependent meanings and are deliberately excluded.
   const syntax = pattern.replace(/\\[\\#?!*[\]{}()+@]/g, "x");
   if (/[\\[\]]/.test(syntax)) return undefined;
+  // Root anchors (gitignore, EditorConfig) and directory suffixes (gitignore)
+  // are not components.
+  let components = syntax;
+  if (dialect === "gitignore" || dialect === "editorconfig")
+    components = components.replace(/^\//, "");
+  if (dialect === "gitignore") components = components.replace(/\/$/, "");
   if (
-    syntax
-      .replace(dialect === "gitignore" || dialect === "editorconfig" ? /^\// : /$^/, "")
-      .replace(dialect === "gitignore" ? /\/$/ : /$^/, "")
+    components
       .split("/")
       .some(
         (part) =>
