@@ -8,12 +8,13 @@ import { styleRules } from "../rules/style.js";
 import { blockRules } from "../rules/blocks.js";
 import { dialectRules } from "../rules/dialects.js";
 import { structureRules } from "../rules/structure.js";
+import { blankLinesConflict } from "../rules/block-spacing.js";
 import { linkStyleRules } from "../rules/link-style.js";
 import { linkRules } from "../rules/links.js";
 import { contentRules } from "../rules/content.js";
 import { listRules } from "../rules/lists.js";
 import { spacingRules } from "../rules/inline-spacing.js";
-import type { JsonSchema, Plugin, ProcessOptions, Rule } from "./types.js";
+import type { JsonSchema, Plugin, ProcessOptions, Rule, RuleSetting } from "./types.js";
 
 /**
  * The built-in rules by rule ID. The table and the rules in it are frozen, so
@@ -132,6 +133,15 @@ function optionsValidator(name: string, schema: JsonSchema): ValidateFunction {
   }
   return validate;
 }
+/** The options of a rule that the configuration enables, or undefined when it is off. */
+function enabledOptions(
+  settings: Readonly<Record<string, RuleSetting>>,
+  name: string,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!Object.hasOwn(settings, name)) return undefined;
+  const enabled = setting(settings[name]!);
+  return enabled.severity === "off" ? undefined : enabled.options;
+}
 export function prepare(options: ProcessOptions) {
   // Only these options, so that resolveConfig's check for the prereleases' form sees no others.
   const { config: given, path, plugins, defaultDialect } = options;
@@ -155,5 +165,11 @@ export function prepare(options: ProcessOptions) {
         );
     }
   }
+  // Blank lines that one rule requires and another removes cannot both be
+  // satisfied, and formatting would not settle; refuse such options together.
+  const spacing = enabledOptions(config.rules, "style/block-spacing");
+  const blankLines = enabledOptions(config.rules, "style/blank-lines");
+  const conflict = spacing && blankLines && blankLinesConflict(spacing, blankLines);
+  if (conflict) throw new Error(`Invalid options for style/block-spacing: ${conflict}`);
   return { config, rules };
 }
