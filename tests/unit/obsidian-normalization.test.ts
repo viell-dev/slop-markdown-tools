@@ -24,6 +24,49 @@ describe("Obsidian Live Preview normalizer", () => {
   ) as NormalizerFactory;
   const { livePreview } = normalizerFactory(normalizeHtml);
 
+  describe("numeric text and source list markers (#735)", () => {
+    const normalized = (text: string, classes = "", kind = "") =>
+      livePreview([{ kind, runs: [[classes, text]] }]);
+
+    it.each(["#123 fixed", "a #123 b", "#123", "123 fixed", "a 123 b", "release 123. fixed"])(
+      "retains the digits in %j",
+      (text) => {
+        for (const classes of ["", "cm-comment"])
+          expect(normalized(text, classes)).not.toEqual(
+            normalized(text.replace("123", "456"), classes),
+          );
+      },
+    );
+
+    it.each(["1. #12 x", "> 1. #12 x", "- 1) #12 x", "<!--\n1. #12 x"])(
+      "normalizes only source list numbers in %j",
+      (text) => {
+        for (const classes of ["", "cm-comment"]) {
+          expect(normalized(text, classes)).toEqual(
+            normalized(text.replace("1.", "42.").replace("1)", "42)"), classes),
+          );
+          expect(normalized(text, classes)).not.toEqual(
+            normalized(text.replace("#12", "#34"), classes),
+          );
+        }
+      },
+    );
+
+    it("retains source marker presence", () => {
+      for (const classes of ["", "cm-comment"])
+        expect(normalized("1. item", classes)).not.toEqual(normalized("item", classes));
+    });
+
+    it("retains code digits and normalizes styled ordered markers", () => {
+      expect(normalized("1. code", "", "HyperMD-codeblock")).not.toEqual(
+        normalized("42. code", "", "HyperMD-codeblock"),
+      );
+      expect(normalized("1. ", "cm-formatting-list-ol")).toEqual(
+        normalized("42. ", "cm-formatting-list-ol"),
+      );
+    });
+  });
+
   describe("heading and normalized-empty records (#544, #545)", () => {
     const normalized = (lines: unknown[]) =>
       (livePreview as (lines: unknown[]) => string[])(structuredClone(lines));
