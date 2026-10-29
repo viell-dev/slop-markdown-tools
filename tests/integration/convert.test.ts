@@ -596,3 +596,147 @@ describe("bounded file-pattern translation", () => {
     },
   );
 });
+
+describe("round-six pattern boundaries", () => {
+  it("reports gitignore case approximation once and preserves exact case", async () => {
+    const root = await fixture({
+      ".prettierrc": "{}",
+      ".prettierignore": "README.md\nother.md\n",
+      "readme.md": "text\n",
+    });
+    expect(
+      (
+        await getFileInfo(path.join(root, "readme.md"), {
+          ignorePath: path.join(root, ".prettierignore"),
+        })
+      ).ignored,
+    ).toBe(true);
+    const written = run(root, ["config", "convert", "--write"]);
+    expect(written.status).toBe(0);
+    expect(
+      written.stderr.match(/Prettier matches its patterns without regard to letter case/g),
+    ).toHaveLength(1);
+    expect(written.stderr).toContain(path.join(root, ".prettierignore"));
+    expect(parseReport(run(root, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual([
+      "readme.md",
+    ]);
+  });
+  it.each(["{a,b}.md", "a.md/**", "{a,b}.md/**", "sub/{a,b}.md/**"])(
+    "preserves Prettier literal and zero-component matches for %s",
+    async (pattern) => {
+      const names = ["a.md", "b.md", "{a,b}.md", "sub/a.md", "sub/{a,b}.md", "other.md"];
+      const root = await fixture({
+        ".prettierrc": JSON.stringify({
+          overrides: [{ files: pattern, options: { proseWrap: "always", printWidth: 37 } }],
+        }),
+        ...Object.fromEntries(names.map((name) => [name, "text\n"])),
+      });
+      for (const destination of [root, path.join(root, "sub")]) {
+        expect(run(destination, ["config", "convert", "--write"]).status).toBe(0);
+        for (const name of names.filter(
+          (name) => destination === root || name.startsWith("sub/"),
+        )) {
+          const reference = await prettierResolve(path.join(root, name));
+          const relative = path.relative(destination, path.join(root, name));
+          const wrap = parseExplanation(run(destination, ["config", "explain", relative]).stdout)
+            .effective.rules["style/wrap"];
+          if (reference?.printWidth === 37)
+            expect(wrap).toEqual(["warn", expect.objectContaining({ width: 37 })]);
+          else
+            expect(
+              Array.isArray(wrap) ? wrap[0] : wrap,
+              JSON.stringify({ pattern, name, destination, reference, wrap }),
+            ).not.toBe("warn");
+        }
+      }
+    },
+  );
+  it.each(["prettier", "gitignore", "editorconfig", "cli2"])(
+    "reports empty components in %s",
+    async (dialect) => {
+      const pattern = "x//*.md";
+      const root = await fixture({
+        ".prettierrc":
+          dialect === "prettier"
+            ? JSON.stringify({
+                overrides: [{ files: pattern, options: { proseWrap: "always", printWidth: 37 } }],
+              })
+            : "{}",
+        ...(dialect === "gitignore" ? { ".prettierignore": pattern + "\n" } : {}),
+        ...(dialect === "editorconfig"
+          ? { ".editorconfig": `[${pattern}]\nmax_line_length=37\n` }
+          : {}),
+        ...(dialect === "cli2"
+          ? {
+              ".markdownlint-cli2.jsonc": JSON.stringify({
+                config: { default: false },
+                globs: [pattern],
+              }),
+            }
+          : {}),
+        "x/a.md": "text\n",
+      });
+      const written = run(root, ["config", "convert", "--write"]);
+      expect(written.status).toBe(0);
+      expect(written.stderr).toContain(`pattern ${pattern} not carried over`);
+      expect((await prettierResolve(path.join(root, "x/a.md")))?.printWidth).toBeUndefined();
+      if (dialect === "gitignore")
+        expect(
+          (
+            await getFileInfo(path.join(root, "x/a.md"), {
+              ignorePath: path.join(root, ".prettierignore"),
+            })
+          ).ignored,
+        ).toBe(false);
+      expect(parseReport(run(root, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual([
+        "x/a.md",
+      ]);
+    },
+  );
+  it.each([["a,b.md", "c.md"], ["{a,b}.md", "c.md"], ["a,b.md"]])(
+    "handles cli2 union boundaries %j",
+    async (...globs) => {
+      const names = ["a,b.md", "a.md", "b.md", "c.md"];
+      const root = await fixture({
+        ".markdownlint-cli2.jsonc": JSON.stringify({ config: { default: false }, globs }),
+        ...Object.fromEntries(names.map((name) => [name, "text\n"])),
+      });
+      const written = run(root, ["config", "convert", "--write"]);
+      expect(written.status).toBe(0);
+      if (globs.length > 1)
+        expect(written.stderr).toContain(
+          `pattern ${globs[0]} not carried over: unrepresentable combined selection`,
+        );
+      else expect(written.stderr).not.toContain("unrepresentable combined selection");
+      // cli2's documented globby contract selects the literal comma for one branch.
+      // An unrepresentable union is omitted as a whole instead of narrowing selection.
+      expect(parseReport(run(root, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual(
+        globs.length > 1 ? names : ["a,b.md"],
+      );
+    },
+  );
+  it.each(["C:/x/a.md", "C:\\x\\a.md", "//server/share/a.md"])(
+    "reports portable absolute-path rejection for %s",
+    async (pattern) => {
+      const root = await fixture({
+        ".prettierrc": JSON.stringify({
+          overrides: [{ files: pattern, options: { printWidth: 37, proseWrap: "always" } }],
+        }),
+        ".markdownlint-cli2.jsonc": JSON.stringify({
+          config: { default: false },
+          globs: [pattern],
+        }),
+        "a.md": "text\n",
+      });
+      const written = run(root, ["config", "convert", "--write"]);
+      expect(written.status).toBe(0);
+      for (const source of [".prettierrc", ".markdownlint-cli2.jsonc"])
+        expect(written.stderr).toContain(
+          `${path.join(root, source)}: pattern ${pattern} not carried over`,
+        );
+      expect(parseReport(run(root, ["lint", "--json"]).stdout).files.map((f) => f.path)).toEqual([
+        "a.md",
+      ]);
+    },
+  );
+});

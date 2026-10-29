@@ -19,7 +19,9 @@ prereleases' notes there are longer than their entries here.
   preserves source-relative patterns within documented dialect subsets,
   reporting unsupported patterns for manual migration. Directory exclusions
   retain their descendants when converting inside an excluded directory.
-  Converted overrides accumulate through `ruleUpdates`
+  Prettier brace literals and terminal globstars retain their matching branches;
+  ignore conversion reports its case-sensitive approximation. Converted
+  overrides accumulate through `ruleUpdates`
   ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)).
 
 - Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with

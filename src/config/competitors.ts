@@ -80,6 +80,7 @@ type PatternDialect = "prettier" | "editorconfig" | "cli2" | "gitignore";
 /** Admit only syntax whose source meaning we can preserve in Minimatch. */
 function translatePattern(pattern: string, dialect: PatternDialect): string | undefined {
   if (!pattern || /[\r\n\0]/.test(pattern) || pattern.startsWith("!")) return undefined;
+  if (/^[a-zA-Z]:[/\\]/.test(pattern) || pattern.startsWith("//")) return undefined;
   if ((dialect === "prettier" || dialect === "cli2") && pattern.startsWith("/")) return undefined;
   if (dialect !== "gitignore" && /["']/.test(pattern)) return undefined;
   // Escapes of glob punctuation are portable; other escapes and character
@@ -88,8 +89,13 @@ function translatePattern(pattern: string, dialect: PatternDialect): string | un
   if (/[\\[\]]/.test(syntax)) return undefined;
   if (
     syntax
+      .replace(dialect === "gitignore" || dialect === "editorconfig" ? /^\// : /$^/, "")
+      .replace(dialect === "gitignore" ? /\/$/ : /$^/, "")
       .split("/")
-      .some((part) => part === "." || part === ".." || (part.includes("**") && part !== "**"))
+      .some(
+        (part) =>
+          part === "" || part === "." || part === ".." || (part.includes("**") && part !== "**"),
+      )
   )
     return undefined;
   if (dialect === "gitignore") {
@@ -194,7 +200,12 @@ export async function loadCompetitorConfig(
 ): Promise<ConversionReport | undefined> {
   const sources: string[] = [];
   const omitted: string[] = [];
-  const rebase = (pattern: string, file: string, dialect: PatternDialect = "cli2"): string[] => {
+  const rebase = (
+    pattern: string,
+    file: string,
+    dialect: PatternDialect = "cli2",
+    expandPrettier = true,
+  ): string[] => {
     const translated = translatePattern(pattern, dialect);
     if (translated === undefined) {
       omitted.push(
@@ -202,9 +213,17 @@ export async function loadCompetitorConfig(
       );
       return [];
     }
+    if (dialect === "prettier" && expandPrettier) {
+      const basename = !translated.includes("/");
+      const variants = [basename ? `**/${translated}` : translated];
+      if (translated.endsWith("/**")) variants.push(translated.slice(0, -3));
+      // Micromatch also accepts the exact original pattern text, not the
+      // spelling of a generated zero-component branch.
+      if (/(?<!\\)\{/.test(translated)) variants.push(literalPattern(translated));
+      return [...new Set(variants.flatMap((variant) => rebase(variant, file, dialect, false)))];
+    }
     pattern = translated;
-    if ((dialect === "prettier" || dialect === "editorconfig") && !pattern.includes("/"))
-      pattern = `**/${pattern}`;
+    if (dialect === "editorconfig" && !pattern.includes("/")) pattern = `**/${pattern}`;
     const source = path.dirname(file);
     const prefix = path.relative(destination, source).split(path.sep).join("/");
     const local = pattern.replace(/^\//, "");
@@ -380,7 +399,17 @@ export async function loadCompetitorConfig(
       );
       if (positive.length) {
         const rebased = positive.flatMap((p) => rebase(p, cli2File));
-        if (positive.every((p) => translatePattern(p, "cli2") !== undefined))
+        // A brace union introduces another parsing context. Do not reinterpret
+        // literal commas or nest an existing alternative inside that union.
+        const unsafeUnion =
+          positive.length > 1 && rebased.length > 1
+            ? positive.filter((p) => /[,{}]/.test(p.replace(/\\./g, "x")))
+            : [];
+        for (const pattern of unsafeUnion)
+          omitted.push(
+            `${cli2File}: pattern ${pattern} not carried over: unrepresentable combined selection.`,
+          );
+        if (!unsafeUnion.length && positive.every((p) => translatePattern(p, "cli2") !== undefined))
           ignore.push(
             rebased.length === 0
               ? "**"
@@ -517,6 +546,9 @@ export async function loadCompetitorConfig(
   const ignoreFile = await find([".prettierignore"]);
   if (ignoreFile && prettier) {
     sources.push(ignoreFile);
+    omitted.push(
+      `${ignoreFile}: Prettier matches its patterns without regard to letter case; the converted patterns match case exactly.`,
+    );
     ignore.push(
       ...(await readFile(ignoreFile, "utf8"))
         .split(/\r?\n/)

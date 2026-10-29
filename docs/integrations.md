@@ -133,19 +133,32 @@ reported for manual migration.
 
 Pattern conversion is bounded by source dialect. Prettier overrides,
 EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,
-`?`, whole-component `**`, escaped glob punctuation, and flat comma brace
-alternatives; character classes, unescaped parentheses, brace ranges, nested
-braces, quoted patterns, absolute Prettier/CLI2 paths, and whole-pattern
-complements are reported with their source and pattern for manual migration
-rather than emitted. CLI2 negative globs are directory exclusions, and their
-descendants are expanded before rebasing into the destination.
+`?`, and whole-component `**`. Brace alternatives must be flat comma lists,
+without nesting, empty alternatives, ranges, or `**` inside. Accepted escapes
+are backslash followed by another backslash or one of `#`, `?`, `!`, `*`, `[`,
+`]`, `{`, `}`, `(`, `)`, `+`, or `@`. Other escapes, character classes,
+unescaped parentheses, quoted patterns, and whole-pattern complements are
+reported with their source and pattern for manual migration rather than emitted.
+Prettier brace patterns also retain their literal spelling, and terminal `/**`
+also matches the file before that suffix. CLI2 negative globs are directory
+exclusions, and their descendants are expanded before rebasing. When several
+CLI2 positive globs need a combined selection, a literal comma outside braces or
+a brace alternative cannot be represented in that union: the selection is
+reported and omitted. A single positive glob keeps its ordinary meaning.
 
-`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`,
-escaped glob punctuation, and directory exclusions; braces and parentheses stay
-literal. Character classes, trailing whitespace, and negated entries are
-reported rather than emitted. Every emitted pattern is rebased into the
-destination subtree; unrepresentable intersections are also reported for manual
-migration.
+`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`, the
+same accepted escapes, root anchors, and directory suffixes; braces and
+parentheses stay literal. Character classes, trailing whitespace, and negated
+entries are reported rather than emitted. Prettier matches ignore patterns
+without regard to letter case; converted patterns match case exactly. Conversion
+reports this approximation once per `.prettierignore` file.
+
+All subsets reject `.`, `..`, and empty path components, and absolute paths,
+including Windows drive and UNC spellings on every platform. A leading `/` in
+EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
+`.prettierignore` marks a directory; these are permitted boundaries rather than
+empty components. Every emitted pattern is rebased into the destination subtree;
+unrepresentable intersections are also reported for manual migration.
 
 Competitor inline suppression comments and formatting pragmas have no effect;
 honoring them during the fallback is
