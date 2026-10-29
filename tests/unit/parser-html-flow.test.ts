@@ -81,7 +81,9 @@ const html = (source: string, dialect: Dialect): Html[] => {
 describe("a lazy line that could start a type 7 HTML block (#762)", () => {
   // A complete tag alone on its line starts HTML only where no paragraph is
   // open, so below a container's paragraph it continues the paragraph lazily,
-  // as CommonMark, commonmark.js, cmark-gfm, markdown-it and Obsidian read it.
+  // as CommonMark, commonmark.js, markdown-it, Forgejo, Gitea and Obsidian
+  // read it. Every dialect parses it that way; GitHub ends the containers
+  // instead, which a renderer protection covers (github-lazy-html.test.ts).
   const continued: [string, string][] = [
     ["- a\n<b>\nmore\n", "document(list(item(paragraph(a {<b>} more))))"],
     ["* a\n<b>\n", "document(list(item(paragraph(a {<b>}))))"],
@@ -102,10 +104,10 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
     ["- a\n  b\n<b>\nmore\n", "document(list(item(paragraph(a b {<b>} more))))"],
     ["> a\n> b\n<b>\n> more\n", "document(block_quote(paragraph(a b {<b>} more)))"],
     ["- a\n<b>\n- c\n", "document(list(item(paragraph(a {<b>})),item(paragraph(c))))"],
-    // Upstream's own expectation closes the quote here; that is the defect.
+    // Upstream's own expectation closes the quote here, as GitHub does; CommonMark does not.
     ["> a\n<a>\n", "document(block_quote(paragraph(a {<a>})))"],
   ];
-  it.each(dialects)("continues the paragraph in %s", (dialect) => {
+  it.each(dialects)("reads CommonMark's continued paragraph in %s", (dialect) => {
     for (const [source, expected] of continued)
       for (const written of [source, crlf(source)]) {
         expect(commonmark(written), JSON.stringify(written)).toBe(expected);

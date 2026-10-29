@@ -407,8 +407,10 @@ describe("the presets", () => {
 
 describe("a lazy line that could start a type 7 HTML block (#762)", () => {
   // The line continues the container's paragraph, so no rule may separate it
-  // from the lines around it. Obsidian's Reading view and Live Preview read
-  // these as CommonMark does too, so its rendering is checked the same way.
+  // from the lines around it. commonmark.js, markdown-it, Forgejo, Gitea and
+  // both Obsidian views read these as CommonMark does, so their rendering is
+  // checked the same way. GitHub ends the containers there instead, and its
+  // protection leaves such regions as written (github-lazy-html.test.ts).
   const sources = [
     "- a\n<b>\nmore\n",
     "* a\n<b>\nmore\n",
@@ -420,14 +422,14 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
     "- a\n  b\n<b>\n<i>\nmore\n- c\n",
     "- a\n<b>\nmore\n\nAfter.\n",
     "- a\r\n<b>\r\nmore\r\n",
-    // Upstream's test expects the quote to close here; renderers keep it open.
+    // Upstream's test expects the quote to close here, as GitHub does; CommonMark does not.
     "> a\n<a>\n",
     // Types 1 to 6 still interrupt the paragraph and end the containers.
     "- a\n<div>\nmore\n",
     "> a\n<!-- c -->\nmore\n",
   ];
-  it.each(["github", "commonmark", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
-    "keeps what the renderers show with recommended in %s",
+  it.each(["commonmark", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+    "keeps what CommonMark's renderers show with recommended in %s",
     (dialect) => {
       for (const source of sources) {
         const output = formatted(source, { extends: ["recommended"], dialect });
@@ -439,13 +441,23 @@ describe("a lazy line that could start a type 7 HTML block (#762)", () => {
       );
     },
   );
-  it.each(["github", "forgejo", "gitea", "vitepress", "commonmark"] as const)(
-    "formats the authored renderer fixture in %s as the renderers show it",
+  it.each(["forgejo", "gitea", "vitepress", "commonmark"] as const)(
+    "formats the authored renderer fixtures in %s as CommonMark's renderers show them",
     (dialect) => {
-      const { source } = forgeFixtures.find(({ name }) => name === "lazy-html-line")!;
-      const output = formatted(source, { extends: ["recommended"], dialect });
-      expect(output).not.toBe(source);
-      expect(rendered(output)).toEqual(rendered(source));
+      for (const name of ["lazy-html-line", "lazy-html-emphasis", "lazy-html-markers"]) {
+        const { source } = forgeFixtures.find((fixture) => fixture.name === name)!;
+        const output = formatted(source, { extends: ["recommended"], dialect });
+        expect(output, name).not.toBe(source);
+        expect(rendered(output), name).toEqual(rendered(source));
+      }
     },
   );
+  it("leaves these regions as written with recommended in github", () => {
+    for (const source of sources) {
+      const output = formatted(source, { extends: ["recommended"], dialect: "github" });
+      // GitHub reads types 1 to 6 as CommonMark does.
+      if (/<(?:div|!--)/.test(source)) expect(rendered(output)).toEqual(rendered(source));
+      else expect(output, JSON.stringify(source)).toBe(source);
+    }
+  });
 });

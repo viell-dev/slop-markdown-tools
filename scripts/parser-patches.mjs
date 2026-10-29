@@ -95,13 +95,13 @@ const specs = {
     hash: "d32bc5869302bb4b54bd6c5c9c25b3004bd97a2155e0d9cdeb53fbd08510e7d8",
 
     provenance:
-      "mdrefine#762: a type 7 HTML start cannot interrupt a paragraph on a lazy continuation line either",
+      "mdrefine#762: read a lazy type 7 HTML line as CommonMark does; GitHub's renderer differs and is protected separately",
     tracking: {
       dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
       issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/762"],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove after an adopted micromark-core-commonmark release keeps a lazy type 7 HTML line in the container's paragraph, as CommonMark, commonmark.js and markdown-it read it, while lazy type 1-6 starts still interrupt it, across lists, quotes, nesting and LF/CRLF.",
+        "Remove after an adopted micromark-core-commonmark release keeps a lazy type 7 HTML line in the container's paragraph, as CommonMark, commonmark.js, markdown-it, Forgejo, Gitea and Obsidian read it, while lazy type 1-6 starts still interrupt it, across lists, quotes, nesting and LF/CRLF. GitHub's protection for its own reading (src/syntax/github-protections.ts) stays either way.",
     },
   },
   code: {
@@ -257,7 +257,9 @@ function repair(kind, source) {
       'tailEvent[1].type === "listItemIndent" || tailEvent[1].type === "gfmFootnoteDefinitionIndent")',
     );
   // Upstream lets complete (type 7) HTML interrupt a paragraph on a lazy line,
-  // which ends the container there; the specification does not (#762).
+  // which ends the container there; the specification does not (#762). GitHub's
+  // renderer ends the container too but reads HTML to the next blank line, so
+  // a renderer protection, not this reading, covers the GitHub dialect.
   if (kind === "htmlFlow")
     return once(
       source,
