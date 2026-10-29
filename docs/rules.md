@@ -20,7 +20,9 @@ column, ✅ is yes and ❌ no.
 | Rule                            | Kind | `recommended` | Dialect presets                                                 | Options |
 | ------------------------------- | :--: | :-----------: | --------------------------------------------------------------- | :-----: |
 | `content/code-language`         | 🔍   | ❌            | ❌                                                              | ✅      |
+| `content/emphasis-spacing`      | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/image-alt`             | 🔍   | `warn`        | ❌                                                              | ❌      |
+| `content/inline-code-spacing`   | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/line-length`           | 🔍   | ❌            | ❌                                                              | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌                                                              | ❌      |
 | `content/table-columns`         | 🔍   | `warn`        | ❌                                                              | ❌      |
@@ -34,6 +36,7 @@ column, ✅ is yes and ❌ no.
 | `links/notation`                | 🎨   | ❌            | ❌                                                              | ✅      |
 | `links/path`                    | 🎨   | ❌            | ❌                                                              | ✅      |
 | `links/reversed`                | 🔍   | ❌            | ❌                                                              | ❌      |
+| `links/text-spacing`            | 🔍   | ❌            | ❌                                                              | ❌      |
 | `links/undefined-reference`     | 🔍   | `warn`        | ❌                                                              | ✅      |
 | `links/unused-definition`       | 🔍   | `warn`        | ❌                                                              | ✅      |
 | `links/valid`                   | 🔍   | `error`       | ❌                                                              | ✅      |
@@ -121,6 +124,74 @@ Both options only report findings; the code and its fence remain as written.
 
 **Not checked:** indented code blocks, which have no place for a language.
 
+## `content/emphasis-spacing`
+
+Reports emphasis or strong markers with blank space just inside them, as in
+`** bold **` or `*italic *`. A marker with blank space on its inner side cannot
+open or close emphasis, so renderers show the asterisks or underscores as text.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reported:
+
+```markdown
+Here is some ** bold ** text and some *italic * text.
+```
+
+Not reported:
+
+```markdown
+Here is some **bold** text, and 2 * 3 * 4 is 24.
+```
+
+**Details:** removing the spaces turns that text into emphasis, which may not be
+what was meant, so the rule only reports. A pair of markers is reported only
+where the parser of the document's dialect reads emphasis, strong text, or both
+there once the spaces are gone: one, two, or three `*` or `_` at each end, on
+one line, around text with a letter or a digit. Each run pairs with the next run
+of the same marker on its line.
+
+The document is read once with the spaces of every remaining pair removed. Where
+that makes text into a definition, as when `[a]:` followed by `** b **` on the
+next line becomes one, the pairs in it are not reported, and the document is
+read again without them. Where it changes a block in another way, no pair in the
+top-level block that holds the change is reported.
+
+**Not checked:** markers that the parser did not read as text, and those in
+code, math, HTML, link destinations, autolinks, and dialect syntax such as
+Obsidian's comments and highlights or math between `\(` and `\)` on Forgejo and
+Gitea. The content of an inline HTML element, such as `<code>** a **</code>` or
+`<kbd>`, is not checked either: readers take it for literal text, even where
+renderers read Markdown in it.
+
+Where the markers can as well be something other than broken emphasis, they are
+not reported, in favor of missing a mistake over reporting text that is right:
+
+- A single `*` or `_` with blank space on both sides at both ends, as in
+  `a * b * c`, `2 * 3 * 4`, or `* text *`. Multiplication, wildcards, and
+  asterisks or underscores that stand for themselves are written so, and the
+  text alone cannot tell them from emphasis. Two or three markers are reported
+  in the same case, as in `** bold **`.
+- Arithmetic, where the text inside and the words on either side are numbers,
+  single letters, and operators, as in `a ** b ** c` or `2 *3 * 4`.
+- A marker inside a word, as in `a* b *c`, or next to a character other than
+  blank space, brackets, quotation marks, and the punctuation that ends a
+  clause, such as the `/` of a JSX comment `{/* note */}`. Identifiers such as
+  `my_var` and emoji codes such as `:white_check_mark:` stay alone this way.
+- Text that holds a run of the same marker at least as long, as in
+  `"** a **" b, (** c **)`, where the parser pairs the inner runs as strong
+  text, and pairs of different markers that overlap. Which markers belong
+  together is not known there.
+- Text that starts with something other than a letter, a digit, an opening
+  bracket or quotation mark, or ends with something other than a letter, a
+  digit, a closing bracket or quotation mark, or `.`, `!`, or `?`, unless a code
+  span, link, or other inline element starts or ends it there. Emphasis that was
+  meant starts and ends with a word, unlike the wildcard patterns of
+  `glob *.md * notes` or `*.txt *`.
+- Markers in the label of a collapsed or shortcut reference, as in `[** a **]`,
+  where removing the spaces would change the definition that the label names.
+- Runs of four or more markers, and pairs whose text spans lines.
+
 ## `content/image-alt`
 
 Reports an image without alternative text, the text between the brackets of
@@ -149,6 +220,53 @@ Not reported:
 **In Obsidian:** a size after `|`, as in `![|100](chart.png)`, is not text, and
 embeds such as `![[chart.png]]` are not reported, because they have no place for
 text.
+
+## `content/inline-code-spacing`
+
+Reports a code span with blank space at its start or end that renderers show as
+part of the code, as in `` `  npm test  ` `` or `` ` npm test` ``. Readers see
+and copy that space with the code.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reported:
+
+```markdown
+Run ` npm test` before you commit.
+```
+
+Not reported:
+
+```markdown
+Run `npm test` before you commit, and `` `backticks` `` show as code.
+```
+
+**Details:** renderers take one space off each end of a code span only when both
+ends have one, so `` ` npm test ` `` shows `npm test`, while `` ` npm test` ``
+keeps its space and `` `  npm test  ` `` keeps one at each end. Removing the
+space changes the code that readers see and copy, and some code needs it, so the
+rule only reports. Blank space is reported only next to a letter or a digit of
+the code. A line ending at an end of the span counts as the space that renderers
+show for it.
+
+**Not checked:**
+
+- Blank space next to another character, which usually belongs to the code, as
+  when a span shows syntax such as a list item's `- ` or a definition's `: `.
+- The space next to a backtick at an end of the code, as in ``` `` `npm`` ```,
+  which keeps that backtick apart from the span's own.
+- More than one space or a tab at one end only, as in `` `    Text` ``, which
+  shows indentation.
+- The one space at each end that renderers take off, and a span of nothing but
+  blank space.
+
+**In Obsidian:** a span of one or two backticks across lines is not reported,
+because Live Preview ends it at its line.
+
+**With other rules:** this is a rule of its own rather than an option of
+[`style/inline-code`](#styleinline-code): that rule only makes edits that keep
+the code as renderers show it, and no edit of the padding does, so there is
+nothing to fix, only to report.
 
 ## `content/line-length`
 
@@ -701,6 +819,44 @@ or fragment).
 - Footnotes, wikilinks, task markers, code, math, HTML, text inside authored
   links and destinations, and parentheses inside a bare URL, such as
   `https://example.com/(a)[b.md]`.
+
+## `links/text-spacing`
+
+Reports a link whose text starts or ends with blank space, as in
+`[ the guide ](guide.md)`. The space is part of the link, so renderers underline
+it with the text, and readers can click it.
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: none.
+
+Reported:
+
+```markdown
+See [ the installation guide ](install.md) first.
+```
+
+Not reported:
+
+```markdown
+See [the installation guide](install.md) first.
+```
+
+**Details:** inline links and full, collapsed, and shortcut references such as
+`[ the guide ][guide]` and `[ guide ]` are checked; a reference still matches
+its definition without the spaces, because renderers compare labels without the
+blank space at their ends.
+
+Moving the spaces outside the brackets changes the text of the link, which the
+[safety check](design.md#safety-model) compares as part of the document's
+meaning, and where they belong depends on the text around the link:
+`see[ the guide ](guide.md)` needs a space before the brackets to keep `see`
+apart from the link, `([ the guide ](guide.md))` reads best with none, and
+`**[ the guide ](guide.md)**` would lose its strong text with a space just
+inside the `**`. So the rule only reports, and the edit is left to the writer.
+
+**Not checked:** images, because their text describes the image and is not shown
+with it, Obsidian wikilinks and embeds, footnote references, task markers, alert
+and callout markers, autolinks, HTML `<a>` elements, and links whose text is
+only blank space.
 
 ## `links/undefined-reference`
 
@@ -1887,6 +2043,9 @@ protections](obsidian.md#boundary-protections) describe the conservative cases.
 **With other rules:** [`style/wrap`](#stylewrap) joins such a code span only in
 a paragraph that it wraps, and this rule also elsewhere, such as in a paragraph
 with a hard line break.
+[`content/inline-code-spacing`](#contentinline-code-spacing) reports blank space
+that renderers show at the ends of a span, which this rule leaves as written,
+because removing it would change the code.
 
 ## `style/link-title`
 
