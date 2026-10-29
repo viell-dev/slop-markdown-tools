@@ -1696,6 +1696,19 @@ is not.
 **Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: none.
 
+Before, a document with Windows line endings, written as a JavaScript string,
+whose last line has none:
+
+```js
+"# Notes\r\n\r\nThe last line."
+```
+
+After, the same line ending, `\r\n`, ends the last line too:
+
+```js
+"# Notes\r\n\r\nThe last line.\r\n"
+```
+
 **Left as written:** a document whose added line break would become part of the
 last block: an HTML comment or another HTML block without its end marker, an
 Obsidian comment without its closing `%%`, or a code or math block without its

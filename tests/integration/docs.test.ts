@@ -333,10 +333,22 @@ describe("documentation site", () => {
 
 describe("version annotations", () => {
   // A page describes the behavior of the version it documents; the changelog holds the history.
-  // The versions of renderers and other tools, as in "Gitea before 1.26", are not that history.
+  // The versions of renderers and other tools, as in "Gitea before 1.26" or "Gitea version 1.26
+  // fixes", are not that history: a tool's name directly before the version, or before "version"
+  // or "versions" and the version, exempts it.
+  const tool =
+    "Forgejo|Gitea|GitHub|markdown-it|markdownlint|micromark|Node\\.js|npm|Obsidian|pnpm|Prettier|TypeScript|Vite|VitePress|Vue";
+  const notTool = `(?<!\\b(?:${tool}) (?:versions? )?)`;
+  const version = String.raw`v?\d+\.\d+(?:\.(?:\d+|x))?\b`;
   const annotations = [
-    /(?<!\b(?:Forgejo|Gitea|markdownlint|micromark|Node\.js|Obsidian|Prettier|VitePress) )\b(?:after|since|before|until|from|as of|(?:added|introduced|removed|changed|new) in) (?:versions? )?v?\d+\.\d+(?:\.(?:\d+|x))?\b/gi,
-    /\bversions? v?\d+\.\d+(?:\.(?:\d+|x))? (?:adds|added|bundles|changes|changed|corrects|fixes|introduces|introduced|no longer|removes|removed|retains)\b/gi,
+    new RegExp(
+      String.raw`${notTool}\b(?:after|since|before|until|from|as of|in|(?:added|introduced|removed|changed|new) in) (?:versions? )?${version}`,
+      "gi",
+    ),
+    new RegExp(
+      String.raw`(?<!\b(?:${tool}) )\bversions? ${version} (?:adds|added|bundles|changes|changed|corrects|fixes|gained|gains|introduces|introduced|no longer|removes|removed|retains)\b`,
+      "gi",
+    ),
     /\bunreleased\b/gi,
     /\bnext (?:minor |major |patch )?release\b/gi,
   ];
@@ -362,12 +374,12 @@ describe("version annotations", () => {
     ],
     [
       "docs/quick-start.md",
-      "When upgrading from 0.4.x, complete the [naming migration](cli.md#earlier-names) before installing 0.5.0.",
+      "When upgrading from 0.4.x, complete the naming migration before installing 0.5.0.",
       "an upgrade instruction that points to the migration steps",
     ],
     [
       "README.md",
-      "When upgrading from 0.4.x, complete the [naming migration](docs/cli.md#earlier-names) before installing 0.5.0.",
+      "When upgrading from 0.4.x, complete the naming migration before installing 0.5.0.",
       "an upgrade instruction that points to the migration steps",
     ],
     [
@@ -381,27 +393,78 @@ describe("version annotations", () => {
       "the versioning policy",
     ],
   ];
-  /** A page's prose with its blank space collapsed; code blocks are examples, not the page's. */
-  const text = (file: string) => {
-    let source = read(file);
-    const blank = (node: Nodes) => {
-      if (node.type === "code") {
-        const [start, end] = range(node);
-        source = source.slice(0, start) + " ".repeat(end - start) + source.slice(end);
-      } else if ("children" in node) for (const child of node.children) blank(child);
+  /** Node types inside a paragraph; the others separate the text around them. */
+  const phrasing = new Set<string>([
+    "break",
+    "delete",
+    "emphasis",
+    "footnoteReference",
+    "html",
+    "image",
+    "imageReference",
+    "inlineCode",
+    "inlineMath",
+    "link",
+    "linkReference",
+    "strong",
+    "text",
+  ]);
+  /**
+   * The text a reader sees, with its blank space collapsed: inline code without its backticks,
+   * emphasis without its markers, link text without its destination. Code blocks are examples,
+   * not the page's own statements, and are left out.
+   */
+  const readable = (source: string, file = "page.md") => {
+    const parts: string[] = [];
+    const visit = (node: Nodes) => {
+      if (node.type === "code" || node.type === "definition") return;
+      const block = !phrasing.has(node.type);
+      if (block) parts.push(" ");
+      if (node.type === "html") parts.push(node.value.replace(/<[^>]*>/g, " "));
+      else if (node.type === "image") parts.push(node.alt ?? "");
+      else if (node.type === "break") parts.push(" ");
+      else if ("value" in node) parts.push(node.value);
+      else if ("children" in node) for (const child of node.children) visit(child);
+      if (block) parts.push(" ");
     };
-    blank(parse(source, "github", file).tree);
-    return source.replace(/\s+/g, " ");
+    visit(parse(source, "github", file).tree);
+    return parts.join("").replace(/\s+/g, " ");
   };
+  const text = (file: string) => readable(read(file), file);
+  const annotated = (text: string) =>
+    annotations.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[0]));
+  it.each([
+    ["After 0.4.0, the rule also checks tables.", "After 0.4.0"],
+    ["**Unreleased:** the option takes a list.", "Unreleased"],
+    ["Since `0.5.0`, this rule accepts the option.", "Since 0.5.0"],
+    ["Added **in 0.5.0**, this option selects a marker.", "Added in 0.5.0"],
+    ["In 0.5.0, this rule gained an option.", "In 0.5.0"],
+    ["In _version 0.5.0_, this rule gained an option.", "In version 0.5.0"],
+    ["Version 0.6.0 adds the `marker` option.", "Version 0.6.0 adds"],
+    ["Available [from 0.5.0](changelog.md#_0-5-0) onward.", "from 0.5.0"],
+    ["It waits for the next minor release.", "next minor release"],
+  ])("finds the annotation in %j", (source, found) => {
+    expect(annotated(readable(source))).toEqual([found]);
+  });
+  it.each([
+    "Gitea before 1.26 renders nothing.",
+    "Gitea versions before 1.26 render nothing.",
+    "Gitea version 1.26 fixes heading IDs.",
+    "`Obsidian` versions since 1.12 hide the marker.",
+    "Prettier version 3.9.10 changes the list marker.",
+    "Node.js versions from 22.12 load the configuration.",
+    "Install it with `npm install mdrefine@0.5.0`.",
+    "```text\nSince 0.5.0, this rule accepts the option.\n```",
+    "In the next paragraph, version numbers such as 0.5.0 stand alone.",
+  ])("allows %j", (source) => {
+    expect(annotated(readable(source))).toEqual([]);
+  });
   const checked = [...pages.filter((page) => page !== "docs/changelog.md"), "README.md"];
   it.each(checked)("%s describes its version without history", (file) => {
     let rest = text(file);
     for (const [owner, passage] of allowed)
       if (owner === file) rest = rest.split(passage).join(" ");
-    const found = annotations.flatMap((pattern) =>
-      [...rest.matchAll(pattern)].map((match) => match[0]),
-    );
-    expect(found).toEqual([]);
+    expect(annotated(rest)).toEqual([]);
   });
   it("allows only passages that the pages still have", () => {
     for (const [file, passage, reason] of allowed)
