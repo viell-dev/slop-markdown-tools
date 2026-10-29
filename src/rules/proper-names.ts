@@ -1,7 +1,7 @@
 import type { Nodes } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
-import { optionsSchema } from "./shared.js";
+import { holds, optionsSchema } from "./shared.js";
 
 /** Addresses are masked before matching names, including opaque and protocol-relative URLs. */
 const urls =
@@ -37,11 +37,17 @@ export const properNames: Rule = {
     );
     const findings: Finding[] = [];
     let text = "";
-    let offsets: number[] = [];
+    // Each character's source span. Decoded text, such as an entity or an escape,
+    // maps to its whole node, since its characters have no single source offset.
+    let starts: number[] = [];
+    let ends: number[] = [];
     let literalHtml: string | undefined;
-    const append = (value: string, start: number, exact: boolean) => {
+    const append = (value: string, start: number, exact: boolean, spanEnd: number) => {
       text += value;
-      for (let i = 0; i < value.length; i++) offsets.push(start + (exact ? i : 0));
+      for (let i = 0; i < value.length; i++) {
+        starts.push(exact ? start + i : start);
+        ends.push(exact ? start + i + 1 : spanEnd);
+      }
     };
     const flush = () => {
       // Mask addresses once per prose run, before matching any configured name.
@@ -51,8 +57,8 @@ export const properNames: Rule = {
         const end = at + match[0].length;
         if (allowed.has(match[0])) continue;
         findings.push({
-          start: offsets[at]!,
-          end: offsets[end - 1]! + 1,
+          start: starts[at]!,
+          end: ends[end - 1]!,
           message: `Use the configured capitalization ${spellings
             .get(fold(match[0]))!
             .map((name) => JSON.stringify(name))
@@ -60,31 +66,34 @@ export const properNames: Rule = {
         });
       }
       text = "";
-      offsets = [];
+      starts = [];
+      ends = [];
     };
     const visit = (node: Nodes): void => {
       const [start, end] = range(node);
       const raw = document.source.slice(start, end);
       if (node.type === "text" || node.type === "obsidianHighlight") {
-        if (!literalHtml) append(node.value, start, raw === node.value);
+        if (!literalHtml) append(node.value, start, raw === node.value, end);
       } else if (node.type === "image" || node.type === "imageReference") {
         flush();
-        append(node.alt ?? "", start + 2, raw.slice(2).startsWith(node.alt ?? ""));
+        append(node.alt ?? "", start + 2, raw.slice(2).startsWith(node.alt ?? ""), end);
         flush();
       } else if (node.type === "wikiLink") {
         flush();
         // Unaliased targets remain addresses, including embeds.
-        if (node.label) append(node.label, start + raw.indexOf("|") + 1, true);
+        if (node.label) append(node.label, start + raw.indexOf("|") + 1, true, end);
         flush();
       } else if (node.type === "code") {
         flush();
         if (options.codeBlocks === true) {
-          let cursor = /^(?:`{3,}|~{3,})/.test(raw) ? raw.indexOf("\n") + 1 : 0;
+          // The body starts after the opening fence's line break, of any kind.
+          const opening = /^(?:`{3,}|~{3,})/.test(raw) ? /\r\n|\r|\n/.exec(raw) : null;
+          let cursor = opening ? opening.index + opening[0].length : 0;
           for (const line of node.value.split("\n")) {
             const at = raw.indexOf(line, cursor);
-            append(line, start + Math.max(cursor, at), at >= 0);
+            append(line, start + Math.max(cursor, at), at >= 0, end);
             cursor = Math.max(cursor, at) + line.length;
-            append("\n", start + cursor, true);
+            append("\n", start + cursor, true, end);
             if (raw[cursor] === "\r") cursor++;
             if (raw[cursor] === "\n") cursor++;
           }
@@ -96,18 +105,24 @@ export const properNames: Rule = {
           // literal-element state across separate inline HTML and text nodes.
           let copied = 0;
           for (const tag of raw.matchAll(/<!--[\s\S]*?(?:-->|$)|<(?:[^<>"']|"[^"]*"|'[^']*')*>/g)) {
-            if (!literalHtml) append(raw.slice(copied, tag.index), start + copied, true);
+            if (!literalHtml) append(raw.slice(copied, tag.index), start + copied, true, end);
             const name = /^<(\/?)([a-z][\w-]*)/i.exec(tag[0]);
-            if (name?.[1] && name[2]?.toLowerCase() === literalHtml) literalHtml = undefined;
-            else if (
+            // A skipped element's body ends the prose run on both sides, so a name
+            // cannot match across it, as in `Java<code>…</code>Script`.
+            if (name?.[1] && name[2]?.toLowerCase() === literalHtml) {
+              literalHtml = undefined;
+              flush();
+            } else if (
               !literalHtml &&
               !name?.[1] &&
               /^(?:script|style|code|pre)$/i.test(name?.[2] ?? "")
-            )
+            ) {
+              flush();
               literalHtml = name![2]!.toLowerCase();
+            }
             copied = tag.index + tag[0].length;
           }
-          if (!literalHtml) append(raw.slice(copied), start + copied, true);
+          if (!literalHtml) append(raw.slice(copied), start + copied, true, end);
         } else flush();
       } else if (node.type === "link" && !raw.startsWith("[")) {
         flush();
@@ -125,7 +140,7 @@ export const properNames: Rule = {
         if (
           options.htmlElements !== false ||
           !["paragraph", "heading", "tableCell"].includes(node.type) ||
-          !node.children.some((child) => child.type === "html")
+          !holds(node, "html")
         )
           node.children.forEach(visit);
         if (block) flush();

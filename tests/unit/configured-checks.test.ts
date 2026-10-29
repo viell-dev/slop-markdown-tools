@@ -224,6 +224,26 @@ it("reports positions under CRLF and escaped or encoded text without edits", () 
     column: 1,
   });
   expect(check("java&#115;cript\n", names, { names: ["JavaScript"] })).toHaveLength(1);
+  // Decoded text maps to its whole node, not to the node's first character.
+  const decoded = "Tom &amp; javascript\n";
+  const [finding] = check(decoded, names, { names: ["JavaScript"] });
+  expect(decoded.slice(finding!.start, finding!.end)).toContain("javascript");
+});
+it("does not match a name across a skipped HTML element's body", () => {
+  expect(check("Java<code>x</code>script\n", names, { names: ["JavaScript"] })).toEqual([]);
+  expect(check("javascript<code>x</code>\n", names, { names: ["JavaScript"] })).toHaveLength(1);
+});
+it("skips prose blocks with nested inline HTML when HTML is not checked", () => {
+  const source = "*<b>x</b>* javascript\n";
+  expect(check(source, names, { names: ["JavaScript"], htmlElements: false })).toEqual([]);
+  expect(check(source, names, { names: ["JavaScript"] })).toHaveLength(1);
+});
+it("finds a code block's body after a lone CR line ending", () => {
+  // The info string holds the same text, which a search from the start finds first.
+  const source = "```javascript\rjavascript\r```\r";
+  expect(
+    check(source, names, { names: ["JavaScript"], codeBlocks: true }).map((item) => item.line),
+  ).toEqual([2]);
 });
 it("validates all new option types", () => {
   for (const [rule, options] of [
