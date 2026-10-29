@@ -19,6 +19,7 @@ presets, dialects, and options.
 | ------------------------------- | :--: | :-----------: | :------------: | :-----: |
 | `content/code-language`         | 🔍   | ❌            | ❌             | ✅      |
 | `content/image-alt`             | 🔍   | ✅            | ❌             | ❌      |
+| `content/proper-names`          | 🔍   | ❌            | ❌             | ✅      |
 | `content/shell-prompt`          | 🔍   | ❌            | ❌             | ❌      |
 | `content/table-columns`         | 🔍   | ✅            | ❌             | ❌      |
 | `forgejo/heading-id`            | 🔍   | ❌            | ✅ (error)     | ❌      |
@@ -38,6 +39,7 @@ presets, dialects, and options.
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌             | ✅      |
 | `structure/heading-increment`   | 🔍   | ✅            | ❌             | ❌      |
 | `structure/heading-punctuation` | 🔍   | ❌            | ❌             | ✅      |
+| `structure/heading-template`    | 🔍   | ❌            | ❌             | ✅      |
 | `structure/initial-heading`     | 🔍   | ❌            | ❌             | ✅      |
 | `structure/single-title`        | 🔍   | ❌            | ❌             | ✅      |
 | `structure/split-quote`         | 🔍   | ❌            | ❌             | ❌      |
@@ -120,6 +122,46 @@ Not reported:
 
 ```markdown
 ![Sales by month, rising from March](sales-by-month.png)
+```
+
+## `content/proper-names`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: below.
+
+After 0.5.0.
+
+Reports other capitalization of configured names in prose, link labels and image
+alt text. For example, `javascript` reports when `JavaScript` is configured.
+Changing a name changes text, so this rule never fixes it.
+
+| Option         | Default | Meaning                                                              |
+| -------------- | ------- | -------------------------------------------------------------------- |
+| `names`        | `[]`    | Literal names with their accepted capitalization.                    |
+| `codeBlocks`   | `false` | Also check fenced and indented code bodies.                          |
+| `htmlElements` | `true`  | Check visible HTML text; tags, attributes and comments are excluded. |
+
+Inline code is always excluded: a command or identifier often needs its exact
+spelling. Code blocks are excluded by default for the same reason; opt in when
+checking prose examples written in fences. HTML script, style, code and pre
+bodies are excluded. With `htmlElements: false`, a prose block containing inline
+HTML is conservatively excluded as a whole; other prose remains checked.
+
+Link destinations, autolinks, bare URLs and email addresses, image sources,
+front matter, math, comments and wikilink targets are excluded. An explicit
+wikilink alias is prose. Names match literal punctuation and spaces, including
+`Node.js`, `C++` and `GitHub Actions`. Adjacent Unicode letters, combining
+marks, numbers or connector punctuation prevent a match: neither `myjavascript`
+nor `javascripts` matches `JavaScript`, and the same boundary rule applies to
+non-Latin scripts. Punctuation outside a name separates it from surrounding
+text. Longer names take precedence over overlapping shorter names. Multiple
+configured spellings of the same name are accepted.
+
+```json
+{
+  "rules": {
+    "content/proper-names": ["warn", { "names": ["JavaScript", "Node.js"] }]
+  }
+}
 ```
 
 ## `content/shell-prompt`
@@ -822,6 +864,54 @@ Not reported:
 ## Why does it need a configuration file?
 
 ## Plugins, tools, etc.
+```
+
+## `structure/heading-template`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options: below.
+
+After 0.5.0.
+
+Requires the document's headings to match a configured sequence. Reports the
+first heading that cannot continue a match, or the end of the document when a
+required heading is missing, with the expected heading or headings. It never
+inserts, removes or renames a heading.
+
+| Option      | Default | Meaning                                                                                             |
+| ----------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `headings`  | Unset   | Sequence of ATX headings and wildcard entries. Unset disables the check; `[]` requires no headings. |
+| `matchCase` | `false` | Require matching capitalization.                                                                    |
+
+Each heading entry includes its level, such as `## Notes`. `*` matches zero or
+more arbitrary headings, `+` one or more, and `?` exactly one. Wildcards use
+bounded-state matching, with time proportional to template length times heading
+count, rather than exponential backtracking.
+
+The sequence follows the document's own outline, including headings in lists.
+Quotes and footnotes have independent outlines and do not participate: a quoted
+example or a footnote need not follow the page template. Comparison uses
+rendered text, collapsing whitespace and reading inline Markdown, escapes and
+character references. Closing hashes are syntax. Trailing attributes in Forgejo,
+Gitea and VitePress, and Obsidian block identifiers, are excluded where the
+dialect reads them as metadata. Attribute-like text remains text in other
+dialects.
+
+Use overrides to apply a template to one group of files:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["guides/**/*.md"],
+      "rules": {
+        "structure/heading-template": [
+          "error",
+          { "headings": ["# Guide", "*", "## Notes"], "matchCase": false }
+        ]
+      }
+    }
+  ]
+}
 ```
 
 ## `structure/initial-heading`
