@@ -534,15 +534,17 @@ documented dialect syntax. Existing adversarial seed behavior is retained.
 each to the lines that still show its difference, and `PROBE`, a JSON array of
 documents, only shows each in Obsidian. Live Preview is compared by its lines'
 text and styles, with the characters that it shows as written left out where
-only the source differs, and Reading view by its HTML. The check requires the
-editor to finish parsing the whole note and publish that syntax tree before
-collecting styles; incomplete parsing fails the run. Empty table source rows
-with no text or embed are ignored. Table widgets ignore their known focus and
-active-handle classes and a generated cell editor only when the cell also
-retains its rendered preview. Rendered content, styles, code spacing, alignment,
-link destinations, and row counts remain significant. A host control activates
-header, code, and link cells with real input and checks those negative cases;
-nested authored tables and editor-only payload remain intact. Boundary
+only the source differs, and Reading view by its HTML. List-number normalization
+applies to styled ordered markers and source-only list prefixes before lines
+join; ordinary numbers and numeric hash-prefixed text retain their digits. The
+check requires the editor to finish parsing the whole note and publish that
+syntax tree before collecting styles; incomplete parsing fails the run. Empty
+table source rows with no text or embed are ignored. Table widgets ignore their
+known focus and active-handle classes and a generated cell editor only when the
+cell also retains its rendered preview. Rendered content, styles, code spacing,
+alignment, link destinations, and row counts remain significant. A host control
+activates header, code, and link cells with real input and checks those negative
+cases; nested authored tables and editor-only payload remain intact. Boundary
 regressions in `tests/fixtures/renderers/obsidian-boundaries.mjs` are shared
 with the unit suite, including the long synthetic note in
 `tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
