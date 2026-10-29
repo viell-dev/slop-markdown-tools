@@ -170,7 +170,15 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     options: {},
   },
   { source: "MD032", alias: "blanks-around-lists", rule: "style/block-spacing" },
-  { source: "MD033", alias: "no-inline-html", issue: 685 },
+  {
+    source: "MD033",
+    alias: "no-inline-html",
+    rule: "content/html-element",
+    options: {
+      allowed_elements: "allowedElements",
+      table_allowed_elements: "tableAllowedElements",
+    },
+  },
   { source: "MD034", alias: "no-bare-urls", rule: "links/bare-url" },
   {
     source: "MD035",
@@ -221,7 +229,7 @@ export const competitorMappings: readonly CompetitorMapping[] = [
     options: { names: "names", code_blocks: "codeBlocks", html_elements: "htmlElements" },
     disabled: true,
   },
-  { source: "MD045", alias: "no-alt-text", rule: "content/image-alt", issue: 694 },
+  { source: "MD045", alias: "no-alt-text", rule: "content/image-alt" },
   {
     source: "MD046",
     alias: "code-block-style",
@@ -390,7 +398,7 @@ export function convertConfig(input: {
     sources: [],
     omitted: [],
     conflicts: [],
-    suggestions: ["Consider links/valid for local file checking."],
+    suggestions: [],
   };
   const owners = new Map<string, string>();
   const set = (row: CompetitorMapping, options: Values, explicit = false) => {
@@ -594,6 +602,12 @@ export function convertConfig(input: {
           `markdownlint ${key}: unknown rule or option; requires manual migration.`,
         );
   }
+  const links = rules["links/valid"];
+  report.suggestions.push(
+    links && links !== "off"
+      ? "links/valid, the counterpart of MD051, also reports local links whose files do not exist."
+      : "Consider links/valid, which checks that local links and their fragments exist.",
+  );
   const spacing = rules["style/block-spacing"];
   const blanks = rules["style/blank-lines"];
   if (Array.isArray(spacing) && Array.isArray(blanks)) {

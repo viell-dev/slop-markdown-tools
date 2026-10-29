@@ -52,6 +52,8 @@ describe("competitor conversion (#669)", () => {
       urlInline: false,
       prohibitedTexts: ["here"],
       alignedDelimiter: true,
+      allowedElements: ["br"],
+      tableAllowedElements: ["br"],
       listItems: false,
     };
     const docs = readFileSync("docs/integrations.md", "utf8");
@@ -178,8 +180,20 @@ describe("competitor conversion (#669)", () => {
       prettier: { requirePragma: true, insertPragma: true, endOfLine: "crlf", plugin: "untrusted" },
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
-    for (const issue of [723, 712, 685]) expect(result.omitted.join("\n")).toContain(`#${issue}`);
+    for (const issue of [723, 712]) expect(result.omitted.join("\n")).toContain(`#${issue}`);
     expect(result.omitted.join("\n")).toContain("strict");
+    expect(result.config.rules?.["content/html-element"]).toEqual(["error", {}]);
+  });
+  it("says that links/valid also checks files when MD051 enables it, and suggests it otherwise", () => {
+    const enabled = convertConfig({ markdownlint: {} });
+    expect(enabled.config.rules?.["links/valid"]).toEqual(["error", {}]);
+    expect(enabled.suggestions.join("\n")).toContain("also reports local links");
+    const off = convertConfig({ markdownlint: { MD051: false } });
+    expect(off.config.rules?.["links/valid"]).toBeUndefined();
+    expect(off.suggestions.join("\n")).toContain("Consider links/valid");
+    expect(convertConfig({ prettier: {} }).suggestions.join("\n")).toContain(
+      "Consider links/valid",
+    );
   });
   it("keeps enabled markdownlint defaults behind Prettier choices but raises severity", () => {
     const result = convertConfig({ prettier: {}, markdownlint: { MD049: true } });
