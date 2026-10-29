@@ -12,6 +12,11 @@ prereleases' notes there are longer than their entries here.
 
 ### Added
 
+- Opt-in `style/code-block` checks `consistent`, `fenced`, or `indented` code
+  form, converting indented blocks to safe fences outside VitePress and
+  reporting other mismatches without losing code or metadata
+  ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)).
+
 - Opt-in `style/link-title` normalizes link, image, and definition title
   delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
   It retains source escapes and line breaks and never changes destinations

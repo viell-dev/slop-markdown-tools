@@ -47,6 +47,7 @@ presets, dialects, and options.
 | `structure/unspaced-heading`    | 🔍   | ❌            | ❌             | ❌      |
 | `style/blank-lines`             | 🎨   | ✅            | ❌             | ✅      |
 | `style/block-spacing`           | 🎨   | ✅            | ❌             | ❌      |
+| `style/code-block`              | 🎨   | ❌            | ❌             | ✅      |
 | `style/code-fence`              | 🎨   | ✅            | ❌             | ✅      |
 | `style/definition-spacing`      | 🎨   | ❌            | ❌             | ❌      |
 | `style/emphasis`                | 🎨   | ✅            | ❌             | ✅      |
@@ -1346,6 +1347,50 @@ display formula connects list items. Display math immediately below the final
 item stays inside it, including after a heading or code block; a table after
 those blocks also stays adjacent. See the [boundary
 protections](obsidian.md#boundary-protections-since-041).
+
+## `style/code-block`
+
+Reports code blocks that do not use the configured fenced or indented form.
+Converts indented code to fences where the dialect permits that change.
+
+**Style rule**, fixed by `format`. Presets: none. Dialects: all. Options:
+`style`.
+
+Before, with `style: "fenced"`:
+
+```markdown
+    npm test
+```
+
+After:
+
+````markdown
+```
+npm test
+```
+````
+
+| Option  | Values                             | Default      |
+| ------- | ---------------------------------- | ------------ |
+| `style` | `consistent`, `fenced`, `indented` | `consistent` |
+
+`consistent` takes the form of the document's first parsed code block. `fenced`
+requires fences; `indented` requires indentation. This is independent of
+`style/code-fence`, which chooses the marker and length of existing fences. The
+rule is opt-in so that `recommended` keeps its existing behavior.
+
+Conversions retain the code value, including tabs and internal blank lines, and
+the block's list or quote container. The new backtick fence is longer than any
+backtick run in the code. Container prefixes containing tabs are reported
+without a fix because removing indentation can change their tab stops.
+
+Fenced blocks are reported without conversion: indentation cannot retain a
+language or metadata and can change blank lines or adjacent paragraph
+boundaries. VitePress also reports indented blocks without conversion, retaining
+its existing opaque-code protection and its distinct fenced-code rendering. Line
+highlighting and `::: code-group` syntax remain intact. Renderer-protected
+blocks stay as written. Continuation paragraphs in list items and footnotes are
+prose, not code blocks, and are not reported.
 
 ## `style/code-fence`
 

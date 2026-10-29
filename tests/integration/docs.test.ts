@@ -76,14 +76,17 @@ describe("rules reference", () => {
       expect(options, rule).toBe(hasOptions(rule) ? "✅" : "❌");
     }
   });
-  it("opens each rule's section with its kind, presets, dialects, and options", () => {
+  it("gives each rule's kind, presets, dialects, and options near its opening", () => {
     const facts =
       /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
     page.forEach((node, at) => {
       if (node.type !== "heading" || node.depth !== 2 || node.children[0]?.type !== "inlineCode")
         return;
       const rule = node.children[0].value;
-      const next = page[at + 1];
+      let next = page[at + 1];
+      // A plain-language opening may precede the facts (#746).
+      if (next?.type === "paragraph" && !source.slice(...range(next)).startsWith("**"))
+        next = page[at + 2];
       const text = next ? source.slice(...range(next)).replace(/\s+/g, " ") : "";
       const match = facts.exec(text);
       expect(match, `${rule}: ${text}`).not.toBeNull();
