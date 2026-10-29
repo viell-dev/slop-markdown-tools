@@ -54,6 +54,10 @@ const configOption = [
   "--config <file>",
   "Use this JSON, JSONC, or JavaScript configuration file instead of searching for one",
 ] as const;
+const competitorOption = [
+  "--no-competitor-config",
+  "Do not fall back to markdownlint and Prettier configurations when no mdrefine configuration is found",
+] as const;
 /** The dialects, each with its other names, as in "forgejo (alias: codeberg)". */
 const dialectList = dialects
   .map((dialect) => {
@@ -67,10 +71,7 @@ const dialectList = dialects
 function workspaceOptions(command: Command): Command {
   return command
     .option(...configOption)
-    .option(
-      "--no-competitor-config",
-      "Disable in-memory markdownlint and Prettier configuration fallback",
-    )
+    .option(...competitorOption)
     .option(
       "--root <directory>",
       "Workspace root (default: the configuration file's directory; without one, the Git repository or vault where the search stopped, else the current directory)",
@@ -451,6 +452,10 @@ workspaceOptions(
 configCommand
   .command("convert")
   .description("Convert markdownlint and Prettier configurations to mdrefine.config.jsonc")
+  .option(
+    "--root <directory>",
+    "Directory to search from and to write to (default: the current directory)",
+  )
   .option("--write", "Create mdrefine.config.jsonc; refuse any existing mdrefine configuration")
   .action(async (_flags: unknown, command: Command) => {
     const flags = command.optsWithGlobals<Flags>();
@@ -483,8 +488,8 @@ configCommand
 program
   .command("rules")
   .description("List the built-in rules and those of the configuration's plugins")
-  .option("--no-competitor-config", "Ignore competitor configurations")
   .option(...configOption)
+  .option(...competitorOption)
   .option("--json", "Print the list as JSON")
   .action(async (flags: Flags) => {
     const loaded = await loadConfig(path.resolve("."), flags.config, flags.competitorConfig);
