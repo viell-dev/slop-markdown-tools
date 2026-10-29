@@ -1,3 +1,4 @@
+import { githubDefinitionText } from "../syntax/github-definitions.js";
 import { walk } from "../syntax/walk.js";
 import type { Blockquote, Nodes, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
@@ -227,16 +228,19 @@ function precedesTable(document: Document, node: RootContent): boolean {
 /**
  * Whether the text directly above a table starts with a link reference
  * definition. GitHub shows such a definition as text when the table
- * interrupts the paragraph that its lines start, where the parser reads a
- * definition, and a blank line above the table would hide that text.
+ * interrupts the paragraph that its lines start. The GitHub parse corrects
+ * those definitions to prose; other dialects retain the definition nodes.
+ * A blank line above the table would hide GitHub's visible text.
  */
 function definitionAbove(parent: Root | Blockquote, index: number): boolean {
+  const previous = parent.children[index - 1];
+  if (previous && githubDefinitionText(previous)) return true;
   for (let at = index - 1; at > 0; at--) {
     const node = parent.children[at]!;
     const above = parent.children[at - 1]!;
     if (node.type !== "paragraph" && node.type !== "definition") return false;
     if (above.position?.end.line !== (node.position?.start.line ?? 0) - 1) return false;
-    if (above.type === "definition") return true;
+    if (above.type === "definition" || githubDefinitionText(above)) return true;
   }
   return false;
 }

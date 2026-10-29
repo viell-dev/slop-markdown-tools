@@ -245,3 +245,56 @@ export function collectGithubLazyHtmlProtections(
     });
   }
 }
+
+/** A Setext underline alone on its line, which a paragraph can show as text. */
+const underlineLine = /^[ \t]*(?:=+|-+)[ \t]*$/;
+
+/**
+ * GitHub reads the link reference definitions at the start of a paragraph
+ * when a Setext underline (`===`, `--` or `-`) follows them, before a table
+ * directly below can interrupt the paragraph, and shows the underline as
+ * text (#732). Joined with the next line, the underline is no longer one and
+ * GitHub shows the definitions as text instead. Keep the line breaks around
+ * such an underline when the paragraph has more lines.
+ */
+export function collectGithubDefinitionUnderlines(
+  document: Document,
+  boundaryText: Set<Nodes>,
+): void {
+  const { source, dialect, tree } = document;
+  if (dialect !== "github") return;
+  const adjacent = (above: Nodes | undefined, below: Nodes) =>
+    above?.position !== undefined && above.position.end.line === below.position!.start.line - 1;
+  const lineBreak = /\r\n?|\n/g;
+  const visit = (parent: Parents) => {
+    parent.children.forEach((child, index) => {
+      if ("children" in child && !leaves.has(child.type)) visit(child);
+      const next = parent.children[index + 1];
+      if (
+        child.type !== "paragraph" ||
+        parent.children[index - 1]?.type !== "definition" ||
+        next?.type !== "table" ||
+        !adjacent(parent.children[index - 1], child) ||
+        !adjacent(child, next)
+      )
+        return;
+      const start = child.position!.start.offset!;
+      lineBreak.lastIndex = start;
+      const after = lineBreak.exec(source);
+      if (!after || after.index >= child.position!.end.offset!) return;
+      if (!underlineLine.test(source.slice(start, after.index))) return;
+      let before = start;
+      while (before > 0 && source[before - 1] !== "\n" && source[before - 1] !== "\r") before--;
+      before--;
+      if (source[before] === "\n" && source[before - 1] === "\r") before--;
+      boundaryText.add({
+        ...child,
+        position: {
+          start: { ...child.position!.start, offset: before },
+          end: { ...child.position!.end, offset: after.index + after[0].length },
+        },
+      });
+    });
+  };
+  visit(tree);
+}
