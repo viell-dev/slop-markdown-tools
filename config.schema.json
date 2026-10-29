@@ -56,6 +56,18 @@
             "items": { "type": "string" },
             "minItems": 1
           },
+          "ruleUpdates": {
+            "description": "Patch rules after rules: retain omitted severity (off when absent) and shallowly merge options, including while off.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "severity": { "$ref": "#/definitions/severity" },
+                "options": { "type": "object" }
+              }
+            }
+          },
           "dialect": { "$ref": "#/definitions/dialect" },
           "vitepress": { "$ref": "#/definitions/vitepress" },
           "rules": { "$ref": "#/definitions/rules" },

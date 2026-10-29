@@ -189,6 +189,19 @@ export const configSchema: JsonSchemaObject = deepFreeze({
             ...strings,
             minItems: 1,
           },
+          ruleUpdates: {
+            description:
+              "Patch rules after rules: retain omitted severity (off when absent) and shallowly merge options, including while off.",
+            type: "object",
+            additionalProperties: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                severity: { $ref: "#/definitions/severity" },
+                options: { type: "object" },
+              },
+            },
+          },
           dialect: { $ref: "#/definitions/dialect" },
           vitepress: { $ref: "#/definitions/vitepress" },
           rules: { $ref: "#/definitions/rules" },
@@ -471,6 +484,15 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       if (override.vitepress) result.vitepress = { ...result.vitepress, ...override.vitepress };
       addRules(result.rules, override.rules);
+      for (const [id, patch] of Object.entries(override.ruleUpdates ?? {})) {
+        const previous = Object.hasOwn(result.rules, id) ? result.rules[id]! : "off";
+        addRules(result.rules, {
+          [id]: [
+            patch.severity ?? (Array.isArray(previous) ? previous[0] : previous),
+            { ...(Array.isArray(previous) ? previous[1] : {}), ...patch.options },
+          ],
+        });
+      }
       if (override.codeFormatters !== undefined)
         result.codeFormatters = tools(override.codeFormatters);
     }

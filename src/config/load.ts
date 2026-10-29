@@ -12,14 +12,24 @@ import { isVault } from "../workspace/vault.js";
 import { splitByteOrderMark } from "../syntax/parse.js";
 import { lineBreaks } from "../syntax/source.js";
 
+import { loadCompetitorConfig } from "./competitors.js";
+import type { ConversionReport } from "./convert.js";
+
+/** A loaded configuration, its workspace, plugins, and optional conversion provenance. */
 export interface LoadedConfig {
+  /** Report when competitor fallback supplied the configuration. */
+  conversion?: ConversionReport;
+  /** Validated configuration data. */
   config: Config;
+  /** Plugin objects loaded from an mdrefine configuration. */
   plugins: Plugin[];
+  /** Absolute workspace root. */
   root: string;
+  /** Absolute mdrefine configuration filename, absent for fallback. */
   file?: string;
 }
 /** The names of the configuration files that the search finds; one directory may hold one. */
-const configFiles = ["jsonc", "json", "mjs", "js", "cjs"].map(
+export const configFiles = ["jsonc", "json", "mjs", "js", "cjs"].map(
   (extension) => `mdrefine.config.${extension}`,
 );
 /**
@@ -63,42 +73,68 @@ function syntaxProblem(text: string, error: ParseError): string {
     return `${JSON.stringify(text.slice(error.offset, error.offset + Math.min(error.length, 40)))} is not valid JSON here`;
   return syntaxProblems[code] ?? code;
 }
-export async function loadConfig(start: string, explicit?: string): Promise<LoadedConfig> {
+/** Shared directory walk for conversion and ordinary configuration loading. */
+export async function searchConfig(start: string) {
+  const directories: string[] = [];
+  let file: string | undefined;
+  let fallbackRoot = path.resolve(start);
+  let directory = path.resolve(start);
+  for (;;) {
+    directories.push(directory);
+    const found: string[] = [];
+    let boundary: boolean;
+    try {
+      for (const name of configFiles)
+        if (await exists(path.join(directory, name))) found.push(path.join(directory, name));
+      // A repository or an Obsidian vault is a workspace of its own.
+      boundary =
+        !found.length &&
+        ((await exists(path.join(directory, ".git"))) || (await isVault(directory)));
+    } catch (error) {
+      // Default rules must not take the place of a configuration that may be there.
+      const code = refusal(error);
+      if (!code) throw error;
+      throw new Error(
+        `Cannot look for a configuration file in ${directory} (${refusalText(code)})`,
+        { cause: error },
+      );
+    }
+    if (found.length > 1)
+      throw new Error(`Multiple mdrefine configuration files in ${directory}. Use --config.`);
+    if (found.length) {
+      file = found[0];
+      break;
+    }
+    if (boundary) {
+      fallbackRoot = directory;
+      break;
+    }
+    if (path.dirname(directory) === directory) break;
+    directory = path.dirname(directory);
+  }
+  return { directories, file, fallbackRoot };
+}
+/** Search for and load mdrefine settings; optionally convert competitor data without executing it. */
+export async function loadConfig(
+  start: string,
+  explicit?: string,
+  competitorFallback = true,
+): Promise<LoadedConfig> {
+  const directories: string[] = [];
   let file = explicit ? path.resolve(explicit) : undefined;
   let fallbackRoot = path.resolve(start);
   if (!file) {
-    let directory = path.resolve(start);
-    for (;;) {
-      const found: string[] = [];
-      let boundary: boolean;
-      try {
-        for (const name of configFiles)
-          if (await exists(path.join(directory, name))) found.push(path.join(directory, name));
-        // A repository or an Obsidian vault is a workspace of its own.
-        boundary =
-          !found.length &&
-          ((await exists(path.join(directory, ".git"))) || (await isVault(directory)));
-      } catch (error) {
-        // Default rules must not take the place of a configuration that may be there.
-        const code = refusal(error);
-        if (!code) throw error;
-        throw new Error(
-          `Cannot look for a configuration file in ${directory} (${refusalText(code)})`,
-          { cause: error },
-        );
-      }
-      if (found.length > 1)
-        throw new Error(`Multiple mdrefine configuration files in ${directory}. Use --config.`);
-      if (found.length) {
-        file = found[0];
-        break;
-      }
-      if (boundary) {
-        fallbackRoot = directory;
-        break;
-      }
-      if (path.dirname(directory) === directory) break;
-      directory = path.dirname(directory);
+    const search = await searchConfig(start);
+    directories.push(...search.directories);
+    file = search.file;
+    fallbackRoot = search.fallbackRoot;
+  }
+
+  if (!file && competitorFallback) {
+    const conversion = await loadCompetitorConfig(directories, false, fallbackRoot);
+    if (conversion) {
+      validateConfig(conversion.config);
+      return { config: conversion.config, plugins: [], root: fallbackRoot, conversion };
     }
   }
   // The file as the user named it, or where the search found it.

@@ -1,8 +1,8 @@
 # Configuration
 
-One configuration controls both `lint` and `format`. Without a configuration
-file, the `recommended` preset applies and the dialect is
-[assumed](dialects.md#the-assumed-dialect).
+One configuration controls both `lint` and `format`. Without an mdrefine or
+competitor configuration file, the `recommended` preset applies and the dialect
+is [assumed](dialects.md#the-assumed-dialect).
 
 ## Configuration files
 
@@ -17,6 +17,24 @@ the workspace root unless `--root` names another; without a configuration file,
 it is the repository or vault where the search stopped, or else the current
 directory. Configuration files do not cascade: a file in a subdirectory is not
 merged with one above it.
+
+### Competitor configuration fallback
+
+When no mdrefine configuration is found, the CLI converts discovered
+markdownlint and Prettier settings in memory. It names sources and omitted
+settings on stderr once per run. `--no-competitor-config` disables this
+behavior; an explicit `--config` also bypasses it. The Node API's
+`loadConfig(start, explicit, competitorFallback)` accepts `false` as its third
+argument to disable it. Portable `convertConfig({ markdownlint, prettier })`
+converts objects without reading files. Neither changes dialect detection.
+
+`mdrefine config convert` prints a configuration and `--write` creates
+`mdrefine.config.jsonc` in the current directory (or `--root`). It refuses any
+existing mdrefine configuration in that directory. The explicit command may
+execute competitor JavaScript settings; fallback loading never does. See the
+[conversion behavior and
+comparison](integrations.md#coming-from-prettier-or-markdownlint) for
+precedence, formats, and remaining coverage gaps.
 
 ### Earlier names
 
@@ -263,8 +281,8 @@ executes these commands; the portable entry never does.
 
 ## Overrides
 
-Each entry of `overrides` applies its `dialect`, `rules`, and `codeFormatters`
-to the documents that match one of its `files` patterns:
+Each entry of `overrides` applies its `dialect`, `rules`, `ruleUpdates`, and
+`codeFormatters` to the documents that match one of its `files` patterns:
 
 ```jsonc
 {
@@ -277,6 +295,34 @@ to the documents that match one of its `files` patterns:
   ],
 }
 ```
+
+`ruleUpdates` patches individual rules: it keeps their severity unless specified
+and merges the named options into their current options.
+
+```jsonc
+{
+  "extends": [],
+  "overrides": [
+    {
+      "files": ["**/*.md"],
+      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
+    },
+    {
+      "files": ["docs/**/*.md"],
+      "ruleUpdates": { "style/wrap": { "severity": "warn" } },
+    },
+  ],
+}
+```
+
+The first override stores a width without turning wrapping on; the second turns
+it on for `docs/`, using that width. A rule absent so far starts off. Setting
+severity to `off` keeps its options, so a later patch can enable it again.
+Options merge shallowly: a nested object replaces the earlier nested object.
+Each override applies its `rules` first as whole-setting replacements, then its
+`ruleUpdates`. Matching overrides run in order, with presets' overrides before
+local overrides. Enabled rules validate the final merged options when they run;
+a partial patch need not supply every required option by itself.
 
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names

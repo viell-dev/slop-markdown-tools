@@ -322,3 +322,28 @@ package installs.
 
 Both entries are ES modules. A CommonJS module can load them with `require()`,
 which the supported Node.js versions allow for ES modules.
+
+## Competitor configuration conversion
+
+The portable entry exports `convertConfig({ markdownlint, prettier })` and the
+`competitorMappings` table. Conversion takes configuration objects and returns
+`ConversionReport`: `config`, `sources`, `omitted`, `conflicts`, and
+`suggestions`. It never reads files or executes configuration code.
+
+`mdrefine/node` exports `loadConfig(start, explicit?, competitorFallback?)` and
+`loadCompetitorConfig(directories, executeScripts?)`. The latter takes search
+directories nearest first; script execution defaults to `false`. `loadConfig`
+returns `LoadedConfig`, including an optional `conversion` report when fallback
+was used. See [configuration
+conversion](configuration.md#competitor-configuration-fallback).
+
+```js
+import { loadConfig, loadCompetitorConfig, competitorFiles } from "mdrefine/node";
+
+const loaded = await loadConfig(process.cwd(), undefined, false);
+const conversion = await loadCompetitorConfig([process.cwd()]);
+console.log(loaded.root, conversion?.sources, competitorFiles.prettier);
+```
+
+`CompetitorMapping` describes each row's source, destination, defaults, option
+names, coverage issue, and whether markdownlint disables it by default.
