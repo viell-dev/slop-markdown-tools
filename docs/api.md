@@ -102,11 +102,11 @@ maps each path, relative to the workspace root with forward slashes, to one of:
   link to a heading in that file resolve as `unreadable`, while a link to the
   file itself still resolves; any other error propagates.
 
-In versions after 0.4.0, a readable target can still have incomplete fragment
-information when renderer-dependent processing leaves its anchors uncertain. The
-result has status `unreadable` and `fragmentIncomplete: true`, without an
-unreadable file or directory list. Verified headings or explicit IDs remain
-checkable; an unverified fragment is not reported as missing.
+A readable target can still have incomplete fragment information when
+renderer-dependent processing leaves its anchors uncertain. The result has
+status `unreadable` and `fragmentIncomplete: true`, without an unreadable file
+or directory list. Verified headings or explicit IDs remain checkable; an
+unverified fragment is not reported as missing.
 
 | `WorkspaceOptions` | Meaning                                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |

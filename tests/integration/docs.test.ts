@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { Ajv } from "ajv";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
-import type { Code, RootContent } from "mdast";
+import type { Code, Nodes, RootContent } from "mdast";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
@@ -28,7 +28,7 @@ describe("rules reference", () => {
   const source = read(file);
   const page = blocks(file);
   const index = page.find((node) => node.type === "table");
-  // The index's rows, as the source text of each cell: rule, kind, `recommended`, dialect preset, options.
+  // The index's rows, as the source text of each cell: rule, kind, `recommended`, dialect presets, options.
   const rows =
     index?.type === "table"
       ? index.children
@@ -58,32 +58,55 @@ describe("rules reference", () => {
     Object.keys(
       (builtInRules[rule]?.schema as { properties?: object } | undefined)?.properties ?? {},
     ).length > 0;
-  /** A cell for whether some presets enable a rule: ✅ or ✅ (error), else ❌. */
-  const mark = (enabled: { severity: string }[]) =>
-    !enabled.length
-      ? "❌"
-      : enabled.some(({ severity }) => severity === "error")
-        ? "✅ (error)"
-        : "✅";
-  it("gives each rule's kind, presets, and options as the code does", () => {
-    for (const [index, [, kind, recommended, dialectPreset, options]] of rows.entries()) {
+  /**
+   * A preset cell: for each severity, `warn` or `error`, followed by the presets that give it
+   * when the column holds several presets, else ❌.
+   */
+  const cell = (enabled: { name: string; severity: string }[], named: boolean) =>
+    enabled.length
+      ? ["error", "warn"]
+          .flatMap((severity) => {
+            const names = enabled.filter((preset) => preset.severity === severity);
+            if (!names.length) return [];
+            const list = names.map(({ name }) => `\`${name}\``).join(", ");
+            return [named ? `\`${severity}\` in ${list}` : `\`${severity}\``];
+          })
+          .join("; ")
+      : "❌";
+  it("gives each rule's kind, presets with their severity, and options as the code does", () => {
+    for (const [index, [, kind, recommended, dialectPresets, options]] of rows.entries()) {
       const rule = listed[index]!;
       const style = builtInRules[rule]?.kind === "style";
       expect(kind, rule).toBe(style ? "🎨" : "🔍");
       const enabled = enabling(rule);
-      expect(recommended, rule).toBe(mark(enabled.filter(({ name }) => name === "recommended")));
-      expect(dialectPreset, rule).toBe(mark(enabled.filter(({ name }) => name !== "recommended")));
+      expect(recommended, rule).toBe(
+        cell(
+          enabled.filter(({ name }) => name === "recommended"),
+          false,
+        ),
+      );
+      expect(dialectPresets, rule).toBe(
+        cell(
+          enabled.filter(({ name }) => name !== "recommended"),
+          true,
+        ),
+      );
       expect(options, rule).toBe(hasOptions(rule) ? "✅" : "❌");
     }
   });
-  it("opens each rule's section with its kind, presets, dialects, and options", () => {
+  it("opens each rule's section with what it does, then its kind, presets, dialects, and options", () => {
     const facts =
       /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
     page.forEach((node, at) => {
       if (node.type !== "heading" || node.depth !== 2 || node.children[0]?.type !== "inlineCode")
         return;
       const rule = node.children[0].value;
-      const next = page[at + 1];
+      // The opening says what the rule does, in prose rather than a label or the facts.
+      const opening = page[at + 1];
+      const opened = opening ? source.slice(...range(opening)) : "";
+      expect(opening?.type, `${rule}: ${opened}`).toBe("paragraph");
+      expect(opened, rule).not.toMatch(/^\*\*/);
+      const next = page[at + 2];
       const text = next ? source.slice(...range(next)).replace(/\s+/g, " ") : "";
       const match = facts.exec(text);
       expect(match, `${rule}: ${text}`).not.toBeNull();
@@ -91,14 +114,19 @@ describe("rules reference", () => {
       const style = builtInRules[rule]?.kind === "style";
       expect(kind, rule).toBe(style ? "Style" : "Problem");
       expect(fixes, rule).toBe(style ? "fixed by `format`" : "reported only");
-      const named = [...presetsText.matchAll(/`([^`]+)`/g)].map((found) => found[1]);
-      expect(named.sort(), rule).toEqual(
+      // Each preset with the severity it gives the rule, as in "`recommended` (warn)".
+      const stated =
+        presetsText === "none"
+          ? []
+          : presetsText.split(", ").map((preset) => {
+              const found = /^`([^`]+)` \((warn|error)\)$/.exec(preset);
+              expect(found, `${rule}: ${preset}`).not.toBeNull();
+              return `${found![1]} ${found![2]}`;
+            });
+      expect(stated.sort(), rule).toEqual(
         enabling(rule)
-          .map(({ name }) => name)
+          .map(({ name, severity }) => `${name} ${severity}`)
           .sort(),
-      );
-      expect(presetsText.includes("(error)"), rule).toBe(
-        enabling(rule).some(({ severity }) => severity === "error"),
       );
       expect(optionsText === "none", rule).toBe(!hasOptions(rule));
     });
@@ -300,6 +328,84 @@ describe("documentation site", () => {
       ["components/VPDoc.vue", ".VPDoc.has-aside .content-container { max-width: 43rem; }"],
     ];
     for (const [file, rule] of expected) expect(theme(file), file).toContain(rule);
+  });
+});
+
+describe("version annotations", () => {
+  // A page describes the behavior of the version it documents; the changelog holds the history.
+  // The versions of renderers and other tools, as in "Gitea before 1.26", are not that history.
+  const annotations = [
+    /(?<!\b(?:Forgejo|Gitea|markdownlint|micromark|Node\.js|Obsidian|Prettier|VitePress) )\b(?:after|since|before|until|from|as of|(?:added|introduced|removed|changed|new) in) (?:versions? )?v?\d+\.\d+(?:\.(?:\d+|x))?\b/gi,
+    /\bversions? v?\d+\.\d+(?:\.(?:\d+|x))? (?:adds|added|bundles|changes|changed|corrects|fixes|introduces|introduced|no longer|removes|removed|retains)\b/gi,
+    /\bunreleased\b/gi,
+    /\bnext (?:minor |major |patch )?release\b/gi,
+  ];
+  /**
+   * Text that names versions for another reason, with the reason. Each entry must still occur,
+   * so that a removed passage does not leave a stale exception behind.
+   */
+  const allowed: [file: string, text: string, reason: string][] = [
+    [
+      "docs/cli.md",
+      "Version 0.5.0 removes the names deprecated in 0.4.x.",
+      "the migration steps for the earlier names",
+    ],
+    [
+      "docs/configuration.md",
+      "Version 0.5.0 no longer discovers",
+      "the migration note for the earlier names",
+    ],
+    [
+      "docs/configuration.md",
+      "before upgrading from 0.4.x",
+      "the migration note for the earlier names",
+    ],
+    [
+      "docs/quick-start.md",
+      "When upgrading from 0.4.x, complete the [naming migration](cli.md#earlier-names) before installing 0.5.0.",
+      "an upgrade instruction that points to the migration steps",
+    ],
+    [
+      "README.md",
+      "When upgrading from 0.4.x, complete the [naming migration](docs/cli.md#earlier-names) before installing 0.5.0.",
+      "an upgrade instruction that points to the migration steps",
+    ],
+    [
+      "docs/benchmarks.md",
+      "The figures below precede the internal parser adapter introduced in 0.4.1.",
+      "the version the measurements were taken with",
+    ],
+    [
+      "docs/versions.md",
+      "Before 1.0, the second number plays the part of the first",
+      "the versioning policy",
+    ],
+  ];
+  /** A page's prose with its blank space collapsed; code blocks are examples, not the page's. */
+  const text = (file: string) => {
+    let source = read(file);
+    const blank = (node: Nodes) => {
+      if (node.type === "code") {
+        const [start, end] = range(node);
+        source = source.slice(0, start) + " ".repeat(end - start) + source.slice(end);
+      } else if ("children" in node) for (const child of node.children) blank(child);
+    };
+    blank(parse(source, "github", file).tree);
+    return source.replace(/\s+/g, " ");
+  };
+  const checked = [...pages.filter((page) => page !== "docs/changelog.md"), "README.md"];
+  it.each(checked)("%s describes its version without history", (file) => {
+    let rest = text(file);
+    for (const [owner, passage] of allowed)
+      if (owner === file) rest = rest.split(passage).join(" ");
+    const found = annotations.flatMap((pattern) =>
+      [...rest.matchAll(pattern)].map((match) => match[0]),
+    );
+    expect(found).toEqual([]);
+  });
+  it("allows only passages that the pages still have", () => {
+    for (const [file, passage, reason] of allowed)
+      expect(text(file), `${file}: ${reason}`).toContain(passage);
   });
 });
 
