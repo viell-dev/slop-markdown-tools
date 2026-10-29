@@ -106,6 +106,42 @@ describe("GitHub definitions in content interrupted by tables (#732)", () => {
     ).toEqual([]);
     expect(workspace.resolve("other.md", "document.md#x", "github").fragmentExists).toBe(true);
   });
+  // GitHub reads the definitions when a Setext underline follows them, before the
+  // table interrupts the paragraph, and shows the underline as text.
+  it.each([
+    ["===", (body: string) => body],
+    ["   ==", (body: string) => body],
+    ["=== ", (body: string) => body],
+    ["--", (body: string) => body],
+    ["-", (body: string) => body],
+    ["===", containers[1]!],
+    ["===", containers[2]!],
+  ])("keeps definitions above the Setext underline %j", (underline, container) => {
+    for (const newline of ["\n", "\r\n"])
+      for (const body of ["[a]: missing.md\n", "[c]: other.md\n[a]: missing.md\n"]) {
+        const source = (
+          "See [x][a].\n\n" + container(body + underline + "\ntext\n" + table)
+        ).replaceAll("\n", newline);
+        const types = [] as string[];
+        const visit = (node: { type: string; children?: unknown[] }) => {
+          types.push(node.type);
+          for (const child of node.children ?? []) visit(child as typeof node);
+        };
+        visit(parse(source, "github").tree);
+        expect(types).toContain("definition");
+        expect(types).not.toContain("heading");
+        expect(lint(source, { config: config("github", "links/undefined-reference") })).toEqual([]);
+        const result = format(source, { config: { extends: ["recommended", "github"] } });
+        expect(result.diagnostics.some((d) => d.rule === "engine/unsafe-format")).toBe(false);
+        expect(semanticFingerprint(parse(result.output, "github"))).toBe(
+          semanticFingerprint(parse(source, "github")),
+        );
+      }
+  });
+  it("reads a lazy underline line as visible text, as GitHub does", () => {
+    const source = "See [x][a].\n\n> [a]: missing.md\n===\n> " + table.replaceAll("\n|", "\n> |");
+    expect(lint(source, { config: config("github", "links/undefined-reference") })).toHaveLength(1);
+  });
   it("indexes HTML anchors in visible definition text", () => {
     const source = '[a]: /b "<a id=visible></a>"\n' + table;
     const workspace = createWorkspace({ "target.md": source }, { dialect: "github" });

@@ -111,7 +111,9 @@ The comparison is only as good as the parser's reading:
 - On GitHub, link reference definitions in content directly interrupted by a
   table are read as visible paragraph text, including inline markup, also in
   lists and quotes. Link checks and workspace anchors use that reading. Blank
-  lines that would turn this text into hidden definitions are kept out ([issue
+  lines that would turn this text into hidden definitions are kept out. A Setext
+  underline line directly below the definitions keeps them, because GitHub reads
+  them first and shows the line as text, so that line keeps its own line ([issue
   #732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
 - Front matter needs a closing line. A first line of `---` or `+++` that no
   later line closes is read as renderers read it, as a thematic break or text,

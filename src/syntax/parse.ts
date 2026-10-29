@@ -29,6 +29,7 @@ import { gfmAutolinkLiteralFromMarkdown } from "mdast-util-gfm-autolink-literal"
 import {
   githubDefinitionSyntax,
   githubTableDefinitions,
+  keepUnderlinedDefinitions,
   recordGithubDefinitionText,
 } from "./github-definitions.js";
 import { projectVitePress, recordVitePress, vitepressCodeText } from "./vitepress/projection.js";
@@ -424,12 +425,15 @@ export function parse(
     let parsed = fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
     if (read === "github") {
       const definitions = githubTableDefinitions(parsed);
-      if (definitions.size) {
-        parsed = fromMarkdown(source, {
+      while (definitions.size) {
+        const corrected = fromMarkdown(projection?.source ?? source, {
           extensions: [...extensions, githubDefinitionSyntax(definitions)],
           mdastExtensions,
         });
+        if (keepUnderlinedDefinitions(corrected, definitions)) continue;
+        parsed = corrected;
         recordGithubDefinitionText(parsed, definitions);
+        break;
       }
     }
     if (read === "github" && withMath) {

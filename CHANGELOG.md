@@ -233,7 +233,10 @@ prereleases' notes there are longer than their entries here.
 
 - GitHub link checks and workspace indexes read definitions directly above an
   interrupting table as visible text, including in lists and quotes, while
-  keeping formatting from hiding that text
+  keeping formatting from hiding that text. A Setext underline line such as
+  `===` directly below the definitions keeps them, as on GitHub, and
+  `style/wrap` no longer joins it with the next line, which made GitHub show the
+  definitions as text
   ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
 
 - Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML

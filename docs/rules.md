@@ -1094,8 +1094,9 @@ brackets such as `[a][b][c]` is reported once, at its start.
 **On GitHub:** definitions at the start of a paragraph directly interrupted by a
 table are visible text, including consecutive definitions and definitions alone
 above the table, also in lists and quotes. They do not define labels. A blank
-line before the table keeps them as definitions. Forgejo, Gitea, and VitePress
-retain the definitions without that blank line.
+line before the table keeps them as definitions, as does a Setext underline
+line, such as `===`, directly below them, which GitHub shows as text. Forgejo,
+Gitea, and VitePress retain the definitions without that blank line.
 
 **Not checked:** a shortcut reference, `[label]` alone, unless `shortcutSyntax`
 is on, because brackets in prose are usually just brackets. Neither are brackets
@@ -1168,8 +1169,9 @@ reported whatever its label.
 **On GitHub:** definitions at the start of a paragraph directly interrupted by a
 table are visible text, including consecutive definitions and definitions alone
 above the table, also in lists and quotes. They do not define labels. A blank
-line before the table keeps them as definitions. Forgejo, Gitea, and VitePress
-retain the definitions without that blank line.
+line before the table keeps them as definitions, as does a Setext underline
+line, such as `===`, directly below them, which GitHub shows as text. Forgejo,
+Gitea, and VitePress retain the definitions without that blank line.
 
 **With other rules:** [`links/empty`](#linksempty) takes the same option.
 
