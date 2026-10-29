@@ -132,12 +132,14 @@ describe("CLI defaults and discovery (#788)", () => {
     ]) {
       const result = run(root, [...command, "--help"]);
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain("including files above a subdirectory");
-      expect(result.stdout).toContain("Stdin");
-      expect(result.stdout).toContain(
-        "Exit codes: 0 success; 1 findings or required changes; 2 usage or run failure.",
+      const documents = command[0] === "lint" || command[0] === "format";
+      // The selection scope and stdin belong to the commands that read documents.
+      expect(result.stdout.includes("Without paths, the whole workspace is selected")).toBe(
+        documents,
       );
-      expect(result.stdout).toContain("Examples:");
+      expect(result.stdout.includes("--stdin-filepath <file> alone")).toBe(documents);
+      expect(result.stdout).toMatch(/Exit codes: 0 [^\n]+/);
+      expect(result.stdout).toMatch(/Examples?:\n {2}mdrefine /);
       expect(Math.max(...result.stdout.split("\n").map((line) => line.length))).toBeLessThanOrEqual(
         80,
       );
@@ -147,9 +149,11 @@ describe("CLI defaults and discovery (#788)", () => {
     expect(help).toContain("config explain");
     expect(help).toContain("config convert");
     const format = run(root, ["format", "--help"]).stdout;
-    expect(format).toContain(
-      "Stdin prints the formatted document by default. --json omits the diff.",
+    expect(format).toContain("Stdin prints the formatted document unless --check or --diff");
+    expect(format).toContain("--json reports the results without the diff");
+    expect(format).toContain("errors that remain exit 1");
+    expect(run(root, ["lint", "--help"]).stdout).toContain(
+      "1 errors, or more warnings than --max-warnings",
     );
-    expect(format).toContain("remaining errors exit 1");
   });
 });

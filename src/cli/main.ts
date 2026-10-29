@@ -101,7 +101,10 @@ function common(command: Command): Command {
         "--no-warn-ignored",
         "Do not warn about named files and directories that are skipped as ignored",
       )
-      .option("--stdin-filepath <file>", "Filename context for stdin")
+      .option(
+        "--stdin-filepath <file>",
+        "Read stdin as this file, for its configuration and reports",
+      )
       .option(
         "--max-warnings <count>",
         "Fail when warning count exceeds this nonnegative integer",
@@ -541,38 +544,68 @@ program
           `${rule.id}\t${rule.kind}\t${rule.description.replace(/\s+/g, " ")}\n`,
         );
   });
-// Keep command discovery and short examples available without opening the docs.
-const selectionHelp =
-  "For lint and format, no paths selects the whole workspace,\nincluding files above a subdirectory.";
-const exitsHelp = "Exit codes: 0 success; 1 findings or required changes; 2 usage or run failure.";
-program.addHelpText("after", "\nConfiguration: config explain <file>; config convert [--write].");
-for (const command of program.commands) {
-  const name = command.name();
-  const documentCommand = name === "lint" || name === "format";
-  command.addHelpText(
-    "after",
-    `
-${selectionHelp}
-${documentCommand ? "Stdin: use - or --stdin-filepath <file> without paths." : "Stdin is not read by this command; lint and format accept -."}
-${exitsHelp}
-${name === "format" ? "Stdin prints the formatted document by default. --json omits the diff.\nAlso reports problem rules; remaining errors exit 1.\n" : ""}
+// Keep the selection scope, exit codes and short examples available without
+// opening the docs. Each footer stays within 80 columns.
+const selection = `Without paths, the whole workspace is selected, including documents outside the
+current directory. Read stdin with - or with --stdin-filepath <file> alone.`;
+const footers: Record<string, string> = {
+  "": `
+Start with mdrefine lint and mdrefine format; mdrefine help <command> describes
+each command. Configuration: mdrefine config explain <file> and config convert.`,
+  lint: `
+${selection}
+
+Exit codes: 0 no errors; 1 errors, or more warnings than --max-warnings;
+2 usage, configuration or run failure.
+
 Examples:
-  mdrefine ${name === "config" ? "config explain notes/a.md" : name}
-  mdrefine ${name === "config" ? "config convert" : name === "rules" ? "rules --root docs" : `${name} --root docs`}
-${documentCommand ? `  mdrefine ${name} - --stdin-filepath notes/a.md\n` : ""}`,
-  );
+  mdrefine lint                      Report the findings in every document
+  mdrefine lint docs README.md       Only these paths
+  mdrefine lint --max-warnings 0     Also fail on warnings`,
+  format: `
+${selection}
+Stdin prints the formatted document unless --check or --diff is given.
+--json reports the results without the diff. Formatting also reports problem
+rules; errors that remain exit 1.
+
+Exit codes: 0 nothing to change, or the changes were written, previewed with
+--diff, or printed from stdin; 1 changes needed or errors remain; 2 usage,
+configuration or run failure.
+
+Examples:
+  mdrefine format                    Check every document and show the diff
+  mdrefine format --write            Apply the changes
+  mdrefine format --check            List the documents that would change
+  mdrefine format --stdin-filepath a.md  Format stdin as a.md`,
+  rules: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Examples:
+  mdrefine rules                     List the rules
+  mdrefine rules --json              The same list as JSON`,
+  config: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Examples:
+  mdrefine config explain notes/a.md  Show one document's configuration
+  mdrefine config convert --write     Convert other tools' settings`,
+  explain: `
+Exit codes: 0 success; 2 usage or configuration failure.
+
+Example:
+  mdrefine config explain notes/a.md`,
+  convert: `
+Exit codes: 0 success; 2 usage or configuration failure, or nothing to convert.
+
+Examples:
+  mdrefine config convert            Print the converted configuration
+  mdrefine config convert --write    Create the configuration file`,
+};
+program.addHelpText("after", footers[""]!);
+for (const command of [...program.commands, ...configCommand.commands]) {
+  const footer = footers[command.name()];
+  if (footer) command.addHelpText("after", footer);
 }
-for (const command of configCommand.commands)
-  command.addHelpText(
-    "after",
-    `
-${selectionHelp}
-Stdin is not read; this command inspects configuration.
-${exitsHelp}
-Examples:
-  mdrefine config ${command.name()}${command.name() === "explain" ? " notes/a.md" : ""}
-  mdrefine config ${command.name()} --root docs${command.name() === "explain" ? " notes/a.md" : " --write"}`,
-  );
 try {
   const args = process.argv.slice(2);
   if (args[0] === "check" || args[0] === "fix")
