@@ -1485,9 +1485,9 @@ punctuation, and `&#46;` is a period. A closing `#` sequence, a comment, or a
 footnote reference after the text does not count, and neither does a trailing
 attribute block such as `{#setup}` in Forgejo, Gitea, and VitePress, which read
 it as the heading's attributes, or a block identifier such as `^setup` in
-Obsidian. With VitePress's [`attrs`](vitepress.md#renderer-options) setting
-off, the block is text and counts. The text before such a suffix counts even
-when it is formatted, as in `## **Use.** ^usage`.
+Obsidian. With VitePress's [`attrs`](vitepress.md#renderer-options) setting off,
+the block is text and counts. The text before such a suffix counts even when it
+is formatted, as in `## **Use.** ^usage`.
 
 **Not checked:** a heading that ends with code, math, an image, an autolink, or
 an Obsidian embed, nor these endings:
@@ -1968,9 +1968,12 @@ means or what a comment applies to:
   blocks of a list item makes the list loose, which changes how it renders.
 - Front matter and the block below it, apart from a heading with
   `includeFrontMatter`.
-- A boundary inside a paragraph or underlined heading in the reading without
-  TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
-  fence. A blank line there would make a list from text.
+- A boundary inside a block of the reading without TOML front matter, such as
+  `1.` and `2) b` directly below its closing `+++` fence, where a blank line
+  would make a list from text, or a block quote or list that continues below the
+  fence there. A new line keeps such a quote only when it holds the quote's
+  markers, and such a list only inside a block quote of its item, where a line
+  of the quote's markers continues the item and keeps the list tight.
 - A list that ends inside an HTML comment or another HTML block without its end
   marker, which would take the blank line in. The same goes for a list whose
   last item ends in a fenced code block without its closing fence: renderers put
@@ -2014,7 +2017,12 @@ Those renderers put the table in the description.
 
 **In VitePress:** the site generator reads front matter itself, so with
 `includeFrontMatter` nothing is added directly against the closing line; blank
-lines that are already there can be added to.
+lines that are already there can be added to. Nothing is added inside a block of
+VitePress's own reading either: a paragraph that it continues over a line that
+the parser starts a block with, such as `<b>` or `[^b]: note` below a list item,
+and a table, list, or unclosed code fence that it reads where the parser reads
+something else. A line of quote markers inside a block quote that both readings
+place in a list item, as between `- > a` and `  > # Heading`, is still added.
 
 **In Obsidian:** existing blank lines are added to only when they are empty,
 because Obsidian can read a line of blank space as text. A table is separated
@@ -2661,9 +2669,9 @@ After:
   moving its continuation lines too. Nested lists still use `nestedIndent`. A
   list that starts a block quote's line is indented too; set
   [`style/quote-marker`](#stylequote-marker)'s `listItems` to `false` with it.
-  Four or more columns would make code, so the rule keeps lists as written for those
-  values. A first-level list directly below nonblank text also stays, because
-  indentation can make it continue that text.
+  Four or more columns would make code, so the rule keeps lists as written for
+  those values. A first-level list directly below nonblank text also stays,
+  because indentation can make it continue that text.
 
 **Left as written:**
 
@@ -3437,3 +3445,11 @@ In Obsidian, a paragraph is also left as written when it:
 - holds a multiline image description containing backticks, where joining could
   turn displayed Live Preview source into an embed. Surrounding inline
   preferences can still be applied.
+
+**In VitePress:** a paragraph is also left as written when it holds an attribute
+block such as `{.note}` or `{target="_blank"}`, an inline footnote (`^[…]`), or
+whitespace between two inline elements, such as two code spans, where a line
+break would disappear in Vue's output; see
+[preservation](vitepress.md#preservation). `reportUnreflowed` reports such a
+paragraph with that reason. Braces and `^[` in a code span are code, so a
+paragraph with nothing else of the kind wraps.

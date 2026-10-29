@@ -235,6 +235,23 @@ prereleases' notes there are longer than their entries here.
   nothing closes. Live Preview shows such an item as code carried from the run
   ([#670](https://github.com/viell-dev/slop-markdown-tools/issues/670)).
 
+- `style/block-spacing` no longer proposes a blank line that the engine then
+  refuses as a change of meaning. Below TOML front matter, it keeps a block
+  quote that the reading without front matter continues below a list, and in
+  VitePress it adds nothing inside a block of VitePress's own reading, such as a
+  paragraph that it continues lazily over `<b>` or a footnote definition below a
+  list item, or an unclosed fence that it reads below a table
+  ([#748](https://github.com/viell-dev/slop-markdown-tools/issues/748)).
+
+- In VitePress, `style/wrap` reflows a paragraph that holds braces or `^[` only
+  in code spans, such as `` `{ "a": 1 }` `` beside a link or in a task item:
+  only attribute blocks and inline footnotes that VitePress reads, and Vue
+  whitespace between inline elements, keep a paragraph as written, and other
+  rules no longer leave such code spans alone either. A paragraph that VitePress
+  syntax keeps as written is reported by `reportUnreflowed` with its reason
+  instead of being skipped silently
+  ([#755](https://github.com/viell-dev/slop-markdown-tools/issues/755)).
+
 - Forgejo and Gitea retain native table rows misread as ordered lists, tables
   hidden inside quoted paragraphs, and URL-adjacent backslash hard breaks.
   Shared edit protections cover builtin rules and plugins while leaving

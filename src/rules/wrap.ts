@@ -5,6 +5,7 @@ import type { Paragraph, Parents } from "mdast";
 import type { Dialect, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
+import { vitepressProtection } from "../syntax/vitepress/projection.js";
 import {
   frontMatterReading,
   labelEnd,
@@ -966,6 +967,8 @@ function wrapParagraph(
   for (const atom of inline.atoms) protection.add(atom.from, atom.to);
   // Forgejo and Gitea protections apply before paragraphs are skipped, so
   // that diagnostics still count one-line math and shortlinks as atoms.
+  // VitePress syntax that the projection protects keeps the paragraph, which
+  // `reportUnreflowed` reports with its reason (#755).
   const protections = forge
     ? forgeProtections(source, start, end, forge)
     : document.dialect === "obsidian"
@@ -975,7 +978,7 @@ function wrapParagraph(
           end,
           inline.atoms.filter((atom) => atom.joining === "code").map(({ from, to }) => [from, to]),
         )
-      : { ranges: [] as Range[] };
+      : { ranges: [] as Range[], reason: vitepressProtection(document, start, end) };
   for (const [from, to] of protections.ranges) protection.add(from, to);
   for (const [from, to] of templateTags(source.slice(start, end), start)) protection.add(from, to);
   const reportUnbreakable = () =>

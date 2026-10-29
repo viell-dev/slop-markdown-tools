@@ -1273,6 +1273,114 @@ describe("Obsidian inline footnotes", () => {
   });
 });
 
+describe("VitePress syntax that keeps a paragraph (#755)", () => {
+  const vitepress = (options: Record<string, unknown> = {}): Config => ({
+    ...wrap(options),
+    dialect: "vitepress",
+  });
+  const wide =
+    "`recommended` enables [`style/block-spacing`](rules.md#styleblock-spacing) at\n" +
+    "`warn`, separating headings, lists, and tables from adjacent blocks with a blank line where safe.\n" +
+    'To keep compact spacing, set `"rules": { "style/block-spacing": "off" }`.\n';
+  it.each([
+    ["a link and braces in a code span", wide],
+    ["a link without a fragment", wide.replace("#styleblock-spacing", "")],
+    [
+      "a task item with braces in a code span",
+      "- [ ] A task with `{ a }` in its words that goes on past the width.\n",
+    ],
+    ["`^[` in a code span", "Some words with `^[x]` in code that go on past the width here.\n"],
+  ])("wraps a paragraph with %s as in other dialects", (_name, body) => {
+    for (const newline of ["\n", "\r\n"]) {
+      const source = body.replaceAll("\n", newline);
+      const output = verify(source, vitepress()).output;
+      expect(output).not.toBe(source);
+      expect(output).toBe(verify(source, { ...wrap(), dialect: "github" }).output);
+      expect(lint(output, { config: vitepress({ reportUnreflowed: true }) })).toEqual([]);
+    }
+  });
+  it.each([
+    [
+      "VitePress attribute syntax",
+      "Some words in a paragraph that goes on past the width {.note}\n",
+    ],
+    [
+      "VitePress attribute syntax",
+      "A [link](u.md){target=_blank} in words that go on past the width.\n",
+    ],
+    [
+      "VitePress inline footnote",
+      "Some words with a note^[a note] that go on past the width here.\n",
+    ],
+    [
+      "Vue whitespace between elements",
+      "Some words with `a` `b` in code that go on past the width here.\n",
+    ],
+  ])("keeps a paragraph with %s and reports it", (reason, body) => {
+    for (const newline of ["\n", "\r\n"]) {
+      const source = body.replaceAll("\n", newline);
+      expect(verify(source, vitepress()).output).toBe(source);
+      expect(lint(source, { config: vitepress() })).toEqual([]);
+      expect(lint(source, { config: vitepress({ reportUnreflowed: true }) })).toMatchObject([
+        {
+          rule: "style/wrap",
+          line: 1,
+          message: `Paragraph not reflowed: ${reason} (width 40 columns).`,
+        },
+      ]);
+      // A paragraph that fits needs no report.
+      expect(lint(source, { config: vitepress({ width: 200, reportUnreflowed: true }) })).toEqual(
+        [],
+      );
+    }
+  });
+  it("reports each kept paragraph of a long document with its own reason", () => {
+    const kept = [
+      "Some words in a paragraph that goes on past the width {.note}",
+      "Some words with a note^[a note] that go on past the width here.",
+      "Some words with `a` `b` in code that go on past the width here.",
+      "Plain words in a paragraph that go on past the width here.",
+    ];
+    const reasons = [
+      "VitePress attribute syntax",
+      "VitePress inline footnote",
+      "Vue whitespace between elements",
+    ];
+    const blocks = Array.from({ length: 300 }, (_, index) => kept[index % 4]!);
+    const source = blocks.join("\n\n") + "\n";
+    const findings = lint(source, { config: vitepress({ reportUnreflowed: true }) });
+    expect(
+      findings.filter(({ message }) => message.startsWith("Paragraph not reflowed")),
+    ).toMatchObject(
+      blocks.flatMap((_, index) =>
+        index % 4 === 3
+          ? []
+          : [
+              {
+                line: 2 * index + 1,
+                message: `Paragraph not reflowed: ${reasons[index % 4]} (width 40 columns).`,
+              },
+            ],
+      ),
+    );
+    expect(findings).toHaveLength(300);
+    const output = verify(source, vitepress()).output.split("\n\n");
+    output.forEach((block, index) =>
+      index % 4 === 3 ? expect(block).toContain("\n") : expect(block).toBe(blocks[index]),
+    );
+  });
+  it("wraps an attribute block as text with VitePress's attrs off", () => {
+    const config: Config = {
+      ...vitepress({ reportUnreflowed: true }),
+      vitepress: { attrs: false },
+    };
+    const source = "Some words in a paragraph that goes on past the width {.note}\n";
+    expect(verify(source, config).output).toBe(
+      "Some words in a paragraph that goes on\npast the width {.note}\n",
+    );
+  });
+});
+
 describe("multiline code spans", () => {
   const config: Config = {
     extends: [],

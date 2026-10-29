@@ -41,17 +41,20 @@ contract.
 
 VitePress combines Markdown with Vue templates. A newline containing nothing but
 whitespace between two inline elements can disappear in Vue's output, where a
-space remains visible. Wrapping leaves paragraphs with such gaps as written.
-Ordinary paragraphs still reflow.
+space remains visible. Wrapping leaves paragraphs with such gaps as written, and
+its [`reportUnreflowed`](rules.md#stylewrap) option reports them. Ordinary
+paragraphs still reflow.
 
-Curly attributes keep their position. Containers separate blocks, including the
-paragraphs immediately above and below their edges. Front matter follows
-gray-matter's boundaries and remains opaque; an unclosed opener protects the
-whole document. TOML fences are ordinary Markdown here. Components and other
-renderer-only blocks are preserved; where mdast cannot represent a component
-boundary, its containing block is left as written. Paragraphs with inline
-footnotes remain opaque. Findings and edits in opaque areas are omitted, because
-mdast does not describe their full reading.
+Curly attributes keep their position; braces in a code span are code, not
+attributes. Containers separate blocks, including the paragraphs immediately
+above and below their edges. Front matter follows gray-matter's boundaries and
+remains opaque; an unclosed opener protects the whole document. TOML fences are
+ordinary Markdown here. Components and other renderer-only blocks are preserved;
+where mdast cannot represent a component boundary, its containing block is left
+as written. Paragraphs with inline footnotes remain opaque. Findings and edits
+in opaque areas are omitted, because mdast does not describe their full reading;
+with `reportUnreflowed: true`, `style/wrap` still reports a paragraph there that
+is too wide and that it keeps as written.
 
 With math enabled, `$` follows VitePress's inline conditions and `$$` may
 interrupt a paragraph or close on the same line. The tool never evaluates
