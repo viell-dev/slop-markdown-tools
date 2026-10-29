@@ -83,9 +83,21 @@ describe("paragraph unwrapping", () => {
       reportUnreflowed: true,
       reportUnbreakable: true,
     });
-    expect(result.output).toBe(source.trim().replace("\n", " ") + "\n");
+    expect(result.output).toBe(source.trim().replaceAll("\n", " ") + "\n");
     expect(result.diagnostics.every((d) => d.edit)).toBe(true);
   });
+  it.each(["github", "commonmark", "vitepress", "forgejo"] as const)(
+    "keeps lines whose join would form a link reference definition (%s)",
+    (dialect) => {
+      // An angle destination may hold a space, so joined, these define `a`.
+      for (const source of [
+        "[a]: <u\n1>\n\n[a]\n",
+        '[a]: <x\n#y> "t"\n\n[a]\n',
+        "> [a]: <u\n> 1>\n\n[a]\n",
+      ])
+        expect(unwrap(source, dialect).output, source).toBe(source);
+    },
+  );
   it("keeps distinct quote paragraphs and inline link destinations", () => {
     expect(unwrap("> [one](https://example.com)\n>\n> [two](https://example.org)\n").output).toBe(
       "> [one](https://example.com)\n>\n> [two](https://example.org)\n",

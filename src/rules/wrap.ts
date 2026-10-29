@@ -1071,6 +1071,17 @@ function wrapParagraph(
   // A paragraph that starts like a link reference definition becomes one
   // when a line ends after the definition's destination or title. Keep
   // words on the first line until the lines read as one paragraph again.
+  // Joining can make one too: `[a]: <u` and `1>` below it are text, but
+  // `[a]: <u 1>` defines `a`, since an angle destination may hold a space.
+  if (
+    options.mode === "never" &&
+    atoms[0]!.startsWith("[") &&
+    definitionStart.test(output[0]!) &&
+    !oneParagraph(output[0]!, document.dialect)
+  ) {
+    reportSkipped("joined lines that would read as a link reference definition");
+    return;
+  }
   if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
     let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
     while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
