@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { convertConfig, format, lint, type Plugin } from "../../src/index.js";
+import { builtInRules, convertConfig, format, lint, parse, type Plugin } from "../../src/index.js";
 
 const opts = (markdownlint: Record<string, unknown>, prettier?: Record<string, unknown>) => {
   const r = convertConfig({
@@ -179,4 +179,43 @@ it("round4 attributes edge-cell padding combined with pipe changes", () => {
   const o = opts({ MD055: { style: "no_leading_or_trailing" }, MD060: { style: "aligned" } });
   expect(lint(source, o).some((d) => d.rule === "style/table" && !d.edit)).toBe(true);
   expect(format(source, o).output).toBe(source);
+});
+it("keeps compatibility internals out of plugin options and of rules called directly", () => {
+  // Attribution and the compatibility marker are internal: a plugin's options
+  // and a built-in rule's findings show no extra keys, symbols included.
+  const r = convertConfig({ prettier: {} });
+  const seen: (string | symbol)[][] = [];
+  const plugins: Plugin[] = [
+    {
+      name: "probe",
+      rules: {
+        demo: {
+          kind: "style",
+          phase: "block",
+          description: "Record options",
+          check: ({ options }) => {
+            seen.push(Reflect.ownKeys(options));
+            return [];
+          },
+        },
+      },
+    },
+  ];
+  const rules = { ...r.config.rules, "probe/demo": "warn" as const };
+  lint("text\n", { config: { ...r.config, rules }, compatibility: r.compatibility, plugins });
+  expect(seen.length).toBeGreaterThan(0);
+  for (const keys of seen) expect(keys).toEqual([]);
+  for (const [name, source] of [
+    ["style/heading", "#  Heading\n"],
+    ["style/list-indent", "-   one\n"],
+    ["style/table", "a|b\n---|---\nx|y\n"],
+  ] as const) {
+    const findings = builtInRules[name]!.check({ document: parse(source, "github"), options: {} });
+    expect(Array.isArray(findings) && findings.length, name).toBeTruthy();
+    for (const finding of findings as object[])
+      expect(
+        Reflect.ownKeys(finding).filter((key) => typeof key === "symbol"),
+        name,
+      ).toEqual([]);
+  }
 });

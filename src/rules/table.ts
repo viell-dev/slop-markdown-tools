@@ -1,4 +1,4 @@
-import { attributed, sourceChecks, type AttributedFinding } from "../core/source-checks.js";
+import { attributed, attributionOf } from "../core/source-checks.js";
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
 import type { Nodes, Table } from "mdast";
@@ -232,11 +232,7 @@ const table: Rule = {
               message: "Format table padding and pipes.",
               edit: { start, end, text: replacement },
             },
-            [
-              ...new Set(
-                parts.flatMap((part) => (part as AttributedFinding)[sourceChecks]!.checks),
-              ),
-            ],
+            [...new Set(parts.flatMap((part) => attributionOf(part)!.checks))],
             parts,
           ),
         );

@@ -1,4 +1,4 @@
-import { sourceChecks, type AttributedFinding } from "./source-checks.js";
+import { attributionOf } from "./source-checks.js";
 import { Minimatch } from "minimatch";
 import { convertConfig, competitorMappings } from "../config/convert.js";
 import { resolveConfig } from "../config/resolve.js";
@@ -391,7 +391,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
         return undefined;
       // Missing provenance in compatibility mode must never bypass an ignore.
       const origins = compat.origins[rule] ?? (compat.prettier ? ["unknown prettier origin"] : []);
-      const attribution = (finding as AttributedFinding)[sourceChecks];
+      const attribution = attributionOf(finding);
       let checks = origins.filter((id) => id.startsWith("MD"));
       if (attribution) checks = checks.filter((id) => attribution.checks.includes(id));
       if (rule === "style/block-spacing") {

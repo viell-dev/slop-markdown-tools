@@ -1,4 +1,4 @@
-import { attributed, compatibilityCheck } from "../core/source-checks.js";
+import { attributed, compatibilityRun } from "../core/source-checks.js";
 import { lineEndingRule } from "./line-ending.js";
 
 import { codeBlock } from "./code-block.js";
@@ -203,7 +203,7 @@ const styleRules: Record<string, Rule> = {
             );
           // Ordinary runs reparse before conversion. Compatibility also needs
           // independent diagnostics when indentation itself is suppressed.
-          if (!(options as Record<symbol, unknown>)[compatibilityCheck]) return;
+          if (!compatibilityRun()) return;
         }
         // An ATX heading is one line, a Setext heading also has its underline.
         if (!/[\r\n]/.test(source.slice(headingStart, end))) {

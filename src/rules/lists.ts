@@ -1,4 +1,4 @@
-import { attributed, sourceChecks, type AttributedFinding } from "../core/source-checks.js";
+import { attributed, attributionOf } from "../core/source-checks.js";
 import type {
   Blockquote,
   FootnoteDefinition,
@@ -1139,16 +1139,12 @@ const listIndent: Rule = {
         findings.push(
           attributed(
             finding,
-            [
-              ...new Set(
-                parts.flatMap((part) => (part as AttributedFinding)[sourceChecks]!.checks),
-              ),
-            ],
+            [...new Set(parts.flatMap((part) => attributionOf(part)!.checks))],
             parts,
             [
               ...new Set(
                 parts.flatMap((part) => {
-                  const info = (part as AttributedFinding)[sourceChecks]!;
+                  const info = attributionOf(part)!;
                   return info.editChecks ?? info.checks;
                 }),
               ),

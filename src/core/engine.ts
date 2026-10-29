@@ -1,6 +1,6 @@
 import {
-  compatibilityCheck,
   compatibilityParts,
+  inCompatibility,
   sourceChecks,
   type AttributedFinding,
 } from "./source-checks.js";
@@ -148,14 +148,15 @@ function inspect(
     let findings: (Finding & { variant?: typeof value })[] = [];
     let problem: string | undefined;
     try {
-      const returned: unknown = rule.check({
-        document,
-        options: {
-          ...enabled.options,
-          ...(options.compatibility ? { [compatibilityCheck]: true } : {}),
-        },
-        ...(workspace ? { workspace } : {}),
-      });
+      const check = () =>
+        rule.check({
+          document,
+          options: { ...enabled.options },
+          ...(workspace ? { workspace } : {}),
+        });
+      // Under compatibility, built-in rules attribute their findings to source
+      // checks; nothing of that reaches the options or findings plugins see.
+      const returned: unknown = options.compatibility ? inCompatibility(check) : check();
       // A directly returned Promise is invalid, but its later rejection must
       // not escape the synchronous rule failure. Do not await eventual findings.
       if (!Array.isArray(returned)) void Promise.resolve(returned).catch(() => undefined);
@@ -164,11 +165,13 @@ function inspect(
         findings = [...(returned as Finding[])];
         for (const alternative of competitor.variants[name] ?? []) {
           if (setting(alternative).severity === "off") continue;
-          const extra: unknown = rule.check({
-            document,
-            options: { ...setting(alternative).options, [compatibilityCheck]: true },
-            ...(workspace ? { workspace } : {}),
-          });
+          const extra: unknown = inCompatibility(() =>
+            rule.check({
+              document,
+              options: { ...setting(alternative).options },
+              ...(workspace ? { workspace } : {}),
+            }),
+          );
           if (!Array.isArray(extra)) void Promise.resolve(extra).catch(() => undefined);
           problem = findingsProblem(extra, document.source.length);
           if (problem) break;
