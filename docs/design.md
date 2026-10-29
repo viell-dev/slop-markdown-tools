@@ -177,9 +177,12 @@ Formatting:
   option reports them.
 - Emphasis inside a word keeps `*` when the configured marker is `_`, because
   `_` cannot mark emphasis there.
-- Tables in footnote definitions, and indented tables outside lists and block
-  quotes, are not aligned. Inside lists and block quotes, rows keep their
-  container prefixes as written.
+- Tables in lists and block quotes are aligned, with each row's container prefix
+  kept as written. Such a table stays as written when a row is a lazy
+  continuation line, at a site generator's container boundary, and when its
+  header shares a list item's marker line and a row would need a leading pipe.
+  Tables in footnote definitions, and indented tables outside lists and block
+  quotes, are not aligned.
 - Footnotes and strikethrough are read but have no rules of their own. Reference
   definitions are checked; opt-in title and spacing rules preserve their
   destinations and multiline layout.
