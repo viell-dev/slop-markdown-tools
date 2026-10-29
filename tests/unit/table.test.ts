@@ -248,9 +248,13 @@ describe("tables in lists and block quotes (#710)", () => {
     );
   });
   it("keeps the leading pipe of a header on its list item's marker line", () => {
-    // markdown-it reads `- a | b` above an indented delimiter as a table outside the list.
-    expect(check("- a | b\n  --|--\n  | c | d |\n", {}, "vitepress")).toBe(
+    expect(check("- a | b\n  --|--\n  | c | d |\n", {})).toBe(
       "- a   | b   |\n  --- | --- |\n  c   | d   |\n",
+    );
+    // markdown-it reads `- a | b` above an indented delimiter as a table
+    // outside the list, which stays as written (#763).
+    expect(check("- a | b\n  --|--\n  | c | d |\n", {}, "vitepress")).toBe(
+      "- a | b\n  --|--\n  | c | d |\n",
     );
     expect(
       check("- | a | b |\n  |--|--|\n", { pipeStyle: "noLeadingOrTrailing" }, "vitepress"),
@@ -260,9 +264,8 @@ describe("tables in lists and block quotes (#710)", () => {
       const input = "- a | b\n  --|--\n  | | d |\n";
       expect(check(input, {}, dialect)).toBe(input);
     }
-    expect(check("1. a |\n   --|\n   b |\n", {}, "vitepress")).toBe(
-      "1. a   |\n   --- |\n   b   |\n",
-    );
+    expect(check("1. a |\n   --|\n   b |\n", {})).toBe("1. a   |\n   --- |\n   b   |\n");
+    expect(check("1. a |\n   --|\n   b |\n", {}, "vitepress")).toBe("1. a |\n   --|\n   b |\n");
   });
   it("leaves lazy lines, other containers and indented top-level tables as written", () => {
     expect(check("> | a | b |\n> |---|---|\nlazy text\n", {})).toBe(

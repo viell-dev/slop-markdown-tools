@@ -8,6 +8,7 @@ import {
 } from "./github-protections.js";
 import { collectForgeProtections } from "./forge-protections.js";
 import { collectObsidianProtections } from "./obsidian-protections.js";
+import { collectVitePressListProtections } from "./vitepress/lists.js";
 
 /**
  * Positioned source regions whose renderer readings differ from the primary tree.
@@ -251,6 +252,9 @@ export interface RendererProtections {
    * Lists whose markers and indentation affect continuations outside their
    * parsed container, including a lazy paragraph after a heading (#513, #543)
    * or lists joined through a quote, table or display formula (#582, #586).
+   * In VitePress, lists with an item whose first line is a table's header row,
+   * which markdown-it can read as a table above the list (#763), and lists
+   * beside a list that a component leaves opaque (#769).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -297,6 +301,7 @@ export function rendererProtections(document: Document): RendererProtections {
     indentLists,
   } = collectObsidianProtections(document, positions, text, boundaryText);
   collectForgeProtections(document, positions, tableText, boundaryText);
+  collectVitePressListProtections(document, boundaryLists);
   const result = {
     text,
     nested,
