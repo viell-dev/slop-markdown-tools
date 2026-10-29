@@ -40,6 +40,8 @@ describe("content/emphasis-spacing", () => {
     ["See ** [a link](https://example.com) ** here.\n", "** [a link](https://example.com) **"],
     ["[** link text **](https://example.com)\n", "** link text **"],
     ["Press ** A ** now.\n", "** A **"],
+    // A supplementary-plane letter last: Node.js 26 misses it with `[…]$/u` (#743).
+    ["Some **bold \u{10400} ** text.\n", "**bold \u{10400} **"],
   ])("reports %j in every dialect", (source, span) => {
     for (const dialect of dialects) {
       const findings = check(source, rule, dialect);
@@ -248,6 +250,7 @@ describe("content/inline-code-spacing", () => {
     ["a `  ./run.sh  ` b\n", "ends"],
     ["a ` 2 + 2` b\n", "starts"],
     ["a `naïve ` b\n", "ends"],
+    ["a `\u{10400} ` b\n", "ends"],
     ["| ` a` | b |\n| --- | - |\n", "starts"],
   ])("reports %j in every dialect", (source, where) => {
     for (const dialect of dialects) {

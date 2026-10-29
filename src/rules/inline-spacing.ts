@@ -106,7 +106,13 @@ const outside = /[\s\p{Ps}\p{Pe}\p{Pi}\p{Pf}"'.,;:!?、。，：；！？]/u;
  * pattern `*.md *`, is a wildcard or another notation.
  */
 const textFirst = /^[\p{L}\p{N}\p{Ps}\p{Pi}"'¿¡]/u;
-const textLast = /[\p{L}\p{N}\p{M}\p{Pe}\p{Pf}"'.!?…。！？]$/u;
+const textLast = /^[\p{L}\p{N}\p{M}\p{Pe}\p{Pf}"'.!?…。！？]/u;
+/**
+ * The last character of `text`, whole when it is a surrogate pair. Test it with a
+ * start-anchored pattern: on Node.js 26, a `u` pattern with a character class
+ * right before `$` misses a surrogate pair there (#743).
+ */
+const lastCharacter = (text: string) => [...text.slice(-2)].at(-1) ?? "";
 /** A number or a single letter, such as the operands of `a * b` or `2 * 3`. */
 const operand = /^[+\-−]?(?:\p{L}|\p{N}+(?:[.,]\p{N}+)*)$/u;
 /** An operator between operands. */
@@ -311,7 +317,7 @@ export const spacingRules: Record<string, Rule> = {
             const textStart = opening.end + before.length;
             const textEnd = closing.start - after.length;
             if (!nodeStarts.has(textStart) && !textFirst.test(text)) continue;
-            if (!nodeEnds.has(textEnd) && !textLast.test(text)) continue;
+            if (!nodeEnds.has(textEnd) && !textLast.test(lastCharacter(text))) continue;
             // Taking spaces out of a reference's label would change the
             // definition that it names.
             if ((opening.label && before) || (closing.label && after)) continue;
@@ -398,7 +404,7 @@ export const spacingRules: Record<string, Rule> = {
         const padded = (blank: string, edge: boolean) =>
           blank.length > removed && edge && (removed > 0 || blank === " ");
         const start = padded(leading, /^[\p{L}\p{N}]/u.test(code));
-        const end = padded(trailing, /[\p{L}\p{N}]$/u.test(code));
+        const end = padded(trailing, /^[\p{L}\p{N}]/u.test(lastCharacter(code)));
         if (!start && !end) return;
         const [from, to] = range(node);
         if (misread({ start: from, end: to, text: "" })) return;
