@@ -53,7 +53,7 @@ column, ✅ is yes and ❌ no.
 | `structure/unspaced-heading`    | 🔍   | ❌            | ❌                                                              | ❌      |
 | `style/blank-lines`             | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/block-spacing`           | 🎨   | `warn`        | ❌                                                              | ❌      |
-| `style/code-block`              | 🎨   | ❌            | ❌             | ✅      |
+| `style/code-block`              | 🎨   | ❌            | ❌                                                              | ✅      |
 | `style/code-fence`              | 🎨   | `warn`        | ❌                                                              | ✅      |
 | `style/definition-spacing`      | 🎨   | ❌            | ❌                                                              | ❌      |
 | `style/emphasis`                | 🎨   | `warn`        | ❌                                                              | ✅      |
@@ -1747,8 +1747,8 @@ longer than any run of backticks in the code.
 
 **Reported without a fix:**
 
-- A fenced block where the indented form is required: indentation cannot keep
-  a language or metadata, and can change blank lines or where an adjacent
+- A fenced block where the indented form is required: indentation cannot keep a
+  language or metadata, and can change blank lines or where an adjacent
   paragraph ends.
 - An indented block in a container whose prefix holds a tab, because removing
   indentation can change its tab stops.
