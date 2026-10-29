@@ -12,8 +12,10 @@ Enable and configure rules under `rules` in the
 the built-in rules and those of the configuration's [plugins](plugins.md).
 
 🎨 marks a style rule, whose findings `format` fixes, and 🔍 a problem rule,
-which is reported only. ✅ is yes and ❌ no. Each rule's section names its
-presets, dialects, and options.
+which is reported only. In the preset columns, ✅ means that a preset enables
+the rule at `warn`, and ✅ (error) at `error`; ❌ means that none does. In the
+options column, ✅ is yes and ❌ no. Each rule's section names its presets with
+their severity, its dialects, and its options.
 
 | Rule                          | Kind | `recommended` | Dialect preset | Options |
 | ----------------------------- | :--: | :-----------: | :------------: | :-----: |
@@ -52,9 +54,10 @@ presets, dialects, and options.
 | `style/trailing-space`        | 🎨   | ✅            | ❌             | ✅      |
 | `style/wrap`                  | 🎨   | ✅            | ❌             | ✅      |
 
-A preset enables its rules as warnings, unless the rule's section says error.
-The `codeberg` preset is the `forgejo` preset under another name. In a dialect
-that a rule's section does not name, the rule finds nothing.
+A configuration can set any rule to another severity; see [rules and
+severity](configuration.md#rules-and-severity). The `codeberg` preset is the
+`forgejo` preset under another name. In a dialect that a rule's section does not
+name, the rule finds nothing.
 
 ## `content/code-language`
 
@@ -92,8 +95,8 @@ npm test
 
 ## `content/image-alt`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all.
+Options: none.
 
 Reports an image without alternative text, the text between the brackets of
 `![text](chart.png)`. Screen readers read it in place of the image, and browsers
@@ -116,8 +119,8 @@ Not reported:
 
 ## `content/table-columns`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all but
-CommonMark. Options: none.
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all
+but CommonMark. Options: none.
 
 Reports a table row with more or fewer cells than the header row. As the GFM
 specification requires, renderers drop the extra cells of a longer row without a
@@ -149,8 +152,8 @@ Not reported:
 
 ## `forgejo/heading-id`
 
-**Problem rule**, reported only. Presets: `forgejo`, `gitea` (error). Dialects:
-Forgejo, Gitea. Options: none.
+**Problem rule**, reported only. Presets: `forgejo` (error), `gitea` (error).
+Dialects: Forgejo, Gitea. Options: none.
 
 Reports a heading attribute block whose `id` is not text, such as `{id=5}`,
 `{id=true}`, or a list. Forgejo, and Gitea before 1.26, render nothing at all
@@ -172,8 +175,9 @@ Not reported:
 
 ## `github/alert-marker`
 
-**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`,
-`vitepress`. Dialects: GitHub, Forgejo, Gitea, VitePress. Options: none.
+**Style rule**, fixed by `format`. Presets: `github` (warn), `forgejo` (warn),
+`gitea` (warn), `vitepress` (warn). Dialects: GitHub, Forgejo, Gitea, VitePress.
+Options: none.
 
 Writes the type of a GitHub alert in capitals. The renderers accept any case for
 the five types `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`, and their
@@ -199,9 +203,9 @@ After:
 
 ## `github/task-marker`
 
-**Style rule**, fixed by `format`. Presets: `github`, `forgejo`, `gitea`,
-`obsidian`, `vitepress`. Dialects: all but CommonMark; VitePress needs task
-lists enabled. Options: none.
+**Style rule**, fixed by `format`. Presets: `github` (warn), `forgejo` (warn),
+`gitea` (warn), `obsidian` (warn), `vitepress` (warn). Dialects: all but
+CommonMark; VitePress needs task lists enabled. Options: none.
 
 Writes the mark of a completed task as a lowercase `x`.
 
@@ -219,8 +223,8 @@ After:
 
 ## `links/empty`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all.
+Options: none.
 
 Reports a link or image whose destination is empty, as in `[guide]()`, or only
 `#`, which leads to the top of the page. Both are usually placeholders that were
@@ -334,7 +338,7 @@ See the [guide](./docs/guide.md#setup).
 
 ## `links/undefined-reference`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all;
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all;
 footnotes all but CommonMark. Options: none.
 
 Reports a reference whose label has no definition in the document: a full
@@ -366,8 +370,8 @@ See the [installation guide][Setup] and press [Enter].
 
 ## `links/unused-definition`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all.
+Options: none.
 
 Reports a reference definition or footnote that no reference in the document
 uses. A definition that only a shortcut reference `[label]` uses counts as used.
@@ -417,16 +421,15 @@ not visit, such as `dist`, or through a symbolic link is checked on disk; see
 | `Local target could not be checked: …` | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
 | `Fragment could not be checked: …`     | The target exists but could not be read.                                                                     |
 
-In versions after 0.4.0, `Fragment could not be checked` also reports a readable
-target whose renderer-dependent anchor information is incomplete. It does not
-claim the fragment is missing; verified headings or explicit HTML IDs remain
-checkable.
+`Fragment could not be checked` also reports a readable target whose
+renderer-dependent anchor information is incomplete. It does not claim the
+fragment is missing; verified headings or explicit HTML IDs remain checkable.
 
-After 0.4.0, GitHub file fragments also follow the native Markdown reading of
-dollar-math source. Heading IDs can include dollar-delimited lines above a
-Setext title, and inline markup or HTML inside such source can supply anchors
-too. Duplicate numbering uses that complete reading after the YAML front matter
-choice; the formatter's math reading stays the same.
+GitHub file fragments also follow the native Markdown reading of dollar-math
+source. Heading IDs can include dollar-delimited lines above a Setext title, and
+inline markup or HTML inside such source can supply anchors too. Duplicate
+numbering uses that complete reading after the YAML front matter choice; the
+formatter's math reading stays the same.
 
 URLs with a scheme, such as `https:`, are never fetched or checked. Outside the
 Obsidian dialect, a destination that starts with `/` or contains `?` depends on
@@ -468,8 +471,8 @@ Second idea. ^idea
 
 ## `obsidian/callout-marker`
 
-**Style rule**, fixed by `format`. Presets: `obsidian`. Dialects: Obsidian.
-Options: none.
+**Style rule**, fixed by `format`. Presets: `obsidian` (warn). Dialects:
+Obsidian. Options: none.
 
 Writes the type of an Obsidian callout in lowercase, custom types included. The
 title and the body are left as written, and so is a marker written with an
@@ -491,7 +494,7 @@ After:
 
 ## `obsidian/strict-line-breaks`
 
-**Problem rule**, reported only. Presets: `obsidian`. Dialects: Obsidian.
+**Problem rule**, reported only. Presets: `obsidian` (warn). Dialects: Obsidian.
 Options: none.
 
 Reports, once per note, that `style/wrap` leaves the note as written because the
@@ -545,8 +548,8 @@ Not reported:
 
 ## `structure/heading-increment`
 
-**Problem rule**, reported only. Presets: `recommended`. Dialects: all. Options:
-none.
+**Problem rule**, reported only. Presets: `recommended` (warn). Dialects: all.
+Options: none.
 
 Reports a heading more than one level deeper than the heading before it, such as
 a level-3 heading directly after a level-1 heading. Readers who move through a
@@ -668,7 +671,7 @@ title: Install
 
 ## `style/blank-lines`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `maximum`.
 
 Collapses blank lines in a row to at most `maximum` of them, and removes blank
@@ -714,14 +717,14 @@ number changes what the document means:
   the parser counts them toward: there it reads a list as loose when two or more
   follow and as tight when one does.
 
-After 0.4.0, Obsidian also keeps blank quote rows between consecutive blocks
-opened by a Tab directly after `>` or `> `. Reading view reads those blocks and
-their intervening blank rows as one literal code block. A later ordinary quoted
+Obsidian also keeps blank quote rows between consecutive blocks opened by a Tab
+directly after `>` or `> `. Reading view reads those blocks and their
+intervening blank rows as one literal code block. A later ordinary quoted
 paragraph still permits blank-line cleanup and inline preferences.
 
 ## `style/block-spacing`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: none.
 
 Separates every heading and every list from the blocks before and after it with
@@ -761,9 +764,9 @@ or what a comment applies to:
 - A boundary inside a paragraph or underlined heading in the reading without
   TOML front matter, such as `1.` and `2) b` directly below its closing `+++`
   fence. A blank line there would make a list from text.
-- On GitHub after 0.4.0, between dollar display math and an immediately
-  following Setext title. They can form one native heading or continue a
-  list/quote paragraph, so their source stays together.
+- On GitHub, between dollar display math and an immediately following Setext
+  title. They can form one native heading or continue a list/quote paragraph, so
+  their source stays together.
 - In the Obsidian dialect, after an underlined heading that a view reads as
   paragraph text, such as a multiline level-1 heading, one beginning with a
   reference-like line, or one whose underline has trailing space, extra
@@ -788,15 +791,14 @@ or what a comment applies to:
   the blank line into the code, although the parser does not.
 - A heading or list directly below an HTML comment or below a
   `mdrefine-disable-next-line` directive, which apply to the line below them.
-  After 0.4.0, the Obsidian dialect also retains the boundary after a standalone
-  `%%` comment: adding a blank can split a native paragraph even when the parser
+  The Obsidian dialect also retains the boundary after a standalone `%%`
+  comment: adding a blank can split a native paragraph even when the parser
   reads a separate heading. Inline style edits below the comment remain
   available.
-- After 0.4.0, in the Obsidian dialect, a list immediately after a list's final
-  secondary paragraph or indented code block: a new blank splits Live Preview's
-  paragraph. Markers, numbering and inline styles remain eligible. A sole first
-  paragraph, final heading, closed fence or existing blank permits ordinary
-  spacing.
+- In the Obsidian dialect, a list immediately after a list's final secondary
+  paragraph or indented code block: a new blank splits Live Preview's paragraph.
+  Markers, numbering and inline styles remain eligible. A sole first paragraph,
+  final heading, closed fence or existing blank permits ordinary spacing.
 - The line that opens a callout or alert, such as `> [!NOTE]`, and the block
   directly below it.
 - In the Obsidian dialect, a block identifier on a line of its own (`^id`)
@@ -819,23 +821,23 @@ or what a comment applies to:
   definition, such as `> - [^1]:`. The parser would count the new line of `>` as
   part of the item and read the list as loose.
 
-After 0.4.0, an Obsidian list ending in a paragraph also stays adjacent to a
-parsed tilde opener whose info contains a written backtick. Live Preview reads
-it as paragraph continuation. List markers, padding and safe earlier reflow
-remain eligible; an existing blank and ordinary info strings keep their usual
-spacing behavior. When its parsed closer opens Live Preview code, the opener and
+An Obsidian list ending in a paragraph also stays adjacent to a parsed tilde
+opener whose info contains a written backtick. Live Preview reads it as
+paragraph continuation. List markers, padding and safe earlier reflow remain
+eligible; an existing blank and ordinary info strings keep their usual spacing
+behavior. When its parsed closer opens Live Preview code, the opener and
 remaining document stay as written, conservatively retaining later fence
 pairings too.
 
-After 0.4.0, Obsidian also retains both separators when a quote, table or
-display formula connects list items. Display math immediately below the final
-item stays inside it, including after a heading or code block; a table after
-those blocks also stays adjacent. See the [boundary
-protections](obsidian.md#boundary-protections-since-041).
+Obsidian also retains both separators when a quote, table or display formula
+connects list items. Display math immediately below the final item stays inside
+it, including after a heading or code block; a table after those blocks also
+stays adjacent. See the [boundary
+protections](obsidian.md#boundary-protections).
 
 ## `style/code-fence`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `marker`.
 
 Writes the fences of a fenced code block with one marker, and as long as its
@@ -866,7 +868,7 @@ whose info string contains a backtick, because a backtick fence cannot have one.
 
 ## `style/emphasis`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `marker`.
 
 Writes emphasis with one marker. The option `marker` is `"_"` (the default) or
@@ -916,7 +918,7 @@ so are the exceptions of [Forgejo and Gitea](dialects.md#forgejo-and-gitea):
 
 ## `style/final-newline`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: none.
 
 Ends a document that is not empty with a line break, using the document's own
@@ -933,7 +935,7 @@ stays where that code's closing boundary is uncertain.
 
 ## `style/heading`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `style`, `closing`.
 
 Writes headings in one style and without closing `#` sequences. By default it
@@ -970,9 +972,9 @@ After:
 ```
 
 A trailing run of `#` in the text of an underlined heading is escaped, so that
-it is not taken for a closing sequence. After 0.4.0, Obsidian keeps such a title
-in Setext form instead: the escaped ATX form can reveal hashes in Live Preview.
-Inline title formatting remains available. Tight, already escaped, code-span and
+it is not taken for a closing sequence. Obsidian keeps such a title in Setext
+form instead: the escaped ATX form can reveal hashes in Live Preview. Inline
+title formatting remains available. Tight, already escaped, code-span and
 nonterminal hashes still allow conversion.
 
 Underlined headings of more than one line, those inside lists or block quotes,
@@ -992,23 +994,22 @@ on Forgejo and Gitea when it contains `{`. Below a first line of `---` that no
 line closes, a level-2 underline has at least four `-`, because `---` would
 close it as front matter.
 
-After 0.4.0, GitHub keeps an existing Setext title directly after dollar display
-math. The dollar lines belong to that native heading too, so the complete range
-stays as written. An intervening blank or interrupting block permits heading
-preferences again. Where text below a list or quote ending in math continues
-that native container, the source boundary stays together too.
+GitHub keeps an existing Setext title directly after dollar display math. The
+dollar lines belong to that native heading too, so the complete range stays as
+written. An intervening blank or interrupting block permits heading preferences
+again. Where text below a list or quote ending in math continues that native
+container, the source boundary stays together too.
 
-After 0.4.0, Obsidian also retains the heading form when a title line begins
-directly with math or its only content is an image/embed. ATX and Setext can
-give those widgets different typography or placement. A retained Setext heading
-keeps its complete source; mixed text before math, wrapped math, and images
-beside ordinary title text remain eligible. Independent blocks below the heading
-still get their spacing, inline formatting, and table or list preferences.
+Obsidian also retains the heading form when a title line begins directly with
+math or its only content is an image/embed. ATX and Setext can give those
+widgets different typography or placement. A retained Setext heading keeps its
+complete source; mixed text before math, wrapped math, and images beside
+ordinary title text remain eligible. Independent blocks below the heading still
+get their spacing, inline formatting, and table or list preferences.
 
-After 0.4.0, a Setext title directly after a standalone Obsidian comment keeps
-its underline, since conversion can turn Reading-view paragraph text into a
-heading. Inline title formatting remains available, and a real blank permits
-heading conversion.
+A Setext title directly after a standalone Obsidian comment keeps its underline,
+since conversion can turn Reading-view paragraph text into a heading. Inline
+title formatting remains available, and a real blank permits heading conversion.
 
 ## `style/inline-code`
 
@@ -1039,12 +1040,11 @@ joined line would read differently:
   too. This conservative check also retains the newline when the backticks do
   pair.
 
-After 0.4.0, Obsidian also retains a multiline span with one or two backticks
-and the following source in its inline block: Live Preview resets short code at
-the physical newline. Earlier independent inline text and later paragraphs can
-still format. The [boundary
-protections](obsidian.md#boundary-protections-since-041) describe the
-conservative cases.
+Obsidian also retains a multiline span with one or two backticks and the
+following source in its inline block: Live Preview resets short code at the
+physical newline. Earlier independent inline text and later paragraphs can still
+format. The [boundary protections](obsidian.md#boundary-protections) describe
+the conservative cases.
 
 Before:
 
@@ -1061,7 +1061,7 @@ Run `npm run build` before the tests.
 
 ## `style/list-indent`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: spaces after markers, `nestedIndent`.
 
 Puts the configured spaces, one by default, between a list marker and the item's
@@ -1139,23 +1139,22 @@ These are left as written:
   works](design.md#safety-model)). `style/list-marker` and `style/ordered-list`
   keep their markers too.
 
-After 0.4.0, Obsidian also keeps the indentation of a document-level list that
-ends in a nested list, and of the opening list in the following quote when its
-marker has exactly two spaces after `>`. Live Preview carries the earlier
-indentation into that quoted list, even across blank lines; changing it can
-remove a painted bullet. An intervening block restores ordinary indentation
-preferences. This exception applies to `style/list-indent`; safe marker and
-inline styles remain available. [`style/ordered-list`](#styleordered-list) also
-keeps the number width in those units, while allowing same-width numbering and
-delimiter changes.
+Obsidian also keeps the indentation of a document-level list that ends in a
+nested list, and of the opening list in the following quote when its marker has
+exactly two spaces after `>`. Live Preview carries the earlier indentation into
+that quoted list, even across blank lines; changing it can remove a painted
+bullet. An intervening block restores ordinary indentation preferences. This
+exception applies to `style/list-indent`; safe marker and inline styles remain
+available. [`style/ordered-list`](#styleordered-list) also keeps the number
+width in those units, while allowing same-width numbering and delimiter changes.
 
 Quoted blocks opened after a Tab have separate literal-source protection; see
-[Obsidian's boundary protections](obsidian.md#boundary-protections-since-041).
-Ordinary space-only quoted margins remain eligible for list indentation.
+[Obsidian's boundary protections](obsidian.md#boundary-protections). Ordinary
+space-only quoted margins remain eligible for list indentation.
 
 ## `style/list-marker`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `marker`.
 
 Writes every bullet list with one marker.
@@ -1198,7 +1197,7 @@ After:
 
 ## `style/ordered-list`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `delimiter`, `numbering`.
 
 Writes the numbers of ordered lists with one delimiter and numbers the items
@@ -1227,8 +1226,8 @@ nine digits. A list directly below TOML front matter that does not start at 1,
 or whose first item starts with a blank line, keeps its delimiter and numbers,
 as for `style/list-indent`.
 
-After 0.4.0, Obsidian also keeps digit widths where a trailing nested list
-controls a following quoted list's indentation, as described for
+Obsidian also keeps digit widths where a trailing nested list controls a
+following quoted list's indentation, as described for
 [`style/list-indent`](#stylelist-indent). Same-width numbering and delimiter
 preferences remain available.
 
@@ -1250,7 +1249,7 @@ After:
 
 ## `style/strong`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `marker`.
 
 Writes strong emphasis with one marker. The option `marker` is `"*"` (the
@@ -1270,9 +1269,9 @@ A **bold** claim.
 
 ## `style/table`
 
-**Style rule**, fixed by `format`. Presets: `recommended`, `github`, `forgejo`,
-`gitea`, `obsidian`, `vitepress`. Dialects: all but CommonMark. Options:
-`style`.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn), `github`
+(warn), `forgejo` (warn), `gitea` (warn), `obsidian` (warn), `vitepress` (warn).
+Dialects: all but CommonMark. Options: `style`.
 
 Aligns a table: every cell of a column is padded to the column's width, measured
 in display columns, and the delimiter row keeps each column's alignment. The
@@ -1292,15 +1291,15 @@ has only its leading pipe, can instead begin paragraph text. That row and the
 remaining primary table retain their source and preceding boundary, so adding
 table borders cannot absorb the paragraph or split pipes inside links.
 
-After 0.4.0, a one-column Obsidian table also stays as written unless both its
-header and delimiter have leading and trailing pipes. Live Preview displays the
-other forms as source text. Reading view also accepts matching trailing-only
-pipes; missing final pipes or mismatched leading borders instead continue
-paragraph text, including across a Tab-only line into later literal rows.
+A one-column Obsidian table also stays as written unless both its header and
+delimiter have leading and trailing pipes. Live Preview displays the other forms
+as source text. Reading view also accepts matching trailing-only pipes; missing
+final pipes or mismatched leading borders instead continue paragraph text,
+including across a Tab-only line into later literal rows.
 
-After 0.4.0, a table immediately after a list item's closing code fence also
-keeps its literal rows: Live Preview shows them as source text. A table after a
-heading, indented code, a root fence or a real blank still formats.
+A table immediately after a list item's closing code fence also keeps its
+literal rows: Live Preview shows them as source text. A table after a heading,
+indented code, a root fence or a real blank still formats.
 
 Before:
 
@@ -1320,7 +1319,7 @@ After:
 
 ## `style/thematic-break`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `marker`.
 
 Writes thematic breaks with one marker. The option `marker` is `"---"` (the
@@ -1349,10 +1348,10 @@ means:
 - With `---`, directly below a paragraph, a link reference definition, or
   display math, which `---` would underline as a heading; GitHub builds display
   math from a paragraph.
-- After 0.4.0, a compact hyphen line already directly below display math also
-  stays when another marker is requested. Spaced `- - -` remains eligible for
-  star or underscore preferences, as does a break separated from the math by a
-  blank line.
+- A compact hyphen line already directly below display math also stays when
+  another marker is requested. Spaced `- - -` remains eligible for star or
+  underscore preferences, as does a break separated from the math by a blank
+  line.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
 - At the start of a document, with `---`, which would open front matter if a
@@ -1367,7 +1366,7 @@ means:
 
 ## `style/trailing-space`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `hardBreak`.
 
 Removes spaces and tabs at the end of lines. A hard line break written as two or
@@ -1382,23 +1381,22 @@ to that one space where safe. Quoted markers and further markers on the same
 physical line keep ordinary trailing-space cleanup, because Live Preview reads
 them as text.
 
-After 0.4.0, blank space after a literal backslash stays as written when
-removing it would turn a continuing prose line into a hard line break. This
-includes spaces and tabs inside paragraphs, headings, lists, and quotes. Blank
-space at the end of a paragraph or file can still be removed; `hardBreak`
-continues to control existing hard line breaks.
+Blank space after a literal backslash stays as written when removing it would
+turn a continuing prose line into a hard line break. This includes spaces and
+tabs inside paragraphs, headings, lists, and quotes. Blank space at the end of a
+paragraph or file can still be removed; `hardBreak` continues to control
+existing hard line breaks.
 
-Also after 0.4.0, a Tab followed by two or more spaces can mark a hard line
-break even where the primary Markdown reading has a soft line ending. Across
-dialects, that suffix stays exactly as written, including with
-`hardBreak: "backslash"`. Ordinary trailing Tabs and spaces, and those on the
-last content line of a paragraph or heading, can still be removed where they
-have no rendered meaning.
+A Tab followed by two or more spaces can mark a hard line break even where the
+primary Markdown reading has a soft line ending. Across dialects, that suffix
+stays exactly as written, including with `hardBreak: "backslash"`. Ordinary
+trailing Tabs and spaces, and those on the last content line of a paragraph or
+heading, can still be removed where they have no rendered meaning.
 
-After 0.4.0, Obsidian also keeps the preceding paragraph's separator before a
-Tab-only continuation when it marks a hard break or keeps a backslash literal. A
-Tab that begins before an unquoted paragraph's content column does not continue
-that paragraph merely by advancing past the column. Quoted margins are handled
+Obsidian also keeps the preceding paragraph's separator before a Tab-only
+continuation when it marks a hard break or keeps a backslash literal. A Tab that
+begins before an unquoted paragraph's content column does not continue that
+paragraph merely by advancing past the column. Quoted margins are handled
 conservatively, retaining a possibly removable separator.
 
 With `{ "hardBreak": "backslash" }`, before, with two spaces after `one`:
@@ -1431,7 +1429,7 @@ math.
 
 ## `style/wrap`
 
-**Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
+**Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
@@ -1537,8 +1535,8 @@ what it means, that is, when it:
   line once reflowed, as `[a` and `b]: c d` below it would, which Live Preview
   styles as a link reference definition.
 
-After 0.4.0, Obsidian wrapping retains the exact terminal separator before a
-Tab-only paragraph continuation when trailing spaces mark a hard break or keep a
+Obsidian wrapping retains the exact terminal separator before a Tab-only
+paragraph continuation when trailing spaces mark a hard break or keep a
 preceding backslash literal. The earlier paragraph text can still wrap. In every
 dialect, paragraphs with a Tab followed by two final spaces before continuing
 text also stay unreflowed: native renderers can read that separator as a hard
@@ -1548,14 +1546,14 @@ multiline code span keeps its whole paragraph unreflowed; see
 [`style/inline-code`](#styleinline-code). Earlier independent inline markup can
 still format.
 
-After 0.4.0, Obsidian also keeps a standalone one-line `$$…$$` formula on its
-physical line, with the adjacent separators, when joining would change Live
-Preview's display widget. Math already beside ordinary prose still wraps; see
-the [boundary protections](obsidian.md#boundary-protections-since-041).
+Obsidian also keeps a standalone one-line `$$…$$` formula on its physical line,
+with the adjacent separators, when joining would change Live Preview's display
+widget. Math already beside ordinary prose still wraps; see the [boundary
+protections](obsidian.md#boundary-protections).
 
-After 0.4.0, Obsidian also leaves a multiline image description containing
-backticks unreflowed, where joining could turn displayed Live Preview source
-into an embed. Surrounding inline preferences can still be applied.
+Obsidian also leaves a multiline image description containing backticks
+unreflowed, where joining could turn displayed Live Preview source into an
+embed. Surrounding inline preferences can still be applied.
 
 In the Obsidian dialect, the rule wraps only with the vault's [strict line
 breaks](obsidian.md#enable-wrapping). [Forgejo and

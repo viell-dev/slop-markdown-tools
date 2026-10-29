@@ -182,11 +182,11 @@ The other fields are present when they apply:
   with status `resolved`, whether the target has that heading, block, or anchor
   by the rules of `dialect`, and `true` without a fragment and for a target that
   is not Markdown, whose fragments are its own.
-- In versions after 0.4.0, `fragmentIncomplete: true`, with status `unreadable`,
-  means the file was read but its renderer's fragment targets are not fully
-  known. No `unreadable` file/directory list accompanies this result. Verified
-  headings or explicit IDs can still resolve; an unverified fragment is not
-  evidence that an anchor is missing.
+- `fragmentIncomplete: true`, with status `unreadable`, means the file was read
+  but its renderer's fragment targets are not fully known. No `unreadable`
+  file/directory list accompanies this result. Verified headings or explicit IDs
+  can still resolve; an unverified fragment is not evidence that an anchor is
+  missing.
 - `unreadable`: the directories or the file that stood in the way. An entry that
   starts with `..` stands for the part of a vault outside the workspace root. In
   the Obsidian dialect, a search by note name that finds nothing readable
@@ -215,11 +215,11 @@ fields: the semantic comparison looks at every field except `position` and
 `data`. Syntax that a parser reads as plain text is not safe to format merely
 for that; test the extension's meaning and its source preservation.
 
-Version 0.4.1 retains the original attention and strikethrough resolvers,
-including CJK emphasis, when any syntax plugin is present. This preserves the
-intermediate inline events that a custom tokenizer or resolver can observe; the
-other parser corrections still apply. Rule-only plugins keep the optimized
-inline resolvers. The syntax extension types and their order remain the same.
+The parser retains the original attention and strikethrough resolvers, including
+CJK emphasis, when any syntax plugin is present. This preserves the intermediate
+inline events that a custom tokenizer or resolver can observe; the other parser
+corrections still apply. Rule-only plugins keep the optimized inline resolvers.
+The syntax extension types and their order remain the same.
 
 This is not a remark plugin adapter. Existing micromark extensions can be
 reused, but a remark plugin that changes the tree must be rewritten as a rule
