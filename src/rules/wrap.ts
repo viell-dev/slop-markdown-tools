@@ -2,7 +2,7 @@ import type { Document, RuleContext } from "../core/types.js";
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
 import type { Paragraph, Parents } from "mdast";
-import type { Dialect, Finding, Rule } from "../core/types.js";
+import type { Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
 import { vitepressProtection } from "../syntax/vitepress/projection.js";
@@ -10,8 +10,8 @@ import {
   frontMatterReading,
   labelEnd,
   lazyIndentation,
-  parse,
   range,
+  reread,
   startsWithMarker,
 } from "../syntax/parse.js";
 import { type Range, located, holds, obsidianTag } from "./shared.js";
@@ -473,9 +473,9 @@ export function lineWidth(text: string, measure: (text: string) => number): numb
   return width;
 }
 
-/** Whether text parses as a single paragraph. */
-function oneParagraph(text: string, dialect: Dialect): boolean {
-  const { children } = parse(text, dialect).tree;
+/** Whether text reads as a single paragraph, as the document is read. */
+function oneParagraph(text: string, document: Document): boolean {
+  const { children } = reread(document, text).tree;
   return children.length === 1 && children[0]!.type === "paragraph";
 }
 
@@ -1064,7 +1064,7 @@ function wrapParagraph(
     (firstWordAlone.test(atoms[0]!) ||
       (leadingComment !== undefined && atoms[0] === leadingComment) ||
       (belowHeader && /^(?:=+|-+)$/.test(atoms[0]!)) ||
-      (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document.dialect)))
+      (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document)))
   )
     atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
   let output =
@@ -1080,14 +1080,14 @@ function wrapParagraph(
     options.mode === "never" &&
     atoms[0]!.startsWith("[") &&
     definitionStart.test(output[0]!) &&
-    !oneParagraph(output[0]!, document.dialect)
+    !oneParagraph(output[0]!, document)
   ) {
     reportSkipped("joined lines that would read as a link reference definition");
     return;
   }
   if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
     let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
-    while (output.length > 1 && !oneParagraph(output.join("\n"), document.dialect))
+    while (output.length > 1 && !oneParagraph(output.join("\n"), document))
       output = fillLines(atoms, ++first, prefix, continuation, width, measure);
   }
   // Live Preview hides the destination after `[`, a label, and `]:` at a

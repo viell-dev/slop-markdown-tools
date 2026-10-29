@@ -233,6 +233,24 @@ function hasTargetMath(tree: Root): boolean {
 export function githubFileReading(tree: Root): Root {
   return githubFileReadings.get(tree)?.() ?? tree;
 }
+/** The plugins and VitePress options that `parse` read each returned tree with. */
+const readers = new WeakMap<Root, { plugins: readonly Plugin[]; vitepress: VitePressOptions }>();
+/**
+ * Read `text` as `parse` read `document`: in its dialect, with its path,
+ * plugins and VitePress options. Rules that check what changed text would mean
+ * use it, so that this reading has the same grammar as the document's (#752).
+ * A document that `parse` did not return is read without plugins.
+ */
+export function reread(document: Document, text: string): Document {
+  const reader = readers.get(document.tree);
+  return parse(
+    text,
+    document.dialect,
+    document.path,
+    reader?.plugins ?? [],
+    reader?.vitepress ?? document.vitepress,
+  );
+}
 /** All parser-created front-matter roots, including alternate candidates. */
 const plainReadings = new WeakMap<Root, () => Root>();
 /**
@@ -330,6 +348,10 @@ export function parse(
   vitepress: VitePressOptions = {},
 ): Document {
   const read = knownDialect(dialect);
+  const remember = (document: Document) => {
+    readers.set(document.tree, { plugins, vitepress });
+    return document;
+  };
   source = splitByteOrderMark(source)[1];
   const projection =
     read === "vitepress"
@@ -448,7 +470,7 @@ export function parse(
   const result = tree(!unclosedFrontMatter(source));
   if (projection) {
     recordVitePress(result, projection, source);
-    return { source, dialect: read, path, tree: result, vitepress };
+    return remember({ source, dialect: read, path, tree: result, vitepress });
   }
   // The tree's types know YAML front matter only; the parser also reads TOML.
   const matter = result.children[0] as { type: string; value?: string } | undefined;
@@ -474,11 +496,11 @@ export function parse(
       )
     ) {
       frontMatterReadings.set(plain, result);
-      return { source, dialect: read, path, tree: plain };
+      return remember({ source, dialect: read, path, tree: plain });
     }
   }
   if (matter?.type === "toml") tomlReadings.set(result, plainReadings.get(result)!);
-  return { source, dialect: read, path, tree: result };
+  return remember({ source, dialect: read, path, tree: result });
 }
 
 /**
