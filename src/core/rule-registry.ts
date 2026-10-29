@@ -1,3 +1,4 @@
+import { lineLength } from "../rules/line-length.js";
 import { Ajv } from "ajv";
 import type { AnySchema, ValidateFunction } from "ajv";
 import { deepFreeze } from "./frozen.js";
@@ -23,6 +24,7 @@ export const builtInRules: Readonly<Record<string, Readonly<Rule>>> = deepFreeze
   ...linkRules,
   ...structureRules,
   ...contentRules,
+  "problem/line-length": lineLength,
   ...listRules,
 });
 export const phases = ["inline", "block", "document"] as const;

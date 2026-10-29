@@ -34,6 +34,7 @@ presets, dialects, and options.
 | `obsidian/block-reference`      | 🔍   | ❌            | ✅ (error)     | ❌      |
 | `obsidian/callout-marker`       | 🎨   | ❌            | ✅             | ❌      |
 | `obsidian/strict-line-breaks`   | 🔍   | ❌            | ✅             | ❌      |
+| `problem/line-length`           | 🔍   | ❌            | ❌             | ✅      |
 | `structure/duplicate-heading`   | 🔍   | ❌            | ❌             | ✅      |
 | `structure/emphasis-heading`    | 🔍   | ❌            | ❌             | ✅      |
 | `structure/heading-increment`   | 🔍   | ✅            | ❌             | ❌      |
@@ -659,6 +660,57 @@ joining or breaking lines would change what the note looks like. The setting is
 it and never changes it. The finding is at line 1, and its message begins
 `Obsidian's "Strict line breaks" setting is not known to be on`. See [Obsidian
 vaults](obsidian.md#enable-wrapping).
+
+## `problem/line-length`
+
+**Problem rule**, reported only. Presets: none. Dialects: all. Options:
+`lineLength`, `headingLineLength`, `codeBlockLineLength`, `codeBlocks`,
+`tables`, `headings`, `strict`, `stern`, `measure`.
+
+After 0.5.0, reports physical lines in ATX and Setext headings, fenced and
+indented code blocks (including fence lines), and parsed tables. Container
+markers count toward the width. It never edits: splitting these lines can change
+their meaning. Paragraphs remain the responsibility of `style/wrap`.
+
+| Option                | Values                                       | Default      |
+| --------------------- | -------------------------------------------- | ------------ |
+| `lineLength`          | Nonnegative integer; zero disables the limit | `80`         |
+| `headingLineLength`   | Nonnegative integer                          | `lineLength` |
+| `codeBlockLineLength` | Nonnegative integer                          | `lineLength` |
+| `headings`            | Boolean                                      | `true`       |
+| `codeBlocks`          | Boolean                                      | `true`       |
+| `tables`              | Boolean                                      | `true`       |
+| `strict`              | Boolean                                      | `false`      |
+| `stern`               | Boolean                                      | `false`      |
+| `measure`             | `"columns"` or `"codepoints"`                | `"columns"`  |
+
+The default allows an overflowing final word with no whitespace beyond the
+limit. `stern` reports such a line if it has multiple words; `strict` reports
+every long line and takes precedence. Display measurement and four-column tab
+stops match `style/wrap`, avoiding character-count errors with CJK and combining
+marks. `codepoints` is available for source-oriented policies.
+
+```jsonc
+{
+  "rules": {
+    "problem/line-length": ["warn", { "lineLength": 100, "codeBlocks": false }],
+  },
+}
+```
+
+This separate rule keeps existing paragraph findings and reflow policy intact.
+Its `strict` and `stern` apply only to the named blocks; they do not imply
+`style/wrap`'s `reportUnreflowed` or `reportUnbreakable`, which classify safe
+prose break opportunities and protected atoms rather than raw whitespace.
+Neither addition changes `recommended`.
+
+MD013 checks other physical lines too, including HTML and math, but excludes
+front matter and reference definitions; its implementation also excludes
+link-only lines outside strict checking. Here front matter, HTML, math,
+definitions, thematic breaks and all other unnamed blocks are intentionally
+excluded: this rule reports only headings, code and tables, and `style/wrap`
+continues to own paragraphs. A table in a dialect without table syntax is
+therefore prose, not a table for this rule.
 
 ## `structure/duplicate-heading`
 
@@ -2038,7 +2090,17 @@ math.
 ## `style/wrap`
 
 **Style rule**, fixed by `format`. Presets: `recommended`. Dialects: all.
-Options: `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
+Options: `mode`, `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
+
+After 0.5.0, `mode: "never"` joins each eligible paragraph onto one line, using
+exactly the same protected paragraphs, inline atoms and container handling as
+wrapping. `mode: "always"` remains the default. For example,
+`{ "rules": { "style/wrap": ["warn", { "mode": "never" }] } }` joins
+`First line` followed by `second line` to `First line second line`. `width`,
+`reportUnreflowed` and `reportUnbreakable` are ignored in `never` mode, since
+overflow is intentional. The separate `problem/line-length` rule can still check
+headings, code and tables. Inline HTML and hard breaks stay as written; Obsidian
+still requires verified strict line breaks.
 
 Reflows each paragraph so that its lines fill the width without exceeding it. A
 line break inside a paragraph renders as a space, so the rendered text stays the
@@ -2086,6 +2148,7 @@ Live Preview reads a tag directly after `>` as text.
 
 | Option              | Values                        | Default     |
 | ------------------- | ----------------------------- | ----------- |
+| `mode`              | `"always"` or `"never"`       | `"always"`  |
 | `width`             | An integer from 20 to 500     | `80`        |
 | `measure`           | `"columns"` or `"codepoints"` | `"columns"` |
 | `reportUnreflowed`  | `true` or `false`             | `false`     |
