@@ -32,7 +32,8 @@ it.each([
     { MD055: true, MD060: { style: "aligned" } },
     "MD055",
     "a|b\n---|---\nx|y\n",
-    "| a   | b   |\n| --- | --- |\n| x   | y   |\n",
+    // The combined pipe/padding edit needs suppressed MD055; retain MD060 diagnostics.
+    "a|b\n---|---\nx|y\n",
   ],
 ] as const)(
   "round3 active checks survive a sibling suppression %j",

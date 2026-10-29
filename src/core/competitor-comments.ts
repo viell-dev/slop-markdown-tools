@@ -1,10 +1,11 @@
+import { sourceChecks, type AttributedFinding } from "./source-checks.js";
 import { Minimatch } from "minimatch";
 import { convertConfig, competitorMappings } from "../config/convert.js";
 import { resolveConfig } from "../config/resolve.js";
 import { range } from "../syntax/parse.js";
 import { lineStarts } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
-import type { Document, Finding, ProcessOptions, RuleSetting } from "./types.js";
+import type { Document, Edit, Finding, ProcessOptions, RuleSetting } from "./types.js";
 
 function names(name: string) {
   const key = name.toLowerCase();
@@ -141,7 +142,13 @@ export function competitorComments(document: Document, options: ProcessOptions) 
   if (!compat)
     return Object.assign(
       (_rule: string, finding: Finding): CompatibleFinding | undefined => finding,
-      { variants: emptyVariants },
+      {
+        variants: emptyVariants,
+        prepare: (rule: string, findings: (Finding & { variant?: RuleSetting })[]) => {
+          void rule;
+          void findings;
+        },
+      },
     );
   const effectiveRules = resolveConfig({
     config: options.config ?? {},
@@ -341,7 +348,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
     }
     return { start, rules };
   });
-  function rulesAt(position: number) {
+  function regionAt(position: number) {
     let low = 0;
     let high = regions.length;
     while (low < high) {
@@ -349,7 +356,10 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       if (regions[mid]!.start <= position) low = mid + 1;
       else high = mid;
     }
-    return regions[Math.max(0, low - 1)]!.rules;
+    return Math.max(0, low - 1);
+  }
+  function rulesAt(position: number) {
+    return regions[regionAt(position)]!.rules;
   }
   const variants: Record<string, RuleSetting[]> = {};
   for (const rules of converted.values())
@@ -358,6 +368,19 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       const values = (variants[rule] ??= []);
       if (!values.some((v) => JSON.stringify(v) === JSON.stringify(value))) values.push(value);
     }
+  const proposals = new Map<string, Set<string>>();
+  const editKeys = new WeakMap<Edit, string>();
+  const editPermissions = new Map<string, Map<string, boolean>>();
+  const editKey = (finding: Finding) => {
+    const edit = finding.edit!;
+    let key = editKeys.get(edit);
+    if (key === undefined) {
+      key = JSON.stringify(edit);
+      editKeys.set(edit, key);
+    }
+    return key;
+  };
+  const variantKey = (value: RuleSetting | undefined) => JSON.stringify(value);
   return Object.assign(
     (
       rule: string,
@@ -368,7 +391,9 @@ export function competitorComments(document: Document, options: ProcessOptions) 
         return undefined;
       // Missing provenance in compatibility mode must never bypass an ignore.
       const origins = compat.origins[rule] ?? (compat.prettier ? ["unknown prettier origin"] : []);
+      const attribution = (finding as AttributedFinding)[sourceChecks];
       let checks = origins.filter((id) => id.startsWith("MD"));
+      if (attribution) checks = checks.filter((id) => attribution.checks.includes(id));
       if (rule === "style/block-spacing") {
         const check = /the heading/.test(finding.message)
           ? "MD022"
@@ -391,7 +416,37 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       const ignored = !!compat.prettier && intersects(prettier, start, end);
       if (!markdownlint && (!fromPrettier || ignored)) return undefined;
       const positional = finding.edit && intersects(positionalRanges, start, end);
-      const editSuppressed = !fromPrettier && !checks.some((id) => !suppressed(id, start, end));
+      let editSuppressed = !fromPrettier && !checks.some((id) => !suppressed(id, start, end));
+      if (finding.edit) {
+        // Edits are indivisible. Every intersected region must propose the exact
+        // replacement and authorize every source behavior combined in it.
+        const required = attribution?.editChecks ?? attribution?.checks;
+        const key = editKey(finding);
+        const requirements = JSON.stringify(required ?? checks);
+        const permissions = editPermissions.get(key) ?? new Map<string, boolean>();
+        editPermissions.set(key, permissions);
+        let permitted = permissions.get(requirements);
+        if (permitted === undefined) {
+          permitted = true;
+          const last = regionAt(Math.max(start, end - 1));
+          for (let i = regionAt(start); i <= last; i++) {
+            const at = Math.max(start, regions[i]!.start);
+            const regional = regions[i]!.rules[rule];
+            const agrees = proposals.get(editKey(finding))?.has(variantKey(regional));
+            const authorized =
+              fromPrettier ||
+              (required
+                ? required.every((id) => origins.includes(id) && !suppressed(id, at))
+                : checks.some((id) => !suppressed(id, at)));
+            if (!agrees || !authorized) {
+              permitted = false;
+              break;
+            }
+          }
+          permissions.set(requirements, permitted);
+        }
+        if (!permitted) editSuppressed = true;
+      }
       if ((ignored || positional || editSuppressed) && finding.edit) {
         const retained = { ...finding };
         delete retained.edit;
@@ -399,6 +454,19 @@ export function competitorComments(document: Document, options: ProcessOptions) 
       }
       return markdownlint ? finding : { ...finding, compatibilitySeverity: "warn" };
     },
-    { variants },
+    {
+      variants,
+      prepare: (rule: string, findings: (Finding & { variant?: RuleSetting })[]) => {
+        proposals.clear();
+        editPermissions.clear();
+        for (const finding of findings) {
+          if (!finding.edit) continue;
+          const key = editKey(finding);
+          const values = proposals.get(key) ?? new Set<string>();
+          values.add(variantKey(finding.variant ?? effectiveRules[rule]));
+          proposals.set(key, values);
+        }
+      },
+    },
   );
 }

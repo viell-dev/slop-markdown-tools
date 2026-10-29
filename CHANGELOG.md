@@ -15,8 +15,9 @@ prereleases' notes there are longer than their entries here.
 - Honor markdownlint inline configuration and suppression comments, Prettier
   ignore comments, and `requirePragma` during competitor configuration fallback.
   Written mdrefine configurations ignore these comments. Runtime provenance
-  keeps each tool's enabled checks separate
-  ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
+  keeps each tool's enabled checks separate, attributes combined rules' findings
+  to their source checks, and withholds edits that disagree across suppression
+  regions ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
 
 - `config convert` translates markdownlint and Prettier settings into a
   configuration, with exclusive `--write`, source and conflict reporting, and

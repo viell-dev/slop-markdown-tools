@@ -180,17 +180,22 @@ Disabling a markdownlint check leaves Prettier's choice active at warning
 severity, using Prettier's own options in that region. Stated markdownlint
 options still win where both sources are active. Each distinct set of active
 checks is converted with Prettier's choices and the same file override patches.
-The engine evaluates each distinct rule setting once per document and selects
+The engine evaluates each distinct rule setting once per inspection and selects
 its findings in the corresponding regions. This also recalculates dependent
 options: disabling MD022 restores MD012's own blank-line maximum.
 
-Shared destinations retain the active checks: `style/heading` (MD003, MD019,
-MD021, MD023), `style/list-indent` (MD005, MD007, MD030), and `style/table`
-(MD055, MD060) use the converted regional setting. `style/block-spacing` (MD022,
-MD031, MD032, MD058) additionally attributes findings to their named block, and
-`structure/unspaced-heading` (MD018, MD020) distinguishes ordinary and closed
-ATX candidates. Every proposal still passes the ordinary edit and semantic
-safety checks.
+Shared destinations attribute findings to their source checks: `style/heading`
+(MD003, MD019, MD021, MD023), `style/list-indent` (MD005, MD007, MD030), and
+`style/table` (MD055, MD060). Table rows and list operations retain active check
+diagnostics even when the construct starts in a suppressed region.
+`style/block-spacing` (MD022, MD031, MD032, MD058) attributes findings to their
+named block, and `structure/unspaced-heading` (MD018, MD020) distinguishes
+ordinary and closed ATX candidates. A combined edit is withheld when it needs a
+suppressed check; active diagnostics remain. For every rule, an edit crossing
+regions is accepted only when each region proposes the same replacement and
+authorizes its checks. This can leave a whole table or list as written when a
+partial repair is unavailable. Every proposal still passes the ordinary edit and
+semantic safety checks.
 
 Prettier's `ignore` preserves the next parsed node; `ignore-start` and
 `ignore-end` preserve a top-level range, with blank lines before the comments.

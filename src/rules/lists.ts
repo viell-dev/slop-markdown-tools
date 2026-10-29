@@ -1,3 +1,4 @@
+import { attributed, sourceChecks, type AttributedFinding } from "../core/source-checks.js";
 import type {
   Blockquote,
   FootnoteDefinition,
@@ -977,6 +978,7 @@ const listIndent: Rule = {
     for (const unit of analysis.units) {
       if (!unit.valid || unit.lists.some(({ node }) => indentLists.has(node))) continue;
       const ops: Op[] = [];
+      const parts: Finding[] = [];
       const delta = new Map<Item, number>();
       // The columns from each item's marker to its text once the rule is done,
       // and the fewest columns that its lines can need then.
@@ -1088,12 +1090,71 @@ const listIndent: Rule = {
           lowest.set(item, (accepted ? indent : (item.offset ?? 0)) + narrowest);
         }
         if (!accepted) continue;
-        for (const op of marks) ops.push(op);
+        const inconsistentStarts = new Set(
+          list.items.filter((item) => item.offset !== first.offset).map((item) => item.start),
+        );
+        for (const op of marks) {
+          ops.push(op);
+          const spacing = op.message?.includes("after the list marker");
+          const nestedBullet = holder && !list.node.ordered;
+          const inconsistent = !spacing && inconsistentStarts.has(op.start);
+          const checks = spacing
+            ? ["MD030"]
+            : nestedBullet
+              ? ["MD007", ...(inconsistent ? ["MD005"] : [])]
+              : ["MD005"];
+          const required = spacing ? ["MD030"] : nestedBullet ? ["MD007"] : ["MD005"];
+          parts.push(
+            attributed(
+              { start: op.start, end: op.end, message: op.message! },
+              checks,
+              undefined,
+              required,
+            ),
+          );
+        }
+        // Consistency can be violated on a peer already at the target column:
+        // the combined repair then moves the first item, not that peer.
+        if (holder)
+          for (const item of list.items) {
+            if (item.offset === first.offset) continue;
+            parts.push(
+              attributed(
+                {
+                  start: item.marker,
+                  end: item.markerEnd,
+                  message: "Use consistent indentation for list markers.",
+                },
+                ["MD005"],
+                undefined,
+                [],
+              ),
+            );
+          }
         for (const [item, change] of changes) delta.set(item, change);
       }
       for (const op of shiftOps(analysis, unit, delta, "start")) ops.push(op);
       const finding = unitFinding(source, ops);
-      if (finding) findings.push(finding);
+      if (finding)
+        findings.push(
+          attributed(
+            finding,
+            [
+              ...new Set(
+                parts.flatMap((part) => (part as AttributedFinding)[sourceChecks]!.checks),
+              ),
+            ],
+            parts,
+            [
+              ...new Set(
+                parts.flatMap((part) => {
+                  const info = (part as AttributedFinding)[sourceChecks]!;
+                  return info.editChecks ?? info.checks;
+                }),
+              ),
+            ],
+          ),
+        );
     }
     return findings;
   },

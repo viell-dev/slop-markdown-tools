@@ -1,3 +1,9 @@
+import {
+  compatibilityCheck,
+  compatibilityParts,
+  sourceChecks,
+  type AttributedFinding,
+} from "./source-checks.js";
 import { configuredComments, competitorComments } from "./competitor-comments.js";
 import { diagnostic, sortDiagnostics } from "./diagnostics.js";
 import { protectedVitePress } from "../syntax/vitepress/projection.js";
@@ -144,7 +150,10 @@ function inspect(
     try {
       const returned: unknown = rule.check({
         document,
-        options: enabled.options,
+        options: {
+          ...enabled.options,
+          ...(options.compatibility ? { [compatibilityCheck]: true } : {}),
+        },
         ...(workspace ? { workspace } : {}),
       });
       // A directly returned Promise is invalid, but its later rejection must
@@ -157,7 +166,7 @@ function inspect(
           if (setting(alternative).severity === "off") continue;
           const extra: unknown = rule.check({
             document,
-            options: setting(alternative).options,
+            options: { ...setting(alternative).options, [compatibilityCheck]: true },
             ...(workspace ? { workspace } : {}),
           });
           if (!Array.isArray(extra)) void Promise.resolve(extra).catch(() => undefined);
@@ -181,10 +190,17 @@ function inspect(
       );
       continue;
     }
-    for (const { variant, ...original } of findings) {
+    competitor.prepare(name, findings);
+    const selected = options.compatibility
+      ? findings.flatMap(({ variant, ...finding }) =>
+          compatibilityParts(finding).map((part) => ({ ...part, variant })),
+        )
+      : findings;
+    for (const { variant, ...original } of selected) {
       const compatibleFinding = competitor(name, original, variant);
       if (!compatibleFinding) continue;
       const { compatibilitySeverity, ...finding } = compatibleFinding;
+      delete (finding as AttributedFinding)[sourceChecks];
       if (suppressed(name, original) || protectedVitePress(document, name, original)) continue;
       if (
         original.edit &&
