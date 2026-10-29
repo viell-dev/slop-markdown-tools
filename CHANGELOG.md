@@ -19,6 +19,33 @@ prereleases' notes there are longer than their entries here.
   same safety protections as wrapping; preset defaults remain unchanged
   ([#711](https://github.com/viell-dev/slop-markdown-tools/issues/711)).
 
+- Opt-in `style/link-title` normalizes link, image, and definition title
+  delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
+  It retains source escapes and line breaks and never changes destinations
+  ([#716](https://github.com/viell-dev/slop-markdown-tools/issues/716)).
+
+- Opt-in `style/definition-spacing` writes one space after a reference
+  definition's colon and before its title, also where the colon has none.
+  Multiline definitions, tabbed definitions, footnotes, and Obsidian spacing
+  stay as written
+  ([#717](https://github.com/viell-dev/slop-markdown-tools/issues/717)).
+
+- Opt-in `links/reversed` reports likely reversed links such as
+  `(text)[https://example.com]`, without a fix, since a fix would turn text into
+  a link. Citations, versions, numbers, call syntax and defined labels are not
+  reported
+  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672)).
+
+- Opt-in `links/bare-url` reports bare URLs and email addresses, and adds angle
+  brackets where the dialect already links the address and the brackets keep the
+  same link. CommonMark, which shows them as text, is only reported
+  ([#686](https://github.com/viell-dev/slop-markdown-tools/issues/686)).
+
+- Opt-in `links/allowed-notation` restricts link and image notations with
+  markdownlint's MD054 options, all allowed by default, and turns a title-free
+  link whose text is its URL into an autolink where that renders the same
+  ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
+
 - Opt-in `style/no-tabs` reports tabs with `codeBlocks`, `ignoredCodeLanguages`,
   and `spacesPerTab`, replacing safe prose and indentation tabs while keeping
   literal content and Obsidian list nesting
