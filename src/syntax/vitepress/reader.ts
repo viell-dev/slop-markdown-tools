@@ -25,6 +25,11 @@ export const containerNames = [
   "code-group",
 ] as const;
 const parsers = new Map<string, MarkdownIt>();
+const attributedTokens = new WeakSet<Token>();
+/** Whether the attribute syntax, `{…}`, gave a token any of its attributes. */
+export function attributed(token: Token): boolean {
+  return attributedTokens.has(token);
+}
 
 /** gray-matter's lexical boundary; metadata is kept opaque, never evaluated. */
 export function frontmatterEnd(source: string): number {
@@ -121,7 +126,7 @@ function parserFor(options: VitePressOptions): MarkdownIt {
       }
     }
   });
-  if (options.attrs !== false)
+  if (options.attrs !== false) {
     parser.use(attrs, {
       rule: [
         "inline",
@@ -135,6 +140,27 @@ function parserFor(options: VitePressOptions): MarkdownIt {
         "tasklist",
       ],
     });
+    // Record which tokens the attribute rule gave attributes: links, images,
+    // and table alignment have attributes of their own (#755).
+    const written = new WeakMap<Token, string>();
+    const each = (state: { tokens: Token[] }, visit: (token: Token) => void) => {
+      for (const token of state.tokens) {
+        visit(token);
+        for (const child of token.children ?? []) visit(child);
+      }
+    };
+    parser.core.ruler.before("attrs", "mdrefine_attrs_before", (state) => {
+      each(state, (token) => {
+        if (token.attrs) written.set(token, JSON.stringify(token.attrs));
+      });
+    });
+    parser.core.ruler.after("attrs", "mdrefine_attrs_after", (state) => {
+      each(state, (token) => {
+        if (token.attrs && written.get(token) !== JSON.stringify(token.attrs))
+          attributedTokens.add(token);
+      });
+    });
+  }
   parser.use(fullEmoji);
   if (options.tasklist !== false) parser.use(tasklist);
   if (options.footnote !== false) parser.use(footnote);

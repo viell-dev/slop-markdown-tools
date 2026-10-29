@@ -44,6 +44,48 @@ const fixtures = [
   "Image ![wide](./a.png){width=200 height=100} and text.\n",
 ];
 
+it.each([false, true])(
+  "wraps paragraphs whose braces and `^[` are code with math=%s (#755)",
+  async (math) => {
+    const render = await renderer({ math });
+    const config = configured({ math });
+    for (const source of [
+      'Enable [`style/block-spacing`](rules.md#styleblock-spacing) with `"rules": { "style/block-spacing": "warn" }` to separate blocks.\n',
+      "- [ ] A task with `{ a }` in its words that goes on past the width.\n",
+      "Some words with `^[x]` in code that go on past the width here.\n",
+    ]) {
+      const result = format(source, { config, path: "page.md" });
+      expect(result.diagnostics, source).toEqual([]);
+      expect(result.output, source).not.toBe(source);
+      expect(await render(result.output), source).toBe(await render(source));
+      expect(format(result.output, { config }).output, source).toBe(result.output);
+    }
+  },
+);
+
+it("reads the blocks that style/block-spacing keeps together as VitePress does (#748)", async () => {
+  const render = await renderer({});
+  const config: Config = {
+    extends: [],
+    dialect: "vitepress",
+    rules: { "style/block-spacing": "warn" },
+  };
+  for (const [source, line] of [
+    ["- a | b\n  --|--\n  ```\n- * A\n> : Description\n", 4],
+    ["text\n\n- a\n<b>\nmore\n", 4],
+    ["- > a\n[^b]: note\n", 1],
+  ] as const) {
+    const result = format(source, { config, path: "page.md" });
+    expect(result.diagnostics, source).toEqual([]);
+    expect(result.output, source).toBe(source);
+    // The separator that the parser's reading alone would call for changes
+    // what VitePress shows.
+    const lines = source.split("\n");
+    lines.splice(line, 0, "");
+    expect(await render(lines.join("\n")), source).not.toBe(await render(source));
+  }
+});
+
 it("preserves actual VitePress heading IDs when bracketing literal addresses", async () => {
   const render = await renderer({});
   const config: Config = {

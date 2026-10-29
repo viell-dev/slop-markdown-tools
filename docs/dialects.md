@@ -23,12 +23,12 @@ what is text, and so what formatting has to leave alone. Choose it in the
 
 GitHub's syntax is the common base of the Forgejo, Gitea, and Obsidian dialects,
 and the rules for GitHub Markdown apply to all three. TOML front matter is read
-in those dialects and CommonMark for site generators, though the renderers read its lines as a
-paragraph, and formatting keeps the meaning of [both
-readings](design.md#safety-model). Obsidian and VitePress mark strikethrough with two tildes
-only, so `~a~` is text there. VitePress reads TOML fences as ordinary Markdown;
-its [renderer options and preservation](vitepress.md) describe its separate reading.
-The syntax that only Forgejo and Gitea have is
+in those dialects and CommonMark for site generators, though the renderers read
+its lines as a paragraph, and formatting keeps the meaning of [both
+readings](design.md#safety-model). Obsidian and VitePress mark strikethrough
+with two tildes only, so `~a~` is text there. VitePress reads TOML fences as
+ordinary Markdown; its [renderer options and preservation](vitepress.md)
+describe its separate reading. The syntax that only Forgejo and Gitea have is
 protected from formatting rather than parsed; see [Forgejo and
 Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as an Obsidian
 plugin's, is read as text: use a suppression comment or an `ignore` pattern for
