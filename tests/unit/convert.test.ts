@@ -191,12 +191,12 @@ describe("competitor conversion (#669)", () => {
       prettier: { requirePragma: true, insertPragma: true, endOfLine: "crlf", plugin: "untrusted" },
       markdownlint: { default: false, MD033: true, MD009: { strict: true } },
     });
-    expect(result.omitted.join("\n")).toContain("#723");
+    expect(result.compatibility.prettier?.requirePragma).toBe(true);
     expect(result.config.rules?.["style/line-ending"]).toEqual(["warn", { endOfLine: "crlf" }]);
     // Competitor pragmas never apply with an mdrefine configuration, so the
     // report must not suggest that a written configuration will honor them.
     expect(result.omitted).toContain(
-      "Prettier requirePragma: has no effect with an mdrefine configuration; honoring it during the fallback is #723.",
+      "Prettier requirePragma: applies during fallback only; has no effect with a written mdrefine configuration.",
     );
     expect(result.omitted).toContain(
       "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",

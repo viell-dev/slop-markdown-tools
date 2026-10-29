@@ -228,12 +228,22 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
     process.cwd(),
     flags.stdinFilepath !== undefined,
   );
+  const compatibilityWarnings = new Set<string>();
   const reports: Report[] = [];
   const changes: { file: string; before: string; after: string }[] = [];
   // Selected files that the system refused to let the tool read, or that are not UTF-8 text.
   const unread: string[] = [];
   for (const name of discovery.selected) {
-    const options = discovery.options(name);
+    const options = {
+      ...discovery.options(name),
+      compatibility: loaded.compatibility,
+      onCompatibilityWarning: (message: string) => {
+        if (!compatibilityWarnings.has(message)) {
+          compatibilityWarnings.add(message);
+          process.stderr.write(`mdrefine: ${message}\n`);
+        }
+      },
+    };
     let source: string;
     try {
       source = discovery.read(name);
@@ -482,7 +492,7 @@ configCommand
     ])
       process.stderr.write(`mdrefine: ${message}\n`);
     process.stderr.write(
-      "mdrefine: competitor inline comments and pragmas are not converted and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
+      "mdrefine: competitor inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
     );
   });
 program

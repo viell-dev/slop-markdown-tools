@@ -384,6 +384,14 @@ that cannot be loaded stops the command with exit code `2`.
 
 ## Suppression comments
 
+Competitor comments apply only during the [competitor configuration
+fallback](#competitor-configuration-fallback). A hand-written mdrefine
+configuration or one written by `config convert` ignores all markdownlint and
+Prettier comments and pragmas. The [conversion
+guide](integrations.md#coming-from-prettier-or-markdownlint) describes their
+scopes and how shared rules behave. There is no configuration setting that
+enables competitor comments.
+
 ```markdown
 <!-- mdrefine-disable style/wrap -->
 

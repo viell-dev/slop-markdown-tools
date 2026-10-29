@@ -13,12 +13,14 @@ import { splitByteOrderMark } from "../syntax/parse.js";
 import { lineBreaks } from "../syntax/source.js";
 
 import { loadCompetitorConfig } from "./competitors.js";
-import type { ConversionReport } from "./convert.js";
+import type { CompetitorCompatibility, ConversionReport } from "./convert.js";
 
 /** A loaded configuration, its workspace, plugins, and optional conversion provenance. */
 export interface LoadedConfig {
   /** Report when competitor fallback supplied the configuration. */
   conversion?: ConversionReport;
+  /** Pass to lint/format to honor competitor comments during fallback. */
+  compatibility?: CompetitorCompatibility;
   /** Validated configuration data. */
   config: Config;
   /** Plugin objects loaded from an mdrefine configuration. */
@@ -134,7 +136,13 @@ export async function loadConfig(
     const conversion = await loadCompetitorConfig(directories, false, fallbackRoot);
     if (conversion) {
       validateConfig(conversion.config);
-      return { config: conversion.config, plugins: [], root: fallbackRoot, conversion };
+      return {
+        config: conversion.config,
+        plugins: [],
+        root: fallbackRoot,
+        conversion,
+        compatibility: conversion.compatibility,
+      };
     }
   }
   // The file as the user named it, or where the search found it.

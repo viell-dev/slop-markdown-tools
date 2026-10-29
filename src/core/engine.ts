@@ -1,3 +1,4 @@
+import { configuredComments, competitorComments } from "./competitor-comments.js";
 import { diagnostic, sortDiagnostics } from "./diagnostics.js";
 import { protectedVitePress } from "../syntax/vitepress/projection.js";
 import { setting } from "../config/resolve.js";
@@ -127,9 +128,11 @@ function inspect(
   rules: Record<string, Rule>,
   { workspace, errors: hostErrors }: Host,
   include: (rule: Rule) => boolean = () => true,
+  options: ProcessOptions = {},
 ): Diagnostic[] {
   const result: Diagnostic[] = [];
   const suppressed = suppressions(document);
+  const competitor = competitorComments(document, options);
   const misread = protectedEdit(document);
   const starts = lineStarts(document.source);
   for (const [name, value] of Object.entries(config.rules)) {
@@ -162,21 +165,26 @@ function inspect(
       );
       continue;
     }
-    for (const finding of findings) {
-      if (suppressed(name, finding) || protectedVitePress(document, name, finding)) continue;
+    for (const original of findings) {
+      const compatibleFinding = competitor(name, original);
+      if (!compatibleFinding) continue;
+      const { compatibilitySeverity, ...finding } = compatibleFinding;
+      if (suppressed(name, original) || protectedVitePress(document, name, original)) continue;
       if (
-        finding.edit &&
-        (ambiguousObsidianEdit(document, name, finding.edit) || misread(finding.edit))
+        original.edit &&
+        (ambiguousObsidianEdit(document, name, original.edit) || misread(original.edit))
       ) {
         if (document.dialect === "obsidian" && rule.kind === "style") {
           const retained = { ...finding };
           delete retained.edit;
           retained.message = `Left as written to preserve Obsidian rendering: ${finding.message}`;
-          result.push(diagnostic(starts, name, enabled.severity, retained));
+          result.push(
+            diagnostic(starts, name, compatibilitySeverity ?? enabled.severity, retained),
+          );
         }
         continue;
       }
-      result.push(diagnostic(starts, name, enabled.severity, finding));
+      result.push(diagnostic(starts, name, compatibilitySeverity ?? enabled.severity, finding));
     }
   }
   return result.sort(sortDiagnostics);
@@ -206,10 +214,23 @@ function located(diagnostics: Diagnostic[], mark: string): Diagnostic[] {
  */
 export function lint(source: string, options: ProcessOptions = {}): Diagnostic[] {
   if (options.ranges) checkRanges(options.ranges, source);
+  if (options.compatibility) {
+    const initial = prepare(options).config;
+    options = configuredComments(
+      parse(
+        splitByteOrderMark(source)[1],
+        initial.dialect,
+        options.path,
+        options.plugins,
+        initial.vitepress,
+      ),
+      options,
+    );
+  }
   const { config, rules } = prepare(options);
   const [mark, text] = splitByteOrderMark(source);
   const document = parse(text, config.dialect, options.path, options.plugins, config.vitepress);
-  const diagnostics = inspect(document, config, rules, host(options.workspace));
+  const diagnostics = inspect(document, config, rules, host(options.workspace), undefined, options);
   // Ranges count the marks, and the document's positions do not.
   const scope =
     options.ranges && widen(document.tree, document.source, shifted(options.ranges, -mark.length));
@@ -333,6 +354,19 @@ function formatText(
   options: ProcessOptions,
   ranges: SourceRange[] | undefined,
 ): FormatResult {
+  if (options.compatibility) {
+    const initial = prepare(options).config;
+    options = configuredComments(
+      parse(
+        splitByteOrderMark(source)[1],
+        initial.dialect,
+        options.path,
+        options.plugins,
+        initial.vitepress,
+      ),
+      options,
+    );
+  }
   const { config, rules } = prepare(options);
   // What the workspace throws stops formatting, as it stops `lint`.
   const hosted = host(options.workspace);
@@ -394,6 +428,7 @@ function formatText(
           rules,
           hosted,
           (rule) => rule.kind === "style" && (rule.phase ?? "inline") === phase,
+          options,
         );
         for (const diagnostic of diagnostics) findings.push(diagnostic);
         // With ranges, an edit that reaches outside them is not applied. One
@@ -447,7 +482,14 @@ function formatText(
       if (output === before) {
         // No phase changed the document, so every style finding of this pass
         // describes the final document; only the non-style rules still need to run.
-        const remaining = inspect(document, config, rules, hosted, (rule) => rule.kind !== "style");
+        const remaining = inspect(
+          document,
+          config,
+          rules,
+          hosted,
+          (rule) => rule.kind !== "style",
+          options,
+        );
         // A refusal of this pass was tried on the final text, unless one
         // phase undid what an earlier one did.
         const starts = refused.length ? lineStarts(output) : [];

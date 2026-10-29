@@ -355,6 +355,10 @@ export interface ResolveConfigOptions {
 }
 /** The options of `lint` and `format`. */
 export interface ProcessOptions extends ResolveConfigOptions {
+  /** Runtime provenance from competitor fallback; not a configuration setting. */
+  compatibility?: import("../config/convert.js").CompetitorCompatibility | undefined;
+  /** Receives compatibility comment notices; hosts can deduplicate per run. */
+  onCompatibilityWarning?: ((message: string) => void) | undefined;
   /** The files that links can reach. Without it, links are not checked or rewritten. */
   workspace?: Workspace | undefined;
   /**

@@ -447,8 +447,8 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   },
   { source: "embeddedLanguageFormatting" },
   { source: "singleQuote", rule: "style/link-title" },
-  { source: "requirePragma", issue: 723 },
-  { source: "insertPragma", issue: 723 },
+  { source: "requirePragma" },
+  { source: "insertPragma" },
   { source: "emphasis", rule: "style/emphasis", defaults: { marker: "_" } },
   { source: "strong", rule: "style/strong", defaults: { marker: "*" } },
   { source: "headings", rule: "style/heading", defaults: { style: "atx", closing: "remove" } },
@@ -482,8 +482,21 @@ export const competitorMappings: readonly CompetitorMapping[] = [
   { source: "prose spacing", rule: "style/prose-space" },
 ];
 
+/** Portable runtime provenance supplied by competitor configuration fallback. */
+export interface CompetitorCompatibility {
+  /** Original data, retained portably for configure-file comments. */
+  markdownlint?: Values;
+  /** Original Prettier data, including requirePragma. */
+  prettier?: Values;
+  /** Enabled competitor checks grouped by destination rule. */
+  origins: Record<string, string[]>;
+  /** Prettier pragma overrides, in configuration order. */
+  pragmaOverrides?: { files: string[]; requirePragma: boolean }[];
+}
 /** Converted configuration with the information needed to review its limits. */
 export interface ConversionReport {
+  /** Runtime provenance; never written into an mdrefine configuration. */
+  compatibility: CompetitorCompatibility;
   /** Configuration with no implicit preset. */
   config: Config;
   /** Configuration files read by the Node loader; empty for object conversion. */
@@ -502,6 +515,7 @@ export function convertConfig(input: {
 }): ConversionReport {
   const rules: Record<string, RuleSetting> = {};
   const report: ConversionReport = {
+    compatibility: { ...input, origins: {} },
     config: { extends: [], rules },
     sources: [],
     omitted: [],
@@ -511,6 +525,7 @@ export function convertConfig(input: {
   const owners = new Map<string, string>();
   const set = (row: CompetitorMapping, options: Values, explicit = false) => {
     if (!row.rule) return;
+    (report.compatibility.origins[row.rule] ??= []).push(row.source);
     const previous = rules[row.rule];
     const before: Values = Array.isArray(previous) ? (previous[1] as Values) : {};
     for (const [key, value] of Object.entries(options)) {
@@ -550,7 +565,7 @@ export function convertConfig(input: {
         set(row, row.defaults ?? {});
       if (row.source === "requirePragma" && p.requirePragma === true)
         report.omitted.push(
-          `Prettier requirePragma: has no effect with an mdrefine configuration; honoring it during the fallback is #${row.issue}.`,
+          "Prettier requirePragma: applies during fallback only; has no effect with a written mdrefine configuration.",
         );
       else if (row.source === "insertPragma" && p.insertPragma === true)
         report.omitted.push(
