@@ -36,6 +36,21 @@ it.each(dialects)("preserves literal bytes and normalizes independent prose in %
     semanticFingerprint(parse(source, dialect)),
   );
 });
+it("keeps inline literals' line endings and still converts the prose around them", () => {
+  const config: Config = { extends: [], dialect: "github", rules: { "style/line-ending": "warn" } };
+  for (const [source, expected] of [
+    // Inline math across lines once blocked every conversion in the document.
+    ["Text $a\r\nb$ end.\r\n\r\nText.\r\n", "Text $a\r\nb$ end.\n\nText.\n"],
+    // A code span's bytes are kept, as the docs promise for literal content.
+    ["Text `code\r\nspan` end.\r\n", "Text `code\r\nspan` end.\n"],
+    ['[a](u "t\r\nx") end.\r\n\r\nNext.\r\n', '[a](u "t\r\nx") end.\n\nNext.\n'],
+  ]) {
+    const result = format(source, { config });
+    expect(result.output, source).toBe(expected);
+    expect(result.diagnostics.filter((item) => item.rule.startsWith("engine/"))).toEqual([]);
+    expect(format(result.output, { config }).output).toBe(result.output);
+  }
+});
 it("defaults to LF only when enabled and validates the option", () => {
   expect(
     format("A\rB\r", { config: { extends: [], rules: { "style/line-ending": "warn" } } }).output,

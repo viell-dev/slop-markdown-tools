@@ -2153,12 +2153,13 @@ with `endOfLine: "lf"`: `First\nSecond\n`.
 line-ending convention rather than rewriting CRLF files; Git attributes and
 checkout settings can already manage that convention.
 
-**Left as written:** line endings inside code, HTML, math, and YAML or TOML
-front matter retain their bytes. These literal values can depend on whitespace,
-so this rule differs from Prettier's document-wide replacement. Renderer
-boundary protections and suppressions still apply. A change that fails the
-semantic comparison is reported without a fix. This can leave mixed endings
-around protected content. The rule neither adds nor removes a final newline; use
+**Left as written:** line endings inside code blocks and code spans, HTML, math
+(display and inline), link, image and definition titles, and YAML or TOML front
+matter retain their bytes. These literal values can depend on whitespace, so
+this rule differs from Prettier's document-wide replacement. Renderer boundary
+protections and suppressions still apply. A change that fails the semantic
+comparison is reported without a fix. This can leave mixed endings around
+protected content. The rule neither adds nor removes a final newline; use
 [`style/final-newline`](#stylefinal-newline) for that.
 
 ## `style/link-title`

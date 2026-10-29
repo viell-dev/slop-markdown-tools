@@ -26,7 +26,16 @@ export const lineEndingRule: Rule = {
     const alternative = otherReading(document.tree);
     for (const tree of alternative ? [document.tree, alternative] : [document.tree])
       walk(tree, (node) => {
-        if (["code", "html", "math", "yaml", "toml"].includes(node.type)) opaque.push(range(node));
+        const [start, end] = range(node);
+        if (
+          ["code", "inlineCode", "html", "math", "inlineMath", "yaml", "toml"].includes(
+            node.type,
+          ) ||
+          // A title written across lines keeps its line endings as content.
+          ((node.type === "link" || node.type === "image" || node.type === "definition") &&
+            /[\r\n]/.test(node.title ?? ""))
+        )
+          opaque.push([start, end]);
       });
     opaque.sort((a, b) => a[0] - b[0]);
     const findings: Finding[] = [];
