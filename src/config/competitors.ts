@@ -347,7 +347,7 @@ export async function loadCompetitorConfig(
   };
   const read = async (file: string, chain: string[] = []): Promise<Values> => {
     if (chain.includes(file))
-      throw new Error(`Cyclic competitor extends: ${[...chain, file].map(shown).join(" -> ")}`);
+      throw new Error(`Cyclic extends: ${[...chain, file].map(shown).join(" -> ")}`);
     sources.push(file);
     let value: unknown;
     if (/\.[cm]?[jt]s$/.test(file)) {
@@ -376,7 +376,7 @@ export async function loadCompetitorConfig(
       if (/\.jsonc?$/.test(file)) {
         const errors: ParseError[] = [];
         value = json(text, errors, { allowTrailingComma: true });
-        if (errors.length) throw new Error(`Invalid competitor JSON in ${shown(file)}${bypass}`);
+        if (errors.length) throw new Error(`Invalid JSON in ${shown(file)}${bypass}`);
       } else {
         // Prettier reads an extensionless .prettierrc as YAML too, with the same
         // parser, so JSON reads as JSON there, and a JSON comment joins the key after it.
@@ -384,7 +384,7 @@ export async function loadCompetitorConfig(
           value = text.trim() ? (yaml(text) as unknown) : {};
         } catch (error) {
           throw new Error(
-            `Invalid competitor YAML in ${shown(file)}: ${reason(error).split("\n")[0]!.replace(/:$/, "")}${bypass}`,
+            `Invalid YAML in ${shown(file)}: ${reason(error).split("\n")[0]!.replace(/:$/, "")}${bypass}`,
             { cause: error },
           );
         }

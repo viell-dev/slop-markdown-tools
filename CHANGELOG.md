@@ -9,9 +9,22 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.6.1 - 2026-10-30
+
+The documentation is reorganized for people new to mdrefine: rules have pages of
+their own, upgrading steps and release notes have theirs, and the site has a
+glossary. [What's new in
+0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html#in-061)
+summarizes 0.6.1. No upgrading steps are needed.
 
 ### Changed
+
+- `mdrefine help` with an unknown command ends with
+  `mdrefine: unknown command 'NAME'`, `config` with options but no command names
+  its commands, `lint` with stdin and a path no longer mentions `--write`, which
+  it does not take, and the conversion messages name markdownlint, Prettier, and
+  `#` and underlined headings instead of competitors, ATX, and Setext
+  ([#830](https://github.com/viell-dev/slop-markdown-tools/issues/830)).
 
 - A [glossary](https://viell-dev.github.io/slop-markdown-tools/glossary.html)
   defines the terms the pages use, and pages link it. Rule pages and the

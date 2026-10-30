@@ -41,7 +41,7 @@ mdrefine needs Node.js 22.12 or newer. Install it in the project that holds your
 documents, then check them and apply the fixes:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.6.0
+npm install --save-dev --save-exact mdrefine@0.6.1
 npx mdrefine lint
 npx mdrefine format --write
 ```
@@ -88,10 +88,10 @@ conversion](https://viell-dev.github.io/slop-markdown-tools/integrations.html#co
   same engine without the command line.
 
 mdrefine is meant to replace a general-purpose linter and formatter, such as
-markdownlint and Prettier, for Markdown. It does not cover all of their checks
-yet; [the
+markdownlint and Prettier, for Markdown. [The
 comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
-lists each one with its rule or the issue that tracks it.
+lists each of their checks with the rule that covers it and where it behaves
+differently.
 
 ## Documentation
 

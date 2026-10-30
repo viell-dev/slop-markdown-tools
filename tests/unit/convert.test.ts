@@ -200,7 +200,7 @@ describe("competitor conversion (#669)", () => {
       "Prettier requirePragma: applies during fallback only; has no effect with a written mdrefine configuration.",
     );
     expect(result.omitted).toContain(
-      "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
+      "Prettier insertPragma: not carried over; mdrefine does not write Prettier pragmas.",
     );
     expect(result.omitted.join("\n")).toContain("strict");
     expect(result.config.rules?.["content/html-element"]).toEqual(["error", {}]);
@@ -333,14 +333,14 @@ describe("competitor conversion (#669)", () => {
     },
   );
 
-  it("documents the Setext difference instead of claiming Prettier changes it", async () => {
+  it("documents the underlined heading difference instead of claiming Prettier changes it", async () => {
     const input = "Title\n=====\n";
     expect(await prettierFormat(input, { parser: "markdown" })).toBe(input);
     expect(format(input, { config: convertConfig({ prettier: {} }).config }).output).toBe(
       "# Title\n",
     );
     expect(readFileSync("docs/integrations.md", "utf8")).toContain(
-      "Prettier keeps Setext headings",
+      "Prettier keeps underlined headings",
     );
   });
   it.each([

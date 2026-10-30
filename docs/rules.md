@@ -124,7 +124,12 @@ import { onMounted } from "vue";
 // A link to a rule's section of the former single page, such as
 // rules.html#stylewrap, continues to the rule's page that the tables link.
 onMounted(() => {
-  const fragment = decodeURIComponent(location.hash.slice(1));
+  let fragment;
+  try {
+    fragment = decodeURIComponent(location.hash.slice(1));
+  } catch {
+    return;
+  }
   if (!fragment) return;
   for (const link of document.querySelectorAll(".vp-doc table a")) {
     const page = /\/rules\/([a-z]+)\/([a-z-]+)\.html$/.exec(new URL(link.href).pathname);
