@@ -1,7 +1,16 @@
+import { readdirSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { slug } from "github-slugger";
 import { defineConfig } from "vitepress";
+
+// The release notes, one page per minor version in docs/release-notes/, newest first.
+const releaseNotes = readdirSync(fileURLToPath(new URL("../release-notes/", import.meta.url)))
+  .filter((name) => /^\d+\.\d+\.md$/.test(name))
+  .map((name) => name.slice(0, -".md".length))
+  .sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+  .map((version) => ({ text: `What's new in ${version}`, link: `/release-notes/${version}` }));
 
 export default defineConfig({
   // The configuration's JSON Schema, at the address that the configuration page gives.
@@ -35,7 +44,7 @@ export default defineConfig({
       { text: "Get started", link: "/quick-start" },
       { text: "Rules", link: "/rules" },
       { text: "Reference", link: "/cli" },
-      { text: "Changelog", link: "/changelog" },
+      { text: "Releases", link: releaseNotes[0]!.link },
       {
         text: "Contribute",
         link: "https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md",
@@ -70,6 +79,7 @@ export default defineConfig({
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Versions", link: "/versions" },
           { text: "Upgrading", link: "/upgrading" },
+          ...releaseNotes,
           { text: "Changelog", link: "/changelog" },
         ],
       },

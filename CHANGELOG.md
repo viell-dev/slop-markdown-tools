@@ -5,12 +5,20 @@ Changelog](https://keepachangelog.com/en/1.1.0/), and version numbers follow the
 [versioning
 policy](https://viell-dev.github.io/slop-markdown-tools/versions.html). Each
 release's section is also its [GitHub
-release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
-prereleases' notes there are longer than their entries here.
+release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
+those of 0.6.0 and of the prereleases there are longer than their entries here.
+From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
 ### Changed
+
+- The site has release notes, starting with [What's new in
+  0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html),
+  under "Releases" in the top bar. This changelog's 0.6.0 entry is shorter, with
+  internal work under "Maintenance", and the 0.6.0 and 0.5.0 entries point to
+  their upgrading steps
+  ([#813](https://github.com/viell-dev/slop-markdown-tools/issues/813)).
 
 - The documentation has an
   [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
@@ -23,563 +31,251 @@ prereleases' notes there are longer than their entries here.
 
 ## 0.6.0 - 2026-10-30
 
+[What's new in
+0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html)
+describes this release with examples.
+
+### Upgrading
+
+Without an mdrefine configuration, a markdownlint or Prettier configuration in
+the workspace now replaces the `recommended` preset, and bare `format` exits `1`
+when a file would change. The [upgrading
+steps](https://viell-dev.github.io/slop-markdown-tools/upgrading.html#060) say
+how to keep the earlier results.
+
 ### Changed
 
-- A workspace with a markdownlint or Prettier configuration and no mdrefine
-  configuration now gets the settings converted from them instead of the
-  `recommended` preset, so `lint` and `format` can report other rules, at other
-  severities, ignore other files, and exit differently than in 0.5.0. Upgrading:
-  to keep the `recommended` preset, create an mdrefine configuration, for
-  example with `"extends": ["recommended"]`, or pass `--no-competitor-config`;
-  to adopt the converted settings, write them with
-  `mdrefine config convert --write`. Files that the fallback cannot use apply
-  nothing, and without a usable one the `recommended` preset applies as before:
-  JavaScript and TypeScript configurations, which it never runs, TOML and JSON5
-  ones, and a Prettier configuration whose `.prettierignore` provably excludes
-  all Markdown, so that the coexistence setup in the integration guide keeps
-  checking documents; one with a negated entry never qualifies. The fallback
-  applies none of the patterns of a `.prettierignore` with a negated entry,
-  which conversion cannot express, rather than apply its exclusions without
-  their exceptions, which can select no documents. `.markdownlintignore` is not
-  converted, so the documents it excludes are checked; the fallback names it.
-  The fallback prints one line on stderr for the settings it uses and one for
-  each file it leaves out, with paths from the workspace root, and none with
-  `--quiet`; `config explain` lists the files left out under `conversion.unused`
+- Without an mdrefine configuration, `lint` and `format` use the settings
+  converted from a markdownlint or Prettier configuration in the workspace, and
+  say so on stderr; `--no-competitor-config` turns this off
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- An error about a rule setting that cannot be used, such as an unknown rule or
-  invalid options, names the configuration file that holds it
+- Bare `format` prints the diff and exits `1` when a file would change;
+  `format --diff` is the preview that exits `0`
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- Bare `format` on files prints a diff and exits `1` when formatting would
-  change a document. Scripts needing an exit-`0` preview should use
-  `format --diff`. `--check --diff` prints the diff and fails on changes.
-  Remaining errors still exit `1`, and operational failures take precedence with
-  exit `2`. Stdin keeps its formatted output and exit behavior
+- An error about an unusable rule setting names the configuration file that
+  holds it
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- `lint` and `format` read stdin when `--stdin-filepath` is given without paths,
-  and reject it with paths other than `-`. Help includes examples, workspace
-  scope and exit codes; nested configuration help selects the named subcommand.
-  Mistaken `check`/`fix` commands and lint modes suggest `format`. `rules`
-  accepts `--root`; empty selections print a notice on stderr, and formatting
-  previews name `--write` as the next step
+- `lint` and `format` read stdin with `--stdin-filepath` alone; help shows
+  examples, the workspace scope, and exit codes; `check` and `fix` suggest the
+  `format` command to use; `rules` takes `--root`
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
-  without an `alt` attribute, where renderers certainly show it. `alt=""`, which
-  marks a decorative image, is accepted, and so are images hidden by
-  `aria-hidden="true"`, `hidden`, `inert`, or a hiding style outside GitHub,
-  whose sanitizer removes those attributes. Blank Markdown alternative text is
-  still reported, because Markdown cannot mark an image as decorative. Images in
-  content that may not be shown, such as `<template>` or `<video>`, after HTML
-  whose reading is uncertain, after an end tag that a browser may ignore inside
-  a hidden element, in unused footnote definitions, and in VitePress near Vue
-  syntax are not reported
+- `content/image-alt` also reports an HTML `<img>` without `alt`
   ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
-
-- The documentation describes the behavior of the version it belongs to, without
-  version notes; this changelog keeps the history. Each rule section opens with
-  what the rule does, then states the severity that each preset gives it, as the
-  rule index does
-  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
-
-- `style/table` formats tables inside lists and block quotes with all of its
-  options, as Prettier aligns them, where it used to leave them as written. Each
-  row keeps the quote markers, indentation, and line ending before it, and
-  widths are measured after them, so a second run changes nothing. A header on
-  its list item's marker line keeps its leading pipe or its lack of one, because
-  markdown-it reads `- a | b` above an indented delimiter row as a table outside
-  the list. Tables in footnote definitions, indented tables outside containers,
-  and tables that renderer protections hold stay as written
+- `style/table` formats tables inside lists and block quotes
   ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
-
-- `style/heading` removes heading-owned indentation, including Setext text and
-  underlines, while retaining container prefixes. Its new `closing: "add"`
-  option writes matching closing hash sequences on ATX headings, including the
-  deeper levels of the Setext style. Renderer protections still apply. This
-  interface addition belongs to the next minor release
-  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
-  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
-
-- `style/block-spacing` also separates fenced code blocks that have a closing
-  fence, and tables, from the blocks around them, as markdownlint's `MD031` and
-  `MD058` and Prettier do. Blocks inside list items and footnote definitions
-  stay as written, and a table is separated only from blocks that every renderer
-  reads as separate from it: text below a table, which GFM reads as another row,
-  stays ([#684](https://github.com/viell-dev/slop-markdown-tools/issues/684),
-  [#697](https://github.com/viell-dev/slop-markdown-tools/issues/697)).
-
-- `style/heading` writes one space between ATX heading hashes and text,
-  including tabs and retained closing sequences. Empty headings need no
-  separator. Protected Forgejo and Gitea attribute suffixes stay as written
+- `style/heading` removes the indentation of headings, writes one space after
+  the opening hashes, and takes `closing: "add"`
   ([#676](https://github.com/viell-dev/slop-markdown-tools/issues/676),
-  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678)).
-
+  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678),
+  [#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
+  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
+- `style/block-spacing` also separates fenced code blocks and tables from the
+  blocks around them
+  ([#684](https://github.com/viell-dev/slop-markdown-tools/issues/684),
+  [#697](https://github.com/viell-dev/slop-markdown-tools/issues/697)).
+- The documentation pages describe the current version without version notes,
+  and each rule's section opens with what the rule does
+  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
 - The [comparison with Prettier and
   markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
-  lists every markdownlint rule and every Prettier Markdown option and
-  formatting choice, with the issue that tracks each check not yet covered
+  covers every markdownlint rule and Prettier option
   ([#668](https://github.com/viell-dev/slop-markdown-tools/issues/668)).
-
-- Tokenizer identity verification partitions the unchanged deterministic corpus
-  into bounded unit cases while retaining every source, selection and assertion
-  under the existing deadline
-  ([#654](https://github.com/viell-dev/slop-markdown-tools/issues/654)).
-
-- Release evidence selects the latest check-run identity, preserving pending and
-  unsuccessful reruns without letting an older completed null-start check hide a
-  newer success
-  ([#647](https://github.com/viell-dev/slop-markdown-tools/issues/647)).
-
-- The shipped internal protection-source declaration uses its existing point
-  type without an undeclared direct type import. Installed package checks cover
-  that declaration with npm and strict pnpm; public entry points are unchanged
-  ([#655](https://github.com/viell-dev/slop-markdown-tools/issues/655)).
-
-- Maintainer guidance distinguishes intentional first-occurrence fixture
-  rewrites from sanitizers, preserving intended bytes when triaging scanner
-  alerts ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).
-
-- Workspace memory verification separates document/cache lifecycle checks from a
-  fresh compiled-product process's retained-text sample. The existing source
-  allowance remains enforced, with numeric failure evidence and opt-in heap
-  diagnostics
-  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
-
-- Filesystem discovery and selection, on-demand related-file lookup, and
-  in-place write/recovery now have separate internal owners. Public discovery,
-  selection and filesystem safety contracts are preserved
-  ([#620](https://github.com/viell-dev/slop-markdown-tools/issues/620)).
-
-- The Obsidian verification harness uses only its service-provided browser and
-  ChromeDriver binaries, removing unused automatic-download FTP/PAC and
-  `extract-zip` dependencies. Missing or incomplete executables fail explicitly;
-  native host downloads, caching and version selection retain their existing
-  owners ([#639](https://github.com/viell-dev/slop-markdown-tools/issues/639),
-  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640)).
-
-- Dependency updates follow parser, VitePress/reference and tooling maintenance
-  units across dependency declarations. Existing compatibility deferrals remain,
-  with explicit revisit checks for peers, tool pins and verified host baselines
-  ([#636](https://github.com/viell-dev/slop-markdown-tools/issues/636),
-  [#637](https://github.com/viell-dev/slop-markdown-tools/issues/637)).
-
-- Five parser extensions used only to build the bundled parser are development
-  dependencies. Installed consumers retain the required runtime utilities and
-  public plugin types; package checks cover both parser paths and the shipped
-  internal declarations. Release audits include bundled inputs regardless of
-  npm's development flag
-  ([#624](https://github.com/viell-dev/slop-markdown-tools/issues/624)).
-
-- Maintained internal parser algorithms live in directly checked TypeScript
-  source, with source guards and generated provenance linking their rationale,
-  ownership and removal conditions to the dependency records. Parser behavior,
-  extension compatibility and the bundled license graph are preserved
-  ([#622](https://github.com/viell-dev/slop-markdown-tools/issues/622),
-  [#623](https://github.com/viell-dev/slop-markdown-tools/issues/623)).
-
-- Test suites separate engine, configuration, plugin, rule and comparison
-  responsibilities. Shared parser/CLI support and authored native fixtures have
-  explicit ownership, preserving their cases and native workload plans
-  ([#634](https://github.com/viell-dev/slop-markdown-tools/issues/634)).
-
-- Internal renderer protections have named collectors and one cached result;
-  rule registration and semantic acceptance are separate from engine phase
-  orchestration, preserving the public API and formatting behavior
-  ([#618](https://github.com/viell-dev/slop-markdown-tools/issues/618),
-  [#619](https://github.com/viell-dev/slop-markdown-tools/issues/619)).
-
-- Workflow regression tests check YAML structure while retaining exact evidence
-  identities. Contributor and release policy is authoritative; agent navigation
-  permits cohesive internal modules, and optional review bots have no guaranteed
-  availability
-  ([#635](https://github.com/viell-dev/slop-markdown-tools/issues/635),
-  [#641](https://github.com/viell-dev/slop-markdown-tools/issues/641),
-  [#642](https://github.com/viell-dev/slop-markdown-tools/issues/642)).
-
-- Native renderer reports validate the intended documents, widths, views and
-  calibration controls, including unchanged formatting attempts. Obsidian
-  PR/release checks pin the app, installer and Docker base and record observed
-  runtime/image identity; weekly/manual checks retain explicit latest coverage
-  ([#632](https://github.com/viell-dev/slop-markdown-tools/issues/632),
-  [#633](https://github.com/viell-dev/slop-markdown-tools/issues/633)).
-
-- Linux 24 CI collects unit and coverage evidence in one required, isolated job.
-  Hosted release preparation reuses exact-commit push/main CI results while
-  freshly building and testing its publication tarball; local preparation
-  retains the complete checks
-  ([#628](https://github.com/viell-dev/slop-markdown-tools/issues/628),
-  [#629](https://github.com/viell-dev/slop-markdown-tools/issues/629)).
-
-- Builds prepare fresh staged output and reject unexpected packaged files. CI
-  and release preparation reuse one verified build within their invocation,
-  while standalone commands remain self-contained
-  ([#626](https://github.com/viell-dev/slop-markdown-tools/issues/626),
-  [#627](https://github.com/viell-dev/slop-markdown-tools/issues/627)).
-
-- Native PR checks classify semantic inputs and resolved dependency roles, avoid
-  unnecessary hosts for VitePress-only dependency updates or offline-tool
-  changes, and enforce applicable comparisons through one required result.
-  Release still compares every native host at its exact commit
-  ([#630](https://github.com/viell-dev/slop-markdown-tools/issues/630),
-  [#631](https://github.com/viell-dev/slop-markdown-tools/issues/631)).
-
-- Dependency automation also defers the markdown-it 15 lines of
-  `@mdit/plugin-container`, `@mdit/plugin-emoji` and `@mdit/plugin-tasklist`
-  assessed in [#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),
-  [#610](https://github.com/viell-dev/slop-markdown-tools/pull/610) and
-  [#611](https://github.com/viell-dev/slop-markdown-tools/pull/611), under the
-  same reconsideration conditions as the earlier deferrals.
 
 ### Added
 
-- Honor markdownlint inline configuration and suppression comments, Prettier
-  ignore comments, and `requirePragma` during competitor configuration fallback.
-  Written mdrefine configurations ignore these comments. Runtime provenance
-  keeps each tool's enabled checks separate, attributes combined rules' findings
-  to their source checks, and withholds edits that disagree across suppression
-  regions ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
-
-- `config convert` translates markdownlint and Prettier settings into a
-  configuration, with exclusive `--write`, source and conflict reporting, and
-  in-memory fallback when no mdrefine configuration exists. Disable fallback
-  with `--no-competitor-config`; fallback never executes competitor scripts and
-  preserves source-relative patterns within documented dialect subsets,
-  reporting unsupported patterns for manual migration. Directory exclusions
-  retain their descendants when converting inside an excluded directory.
-  Prettier brace literals and terminal globstars retain their matching branches;
-  ignore conversion reports its case-sensitive approximation. Converted
-  overrides accumulate through `ruleUpdates`. A markdownlint-cli2 file without
-  `config` reads as markdownlint's defaults, as markdownlint-cli2 does, and
-  MD007's `start_indented` sets `style/quote-marker`'s `listItems` to false,
-  which the two would otherwise undo. The library exports `convertConfig`,
-  `competitorMappings` and the `ConversionReport`, `CompetitorMapping` and
-  `CompetitorCompatibility` types from `mdrefine`, and `loadConfig`,
-  `loadCompetitorConfig`, `competitorFiles` and `LoadedConfig` from
-  `mdrefine/node`; `lint` and `format` take a `compatibility` option
-  ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)). Without
-  `--root`, `--write` creates the configuration where `lint` looks for the
-  workspace's configuration and prints its path; `--config`, `--dialect`,
-  `--no-competitor-config`, and a `--root` that is not a directory are usage
-  errors. An extensionless `.prettierrc` is read as YAML, as Prettier reads it,
-  and errors in competitor configuration files name the file
-  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- Opt-in `style/line-ending` selects LF, CRLF, CR, or the first ending with
-  `endOfLine`, preserving hard breaks and literal content bytes
-  ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)).
-- External formatter entries can select YAML and TOML `frontMatter` bodies, with
-  the existing command limits and a guard for surrounding Markdown. Metadata
-  semantics remain the configured tool's responsibility; no YAML or TOML printer
-  is bundled
-  ([#718](https://github.com/viell-dev/slop-markdown-tools/issues/718)).
-
-- Opt-in `content/html-element` reports HTML elements, once each at the opening
-  tag, in HTML blocks and inline HTML, with markdownlint's MD033 options
-  `allowedElements` and `tableAllowedElements`, compared without letter case.
-  Comments, mdrefine's suppression comments included, autolinks such as
-  `<user@example.com>`, code, and the text of raw-text elements are not
-  elements. VitePress components count as elements; VitePress HTML blocks stay
-  opaque. Where the reading of the HTML becomes uncertain, as after an unclosed
-  comment, the rest is not reported
-  ([#685](https://github.com/viell-dev/slop-markdown-tools/issues/685)).
-
-- Two style rules in `recommended` write the prefixes of block quotes and their
-  contents. `style/quote-marker` writes one space after each `>`, removing extra
-  spaces and adding a missing one, and takes markdownlint's MD027 `listItems`
-  option, under which it moves a list that starts a quote's line with its lines.
-  `style/lazy-continuation` writes a quote's `>` and a list item's or footnote
-  definition's indentation on lazy continuation lines, keeping a footnote's
-  first line on its label's line. Both leave the source as written where the
-  preferred form could read otherwise: indented code, a lazy line that could
-  start a block, and, in Obsidian, a tag directly after `>`, a callout's marker
-  after two spaces, and the lazy lines whose prefixes change Live Preview, which
-  are reported as left as written
+- `config convert` writes an mdrefine configuration from markdownlint and
+  Prettier settings, and the library exports the conversion
+  ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669),
+  [#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+- During the fallback, markdownlint's inline configuration comments, Prettier's
+  ignore comments, and `requirePragma` apply
+  ([#723](https://github.com/viell-dev/slop-markdown-tools/issues/723)).
+- In `recommended`: `style/quote-marker`, one space after each `>`, and
+  `style/lazy-continuation`, the `>` and indentation on lazy continuation lines
   ([#682](https://github.com/viell-dev/slop-markdown-tools/issues/682),
   [#713](https://github.com/viell-dev/slop-markdown-tools/issues/713)).
-
-- Opt-in `structure/heading-template` checks a configured heading sequence with
-  wildcards and optional case matching, using the document's independent outline
-  ([#692](https://github.com/viell-dev/slop-markdown-tools/issues/692)).
-- Opt-in `content/proper-names` reports incorrect capitalization of configured
-  names in prose, with optional code-block and HTML checking; inline code and
-  destinations remain excluded
-  ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693)).
-
-- Opt-in `style/code-block` checks `consistent`, `fenced`, or `indented` code
-  form, converting indented blocks to safe fences outside VitePress and
-  reporting other mismatches without losing code or metadata
-  ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)).
-
-- `style/block-spacing` takes `linesAbove` and `linesBelow`, the blank lines
-  that a heading needs above and below it, as one count or one per level, and
-  `includeFrontMatter`, which also separates a heading directly below front
-  matter. The counts are minimums, and the default stays one blank line. A
-  configuration whose counts exceed `style/blank-lines`' `maximum` is refused
-  when it is read, instead of leaving the two rules to undo each other
-  ([#679](https://github.com/viell-dev/slop-markdown-tools/issues/679)).
-
-- `structure/heading-increment` takes `frontMatterTitle`, with the values of
-  `structure/initial-heading`'s, which treats a front-matter title as a level-1
-  heading, so that the first heading may be at most level 2. It is off by
-  default, because the supported renderers do not show such a title as a heading
-  ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699)).
-
-- Three report-only rules, in no preset, cover markdownlint's MD037, MD038, and
-  MD039: `content/emphasis-spacing` reports emphasis or strong markers with
-  blank space just inside them, as in `** bold **`, where the parser reads
-  emphasis once the spaces are gone; `content/inline-code-spacing` reports blank
-  space at the ends of a code span that renderers show as part of the code; and
-  `links/text-spacing` reports blank space at the ends of link text. They leave
-  alone a single `*` or `_` with spaces on both sides, as in `a * b * c`,
-  arithmetic, markers inside words, wildcard patterns such as `*.md *`,
-  identifiers, emoji codes, the content of inline HTML elements such as
-  `<code>`, JSX comments, and code whose blank space shows syntax or
-  indentation, as in `- `, or keeps a backtick apart
+- Style rules in no preset: `style/line-ending`
+  ([#712](https://github.com/viell-dev/slop-markdown-tools/issues/712)),
+  `style/code-block`
+  ([#695](https://github.com/viell-dev/slop-markdown-tools/issues/695)),
+  `style/link-title`
+  ([#716](https://github.com/viell-dev/slop-markdown-tools/issues/716)),
+  `style/definition-spacing`
+  ([#717](https://github.com/viell-dev/slop-markdown-tools/issues/717)),
+  `style/no-tabs`
+  ([#671](https://github.com/viell-dev/slop-markdown-tools/issues/671)),
+  `style/prose-space`
+  ([#720](https://github.com/viell-dev/slop-markdown-tools/issues/720)),
+  `links/bare-url`
+  ([#686](https://github.com/viell-dev/slop-markdown-tools/issues/686)), and
+  `links/allowed-notation`
+  ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
+- Problem rules in no preset: `content/html-element`
+  ([#685](https://github.com/viell-dev/slop-markdown-tools/issues/685)),
+  `content/proper-names`
+  ([#693](https://github.com/viell-dev/slop-markdown-tools/issues/693)),
+  `content/line-length`
+  ([#673](https://github.com/viell-dev/slop-markdown-tools/issues/673)),
+  `content/emphasis-spacing`, `content/inline-code-spacing`, and
+  `links/text-spacing`
   ([#689](https://github.com/viell-dev/slop-markdown-tools/issues/689),
   [#690](https://github.com/viell-dev/slop-markdown-tools/issues/690),
-  [#691](https://github.com/viell-dev/slop-markdown-tools/issues/691)).
-
-- Opt-in `content/line-length` reports heading, code and table overflow with
-  per-kind limits, switches and display-column measurement
-  ([#673](https://github.com/viell-dev/slop-markdown-tools/issues/673)).
-- `style/wrap` takes `mode: "never"` to join paragraphs onto one line with the
-  same safety protections as wrapping; preset defaults remain unchanged
-  ([#711](https://github.com/viell-dev/slop-markdown-tools/issues/711)).
-
-- Opt-in `style/link-title` normalizes link, image, and definition title
-  delimiters with `double`, `single`, `parentheses`, and `consistent` choices.
-  It retains source escapes and line breaks and never changes destinations
-  ([#716](https://github.com/viell-dev/slop-markdown-tools/issues/716)).
-
-- Opt-in `style/definition-spacing` writes one space after a reference
-  definition's colon and before its title, also where the colon has none.
-  Multiline definitions, tabbed definitions, footnotes, and Obsidian spacing
-  stay as written
-  ([#717](https://github.com/viell-dev/slop-markdown-tools/issues/717)).
-
-- Opt-in `links/reversed` reports likely reversed links such as
-  `(text)[https://example.com]`, without a fix, since a fix would turn text into
-  a link. Citations, versions, numbers, call syntax and defined labels are not
-  reported
-  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672)).
-
-- Opt-in `links/bare-url` reports bare URLs and email addresses, and adds angle
-  brackets where the dialect already links the address and the brackets keep the
-  same link. CommonMark, which shows them as text, is only reported
-  ([#686](https://github.com/viell-dev/slop-markdown-tools/issues/686)).
-
-- Opt-in `links/allowed-notation` restricts link and image notations with
-  markdownlint's MD054 options, all allowed by default, and turns a title-free
-  link whose text is its URL into an autolink where that renders the same
-  ([#696](https://github.com/viell-dev/slop-markdown-tools/issues/696)).
-
-- Opt-in `style/no-tabs` reports tabs with `codeBlocks`, `ignoredCodeLanguages`,
-  and `spacesPerTab`, replacing safe prose and indentation tabs while keeping
-  literal content and Obsidian list nesting
-  ([#671](https://github.com/viell-dev/slop-markdown-tools/issues/671)).
-
-- Opt-in `style/prose-space` collapses repeated prose spaces without moving line
-  breaks, preserving literal content, indentation and hard breaks
-  ([#720](https://github.com/viell-dev/slop-markdown-tools/issues/720)).
-
-- `links/valid` takes `ignoredFragments`, a regular expression for fragments not
-  to check, validated when the configuration is read, and `exactCase`, which
-  also reports a fragment that reaches its anchor only because the renderer
-  ignores letter case. By default fragments still match as each dialect's
-  renderer matches them, and anchors are still generated per dialect.
-  `Workspace.resolve` returns the anchor's own spelling as `fragmentAnchor`
-  ([#705](https://github.com/viell-dev/slop-markdown-tools/issues/705)).
-
-- `links/undefined-reference` takes `shortcutSyntax`, which also reports an
-  undefined shortcut reference such as `[label]`, and `ignoredLabels`. Shortcuts
-  leave alone task marks, alert and callout markers, Obsidian inline footnotes,
-  Forgejo and Gitea shortlinks, inline HTML elements, and URLs written as text,
-  delimited as GFM's autolink literals are, besides the existing indexes, code,
-  math, and HTML. Both are off by default
-  ([#706](https://github.com/viell-dev/slop-markdown-tools/issues/706)).
-
-- `style/trailing-space` takes `hardBreakSpaces` for exact space-style breaks,
-  `listItemEmptyLines` to keep blank list-line indentation, and report-only
-  `codeBlocks`. `style/thematic-break` accepts any exact break text and follows
-  the first exact text with `consistent`. `style/list-indent` takes
-  `startIndented` and `startIndent` for first-level indentation. Preset defaults
-  stay unchanged; existing protections remain, and the thematic-break protection
-  for a compact hyphen line now also covers longer runs such as `-----`
-  ([#702](https://github.com/viell-dev/slop-markdown-tools/issues/702),
-  [#687](https://github.com/viell-dev/slop-markdown-tools/issues/687),
-  [#701](https://github.com/viell-dev/slop-markdown-tools/issues/701)).
-
-- `style/inline-code` writes a code span with the fewest backticks its content
-  allows, keeping padding and table cell escapes, and keeps its delimiters where
-  a shorter run could pair with an earlier one. `style/code-fence` removes
-  spaces and tabs before the info string, keeping metadata and nested fence
-  lengths. These extend the existing rules without new options
-  ([#714](https://github.com/viell-dev/slop-markdown-tools/issues/714),
-  [#715](https://github.com/viell-dev/slop-markdown-tools/issues/715)).
-
-- `style/table` takes `pipeStyle` for explicit, document-consistent, or
-  per-table borders, `style: "tight"`, `alignedDelimiter` for header-aligned
-  delimiters, and `padding: "alignment"` for padding by column alignment.
-  Defaults remain aligned cells with both borders and padding on the right;
-  required pipes and renderer protections remain
-  ([#708](https://github.com/viell-dev/slop-markdown-tools/issues/708),
-  [#709](https://github.com/viell-dev/slop-markdown-tools/issues/709),
-  [#719](https://github.com/viell-dev/slop-markdown-tools/issues/719)).
-
-- `links/unused-definition` and `links/empty` take `ignoredDefinitions`, the
-  labels of definitions written as comments, which default to `["//"]`.
-  `recommended` no longer reports `[//]: # (comment)` while no reference uses
-  its label; footnotes are still reported
-  ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
-
-- `style/emphasis` and `style/strong` accept `marker: "consistent"`: the first
-  parsed emphasis or strong text chooses its marker for the document. Preset
-  defaults stay unchanged
-  ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
-  [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
-
-- Three report-only rules, in no preset, cover markdownlint's MD026, MD036, and
-  MD059 with their options: `structure/heading-punctuation` reports a heading
-  that ends with sentence punctuation, `structure/emphasis-heading` a paragraph
-  of only emphasized or strong text, and `links/descriptive-text` a link whose
-  whole text, such as "here", does not say where it leads. They read headings
-  and links as each dialect's renderer shows them, and leave abbreviations,
-  ellipses, and emoji shortcodes at the end of a heading alone
-  ([#681](https://github.com/viell-dev/slop-markdown-tools/issues/681),
-  [#688](https://github.com/viell-dev/slop-markdown-tools/issues/688),
-  [#698](https://github.com/viell-dev/slop-markdown-tools/issues/698)).
-
-- Three report-only rules, in no preset, cover markdownlint's MD014, MD018,
-  MD020, and MD028: `structure/unspaced-heading` reports text such as `#Heading`
-  or `#Heading#` that would be a heading with a space after its hashes,
-  `structure/split-quote` a blank line between two block quotes, and
-  `content/shell-prompt` a shell code block whose every command starts with a
-  `$` or `%` prompt and that shows no output. They leave Obsidian tags, issue
-  references such as `#123`, shebangs, and a blank line before an alert or
-  callout alone
+  [#691](https://github.com/viell-dev/slop-markdown-tools/issues/691)),
+  `content/shell-prompt`, `structure/unspaced-heading`, and
+  `structure/split-quote`
   ([#674](https://github.com/viell-dev/slop-markdown-tools/issues/674),
   [#675](https://github.com/viell-dev/slop-markdown-tools/issues/675),
   [#677](https://github.com/viell-dev/slop-markdown-tools/issues/677),
-  [#683](https://github.com/viell-dev/slop-markdown-tools/issues/683)).
+  [#683](https://github.com/viell-dev/slop-markdown-tools/issues/683)),
+  `structure/heading-punctuation`, `structure/emphasis-heading`, and
+  `links/descriptive-text`
+  ([#681](https://github.com/viell-dev/slop-markdown-tools/issues/681),
+  [#688](https://github.com/viell-dev/slop-markdown-tools/issues/688),
+  [#698](https://github.com/viell-dev/slop-markdown-tools/issues/698)),
+  `structure/heading-template`
+  ([#692](https://github.com/viell-dev/slop-markdown-tools/issues/692)), and
+  `links/reversed`
+  ([#672](https://github.com/viell-dev/slop-markdown-tools/issues/672)).
+- Code formatters can format YAML and TOML front matter
+  ([#718](https://github.com/viell-dev/slop-markdown-tools/issues/718)).
+- `style/wrap` takes `mode: "never"`, which joins each paragraph onto one line
+  ([#711](https://github.com/viell-dev/slop-markdown-tools/issues/711)).
+- `style/block-spacing` takes `linesAbove`, `linesBelow`, and
+  `includeFrontMatter` for headings
+  ([#679](https://github.com/viell-dev/slop-markdown-tools/issues/679)).
+- `structure/heading-increment` takes `frontMatterTitle`
+  ([#699](https://github.com/viell-dev/slop-markdown-tools/issues/699)).
+- `links/valid` takes `ignoredFragments` and `exactCase`
+  ([#705](https://github.com/viell-dev/slop-markdown-tools/issues/705)).
+- `links/undefined-reference` takes `shortcutSyntax` and `ignoredLabels`
+  ([#706](https://github.com/viell-dev/slop-markdown-tools/issues/706)).
+- `style/trailing-space` takes `hardBreakSpaces`, `listItemEmptyLines`, and
+  `codeBlocks`; `style/thematic-break` takes any exact text and `consistent`;
+  `style/list-indent` takes `startIndented` and `startIndent`
+  ([#687](https://github.com/viell-dev/slop-markdown-tools/issues/687),
+  [#701](https://github.com/viell-dev/slop-markdown-tools/issues/701),
+  [#702](https://github.com/viell-dev/slop-markdown-tools/issues/702)).
+- `style/inline-code` writes the fewest backticks a span needs, and
+  `style/code-fence` removes blank space before the info string
+  ([#714](https://github.com/viell-dev/slop-markdown-tools/issues/714),
+  [#715](https://github.com/viell-dev/slop-markdown-tools/issues/715)).
+- `style/table` takes `pipeStyle`, `style: "tight"`, `alignedDelimiter`, and
+  `padding: "alignment"`
+  ([#708](https://github.com/viell-dev/slop-markdown-tools/issues/708),
+  [#709](https://github.com/viell-dev/slop-markdown-tools/issues/709),
+  [#719](https://github.com/viell-dev/slop-markdown-tools/issues/719)).
+- `links/unused-definition` and `links/empty` take `ignoredDefinitions`, so
+  `recommended` no longer reports comment definitions such as `[//]: # (note)`
+  ([#707](https://github.com/viell-dev/slop-markdown-tools/issues/707)).
+- `style/emphasis` and `style/strong` take `marker: "consistent"`
+  ([#703](https://github.com/viell-dev/slop-markdown-tools/issues/703),
+  [#704](https://github.com/viell-dev/slop-markdown-tools/issues/704)).
 
 ### Fixed
 
-- `style/wrap` indents a quoted list item's continuation lines to the item's
-  content where the quote marker directly precedes the list marker, as in
-  `>10) text`. It indented them one column short, and `style/lazy-continuation`
-  then added the column back, so formatting oscillated and left the document
-  unchanged
+- `style/wrap` no longer oscillates with `style/lazy-continuation` on a quoted
+  list item such as `>10) text`
   ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
-
-- In VitePress, rules leave as written a list item whose first line markdown-it
-  reads as a table header, as in `* a | b` above `  --|--`: markdown-it tries a
-  table before a list, so it shows a table whose first cell holds the marker.
-  `style/list-marker` and `style/list-indent` proposed edits there that the
-  engine refused, and `style/table` formatted the table by the list's reading.
-  The list rules also keep a list whose item's table markdown-it reads only
-  because of its indentation, as in `*   a | b` above `    --|--`, and the lists
-  next to such a list, which another marker would join to it
+- In VitePress, rules leave as written a list item that markdown-it reads as a
+  table header
   ([#763](https://github.com/viell-dev/slop-markdown-tools/issues/763)).
-
-- `style/heading` keeps the indentation of a heading line that is `---` or `+++`
-  alone, such as an underline `  ---`, below a first line of the same fence that
-  no line closes, where removing it would close front matter and make the lines
-  above it front matter. It proposed that edit, which the engine refused, in
-  GitHub, Forgejo, Gitea and CommonMark
+- `style/heading` no longer proposes an edit that would close front matter
   ([#764](https://github.com/viell-dev/slop-markdown-tools/issues/764)).
-
-- In VitePress, a list item or paragraph that a component line such as
-  `<MyComponent />` ends is left as written, as other blocks with a component
-  that mdast cannot represent are. VitePress ends the paragraph at the component
-  line, so `style/lazy-continuation` proposed indenting a lazy line below it,
-  which would move that line into the list item, and the engine refused it. The
-  list rules keep a list directly beside such a list as written, because another
-  marker would join the two
-  ([#769](https://github.com/viell-dev/slop-markdown-tools/issues/769)).
-
-- GitHub link checks and workspace indexes read definitions directly above an
-  interrupting table as visible text, including in lists and quotes, while
-  keeping formatting from hiding that text. A Setext underline line such as
-  `===` directly below the definitions keeps them, as on GitHub, and
-  `style/wrap` no longer joins it with the next line, which made GitHub show the
-  definitions as text
+- In VitePress, a list item or paragraph that a component line ends is left as
+  written ([#769](https://github.com/viell-dev/slop-markdown-tools/issues/769)).
+- On GitHub, definitions directly above a table that interrupts them are read as
+  the visible text that GitHub shows
   ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
-
-- `links/valid` accepts a GitHub file fragment whose `user-content-` prefix is
-  not lowercase, such as `#User-Content-setup`, as GitHub's file view does, and
-  its `exactCase` option reports the lowercase spelling
+- `links/valid` accepts a GitHub `user-content-` fragment in any letter case
   ([#739](https://github.com/viell-dev/slop-markdown-tools/issues/739)).
-
-- `style/wrap`, `content/emphasis-spacing`, `style/line-ending` and
-  `structure/heading-template` read changed text again with the configuration's
-  syntax plugins, as the document is read, rather than without them
+- Rules that read changed text again use the configuration's syntax plugins
   ([#752](https://github.com/viell-dev/slop-markdown-tools/issues/752)).
-
-- Emphasis and strong marker rules keep pairs crossing protected Obsidian HTML
-  or VitePress component blocks without proposing refused edits
+- Emphasis and strong rules keep pairs that cross protected Obsidian HTML or
+  VitePress component blocks
   ([#766](https://github.com/viell-dev/slop-markdown-tools/issues/766),
   [#768](https://github.com/viell-dev/slop-markdown-tools/issues/768)).
-
-- A table whose header row is a complete HTML tag alone on its line, directly
-  below text, as in `<b title="|">` above `|-|-|`, is now read as a table, as
-  GitHub, Forgejo, Gitea and VitePress read it, instead of as HTML. Rules
-  formatted it by the wrong reading. `style/block-spacing` leaves such a table
-  directly below its text, where a blank line would make the tag line HTML, and
-  adds no blank line that would end a block quote above a lazy header line. In
-  Forgejo and Gitea, rules leave a table in a list item or block quote as
-  written where the lines below it continue it lazily, which those renderers
-  read as more rows. In VitePress, `style/table` formats only the tables that
-  VitePress reads on the same lines and leaves the others, such as a one-column
-  table whose header has no pipe, as written
+- A table whose header row is an HTML tag holding a pipe is read as a table, as
+  the renderers read it, so formatting no longer drops its rows
   ([#770](https://github.com/viell-dev/slop-markdown-tools/issues/770)).
-
-- A lazy line below a list item's or block quote's paragraph that could start an
-  HTML block of the kind that cannot interrupt a paragraph, such as `<b>` alone
-  on its line, now continues the paragraph, as CommonMark, Forgejo, Gitea,
-  VitePress and Obsidian read it, instead of ending the container. Rules
-  formatted it by the wrong reading: `style/block-spacing` added a blank line
-  after the tag, and the item lost its last line. GitHub reads it otherwise: it
-  ends the containers there and shows the tag and the lines below it, up to a
-  blank line, as HTML, with Markdown such as `*` as literal text. In the GitHub
-  dialect, rules now leave those containers and lines as written, also where
-  CommonMark reads the paragraph text as a Setext heading or as link definitions
-  before the tag line. HTML that may interrupt a paragraph, such as `<div>` or a
-  comment, still ends the paragraph
+- A lazy line such as `<b>` below a list item's or quote's paragraph continues
+  the paragraph, as most renderers read it; on GitHub, which ends the containers
+  there, they stay as written
   ([#762](https://github.com/viell-dev/slop-markdown-tools/issues/762)).
-
-- In Obsidian, rules no longer change a list item that starts on a footnote's
-  label line, as in `[^1]: - item`, below a run of three or more backticks that
-  nothing closes. Live Preview shows such an item as code carried from the run
+- In Obsidian, rules no longer change a list item on a footnote's label line
+  below an unclosed run of backticks
   ([#670](https://github.com/viell-dev/slop-markdown-tools/issues/670)).
-
-- `style/block-spacing` no longer proposes a blank line that the engine then
-  refuses as a change of meaning. Below TOML front matter, it keeps a block
-  quote that the reading without front matter continues below a list, and in
-  VitePress it adds nothing inside a block of VitePress's own reading, such as a
-  paragraph that it continues lazily over `<b>` or a footnote definition below a
-  list item, or an unclosed fence that it reads below a table
+- `style/block-spacing` no longer proposes blank lines that the engine refuses,
+  below TOML front matter and in VitePress
   ([#748](https://github.com/viell-dev/slop-markdown-tools/issues/748)).
-
-- In VitePress, `style/wrap` reflows a paragraph that holds braces or `^[` only
-  in code spans, such as `` `{ "a": 1 }` `` beside a link or in a task item:
-  only attribute blocks and inline footnotes that VitePress reads, and Vue
-  whitespace between inline elements, keep a paragraph as written, and other
-  rules no longer leave such code spans alone either. A paragraph that VitePress
-  syntax keeps as written is reported by `reportUnreflowed` with its reason
-  instead of being skipped silently
+- In VitePress, `style/wrap` reflows a paragraph whose braces are only in code
+  spans, and `reportUnreflowed` reports the paragraphs it keeps
   ([#755](https://github.com/viell-dev/slop-markdown-tools/issues/755)).
-
-- Forgejo and Gitea retain native table rows misread as ordered lists, tables
-  hidden inside quoted paragraphs, and URL-adjacent backslash hard breaks.
-  Shared edit protections cover builtin rules and plugins while leaving
-  independent prose editable
+- Forgejo and Gitea keep table rows read as ordered lists, tables hidden in
+  quoted paragraphs, and backslash hard breaks next to URLs
   ([#661](https://github.com/viell-dev/slop-markdown-tools/issues/661),
   [#663](https://github.com/viell-dev/slop-markdown-tools/issues/663),
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
+### Maintenance
+
+- Tokenizer identity checks run as bounded unit cases
+  ([#654](https://github.com/viell-dev/slop-markdown-tools/issues/654)).
+- Release evidence selects the latest check run
+  ([#647](https://github.com/viell-dev/slop-markdown-tools/issues/647)).
+- A shipped internal declaration no longer imports an undeclared type
+  ([#655](https://github.com/viell-dev/slop-markdown-tools/issues/655)).
+- Scanner alerts on fixture rewrites are told apart from sanitizers
+  ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).
+- Workspace memory checks sample a fresh compiled process
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
+- File discovery, lookup, and writes have separate internal modules
+  ([#620](https://github.com/viell-dev/slop-markdown-tools/issues/620)).
+- The Obsidian check drops unused download dependencies
+  ([#639](https://github.com/viell-dev/slop-markdown-tools/issues/639),
+  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640)).
+- Dependency updates are grouped by maintenance unit
+  ([#636](https://github.com/viell-dev/slop-markdown-tools/issues/636),
+  [#637](https://github.com/viell-dev/slop-markdown-tools/issues/637)), and the
+  markdown-it 15 lines of three plugins are deferred
+  ([#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),
+  [#610](https://github.com/viell-dev/slop-markdown-tools/pull/610),
+  [#611](https://github.com/viell-dev/slop-markdown-tools/pull/611)).
+- Five parser extensions used only in the build are development dependencies
+  ([#624](https://github.com/viell-dev/slop-markdown-tools/issues/624)).
+- Maintained parser algorithms are checked TypeScript with recorded provenance
+  ([#622](https://github.com/viell-dev/slop-markdown-tools/issues/622),
+  [#623](https://github.com/viell-dev/slop-markdown-tools/issues/623)).
+- Test suites are organized by responsibility
+  ([#634](https://github.com/viell-dev/slop-markdown-tools/issues/634)).
+- Renderer protections and rule registration have their own internal modules
+  ([#618](https://github.com/viell-dev/slop-markdown-tools/issues/618),
+  [#619](https://github.com/viell-dev/slop-markdown-tools/issues/619)).
+- Workflow tests check YAML structure, and maintenance policy has one home
+  ([#635](https://github.com/viell-dev/slop-markdown-tools/issues/635),
+  [#641](https://github.com/viell-dev/slop-markdown-tools/issues/641),
+  [#642](https://github.com/viell-dev/slop-markdown-tools/issues/642)).
+- Native renderer reports are validated against their plans, and the Obsidian
+  check pins its versions
+  ([#632](https://github.com/viell-dev/slop-markdown-tools/issues/632),
+  [#633](https://github.com/viell-dev/slop-markdown-tools/issues/633)).
+- Release preparation reuses the release commit's CI results
+  ([#628](https://github.com/viell-dev/slop-markdown-tools/issues/628),
+  [#629](https://github.com/viell-dev/slop-markdown-tools/issues/629)).
+- Builds stage fresh output and are reused within one invocation
+  ([#626](https://github.com/viell-dev/slop-markdown-tools/issues/626),
+  [#627](https://github.com/viell-dev/slop-markdown-tools/issues/627)).
+- Native PR checks select the renderers a change can affect
+  ([#630](https://github.com/viell-dev/slop-markdown-tools/issues/630),
+  [#631](https://github.com/viell-dev/slop-markdown-tools/issues/631)).
+
 ## 0.5.0 - 2026-10-24
+
+### Upgrading
+
+The `mdtools` command, configuration file names, and comment prefixes are
+removed; the [upgrading
+steps](https://viell-dev.github.io/slop-markdown-tools/upgrading.html#050) list
+the renames.
 
 ### Changed
 
