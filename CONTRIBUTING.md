@@ -1082,7 +1082,11 @@ data are not acceptable.
 - Update every document, example, and test that describes what you changed, in
   the same pull request, and add the change to the `Unreleased` section of
   [CHANGELOG.md](CHANGELOG.md). The first change after a release starts that
-  section above the newest version's, because a release renames it.
+  section above the newest version's, because a release renames it. Write each
+  entry in one or two lines that say what a user will notice, with its issue
+  link; the documentation and the issue hold the details. Changes that users do
+  not see, such as tests, CI, and internal reorganization, go under
+  `### Maintenance`, one line each.
 - A change to the command line, the configuration, the JSON report, or the
   library that is not a defect fix waits for the next minor release; see the
   [versioning

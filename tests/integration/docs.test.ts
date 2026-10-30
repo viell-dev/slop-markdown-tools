@@ -488,9 +488,12 @@ describe("version annotations", () => {
   ])("allows %j", (source) => {
     expect(annotated(readable(source))).toEqual([]);
   });
-  // The changelog and the upgrading steps are the history that the other pages leave out.
-  const history = new Set(["docs/changelog.md", "docs/upgrading.md"]);
-  const checked = [...pages.filter((page) => !history.has(page)), "README.md"];
+  // The changelog, the upgrading steps, and the release notes are the history that the other
+  // pages leave out.
+  const history = (page: string) =>
+    ["docs/changelog.md", "docs/upgrading.md"].includes(page) ||
+    page.startsWith("docs/release-notes/");
+  const checked = [...pages.filter((page) => !history(page)), "README.md"];
   it.each(checked)("%s describes its version without history", (file) => {
     let rest = text(file);
     for (const [owner, passage] of allowed)
@@ -591,6 +594,17 @@ describe("changelog", () => {
     // GitHub shows each line break of a release's notes, so wrapped lines are joined.
     for (const [index, line] of lines.entries())
       if (index > 0 && lines[index - 1] && line) expect(line).toMatch(/^\s*(?:[-*+] |\d+[.)] |#)/);
+  });
+  it("links a minor release's notes page from its section, which exists", () => {
+    // A release such as 0.7.0 needs docs/release-notes/0.7.md, which RELEASING.md asks for.
+    const [major, minor, patch] = manifest.version.split(/[.-]/);
+    const line = `${major}.${minor}`;
+    const page = `docs/release-notes/${line}.md`;
+    expect(pages).toContain(page);
+    expect(read(page).startsWith(`# What's new in ${line}\n`)).toBe(true);
+    // The GitHub release of X.Y.0 opens with the link, as its changelog section does.
+    const link = `[What's new in ${line}](https://viell-dev.github.io/slop-markdown-tools/release-notes/${line}.html)`;
+    if (patch === "0") expect(notes(manifest.version).stdout.startsWith(link)).toBe(true);
   });
   it("refuses a version that has no section", () => {
     const result = notes("0.0.0-none.0");
