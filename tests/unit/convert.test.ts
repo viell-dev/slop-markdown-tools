@@ -239,6 +239,24 @@ describe("competitor conversion (#669)", () => {
       expect(suggestions).not.toContain("NaN");
     }
   });
+  it("keeps MD007 start_indented and MD027 from undoing each other in quoted lists", () => {
+    const result = convertConfig({
+      markdownlint: { default: true, MD007: { start_indented: true } },
+    });
+    expect(result.config.rules?.["style/quote-marker"]).toEqual(["error", { listItems: false }]);
+    expect(result.conflicts.join("\n")).toContain("MD007 start_indented wins over MD027");
+    for (const source of ["> - item\n", "> - a\n> - b\n", "> 1) item\n", "> - a\n>   - b\n"]) {
+      const formatted = format(source, { config: { ...result.config, dialect: "github" } });
+      expect(formatted.diagnostics.filter((d) => d.rule.startsWith("engine/"))).toEqual([]);
+      expect(
+        format(formatted.output, { config: { ...result.config, dialect: "github" } }).output,
+      ).toBe(formatted.output);
+    }
+    // Without start_indented, MD027 keeps checking list items.
+    expect(
+      convertConfig({ markdownlint: { default: true } }).config.rules?.["style/quote-marker"],
+    ).toEqual(["error", {}]);
+  });
   it("maps MD009 code blocks and explains strict and MD031's safety limit without closed issues", () => {
     const result = convertConfig({
       markdownlint: {

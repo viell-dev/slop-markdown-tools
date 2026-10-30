@@ -165,7 +165,10 @@ for manual migration and converts the other patterns, so review its `ignore`
 before using it. The fallback, which has no such review, applies none of the
 patterns of a `.prettierignore` with a negated entry: it checks the documents
 that the file excludes rather than apply the exclusions without their
-exceptions, which can leave nothing to check. The
+exceptions, which can leave nothing to check. `.markdownlintignore`, the ignore
+file of markdownlint-cli and editor extensions, is not converted: beside a
+markdownlint configuration in use, the documents it excludes are checked; add
+its patterns to `ignore` in an mdrefine configuration. The
 [notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
 
 Pattern conversion is bounded by source dialect. Prettier overrides,

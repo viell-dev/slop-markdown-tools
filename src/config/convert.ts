@@ -792,5 +792,28 @@ export function convertConfig(input: {
       report.conflicts.push(`MD022 heading spacing wins over MD012: maximum raised to ${count}.`);
     }
   }
+  // MD007's start_indented indents a list that starts a quote's content, and
+  // MD027's list_items check takes that indentation out again, so the two
+  // rules would undo each other on every quoted list. The list indentation
+  // wins, as the rule documentation advises for this pair.
+  const listIndent = rules["style/list-indent"];
+  const quoteMarker = rules["style/quote-marker"];
+  const quoteOptions = Array.isArray(quoteMarker) ? ((quoteMarker[1] as Values) ?? {}) : {};
+  if (
+    Array.isArray(listIndent) &&
+    (listIndent[1] as Values | undefined)?.startIndented === true &&
+    quoteMarker !== undefined &&
+    quoteMarker !== "off" &&
+    !(Array.isArray(quoteMarker) && quoteMarker[0] === "off") &&
+    quoteOptions.listItems !== false
+  ) {
+    rules["style/quote-marker"] = [
+      Array.isArray(quoteMarker) ? quoteMarker[0] : quoteMarker,
+      { ...quoteOptions, listItems: false },
+    ];
+    report.conflicts.push(
+      "MD007 start_indented wins over MD027 list_items: style/quote-marker listItems is false, since the two would undo each other in quoted lists.",
+    );
+  }
   return report;
 }
