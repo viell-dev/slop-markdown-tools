@@ -7,7 +7,7 @@ import { vitepressWhitespaceLiterals } from "../syntax/vitepress/projection.js";
 import { optionsSchema } from "./shared.js";
 
 export const lineEndingRule: Rule = {
-  description: "Use a configured line ending outside literal content.",
+  description: "Writes one configured line ending outside literal content.",
   kind: "style",
   phase: "document",
   schema: optionsSchema({ endOfLine: { enum: ["lf", "crlf", "cr", "auto"] } }),

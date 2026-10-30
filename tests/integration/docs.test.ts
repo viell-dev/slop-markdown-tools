@@ -26,12 +26,12 @@ const isCode = (node: RootContent | undefined, lang: string): node is Code =>
 describe("rules reference", () => {
   const file = "docs/rules.md";
   const source = read(file);
-  const page = blocks(file);
-  const index = page.find((node) => node.type === "table");
-  // The index's rows, as the source text of each cell: rule, kind, `recommended`, dialect presets, options.
-  const rows =
-    index?.type === "table"
-      ? index.children
+  const index = blocks(file).filter((node) => node.type === "table");
+  // The index's rows, as the source text of each cell: rule, description, kind, `recommended`,
+  // dialect presets, options.
+  const rows = index.flatMap((table) =>
+    table.type === "table"
+      ? table.children
           .slice(1)
           .map((row) =>
             row.children.map((cell) =>
@@ -40,8 +40,9 @@ describe("rules reference", () => {
                 : "",
             ),
           )
-      : [];
-  const listed = rows.map(([rule]) => /^`([^`]+)`$/.exec(rule ?? "")?.[1] ?? String(rule));
+      : [],
+  );
+  const listed = rows.map(([rule]) => /^\[`([^`]+)`\]\(rules\/\1\.md\)$/.exec(rule ?? "")?.[1]);
   /** The presets that enable a rule, with the severity they give it. */
   const enabling = (rule: string) =>
     Object.entries(presets).flatMap(([name, preset]) => {
@@ -49,7 +50,8 @@ describe("rules reference", () => {
       const severity = typeof value === "string" ? value : value?.[0];
       return severity && severity !== "off" ? [{ name, severity }] : [];
     });
-  it("has one index row for every built-in rule, in alphabetical order", () => {
+  it("has one index row for every built-in rule, linking its page, in alphabetical order", () => {
+    expect(listed).not.toContain(undefined);
     expect([...listed].sort()).toEqual(Object.keys(builtInRules).sort());
     expect(listed).toEqual([...listed].sort());
   });
@@ -60,7 +62,7 @@ describe("rules reference", () => {
     ).length > 0;
   /**
    * A preset cell: for each severity, `warn` or `error`, followed by the presets that give it
-   * when the column holds several presets, else ❌.
+   * when the column holds several presets, else —.
    */
   const cell = (enabled: { name: string; severity: string }[], named: boolean) =>
     enabled.length
@@ -72,12 +74,16 @@ describe("rules reference", () => {
             return [named ? `\`${severity}\` in ${list}` : `\`${severity}\``];
           })
           .join("; ")
-      : "❌";
-  it("gives each rule's kind, presets with their severity, and options as the code does", () => {
-    for (const [index, [, kind, recommended, dialectPresets, options]] of rows.entries()) {
+      : "—";
+  it("gives each rule's description, kind, presets with their severity, and options as the code does", () => {
+    for (const [
+      index,
+      [, description, kind, recommended, dialectPresets, options],
+    ] of rows.entries()) {
       const rule = listed[index]!;
-      const style = builtInRules[rule]?.kind === "style";
-      expect(kind, rule).toBe(style ? "🎨" : "🔍");
+      // `mdrefine rules` prints the same description.
+      expect(description, rule).toBe(builtInRules[rule]?.description);
+      expect(kind, rule).toBe(builtInRules[rule]?.kind === "style" ? "Style" : "Problem");
       const enabled = enabling(rule);
       expect(recommended, rule).toBe(
         cell(
@@ -91,54 +97,65 @@ describe("rules reference", () => {
           true,
         ),
       );
-      expect(options, rule).toBe(hasOptions(rule) ? "✅" : "❌");
+      expect(options, rule).toBe(hasOptions(rule) ? "Yes" : "—");
     }
   });
-  it("opens each rule's section with what it does, then its kind, presets, dialects, and options", () => {
-    const facts =
-      /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
-    page.forEach((node, at) => {
-      if (node.type !== "heading" || node.depth !== 2 || node.children[0]?.type !== "inlineCode")
-        return;
-      const rule = node.children[0].value;
+  it("has a page for every rule, and no other", () => {
+    const rulePages = pages.filter((page) => page.startsWith("docs/rules/"));
+    expect(rulePages.sort()).toEqual(
+      Object.keys(builtInRules)
+        .sort()
+        .map((rule) => `docs/rules/${rule}.md`),
+    );
+  });
+  const facts =
+    /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
+  it.each(Object.keys(builtInRules).sort())(
+    "%s's page opens with what it does, then its kind, presets, dialects, and options",
+    (rule) => {
+      const file = `docs/rules/${rule}.md`;
+      const source = read(file);
+      const page = blocks(file);
+      const title = page[0];
+      expect(title?.type === "heading" && title.depth === 1 && title.children[0]).toEqual(
+        expect.objectContaining({ type: "inlineCode", value: rule }),
+      );
       // The opening says what the rule does, in prose rather than a label or the facts.
-      const opening = page[at + 1];
+      const opening = page[1];
       const opened = opening ? source.slice(...range(opening)) : "";
-      expect(opening?.type, `${rule}: ${opened}`).toBe("paragraph");
-      expect(opened, rule).not.toMatch(/^\*\*/);
-      const next = page[at + 2];
+      expect(opening?.type, opened).toBe("paragraph");
+      expect(opened).not.toMatch(/^\*\*/);
+      const next = page[2];
       const text = next ? source.slice(...range(next)).replace(/\s+/g, " ") : "";
       const match = facts.exec(text);
-      expect(match, `${rule}: ${text}`).not.toBeNull();
+      expect(match, text).not.toBeNull();
       const [, kind, fixes, presetsText = "", , optionsText] = match!;
       const style = builtInRules[rule]?.kind === "style";
-      expect(kind, rule).toBe(style ? "Style" : "Problem");
-      expect(fixes, rule).toBe(style ? "fixed by `format`" : "reported only");
+      expect(kind).toBe(style ? "Style" : "Problem");
+      expect(fixes).toBe(style ? "fixed by `format`" : "reported only");
       // Each preset with the severity it gives the rule, as in "`recommended` (warn)".
       const stated =
         presetsText === "none"
           ? []
           : presetsText.split(", ").map((preset) => {
               const found = /^`([^`]+)` \((warn|error)\)$/.exec(preset);
-              expect(found, `${rule}: ${preset}`).not.toBeNull();
+              expect(found, preset).not.toBeNull();
               return `${found![1]} ${found![2]}`;
             });
-      expect(stated.sort(), rule).toEqual(
+      expect(stated.sort()).toEqual(
         enabling(rule)
           .map(({ name, severity }) => `${name} ${severity}`)
           .sort(),
       );
-      expect(optionsText === "none", rule).toBe(!hasOptions(rule));
-    });
-  });
-  it("has a section for every rule, in the order of the index", () => {
-    const sections = page.flatMap((node) =>
-      node.type === "heading" && node.depth === 2 && node.children[0]?.type === "inlineCode"
-        ? [node.children[0].value]
-        : [],
-    );
-    expect(sections).toEqual(listed);
-  });
+      expect(optionsText === "none").toBe(!hasOptions(rule));
+      // The common case comes first; the rest follows under these headings, in this order.
+      const sections = page.flatMap((node) =>
+        node.type === "heading" && node.depth === 2 ? [source.slice(...range(node))] : [],
+      );
+      const order = ["## Edge cases and advanced usage", "## Dialect notes", "## Related rules"];
+      expect(sections).toEqual(order.filter((heading) => sections.includes(heading)));
+    },
+  );
 });
 
 describe("configuration and dialect references", () => {
@@ -301,11 +318,17 @@ describe("examples page", () => {
 });
 
 describe("documentation site", () => {
-  it("links every page from the sidebar, and only pages that exist", () => {
-    const config = read("docs/.vitepress/config.mts");
-    const sidebar = [...config.matchAll(/link: "\/([a-z0-9/-]+)"/g)].map(
-      (match) => `docs/${match[1]}.md`,
-    );
+  it("links every page from the sidebar, and only pages that exist", async () => {
+    type Item = { link?: string; items?: Item[] };
+    // The site's configuration, which generates the rule pages' part of the sidebar.
+    const configuration = pathToFileURL(path.join(repository, "docs/.vitepress/config.mts"));
+    const { default: config } = (await import(configuration.href)) as {
+      default: { themeConfig: { sidebar: Item[] } };
+    };
+    const links = (items: Item[]): string[] =>
+      items.flatMap((item) => [...(item.link ? [item.link] : []), ...links(item.items ?? [])]);
+    const sidebar = links(config.themeConfig.sidebar).map((link) => `docs${link}.md`);
+    expect(sidebar).toContain("docs/rules/style/wrap.md");
     for (const page of pages) if (page !== "docs/index.md") expect(sidebar).toContain(page);
     for (const link of sidebar) expect(pages).toContain(link);
   });

@@ -42,7 +42,7 @@ contract.
 VitePress combines Markdown with Vue templates. A newline containing nothing but
 whitespace between two inline elements can disappear in Vue's output, where a
 space remains visible. Wrapping leaves paragraphs with such gaps as written, and
-its [`reportUnreflowed`](rules.md#stylewrap) option reports them. Ordinary
+its [`reportUnreflowed`](rules/style/wrap.md) option reports them. Ordinary
 paragraphs still reflow.
 
 Curly attributes keep their position; braces in a code span are code, not

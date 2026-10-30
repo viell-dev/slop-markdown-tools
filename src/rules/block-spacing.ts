@@ -476,7 +476,7 @@ function together(
 
 const blockSpacing: Rule = {
   description:
-    "Separate headings, lists, fenced code blocks, and tables from neighboring blocks with a blank line.",
+    "Separates headings, lists, fenced code blocks, and tables from the blocks around them with a blank line.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({

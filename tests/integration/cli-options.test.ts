@@ -30,12 +30,19 @@ describe("the command line", () => {
       expect(result.stdout, args.join(" ")).toBe("");
       expect(result.stderr, args.join(" ")).toBe(message);
     }
-    // Without a command, or with one that only groups others, the help goes to stderr.
-    for (const args of [[], ["config"], ["help", "bogus"]]) {
-      const result = run(root, args);
+    // Without a command, or with one that only groups others, the help goes to stderr, followed
+    // by a line that says what is missing.
+    for (const [args, missing] of [
+      [[], "mdrefine: no command given; try mdrefine lint\n"],
+      [["config"], "mdrefine: config needs a command: explain or convert\n"],
+      [["help", "bogus"], undefined],
+    ] as const) {
+      const result = run(root, [...args]);
       expect(result.status, args.join(" ")).toBe(2);
       expect(result.stdout, args.join(" ")).toBe("");
       expect(result.stderr, args.join(" ")).toMatch(/^Usage: mdrefine /);
+      if (missing) expect(result.stderr.endsWith(`\n${missing}`), args.join(" ")).toBe(true);
+      else expect(result.stderr, args.join(" ")).not.toMatch(/no command given|needs a command/);
     }
     for (const args of [["--help"], ["help"], ["help", "lint"], ["lint", "--help"], ["-V"]]) {
       const result = run(root, args);
@@ -348,12 +355,16 @@ describe("the command line", () => {
     expect(listed.status, listed.stderr).toBe(0);
     const lines = listed.stdout.trimEnd().split("\n");
     expect(lines).toContain(
-      "style/wrap\tstyle\tReflow paragraphs using configurable width and protected inline atoms.",
+      "style/wrap\tstyle\tReflows paragraphs to fill the line width, 80 columns by default.",
     );
-    expect(lines.at(-1)).toBe("local/report\tproblem\tReports everything.");
+    // Sorted by ID, with the plugin's rule among the built-in ones.
+    const ids = lines.map((line) => line.split("\t")[0]!);
+    expect(ids).toEqual([...ids].sort());
+    expect(lines[ids.indexOf("local/report")]).toBe("local/report\tproblem\tReports everything.");
     const rules = (parseRules(run(root, ["rules", "--json"]).stdout) as { rules: unknown[] }).rules;
     expect(rules.length).toBe(lines.length);
-    expect(rules.at(-1)).toEqual({
+    expect(rules.map((rule) => (rule as { id: string }).id)).toEqual(ids);
+    expect(rules[ids.indexOf("local/report")]).toEqual({
       id: "local/report",
       kind: "problem",
       description: "Reports\n\teverything.",

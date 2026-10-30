@@ -8,7 +8,7 @@ import { located, optionsSchema } from "./shared.js";
 
 /** Code form is independent of the spelling of an existing fence. */
 export const codeBlock: Rule = {
-  description: "Use a consistent, fenced, or indented code block style.",
+  description: "Writes code blocks in one form, fenced or indented.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({ style: { enum: ["consistent", "fenced", "indented"] } }),

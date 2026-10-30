@@ -7,7 +7,8 @@ import { lineWidth } from "./wrap.js";
 
 /** Report literal block lines without proposing structural edits or duplicating prose reflow. */
 export const lineLength: Rule = {
-  description: "Report long heading, code block, and table lines without editing them.",
+  description:
+    "Reports heading, code block, and table lines longer than a limit, without editing them.",
   kind: "problem",
   schema: optionsSchema({
     lineLength: { type: "integer", minimum: 0 },
