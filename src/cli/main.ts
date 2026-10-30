@@ -39,6 +39,14 @@ interface Flags {
 const manifest = JSON.parse(
   await readFile(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
 ) as { version: string };
+// A reader that stops early, as `head` does, closes the pipe. The rest of the
+// output then has nowhere to go: drop it, and let the run end with the exit code
+// it would have had, so that a pipeline with `pipefail` still sees a failure.
+for (const stream of [process.stdout, process.stderr])
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code !== "EPIPE") throw error;
+    stream.write = () => true;
+  });
 // Subcommands inherit these settings, so they come before the commands.
 const program = new Command()
   .name("mdrefine")

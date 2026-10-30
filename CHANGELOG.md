@@ -95,6 +95,14 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   examples' README lists `vitepress.jsonc`
   ([#814](https://github.com/viell-dev/slop-markdown-tools/issues/814)).
 
+### Fixed
+
+- Piping output into a program that stops reading early, such as
+  `mdrefine lint --json | head`, no longer ends with an `EPIPE` stack trace and
+  exit code `1`: the rest of the output is dropped, and the run keeps its own
+  exit code
+  ([#820](https://github.com/viell-dev/slop-markdown-tools/issues/820)).
+
 ## 0.6.0 - 2026-10-30
 
 [What's new in
