@@ -500,9 +500,11 @@ export async function loadCompetitorConfig(
         directories.indexOf(path.dirname(cli2File)) <
           directories.indexOf(path.dirname(markdownFile)))
     )
+      // Without a `config` key, markdownlint-cli2 uses a `.markdownlint.*` file,
+      // or else markdownlint's defaults, all rules on: an empty configuration.
       markdownlint =
         wrapper.config === undefined
-          ? markdownlint
+          ? (markdownlint ?? {})
           : object(wrapper.config, `the config of ${shown(cli2File)}`);
     for (const name of ["ignores", "globs"]) {
       const patterns = wrapper[name];
