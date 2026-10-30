@@ -231,7 +231,7 @@ describe("competitor conversion (#669)", () => {
     expect(result.suggestions.join("\n")).toContain("width 97");
     expect(result.config.rules?.["style/wrap"]).toBeUndefined();
     // A width that is not a number names no width rather than "NaN".
-    for (const lineLength of ["wide", -1, 2.5]) {
+    for (const lineLength of ["wide", -1, 2.5, true, null, [60], "60"]) {
       const suggestions = convertConfig({
         markdownlint: { MD013: { line_length: lineLength } },
       }).suggestions.join("\n");
@@ -452,6 +452,11 @@ describe("a .prettierignore that excludes all Markdown (#788)", () => {
     // Together these exclude all Markdown, which no single entry proves.
     "/*.md\n*/**/*.md\n",
     "[!_]*.md\n",
+    // `?` needs a character, so a file named only `.md` stays with Prettier.
+    "?*.md\n",
+    "*?.md\n",
+    "**/?*.md\n",
+    "?.md\n",
   ])("is not established without proof: %j", (text) => {
     expect(ignoresAllMarkdown(text)).toBe(false);
   });

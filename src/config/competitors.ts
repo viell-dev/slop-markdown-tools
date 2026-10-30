@@ -27,9 +27,10 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
  * character class. Otherwise one entry by itself must ignore every sample `.md`
  * path, as Prettier reads it, with the `ignore` package and without regard to
  * letter case: names and directories of a character absent from the entries,
- * and longer ones, at the root and at more depths than any entry has
- * components. An entry can match a name made of characters it does not contain
- * only through wildcards, which match other names too. `.markdown` files are
+ * and longer ones, and a file named only `.md`, which `?` cannot match, at the
+ * root and at more depths than any entry has components. An entry can match a
+ * name made of characters it does not contain only through wildcards, which
+ * match other names too. `.markdown` files are
  * not required to be ignored as well: an entry for `.md` files alone is the
  * usual way to leave Markdown to another tool, and taking it for Prettier's
  * Markdown setup would ignore every document.
@@ -42,9 +43,10 @@ export function ignoresAllMarkdown(text: string): boolean {
   if (fresh === undefined) return false;
   const depth = Math.max(2, ...lines.map((line) => line.split("/").length)) + 1;
   const probes: string[] = [];
-  for (const name of [fresh, "mdrefine-probe"])
-    for (let level = 0; level <= depth; level++)
-      probes.push(`${`${name}/`.repeat(level)}${name}.md`);
+  for (const directory of [fresh, "mdrefine-probe"])
+    for (const stem of ["", fresh, "mdrefine-probe"])
+      for (let level = 0; level <= depth; level++)
+        probes.push(`${`${directory}/`.repeat(level)}${stem}.md`);
   return lines.some((line) => {
     const matcher = gitignore({ allowRelativePaths: true }).add(line);
     return probes.every((probe) => matcher.ignores(probe));
