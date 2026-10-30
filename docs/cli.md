@@ -182,7 +182,9 @@ Without `--json`, findings go to stderr, one per line, as
 directory to the document, with forward slashes, as Prettier names files, so
 that a terminal or an editor can open it. `format` prints its diff on stdout
 with the same paths, so that `patch -p1` or `git apply` applies it in the same
-directory. `format --check` names each document that would change, one per line
+directory. When the program reading the output stops early, as `head` does, the
+rest of the output is dropped, and the exit code is the one that the run would
+have had. `format --check` names each document that would change, one per line
 after the findings; `--check --diff` prints the diff instead of that list. A
 preview ends with a hint to use `--write` to apply changes. A run selecting no
 documents prints a short notice on stderr, including with `--json`, without
