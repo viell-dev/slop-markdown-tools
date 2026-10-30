@@ -308,6 +308,10 @@ describe("documentation site", () => {
       for (const version of versions) expect(version, file).toBe(manifest.version);
     }
   });
+  it("shows the current version in the JSON report's example", () => {
+    const versions = [...read("docs/cli.md").matchAll(/^ {2}"version": "([^"]+)",$/gm)];
+    expect(versions.map((match) => match[1])).toEqual([manifest.version]);
+  });
   it("fits a line of the default wrap width into a code block", () => {
     // The site shows formatted output, so a code block must hold a line of the default wrap
     // width without scrolling sideways. Only a browser shows the real layout. This checks the
@@ -380,21 +384,6 @@ describe("version annotations", () => {
    * so that a removed passage does not leave a stale exception behind.
    */
   const allowed: [file: string, text: string, reason: string][] = [
-    [
-      "docs/configuration.md",
-      "Version 0.5.0 no longer discovers",
-      "the migration note for the earlier names",
-    ],
-    [
-      "docs/configuration.md",
-      "before upgrading from 0.4.x",
-      "the migration note for the earlier names",
-    ],
-    [
-      "docs/quick-start.md",
-      "When upgrading from 0.4.x, complete the naming migration before installing 0.6.0.",
-      "an upgrade instruction that points to the migration steps",
-    ],
     [
       "docs/benchmarks.md",
       "The figures below precede the internal parser adapter introduced in 0.4.1.",
@@ -472,7 +461,9 @@ describe("version annotations", () => {
   ])("allows %j", (source) => {
     expect(annotated(readable(source))).toEqual([]);
   });
-  const checked = [...pages.filter((page) => page !== "docs/changelog.md"), "README.md"];
+  // The changelog and the upgrading steps are the history that the other pages leave out.
+  const history = new Set(["docs/changelog.md", "docs/upgrading.md"]);
+  const checked = [...pages.filter((page) => !history.has(page)), "README.md"];
   it.each(checked)("%s describes its version without history", (file) => {
     let rest = text(file);
     for (const [owner, passage] of allowed)
@@ -591,12 +582,10 @@ describe("competitor fallback (#788)", () => {
     expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
   });
   it("tells those upgrading how to keep the defaults", () => {
-    // The newest section, before or after its release: `Unreleased` or a version.
-    const newest = prose("CHANGELOG.md").split(/ ## /)[1]!;
-    const changed = newest.split("### Changed")[1]!.split(/ ### /)[0]!;
-    expect(changed).toContain("instead of the `recommended` preset");
-    expect(changed).toContain("--no-competitor-config");
-    expect(changed).toContain("mdrefine config convert --write");
+    const steps = prose("docs/upgrading.md").split("## 0.6.0")[1]!.split(/ ## /)[0]!;
+    expect(steps).toContain("instead of the `recommended` preset");
+    expect(steps).toContain("--no-competitor-config");
+    expect(steps).toContain("mdrefine config convert --write");
   });
   it("ascribes --quiet only to the commands that take it", () => {
     const takes = (args: string[]) =>

@@ -1021,11 +1021,11 @@ A page describes the behavior of the version it documents, without version
 history: no notes such as "after 0.4.0", "since", "added in", or "unreleased".
 The site is built from a release tag, so it never shows unreleased behavior, and
 the changelog's `Unreleased` section lists what `main` adds; a page on `main`
-describes `main`. History belongs in `CHANGELOG.md` and in migration steps such
-as the CLI's [earlier names](docs/cli.md#earlier-names). The versioning policy,
-the version a benchmark measured, and the versions of renderers and other tools
-are not history. The docs tests reject version annotations outside a short list
-of such passages; add to that list only a passage of those kinds.
+describes `main`. History belongs in `CHANGELOG.md` and in the steps of the
+[upgrading](docs/upgrading.md) page. The versioning policy, the version a
+benchmark measured, and the versions of renderers and other tools are not
+history. The docs tests reject version annotations in the other pages outside a
+short list of such passages; add to that list only a passage of those kinds.
 
 Each rule has a page, `docs/rules/<category>/<name>.md`, titled with its ID,
 which follows one order:

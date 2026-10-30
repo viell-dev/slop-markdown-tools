@@ -12,6 +12,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- The documentation has an
+  [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
+  page with the steps for each release that needs them: the markdownlint and
+  Prettier fallback and the exit code of bare `format` in 0.6.0, and the
+  `mdtools` names removed in 0.5.0. Getting started, the command line,
+  configuration, and library pages no longer carry migration notes, and the JSON
+  report's example shows the current version
+  ([#810](https://github.com/viell-dev/slop-markdown-tools/issues/810)).
+
 - The rules reference has one page per rule, at `rules/<category>/<name>.html`.
   Each page opens with what the rule does, its facts, an example, and its
   options; edge cases, dialect notes, and related rules follow under their own
