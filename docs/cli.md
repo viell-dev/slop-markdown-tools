@@ -88,24 +88,9 @@ directories; the rest of the workspace still counts for checking links.
   the ignore rules; the JSON report still lists the input in `skipped`, and the
   other warnings, such as the one for a workspace root that Git ignores, still
   print.
-- Git's ignore rules apply as in Git. A path is checked against each
-  `.gitignore` from the deepest up to the repository's top level, including
-  those above the workspace root, then the repository's `.git/info/exclude`,
-  then the global excludes file (`core.excludesFile`, by default
-  `~/.config/git/ignore`), and the first with a pattern that matches decides. So
-  a negated pattern includes a file again, but nothing below an excluded
-  directory can be included, and nothing in a workspace root that Git ignores is
-  processed, except files that Git tracks, which it never ignores. Inside a
-  nested repository only its own rules and settings apply, and outside a
-  repository only the workspace's `.gitignore` files. The tool asks Git, in each
-  repository, which global excludes file it reads, whether it ignores letter
-  case (`core.ignorecase`, which Git turns on when it creates a repository on a
-  file system that ignores case, as Windows and macOS do by default), and which
-  files it tracks. Without Git installed, that file is not read, tracked files
-  are ignored like the others, and letter case is ignored on Windows and macOS
-  and not elsewhere. The configuration's `ignore` and `overrides` patterns match
-  case exactly on every system, so that a shared configuration applies to the
-  same files everywhere.
+- Git's ignore rules apply as Git applies them, including the global excludes
+  file and files that Git tracks; see [how Git ignore rules are
+  applied](#how-git-ignore-rules-are-applied).
 - A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
   PowerShell, cmd, and npm scripts. It is relative to the current directory,
@@ -121,6 +106,26 @@ directories; the rest of the workspace still counts for checking links.
 
 To check only the files that changed, pass them as arguments; see [Git
 hooks](integrations.md#git-hooks).
+
+### How Git ignore rules are applied
+
+Git's ignore rules apply as in Git. A path is checked against each `.gitignore`
+from the deepest up to the repository's top level, including those above the
+workspace root, then the repository's `.git/info/exclude`, then the global
+excludes file (`core.excludesFile`, by default `~/.config/git/ignore`), and the
+first with a pattern that matches decides. So a negated pattern includes a file
+again, but nothing below an excluded directory can be included, and nothing in a
+workspace root that Git ignores is processed, except files that Git tracks,
+which it never ignores. Inside a nested repository only its own rules and
+settings apply, and outside a repository only the workspace's `.gitignore`
+files. The tool asks Git, in each repository, which global excludes file it
+reads, whether it ignores letter case (`core.ignorecase`, which Git turns on
+when it creates a repository on a file system that ignores case, as Windows and
+macOS do by default), and which files it tracks. Without Git installed, that
+file is not read, tracked files are ignored like the others, and letter case is
+ignored on Windows and macOS and not elsewhere. The configuration's `ignore` and
+`overrides` patterns match case exactly on every system, so that a shared
+configuration applies to the same files everywhere.
 
 ## Read from stdin
 
@@ -261,83 +266,9 @@ document cannot be read or written; each problem is reported for its own file,
 and the exit code is then `2`. A document with a rule whose edits were refused,
 or that a rule failed on, is written with the other rules' edits.
 
-## Files that cannot be read or written
-
-A directory that the system does not let the tool read is skipped: it is
-reported once as a warning, or in the report's `skipped` list, and the rest of
-the workspace is processed. This includes a directory that can be listed but not
-entered or the reverse, one whose `.gitignore` cannot be read, and a nested
-repository whose `.git/info/exclude` cannot be read. The warning does not change
-the exit code and is not counted by `--max-warnings`. A link into a skipped
-directory is reported as not checkable rather than missing; see
-[`links/valid`](rules/links/valid.md). Naming the directory, or a path inside
-it, on the command line is an error. To leave a directory out without a warning,
-list it in a `.gitignore`.
-
-A selected document that cannot be read gets an `engine/unreadable-file` error;
-the other documents are processed, and written with `--write`, and the exit code
-is `2`. The system errors `EACCES` and `EPERM` count as not being permitted to
-read, and so does `EBUSY`, which Windows reports for a file that another program
-has locked. Any other read error stops the run with exit code `2`. So do a root,
-configuration file, or path on the command line that does not exist, cannot be
-read, or is of the wrong kind, as in `Input does not exist: notes/absent.md`,
-and a configuration file that cannot be read or a directory that refuses the
-search for one. A file of Git's ignore rules that applies to the root, such as a
-`.gitignore` above it, that cannot be read stops the run too.
-
-Documents are read as UTF-8, with or without a byte order mark. The tool does
-not guess another encoding: a guess can be wrong, and the supported renderers
-read Markdown as UTF-8. A selected document that is not UTF-8 text gets the same
-`engine/unreadable-file` error, with a message that says what was found, as in
-`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
-So does a file that starts with a UTF-16 or UTF-32 byte order mark, which
-Windows PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as
-UTF-16 text without a mark does. Save such a file as UTF-8 to process it. A link
-to a heading in it is reported as `Fragment could not be checked`.
-
-A vault's `.obsidian/app.json` that cannot be read, or that is not valid JSON,
-gets a warning, and the vault's notes are not wrapped. When the system does not
-let the tool find out whether a directory is a vault, the command stops with
-exit code `2`, because reading notes in another dialect is not safe.
-
-`format --write` writes each changed file in place, into the existing file,
-which keeps everything about the file but its content; see
-[below](#what-writing-keeps). Before it writes a file, it checks that the file
-may be written and that its directory lets it create a trial file. A file that
-fails the check gets an `engine/unwritable-file` error, such as
-`The file may not be written (EACCES: permission denied); the file is unchanged.`,
-and is left alone; the other files are still written. A read-only file fails the
-check on every platform, and the tool never makes a file writable to write it. A
-failure that the check cannot foresee, such as a file that another program has
-locked on Windows or a full disk, is reported for that file in the same way.
-Either way the file is not listed in `written`, and the exit code is `2`.
-
-### What writing keeps
-
-Writing into the existing file keeps everything about it except its content and
-its modification time: its permissions, including access control entries of its
-own, its owner and group, attributes such as Hidden, extended attributes,
-alternate data streams such as the mark of a downloaded file, its creation time,
-and its other names if it has hard links. A file whose two names are both
-selected documents is written once and counted for each.
-
-Writing in place is not atomic, and the tool makes up for that as far as it can.
-Before it writes a file, it writes a trial file of the same size beside it,
-holding random bytes, and removes it again, which shows that the new content
-fits on the disk. Just before writing, it checks through the open file that the
-file still holds exactly the bytes it read. If writing then fails part way, it
-writes those bytes back and says whether that worked, as in
-`The file could not be written (EIO: i/o error), and its content from before formatting was written back.`
-or, when that fails too,
-`… and writing its content from before formatting back failed too (EIO: i/o error); it may be incomplete.`
-
-Nothing protects a file from a crash of the computer or a power failure while it
-is being written. The file can then be left incomplete, with part of the new
-content and part of the old, and a later run cannot repair it; keep documents
-that matter in version control or a backup. A program that reads the file at
-that moment can see it half written too. A crash during the trial write can
-leave the trial file behind; it is named `.mdrefine-` followed by a random name
-and `.tmp`, holds no document text, and can be deleted.
+A directory that cannot be read is skipped with a warning, and a document that
+cannot be read or written is reported for its own file; see [reliability
+details](#reliability-details).
 
 ## Configuration commands
 
@@ -415,3 +346,86 @@ reads. Given before or after `convert`, each is a usage error. So is a `--root`
 that does not exist or is not a directory. These errors, finding no
 configuration to convert, and finding only files that it cannot use end the
 command with exit code `2`.
+
+## Reliability details
+
+These sections describe what happens when the file system refuses a read or a
+write, and what writing keeps of each file.
+
+### Files that cannot be read or written
+
+A directory that the system does not let the tool read is skipped: it is
+reported once as a warning, or in the report's `skipped` list, and the rest of
+the workspace is processed. This includes a directory that can be listed but not
+entered or the reverse, one whose `.gitignore` cannot be read, and a nested
+repository whose `.git/info/exclude` cannot be read. The warning does not change
+the exit code and is not counted by `--max-warnings`. A link into a skipped
+directory is reported as not checkable rather than missing; see
+[`links/valid`](rules/links/valid.md). Naming the directory, or a path inside
+it, on the command line is an error. To leave a directory out without a warning,
+list it in a `.gitignore`.
+
+A selected document that cannot be read gets an `engine/unreadable-file` error;
+the other documents are processed, and written with `--write`, and the exit code
+is `2`. The system errors `EACCES` and `EPERM` count as not being permitted to
+read, and so does `EBUSY`, which Windows reports for a file that another program
+has locked. Any other read error stops the run with exit code `2`. So do a root,
+configuration file, or path on the command line that does not exist, cannot be
+read, or is of the wrong kind, as in `Input does not exist: notes/absent.md`,
+and a configuration file that cannot be read or a directory that refuses the
+search for one. A file of Git's ignore rules that applies to the root, such as a
+`.gitignore` above it, that cannot be read stops the run too.
+
+Documents are read as UTF-8, with or without a byte order mark. The tool does
+not guess another encoding: a guess can be wrong, and the supported renderers
+read Markdown as UTF-8. A selected document that is not UTF-8 text gets the same
+`engine/unreadable-file` error, with a message that says what was found, as in
+`The file is not UTF-8 text (byte 0xE9 on line 1 is not valid UTF-8) and was not linted.`
+So does a file that starts with a UTF-16 or UTF-32 byte order mark, which
+Windows PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as
+UTF-16 text without a mark does. Save such a file as UTF-8 to process it. A link
+to a heading in it is reported as `Fragment could not be checked`.
+
+A vault's `.obsidian/app.json` that cannot be read, or that is not valid JSON,
+gets a warning, and the vault's notes are not wrapped. When the system does not
+let the tool find out whether a directory is a vault, the command stops with
+exit code `2`, because reading notes in another dialect is not safe.
+
+`format --write` writes each changed file in place, into the existing file,
+which keeps everything about the file but its content; see
+[below](#what-writing-keeps). Before it writes a file, it checks that the file
+may be written and that its directory lets it create a trial file. A file that
+fails the check gets an `engine/unwritable-file` error, such as
+`The file may not be written (EACCES: permission denied); the file is unchanged.`,
+and is left alone; the other files are still written. A read-only file fails the
+check on every platform, and the tool never makes a file writable to write it. A
+failure that the check cannot foresee, such as a file that another program has
+locked on Windows or a full disk, is reported for that file in the same way.
+Either way the file is not listed in `written`, and the exit code is `2`.
+
+### What writing keeps
+
+Writing into the existing file keeps everything about it except its content and
+its modification time: its permissions, including access control entries of its
+own, its owner and group, attributes such as Hidden, extended attributes,
+alternate data streams such as the mark of a downloaded file, its creation time,
+and its other names if it has hard links. A file whose two names are both
+selected documents is written once and counted for each.
+
+Writing in place is not atomic, and the tool makes up for that as far as it can.
+Before it writes a file, it writes a trial file of the same size beside it,
+holding random bytes, and removes it again, which shows that the new content
+fits on the disk. Just before writing, it checks through the open file that the
+file still holds exactly the bytes it read. If writing then fails part way, it
+writes those bytes back and says whether that worked, as in
+`The file could not be written (EIO: i/o error), and its content from before formatting was written back.`
+or, when that fails too,
+`… and writing its content from before formatting back failed too (EIO: i/o error); it may be incomplete.`
+
+Nothing protects a file from a crash of the computer or a power failure while it
+is being written. The file can then be left incomplete, with part of the new
+content and part of the old, and a later run cannot repair it; keep documents
+that matter in version control or a backup. A program that reads the file at
+that moment can see it half written too. A crash during the trial write can
+leave the trial file behind; it is named `.mdrefine-` followed by a random name
+and `.tmp`, holds no document text, and can be deleted.

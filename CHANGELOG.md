@@ -25,6 +25,15 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   named About. Issues about the documentation have their own form
   ([#818](https://github.com/viell-dev/slop-markdown-tools/issues/818)).
 
+- The Obsidian, dialect, integration, VitePress, benchmark, and command line
+  pages describe what users need, and the details for maintainers, such as the
+  list of every Obsidian protection and the parser work behind the benchmark
+  limits, move to [maintainer
+  notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/README.md)
+  in the repository. The command line page gathers its file access and write
+  safety details at its end
+  ([#812](https://github.com/viell-dev/slop-markdown-tools/issues/812)).
+
 - The documentation has an
   [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
   page with the steps for each release that needs them: the markdownlint and

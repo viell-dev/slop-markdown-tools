@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { Ajv } from "ajv";
+import GithubSlugger from "github-slugger";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Code, Nodes, RootContent } from "mdast";
@@ -317,6 +318,37 @@ describe("examples page", () => {
   });
 });
 
+describe("links to the repository", () => {
+  // The pages link maintainer notes and guides in the repository by their GitHub address, which
+  // neither the site build nor the tool's link check follows.
+  const base = "https://github.com/viell-dev/slop-markdown-tools/blob/main/";
+  const links = [...pages, "README.md"].flatMap((file) =>
+    [
+      ...read(file).matchAll(
+        /https:\/\/github\.com\/viell-dev\/slop-markdown-tools\/blob\/main\/([\w./-]+\.md)(?:#([\w-]+))?/g,
+      ),
+    ].map((match) => ({ file, target: match[1]!, fragment: match[2] })),
+  );
+  it("name files and headings that exist", () => {
+    expect(links.some(({ target }) => target.startsWith("internals/"))).toBe(true);
+    for (const { file, target, fragment } of links) {
+      expect(
+        readdirSync(path.join(repository, path.dirname(target))),
+        `${file}: ${base}${target}`,
+      ).toContain(path.basename(target));
+      if (!fragment) continue;
+      const source = read(target);
+      const slugger = new GithubSlugger();
+      const anchors = blocks(target).flatMap((node) =>
+        node.type === "heading"
+          ? [slugger.slug(source.slice(...range(node)).replace(/^#+\s*/, ""))]
+          : [],
+      );
+      expect(anchors, `${file}: ${base}${target}#${fragment}`).toContain(fragment);
+    }
+  });
+});
+
 describe("documentation site", () => {
   it("links every page from the sidebar, and only pages that exist", async () => {
     type Item = { link?: string; items?: Item[] };
@@ -415,11 +447,6 @@ describe("version annotations", () => {
    * so that a removed passage does not leave a stale exception behind.
    */
   const allowed: [file: string, text: string, reason: string][] = [
-    [
-      "docs/benchmarks.md",
-      "The figures below precede the internal parser adapter introduced in 0.4.1.",
-      "the version the measurements were taken with",
-    ],
     [
       "docs/versions.md",
       "Before 1.0, the second number plays the part of the first",

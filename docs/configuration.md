@@ -31,25 +31,16 @@ off; an explicit `--config` also bypasses it. The Node API's
 argument to turn it off. Portable `convertConfig({ markdownlint, prettier })`
 converts objects without reading files. Neither changes dialect detection.
 
-A file that the fallback cannot read contributes nothing: a JavaScript or
-TypeScript configuration, which it never runs, and a TOML or JSON5 one. Neither
-does a Prettier configuration in a workspace whose `.prettierignore` [excludes
-all Markdown](integrations.md#next-to-prettier-or-markdownlint), because
-Prettier does not format Markdown there. A `.prettierignore` with a negated
-entry, which conversion cannot express, applies none of its patterns. When no
-file found can be used, the
-`recommended` preset applies, as without any of them. The CLI names each file
-that it does not use, and why, on stderr, with a line for the settings that
-apply; see [fallback notices](cli.md#competitor-fallback-notices).
-
-`mdrefine config convert` prints the converted configuration, and `--write`
-creates `mdrefine.config.jsonc` where `lint` looks for the workspace's
-configuration, or in the directory that `--root` names. The explicit command may
-execute competitor JavaScript settings; fallback loading never does. See
-[convert a configuration](cli.md#convert-a-configuration) for its options, and
-the [conversion behavior and
-comparison](integrations.md#coming-from-prettier-or-markdownlint) for
-precedence, formats, and remaining coverage gaps.
+JavaScript, TypeScript, TOML, and JSON5 configurations contribute nothing, and
+neither does a Prettier configuration whose `.prettierignore` excludes all
+Markdown. When no file found can be used, the `recommended` preset applies. The
+CLI names each file that it uses or leaves out on stderr; see [fallback
+notices](cli.md#competitor-fallback-notices). `mdrefine config convert --write`
+saves the converted configuration as a file; see [convert a
+configuration](cli.md#convert-a-configuration).
+[Integrations](integrations.md#configuration-conversion-and-fallback) describes
+what is converted, which files are read, and how markdownlint's and Prettier's
+comments apply during the fallback.
 
 ### File contents
 

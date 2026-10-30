@@ -107,8 +107,8 @@ into that quoted list, even across blank lines; changing it can remove a painted
 bullet. An intervening block restores ordinary indentation preferences, and safe
 marker and inline styles remain available. Quoted blocks opened after a Tab have
 separate literal-source protection; see [Obsidian's boundary
-protections](../../obsidian.md#boundary-protections). Ordinary space-only quoted
-margins remain eligible for list indentation.
+protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md#boundary-protections).
+Ordinary space-only quoted margins remain eligible for list indentation.
 
 ## Related rules
 
