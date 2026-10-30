@@ -14,7 +14,7 @@ heading anchors are made. See [dialects](dialects.md).
 What applies without an mdrefine configuration: the settings converted from a
 markdownlint or Prettier configuration in the workspace, or else the
 `recommended` preset. See [the
-fallback](configuration.md#competitor-configuration-fallback).
+fallback](configuration.md#fallback-to-markdownlint-and-prettier).
 
 ## Heading forms
 

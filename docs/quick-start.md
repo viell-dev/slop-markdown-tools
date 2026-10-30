@@ -150,11 +150,11 @@ such as a broken link, which remain errors after `--write`.
 Without a configuration file, documents are read as GitHub Markdown, or as
 Obsidian notes inside a vault. The rules then come from a markdownlint or
 Prettier configuration in the workspace, if there is one that mdrefine can read:
-it [converts](configuration.md#competitor-configuration-fallback) their settings
-and says so on stderr. Pass `--no-competitor-config` to leave them out. Without
-such a configuration, the `recommended` rules apply. A configuration file is
-still worth creating: it enables the rules for your renderer and makes the
-dialect explicit. `npx mdrefine config convert --write` creates one from the
+it [converts](configuration.md#fallback-to-markdownlint-and-prettier) their
+settings and says so on stderr. Pass `--no-competitor-config` to leave them out.
+Without such a configuration, the `recommended` rules apply. A configuration
+file is still worth creating: it enables the rules for your renderer and makes
+the dialect explicit. `npx mdrefine config convert --write` creates one from the
 markdownlint or Prettier settings.
 
 ## Change a rule
@@ -184,3 +184,4 @@ This wraps at 100 columns and leaves emphasis markers as they are.
   Prettier or markdownlint.
 - [Obsidian vaults](obsidian.md) and [examples](examples.md) of documents before
   and after formatting.
+- [Glossary](glossary.md): the terms these pages use.

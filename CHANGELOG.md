@@ -13,6 +13,16 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Changed
 
+- A [glossary](https://viell-dev.github.io/slop-markdown-tools/glossary.html)
+  defines the terms the pages use, and pages link it. Rule pages and the
+  `style/heading` message say "`#` heading" and "underlined heading" instead of
+  ATX and Setext. The pages name markdownlint and Prettier instead of calling
+  them competitors, so the fallback's sections are now "Fallback to markdownlint
+  and Prettier" and "Fallback notices", and so does the notice about their
+  inline comments. The README and the home page say that the package is
+  `mdrefine` and the repository keeps the original name
+  ([#817](https://github.com/viell-dev/slop-markdown-tools/issues/817)).
+
 - The site has release notes, starting with [What's new in
   0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html),
   in a menu named after the documented version in the top bar. This changelog's

@@ -26,7 +26,7 @@ on stderr, unless given `--quiet`:
 mdrefine: no mdrefine configuration; using Prettier settings from .prettierrc (2 conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)
 ```
 
-The [fallback](configuration.md#competitor-configuration-fallback) describes
+The [fallback](configuration.md#fallback-to-markdownlint-and-prettier) describes
 which files it reads and which it leaves out.
 
 **Steps:** choose one.

@@ -39,21 +39,21 @@ block and keeping other safe edits.
 `format`, `--check --diff` combines the two, and `--write` cannot be combined
 with either.
 
-| Option                    | Commands         | Meaning                                                                                                                                                       |
-| ------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--root <directory>`      | `lint`, `format` | The workspace root; see [the workspace root](#the-workspace-root).                                                                                            |
-| `--no-competitor-config`  | `lint`, `format` | Do not use markdownlint or Prettier settings when there is no mdrefine configuration; see the [fallback](configuration.md#competitor-configuration-fallback). |
-| `--config <file>`         | `lint`, `format` | Use this configuration file instead of searching for one.                                                                                                     |
-| `--dialect <name>`        | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                   |
-| `--exclude <path>`        | `lint`, `format` | Leave out a file or a directory. Repeat it for more.                                                                                                          |
-| `--json`                  | `lint`, `format` | Print one [JSON report](#json-report) on stdout instead of text.                                                                                              |
-| `--quiet`                 | `lint`, `format` | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                          |
-| `--no-warn-ignored`       | `lint`, `format` | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                            |
-| `--stdin-filepath <file>` | `lint`, `format` | The path of the document read from [stdin](#read-from-stdin).                                                                                                 |
-| `--max-warnings <count>`  | `lint`, `format` | Exit with code `1` when there are more warnings than this.                                                                                                    |
-| `--check`                 | `format`         | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                              |
-| `--diff`                  | `format`         | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                      |
-| `--write`                 | `format`         | Write the changes.                                                                                                                                            |
+| Option                    | Commands         | Meaning                                                                                                                                                           |
+| ------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--root <directory>`      | `lint`, `format` | The workspace root; see [the workspace root](#the-workspace-root).                                                                                                |
+| `--no-competitor-config`  | `lint`, `format` | Do not use markdownlint or Prettier settings when there is no mdrefine configuration; see the [fallback](configuration.md#fallback-to-markdownlint-and-prettier). |
+| `--config <file>`         | `lint`, `format` | Use this configuration file instead of searching for one.                                                                                                         |
+| `--dialect <name>`        | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                       |
+| `--exclude <path>`        | `lint`, `format` | Leave out a file or a directory. Repeat it for more.                                                                                                              |
+| `--json`                  | `lint`, `format` | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                  |
+| `--quiet`                 | `lint`, `format` | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                              |
+| `--no-warn-ignored`       | `lint`, `format` | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                                |
+| `--stdin-filepath <file>` | `lint`, `format` | The path of the document read from [stdin](#read-from-stdin).                                                                                                     |
+| `--max-warnings <count>`  | `lint`, `format` | Exit with code `1` when there are more warnings than this.                                                                                                        |
+| `--check`                 | `format`         | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                  |
+| `--diff`                  | `format`         | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                          |
+| `--write`                 | `format`         | Write the changes.                                                                                                                                                |
 
 ### The workspace root
 
@@ -288,13 +288,14 @@ document; [inspect the result](configuration.md#inspect-the-result) describes
 its fields. It reads `--config`, `--no-competitor-config`, `--root`, and
 `--dialect`, before or after `explain`.
 
-### Competitor fallback notices
+### Fallback notices
 
-When `lint`, `format`, or `config explain` runs on the [competitor
-fallback](configuration.md#competitor-configuration-fallback), it prints notices
-on stderr, with paths from the workspace root: one line for each markdownlint or
-Prettier configuration file that it found and does not use, with the reason, and
-one line that names the files it uses and counts the conversion notes, as in:
+When `lint`, `format`, or `config explain` runs on the
+[fallback](configuration.md#fallback-to-markdownlint-and-prettier), it prints
+notices on stderr, with paths from the workspace root: one line for each
+markdownlint or Prettier configuration file that it found and does not use, with
+the reason, and one line that names the files it uses and counts the conversion
+notes, as in:
 
 ```text
 mdrefine: not using prettier.config.mjs: the fallback does not run JavaScript or TypeScript; "mdrefine config convert" can convert it
@@ -317,15 +318,15 @@ report of `--json` is unchanged.
 
 With the fallback, `config explain` adds a `conversion` object to its JSON:
 
-| Field           | Meaning                                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config`        | The converted settings, which use no preset; `{}` when no file could be used and the defaults apply.                                         |
-| `sources`       | The files whose settings were converted, as absolute paths.                                                                                  |
-| `unused`        | The files that were found and not used, each as `{ "file", "reason" }`.                                                                      |
-| `omitted`       | The settings that were not carried over or only in part, with the reason and any issue that tracks the missing part.                         |
-| `conflicts`     | The settings of the two tools that disagreed, and which one won.                                                                             |
-| `suggestions`   | mdrefine checks worth considering that the competitor configuration does not enable.                                                         |
-| `compatibility` | The original competitor settings and the competitor checks behind each converted rule, which the fallback uses to honor competitor comments. |
+| Field           | Meaning                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`        | The converted settings, which use no preset; `{}` when no file could be used and the defaults apply.                                        |
+| `sources`       | The files whose settings were converted, as absolute paths.                                                                                 |
+| `unused`        | The files that were found and not used, each as `{ "file", "reason" }`.                                                                     |
+| `omitted`       | The settings that were not carried over or only in part, with the reason and any issue that tracks the missing part.                        |
+| `conflicts`     | The settings of the two tools that disagreed, and which one won.                                                                            |
+| `suggestions`   | mdrefine checks worth considering that the markdownlint or Prettier configuration does not enable.                                          |
+| `compatibility` | The original markdownlint and Prettier settings and the checks behind each converted rule, which the fallback uses to honor their comments. |
 
 `rules` accepts `--no-competitor-config` too. Its list describes the available
 rules rather than the effective settings, so it does not print fallback notices;

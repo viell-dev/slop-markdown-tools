@@ -65,15 +65,16 @@ VitePress ends it and stays as written; an opening `---` that nothing closes
 keeps the whole page as written. TOML fences (`+++`) are ordinary Markdown here.
 Components and other syntax that only VitePress renders are preserved.
 
-Some blocks are read one way by VitePress, whose renderer is markdown-it, and
-another way by the tool, whose reading follows CommonMark. Those blocks are left
-as written: a block that a component line ends, such as a paragraph directly
-above `<MyComponent />`; a block where VitePress reads a table that the tool
-reads as something else, such as `* a | b` above `  --|--`, which VitePress
-shows as a table whose first cell holds the marker; and a paragraph with an
-inline footnote. Rules report nothing and change nothing there, because the tool
-cannot tell how VitePress shows them; with `reportUnreflowed: true`,
-`style/wrap` still reports a paragraph there that is too wide.
+Some blocks are read one way by VitePress, whose renderer is
+[markdown-it](glossary.md#parsers-and-syntax-trees), and another way by the
+tool, whose reading follows CommonMark. Those blocks are left as written: a
+block that a component line ends, such as a paragraph directly above
+`<MyComponent />`; a block where VitePress reads a table that the tool reads as
+something else, such as `* a | b` above `  --|--`, which VitePress shows as a
+table whose first cell holds the marker; and a paragraph with an inline
+footnote. Rules report nothing and change nothing there, because the tool cannot
+tell how VitePress shows them; with `reportUnreflowed: true`, `style/wrap` still
+reports a paragraph there that is too wide.
 
 With math enabled, `$` follows VitePress's inline conditions and `$$` may
 interrupt a paragraph or close on the same line. The tool never evaluates

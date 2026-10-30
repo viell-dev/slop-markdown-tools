@@ -166,7 +166,7 @@ Without an mdrefine configuration, the same conversion runs in memory. Use
 its sources and converted settings. The search stops at the same repository or
 vault boundary as the ordinary configuration search. When none of the files
 found can be used, the `recommended` preset applies, as without them; the
-[notices](cli.md#competitor-fallback-notices) on stderr name each such file.
+[notices](cli.md#fallback-notices) on stderr name each such file.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.
@@ -203,7 +203,7 @@ exceptions, which can leave nothing to check. `.markdownlintignore`, the ignore
 file of markdownlint-cli and editor extensions, is not converted: beside a
 markdownlint configuration in use, the documents it excludes are checked; add
 its patterns to `ignore` in an mdrefine configuration. The
-[notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
+[notices](cli.md#fallback-notices) and `conversion.unused` say so.
 
 Patterns convert within the subset of glob syntax that each source documents. A
 pattern outside it, such as a character class or a negated `.prettierignore`
@@ -214,10 +214,10 @@ patterns match case exactly; conversion says so once per `.prettierignore`. The
 notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
 list the exact subsets.
 
-During the competitor fallback, markdownlint inline comments and Prettier ignore
-comments and `requirePragma` apply. With an mdrefine configuration, including
-one that `config convert` writes, they have no effect: migrate them to
-mdrefine's own [suppression comments](configuration.md#suppression-comments).
+During the fallback, markdownlint inline comments and Prettier ignore comments
+and `requirePragma` apply. With an mdrefine configuration, including one that
+`config convert` writes, they have no effect: migrate them to mdrefine's own
+[suppression comments](configuration.md#suppression-comments).
 
 markdownlint's `disable`, `enable`, `disable-line`, `disable-next-line`,
 `disable-file`, and `enable-file` select enabled markdownlint checks by ID,

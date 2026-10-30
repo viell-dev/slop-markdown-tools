@@ -2,7 +2,7 @@
 
 One configuration controls both `lint` and `format`. Without an mdrefine
 configuration file, the settings of a markdownlint or Prettier configuration
-apply, [converted](#competitor-configuration-fallback); without one of those
+apply, [converted](#fallback-to-markdownlint-and-prettier); without one of those
 either, the `recommended` preset applies. Either way, the dialect is
 [assumed](dialects.md#the-assumed-dialect).
 
@@ -27,11 +27,11 @@ root](cli.md#the-workspace-root).
 Outside a Git repository or a vault, the search goes on up to the filesystem
 root, so a configuration in a parent folder, such as your home directory,
 applies. So does a markdownlint or Prettier configuration there, such as
-`~/.prettierrc`, through the [fallback](#competitor-configuration-fallback). To
-stop the search at your documents, create a configuration there or make the
+`~/.prettierrc`, through the [fallback](#fallback-to-markdownlint-and-prettier).
+To stop the search at your documents, create a configuration there or make the
 folder a Git repository.
 
-### Competitor configuration fallback
+### Fallback to markdownlint and Prettier
 
 When no mdrefine configuration is found, the CLI converts the markdownlint and
 Prettier configurations that the same search finds, in memory, and uses the
@@ -46,8 +46,8 @@ JavaScript, TypeScript, TOML, and JSON5 configurations contribute nothing, and
 neither does a Prettier configuration whose `.prettierignore` excludes all
 Markdown. When no file found can be used, the `recommended` preset applies. The
 CLI names each file that it uses or leaves out on stderr; see [fallback
-notices](cli.md#competitor-fallback-notices). `mdrefine config convert --write`
-saves the converted configuration as a file; see [convert a
+notices](cli.md#fallback-notices). `mdrefine config convert --write` saves the
+converted configuration as a file; see [convert a
 configuration](cli.md#convert-a-configuration).
 [Integrations](integrations.md#configuration-conversion-and-fallback) describes
 what is converted, which files are read, and how markdownlint's and Prettier's
@@ -415,13 +415,13 @@ that cannot be loaded stops the command with exit code `2`.
 
 ## Suppression comments
 
-Competitor comments apply only during the [competitor configuration
-fallback](#competitor-configuration-fallback). A hand-written mdrefine
+markdownlint's and Prettier's comments apply only during the
+[fallback](#fallback-to-markdownlint-and-prettier). A hand-written mdrefine
 configuration or one written by `config convert` ignores all markdownlint and
 Prettier comments and pragmas. The [conversion
 guide](integrations.md#coming-from-prettier-or-markdownlint) describes their
 scopes and how shared rules behave. There is no configuration setting that
-enables competitor comments.
+enables their comments.
 
 ```markdown
 <!-- mdrefine-disable style/wrap -->
@@ -457,7 +457,7 @@ npx mdrefine config explain notes/example.md
 ```
 
 It reads `--config`, `--no-competitor-config`, `--root`, and `--dialect`, before
-or after `explain`. When the settings come from the [competitor
-fallback](#competitor-configuration-fallback), the JSON also has a `conversion`
-object, with the converted settings, the files used and not used, and what was
-not carried over; see [fallback notices](cli.md#competitor-fallback-notices).
+or after `explain`. When the settings come from the
+[fallback](#fallback-to-markdownlint-and-prettier), the JSON also has a
+`conversion` object, with the converted settings, the files used and not used,
+and what was not carried over; see [fallback notices](cli.md#fallback-notices).

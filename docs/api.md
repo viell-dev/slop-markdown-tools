@@ -322,11 +322,11 @@ package installs.
 Both entries are ES modules. A CommonJS module can load them with `require()`,
 which the supported Node.js versions allow for ES modules.
 
-## Competitor configuration conversion
+## Converting markdownlint and Prettier configurations
 
 These exports convert markdownlint and Prettier configurations, as
 `config convert` and the
-[fallback](configuration.md#competitor-configuration-fallback) do:
+[fallback](configuration.md#fallback-to-markdownlint-and-prettier) do:
 
 | Export                                                                        | From            | What it does                                                                                                   |
 | ----------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -363,10 +363,10 @@ with negated entries under the fallback, or a `.markdownlintignore` beside a
 markdownlint configuration in use. When it could use none, `sources` is empty
 and `config` is `{}`.
 
-`loadConfig` returns a `LoadedConfig`. When the fallback found competitor files,
-it includes their `conversion` report, and when it used them, the
-`compatibility` for the engine; when it used none, its `config` is `{}`, which
-applies the `recommended` preset. Pass `loaded.compatibility` along with
+`loadConfig` returns a `LoadedConfig`. When the fallback found markdownlint or
+Prettier files, it includes their `conversion` report, and when it used them,
+the `compatibility` for the engine; when it used none, its `config` is `{}`,
+which applies the `recommended` preset. Pass `loaded.compatibility` along with
 `loaded.config` and `loaded.plugins` to `lint` or `format`; with the
 configuration alone, they use mdrefine's own behavior instead of the other
 tools' comments and choices. `onCompatibilityWarning` in the processing options
