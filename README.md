@@ -7,25 +7,6 @@ CommonMark renderer, with one configuration for both.
 [![CI](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/viell-dev/slop-markdown-tools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/mdrefine)](LICENSE)
 
-mdrefine is meant to replace a general-purpose linter and formatter, such as
-markdownlint and Prettier, for Markdown. It does not cover all of their checks
-yet; [the
-comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
-lists each one with its rule or the issue that tracks it.
-
-- **One configuration for lint and format.** Style rules report in `lint` and
-  fix in `format`; problem rules report what has no single correct repair.
-- **Changes only what is configured.** Markdown style edits preserve parsed
-  meaning. Optional external formatters target fenced bodies and front matter
-  while a guard protects the surrounding Markdown.
-- **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, Obsidian,
-  and VitePress: tables, math, wikilinks, and callouts are read as each renderer
-  reads them.
-- **Checks local links** and their heading and block fragments, with each
-  renderer's anchors.
-- **Extensible.** Plugins add rules, presets, and syntax, and a library runs the
-  same engine without the command line.
-
 ## Example
 
 ```markdown
@@ -56,33 +37,23 @@ a sensor board.
 
 ## Install
 
-mdrefine needs Node.js 22.12 or newer:
+mdrefine needs Node.js 22.12 or newer. Install it in the project that holds your
+documents, then check them and apply the fixes:
 
 ```sh
 npm install --save-dev --save-exact mdrefine@0.6.0
 npx mdrefine lint
-npx mdrefine format
-npx mdrefine format --diff
 npx mdrefine format --write
-npx mdrefine format --check
 ```
 
-`lint` reports and never writes. Bare `format` shows a diff and exits `1` when a
-document would change. Use `format --diff` for an exit-`0` preview,
-`format --write` to apply changes, or `format --check` to list files needing
-changes. `format --check --diff` combines the diff with failing on changes.
-Stdin prints the formatted document by default; `--json` omits the diff.
-Remaining errors fail every mode; operational failures exit `2`.
+`lint` reports what the rules find and never writes; `format --write` applies
+the fixes. [Getting
+started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html)
+compares the other forms of `format`, for previews and CI.
 
 ## Configure
 
-To adopt an existing markdownlint or Prettier setup, run
-`npx mdrefine config convert --write`. Without an mdrefine configuration,
-competitor settings are converted in memory; `--no-competitor-config` disables
-that fallback. See [conversion
-details](docs/integrations.md#coming-from-prettier-or-markdownlint).
-
-`mdrefine.config.jsonc` at the root of the documents:
+Create `mdrefine.config.jsonc` at the root of the documents:
 
 ```jsonc
 {
@@ -90,29 +61,64 @@ details](docs/integrations.md#coming-from-prettier-or-markdownlint).
 }
 ```
 
-`recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
-text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
-code fences with backticks, and thematic breaks as `---`; aligns tables; removes
-trailing spaces and repeated blank lines; separates headings, lists, code
-fences, and tables from adjacent blocks with a blank line where safe; ends files
-with a line break; and checks links. It also warns about references without a
-definition, unused definitions, empty links, skipped heading levels, images
-without alternative text, and table rows with the wrong number of cells. Use
-`forgejo`, `codeberg`, `gitea`, `obsidian`, or `vitepress` in place of `github`
-for documents rendered there.
+`recommended` wraps prose at 80 columns, writes consistent markers, aligns
+tables, and checks links; see [what it
+does](https://viell-dev.github.io/slop-markdown-tools/configuration.html#what-recommended-does).
+Use `forgejo`, `codeberg`, `gitea`, `obsidian`, or `vitepress` in place of
+`github` for documents rendered there.
+
+To adopt an existing markdownlint or Prettier setup, run
+`npx mdrefine config convert --write`. Without an mdrefine configuration, their
+settings apply; `--no-competitor-config` turns that off. See [configuration
+conversion](https://viell-dev.github.io/slop-markdown-tools/integrations.html#configuration-conversion-and-fallback).
+
+## Features
+
+- **One configuration for lint and format.** Style rules report in `lint` and
+  fix in `format`; problem rules report what has no single correct repair.
+- **Never changes what a document means.** Formatting edits only what its rules
+  and configured code formatters target, keeps everything else byte for byte,
+  and refuses an edit that would change what the document says.
+- **Dialect-aware.** CommonMark, GitHub, Forgejo and Codeberg, Gitea, Obsidian,
+  and VitePress: tables, math, wikilinks, and callouts are read as each renderer
+  reads them.
+- **Checks local links** and their heading and block fragments, with each
+  renderer's anchors.
+- **Extensible.** Plugins add rules, presets, and syntax, and a library runs the
+  same engine without the command line.
+
+mdrefine is meant to replace a general-purpose linter and formatter, such as
+markdownlint and Prettier, for Markdown. It does not cover all of their checks
+yet; [the
+comparison](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
+lists each one with its rule or the issue that tracks it.
 
 ## Documentation
 
-The [documentation](https://viell-dev.github.io/slop-markdown-tools/) starts
-with [getting
-started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html) and
-covers the [rules](https://viell-dev.github.io/slop-markdown-tools/rules.html),
-configuration, the command line, Obsidian vaults, CI and editors, the library
-and plugins, and [what is not covered
-yet](https://viell-dev.github.io/slop-markdown-tools/design.html#limits). The
-package ships working
-[examples](https://viell-dev.github.io/slop-markdown-tools/examples.html) and
-the [changelog](CHANGELOG.md).
+The [documentation site](https://viell-dev.github.io/slop-markdown-tools/)
+describes the newest release:
+
+- [Getting
+  started](https://viell-dev.github.io/slop-markdown-tools/quick-start.html):
+  install, configure, and run.
+- [Examples](https://viell-dev.github.io/slop-markdown-tools/examples.html):
+  documents before and after formatting; the package ships the same files.
+- [Rules](https://viell-dev.github.io/slop-markdown-tools/rules.html): what each
+  rule does, with examples.
+- [Configuration](https://viell-dev.github.io/slop-markdown-tools/configuration.html)
+  and the [command
+  line](https://viell-dev.github.io/slop-markdown-tools/cli.html): every
+  setting, option, and exit code.
+- [Obsidian
+  vaults](https://viell-dev.github.io/slop-markdown-tools/obsidian.html) and
+  [integrations](https://viell-dev.github.io/slop-markdown-tools/integrations.html):
+  CI, Git hooks, editors, and moving from Prettier or markdownlint.
+- [Library API](https://viell-dev.github.io/slop-markdown-tools/api.html) and
+  [plugins](https://viell-dev.github.io/slop-markdown-tools/plugins.html).
+- [How it works and its
+  limits](https://viell-dev.github.io/slop-markdown-tools/design.html#limits),
+  including what is not covered yet.
+- [Changelog](CHANGELOG.md).
 
 ## Status
 

@@ -51,6 +51,14 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   formatting changes to the files
   ([#819](https://github.com/viell-dev/slop-markdown-tools/issues/819)).
 
+- Getting started picks presets from a table of renderers, shows what `lint`
+  prints, and compares the forms of `lint` and `format` in a table. The
+  configuration page lists what `recommended` does, and the README and the home
+  page show only `lint` and `format --write`. The examples' commands use the
+  installed `npx mdrefine`, after copying the examples from the package, and the
+  examples' README lists `vitepress.jsonc`
+  ([#814](https://github.com/viell-dev/slop-markdown-tools/issues/814)).
+
 ## 0.6.0 - 2026-10-30
 
 [What's new in
