@@ -103,11 +103,12 @@ On a branch, in one pull request:
 2. Rename the `Unreleased` section of `CHANGELOG.md` to
    `## VERSION - YYYY-MM-DD`, with the date of publication. The Release workflow
    takes the release notes from this section and fails without it.
-3. Update the pinned installation commands in `README.md` and
-   `docs/quick-start.md`, which the tests compare with the version, the
-   `version` default of `.github/workflows/release.yml`, and every example and
-   document that names the version. When users need to do something to upgrade,
-   add the release's section to `docs/upgrading.md`.
+3. Update the pinned installation commands in `README.md`,
+   `docs/quick-start.md`, and the other pages that name the version, which the
+   tests compare with it, the `version` default of
+   `.github/workflows/release.yml`, and every example and document that names
+   the version. When users need to do something to upgrade, add the release's
+   section to `docs/upgrading.md`.
 4. Refresh the indirect dependencies with `npm update`, so that the tests run
    with what a fresh installation of the package gets. The lockfile does not
    ship, and Dependabot updates only the direct dependencies. Check first that

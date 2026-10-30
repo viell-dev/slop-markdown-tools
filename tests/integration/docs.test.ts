@@ -302,9 +302,12 @@ describe("documentation site", () => {
     for (const link of sidebar) expect(pages).toContain(link);
   });
   it("gives installation commands for the current version", () => {
-    for (const file of ["README.md", "docs/quick-start.md"]) {
+    // Release notes name the versions they describe; the other pages install the current one.
+    const files = [...pages.filter((page) => !page.startsWith("docs/release-notes/")), "README.md"];
+    for (const file of files) {
       const versions = [...read(file).matchAll(/mdrefine@(\d[\w.-]*)/g)].map((match) => match[1]);
-      expect(versions.length, file).toBeGreaterThan(0);
+      if (["README.md", "docs/quick-start.md"].includes(file))
+        expect(versions.length, file).toBeGreaterThan(0);
       for (const version of versions) expect(version, file).toBe(manifest.version);
     }
   });

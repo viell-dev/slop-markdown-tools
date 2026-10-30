@@ -12,6 +12,14 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Getting started covers running mdrefine without installing it, a global
+  installation, pnpm, Yarn, and Bun, and what `npm install` does in a folder
+  without `package.json`. The Obsidian page says how to install for a vault, the
+  integration guide has hooks for the pre-commit framework and lefthook, and the
+  configuration page warns that outside a repository the search for a
+  configuration reaches parent folders such as the home directory
+  ([#815](https://github.com/viell-dev/slop-markdown-tools/issues/815)).
+
 - The documentation has an
   [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
   page with the steps for each release that needs them: the markdownlint and

@@ -57,6 +57,37 @@ skips, such as one that the configuration's `ignore` patterns match.
 starts with `-` from being read as an option. This hook checks each file as it
 is on disk, including changes that are not staged.
 
+With the [pre-commit](https://pre-commit.com/) framework, a hook in the
+repository's `.pre-commit-config.yaml` installs mdrefine in an environment of
+its own, with the computer's Node.js, and passes it the staged Markdown files;
+it needs no `package.json`:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: mdrefine
+        name: mdrefine
+        language: node
+        additional_dependencies: ["mdrefine@0.6.0"]
+        entry: mdrefine lint --max-warnings 0 --no-warn-ignored
+        types: [markdown]
+```
+
+With [lefthook](https://lefthook.dev/), installed in the project next to
+mdrefine, add to `lefthook.yml`:
+
+```yaml
+pre-commit:
+  commands:
+    mdrefine:
+      glob: "*.{md,markdown}"
+      run: npx --no-install mdrefine lint --max-warnings 0 --no-warn-ignored -- {staged_files}
+```
+
+Both skip the command when the commit changes no Markdown file, and lefthook's
+glob also matches files in subdirectories.
+
 ## Editors
 
 There is no editor extension or language server. An editor that can format a

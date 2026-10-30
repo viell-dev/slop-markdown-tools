@@ -20,6 +20,13 @@ it is the repository or vault where the search stopped, or else the current
 directory. Configuration files do not cascade: a file in a subdirectory is not
 merged with one above it.
 
+Outside a Git repository or a vault, the search goes on up to the filesystem
+root, so a configuration in a parent folder, such as your home directory,
+applies. So does a markdownlint or Prettier configuration there, such as
+`~/.prettierrc`, through the [fallback](#competitor-configuration-fallback). To
+stop the search at your documents, create a configuration there or make the
+folder a Git repository.
+
 ### Competitor configuration fallback
 
 When no mdrefine configuration is found, the CLI converts the markdownlint and
