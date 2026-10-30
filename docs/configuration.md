@@ -141,11 +141,32 @@ setting for a rule replaces an earlier one as a whole, options included. A
 plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
 
-`recommended` enables [`style/block-spacing`](rules/style/block-spacing.md) at
-`warn`, separating headings, lists, code fences, and tables from adjacent blocks
-with a blank line where safe. `lint` reports missing separators, and `format`
-adds them. To keep compact spacing, set
-`"rules": { "style/block-spacing": "off" }`.
+### What `recommended` does
+
+`recommended` sets no dialect, so it suits any document. Its rules report at
+`warn`, except broken links, at `error`. `format` fixes everything in the first
+five points:
+
+- Wraps prose at 80 columns.
+- Writes emphasis as `_text_`, strong text as `**text**`, bullets as `- item`,
+  and ordered lists with `.`, numbered consistently, and indents list items
+  consistently.
+- Writes headings with `#`, code fences with backticks, thematic breaks as
+  `---`, and one space after a block quote's `>`, also on lines that continue a
+  quote without it.
+- Aligns tables.
+- Removes trailing spaces and repeated blank lines, puts a blank line around
+  headings, lists, code fences, and tables where that is safe, and ends every
+  file with a line break.
+- Reports local links whose file or heading does not exist.
+- Reports problems that show on the rendered page: a reference without a
+  definition, a definition that nothing uses, an empty link, a skipped heading
+  level, an image without alternative text, and a table row with the wrong
+  number of cells.
+
+The [rules](rules.md) index lists each of these rules. To leave one out, turn it
+off under `rules`, such as `"rules": { "style/block-spacing": "off" }` for
+compact spacing.
 
 ## Rules and severity
 

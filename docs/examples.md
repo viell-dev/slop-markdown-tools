@@ -6,10 +6,17 @@ directory holds working examples, and the package ships the same files under
 `node_modules/mdrefine/examples/`. The tests compare every file and output on
 this page with the tool.
 
-The commands run from the root of a [built
-checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up).
-With the installed package, use `npx mdrefine` in place of
-`node dist/cli/main.js`.
+To run the commands, copy the examples into the project where you installed
+mdrefine, and run them from its root:
+
+```sh
+cp -r node_modules/mdrefine/examples .
+```
+
+In PowerShell, use `Copy-Item -Recurse node_modules/mdrefine/examples .`. In a
+[built
+checkout](https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md#set-up),
+run them from its root with `node dist/cli/main.js` in place of `npx mdrefine`.
 
 ## Start from a configuration
 
@@ -81,7 +88,7 @@ Preview the changes with `--diff`. To try `--write`, copy `before/` elsewhere
 first.
 
 ```sh
-node dist/cli/main.js format --root examples/workspaces/repository-docs/before --diff
+npx mdrefine format --root examples/workspaces/repository-docs/before --diff
 ```
 
 The same README afterwards:
@@ -139,7 +146,7 @@ Formatting never guesses a target, so `lint` still reports it and exits with
 code `1`:
 
 ```sh
-node dist/cli/main.js lint --root examples/workspaces/repository-docs/after
+npx mdrefine lint --root examples/workspaces/repository-docs/after
 ```
 
 ```text
@@ -374,7 +381,7 @@ Linting reports both, but not the `TODO` inside the code span. The built-in
 of proposing an edit from a plugin.
 
 ```sh
-node dist/cli/main.js lint --root examples/plugin
+npx mdrefine lint --root examples/plugin
 ```
 
 ```text
@@ -387,7 +394,7 @@ examples/plugin/notes/release-checklist.md:7:3: warn style/heading: Use one spac
 Formatting applies the style rule's edit and leaves the placeholder to a person:
 
 ```sh
-node dist/cli/main.js format --root examples/plugin --diff
+npx mdrefine format --root examples/plugin --diff
 ```
 
 ```text
@@ -603,7 +610,7 @@ The script
 reads a `--json` report and counts diagnostics per rule:
 
 ```sh
-node dist/cli/main.js lint --root examples/plugin --json | node examples/automation/summarize-report.mjs
+npx mdrefine lint --root examples/plugin --json | node examples/automation/summarize-report.mjs
 ```
 
 ```text
