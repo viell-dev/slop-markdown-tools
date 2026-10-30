@@ -69,6 +69,7 @@ export default defineConfig({
           { text: "How it works and its limits", link: "/design" },
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Versions", link: "/versions" },
+          { text: "Upgrading", link: "/upgrading" },
           { text: "Changelog", link: "/changelog" },
         ],
       },

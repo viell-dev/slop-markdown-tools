@@ -3,12 +3,6 @@
 The command is `mdrefine`; with the package installed in a project, run it as
 `npx mdrefine`.
 
-## Earlier names
-
-Use `mdrefine`, `mdrefine.config.*`, and `mdrefine-disable` comments. For
-migration from the `mdtools` names, see the [changelog](changelog.md).
-Formatting does not rename files or migrate comments.
-
 ## Commands
 
 | Command                 | What it does                                                                                                   |
@@ -195,7 +189,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.6.0",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [
