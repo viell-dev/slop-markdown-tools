@@ -351,25 +351,47 @@ it.each([
   ({ prefix, unit, regions }) => {
     // Each paragraph line is read once; a stretch's lines share one search for
     // the next blank line, and one forward search finds each `<`.
+    // One 8,000-unit document is timed against four separately parsed
+    // 2,000-unit documents: the same work when it is linear, so both timed
+    // windows last about as long. A window four times longer than the other is
+    // likelier to lose time to collection or to other processes, and that
+    // inflated the growth past the bound (#774). The bound still allows 2.5
+    // times linear growth, as 10 did for four times the size.
     const sizes: [number, number] = [2000, 8000];
-    const templates = new Map(
-      sizes.map((count) => [count, parse(prefix + unit.repeat(count), "github")] as const),
+    const documents = new Map(
+      sizes.map(
+        (count) =>
+          [
+            count,
+            Array.from({ length: sizes[1] / count }, () =>
+              parse(prefix + unit.repeat(count), "github"),
+            ),
+          ] as const,
+      ),
     );
     expect(
       scaling(
         sizes,
-        (count) => ({ document: templates.get(count)!, count }),
-        ({ document }) => {
-          const found = new Set<Nodes>();
-          collectGithubLazyHtmlProtections(document, found);
-          return found;
-        },
-        (found, { document, count }) => {
-          expect(found.size).toBe(regions(count));
-          for (const node of found)
-            expect(node.position!.end.offset).toBeLessThanOrEqual(document.source.length);
+        (count) => ({ documents: documents.get(count)!, count }),
+        ({ documents }) =>
+          documents.map((document) => {
+            const found = new Set<Nodes>();
+            collectGithubLazyHtmlProtections(document, found);
+            return found;
+          }),
+        (results, { documents, count }) => {
+          expect(results).toHaveLength(documents.length);
+          results.forEach((found, index) => {
+            expect(found.size).toBe(regions(count));
+            for (const node of found)
+              expect(node.position!.end.offset).toBeLessThanOrEqual(
+                documents[index]!.source.length,
+              );
+          });
         },
       ),
-    ).toBeLessThan(10);
+    ).toBeLessThan(2.5);
   },
+  // Parsing the documents takes most of the time.
+  120_000,
 );
