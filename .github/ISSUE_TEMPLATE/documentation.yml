@@ -1,0 +1,38 @@
+name: Documentation
+description: Report a mistake, a gap, or something hard to follow in the documentation or help text
+labels: ["Type: Documentation"]
+body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Existing issues
+      options:
+        - label: I searched the open and closed issues and found no report of this.
+          required: true
+        - label:
+            I follow the project's [code of
+            conduct](https://github.com/viell-dev/slop-markdown-tools/blob/main/CODE_OF_CONDUCT.md).
+          required: true
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description:
+        The address of the page, the file in the repository, or the command whose `--help` you read.
+      placeholder: https://viell-dev.github.io/slop-markdown-tools/quick-start.html#install
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing
+      description:
+        Quote the passage, and say what you expected to find or what you did not understand. If the
+        tool behaved otherwise than the page says, use the bug form instead.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggestion
+      description: Optional. How the page could say it, or where you looked for it first.

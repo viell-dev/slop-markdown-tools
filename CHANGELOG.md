@@ -15,10 +15,15 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 - The site has release notes, starting with [What's new in
   0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html),
-  under "Releases" in the top bar. This changelog's 0.6.0 entry is shorter, with
-  internal work under "Maintenance", and the 0.6.0 and 0.5.0 entries point to
-  their upgrading steps
+  in a menu named after the documented version in the top bar. This changelog's
+  0.6.0 entry is shorter, with internal work under "Maintenance", and the 0.6.0
+  and 0.5.0 entries point to their upgrading steps
   ([#813](https://github.com/viell-dev/slop-markdown-tools/issues/813)).
+
+- The site's top bar has Guide and Reference menus and an Examples link, which
+  the home page's second button also opens, and the sidebar's last group is
+  named About. Issues about the documentation have their own form
+  ([#818](https://github.com/viell-dev/slop-markdown-tools/issues/818)).
 
 - The documentation has an
   [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
