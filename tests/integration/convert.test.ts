@@ -359,6 +359,32 @@ describe("competitor configuration CLI (#669)", () => {
       expect(run(root, args).status).not.toBe(2);
     },
   );
+  it("reads a cli2 file without config as markdownlint's defaults (#792)", async () => {
+    for (const name of [".markdownlint-cli2.jsonc", ".markdownlint-cli2.yaml"]) {
+      const root = await fixture({
+        [name]: name.endsWith("yaml") ? "ignores:\n  - generated\n" : '{"ignores":["generated"]}',
+        "generated/a.md": "text",
+        "note.md": "text",
+      });
+      const result = run(root, ["lint", "--json"]);
+      const files = parseReport(result.stdout).files;
+      // markdownlint's defaults report the missing final line break (MD047).
+      expect(files.map((f) => f.path)).toEqual(["note.md"]);
+      expect(files[0]!.diagnostics.map((d) => d.rule)).toContain("style/final-newline");
+      const rules = parseExplanation(run(root, ["config", "explain", "note.md"]).stdout).effective
+        .rules;
+      expect(Object.keys(rules).length).toBeGreaterThan(10);
+    }
+    // A `.markdownlint.*` file beside it still supplies the configuration.
+    const root = await fixture({
+      ".markdownlint-cli2.jsonc": '{"ignores":["generated"]}',
+      ".markdownlint.json": '{"default":false,"MD047":true}',
+      "note.md": "text",
+    });
+    const rules = parseExplanation(run(root, ["config", "explain", "note.md"]).stdout).effective
+      .rules;
+    expect(Object.keys(rules)).toEqual(["style/final-newline"]);
+  });
   it("replaces cli2 config instead of merging standalone settings", async () => {
     const root = await fixture({
       ".markdownlint.json": '{"default":false,"MD049":{"style":"asterisk"}}',
