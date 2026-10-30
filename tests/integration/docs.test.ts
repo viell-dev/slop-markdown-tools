@@ -9,7 +9,7 @@ import type { Code, Nodes, RootContent } from "mdast";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
-import { manifest, repository } from "../support/cli.js";
+import { manifest, repository, run } from "../support/cli.js";
 
 const { builtInRules, dialectAliases, dialects, lint, parse, presets, range } = library;
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
@@ -575,5 +575,21 @@ describe("competitor fallback (#788)", () => {
     expect(changed).toContain("instead of the `recommended` preset");
     expect(changed).toContain("--no-competitor-config");
     expect(changed).toContain("mdrefine config convert --write");
+  });
+  it("ascribes --quiet only to the commands that take it", () => {
+    const takes = (args: string[]) =>
+      run(repository, [...args, "--help"]).stdout.includes("--quiet");
+    expect(takes(["lint"]) && takes(["format"])).toBe(true);
+    expect(takes(["config", "explain"])).toBe(false);
+    const notices = prose("docs/cli.md")
+      .split("### Competitor fallback notices")[1]!
+      .split(" ### ")[0]!;
+    const sentences = notices.split(/(?<=\.) /).filter((text) => text.includes("`--quiet`"));
+    expect(sentences.length).toBeGreaterThan(0);
+    for (const sentence of sentences) {
+      expect(sentence).toMatch(/`lint` and `format`/);
+      if (sentence.includes("`config explain`"))
+        expect(sentence).toContain("`config explain` takes no `--quiet`");
+    }
   });
 });

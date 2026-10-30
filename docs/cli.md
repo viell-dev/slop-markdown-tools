@@ -363,8 +363,18 @@ mdrefine: no mdrefine configuration; using markdownlint settings from .markdownl
 ```
 
 When it uses none of the files it found, the last line says that the defaults
-apply instead. `--quiet` leaves the notices out. They never go to stdout, so the
-JSON report of `--json` is unchanged.
+apply instead. A `.prettierignore` with a negated (`!`) entry, which conversion
+cannot express, is not used either: none of its patterns apply, so the documents
+it excludes are checked, and a line says so:
+
+```text
+mdrefine: not using .prettierignore: its negated entries (!README.md) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration
+```
+
+`config convert` instead converts the other patterns of such a file and reports
+the negated entries. With `lint` and `format`, `--quiet` leaves the notices out;
+`config explain` takes no `--quiet`. The notices never go to stdout, so the JSON
+report of `--json` is unchanged.
 
 With the fallback, `config explain` adds a `conversion` object to its JSON:
 

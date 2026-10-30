@@ -503,8 +503,9 @@ export interface ConversionReport {
   sources: string[];
   /**
    * Configuration files the Node loader found and did not use, each with the
-   * reason: a format it does not read, or a Prettier configuration whose
-   * `.prettierignore` excludes all Markdown. With no source to use, `config`
+   * reason: a format it does not read, a Prettier configuration whose
+   * `.prettierignore` excludes all Markdown, or, for the fallback, a
+   * `.prettierignore` with negated entries. With no source to use, `config`
    * is empty, so the defaults apply, and `sources` is empty.
    */
   unused: { file: string; reason: string }[];

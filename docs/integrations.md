@@ -92,15 +92,17 @@ The order matters. Without an mdrefine configuration, mdrefine falls back to the
 Prettier configuration, but not once `.prettierignore` excludes all Markdown:
 Prettier then formats no Markdown in the workspace, so neither its options nor
 its ignore patterns describe your documents, and `config convert` and the
-fallback leave the Prettier configuration out and say so. To decide, the
-patterns are evaluated as Prettier evaluates them, as gitignore patterns without
-regard to letter case, against `.md` files at the root and in nested
-directories, and against each path that a negated (`!`) entry names, `.md` or
-`.markdown`. Any of them that Prettier would still format, or a negated entry
-with a character class, keeps the Prettier configuration in use. `*.md`,
-`**/*.md`, and `*` exclude all Markdown, with or without an entry for
-`.markdown`, because an entry for `.md` files alone is the usual way to leave
-Markdown to another tool. `docs/*.md`, or `**/*.md` with `!README.md`, does not.
+fallback leave the Prettier configuration out and say so. This applies only
+where it can be established: one entry by itself must exclude every `.md` file,
+whatever its name and directory, evaluated as Prettier evaluates it, as a
+gitignore pattern without regard to letter case. A file with a negated (`!`)
+entry or a character class never qualifies, because its exceptions cannot be
+proved not to leave Prettier some Markdown, so it keeps the Prettier
+configuration in use. `*.md`, `**/*.md`, and `*` exclude all Markdown, with or
+without an entry for `.markdown`, because an entry for `.md` files alone is the
+usual way to leave Markdown to another tool. `docs/*.md`, `**/*.md` with
+`!README.md`, and even `**/*.md` with `!docs/`, which re-includes no document,
+do not.
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
 disagree, such as markdownlint's emphasis style (MD049) and `style/emphasis`.
@@ -156,8 +158,13 @@ through Node.js. TOML and JSON5 are not read, by either. An extensionless
 comment in it becomes part of the next key in Prettier too, which ignores that
 setting, and conversion reports it. A file that cannot be parsed is an error
 that names it. `.prettierignore` and markdownlint-cli2 `ignores` and `globs`
-become `ignore`. Negated `.prettierignore` patterns are reported for manual
-migration.
+become `ignore`. Negated `.prettierignore` patterns cannot be converted:
+`config convert` reports them for manual migration and converts the other
+patterns, so review its `ignore` before using it. The fallback, which has no
+such review, applies none of the patterns of a `.prettierignore` with a negated
+entry: it checks the documents that the file excludes rather than apply the
+exclusions without their exceptions, which can leave nothing to check. The
+[notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
 
 Pattern conversion is bounded by source dialect. Prettier overrides,
 EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,

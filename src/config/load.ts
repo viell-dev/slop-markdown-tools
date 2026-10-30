@@ -136,7 +136,7 @@ export async function loadConfig(
   }
 
   if (!file && competitorFallback) {
-    const conversion = await loadCompetitorConfig(directories, false, fallbackRoot);
+    const conversion = await loadCompetitorConfig(directories, false, fallbackRoot, true);
     // Files that were found but could not be used contribute nothing, and the defaults apply.
     if (conversion && !conversion.sources.length)
       return { config: {}, plugins: [], root: fallbackRoot, conversion };

@@ -35,7 +35,9 @@ A file that the fallback cannot read contributes nothing: a JavaScript or
 TypeScript configuration, which it never runs, and a TOML or JSON5 one. Neither
 does a Prettier configuration in a workspace whose `.prettierignore` [excludes
 all Markdown](integrations.md#next-to-prettier-or-markdownlint), because
-Prettier does not format Markdown there. When no file found can be used, the
+Prettier does not format Markdown there. A `.prettierignore` with a negated
+entry, which conversion cannot express, applies none of its patterns. When no
+file found can be used, the
 `recommended` preset applies, as without any of them. The CLI names each file
 that it does not use, and why, on stderr, with a line for the settings that
 apply; see [fallback notices](cli.md#competitor-fallback-notices).

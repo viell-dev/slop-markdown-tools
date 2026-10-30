@@ -421,11 +421,31 @@ describe("a .prettierignore that excludes all Markdown (#788)", () => {
     "*\n",
     "**\n",
     "**/*.MD\n**/*.MARKDOWN\n",
-    "# comment\n\n*.md\n*.markdown\n!docs/\n",
+    "# comment [old]\n\n*.md\n*.markdown\n",
     "**/*.md\n",
     "*.md\n",
+    "docs/\n*.md\n",
+    "/*\n",
   ])("is recognized from what it ignores: %j", (text) => {
     expect(ignoresAllMarkdown(text)).toBe(true);
+  });
+  it.each([
+    // Exceptions that one sample directory depth misses.
+    "**/*.md\n!docs/**/*.md\ndocs/*/*.md\n",
+    "**/*.md\n!**/README.md\n*/README.md\n",
+    // A negated entry that re-includes no document is not established either.
+    "# comment\n\n*.md\n*.markdown\n!docs/\n",
+    "**/*.md\n!docs/\n",
+    // Entries that each ignore some sample names and depths, but not all names.
+    "?.md\n*-*.md\n",
+    "*-*.md\n",
+    "m*\n",
+    "/*.md\n/*/*.md\n/*/*/*.md\n",
+    // Together these exclude all Markdown, which no single entry proves.
+    "/*.md\n*/**/*.md\n",
+    "[!_]*.md\n",
+  ])("is not established without proof: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(false);
   });
   it.each([
     "",

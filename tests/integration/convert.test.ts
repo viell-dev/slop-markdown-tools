@@ -909,9 +909,9 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
   });
   it.each([
     ["docs/*.md\n", ["docs/b.md"]],
-    ["**/*.md\n!docs/b.md\n", ["a.md", "README.md", "docs/b.md"]],
-    ["**/*.md\n!README.md\n", ["a.md", "README.md", "docs/b.md"]],
     ["/*.md\n", ["a.md", "README.md"]],
+    // Each entry ignores the sample names at some depths, and neither ignores README.md.
+    ["?.md\n*-*.md\n", ["a.md", "docs/b.md"]],
   ])("still converts Prettier where %j leaves it some Markdown", async (text, ignored) => {
     const root = await fixture({
       ".prettierrc.json": '{ "proseWrap": "always" }',
@@ -939,13 +939,132 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     expect(linted.stderr).toContain(
       "using Prettier settings from .prettierrc.json, .prettierignore",
     );
-    // The ignore is converted as before; a negated entry is reported, not carried over.
+    // Without a negated entry, the ignore is converted as before.
     expect(
       parseReport(linted.stdout)
         .files.map((file) => file.path)
         .sort(),
     ).toEqual(["a.md", "docs/b.md", "README.md"].filter((file) => !ignored.includes(file)).sort());
   });
+  it.each([
+    ["**/*.md\n!docs/**/*.md\ndocs/*/*.md\n", "docs/README.md", "!docs/**/*.md"],
+    ["**/*.md\n!**/README.md\n*/README.md\n", "README.md", "!**/README.md"],
+    ["**/*.md\n!README.md\n", "README.md", "!README.md"],
+    ["**/*.md\n!docs/\n", "docs/README.md", "!docs/"],
+  ])(
+    "keeps Prettier's settings, and checks every document, with the exception in %j",
+    async (text, document, negated) => {
+      const root = await fixture({
+        ".prettierrc.json": '{ "proseWrap": "always", "printWidth": 60 }',
+        ".prettierignore": text,
+        [document]: "text",
+        "other.md": "text\n",
+      });
+      const reference = await prettierResolve(path.join(root, document), { editorconfig: false });
+      expect(reference).toEqual({ proseWrap: "always", printWidth: 60 });
+      // Prettier applies the settings to the document, except where an exception has no effect.
+      const info = await getFileInfo(path.join(root, document), {
+        ignorePath: path.join(root, ".prettierignore"),
+      });
+      expect(info.ignored).toBe(negated === "!docs/");
+      const explanation = explained(root, document);
+      expect(explanation.effective.rules["style/wrap"]).toEqual(["warn", { width: 60 }]);
+      expect(explanation.effective.ignore).toEqual([]);
+      const conversion = (
+        JSON.parse(run(root, ["config", "explain", document]).stdout) as {
+          conversion: { sources: string[]; unused: unknown[] };
+        }
+      ).conversion;
+      expect(conversion.sources).toEqual([path.join(root, ".prettierrc.json")]);
+      const notice = `its negated entries (${negated}) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration`;
+      expect(conversion.unused).toEqual([
+        { file: path.join(root, ".prettierignore"), reason: notice },
+      ]);
+      // The fallback checks the documents and says why, also with --json.
+      const linted = run(root, ["lint", "--json"]);
+      expect(linted.status, linted.stderr).toBe(0);
+      expect(
+        parseReport(linted.stdout)
+          .files.map((file) => file.path)
+          .sort(),
+      ).toEqual([document, "other.md"].sort());
+      expect(linted.stderr.split("\n").filter(Boolean)).toEqual([
+        `mdrefine: not using .prettierignore: ${notice}`,
+        "mdrefine: no mdrefine configuration; using Prettier settings from .prettierrc.json (2 conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)",
+      ]);
+      const checked = run(root, ["format", "--check"]);
+      expect(checked.status).toBe(1);
+      expect(checked.stderr).toContain(`\n${document}\n2 file(s) processed; 1 would change.\n`);
+      // config convert still converts the other patterns and reports the negated entries.
+      const converted = run(root, ["config", "convert"]);
+      expect(converted.status, converted.stderr).toBe(0);
+      expect(parseConfig(converted.stdout).ignore).toContain("**/*.md");
+      expect(converted.stderr).toContain("mdrefine: converted .prettierignore\n");
+      expect(converted.stderr).toContain(
+        `mdrefine: .prettierignore: negated pattern ${negated} cannot be represented by independent ignore globs.\n`,
+      );
+      expect(converted.stderr).not.toContain("not using");
+    },
+  );
+  it.each([
+    [
+      "a package key",
+      {
+        "package.json": '{ "prettier": "./shared.json" }',
+        "shared.json": '{ "overrides": [{ "files": 7, "options": { "proseWrap": "always" } }] }',
+      },
+      "Invalid files in Prettier overrides[0] in shared.json (reached from package.json)",
+    ],
+    [
+      "extends",
+      {
+        ".prettierrc.json": '{ "extends": "./base.json", "printWidth": 70 }',
+        "base.json": '{ "overrides": [{ "files": "*.md", "options": 7 }] }',
+      },
+      "Expected a configuration object in the options of Prettier overrides[0] in base.json (reached from .prettierrc.json)",
+    ],
+    [
+      "an extends chain from a package key",
+      {
+        "package.yaml": "prettier: ./shared.json\n",
+        "shared.json": '{ "extends": "./base.json" }',
+        "base.json": '{ "overrides": [7] }',
+      },
+      "Expected a configuration object in Prettier overrides[0] in base.json (reached from package.yaml)",
+    ],
+    [
+      "the file itself",
+      {
+        ".prettierrc.json": '{ "extends": "./base.json", "overrides": [{ "files": [7] }] }',
+        "base.json": '{ "overrides": [{ "files": "*.md", "options": {} }] }',
+      },
+      "Invalid files in Prettier overrides[0] in .prettierrc.json",
+    ],
+    [
+      "a package key object",
+      { "package.json": '{ "prettier": { "overrides": [{ "files": 7 }] } }' },
+      "Invalid files in Prettier overrides[0] in package.json",
+    ],
+    [
+      "markdownlint extends",
+      {
+        ".markdownlint.json": '{ "extends": "./base.json" }',
+        "base.json": '{ "extends": "./deeper.yaml" }',
+        "deeper.yaml": "- MD013\n",
+      },
+      "Expected a configuration object in deeper.yaml",
+    ],
+  ])(
+    "names the file that holds an invalid setting reached through %s",
+    async (_kind, files, message) => {
+      const root = await fixture({ ...files, "a.md": "text\n" });
+      for (const args of [["config", "convert"], ["lint"]]) {
+        const result = run(root, args);
+        expect(result.status).toBe(2);
+        expect(result.stderr).toBe(`mdrefine: ${message}\n`);
+      }
+    },
+  );
   it.each([
     ["prettier.config.mjs", "export default { proseWrap: 'never' };", "does not run JavaScript"],
     [".prettierrc.cjs", "module.exports = { proseWrap: 'never' };", "does not run JavaScript"],

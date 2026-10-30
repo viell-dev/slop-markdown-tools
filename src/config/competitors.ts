@@ -19,36 +19,36 @@ const object = (value: unknown, where: string): Values => {
 /** The text of an error, for a message that adds where it happened. */
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** Paths that stand for `.md` files at the root and in nested directories. */
-const markdownProbes = ["", "mdrefine-probe/", "mdrefine-probe/nested/"].map(
-  (directory) => `${directory}mdrefine-probe.md`,
-);
 /**
- * Whether a `.prettierignore` leaves Markdown to another tool. Prettier reads
- * it with the `ignore` package, as gitignore rules without regard to letter
- * case, so it is evaluated that way against `.md` paths at several depths and
- * against the paths that its negated entries name, `.markdown` ones included.
- * `.markdown` files are not required to be ignored as well: an entry for `.md`
- * files alone is the usual way to leave Markdown to another tool, and taking it
- * for Prettier's Markdown setup would ignore every document. A negated entry
- * whose path cannot be derived, such as one with a character class, could
- * re-include a document, so the answer is then no.
+ * Whether a `.prettierignore` provably leaves Markdown to another tool; when
+ * that cannot be established, the answer is no and the Prettier configuration
+ * stays in use. A negated entry can re-include documents in ways that samples
+ * cannot rule out, so a file with one never qualifies, nor does one with a
+ * character class. Otherwise one entry by itself must ignore every sample `.md`
+ * path, as Prettier reads it, with the `ignore` package and without regard to
+ * letter case: names and directories of a character absent from the entries,
+ * and longer ones, at the root and at more depths than any entry has
+ * components. An entry can match a name made of characters it does not contain
+ * only through wildcards, which match other names too. `.markdown` files are
+ * not required to be ignored as well: an entry for `.md` files alone is the
+ * usual way to leave Markdown to another tool, and taking it for Prettier's
+ * Markdown setup would ignore every document.
  */
 export function ignoresAllMarkdown(text: string): boolean {
-  const matcher = gitignore({ allowRelativePaths: true }).add(text);
-  const probes = [...markdownProbes];
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.startsWith("!")) continue;
-    const named = line.slice(1).trim().replace(/^\//, "").replace(/\/$/, "");
-    if (!named || /[[\]\\]/.test(named)) return false;
-    const sample = named
-      .replace(/\*\*/g, "mdrefine-probe")
-      .replace(/\*/g, "mdrefine-probe")
-      .replace(/\?/g, "x");
-    if (/\.(?:md|markdown)$/i.test(sample)) probes.push(sample);
-    else probes.push(`${sample}.md`, `${sample}/mdrefine-probe.md`);
-  }
-  return probes.every((probe) => matcher.ignores(probe));
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() && !line.startsWith("#"));
+  if (lines.some((line) => line.trimStart().startsWith("!") || line.includes("["))) return false;
+  const lower = lines.join("\n").toLowerCase();
+  const fresh = [..."abcdefghijklmnopqrstuvwxyz0123456789"].find((c) => !lower.includes(c));
+  if (fresh === undefined) return false;
+  const depth = Math.max(2, ...lines.map((line) => line.split("/").length)) + 1;
+  const probes: string[] = [];
+  for (const name of [fresh, "mdrefine-probe"])
+    for (let level = 0; level <= depth; level++)
+      probes.push(`${`${name}/`.repeat(level)}${name}.md`);
+  return lines.some((line) => {
+    const matcher = gitignore({ allowRelativePaths: true }).add(line);
+    return probes.every((probe) => matcher.ignores(probe));
+  });
 }
 /** Recognized competitor configuration filenames, in search precedence order. */
 export const competitorFiles = {
@@ -231,16 +231,24 @@ function editorOptions(raw: Values): Values {
   };
 }
 
-/** Read competitors only in directories the mdrefine search already visited, nearest first. */
+/**
+ * Read competitors only in directories the mdrefine search already visited, nearest first.
+ * For the in-memory `fallback`, a `.prettierignore` whose negated entries conversion
+ * cannot express applies none of its patterns, so its documents are checked rather than
+ * none; conversion for a written configuration reports those entries for manual migration.
+ */
 export async function loadCompetitorConfig(
   directories: readonly string[],
   executeScripts = false,
   destination = directories.at(-1)!,
+  fallback = false,
 ): Promise<ConversionReport | undefined> {
   const sources: string[] = [];
   const omitted: string[] = [];
   /** Files found and not used, with the reason, in the order they were found. */
   const unused = new Map<string, string>();
+  /** The file that each object or array value of a configuration was read from. */
+  const origins = new WeakMap<object, string>();
   /** A file from the destination, the workspace root, with forward slashes, when it lies inside. */
   const shown = (file: string) => {
     const relative = path.relative(destination, file);
@@ -381,6 +389,8 @@ export async function loadCompetitorConfig(
       }
     }
     const result = object(value, shown(file));
+    for (const setting of Object.values(result))
+      if (setting && typeof setting === "object") origins.set(setting, file);
     if (path.basename(file) === ".prettierrc")
       for (const key of Object.keys(result))
         if (/^\s*(?:\/\/|\/\*)/.test(key)) {
@@ -661,9 +671,15 @@ export async function loadCompetitorConfig(
     ...(markdownlint ? { markdownlint } : {}),
     ...(prettier ? { prettier } : {}),
   });
-  if (prettier && Array.isArray(prettier.overrides))
+  if (prettier && Array.isArray(prettier.overrides)) {
+    // Name the file that holds the overrides, which a package key or extends can reach.
+    const holder = origins.get(prettier.overrides) ?? prettierSource!;
+    const file =
+      holder === prettierSource
+        ? shown(holder)
+        : `${shown(holder)} (reached from ${shown(prettierSource!)})`;
     for (const [index, raw] of prettier.overrides.entries()) {
-      const where = `Prettier overrides[${index}] in ${shown(prettierSource!)}`;
+      const where = `Prettier overrides[${index}] in ${file}`;
       const item = object(raw, where);
       const files = typeof item.files === "string" ? [item.files] : item.files;
       if (!Array.isArray(files) || !files.every((file): file is string => typeof file === "string"))
@@ -673,7 +689,16 @@ export async function loadCompetitorConfig(
       if (item.excludeFiles) omitted.push("Prettier overrides.excludeFiles: not carried over.");
       addOverride(rebased, object(item.options, `the options of ${where}`));
     }
-  if (ignoreFile && ignoreText !== undefined && prettier) {
+  }
+  const negated = (ignoreText ?? "").split(/\r?\n/).filter((line) => line.startsWith("!"));
+  if (ignoreFile && prettier && fallback && negated.length)
+    // Independent ignore globs cannot re-include a document, so the fallback would
+    // apply the exclusions without their exceptions and could check nothing.
+    unused.set(
+      ignoreFile,
+      `its negated entries (${negated.join(", ")}) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration`,
+    );
+  else if (ignoreFile && ignoreText !== undefined && prettier) {
     sources.push(ignoreFile);
     omitted.push(
       `${shown(ignoreFile)}: Prettier matches its patterns without regard to letter case; the converted patterns match case exactly.`,

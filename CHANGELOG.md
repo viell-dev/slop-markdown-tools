@@ -362,16 +362,20 @@ prereleases' notes there are longer than their entries here.
   `mdrefine config convert --write`. Files that the fallback cannot use apply
   nothing, and without a usable one the `recommended` preset applies as before:
   JavaScript and TypeScript configurations, which it never runs, TOML and JSON5
-  ones, and a Prettier configuration whose `.prettierignore` excludes all
-  Markdown, so that the coexistence setup in the integration guide keeps
-  checking documents. The fallback prints one line on stderr for the settings it
-  uses and one for each file it leaves out, with paths from the workspace root,
-  and none with `--quiet`; `config explain` lists the files left out under
-  `conversion.unused`
+  ones, and a Prettier configuration whose `.prettierignore` provably excludes
+  all Markdown, so that the coexistence setup in the integration guide keeps
+  checking documents; one with a negated entry never qualifies. The fallback
+  applies none of the patterns of a `.prettierignore` with a negated entry,
+  which conversion cannot express, rather than apply its exclusions without
+  their exceptions, which can select no documents. The fallback prints one line
+  on stderr for the settings it uses and one for each file it leaves out, with
+  paths from the workspace root, and none with `--quiet`; `config explain` lists
+  the files left out under `conversion.unused`
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - An error about a rule setting that cannot be used, such as an unknown rule or
   invalid options, names the configuration file that holds it
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - Bare `format` on files prints a diff and exits `1` when formatting would
   change a document. Scripts needing an exit-`0` preview should use
