@@ -149,21 +149,23 @@ paragraph lines are reported as unchecked, with a suggestion to enable
 mdrefine's safety guards.
 
 Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
-markdownlint-cli2 `config`, Prettier's `package.json` or `package.yaml` key,
-Markdown overrides, and relevant `.editorconfig` values only when a Prettier
-configuration exists. JavaScript and TypeScript configurations are named without
-executing them and contribute nothing; the explicit convert command loads them
-through Node.js. TOML and JSON5 are not read, by either. An extensionless
-`.prettierrc` is read as YAML, as Prettier reads it, so it can hold JSON; a JSON
-comment in it becomes part of the next key in Prettier too, which ignores that
-setting, and conversion reports it. A file that cannot be parsed is an error
-that names it. `.prettierignore` and markdownlint-cli2 `ignores` and `globs`
-become `ignore`. Negated `.prettierignore` patterns cannot be converted:
-`config convert` reports them for manual migration and converts the other
-patterns, so review its `ignore` before using it. The fallback, which has no
-such review, applies none of the patterns of a `.prettierignore` with a negated
-entry: it checks the documents that the file excludes rather than apply the
-exclusions without their exceptions, which can leave nothing to check. The
+markdownlint-cli2 `config` (without one, a `.markdownlint.*` file or else
+markdownlint's defaults, as markdownlint-cli2 uses), Prettier's `package.json`
+or `package.yaml` key, Markdown overrides, and relevant `.editorconfig` values
+only when a Prettier configuration exists. JavaScript and TypeScript
+configurations are named without executing them and contribute nothing; the
+explicit convert command loads them through Node.js. TOML and JSON5 are not
+read, by either. An extensionless `.prettierrc` is read as YAML, as Prettier
+reads it, so it can hold JSON; a JSON comment in it becomes part of the next key
+in Prettier too, which ignores that setting, and conversion reports it. A file
+that cannot be parsed is an error that names it. `.prettierignore` and
+markdownlint-cli2 `ignores` and `globs` become `ignore`. Negated
+`.prettierignore` patterns cannot be converted: `config convert` reports them
+for manual migration and converts the other patterns, so review its `ignore`
+before using it. The fallback, which has no such review, applies none of the
+patterns of a `.prettierignore` with a negated entry: it checks the documents
+that the file excludes rather than apply the exclusions without their
+exceptions, which can leave nothing to check. The
 [notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
 
 Pattern conversion is bounded by source dialect. Prettier overrides,
