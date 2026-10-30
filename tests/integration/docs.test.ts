@@ -369,7 +369,7 @@ describe("version annotations", () => {
     ],
     [
       "docs/quick-start.md",
-      "When upgrading from 0.4.x, complete the naming migration before installing 0.5.0.",
+      "When upgrading from 0.4.x, complete the naming migration before installing 0.6.0.",
       "an upgrade instruction that points to the migration steps",
     ],
     [
@@ -568,10 +568,9 @@ describe("competitor fallback (#788)", () => {
     expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
   });
   it("tells those upgrading how to keep the defaults", () => {
-    const unreleased = prose("CHANGELOG.md")
-      .split("## Unreleased")[1]!
-      .split(/ ## \d/)[0]!;
-    const changed = unreleased.split("### Changed")[1]!.split(/ ### /)[0]!;
+    // The newest section, before or after its release: `Unreleased` or a version.
+    const newest = prose("CHANGELOG.md").split(/ ## /)[1]!;
+    const changed = newest.split("### Changed")[1]!.split(/ ### /)[0]!;
     expect(changed).toContain("instead of the `recommended` preset");
     expect(changed).toContain("--no-competitor-config");
     expect(changed).toContain("mdrefine config convert --write");
