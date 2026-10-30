@@ -77,10 +77,11 @@ and `lint --fix` suggest the matching `format` mode.
 
 ## Which files are processed
 
-Without paths, a command processes every document of the workspace, including
-files above the current directory when run from a subdirectory. Paths, absolute
-or relative to the current directory, narrow the selection to those files and
-directories; the rest of the workspace still counts for checking links.
+Without paths, a command processes every document of the
+[workspace](#the-workspace-root), including files above the current directory
+when run from a subdirectory. Paths, absolute or relative to the current
+directory, narrow the selection to those files and directories; the rest of the
+workspace still counts for checking links.
 
 - Files whose names end in `.md` or `.markdown`, in any case, are documents. A
   file named on the command line is read as Markdown whatever its name. Other

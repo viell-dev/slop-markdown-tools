@@ -16,8 +16,9 @@ The tables give the severity at which a preset enables each rule, `warn` or
 `error`: `recommended` in its own column, and the dialect presets by name in the
 next; — means that none does. A configuration can set any rule to another
 severity; see [rules and severity](configuration.md#rules-and-severity). The
-`codeberg` preset is the `forgejo` preset under another name. In a dialect that
-a rule's page does not name, the rule finds nothing.
+`codeberg` preset is the `forgejo` preset under another name. In a
+[dialect](glossary.md#dialect) that a rule's page does not name, the rule finds
+nothing.
 
 Each rule's page opens with what the rule does, then gives its kind, the presets
 that enable it with their severity, its dialects, and its options, an example,
