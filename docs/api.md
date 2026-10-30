@@ -324,35 +324,17 @@ which the supported Node.js versions allow for ES modules.
 
 ## Competitor configuration conversion
 
-The portable entry exports `convertConfig({ markdownlint, prettier })` and the
-`competitorMappings` table. Conversion takes configuration objects and returns
-`ConversionReport`: `config`, `sources`, `unused`, `omitted`, `conflicts`, and
-`suggestions`, and portable runtime `compatibility` provenance. Only `config` is
-written during conversion. It never reads files or executes configuration code.
+These exports convert markdownlint and Prettier configurations, as
+`config convert` and the
+[fallback](configuration.md#competitor-configuration-fallback) do:
 
-`mdrefine/node` exports `loadConfig(start, explicit?, competitorFallback?)` and
-`loadCompetitorConfig(directories, executeScripts?, destination?, fallback?)`.
-The latter takes search directories nearest first; script execution defaults to
-`false`. `destination`, by default the last search directory, is the workspace
-root that converted file patterns become relative to. `fallback`, `false` by
-default, converts as `loadConfig`'s in-memory fallback does: a `.prettierignore`
-with negated entries applies none of its patterns. It does not run scripts;
-`executeScripts` alone decides that. Its report's `unused` lists the files it
-found and did not use, each with a `reason`: a script it did not run, a TOML or
-JSON5 file, a Prettier configuration whose `.prettierignore` excludes all
-Markdown, or a `.markdownlintignore` beside a markdownlint configuration in use.
-When it could use none, `sources` is empty and `config` is `{}`. `loadConfig`
-returns `LoadedConfig`, including an optional `conversion` report when the
-fallback found competitor files, and `compatibility` for the engine when it used
-them; when it used none, its `config` is `{}`, which applies the `recommended`
-preset. Its fallback also lists a `.prettierignore` with negated entries under
-`unused` and applies none of its patterns, while `loadCompetitorConfig` converts
-the other patterns and reports the negated ones in `omitted`. Pass
-`loaded.compatibility` along with `loaded.config` and `loaded.plugins` to `lint`
-or `format`; passing only the configuration uses native mdrefine behavior.
-`onCompatibilityWarning` in processing options receives comment notices; a host
-can deduplicate messages across documents as the CLI does. See [configuration
-conversion](configuration.md#competitor-configuration-fallback).
+| Export                                                                        | From            | What it does                                                                                                   |
+| ----------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `convertConfig({ markdownlint, prettier })`                                   | `mdrefine`      | Converts configuration objects into a `ConversionReport`. It never reads files or runs configuration code.     |
+| `competitorMappings`                                                          | `mdrefine`      | The `CompetitorMapping` rows that the conversion follows.                                                      |
+| `loadConfig(start, explicit?, competitorFallback?)`                           | `mdrefine/node` | Loads the configuration as the CLI does, with the fallback unless `competitorFallback` is `false`.             |
+| `loadCompetitorConfig(directories, executeScripts?, destination?, fallback?)` | `mdrefine/node` | Converts the files found in `directories`, nearest first, as `config convert` does, into a `ConversionReport`. |
+| `competitorFiles`                                                             | `mdrefine/node` | The file names searched for each tool.                                                                         |
 
 ```js
 import { loadConfig, loadCompetitorConfig, competitorFiles } from "mdrefine/node";
@@ -362,9 +344,37 @@ const conversion = await loadCompetitorConfig([process.cwd()]);
 console.log(loaded.root, conversion?.sources, competitorFiles.prettier);
 ```
 
+A `ConversionReport` holds `config`, the converted configuration; `sources`,
+`unused`, `omitted`, `conflicts`, and `suggestions`, which the CLI prints as its
+report; and `compatibility`, the portable provenance that the engine needs.
+Conversion writes nothing but `config`.
+
+`loadCompetitorConfig` runs JavaScript and TypeScript configurations only when
+`executeScripts` is `true`; it is `false` by default. `destination`, by default
+the last search directory, is the workspace root that converted file patterns
+become relative to. With `fallback`, `false` by default, it converts as
+`loadConfig`'s fallback does: a `.prettierignore` with negated entries applies
+none of its patterns, where it otherwise converts the other patterns and reports
+the negated ones in `omitted`. `fallback` never runs scripts; `executeScripts`
+alone decides that. The report's `unused` lists the files found and not used,
+each with a `reason`: a script it did not run, a TOML or JSON5 file, a Prettier
+configuration whose `.prettierignore` excludes all Markdown, a `.prettierignore`
+with negated entries under the fallback, or a `.markdownlintignore` beside a
+markdownlint configuration in use. When it could use none, `sources` is empty
+and `config` is `{}`.
+
+`loadConfig` returns a `LoadedConfig`. When the fallback found competitor files,
+it includes their `conversion` report, and when it used them, the
+`compatibility` for the engine; when it used none, its `config` is `{}`, which
+applies the `recommended` preset. Pass `loaded.compatibility` along with
+`loaded.config` and `loaded.plugins` to `lint` or `format`; with the
+configuration alone, they use mdrefine's own behavior instead of the other
+tools' comments and choices. `onCompatibilityWarning` in the processing options
+receives the notices about those comments; a host can report each message once
+across documents, as the CLI does.
+
 `CompetitorCompatibility` carries the original competitor data, enabled rule
 origins, and scoped pragma choices. It is serializable and is never part of the
-configuration schema.
-
-`CompetitorMapping` describes each row's source, destination, defaults, option
-names, coverage issue, and whether markdownlint disables it by default.
+configuration schema. `CompetitorMapping` describes each row's source,
+destination, defaults, option names, coverage issue, and whether markdownlint
+disables it by default.

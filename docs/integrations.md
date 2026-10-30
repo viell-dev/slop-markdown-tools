@@ -121,19 +121,22 @@ Leave Markdown to mdrefine in this order:
 
 The order matters. Without an mdrefine configuration, mdrefine falls back to the
 Prettier configuration, but not once `.prettierignore` excludes all Markdown:
-Prettier then formats no Markdown in the workspace, so neither its options nor
-its ignore patterns describe your documents, and `config convert` and the
-fallback leave the Prettier configuration out and say so. This applies only
-where it can be established: one entry by itself must exclude every `.md` file,
-whatever its name and directory, evaluated as Prettier evaluates it, as a
-gitignore pattern without regard to letter case. A file with a negated (`!`)
-entry or a character class never qualifies, because its exceptions cannot be
-proved not to leave Prettier some Markdown, so it keeps the Prettier
-configuration in use. `*.md`, `**/*.md`, and `*` exclude all Markdown, with or
-without an entry for `.markdown`, because an entry for `.md` files alone is the
-usual way to leave Markdown to another tool. `docs/*.md`, `**/*.md` with
-`!README.md`, and even `**/*.md` with `!docs/`, which re-includes no document,
-do not.
+Prettier then formats no Markdown in the workspace, so its options do not
+describe your documents, and `config convert` and the fallback leave the
+Prettier configuration out and say so. A `.prettierignore` counts as excluding
+all Markdown only when that can be established, reading each entry as Prettier
+does, as a gitignore pattern without regard to letter case:
+
+- It counts when one entry by itself excludes every `.md` file, whatever its
+  name and directory, such as `*.md`, `**/*.md`, `*.MD`, or `*`. An entry for
+  `.markdown` is not needed: an entry for `.md` files alone is the usual way to
+  leave Markdown to another tool.
+- It does not count with only narrower entries, such as `docs/*.md`, or `/*.md`,
+  which leaves the Markdown in subdirectories to Prettier.
+- It never counts with a negated (`!`) entry or a character class such as
+  `*.[mM][dD]`, because then it cannot be proved to leave Prettier no Markdown:
+  `**/*.md` with `!README.md` does not count, nor even `**/*.md` with `!docs/`,
+  which re-includes no document.
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
 disagree, such as markdownlint's emphasis style (MD049) and `style/emphasis`.

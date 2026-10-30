@@ -12,6 +12,15 @@ prereleases' notes there are longer than their entries here.
 
 ### Changed
 
+- Reference pages are easier to scan: the command line page explains the
+  workspace root once and marks the options that only `format` takes, the
+  configuration page numbers the search for a configuration file and patches one
+  rule of `recommended` in its `ruleUpdates` example, the integration guide
+  lists which `.prettierignore` entries leave Markdown to mdrefine, the library
+  page has a table of the conversion exports, and the VitePress page explains
+  `srcDir` with the usual layout
+  ([#816](https://github.com/viell-dev/slop-markdown-tools/issues/816)).
+
 - Getting started covers running mdrefine without installing it, a global
   installation, pnpm, Yarn, and Bun, and what `npm install` does in a folder
   without `package.json`. The Obsidian page says how to install for a vault, the

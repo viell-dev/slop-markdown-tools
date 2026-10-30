@@ -10,15 +10,19 @@ either, the `recommended` preset applies. Either way, the dialect is
 
 The file is named `mdrefine.config.jsonc`, `mdrefine.config.json`,
 `mdrefine.config.mjs`, `mdrefine.config.js`, or `mdrefine.config.cjs`. The CLI
-looks for it in the directory given with `--root`, or else the current
-directory, and then in each directory above, up to the first one that is a Git
-repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or the
-filesystem root. Two configuration files in one directory are an error.
-`--config` names a file explicitly. The directory of the configuration file is
-the workspace root unless `--root` names another; without a configuration file,
-it is the repository or vault where the search stopped, or else the current
-directory. Configuration files do not cascade: a file in a subdirectory is not
-merged with one above it.
+finds it this way:
+
+1. `--config` names the file; nothing is searched.
+2. Otherwise, it looks in the directory that `--root` names, or else the current
+   directory.
+3. Then it looks in each directory above, and stops at the first one that is a
+   Git repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or at
+   the filesystem root.
+
+Two configuration files in one directory are an error. Configuration files do
+not cascade: a file in a subdirectory is not merged with one above it. The
+directory of the file that is found is usually the [workspace
+root](cli.md#the-workspace-root).
 
 Outside a Git repository or a vault, the search goes on up to the filesystem
 root, so a configuration in a parent folder, such as your home directory,
@@ -315,28 +319,29 @@ and merges the named options into their current options.
 
 ```jsonc
 {
-  "extends": [],
+  "extends": ["recommended", "github"],
   "overrides": [
     {
-      "files": ["**/*.md"],
-      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
-    },
-    {
       "files": ["docs/**/*.md"],
-      "ruleUpdates": { "style/wrap": { "severity": "warn" } },
+      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
     },
   ],
 }
 ```
 
-The first override stores a width without turning wrapping on; the second turns
-it on for `docs/`, using that width. A rule absent so far starts off. Setting
-severity to `off` keeps its options, so a later patch can enable it again.
-Options merge shallowly: a nested object replaces the earlier nested object.
-Each override applies its `rules` first as whole-setting replacements, then its
-`ruleUpdates`. Matching overrides run in order, with presets' overrides before
-local overrides. Enabled rules validate the final merged options when they run;
-a partial patch need not supply every required option by itself.
+Below `docs/`, this wraps at 72 columns, with the severity and the other options
+that `recommended` gives `style/wrap`. The same override under `rules` would
+replace the whole setting, so it would have to repeat the severity.
+
+A patch can also prepare a rule that is off: its options are stored without
+turning it on, and a later override can turn it on with `"severity": "warn"`. A
+rule absent so far starts off. Setting severity to `off` keeps its options, so a
+later patch can enable it again. Options merge shallowly: a nested object
+replaces the earlier nested object. Each override applies its `rules` first as
+whole-setting replacements, then its `ruleUpdates`. Matching overrides run in
+order, with presets' overrides before local overrides. Enabled rules validate
+the final merged options when they run; a partial patch need not supply every
+required option by itself.
 
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names

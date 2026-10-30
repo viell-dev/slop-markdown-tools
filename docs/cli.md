@@ -35,24 +35,34 @@ block and keeping other safe edits.
 
 ## Options
 
-`lint` and `format` accept these options; the last three are for `format` only.
-`--check --diff` combines the two; `--write` cannot be combined with either.
+`lint` and `format` take these options; the second column says which. For
+`format`, `--check --diff` combines the two, and `--write` cannot be combined
+with either.
 
-| Option                    | Meaning                                                                                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--root <directory>`      | The workspace root. Without it, the configuration file's directory; else the Git repository or vault where the search for one stopped; else the current directory. |
-| `--no-competitor-config`  | Disable competitor configuration fallback.                                                                                                                         |
-| `--config <file>`         | Use this configuration file instead of searching for one.                                                                                                          |
-| `--dialect <name>`        | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                        |
-| `--exclude <path>`        | Leave out a file or a directory. Repeat it for more.                                                                                                               |
-| `--json`                  | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                   |
-| `--quiet`                 | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                               |
-| `--no-warn-ignored`       | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                                 |
-| `--stdin-filepath <file>` | The path of the document read from [stdin](#read-from-stdin).                                                                                                      |
-| `--max-warnings <count>`  | Exit with code `1` when there are more warnings than this.                                                                                                         |
-| `--check`                 | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                   |
-| `--diff`                  | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                           |
-| `--write`                 | Write the changes.                                                                                                                                                 |
+| Option                    | Commands         | Meaning                                                                                                                                                       |
+| ------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--root <directory>`      | `lint`, `format` | The workspace root; see [the workspace root](#the-workspace-root).                                                                                            |
+| `--no-competitor-config`  | `lint`, `format` | Do not use markdownlint or Prettier settings when there is no mdrefine configuration; see the [fallback](configuration.md#competitor-configuration-fallback). |
+| `--config <file>`         | `lint`, `format` | Use this configuration file instead of searching for one.                                                                                                     |
+| `--dialect <name>`        | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                   |
+| `--exclude <path>`        | `lint`, `format` | Leave out a file or a directory. Repeat it for more.                                                                                                          |
+| `--json`                  | `lint`, `format` | Print one [JSON report](#json-report) on stdout instead of text.                                                                                              |
+| `--quiet`                 | `lint`, `format` | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                          |
+| `--no-warn-ignored`       | `lint`, `format` | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                            |
+| `--stdin-filepath <file>` | `lint`, `format` | The path of the document read from [stdin](#read-from-stdin).                                                                                                 |
+| `--max-warnings <count>`  | `lint`, `format` | Exit with code `1` when there are more warnings than this.                                                                                                    |
+| `--check`                 | `format`         | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                              |
+| `--diff`                  | `format`         | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                      |
+| `--write`                 | `format`         | Write the changes.                                                                                                                                            |
+
+### The workspace root
+
+The workspace is the set of documents that a command checks, and the files that
+their links can reach. Its root is the directory that `--root` names. Without
+it, the root is the directory of the configuration file that the search finds;
+without one, the Git repository or vault where the search stopped; and else the
+current directory. Paths in the output and the JSON report are relative to the
+current directory and to the root, respectively.
 
 Bare `format` on files prints a unified diff and exits `1` if any document would
 change, or `0` if none would. Explicit `format --diff` is an exit-`0` preview
@@ -398,20 +408,23 @@ the fallback never does. Its report goes to stderr: each file converted, each
 file not used and why, the settings not carried over with their reasons and the
 issues that track them, the conflicts it resolved, and suggested checks.
 
-| Option               | Meaning                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--root <directory>` | Search from this directory, and write the file there. Without it, the search starts from the current directory, and the file goes where `lint` run from there looks for the workspace's configuration: beside the mdrefine configuration that the search finds, else at the root of the Git repository or vault where the search stopped, else in the current directory. |
-| `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced.                                                                                                         |
+| Option               | Meaning                                                                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--root <directory>` | Search from this directory, and write the file there. Without it, see below.                                                                                                                                                                                     |
+| `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced. |
 
-Without `--root`, the written configuration takes the place of the fallback that
-`lint` used from that directory, so it applies the same settings to the same
-documents. With `--root` naming a subdirectory, it is a configuration for that
-subtree, whose patterns are rebased into it, and `lint` finds it only from that
-directory or below.
+Without `--root`, the search starts from the current directory, and the file
+goes where `lint` run from there looks for the workspace's configuration: beside
+the mdrefine configuration that the search finds, else at the root of the Git
+repository or vault where the search stopped, else in the current directory. The
+written configuration then takes the place of the fallback that `lint` used from
+that directory, so it applies the same settings to the same documents. With
+`--root` naming a subdirectory, it is a configuration for that subtree, whose
+patterns are rebased into it, and `lint` finds it only from that directory or
+below.
 
-`config convert` does not take `--config`, `--dialect`, or
-`--no-competitor-config`, which choose the configuration that `config explain`
-reads. Given before or after `convert`, each is a usage error. So is a `--root`
-that does not exist or is not a directory. These errors, finding no
-configuration to convert, and finding only files that it cannot use end the
-command with exit code `2`.
+`config convert` accepts only `--root` and `--write`. The other configuration
+options, such as `--config`, choose what `config explain` reads, and are usage
+errors with `convert`, before or after it. So is a `--root` that does not exist
+or is not a directory. These errors, finding no configuration to convert, and
+finding only files that it cannot use end the command with exit code `2`.
