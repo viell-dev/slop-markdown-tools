@@ -9,7 +9,7 @@ import type { Code, Nodes, RootContent } from "mdast";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
-import { manifest, repository, run } from "../support/cli.js";
+import { fixture, manifest, repository, run } from "../support/cli.js";
 
 const { builtInRules, dialectAliases, dialects, lint, parse, presets, range } = library;
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
@@ -232,6 +232,26 @@ describe("configuration snippets", () => {
   });
 });
 
+describe("getting started", () => {
+  it("shows the real lint output and result for the README's example", async () => {
+    const [before, after] = blocks("README.md").filter((node) => isCode(node, "markdown"));
+    const page = blocks("docs/quick-start.md");
+    const config = page.find((node) => isCode(node, "jsonc"));
+    const output = page.find((node) => isCode(node, "text"));
+    expect(before && after && config && output).toBeTruthy();
+    const root = await fixture({
+      "README.md": `${(before as Code).value}\n`,
+      "mdrefine.config.jsonc": (config as Code).value,
+    });
+    // A terminal shows both streams; the findings and the summary are on stderr.
+    const linted = run(root, ["lint"]);
+    expect(linted.stdout + linted.stderr).toBe(`${(output as Code).value}\n`);
+    // The README says that `format --write` with these presets turns it into its second block.
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(readFileSync(path.join(root, "README.md"), "utf8")).toBe(`${(after as Code).value}\n`);
+  });
+});
+
 describe("examples page", () => {
   const page = blocks("docs/examples.md");
   const shown = page.flatMap((node, index) => {
@@ -257,12 +277,15 @@ describe("examples page", () => {
     expect(`${node.value}\n`).toBe(read(file));
   });
   it.each(commands)("shows the real output of: $command", ({ command, output }) => {
-    // A documented command is `node <script> <arguments>`, optionally piped into another one.
+    // A documented command is `npx mdrefine <arguments>`, which the built command runs here, or
+    // `node <script> <arguments>`, optionally piped into another one.
     let input: string | undefined;
     let printed = "";
     for (const stage of command.split(" | ")) {
-      const [program, ...args] = stage.split(" ");
-      expect(program).toBe("node");
+      const [program, ...rest] = stage.split(" ");
+      const installed = program === "npx" && rest[0] === "mdrefine";
+      expect(installed || program === "node", stage).toBe(true);
+      const args = installed ? ["dist/cli/main.js", ...rest.slice(1)] : rest;
       const result = spawnSync(process.execPath, args, {
         cwd: repository,
         input,
@@ -283,6 +306,14 @@ describe("examples page", () => {
         : [entry.name];
       for (const name of names) expect(text, name).toContain(`examples/${name}`);
     }
+  });
+  it("lists every starting configuration in the examples' README too", () => {
+    const text = read("examples/README.md");
+    const configurations = readdirSync(path.join(repository, "examples")).filter((name) =>
+      name.endsWith(".jsonc"),
+    );
+    expect(configurations.length).toBeGreaterThan(4);
+    for (const name of configurations) expect(text, name).toContain(`(${name})`);
   });
 });
 
@@ -464,9 +495,12 @@ describe("version annotations", () => {
   ])("allows %j", (source) => {
     expect(annotated(readable(source))).toEqual([]);
   });
-  // The changelog and the upgrading steps are the history that the other pages leave out.
-  const history = new Set(["docs/changelog.md", "docs/upgrading.md"]);
-  const checked = [...pages.filter((page) => !history.has(page)), "README.md"];
+  // The changelog, the upgrading steps, and the release notes are the history that the other
+  // pages leave out.
+  const history = (page: string) =>
+    ["docs/changelog.md", "docs/upgrading.md"].includes(page) ||
+    page.startsWith("docs/release-notes/");
+  const checked = [...pages.filter((page) => !history(page)), "README.md"];
   it.each(checked)("%s describes its version without history", (file) => {
     let rest = text(file);
     for (const [owner, passage] of allowed)
@@ -567,6 +601,17 @@ describe("changelog", () => {
     // GitHub shows each line break of a release's notes, so wrapped lines are joined.
     for (const [index, line] of lines.entries())
       if (index > 0 && lines[index - 1] && line) expect(line).toMatch(/^\s*(?:[-*+] |\d+[.)] |#)/);
+  });
+  it("links a minor release's notes page from its section, which exists", () => {
+    // A release such as 0.7.0 needs docs/release-notes/0.7.md, which RELEASING.md asks for.
+    const [major, minor, patch] = manifest.version.split(/[.-]/);
+    const line = `${major}.${minor}`;
+    const page = `docs/release-notes/${line}.md`;
+    expect(pages).toContain(page);
+    expect(read(page).startsWith(`# What's new in ${line}\n`)).toBe(true);
+    // The GitHub release of X.Y.0 opens with the link, as its changelog section does.
+    const link = `[What's new in ${line}](https://viell-dev.github.io/slop-markdown-tools/release-notes/${line}.html)`;
+    if (patch === "0") expect(notes(manifest.version).stdout.startsWith(link)).toBe(true);
   });
   it("refuses a version that has no section", () => {
     const result = notes("0.0.0-none.0");

@@ -109,7 +109,14 @@ On a branch, in one pull request:
    `.github/workflows/release.yml`, and every example and document that names
    the version. When users need to do something to upgrade, add the release's
    section to `docs/upgrading.md`.
-4. Refresh the indirect dependencies with `npm update`, so that the tests run
+4. For a new minor version, write `docs/release-notes/X.Y.md`, titled "What's
+   new in X.Y": three to five highlights, then a heading for each change users
+   will notice, with a short example, and a link to the release's upgrading
+   steps rather than a copy of them. Open the changelog section with a link to
+   the page, as 0.6.0's does, so that the GitHub release opens with it too. The
+   docs tests require both for the version in `package.json`. A patch release
+   adds to its minor version's page only what users will notice.
+5. Refresh the indirect dependencies with `npm update`, so that the tests run
    with what a fresh installation of the package gets. The lockfile does not
    ship, and Dependabot updates only the direct dependencies. Check first that
    every updated package is at least seven days old and comes from its known
@@ -118,7 +125,7 @@ On a branch, in one pull request:
    publication time, maintainer and patch review, and verification in the
    release PR and #330. Keep the normal waiting period for other packages; a
    security exception does not waive checks or review.
-5. Run the checks below, push, and wait for CI.
+6. Run the checks below, push, and wait for CI.
 
 Apply the [contributor review policy](CONTRIBUTING.md#review-and-verification).
 The release normally gets one independent review of the coherent change range
