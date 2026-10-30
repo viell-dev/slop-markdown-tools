@@ -59,7 +59,7 @@ a sensor board.
 mdrefine needs Node.js 22.12 or newer:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.5.0
+npm install --save-dev --save-exact mdrefine@0.6.0
 npx mdrefine lint
 npx mdrefine format
 npx mdrefine format --diff

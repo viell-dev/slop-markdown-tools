@@ -8,7 +8,216 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
-## Unreleased
+## 0.6.0 - 2026-10-30
+
+### Changed
+
+- A workspace with a markdownlint or Prettier configuration and no mdrefine
+  configuration now gets the settings converted from them instead of the
+  `recommended` preset, so `lint` and `format` can report other rules, at other
+  severities, ignore other files, and exit differently than in 0.5.0. Upgrading:
+  to keep the `recommended` preset, create an mdrefine configuration, for
+  example with `"extends": ["recommended"]`, or pass `--no-competitor-config`;
+  to adopt the converted settings, write them with
+  `mdrefine config convert --write`. Files that the fallback cannot use apply
+  nothing, and without a usable one the `recommended` preset applies as before:
+  JavaScript and TypeScript configurations, which it never runs, TOML and JSON5
+  ones, and a Prettier configuration whose `.prettierignore` provably excludes
+  all Markdown, so that the coexistence setup in the integration guide keeps
+  checking documents; one with a negated entry never qualifies. The fallback
+  applies none of the patterns of a `.prettierignore` with a negated entry,
+  which conversion cannot express, rather than apply its exclusions without
+  their exceptions, which can select no documents. `.markdownlintignore` is not
+  converted, so the documents it excludes are checked; the fallback names it.
+  The fallback prints one line on stderr for the settings it uses and one for
+  each file it leaves out, with paths from the workspace root, and none with
+  `--quiet`; `config explain` lists the files left out under `conversion.unused`
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- An error about a rule setting that cannot be used, such as an unknown rule or
+  invalid options, names the configuration file that holds it
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- Bare `format` on files prints a diff and exits `1` when formatting would
+  change a document. Scripts needing an exit-`0` preview should use
+  `format --diff`. `--check --diff` prints the diff and fails on changes.
+  Remaining errors still exit `1`, and operational failures take precedence with
+  exit `2`. Stdin keeps its formatted output and exit behavior
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- `lint` and `format` read stdin when `--stdin-filepath` is given without paths,
+  and reject it with paths other than `-`. Help includes examples, workspace
+  scope and exit codes; nested configuration help selects the named subcommand.
+  Mistaken `check`/`fix` commands and lint modes suggest `format`. `rules`
+  accepts `--root`; empty selections print a notice on stderr, and formatting
+  previews name `--write` as the next step
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
+  without an `alt` attribute, where renderers certainly show it. `alt=""`, which
+  marks a decorative image, is accepted, and so are images hidden by
+  `aria-hidden="true"`, `hidden`, `inert`, or a hiding style outside GitHub,
+  whose sanitizer removes those attributes. Blank Markdown alternative text is
+  still reported, because Markdown cannot mark an image as decorative. Images in
+  content that may not be shown, such as `<template>` or `<video>`, after HTML
+  whose reading is uncertain, after an end tag that a browser may ignore inside
+  a hidden element, in unused footnote definitions, and in VitePress near Vue
+  syntax are not reported
+  ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
+
+- The documentation describes the behavior of the version it belongs to, without
+  version notes; this changelog keeps the history. Each rule section opens with
+  what the rule does, then states the severity that each preset gives it, as the
+  rule index does
+  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
+
+- `style/table` formats tables inside lists and block quotes with all of its
+  options, as Prettier aligns them, where it used to leave them as written. Each
+  row keeps the quote markers, indentation, and line ending before it, and
+  widths are measured after them, so a second run changes nothing. A header on
+  its list item's marker line keeps its leading pipe or its lack of one, because
+  markdown-it reads `- a | b` above an indented delimiter row as a table outside
+  the list. Tables in footnote definitions, indented tables outside containers,
+  and tables that renderer protections hold stay as written
+  ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
+
+- `style/heading` removes heading-owned indentation, including Setext text and
+  underlines, while retaining container prefixes. Its new `closing: "add"`
+  option writes matching closing hash sequences on ATX headings, including the
+  deeper levels of the Setext style. Renderer protections still apply. This
+  interface addition belongs to the next minor release
+  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
+  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
+
+- `style/block-spacing` also separates fenced code blocks that have a closing
+  fence, and tables, from the blocks around them, as markdownlint's `MD031` and
+  `MD058` and Prettier do. Blocks inside list items and footnote definitions
+  stay as written, and a table is separated only from blocks that every renderer
+  reads as separate from it: text below a table, which GFM reads as another row,
+  stays ([#684](https://github.com/viell-dev/slop-markdown-tools/issues/684),
+  [#697](https://github.com/viell-dev/slop-markdown-tools/issues/697)).
+
+- `style/heading` writes one space between ATX heading hashes and text,
+  including tabs and retained closing sequences. Empty headings need no
+  separator. Protected Forgejo and Gitea attribute suffixes stay as written
+  ([#676](https://github.com/viell-dev/slop-markdown-tools/issues/676),
+  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678)).
+
+- The [comparison with Prettier and
+  markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
+  lists every markdownlint rule and every Prettier Markdown option and
+  formatting choice, with the issue that tracks each check not yet covered
+  ([#668](https://github.com/viell-dev/slop-markdown-tools/issues/668)).
+
+- Tokenizer identity verification partitions the unchanged deterministic corpus
+  into bounded unit cases while retaining every source, selection and assertion
+  under the existing deadline
+  ([#654](https://github.com/viell-dev/slop-markdown-tools/issues/654)).
+
+- Release evidence selects the latest check-run identity, preserving pending and
+  unsuccessful reruns without letting an older completed null-start check hide a
+  newer success
+  ([#647](https://github.com/viell-dev/slop-markdown-tools/issues/647)).
+
+- The shipped internal protection-source declaration uses its existing point
+  type without an undeclared direct type import. Installed package checks cover
+  that declaration with npm and strict pnpm; public entry points are unchanged
+  ([#655](https://github.com/viell-dev/slop-markdown-tools/issues/655)).
+
+- Maintainer guidance distinguishes intentional first-occurrence fixture
+  rewrites from sanitizers, preserving intended bytes when triaging scanner
+  alerts ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).
+
+- Workspace memory verification separates document/cache lifecycle checks from a
+  fresh compiled-product process's retained-text sample. The existing source
+  allowance remains enforced, with numeric failure evidence and opt-in heap
+  diagnostics
+  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
+
+- Filesystem discovery and selection, on-demand related-file lookup, and
+  in-place write/recovery now have separate internal owners. Public discovery,
+  selection and filesystem safety contracts are preserved
+  ([#620](https://github.com/viell-dev/slop-markdown-tools/issues/620)).
+
+- The Obsidian verification harness uses only its service-provided browser and
+  ChromeDriver binaries, removing unused automatic-download FTP/PAC and
+  `extract-zip` dependencies. Missing or incomplete executables fail explicitly;
+  native host downloads, caching and version selection retain their existing
+  owners ([#639](https://github.com/viell-dev/slop-markdown-tools/issues/639),
+  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640)).
+
+- Dependency updates follow parser, VitePress/reference and tooling maintenance
+  units across dependency declarations. Existing compatibility deferrals remain,
+  with explicit revisit checks for peers, tool pins and verified host baselines
+  ([#636](https://github.com/viell-dev/slop-markdown-tools/issues/636),
+  [#637](https://github.com/viell-dev/slop-markdown-tools/issues/637)).
+
+- Five parser extensions used only to build the bundled parser are development
+  dependencies. Installed consumers retain the required runtime utilities and
+  public plugin types; package checks cover both parser paths and the shipped
+  internal declarations. Release audits include bundled inputs regardless of
+  npm's development flag
+  ([#624](https://github.com/viell-dev/slop-markdown-tools/issues/624)).
+
+- Maintained internal parser algorithms live in directly checked TypeScript
+  source, with source guards and generated provenance linking their rationale,
+  ownership and removal conditions to the dependency records. Parser behavior,
+  extension compatibility and the bundled license graph are preserved
+  ([#622](https://github.com/viell-dev/slop-markdown-tools/issues/622),
+  [#623](https://github.com/viell-dev/slop-markdown-tools/issues/623)).
+
+- Test suites separate engine, configuration, plugin, rule and comparison
+  responsibilities. Shared parser/CLI support and authored native fixtures have
+  explicit ownership, preserving their cases and native workload plans
+  ([#634](https://github.com/viell-dev/slop-markdown-tools/issues/634)).
+
+- Internal renderer protections have named collectors and one cached result;
+  rule registration and semantic acceptance are separate from engine phase
+  orchestration, preserving the public API and formatting behavior
+  ([#618](https://github.com/viell-dev/slop-markdown-tools/issues/618),
+  [#619](https://github.com/viell-dev/slop-markdown-tools/issues/619)).
+
+- Workflow regression tests check YAML structure while retaining exact evidence
+  identities. Contributor and release policy is authoritative; agent navigation
+  permits cohesive internal modules, and optional review bots have no guaranteed
+  availability
+  ([#635](https://github.com/viell-dev/slop-markdown-tools/issues/635),
+  [#641](https://github.com/viell-dev/slop-markdown-tools/issues/641),
+  [#642](https://github.com/viell-dev/slop-markdown-tools/issues/642)).
+
+- Native renderer reports validate the intended documents, widths, views and
+  calibration controls, including unchanged formatting attempts. Obsidian
+  PR/release checks pin the app, installer and Docker base and record observed
+  runtime/image identity; weekly/manual checks retain explicit latest coverage
+  ([#632](https://github.com/viell-dev/slop-markdown-tools/issues/632),
+  [#633](https://github.com/viell-dev/slop-markdown-tools/issues/633)).
+
+- Linux 24 CI collects unit and coverage evidence in one required, isolated job.
+  Hosted release preparation reuses exact-commit push/main CI results while
+  freshly building and testing its publication tarball; local preparation
+  retains the complete checks
+  ([#628](https://github.com/viell-dev/slop-markdown-tools/issues/628),
+  [#629](https://github.com/viell-dev/slop-markdown-tools/issues/629)).
+
+- Builds prepare fresh staged output and reject unexpected packaged files. CI
+  and release preparation reuse one verified build within their invocation,
+  while standalone commands remain self-contained
+  ([#626](https://github.com/viell-dev/slop-markdown-tools/issues/626),
+  [#627](https://github.com/viell-dev/slop-markdown-tools/issues/627)).
+
+- Native PR checks classify semantic inputs and resolved dependency roles, avoid
+  unnecessary hosts for VitePress-only dependency updates or offline-tool
+  changes, and enforce applicable comparisons through one required result.
+  Release still compares every native host at its exact commit
+  ([#630](https://github.com/viell-dev/slop-markdown-tools/issues/630),
+  [#631](https://github.com/viell-dev/slop-markdown-tools/issues/631)).
+
+- Dependency automation also defers the markdown-it 15 lines of
+  `@mdit/plugin-container`, `@mdit/plugin-emoji` and `@mdit/plugin-tasklist`
+  assessed in [#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),
+  [#610](https://github.com/viell-dev/slop-markdown-tools/pull/610) and
+  [#611](https://github.com/viell-dev/slop-markdown-tools/pull/611), under the
+  same reconsideration conditions as the earlier deferrals.
 
 ### Added
 
@@ -356,215 +565,6 @@ prereleases' notes there are longer than their entries here.
   ([#661](https://github.com/viell-dev/slop-markdown-tools/issues/661),
   [#663](https://github.com/viell-dev/slop-markdown-tools/issues/663),
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
-
-### Changed
-
-- A workspace with a markdownlint or Prettier configuration and no mdrefine
-  configuration now gets the settings converted from them instead of the
-  `recommended` preset, so `lint` and `format` can report other rules, at other
-  severities, ignore other files, and exit differently than in 0.5.0. Upgrading:
-  to keep the `recommended` preset, create an mdrefine configuration, for
-  example with `"extends": ["recommended"]`, or pass `--no-competitor-config`;
-  to adopt the converted settings, write them with
-  `mdrefine config convert --write`. Files that the fallback cannot use apply
-  nothing, and without a usable one the `recommended` preset applies as before:
-  JavaScript and TypeScript configurations, which it never runs, TOML and JSON5
-  ones, and a Prettier configuration whose `.prettierignore` provably excludes
-  all Markdown, so that the coexistence setup in the integration guide keeps
-  checking documents; one with a negated entry never qualifies. The fallback
-  applies none of the patterns of a `.prettierignore` with a negated entry,
-  which conversion cannot express, rather than apply its exclusions without
-  their exceptions, which can select no documents. `.markdownlintignore` is not
-  converted, so the documents it excludes are checked; the fallback names it.
-  The fallback prints one line on stderr for the settings it uses and one for
-  each file it leaves out, with paths from the workspace root, and none with
-  `--quiet`; `config explain` lists the files left out under `conversion.unused`
-  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- An error about a rule setting that cannot be used, such as an unknown rule or
-  invalid options, names the configuration file that holds it
-  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- Bare `format` on files prints a diff and exits `1` when formatting would
-  change a document. Scripts needing an exit-`0` preview should use
-  `format --diff`. `--check --diff` prints the diff and fails on changes.
-  Remaining errors still exit `1`, and operational failures take precedence with
-  exit `2`. Stdin keeps its formatted output and exit behavior
-  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- `lint` and `format` read stdin when `--stdin-filepath` is given without paths,
-  and reject it with paths other than `-`. Help includes examples, workspace
-  scope and exit codes; nested configuration help selects the named subcommand.
-  Mistaken `check`/`fix` commands and lint modes suggest `format`. `rules`
-  accepts `--root`; empty selections print a notice on stderr, and formatting
-  previews name `--write` as the next step
-  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
-
-- `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
-  without an `alt` attribute, where renderers certainly show it. `alt=""`, which
-  marks a decorative image, is accepted, and so are images hidden by
-  `aria-hidden="true"`, `hidden`, `inert`, or a hiding style outside GitHub,
-  whose sanitizer removes those attributes. Blank Markdown alternative text is
-  still reported, because Markdown cannot mark an image as decorative. Images in
-  content that may not be shown, such as `<template>` or `<video>`, after HTML
-  whose reading is uncertain, after an end tag that a browser may ignore inside
-  a hidden element, in unused footnote definitions, and in VitePress near Vue
-  syntax are not reported
-  ([#694](https://github.com/viell-dev/slop-markdown-tools/issues/694)).
-
-- The documentation describes the behavior of the version it belongs to, without
-  version notes; this changelog keeps the history. Each rule section opens with
-  what the rule does, then states the severity that each preset gives it, as the
-  rule index does
-  ([#746](https://github.com/viell-dev/slop-markdown-tools/issues/746)).
-
-- `style/table` formats tables inside lists and block quotes with all of its
-  options, as Prettier aligns them, where it used to leave them as written. Each
-  row keeps the quote markers, indentation, and line ending before it, and
-  widths are measured after them, so a second run changes nothing. A header on
-  its list item's marker line keeps its leading pipe or its lack of one, because
-  markdown-it reads `- a | b` above an indented delimiter row as a table outside
-  the list. Tables in footnote definitions, indented tables outside containers,
-  and tables that renderer protections hold stay as written
-  ([#710](https://github.com/viell-dev/slop-markdown-tools/issues/710)).
-
-- `style/heading` removes heading-owned indentation, including Setext text and
-  underlines, while retaining container prefixes. Its new `closing: "add"`
-  option writes matching closing hash sequences on ATX headings, including the
-  deeper levels of the Setext style. Renderer protections still apply. This
-  interface addition belongs to the next minor release
-  ([#680](https://github.com/viell-dev/slop-markdown-tools/issues/680),
-  [#700](https://github.com/viell-dev/slop-markdown-tools/issues/700)).
-
-- `style/block-spacing` also separates fenced code blocks that have a closing
-  fence, and tables, from the blocks around them, as markdownlint's `MD031` and
-  `MD058` and Prettier do. Blocks inside list items and footnote definitions
-  stay as written, and a table is separated only from blocks that every renderer
-  reads as separate from it: text below a table, which GFM reads as another row,
-  stays ([#684](https://github.com/viell-dev/slop-markdown-tools/issues/684),
-  [#697](https://github.com/viell-dev/slop-markdown-tools/issues/697)).
-
-- `style/heading` writes one space between ATX heading hashes and text,
-  including tabs and retained closing sequences. Empty headings need no
-  separator. Protected Forgejo and Gitea attribute suffixes stay as written
-  ([#676](https://github.com/viell-dev/slop-markdown-tools/issues/676),
-  [#678](https://github.com/viell-dev/slop-markdown-tools/issues/678)).
-
-- The [comparison with Prettier and
-  markdownlint](https://viell-dev.github.io/slop-markdown-tools/integrations.html#coming-from-prettier-or-markdownlint)
-  lists every markdownlint rule and every Prettier Markdown option and
-  formatting choice, with the issue that tracks each check not yet covered
-  ([#668](https://github.com/viell-dev/slop-markdown-tools/issues/668)).
-
-- Tokenizer identity verification partitions the unchanged deterministic corpus
-  into bounded unit cases while retaining every source, selection and assertion
-  under the existing deadline
-  ([#654](https://github.com/viell-dev/slop-markdown-tools/issues/654)).
-
-- Release evidence selects the latest check-run identity, preserving pending and
-  unsuccessful reruns without letting an older completed null-start check hide a
-  newer success
-  ([#647](https://github.com/viell-dev/slop-markdown-tools/issues/647)).
-
-- The shipped internal protection-source declaration uses its existing point
-  type without an undeclared direct type import. Installed package checks cover
-  that declaration with npm and strict pnpm; public entry points are unchanged
-  ([#655](https://github.com/viell-dev/slop-markdown-tools/issues/655)).
-
-- Maintainer guidance distinguishes intentional first-occurrence fixture
-  rewrites from sanitizers, preserving intended bytes when triaging scanner
-  alerts ([#643](https://github.com/viell-dev/slop-markdown-tools/issues/643)).
-
-- Workspace memory verification separates document/cache lifecycle checks from a
-  fresh compiled-product process's retained-text sample. The existing source
-  allowance remains enforced, with numeric failure evidence and opt-in heap
-  diagnostics
-  ([#413](https://github.com/viell-dev/slop-markdown-tools/issues/413)).
-
-- Filesystem discovery and selection, on-demand related-file lookup, and
-  in-place write/recovery now have separate internal owners. Public discovery,
-  selection and filesystem safety contracts are preserved
-  ([#620](https://github.com/viell-dev/slop-markdown-tools/issues/620)).
-
-- The Obsidian verification harness uses only its service-provided browser and
-  ChromeDriver binaries, removing unused automatic-download FTP/PAC and
-  `extract-zip` dependencies. Missing or incomplete executables fail explicitly;
-  native host downloads, caching and version selection retain their existing
-  owners ([#639](https://github.com/viell-dev/slop-markdown-tools/issues/639),
-  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640)).
-
-- Dependency updates follow parser, VitePress/reference and tooling maintenance
-  units across dependency declarations. Existing compatibility deferrals remain,
-  with explicit revisit checks for peers, tool pins and verified host baselines
-  ([#636](https://github.com/viell-dev/slop-markdown-tools/issues/636),
-  [#637](https://github.com/viell-dev/slop-markdown-tools/issues/637)).
-
-- Five parser extensions used only to build the bundled parser are development
-  dependencies. Installed consumers retain the required runtime utilities and
-  public plugin types; package checks cover both parser paths and the shipped
-  internal declarations. Release audits include bundled inputs regardless of
-  npm's development flag
-  ([#624](https://github.com/viell-dev/slop-markdown-tools/issues/624)).
-
-- Maintained internal parser algorithms live in directly checked TypeScript
-  source, with source guards and generated provenance linking their rationale,
-  ownership and removal conditions to the dependency records. Parser behavior,
-  extension compatibility and the bundled license graph are preserved
-  ([#622](https://github.com/viell-dev/slop-markdown-tools/issues/622),
-  [#623](https://github.com/viell-dev/slop-markdown-tools/issues/623)).
-
-- Test suites separate engine, configuration, plugin, rule and comparison
-  responsibilities. Shared parser/CLI support and authored native fixtures have
-  explicit ownership, preserving their cases and native workload plans
-  ([#634](https://github.com/viell-dev/slop-markdown-tools/issues/634)).
-
-- Internal renderer protections have named collectors and one cached result;
-  rule registration and semantic acceptance are separate from engine phase
-  orchestration, preserving the public API and formatting behavior
-  ([#618](https://github.com/viell-dev/slop-markdown-tools/issues/618),
-  [#619](https://github.com/viell-dev/slop-markdown-tools/issues/619)).
-
-- Workflow regression tests check YAML structure while retaining exact evidence
-  identities. Contributor and release policy is authoritative; agent navigation
-  permits cohesive internal modules, and optional review bots have no guaranteed
-  availability
-  ([#635](https://github.com/viell-dev/slop-markdown-tools/issues/635),
-  [#641](https://github.com/viell-dev/slop-markdown-tools/issues/641),
-  [#642](https://github.com/viell-dev/slop-markdown-tools/issues/642)).
-
-- Native renderer reports validate the intended documents, widths, views and
-  calibration controls, including unchanged formatting attempts. Obsidian
-  PR/release checks pin the app, installer and Docker base and record observed
-  runtime/image identity; weekly/manual checks retain explicit latest coverage
-  ([#632](https://github.com/viell-dev/slop-markdown-tools/issues/632),
-  [#633](https://github.com/viell-dev/slop-markdown-tools/issues/633)).
-
-- Linux 24 CI collects unit and coverage evidence in one required, isolated job.
-  Hosted release preparation reuses exact-commit push/main CI results while
-  freshly building and testing its publication tarball; local preparation
-  retains the complete checks
-  ([#628](https://github.com/viell-dev/slop-markdown-tools/issues/628),
-  [#629](https://github.com/viell-dev/slop-markdown-tools/issues/629)).
-
-- Builds prepare fresh staged output and reject unexpected packaged files. CI
-  and release preparation reuse one verified build within their invocation,
-  while standalone commands remain self-contained
-  ([#626](https://github.com/viell-dev/slop-markdown-tools/issues/626),
-  [#627](https://github.com/viell-dev/slop-markdown-tools/issues/627)).
-
-- Native PR checks classify semantic inputs and resolved dependency roles, avoid
-  unnecessary hosts for VitePress-only dependency updates or offline-tool
-  changes, and enforce applicable comparisons through one required result.
-  Release still compares every native host at its exact commit
-  ([#630](https://github.com/viell-dev/slop-markdown-tools/issues/630),
-  [#631](https://github.com/viell-dev/slop-markdown-tools/issues/631)).
-
-- Dependency automation also defers the markdown-it 15 lines of
-  `@mdit/plugin-container`, `@mdit/plugin-emoji` and `@mdit/plugin-tasklist`
-  assessed in [#608](https://github.com/viell-dev/slop-markdown-tools/pull/608),
-  [#610](https://github.com/viell-dev/slop-markdown-tools/pull/610) and
-  [#611](https://github.com/viell-dev/slop-markdown-tools/pull/611), under the
-  same reconsideration conditions as the earlier deferrals.
 
 ## 0.5.0 - 2026-10-24
 
