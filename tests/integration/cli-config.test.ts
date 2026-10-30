@@ -150,7 +150,9 @@ describe("paths and configuration files that cannot be used", () => {
       fails(
         root,
         args,
-        'Invalid options for style/block-spacing: "linesAbove" asks for 2 blank lines at heading level 2, but style/blank-lines removes blank lines beyond 1 in a row; set its "maximum" to at least 2, or lower "linesAbove"',
+        // The message names the configuration file that holds the settings (#788).
+        `Invalid configuration in ${path.join(root, "mdrefine.config.json")}: ` +
+          'Invalid options for style/block-spacing: "linesAbove" asks for 2 blank lines at heading level 2, but style/blank-lines removes blank lines beyond 1 in a row; set its "maximum" to at least 2, or lower "linesAbove"',
       );
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
     const allowed = run(root, ["format", "--write", "--config", "allowed.json"]);

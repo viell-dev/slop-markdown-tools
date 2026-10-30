@@ -75,12 +75,34 @@ Schemas completes and checks the configuration file with the package's
 ## Next to Prettier or markdownlint
 
 Prettier formats Markdown too, and two formatters undo each other's changes.
-Leave Markdown to mdrefine by adding both file extensions to `.prettierignore`:
+Leave Markdown to mdrefine in this order:
 
-```text
-**/*.md
-**/*.markdown
-```
+1. Run `npx mdrefine config convert --write` to keep the style that Prettier
+   gave your documents; [conversion and
+   fallback](#configuration-conversion-and-fallback) describes what it carries
+   over. Skip this step to use mdrefine's `recommended` preset instead.
+2. Add both file extensions to `.prettierignore`:
+
+   ```text
+   **/*.md
+   **/*.markdown
+   ```
+
+The order matters. Without an mdrefine configuration, mdrefine falls back to the
+Prettier configuration, but not once `.prettierignore` excludes all Markdown:
+Prettier then formats no Markdown in the workspace, so neither its options nor
+its ignore patterns describe your documents, and `config convert` and the
+fallback leave the Prettier configuration out and say so. This applies only
+where it can be established: one entry by itself must exclude every `.md` file,
+whatever its name and directory, evaluated as Prettier evaluates it, as a
+gitignore pattern without regard to letter case. A file with a negated (`!`)
+entry or a character class never qualifies, because its exceptions cannot be
+proved not to leave Prettier some Markdown, so it keeps the Prettier
+configuration in use. `*.md`, `**/*.md`, and `*` exclude all Markdown, with or
+without an entry for `.markdown`, because an entry for `.md` files alone is the
+usual way to leave Markdown to another tool. `docs/*.md`, `**/*.md` with
+`!README.md`, and even `**/*.md` with `!docs/`, which re-includes no document,
+do not.
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
 disagree, such as markdownlint's emphasis style (MD049) and `style/emphasis`.
@@ -98,15 +120,19 @@ that tracks a missing part; keep the other tool for that check until it is done.
 ### Configuration conversion and fallback
 
 Run `mdrefine config convert` to print an `mdrefine.config.jsonc`, or add
-`--write` to create it. Any existing mdrefine configuration in that directory is
-refused. The report on stderr lists sources, omissions with reasons and
-applicable tracking issues, resolved conflicts, and suggested extra checks.
-Review the result before replacing your existing tools.
+`--write` to create it where `lint` looks for the workspace's configuration; an
+existing mdrefine configuration there is an error. The report on stderr lists
+sources, files not used, omissions with reasons and applicable tracking issues,
+resolved conflicts, and suggested extra checks. Review the result before
+replacing your existing tools. [Convert a
+configuration](cli.md#convert-a-configuration) describes its options.
 
 Without an mdrefine configuration, the same conversion runs in memory. Use
 `--no-competitor-config` to disable this fallback. `config explain <file>` shows
 its sources and converted settings. The search stops at the same repository or
-vault boundary as the ordinary configuration search.
+vault boundary as the ordinary configuration search. When none of the files
+found can be used, the `recommended` preset applies, as without them; the
+[notices](cli.md#competitor-fallback-notices) on stderr name each such file.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.
@@ -126,10 +152,19 @@ Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
 markdownlint-cli2 `config`, Prettier's `package.json` or `package.yaml` key,
 Markdown overrides, and relevant `.editorconfig` values only when a Prettier
 configuration exists. JavaScript and TypeScript configurations are named without
-executing them; the explicit convert command loads them through Node.js. TOML
-and JSON5 are reported as unsupported. `.prettierignore` and markdownlint-cli2
-`ignores` and `globs` become `ignore`. Negated `.prettierignore` patterns are
-reported for manual migration.
+executing them and contribute nothing; the explicit convert command loads them
+through Node.js. TOML and JSON5 are not read, by either. An extensionless
+`.prettierrc` is read as YAML, as Prettier reads it, so it can hold JSON; a JSON
+comment in it becomes part of the next key in Prettier too, which ignores that
+setting, and conversion reports it. A file that cannot be parsed is an error
+that names it. `.prettierignore` and markdownlint-cli2 `ignores` and `globs`
+become `ignore`. Negated `.prettierignore` patterns cannot be converted:
+`config convert` reports them for manual migration and converts the other
+patterns, so review its `ignore` before using it. The fallback, which has no
+such review, applies none of the patterns of a `.prettierignore` with a negated
+entry: it checks the documents that the file excludes rather than apply the
+exclusions without their exceptions, which can leave nothing to check. The
+[notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
 
 Pattern conversion is bounded by source dialect. Prettier overrides,
 EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,

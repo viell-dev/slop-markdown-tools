@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { format as prettierFormat } from "prettier";
 import { describe, expect, it } from "vitest";
 import { competitorMappings, convertConfig, builtInRules, format } from "../../src/index.js";
+import { ignoresAllMarkdown } from "../../src/config/competitors.js";
 
 describe("competitor conversion (#669)", () => {
   it("maps every declared markdownlint option and checks Prettier coverage against the comparison", () => {
@@ -229,6 +230,14 @@ describe("competitor conversion (#669)", () => {
     expect(result.omitted.join("\n")).toContain("paragraph lines are not checked");
     expect(result.suggestions.join("\n")).toContain("width 97");
     expect(result.config.rules?.["style/wrap"]).toBeUndefined();
+    // A width that is not a number names no width rather than "NaN".
+    for (const lineLength of ["wide", -1, 2.5, true, null, [60], "60"]) {
+      const suggestions = convertConfig({
+        markdownlint: { MD013: { line_length: lineLength } },
+      }).suggestions.join("\n");
+      expect(suggestions).toContain("Consider style/wrap to reflow paragraph lines.");
+      expect(suggestions).not.toContain("NaN");
+    }
   });
   it("maps MD009 code blocks and explains strict and MD031's safety limit without closed issues", () => {
     const result = convertConfig({
@@ -409,5 +418,60 @@ describe("competitor conversion (#669)", () => {
     expect(convertConfig({ markdownlint: { default: false, "single-h1": true } }).config).toEqual(
       convertConfig({ markdownlint: { default: false, MD025: true } }).config,
     );
+  });
+});
+
+describe("a .prettierignore that excludes all Markdown (#788)", () => {
+  it.each([
+    "**/*.md\n**/*.markdown\n",
+    "*.md\n*.markdown",
+    "*.md\r\n*.markdown\r\n",
+    "*\n",
+    "**\n",
+    "**/*.MD\n**/*.MARKDOWN\n",
+    "# comment [old]\n\n*.md\n*.markdown\n",
+    "**/*.md\n",
+    "*.md\n",
+    "docs/\n*.md\n",
+    "/*\n",
+  ])("is recognized from what it ignores: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(true);
+  });
+  it.each([
+    // Exceptions that one sample directory depth misses.
+    "**/*.md\n!docs/**/*.md\ndocs/*/*.md\n",
+    "**/*.md\n!**/README.md\n*/README.md\n",
+    // A negated entry that re-includes no document is not established either.
+    "# comment\n\n*.md\n*.markdown\n!docs/\n",
+    "**/*.md\n!docs/\n",
+    // Entries that each ignore some sample names and depths, but not all names.
+    "?.md\n*-*.md\n",
+    "*-*.md\n",
+    "m*\n",
+    "/*.md\n/*/*.md\n/*/*/*.md\n",
+    // Together these exclude all Markdown, which no single entry proves.
+    "/*.md\n*/**/*.md\n",
+    "[!_]*.md\n",
+    // `?` needs a character, so a file named only `.md` stays with Prettier.
+    "?*.md\n",
+    "*?.md\n",
+    "**/?*.md\n",
+    "?.md\n",
+  ])("is not established without proof: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(false);
+  });
+  it.each([
+    "",
+    "*.markdown\n",
+    "**/*.md\n!notes/*.markdown\n",
+    "/*.md\n/*.markdown\n",
+    "docs/**\n",
+    "**/*.md\n**/*.markdown\n!README.md\n",
+    "**/*.md\n**/*.markdown\n!/docs/*.md\n",
+    "**/*.md\n**/*.markdown\n!keep*\n",
+    "**/*.md\n**/*.markdown\n![a-z]*.md\n",
+    "node_modules\n",
+  ])("is not assumed where Prettier may still format Markdown: %j", (text) => {
+    expect(ignoresAllMarkdown(text)).toBe(false);
   });
 });
