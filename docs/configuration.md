@@ -158,7 +158,7 @@ setting for a rule replaces an earlier one as a whole, options included. A
 plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
 
-`recommended` enables [`style/block-spacing`](rules.md#styleblock-spacing) at
+`recommended` enables [`style/block-spacing`](rules/style/block-spacing.md) at
 `warn`, separating headings, lists, code fences, and tables from adjacent blocks
 with a blank line where safe. `lint` reports missing separators, and `format`
 adds them. To keep compact spacing, set

@@ -9,7 +9,8 @@ const urls =
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const properNames: Rule = {
-  description: "Report other capitalization of configured proper names in prose.",
+  description:
+    "Reports other capitalizations of configured names, such as `javascript` for `JavaScript`.",
   kind: "problem",
   schema: optionsSchema({
     names: { type: "array", items: { type: "string", minLength: 1 }, default: [] },

@@ -38,7 +38,7 @@ function titleRange(raw: string, definition: boolean): [number, number] | undefi
 }
 
 export const linkTitle: Rule = {
-  description: "Normalize link, image and reference definition title delimiters.",
+  description: "Writes link and image titles with one kind of delimiter, double quotes by default.",
   kind: "style",
   phase: "inline",
   schema: optionsSchema({ delimiter: { enum: ["double", "single", "parentheses", "consistent"] } }),
@@ -108,7 +108,7 @@ function separators(raw: string, node: Definition): [number, number][] {
 }
 
 export const definitionSpacing: Rule = {
-  description: "Use one space in same-line reference definition separators.",
+  description: "Writes one space after a link reference definition's colon and before its title.",
   kind: "style",
   phase: "inline",
   schema: optionsSchema({}),

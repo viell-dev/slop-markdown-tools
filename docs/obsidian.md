@@ -33,12 +33,12 @@ among them the report that wrapping is off, still need the configuration.
 Obsidian shows a single line break inside a paragraph as a line break unless the
 vault's "Strict line breaks" setting is on. `style/wrap` therefore wraps notes
 only when the vault's `.obsidian/app.json` contains `"strictLineBreaks": true`,
-and [`obsidian/strict-line-breaks`](rules.md#obsidianstrict-line-breaks) reports
-when it does not. The tool reads the file and never changes it; when you change
-the setting, keep the file's other settings. If the file cannot be read or is
-not valid JSON, the tool warns and leaves paragraphs as written; a byte order
-mark at its start is ignored. If strict line breaks do not suit your vault,
-disable `style/wrap`; the other rules still run.
+and [`obsidian/strict-line-breaks`](rules/obsidian/strict-line-breaks.md)
+reports when it does not. The tool reads the file and never changes it; when you
+change the setting, keep the file's other settings. If the file cannot be read
+or is not valid JSON, the tool warns and leaves paragraphs as written; a byte
+order mark at its start is ignored. If strict line breaks do not suit your
+vault, disable `style/wrap`; the other rules still run.
 
 The tool reads highlights (`==text==`) and wikilinks within one line. A
 paragraph with `==`, `[[`, or `]]` outside them, such as a highlight written
@@ -48,7 +48,7 @@ highlight or a link.
 In a callout, the title line stays as written, with its folding marker, and the
 body is wrapped inside the quote, also directly below the title. A body
 paragraph is left as written in the cases that
-[`style/wrap`](rules.md#stylewrap) lists, and so is a body whose quote markers
+[`style/wrap`](rules/style/wrap.md) lists, and so is a body whose quote markers
 are not consistent, or inline syntax that runs from the title into the body. A
 title that is too long is reported by `reportUnbreakable`.
 
@@ -67,12 +67,12 @@ already protected as literal block HTML does not seed a Markdown continuation
 boundary; otherwise holding only one list marker could split a list whose
 markers are safe to change together.
 
-[`style/lazy-continuation`](rules.md#stylelazy-continuation) removes some lazy
+[`style/lazy-continuation`](rules/style/lazy-continuation.md) removes some lazy
 continuation margins instead of keeping them: it writes a quote's `>` and list
 items' indentation on the lazy lines where both views were observed to show the
 same, after which the paragraph is no longer lazy for the structural rules. It
 holds the other lazy lines itself, with the finding below.
-[`style/quote-marker`](rules.md#stylequote-marker) follows this policy like the
+[`style/quote-marker`](rules/style/quote-marker.md) follows this policy like the
 list rules.
 
 When a proposed style edit is held by this policy or an existing native
@@ -508,8 +508,8 @@ A heading also matches as its source writes it, and `[[Note#Setup#Mobile]]`
 reaches a heading below another; a wikilink never names a folder. A missing or
 ambiguous target is never guessed. Wikilinks without a label keep their target
 as written, because it is their visible text, and embeds stay embeds, with any
-image size in their label. [`links/path`](rules.md#linkspath) and
-[`links/notation`](rules.md#linksnotation) describe the options.
+image size in their label. [`links/path`](rules/links/path.md) and
+[`links/notation`](rules/links/notation.md) describe the options.
 
 ## Review the result
 

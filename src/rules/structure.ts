@@ -249,7 +249,7 @@ const closingRun = /(?:^|[^\\#])#+$/;
 
 export const structureRules: Record<string, Rule> = {
   "structure/heading-template": {
-    description: "Require the document outline to match a configured heading template.",
+    description: "Reports headings that do not follow a configured sequence.",
     kind: "problem",
     schema: optionsSchema({
       headings: {
@@ -342,7 +342,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/initial-heading": {
-    description: "Require an initial heading at the configured level.",
+    description: "Reports a document that does not start with a heading of the configured level.",
     kind: "problem",
     schema: optionsSchema({
       level: levelSchema,
@@ -370,7 +370,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/heading-increment": {
-    description: "Report headings more than one level deeper than the heading before them.",
+    description: "Reports headings more than one level deeper than the heading before them.",
     kind: "problem",
     schema: optionsSchema({ frontMatterTitle: { ...titleSchema, default: false } }),
     check({ document, options }) {
@@ -400,7 +400,7 @@ export const structureRules: Record<string, Rule> = {
   },
   "structure/single-title": {
     description:
-      "Report repeated title headings at the configured level, including front matter titles.",
+      "Reports more than one title heading in a document, counting a front matter title.",
     kind: "problem",
     schema: optionsSchema({
       level: levelSchema,
@@ -432,7 +432,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/duplicate-heading": {
-    description: "Report repeated heading text among siblings or across an outline.",
+    description: "Reports headings with the same text as an earlier heading under the same parent.",
     kind: "problem",
     schema: optionsSchema({ siblingsOnly: { type: "boolean", default: true } }),
     check({ document, options }) {
@@ -463,7 +463,8 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/unspaced-heading": {
-    description: "Report paragraph text that would be an ATX heading with a space after its #.",
+    description:
+      "Reports text such as `#Installation` that would be a `#` heading with a space after the hashes.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -486,7 +487,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/heading-punctuation": {
-    description: "Report headings that end with sentence punctuation.",
+    description: "Reports headings that end with sentence punctuation.",
     kind: "problem",
     schema: optionsSchema({ punctuation: { type: "string", default: headingPunctuation } }),
     check({ document, options }) {
@@ -514,7 +515,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/emphasis-heading": {
-    description: "Report paragraphs of only emphasized or strong text, which read as headings.",
+    description: "Reports paragraphs of only emphasized or strong text, which read as headings.",
     kind: "problem",
     schema: optionsSchema({ punctuation: { type: "string", default: emphasisPunctuation } }),
     check({ document, options }) {
@@ -548,7 +549,7 @@ export const structureRules: Record<string, Rule> = {
     },
   },
   "structure/split-quote": {
-    description: "Report block quotes separated only by blank lines, which may be meant as one.",
+    description: "Reports block quotes separated only by a blank line, which may be meant as one.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {

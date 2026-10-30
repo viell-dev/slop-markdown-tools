@@ -21,14 +21,17 @@ Formatting does not rename files or migrate comments.
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
 Help and the version are printed on stdout, with exit code `0`. Without a
-command, `mdrefine` prints the help on stderr and exits with code `2`, as it
-does for every mistake on the command line, such as an unknown option.
+command, `mdrefine` prints the help on stderr, followed by
+`mdrefine: no command given; try mdrefine lint`, and exits with code `2`, as it
+does for every mistake on the command line, such as an unknown option. `config`
+without `explain` or `convert` does the same with its own help.
 
-`rules` prints one line per rule: its ID, kind, and description, separated by
-tabs. It looks for the configuration from the current directory, as `lint` does,
-or searches from `--root <directory>`, or reads the one that `--config` names.
-With `--json` it prints `{ "rules": [...] }`, each rule an object with its `id`,
-`kind`, and `description`.
+`rules` prints one line per rule, sorted by ID: its ID, kind, and description,
+separated by tabs. The descriptions of the built-in rules are those of the
+[rules](rules.md) index. It looks for the configuration from the current
+directory, as `lint` does, or searches from `--root <directory>`, or reads the
+one that `--config` names. With `--json` it prints `{ "rules": [...] }`, in the
+same order, each rule an object with its `id`, `kind`, and `description`.
 
 With configured [code formatters](configuration.md#code-formatters), every
 `format` mode also formats selected fenced code. `lint` checks Markdown rules
@@ -273,8 +276,8 @@ entered or the reverse, one whose `.gitignore` cannot be read, and a nested
 repository whose `.git/info/exclude` cannot be read. The warning does not change
 the exit code and is not counted by `--max-warnings`. A link into a skipped
 directory is reported as not checkable rather than missing; see
-[`links/valid`](rules.md#linksvalid). Naming the directory, or a path inside it,
-on the command line is an error. To leave a directory out without a warning,
+[`links/valid`](rules/links/valid.md). Naming the directory, or a path inside
+it, on the command line is an error. To leave a directory out without a warning,
 list it in a `.gitignore`.
 
 A selected document that cannot be read gets an `engine/unreadable-file` error;

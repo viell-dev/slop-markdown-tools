@@ -1,7 +1,34 @@
+import { readdirSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { slug } from "github-slugger";
 import { defineConfig } from "vitepress";
+
+// One collapsed group per rule category, listing the pages in docs/rules/<category>/.
+const rules = fileURLToPath(new URL("../rules/", import.meta.url));
+const categories: Record<string, string> = {
+  content: "Content",
+  forgejo: "Forgejo and Gitea",
+  github: "GitHub",
+  links: "Links",
+  obsidian: "Obsidian",
+  structure: "Structure",
+  style: "Style",
+};
+const ruleGroups = readdirSync(rules)
+  .sort()
+  .map((category) => ({
+    text: categories[category] ?? category,
+    collapsed: true,
+    items: readdirSync(path.join(rules, category))
+      .filter((name) => name.endsWith(".md"))
+      .sort()
+      .map((name) => {
+        const id = `${category}/${name.slice(0, -".md".length)}`;
+        return { text: id, link: `/rules/${id}` };
+      }),
+  }));
 
 export default defineConfig({
   // The configuration's JSON Schema, at the address that the configuration page gives.
@@ -56,7 +83,7 @@ export default defineConfig({
         items: [
           { text: "Command line", link: "/cli" },
           { text: "Configuration", link: "/configuration" },
-          { text: "Rules", link: "/rules" },
+          { text: "Rules", link: "/rules", collapsed: true, items: ruleGroups },
           { text: "Dialects", link: "/dialects" },
           { text: "VitePress", link: "/vitepress" },
           { text: "Library API", link: "/api" },
