@@ -205,34 +205,14 @@ markdownlint configuration in use, the documents it excludes are checked; add
 its patterns to `ignore` in an mdrefine configuration. The
 [notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
 
-Pattern conversion is bounded by source dialect. Prettier overrides,
-EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,
-`?`, and whole-component `**`. Brace alternatives must be flat comma lists,
-without nesting, empty alternatives, ranges, or `**` inside. Accepted escapes
-are backslash followed by another backslash or one of `#`, `?`, `!`, `*`, `[`,
-`]`, `{`, `}`, `(`, `)`, `+`, or `@`. Other escapes, character classes,
-unescaped parentheses, quoted patterns, and whole-pattern complements are
-reported with their source and pattern for manual migration rather than emitted.
-Prettier brace patterns also retain their literal spelling, and terminal `/**`
-also matches the file before that suffix. CLI2 negative globs are directory
-exclusions, and their descendants are expanded before rebasing. When several
-CLI2 positive globs need a combined selection, a literal comma outside braces or
-a brace alternative cannot be represented in that union: the selection is
-reported and omitted. A single positive glob keeps its ordinary meaning.
-
-`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`, the
-same accepted escapes, root anchors, and directory suffixes; braces and
-parentheses stay literal. Character classes, trailing whitespace, and negated
-entries are reported rather than emitted. Prettier matches ignore patterns
-without regard to letter case; converted patterns match case exactly. Conversion
-reports this approximation once per `.prettierignore` file.
-
-All subsets reject `.`, `..`, and empty path components, and absolute paths,
-including Windows drive and UNC spellings on every platform. A leading `/` in
-EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
-`.prettierignore` marks a directory; these are permitted boundaries rather than
-empty components. Every emitted pattern is rebased into the destination subtree;
-unrepresentable intersections are also reported for manual migration.
+Patterns convert within the subset of glob syntax that each source documents. A
+pattern outside it, such as a character class or a negated `.prettierignore`
+entry, is reported with its source for manual migration rather than converted.
+Prettier matches ignore patterns without regard to letter case, while converted
+patterns match case exactly; conversion says so once per `.prettierignore`. The
+[maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
+list the exact subsets.
 
 During the competitor fallback, markdownlint inline comments and Prettier ignore
 comments and `requirePragma` apply. With an mdrefine configuration, including
@@ -249,27 +229,14 @@ source order for the whole file and uses the configuration converter. Unknown
 names or checks without counterparts suppress nothing and are reported once per
 run, with a tracking issue where available.
 
-Each rule retains its enabled competitor origins outside the configuration.
-Disabling a markdownlint check leaves Prettier's choice active at warning
-severity, using Prettier's own options in that region. Stated markdownlint
-options still win where both sources are active. Each distinct set of active
-checks is converted with Prettier's choices and the same file override patches.
-The engine evaluates each distinct rule setting once per inspection and selects
-its findings in the corresponding regions. This also recalculates dependent
-options: disabling MD022 restores MD012's own blank-line maximum.
-
-Shared destinations attribute findings to their source checks: `style/heading`
-(MD003, MD019, MD021, MD023), `style/list-indent` (MD005, MD007, MD030), and
-`style/table` (MD055, MD060). Table rows and list operations retain active check
-diagnostics even when the construct starts in a suppressed region.
-`style/block-spacing` (MD022, MD031, MD032, MD058) attributes findings to their
-named block, and `structure/unspaced-heading` (MD018, MD020) distinguishes
-ordinary and closed ATX candidates. A combined edit is withheld when it needs a
-suppressed check; active diagnostics remain. For every rule, an edit crossing
-regions is accepted only when each region proposes the same replacement and
-authorizes its checks. This can leave a whole table or list as written when a
-partial repair is unavailable. Every proposal still passes the ordinary edit and
-semantic safety checks.
+Where these comments turn a markdownlint check off in part of a file, a Prettier
+style that covers the same thing stays on there, at warning severity, when a
+Prettier configuration is in use; a rule that carries several checks reports
+each under the check that found it. An edit is made only where every part of the
+file that it touches allows it, so a table or list can stay as written when only
+part of it is suppressed. The [maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#comments-during-the-fallback)
+describe how the rules are evaluated per region.
 
 Prettier's `ignore` preserves the next parsed node; `ignore-start` and
 `ignore-end` preserve a top-level range, with blank lines before the comments.

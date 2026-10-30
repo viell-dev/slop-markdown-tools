@@ -25,6 +25,15 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   named About. Issues about the documentation have their own form
   ([#818](https://github.com/viell-dev/slop-markdown-tools/issues/818)).
 
+- The Obsidian, dialect, integration, VitePress, benchmark, and command line
+  pages describe what users need, and the details for maintainers, such as the
+  list of every Obsidian protection and the parser work behind the benchmark
+  limits, move to [maintainer
+  notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/README.md)
+  in the repository. The command line page gathers its file access and write
+  safety details at its end
+  ([#812](https://github.com/viell-dev/slop-markdown-tools/issues/812)).
+
 - Reference pages are easier to scan: the command line page explains the
   workspace root once and marks the options that only `format` takes, the
   configuration page numbers the search for a configuration file and patches one

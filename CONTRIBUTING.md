@@ -989,11 +989,16 @@ only from such a run.
 
 ## Documentation
 
-The site's source is `docs/`, built by VitePress. The tool formats and lints the
-repository's own Markdown at 80 columns; Prettier formats everything else and
-leaves Markdown alone. The fixtures in `tests/fixtures/` and the documents of
-`examples/workspaces/` and `examples/plugin/notes/` are left unformatted on
-purpose.
+The site's source is `docs/`, built by VitePress. A user page explains what a
+reader needs to use the tool; the details that only maintainers need, such as
+lists of individual protections, internal limits, and parser work, go to the
+[maintainer notes](internals/README.md) in `internals/`, which the site does not
+build and the package does not ship, and the page links them by their GitHub
+address. How the checks run belongs in this guide, not in the user pages. The
+tool formats and lints the repository's own Markdown at 80 columns; Prettier
+formats everything else and leaves Markdown alone. The fixtures in
+`tests/fixtures/` and the documents of `examples/workspaces/` and
+`examples/plugin/notes/` are left unformatted on purpose.
 
 ```sh
 npm run format:docs        # format the Markdown

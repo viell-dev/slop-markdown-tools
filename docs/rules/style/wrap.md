@@ -148,7 +148,7 @@ Preview in mind:
 - A standalone one-line `$$…$$` formula keeps its physical line, with the
   adjacent separators, when joining would change Live Preview's display widget.
   Math already beside ordinary prose still wraps; see the [boundary
-  protections](../../obsidian.md#boundary-protections).
+  protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md#boundary-protections).
 
 In Obsidian, a paragraph is also left as written when it:
 

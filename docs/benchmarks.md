@@ -4,11 +4,6 @@
 synthetic documents. This page explains what is measured, records reference
 results, and says how good they are.
 
-The figures below precede the internal parser adapter introduced in 0.4.1. They
-remain reference measurements for that earlier implementation; the adapter's
-focused regression checks establish repaired work growth without replacing these
-throughput or memory measurements.
-
 ## In short
 
 - **Checking a whole workspace takes seconds.** From the command line, 500 pages
@@ -52,8 +47,9 @@ finding and reading files, and printing.
 
 ## Reference results
 
-- Node.js v24.21.0 on Linux x64; AMD EPYC 9V45 96-Core Processor, 4 logical
-  CPUs.
+- mdrefine 0.2.0; later releases have not been measured again.
+- Node.js v24.21.0 on Linux x64, on a 4-vCPU GitHub-hosted runner (AMD EPYC
+  9V45).
 - Each time is the median of 5 runs after one warm-up run.
 - Prettier 3.9.10 is the comparison formatter.
 - Output hash: `aea576e325adf396`.
@@ -152,20 +148,7 @@ Node.js reclaims memory, so it is an upper bound.
 The cost per kilobyte rises by about two thirds from a short document to one of
 a megabyte, far larger than documents usually are. Earlier reference results, on
 another processor, showed a rise of two fifths and of a quarter, so the size of
-the rise depends on the runner. The investigation also found a dependency
-regression: micromark 4.0.3 repeatedly copies its accumulated document events at
-list/table transitions. With many repetitions in one file, doubling the input
-approaches four times the parsing work. A standalone parser reproduction gives
-the same HTML as 4.0.2 while showing that growth; the issue records the version
-matrix, profiling, and reproduction ([issue
-#300](https://github.com/viell-dev/slop-markdown-tools/issues/300)).
-
-Both linting and formatting parse the whole document, so either is affected in
-the measured implementation. The parser adapter includes a reviewed EditMap
-correction that retains the untouched event prefix instead of copying it at
-every transition. They still parse complete documents for references and
-container structure. Exact AST, event-identity and work-growth checks cover the
-correction; the tables above have not been remeasured with it.
+the rise depends on the runner.
 
 While a document is parsed, the parser holds a list of every token it found,
 many times larger than the text. These are the smallest heap limits
@@ -219,21 +202,11 @@ thousands of files.
   reads, bring it out. Lists and tables of that size are not affected. Square
   brackets are the worst case, in every dialect: a single paragraph of 70 kB
   made only of bracketed references such as `[a][b]` took from 1 to more than 30
-  seconds to parse, while one of 35 kB took a fraction of a second ([issue
-  #240](https://github.com/viell-dev/slop-markdown-tools/issues/240)). The
-  parser adapter corrects the known repeated text/code event compaction, inline
-  opener searches and unbalanced-label autolink scans. Builtin grammars also
-  avoid repeated lookups and scans for proven nested bracket labels and batch
-  eligible single pairs of homogeneous emphasis runs
-  ([#94](https://github.com/viell-dev/slop-markdown-tools/issues/94)). Failed
-  Obsidian wikilink and embed openers reuse the scanned part of their line
-  ([#577](https://github.com/viell-dev/slop-markdown-tools/issues/577)). Mixed
-  or multiple raw emphasis pairs can still copy their interiors repeatedly.
-  Syntax plugins retain the original attention, strikethrough and CJK resolvers
-  and nonempty reference/footnote paths, with their costs; the shared EditMap,
-  text/code compaction, position and autolink repairs still apply. These
-  corrections cover the checked families, not every possible large paragraph;
-  they do not replace this page's historical throughput or memory measurements.
+  seconds to parse, while one of 35 kB took a fraction of a second. The tool's
+  parser corrects several known cases of this, not every large paragraph; the
+  [maintainer
+  notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/benchmarks.md)
+  list them.
 - Only the built-in rules run; plugins add their own time.
 - The runner is shared. Two runs on the same day differed by a factor of about
   1.8 in every absolute time, while the "compared with parsing" ratios and the
