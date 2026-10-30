@@ -23,6 +23,22 @@ Working functions, automated UI checks, agent review, and CI cannot establish
 that the product is understandable and usable. Human testing complements all
 required automated checks; it does not replace them.
 
+**This project's exception.** mdrefine has no graphical interface: its user
+experience is the command line and its documentation. The repository owner
+decided on 2026-10-29 that it needs no human usability pass. Instead, before a
+release that changes the command line, independent agent reviewers go through it
+as a new user would:
+
+- the command structure, defaults, and options;
+- the help output, error messages, and exit codes;
+- whether `--help`, the documentation site, and the actual behavior agree.
+
+Their findings are triaged in an issue, as
+[#788](https://github.com/viell-dev/slop-markdown-tools/issues/788) records for
+0.6.0, and each is fixed or given a recorded disposition before publication. The
+procedure below applies again if this exception is reconsidered, for example if
+mdrefine gains a graphical interface or an editor integration.
+
 For a routine fix, the release PR may reuse recorded human evidence while the
 tested workflow remains representative. Link the report and explain what changed
 since the tested build and why no further human pass is needed. Genuine earlier

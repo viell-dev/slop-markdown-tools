@@ -56,21 +56,23 @@ a sensor board.
 
 ## Install
 
-When upgrading from 0.4.x, complete the [naming
-migration](docs/cli.md#earlier-names) before installing 0.5.0.
-
 mdrefine needs Node.js 22.12 or newer:
 
 ```sh
 npm install --save-dev --save-exact mdrefine@0.5.0
 npx mdrefine lint
+npx mdrefine format
 npx mdrefine format --diff
 npx mdrefine format --write
 npx mdrefine format --check
 ```
 
-`lint` reports and never writes. `format` shows a diff, writes with `--write`,
-and with `--check` fails when a document would change.
+`lint` reports and never writes. Bare `format` shows a diff and exits `1` when a
+document would change. Use `format --diff` for an exit-`0` preview,
+`format --write` to apply changes, or `format --check` to list files needing
+changes. `format --check --diff` combines the diff with failing on changes.
+Stdin prints the formatted document by default; `--json` omits the diff.
+Remaining errors fail every mode; operational failures exit `2`.
 
 ## Configure
 

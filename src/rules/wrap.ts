@@ -566,7 +566,12 @@ function obsidianMarkers(source: string, node: Paragraph, start: number, end: nu
 
 /** A line's container prefix, with list item markers and checkboxes made blank. */
 function continuationOf(prefix: string): string {
-  return prefix.replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) => " ".repeat(value.length));
+  // A quote with no separator before a list marker consumes the first space
+  // of the replacement indentation. Supply that separator before blanking the
+  // marker, so the continuation reaches the item content column (#781).
+  return prefix
+    .replace(/>(?=(?:[-+*]|\d+[.)])\s)/g, "> ")
+    .replace(/(?:[-+*]|\d+[.)]|\[[xX ]\])(?=\s)/g, (value) => " ".repeat(value.length));
 }
 /**
  * A failed flow comment can be plain paragraphs when blank lines split its

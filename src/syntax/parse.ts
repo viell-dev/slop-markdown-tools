@@ -26,6 +26,12 @@ import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import { gfmTaskListItemFromMarkdown } from "mdast-util-gfm-task-list-item";
 import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
 import { gfmAutolinkLiteralFromMarkdown } from "mdast-util-gfm-autolink-literal";
+import {
+  githubDefinitionSyntax,
+  githubTableDefinitions,
+  keepUnderlinedDefinitions,
+  recordGithubDefinitionText,
+} from "./github-definitions.js";
 import { projectVitePress, recordVitePress, vitepressCodeText } from "./vitepress/projection.js";
 
 // GFM's tree transform performs GitHub's second, transform-time autolink pass
@@ -438,7 +444,20 @@ export function parse(
         mdastExtensions.push(plugin.syntax.mdast);
       }
     }
-    const parsed = fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
+    let parsed = fromMarkdown(projection?.source ?? source, { extensions, mdastExtensions });
+    if (read === "github") {
+      const definitions = githubTableDefinitions(parsed);
+      while (definitions.size) {
+        const corrected = fromMarkdown(projection?.source ?? source, {
+          extensions: [...extensions, githubDefinitionSyntax(definitions)],
+          mdastExtensions,
+        });
+        if (keepUnderlinedDefinitions(corrected, definitions)) continue;
+        parsed = corrected;
+        recordGithubDefinitionText(parsed, definitions);
+        break;
+      }
+    }
     if (read === "github" && withMath) {
       let reading: Root | undefined;
       githubFileReadings.set(parsed, () => {

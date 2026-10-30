@@ -102,4 +102,14 @@ export const githubFixtures = [
     name: "definition-above-table",
     source: "[ref]: https://example.com\nText\n| a | b |\n| - | - |\n\nA [link][ref].\n",
   },
+  // Definitions alone and in containers are visible GitHub prose too (#732).
+  {
+    name: "definition-table-containers",
+    source: "# [x][a]\n\n[a]: /b\n| c | d |\n| - | - |\n\n> [c]: /d\n> [e]: /f\n> text\n> | c | d |\n> | - | - |\n\n- [g]: /h\n  text\n  | c | d |\n  | - | - |\n\n[x][c] [x][e] [x][g]\n",
+  },
+  // A Setext underline below the definitions keeps them; a lazy one does not (#732).
+  {
+    name: "definition-underline-table",
+    source: "[a]: /b\n===\n| c | d |\n| - | - |\n\n> [c]: /d\n> --\n> | c | d |\n> | - | - |\n\n> [e]: /f\n===\n> | c | d |\n> | - | - |\n\n[x][a] [x][c] [x][e]\n",
+  },
 ];

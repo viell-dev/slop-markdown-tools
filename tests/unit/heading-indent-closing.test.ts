@@ -100,6 +100,61 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
     expect(lint("# A\n", { config })).toMatchObject([{ rule: "style/heading" }]);
   });
 
+  // Below a first line of `---` or `+++` that no line closes, the document has
+  // no front matter. Without its indentation, an underline `  ---` or heading
+  // text `  +++` would close it and make front matter of the lines above
+  // (#278, #764).
+  it.each(dialects)(
+    "keeps the indentation of a line that would close front matter on %s",
+    (dialect) => {
+      for (const newline of ["\n", "\r\n"]) {
+        const lines = (...text: string[]) => text.map((line) => line + newline).join("");
+        for (const style of ["atx", "setext", "consistent"] as const) {
+          const config = only({ "style/heading": ["warn", { style }] }, dialect);
+          const keeps = dialect === "obsidian" || dialect === "vitepress";
+          for (const source of [
+            lines("---", "Title", "  ---"),
+            lines("---", "[[toc]]", "  ---", "  title: T", "  ---", "", "> > # H"),
+            lines("+++", "  +++", "==="),
+          ]) {
+            const output = formatted(source, config);
+            expect(semanticFingerprint(parse(output, dialect))).toBe(
+              semanticFingerprint(parse(source, dialect)),
+            );
+            expect(render(output)).toBe(render(source));
+            expect(markdown.render(output)).toBe(markdown.render(source));
+          }
+          // Obsidian and VitePress read the unclosed opener as front matter to
+          // the end, which stays as written.
+          const output = formatted(lines("---", "Title", "  ---"), config);
+          expect(output).toBe(
+            keeps || style !== "atx" ? lines("---", "Title", "  ---") : lines("---", "## Title"),
+          );
+          expect(formatted(lines("---", "[[toc]]", "  ---", "  title: T", "  ---"), config)).toBe(
+            keeps
+              ? lines("---", "[[toc]]", "  ---", "  title: T", "  ---")
+              : style === "atx"
+                ? lines("---", "## [[toc]]", "## title: T")
+                : lines("---", "[[toc]]", "  ---", "title: T", "  ---"),
+          );
+          // VitePress reads no TOML front matter.
+          expect(formatted(lines("+++", "  +++", "==="), config)).toBe(
+            lines("+++", dialect === "vitepress" ? "+++" : "  +++", "==="),
+          );
+          // Other indented headings below the opener still lose their indentation.
+          expect(formatted(lines("---", "  Title", "  ===", "", "  ## Sub"), config)).toBe(
+            keeps
+              ? lines("---", "  Title", "  ===", "", "  ## Sub")
+              : style === "atx"
+                ? lines("---", "# Title", "", "## Sub")
+                : // An underline of four dashes, which closes no front matter.
+                  lines("---", "Title", "===", "", "Sub", "----"),
+          );
+        }
+      }
+    },
+  );
+
   it.each(["forgejo", "gitea"] as const)("protects %s attribute suffixes", (dialect) => {
     const config = only({ "style/heading": ["warn", { closing: "add" }] }, dialect);
     for (const source of ["## Title {#id}\n", "## Title {#id}  ####\n"])

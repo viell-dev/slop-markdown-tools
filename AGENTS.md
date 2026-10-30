@@ -196,13 +196,13 @@ links to other issues and PRs.
 
 ## Requests for people
 
-The maintaining agents own verification as well as the code. Human usability
-testing is required before the first stable release and after substantial
-interface or workflow changes, as
-[RELEASING.md](RELEASING.md#human-release-testing) describes. Agents prepare and
-track that work; the owner does not take over engineering, regression testing,
-or code review. Other requests cover decisions on direction or scope, identity
-or access, and unavailable observations.
+The maintaining agents own verification as well as the code. For this project,
+which has no graphical interface, independent agent reviews of the command
+line's design take the place of human usability testing, as
+[RELEASING.md](RELEASING.md#human-release-testing) records; agents run and
+triage them. The owner does not take over engineering, regression testing, or
+code review. Other requests cover decisions on direction or scope, identity or
+access, and unavailable observations.
 
 Make such a request an issue, or reuse the issue that already owns the question,
 so that it can be answered on GitHub without a checkout or a conversation. State
@@ -453,19 +453,21 @@ only and remove superseded transition notes.
   engine's existing exports and lazy workspace callbacks stable when changing
   these internal seams.
 - `src/syntax/renderer-protections.ts` owns one `RendererProtections` result
-  cached by positioned root. List, GitHub and forge collectors are separate;
-  `forge-protections.ts` retains native table continuations, paragraph-hidden
-  tables and URL-adjacent hard breaks without requesting another parse.
-  `obsidian-protections.ts` orders Obsidian passes over one shared leaf
-  projection, with code and HTML collectors in focused modules. List text seeds
-  physical fences; joined footnotes seed paragraph/table state; Setext readings
-  precede Tab continuation; both structural and line passes finish underlines
-  before table collection; escaping HTML endpoints precede list-marker checks.
-  Retain original nodes where possible, exact UTF-16 positions, Set order and
-  lazy projections. These paths locate current ownership, not future mandatory
-  accumulation points. Fix an unsafe edit rather than weakening a guard or
-  removing historical protections during an unrelated extraction. Obsidian
-  wrapping needs verified strict line breaks.
+  cached by positioned root. List, GitHub, forge and VitePress list collectors
+  are separate; `forge-protections.ts` retains native table continuations,
+  paragraph-hidden tables and URL-adjacent hard breaks without requesting
+  another parse, and `vitepress/lists.ts` keeps the lists whose markers decide
+  markdown-it's table and component readings. `obsidian-protections.ts` orders
+  Obsidian passes over one shared leaf projection, with code and HTML collectors
+  in focused modules. List text seeds physical fences; joined footnotes seed
+  paragraph/table state; Setext readings precede Tab continuation; both
+  structural and line passes finish underlines before table collection; escaping
+  HTML endpoints precede list-marker checks. Retain original nodes where
+  possible, exact UTF-16 positions, Set order and lazy projections. These paths
+  locate current ownership, not future mandatory accumulation points. Fix an
+  unsafe edit rather than weakening a guard or removing historical protections
+  during an unrelated extraction. Obsidian wrapping needs verified strict line
+  breaks.
 - `docs.test.ts` compares the examples page, the rule index and each rule
   section's presets, the preset table, the library pages, the installation
   commands, and the changelog with the code, and rejects version annotations in

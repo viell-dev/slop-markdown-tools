@@ -1091,6 +1091,13 @@ See the [installation guide][Setup] and press [Enter].
 or to how much blank space separates words, also in `ignoredLabels`. A run of
 brackets such as `[a][b][c]` is reported once, at its start.
 
+**On GitHub:** definitions at the start of a paragraph directly interrupted by a
+table are visible text, including consecutive definitions and definitions alone
+above the table, also in lists and quotes. They do not define labels. A blank
+line before the table keeps them as definitions, as does a Setext underline
+line, such as `===`, directly below them, which GitHub shows as text. Forgejo,
+Gitea, and VitePress retain the definitions without that blank line.
+
 **Not checked:** a shortcut reference, `[label]` alone, unless `shortcutSyntax`
 is on, because brackets in prose are usually just brackets. Neither are brackets
 directly after a letter, digit, `_`, or `)`, as in `matrix[i][j]`, which are
@@ -1159,6 +1166,13 @@ links, which are reported as any others are. The option applies to link
 definitions, not footnotes: a footnote shows its text, so an unreferenced one is
 reported whatever its label.
 
+**On GitHub:** definitions at the start of a paragraph directly interrupted by a
+table are visible text, including consecutive definitions and definitions alone
+above the table, also in lists and quotes. They do not define labels. A blank
+line before the table keeps them as definitions, as does a Setext underline
+line, such as `===`, directly below them, which GitHub shows as text. Forgejo,
+Gitea, and VitePress retain the definitions without that blank line.
+
 **With other rules:** [`links/empty`](#linksempty) takes the same option.
 
 ## `links/valid`
@@ -1198,6 +1212,8 @@ See the [guide](docs/guide.md#setup).
   VitePress, which passes a fragment through its slugger, only a fragment that
   differs from an anchor in case alone is reported. Anchors are still generated
   per dialect, as [heading anchors](dialects.md#heading-anchors) describes.
+  GitHub file links also ignore the case of the optional `user-content-` prefix;
+  `#User-Content-setup` reaches the same anchor as `#setup`.
 
 **Messages:**
 
@@ -1229,11 +1245,14 @@ See the [guide](docs/guide.md#setup).
 Outside the Obsidian dialect, neither is a destination that starts with `/` or
 contains `?`, which depends on the website.
 
-**On GitHub:** file fragments follow the native Markdown reading of dollar-math
-source. Heading IDs can include dollar-delimited lines above a Setext title, and
-inline markup or HTML inside such source can supply anchors too. Duplicate
-numbering uses that complete reading after the YAML front matter choice; the
-formatter's math reading stays the same.
+**On GitHub:** visible definition text above an interrupting table is not a link
+destination; see [undefined references](#linksundefined-reference).
+
+File fragments follow the native Markdown reading of dollar-math source. Heading
+IDs can include dollar-delimited lines above a Setext title, and inline markup
+or HTML inside such source can supply anchors too. Duplicate numbering uses that
+complete reading after the YAML front matter choice; the formatter's math
+reading stays the same.
 
 **In Obsidian:** links resolve as in Obsidian: a path that starts with `./` or
 `../` counts from the note; otherwise an exact path from the vault's root comes
@@ -2365,6 +2384,9 @@ After:
 - The form of underlined headings of more than one line, those inside lists or
   block quotes, and one directly below TOML front matter, whose lines renderers
   without TOML front matter read as part of the heading.
+- Below a first line of `---` or `+++` that no line closes, the indentation of
+  an underline or text line that is that fence alone, as in `  ---`, because
+  without it the line would close front matter.
 
 **With `setext`:** a `#` heading is underlined only where its text can stand on
 a line of its own as the same heading: at the start of a line of the document,
@@ -2527,7 +2549,9 @@ lines also stay:
   a line.
 
 **In VitePress:** lazy lines also stay in documents with a custom container's
-fence on a quote's line.
+fence on a quote's line, and below a component line such as `<MyComponent />`,
+which ends the paragraph there, so that a line without the item's indentation
+starts a paragraph after the list.
 
 **In Obsidian:** the rule writes only the prefixes observed to leave both views
 unchanged: a quote's `>` where the lazy line lacks every `>` of its quotes, and
@@ -2708,6 +2732,15 @@ After:
   list right after them, and the lists next to it (see [how it
   works](design.md#safety-model)).
 
+**In VitePress:** a list with an item whose first line is a table's header row,
+as `*   a | b` above `    --|--` is, keeps its markers and indentation, and so
+do the lists next to it. markdown-it tries a table before a list, so with less
+indentation, or with a marker that joins it to the list above, it reads that row
+as a table above the list, with the marker in its first cell. A list directly
+beside a list that a component line leaves as written (see
+[VitePress](vitepress.md#preservation)) keeps its markers and indentation too,
+because another marker would join the two.
+
 **In Obsidian:** a document-level list that ends in a nested list keeps its
 indentation, and so does the opening list in the following quote when its marker
 has exactly two spaces after `>`. Live Preview carries the earlier indentation
@@ -2769,6 +2802,9 @@ only because its marker differs, so it gets the next marker in the order `-`,
   would with `-`, and the lists next to it.
 - A list directly below TOML front matter whose first item starts with a blank
   line, as for [`style/list-indent`](#stylelist-indent).
+- In VitePress, a list with an item whose first line is a table's header row,
+  and the lists next to it, and a list directly beside a list that a component
+  line leaves as written, as for [`style/list-indent`](#stylelist-indent).
 
 ## `style/no-tabs`
 
@@ -3125,9 +3161,11 @@ as written when a row needs one.
   `:::tip`: site generators use it to open or close a container, where GFM reads
   another row. Cells written with table borders, such as `| ::: |`, are
   formatted normally.
-- In VitePress, a table that markdown-it reads on other lines or not at all,
-  such as a one-column table whose header has no pipe, or a header written as a
-  lazy line in a block quote.
+- In VitePress, a table that markdown-it reads on other lines, in other
+  containers, or not at all, such as a one-column table whose header has no
+  pipe, a header written as a lazy line in a block quote, or a header on its
+  list item's marker line above a delimiter row indented less than four columns,
+  which markdown-it reads outside the list.
 
 **In Obsidian:**
 
@@ -3354,6 +3392,11 @@ them fail a check, set the rule to `error` or pass `--max-warnings 0`;
   a lazy continuation line, which keeps them, such a code span stays as written,
   and so does its paragraph. Whitespace inside code spans otherwise follows
   their own joining rules.
+
+List continuations keep the item's content indentation, including the space a
+quote consumes when its opening marker directly precedes a list marker, as in
+`>10) text`. Wrapping and explicit lazy-continuation indentation therefore
+agree.
 
 **Words kept off the start of a line:**
 

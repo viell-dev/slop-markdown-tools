@@ -5,29 +5,16 @@ The command is `mdrefine`; with the package installed in a project, run it as
 
 ## Earlier names
 
-Version 0.5.0 removes the names deprecated in 0.4.x. Before upgrading:
-
-1. Replace the `mdtools` command with `mdrefine` in scripts, editor settings and
-   other automation. Use `npx mdrefine`; `npx mdtools` can fetch an unrelated
-   package. The old executable is no longer installed.
-2. Rename `mdtools.config.jsonc`, `.json`, `.mjs`, `.js` or `.cjs` to the
-   corresponding `mdrefine.config.*` filename. Old names are no longer
-   discovered, so an unmigrated workspace uses the configuration found higher up
-   or the default preset instead.
-3. Replace `mdtools-disable`, `mdtools-disable-next-line` and `mdtools-enable`
-   with the matching `mdrefine-` comment prefix. Old comments are ordinary HTML
-   and no longer suppress or enable findings.
-
-Formatting does not rename files or migrate comments. The transitional CLI
-migration notice is also removed. The npm package and library imports stay
-`mdrefine` and `mdrefine/node`.
+Use `mdrefine`, `mdrefine.config.*`, and `mdrefine-disable` comments. For
+migration from the `mdtools` names, see the [changelog](changelog.md).
+Formatting does not rename files or migrate comments.
 
 ## Commands
 
 | Command                 | What it does                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `lint [paths…]`         | Reports the findings of the enabled rules. Never writes.                                                       |
-| `format [paths…]`       | Formats documents: prints a diff (the default), checks with `--check`, or writes with `--write`.               |
+| `format [paths…]`       | Prints a diff and fails on changes; lists changes with `--check`, or writes with `--write`.                    |
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
 | `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it exclusively.                      |
 | `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
@@ -39,9 +26,9 @@ does for every mistake on the command line, such as an unknown option.
 
 `rules` prints one line per rule: its ID, kind, and description, separated by
 tabs. It looks for the configuration from the current directory, as `lint` does,
-or reads the one that `--config` names. With `--json` it prints
-`{ "rules": [...] }`, each rule an object with its `id`, `kind`, and
-`description`.
+or searches from `--root <directory>`, or reads the one that `--config` names.
+With `--json` it prints `{ "rules": [...] }`, each rule an object with its `id`,
+`kind`, and `description`.
 
 With configured [code formatters](configuration.md#code-formatters), every
 `format` mode also formats selected fenced code. `lint` checks Markdown rules
@@ -51,8 +38,8 @@ block and keeping other safe edits.
 
 ## Options
 
-`lint` and `format` accept these options; the last three are for `format` only
-and exclude one another.
+`lint` and `format` accept these options; the last three are for `format` only.
+`--check --diff` combines the two; `--write` cannot be combined with either.
 
 | Option                    | Meaning                                                                                                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -67,15 +54,26 @@ and exclude one another.
 | `--stdin-filepath <file>` | The path of the document read from [stdin](#read-from-stdin).                                                                                                      |
 | `--max-warnings <count>`  | Exit with code `1` when there are more warnings than this.                                                                                                         |
 | `--check`                 | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                   |
-| `--diff`                  | Print the changes as a unified diff. The default for files.                                                                                                        |
+| `--diff`                  | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                           |
 | `--write`                 | Write the changes.                                                                                                                                                 |
+
+Bare `format` on files prints a unified diff and exits `1` if any document would
+change, or `0` if none would. Explicit `format --diff` is an exit-`0` preview
+when no errors remain and `--max-warnings` is not exceeded.
+`format --check --diff` prints the diff and fails on changes. `--check` alone
+lists the files instead. `--json` omits the diff and uses the same exit codes.
+Stdin keeps its own output and exit behavior, described below.
+
+`mdrefine check` and `mdrefine fix` are usage errors that suggest
+`format --check` and `format --write`. Likewise, `lint --check`, `lint --write`
+and `lint --fix` suggest the matching `format` mode.
 
 ## Which files are processed
 
-Without paths, a command processes every document of the workspace. Paths,
-absolute or relative to the current directory, narrow the selection to those
-files and directories; the rest of the workspace still counts for checking
-links.
+Without paths, a command processes every document of the workspace, including
+files above the current directory when run from a subdirectory. Paths, absolute
+or relative to the current directory, narrow the selection to those files and
+directories; the rest of the workspace still counts for checking links.
 
 - Files whose names end in `.md` or `.markdown`, in any case, are documents. A
   file named on the command line is read as Markdown whatever its name. Other
@@ -129,7 +127,9 @@ hooks](integrations.md#git-hooks).
 
 ## Read from stdin
 
-With `-` as its only path, a command reads one document from stdin:
+With `-` as its only path, or `--stdin-filepath` without paths, `lint` and
+`format` read one document from stdin. Combining `--stdin-filepath` with any
+path other than `-` is a usage error (exit `2`):
 
 ```sh
 npx mdrefine format - --stdin-filepath notes/example.md < input.md > output.md
@@ -144,8 +144,9 @@ nothing and `format -` prints the document unchanged, both with the
 `Skipped ignored input` warning, which `--no-warn-ignored` leaves out. A nested
 repository is no such rule: a path in one is read as that repository's document.
 `format -` prints the formatted document on stdout, or the diff with `--diff`,
-or nothing with `--check`; it cannot be combined with `--write`. `lint -` prints
-its findings. Neither prints a summary line. Stdin must be [UTF-8
+or nothing with `--check` alone, while `--check --diff` prints the diff and
+fails on changes; it cannot be combined with `--write`. `lint -` prints its
+findings. Neither prints a summary line. Stdin must be [UTF-8
 text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
 anything else stops the command with exit code `2` and a message such as
 `mdrefine: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
@@ -169,7 +170,10 @@ directory to the document, with forward slashes, as Prettier names files, so
 that a terminal or an editor can open it. `format` prints its diff on stdout
 with the same paths, so that `patch -p1` or `git apply` applies it in the same
 directory. `format --check` names each document that would change, one per line
-after the findings. A run over files ends with one summary line on stderr:
+after the findings; `--check --diff` prints the diff instead of that list. A
+preview ends with a hint to use `--write` to apply changes. A run selecting no
+documents prints a short notice on stderr, including with `--json`, without
+changing its exit code. A run over files prints a summary on stderr:
 
 | Command          | Summary                                       |
 | ---------------- | --------------------------------------------- |
@@ -248,16 +252,17 @@ or unsafe code tool, `engine/unreadable-file`, and `engine/unwritable-file`.
 
 | Code | Meaning                                                                                                                                                                                          |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for `format --check`. Also after help or the version.                                                             |
-| `1`  | Errors were found, there were more warnings than `--max-warnings`, or `format --check` found a document to change.                                                                               |
+| `0`  | Done: no errors, no more warnings than `--max-warnings`, and nothing to change for bare `format` on files or `format --check`. Also after help or the version.                                   |
+| `1`  | Errors were found, there were more warnings than `--max-warnings`, or bare `format` on files or `format --check` found a document to change.                                                     |
 | `2`  | The command could not do its job: a mistake on the command line; a configuration, path, or plugin error; a rule that failed; or a document that could not be formatted safely, read, or written. |
 
-Warnings alone never fail a command without `--max-warnings`. `format` can
-succeed and still report problems that only a person can fix, so read its
-findings too. `format --write` writes every document it formatted, also when
-another document cannot be read or written; each problem is reported for its own
-file, and the exit code is then `2`. A document with a rule whose edits were
-refused, or that a rule failed on, is written with the other rules' edits.
+Warnings alone never fail a command without `--max-warnings`. `format` also
+reports problem rules: remaining error diagnostics exit `1` in every mode,
+including `--diff` and `--write`. Operational failures take precedence and exit
+`2`. `format --write` writes every document it formatted, also when another
+document cannot be read or written; each problem is reported for its own file,
+and the exit code is then `2`. A document with a rule whose edits were refused,
+or that a rule failed on, is written with the other rules' edits.
 
 ## Files that cannot be read or written
 

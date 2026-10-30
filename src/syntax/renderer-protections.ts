@@ -3,11 +3,13 @@ import type { Document } from "../core/types.js";
 import { protectionSource } from "./protection-source.js";
 import { collectListProtections } from "./list-protections.js";
 import {
+  collectGithubDefinitionUnderlines,
   collectGithubLazyHtmlProtections,
   collectGithubMathProtections,
 } from "./github-protections.js";
 import { collectForgeProtections } from "./forge-protections.js";
 import { collectObsidianProtections } from "./obsidian-protections.js";
+import { collectVitePressListProtections } from "./vitepress/lists.js";
 
 /**
  * Positioned source regions whose renderer readings differ from the primary tree.
@@ -236,7 +238,10 @@ export interface RendererProtections {
    * a paragraph, a Setext heading or link definitions, and reads HTML to the
    * next blank line. The range runs from the outermost container that GitHub
    * ends, its list for an item, through that blank line and any top-level
-   * block that starts before it (#762).
+   * block that starts before it (#762). In GitHub also a Setext underline line
+   * below link definitions in a paragraph that a table interrupts, from the
+   * line break before it through the one after it: GitHub reads definitions
+   * that such a line follows, and shows the line as text (#732).
    * A quoted block opened after a Tab immediately after `>` or `> ` keeps its
    * whole physical source too: Reading view can read literal code where the
    * primary parser reads a list, heading or inline text (#597). Same-block
@@ -251,6 +256,9 @@ export interface RendererProtections {
    * Lists whose markers and indentation affect continuations outside their
    * parsed container, including a lazy paragraph after a heading (#513, #543)
    * or lists joined through a quote, table or display formula (#582, #586).
+   * In VitePress, lists with an item whose first line is a table's header row,
+   * which markdown-it can read as a table above the list (#763), and lists
+   * beside a list that a component leaves opaque (#769).
    * Inline formatting remains safe; the structural list unit stays as written.
    */
   boundaryLists: ReadonlySet<List>;
@@ -276,6 +284,7 @@ export function rendererProtections(document: Document): RendererProtections {
   const { text, nested, next, descriptions } = collectListProtections(document, positions);
   const boundaryText = collectGithubMathProtections(document);
   collectGithubLazyHtmlProtections(document, boundaryText);
+  collectGithubDefinitionUnderlines(document, boundaryText);
   const {
     unclosedCode,
     htmlCodeToEnd,
@@ -297,6 +306,7 @@ export function rendererProtections(document: Document): RendererProtections {
     indentLists,
   } = collectObsidianProtections(document, positions, text, boundaryText);
   collectForgeProtections(document, positions, tableText, boundaryText);
+  collectVitePressListProtections(document, boundaryLists);
   const result = {
     text,
     nested,

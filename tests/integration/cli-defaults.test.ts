@@ -109,7 +109,7 @@ describe("without a named dialect", () => {
     expect(dialect(root, "docs/table.md")).toBe("forgejo");
     expect(dialect(root, "plain/table.md")).toBe("commonmark");
     const previewed = run(root, ["format", "--json"]);
-    expect(previewed.status, previewed.stderr).toBe(0);
+    expect(previewed.status, previewed.stderr).toBe(1);
     const changed = (parseReport(previewed.stdout) as { files: { path: string }[] }).files;
     expect(changed).toMatchObject([
       // The forgejo preset aligns the table; CommonMark reflows its lines as prose.

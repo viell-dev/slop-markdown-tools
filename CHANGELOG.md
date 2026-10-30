@@ -231,6 +231,52 @@ prereleases' notes there are longer than their entries here.
 
 ### Fixed
 
+- `style/wrap` indents a quoted list item's continuation lines to the item's
+  content where the quote marker directly precedes the list marker, as in
+  `>10) text`. It indented them one column short, and `style/lazy-continuation`
+  then added the column back, so formatting oscillated and left the document
+  unchanged
+  ([#781](https://github.com/viell-dev/slop-markdown-tools/issues/781)).
+
+- In VitePress, rules leave as written a list item whose first line markdown-it
+  reads as a table header, as in `* a | b` above `  --|--`: markdown-it tries a
+  table before a list, so it shows a table whose first cell holds the marker.
+  `style/list-marker` and `style/list-indent` proposed edits there that the
+  engine refused, and `style/table` formatted the table by the list's reading.
+  The list rules also keep a list whose item's table markdown-it reads only
+  because of its indentation, as in `*   a | b` above `    --|--`, and the lists
+  next to such a list, which another marker would join to it
+  ([#763](https://github.com/viell-dev/slop-markdown-tools/issues/763)).
+
+- `style/heading` keeps the indentation of a heading line that is `---` or `+++`
+  alone, such as an underline `  ---`, below a first line of the same fence that
+  no line closes, where removing it would close front matter and make the lines
+  above it front matter. It proposed that edit, which the engine refused, in
+  GitHub, Forgejo, Gitea and CommonMark
+  ([#764](https://github.com/viell-dev/slop-markdown-tools/issues/764)).
+
+- In VitePress, a list item or paragraph that a component line such as
+  `<MyComponent />` ends is left as written, as other blocks with a component
+  that mdast cannot represent are. VitePress ends the paragraph at the component
+  line, so `style/lazy-continuation` proposed indenting a lazy line below it,
+  which would move that line into the list item, and the engine refused it. The
+  list rules keep a list directly beside such a list as written, because another
+  marker would join the two
+  ([#769](https://github.com/viell-dev/slop-markdown-tools/issues/769)).
+
+- GitHub link checks and workspace indexes read definitions directly above an
+  interrupting table as visible text, including in lists and quotes, while
+  keeping formatting from hiding that text. A Setext underline line such as
+  `===` directly below the definitions keeps them, as on GitHub, and
+  `style/wrap` no longer joins it with the next line, which made GitHub show the
+  definitions as text
+  ([#732](https://github.com/viell-dev/slop-markdown-tools/issues/732)).
+
+- `links/valid` accepts a GitHub file fragment whose `user-content-` prefix is
+  not lowercase, such as `#User-Content-setup`, as GitHub's file view does, and
+  its `exactCase` option reports the lowercase spelling
+  ([#739](https://github.com/viell-dev/slop-markdown-tools/issues/739)).
+
 - `style/wrap`, `content/emphasis-spacing`, `style/line-ending` and
   `structure/heading-template` read changed text again with the configuration's
   syntax plugins, as the document is read, rather than without them
@@ -299,6 +345,21 @@ prereleases' notes there are longer than their entries here.
   [#664](https://github.com/viell-dev/slop-markdown-tools/issues/664)).
 
 ### Changed
+
+- Bare `format` on files prints a diff and exits `1` when formatting would
+  change a document. Scripts needing an exit-`0` preview should use
+  `format --diff`. `--check --diff` prints the diff and fails on changes.
+  Remaining errors still exit `1`, and operational failures take precedence with
+  exit `2`. Stdin keeps its formatted output and exit behavior
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
+
+- `lint` and `format` read stdin when `--stdin-filepath` is given without paths,
+  and reject it with paths other than `-`. Help includes examples, workspace
+  scope and exit codes; nested configuration help selects the named subcommand.
+  Mistaken `check`/`fix` commands and lint modes suggest `format`. `rules`
+  accepts `--root`; empty selections print a notice on stderr, and formatting
+  previews name `--write` as the next step
+  ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - `content/image-alt`, in `recommended`, also reports an HTML `<img>` element
   without an `alt` attribute, where renderers certainly show it. `alt=""`, which
