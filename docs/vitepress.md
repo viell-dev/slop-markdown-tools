@@ -46,25 +46,29 @@ its [`reportUnreflowed`](rules/style/wrap.md) option reports them. Ordinary
 paragraphs still reflow.
 
 Curly attributes keep their position; braces in a code span are code, not
-attributes. Containers separate blocks, including the paragraphs immediately
-above and below their edges. Front matter follows gray-matter's boundaries and
-remains opaque; an unclosed opener protects the whole document. TOML fences are
-ordinary Markdown here. Components and other renderer-only blocks are preserved;
-where mdast cannot represent a component boundary, such as a component line that
-ends a paragraph, its containing block is left as written. So is a block where
-markdown-it reads a table that mdast reads in other containers, such as
-`* a | b` above `  --|--`, a table whose first cell holds the marker rather than
-a list item. Paragraphs with inline footnotes remain opaque. Findings and edits
-in opaque areas are omitted, because mdast does not describe their full reading;
-with `reportUnreflowed: true`, `style/wrap` still reports a paragraph there that
-is too wide and that it keeps as written.
+attributes. Containers such as `::: tip` separate blocks, including the
+paragraphs directly above and below their edges. Front matter ends where
+VitePress ends it and stays as written; an opening `---` that nothing closes
+keeps the whole page as written. TOML fences (`+++`) are ordinary Markdown here.
+Components and other syntax that only VitePress renders are preserved.
+
+Some blocks are read one way by VitePress, whose renderer is markdown-it, and
+another way by the tool, whose reading follows CommonMark. Those blocks are left
+as written: a block that a component line ends, such as a paragraph directly
+above `<MyComponent />`; a block where VitePress reads a table that the tool
+reads as something else, such as `* a | b` above `  --|--`, which VitePress
+shows as a table whose first cell holds the marker; and a paragraph with an
+inline footnote. Rules report nothing and change nothing there, because the tool
+cannot tell how VitePress shows them; with `reportUnreflowed: true`,
+`style/wrap` still reports a paragraph there that is too wide.
 
 With math enabled, `$` follows VitePress's inline conditions and `$$` may
 interrupt a paragraph or close on the same line. The tool never evaluates
-MathJax or Vue. It compares a second synchronous syntax reading, including
-attributes and Vue-sensitive gaps, alongside positioned mdast. Configured [code
-formatters](configuration.md#code-formatters) can change a selected fenced body
-while that guard protects the surrounding page.
+MathJax or Vue. Before it applies an edit, it also checks that VitePress's
+reading of the page, attributes and the whitespace that Vue keeps included,
+stays the same. Configured [code formatters](configuration.md#code-formatters)
+can change a selected fenced body while that check protects the surrounding
+page.
 
 Fence aliases stay case-sensitive for `codeFormatters`. VitePress decorations
 such as `js{1,3}` and `ts:line-numbers=2` are metadata, so those blocks route as
@@ -103,8 +107,9 @@ VitePress's own heading-text and collision rules.
 includes are checked from text supplied by the workspace. Non-Markdown included
 files need text or a loader too. The Node host reads them lazily, within its
 existing workspace and symlink boundaries. Cycles remain comments. An expansion
-stops after 64 levels, 10,000 visits, or 16,777,216 UTF-16 code units.
-Unavailable text or selectors leave fragments unchecked, with a diagnostic
+that grows too deep or too large stops; the [maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/vitepress.md)
+give the limits. Unavailable text or selectors leave fragments unchecked, with a diagnostic
 explaining that the target or its included text could not be fully checked.
 
 The tool does not load route rewrites, dynamic routes, custom base-path

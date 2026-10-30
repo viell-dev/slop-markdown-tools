@@ -57,8 +57,8 @@ joined lines could open a highlight or wikilink. A multiline span with one or
 two backticks, and the following source in its inline block, stay as written:
 Live Preview resets short code at the physical newline. Earlier independent
 inline text and later paragraphs can still format. The [boundary
-protections](../../obsidian.md#boundary-protections) describe the conservative
-cases.
+protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md#boundary-protections)
+describe the conservative cases.
 
 ## Related rules
 

@@ -5,7 +5,9 @@ documents. The [README](./README.md#status) states how the project is
 maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test
 layout, documentation workflow, and pull request rules, and
 [RELEASING.md](./RELEASING.md) the release procedure; follow them and do not
-repeat them here. User and API documentation belongs in `docs/`.
+repeat them here. User and API documentation belongs in `docs/`, and the details
+that users do not need, such as lists of individual protections and internal
+limits, in the [maintainer notes](./internals/README.md).
 
 ## Repository boundary
 
@@ -63,10 +65,10 @@ the capabilities users can install; editing source files does not update them.
 
 Known couplings:
 
-- Behavior and its descriptions: the `docs/` pages, the README, `examples/` and
-  each workspace's `after/` tree, CLI help text, type declarations, and
-  `CHANGELOG.md`. The integration tests compare some of these with the code, not
-  all.
+- Behavior and its descriptions: the `docs/` pages, the `internals/` notes, the
+  README, `examples/` and each workspace's `after/` tree, CLI help text, type
+  declarations, and `CHANGELOG.md`. The integration tests compare some of these
+  with the code, not all.
 - Public descriptions and discovery: the README's opening description, feature
   and configuration lists; GitHub's About description, topics, and homepage;
   `package.json`'s description and keywords; and the documentation site's

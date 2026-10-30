@@ -243,7 +243,8 @@ below another block as text. These places are also left as written:
 - Both separators when a quote, table, or display formula connects list items.
   Display math directly below the final item stays inside it, including after a
   heading or code block; a table after those blocks also stays adjacent. See the
-  [boundary protections](../../obsidian.md#boundary-protections).
+  [boundary
+  protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md#boundary-protections).
 - Text directly above or below a fenced code block, which its views can read
   together, and a line below a table that one of its views reads as part of the
   table. The [boundary policy](../../obsidian.md#visible-boundary-refusals)

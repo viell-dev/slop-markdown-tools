@@ -1,5 +1,8 @@
 # How it works and its limits
 
+This page explains how formatting keeps a document's meaning, and lists the
+[limits](#limits): what the tool does not check or model.
+
 ## Safety model
 
 Formatting does not print a document again from its syntax tree. Each style rule
@@ -37,14 +40,9 @@ responsible for program or metadata semantics.
 
 Obsidian's structural rules also apply a general conservative [boundary
 policy](obsidian.md#visible-boundary-refusals). Held style edits produce a
-finding under their original rule and severity. Existing renderer protections
-remain; a new difference is fixed only for plausibly authored CommonMark or
-documented dialect syntax that changes visible content. Exotic generated cases
-are recorded as limits and reconsidered when a real document demonstrates their
-impact. Fixed realistic corpora and regression fixtures gate delivery;
-adversarial generation is discovery only. These checks provide evidence for
-their inputs, not a complete specification of either closed-source Obsidian
-renderer.
+finding under their original rule and severity. The comparisons with Obsidian
+show how its two views read the documents they compare, not a complete
+specification of either closed-source renderer.
 
 The comparison is only as good as the parser's reading:
 
