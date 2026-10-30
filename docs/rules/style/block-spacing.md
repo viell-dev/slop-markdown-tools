@@ -185,8 +185,8 @@ means or what a comment applies to:
 
 ## Dialect notes
 
-**On GitHub:** dollar display math and a Setext title directly below it stay
-together. They can form one native heading or continue a list or quote
+**On GitHub:** dollar display math and an underlined title directly below it
+stay together. They can form one native heading or continue a list or quote
 paragraph.
 
 **On Forgejo and Gitea:** a table directly below the text of a definition

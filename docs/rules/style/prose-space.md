@@ -39,8 +39,8 @@ whitespace significant; HTML blocks and front matter stay literal too. Renderer
 and semantic checks keep the source wherever changing spaces would change
 meaning.
 
-**Reported without a fix:** spaces in ATX and Setext headings, in every dialect,
-because changing heading text can change anchors and heading links.
+**Reported without a fix:** spaces in `#` and underlined headings, in every
+dialect, because changing heading text can change anchors and heading links.
 
 ## Dialect notes
 

@@ -34,9 +34,9 @@ Not reported:
 | `headings`  | An array of `#` headings and `*`, `+`, `?` | Unset   |
 | `matchCase` | `true` or `false`                          | `false` |
 
-- `headings`: the sequence. A heading entry is written as an ATX heading with
-  its level, such as `## Notes`. `*` matches zero or more headings of any text,
-  `+` one or more, and `?` exactly one. Unset turns the check off; `[]` requires
+- `headings`: the sequence. A heading entry is written as a `#` heading with its
+  level, such as `## Notes`. `*` matches zero or more headings of any text, `+`
+  one or more, and `?` exactly one. Unset turns the check off; `[]` requires
   that the document have no headings.
 - `matchCase`: with `true`, capitalization must match too.
 

@@ -1,6 +1,6 @@
 # `structure/unspaced-heading`
 
-Reports text that would be an ATX heading with a space after its hashes, such as
+Reports text that would be a `#` heading with a space after its hashes, such as
 `#Installation` or `##Usage##`. Every supported renderer needs blank space after
 the opening hashes, so it shows the line as paragraph text with its `#`.
 

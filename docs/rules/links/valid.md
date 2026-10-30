@@ -77,10 +77,10 @@ contains `?`, which depends on the website.
 destination; see [undefined references](../links/undefined-reference.md).
 
 File fragments follow the native Markdown reading of dollar-math source. Heading
-IDs can include dollar-delimited lines above a Setext title, and inline markup
-or HTML inside such source can supply anchors too. Duplicate numbering uses that
-complete reading after the YAML front matter choice; the formatter's math
-reading stays the same.
+IDs can include dollar-delimited lines above an underlined title, and inline
+markup or HTML inside such source can supply anchors too. Duplicate numbering
+uses that complete reading after the YAML front matter choice; the formatter's
+math reading stays the same.
 
 **In Obsidian:** links resolve as in Obsidian: a path that starts with `./` or
 `../` counts from the note; otherwise an exact path from the vault's root comes

@@ -72,6 +72,6 @@ are still not reported:
 **On GitHub:** definitions at the start of a paragraph directly interrupted by a
 table are visible text, including consecutive definitions and definitions alone
 above the table, also in lists and quotes. They do not define labels. A blank
-line before the table keeps them as definitions, as does a Setext underline
+line before the table keeps them as definitions, as does a heading underline
 line, such as `===`, directly below them, which GitHub shows as text. Forgejo,
 Gitea, and VitePress retain the definitions without that blank line.

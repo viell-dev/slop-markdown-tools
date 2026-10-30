@@ -58,9 +58,9 @@ Configuring the formatter and the linter for a large workspace takes one file.
 
 ## Edge cases and advanced usage
 
-**Details:** each physical line of ATX and Setext headings, fenced and indented
-code blocks, fence lines included, and parsed tables is measured whole, so list
-and block quote markers count toward the width.
+**Details:** each physical line of `#` and underlined headings, fenced and
+indented code blocks, fence lines included, and parsed tables is measured whole,
+so list and block quote markers count toward the width.
 
 **Not checked:** paragraphs, front matter, HTML, math, reference definitions,
 thematic breaks, and every other block. A table in a dialect without table
