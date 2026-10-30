@@ -56,6 +56,7 @@ const reference: Item[] = [
   { text: "VitePress", link: "/vitepress" },
   { text: "Library API", link: "/api" },
   { text: "Plugins", link: "/plugins" },
+  { text: "Glossary", link: "/glossary" },
 ];
 const releases: Item[] = [
   ...releaseNotes,

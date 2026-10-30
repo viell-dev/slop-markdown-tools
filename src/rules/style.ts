@@ -338,7 +338,7 @@ const styleRules: Record<string, Rule> = {
             {
               start,
               end,
-              message: "Use an ATX heading.",
+              message: "Use a `#` heading.",
               edit: {
                 start,
                 end,

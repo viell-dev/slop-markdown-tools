@@ -4,6 +4,22 @@ The `obsidian` dialect reads wikilinks, embeds, callouts, highlights, comments,
 and heading and block references, and checks links the way Obsidian resolves
 them.
 
+## Install for a vault
+
+Install mdrefine outside the vault. `npm install` puts `package.json`,
+`package-lock.json`, and a `node_modules` folder with thousands of files in the
+folder where it runs, and inside a vault they become part of the vault. Install
+it globally, or in a folder of its own, and point `--root` at the vault:
+
+```sh
+npm install --global mdrefine@0.6.0
+mdrefine lint --root "/path/to/vault"
+```
+
+mdrefine itself never reads a folder named `node_modules`. If you install it
+inside the vault anyway, list `node_modules/` among Obsidian's excluded files
+(Settings, Files and links) and in the vault's `.gitignore` if it has one.
+
 ## Configure the vault
 
 Create `mdrefine.config.jsonc` at the vault's root, next to `.obsidian/`:
@@ -63,8 +79,9 @@ cases are unusual source forms:
   backticks that nothing closes;
 - blocks with no blank line between them, such as a paragraph directly above a
   list, block quote, table, HTML block, fence, or definition;
-- lazy continuation lines, which continue a quote or list item without its `>`
-  or indentation, and a tab after a list or quote marker;
+- [lazy continuation lines](glossary.md#lazy-continuation-line), which continue
+  a quote or list item without its `>` or indentation, and a tab after a list or
+  quote marker;
 - HTML blocks and comments that run on into the blocks around them;
 - `=` or `-` underlines that one view reads as a heading and the other as text;
 - tables that one view reads otherwise, such as rows directly below a list, a

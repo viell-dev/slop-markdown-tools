@@ -13,6 +13,16 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Changed
 
+- A [glossary](https://viell-dev.github.io/slop-markdown-tools/glossary.html)
+  defines the terms the pages use, and pages link it. Rule pages and the
+  `style/heading` message say "`#` heading" and "underlined heading" instead of
+  ATX and Setext. The pages name markdownlint and Prettier instead of calling
+  them competitors, so the fallback's sections are now "Fallback to markdownlint
+  and Prettier" and "Fallback notices", and so does the notice about their
+  inline comments. The README and the home page say that the package is
+  `mdrefine` and the repository keeps the original name
+  ([#817](https://github.com/viell-dev/slop-markdown-tools/issues/817)).
+
 - The site has release notes, starting with [What's new in
   0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html),
   in a menu named after the documented version in the top bar. This changelog's
@@ -33,6 +43,23 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   in the repository. The command line page gathers its file access and write
   safety details at its end
   ([#812](https://github.com/viell-dev/slop-markdown-tools/issues/812)).
+
+- Reference pages are easier to scan: the command line page explains the
+  workspace root once and marks the options that only `format` takes, the
+  configuration page numbers the search for a configuration file and patches one
+  rule of `recommended` in its `ruleUpdates` example, the integration guide
+  lists which `.prettierignore` entries leave Markdown to mdrefine, the library
+  page has a table of the conversion exports, and the VitePress page explains
+  `srcDir` with the usual layout
+  ([#816](https://github.com/viell-dev/slop-markdown-tools/issues/816)).
+
+- Getting started covers running mdrefine without installing it, a global
+  installation, pnpm, Yarn, and Bun, and what `npm install` does in a folder
+  without `package.json`. The Obsidian page says how to install for a vault, the
+  integration guide has hooks for the pre-commit framework and lefthook, and the
+  configuration page warns that outside a repository the search for a
+  configuration reaches parent folders such as the home directory
+  ([#815](https://github.com/viell-dev/slop-markdown-tools/issues/815)).
 
 - The documentation has an
   [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)

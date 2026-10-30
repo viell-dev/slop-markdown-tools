@@ -36,8 +36,8 @@ text. The rule is opt-in because tabs can be intentional, particularly in code.
 - Code, which is literal content: code blocks and spans, math, HTML, and front
   matter.
 - Tables and link syntax.
-- ATX and Setext heading tabs, in every dialect, to keep heading anchors and
-  heading links intact.
+- Tabs in `#` and underlined headings, in every dialect, to keep heading anchors
+  and heading links intact.
 
 **Left as written:** prose tabs in a block that holds inline HTML, which can
 make whitespace significant. Renderer protections can also suppress findings and

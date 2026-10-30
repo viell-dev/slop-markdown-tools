@@ -15,6 +15,43 @@ from downloading a package when the project has none; the examples below leave
 it out. The exact version lets you choose when a release that formats
 differently reaches your documents; see [versions](versions.md).
 
+The commands work the same in PowerShell and cmd, apart from reading a file
+through stdin with `<`, which the [command line](cli.md#read-from-stdin) page
+covers.
+
+### Without a Node.js project
+
+`npm install` in a folder without `package.json` creates `package.json`,
+`package-lock.json`, and a `node_modules` folder there. In a repository of
+another language, add `node_modules/` to its `.gitignore`, or use one of these
+instead:
+
+- Run it once, without installing it in the folder:
+
+  ```sh
+  npx mdrefine@0.6.0 lint
+  ```
+
+- Install it once for every folder, and run `mdrefine` without `npx`:
+
+  ```sh
+  npm install --global mdrefine@0.6.0
+  mdrefine lint
+  ```
+
+For an Obsidian vault, see [install for a
+vault](obsidian.md#install-for-a-vault).
+
+### Other package managers
+
+| Package manager | Install                                           | Run                  |
+| --------------- | ------------------------------------------------- | -------------------- |
+| pnpm            | `pnpm add --save-dev --save-exact mdrefine@0.6.0` | `pnpm exec mdrefine` |
+| Yarn            | `yarn add --dev --exact mdrefine@0.6.0`           | `yarn mdrefine`      |
+| Bun             | `bun add --dev --exact mdrefine@0.6.0`            | `bunx mdrefine`      |
+
+Use the command in the "Run" column where the pages say `npx mdrefine`.
+
 ## Choose where your documents render
 
 Create `mdrefine.config.jsonc` at the root of your documents:
@@ -113,11 +150,11 @@ such as a broken link, which remain errors after `--write`.
 Without a configuration file, documents are read as GitHub Markdown, or as
 Obsidian notes inside a vault. The rules then come from a markdownlint or
 Prettier configuration in the workspace, if there is one that mdrefine can read:
-it [converts](configuration.md#competitor-configuration-fallback) their settings
-and says so on stderr. Pass `--no-competitor-config` to leave them out. Without
-such a configuration, the `recommended` rules apply. A configuration file is
-still worth creating: it enables the rules for your renderer and makes the
-dialect explicit. `npx mdrefine config convert --write` creates one from the
+it [converts](configuration.md#fallback-to-markdownlint-and-prettier) their
+settings and says so on stderr. Pass `--no-competitor-config` to leave them out.
+Without such a configuration, the `recommended` rules apply. A configuration
+file is still worth creating: it enables the rules for your renderer and makes
+the dialect explicit. `npx mdrefine config convert --write` creates one from the
 markdownlint or Prettier settings.
 
 ## Change a rule
@@ -147,3 +184,4 @@ This wraps at 100 columns and leaves emphasis markers as they are.
   Prettier or markdownlint.
 - [Obsidian vaults](obsidian.md) and [examples](examples.md) of documents before
   and after formatting.
+- [Glossary](glossary.md): the terms these pages use.

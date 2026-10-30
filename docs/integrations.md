@@ -57,6 +57,37 @@ skips, such as one that the configuration's `ignore` patterns match.
 starts with `-` from being read as an option. This hook checks each file as it
 is on disk, including changes that are not staged.
 
+With the [pre-commit](https://pre-commit.com/) framework, a hook in the
+repository's `.pre-commit-config.yaml` installs mdrefine in an environment of
+its own, with the computer's Node.js, and passes it the staged Markdown files;
+it needs no `package.json`:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: mdrefine
+        name: mdrefine
+        language: node
+        additional_dependencies: ["mdrefine@0.6.0"]
+        entry: mdrefine lint --max-warnings 0 --no-warn-ignored
+        types: [markdown]
+```
+
+With [lefthook](https://lefthook.dev/), installed in the project next to
+mdrefine, add to `lefthook.yml`:
+
+```yaml
+pre-commit:
+  commands:
+    mdrefine:
+      glob: "*.{md,markdown}"
+      run: npx --no-install mdrefine lint --max-warnings 0 --no-warn-ignored -- {staged_files}
+```
+
+Both skip the command when the commit changes no Markdown file, and lefthook's
+glob also matches files in subdirectories.
+
 ## Editors
 
 There is no editor extension or language server. An editor that can format a
@@ -90,19 +121,22 @@ Leave Markdown to mdrefine in this order:
 
 The order matters. Without an mdrefine configuration, mdrefine falls back to the
 Prettier configuration, but not once `.prettierignore` excludes all Markdown:
-Prettier then formats no Markdown in the workspace, so neither its options nor
-its ignore patterns describe your documents, and `config convert` and the
-fallback leave the Prettier configuration out and say so. This applies only
-where it can be established: one entry by itself must exclude every `.md` file,
-whatever its name and directory, evaluated as Prettier evaluates it, as a
-gitignore pattern without regard to letter case. A file with a negated (`!`)
-entry or a character class never qualifies, because its exceptions cannot be
-proved not to leave Prettier some Markdown, so it keeps the Prettier
-configuration in use. `*.md`, `**/*.md`, and `*` exclude all Markdown, with or
-without an entry for `.markdown`, because an entry for `.md` files alone is the
-usual way to leave Markdown to another tool. `docs/*.md`, `**/*.md` with
-`!README.md`, and even `**/*.md` with `!docs/`, which re-includes no document,
-do not.
+Prettier then formats no Markdown in the workspace, so its options do not
+describe your documents, and `config convert` and the fallback leave the
+Prettier configuration out and say so. A `.prettierignore` counts as excluding
+all Markdown only when that can be established, reading each entry as Prettier
+does, as a gitignore pattern without regard to letter case:
+
+- It counts when one entry by itself excludes every `.md` file, whatever its
+  name and directory, such as `*.md`, `**/*.md`, `*.MD`, or `*`. An entry for
+  `.markdown` is not needed: an entry for `.md` files alone is the usual way to
+  leave Markdown to another tool.
+- It does not count with only narrower entries, such as `docs/*.md`, or `/*.md`,
+  which leaves the Markdown in subdirectories to Prettier.
+- It never counts with a negated (`!`) entry or a character class such as
+  `*.[mM][dD]`, because then it cannot be proved to leave Prettier no Markdown:
+  `**/*.md` with `!README.md` does not count, nor even `**/*.md` with `!docs/`,
+  which re-includes no document.
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
 disagree, such as markdownlint's emphasis style (MD049) and `style/emphasis`.
@@ -132,7 +166,7 @@ Without an mdrefine configuration, the same conversion runs in memory. Use
 its sources and converted settings. The search stops at the same repository or
 vault boundary as the ordinary configuration search. When none of the files
 found can be used, the `recommended` preset applies, as without them; the
-[notices](cli.md#competitor-fallback-notices) on stderr name each such file.
+[notices](cli.md#fallback-notices) on stderr name each such file.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.
@@ -169,7 +203,7 @@ exceptions, which can leave nothing to check. `.markdownlintignore`, the ignore
 file of markdownlint-cli and editor extensions, is not converted: beside a
 markdownlint configuration in use, the documents it excludes are checked; add
 its patterns to `ignore` in an mdrefine configuration. The
-[notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
+[notices](cli.md#fallback-notices) and `conversion.unused` say so.
 
 Patterns convert within the subset of glob syntax that each source documents. A
 pattern outside it, such as a character class or a negated `.prettierignore`
@@ -180,10 +214,10 @@ patterns match case exactly; conversion says so once per `.prettierignore`. The
 notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
 list the exact subsets.
 
-During the competitor fallback, markdownlint inline comments and Prettier ignore
-comments and `requirePragma` apply. With an mdrefine configuration, including
-one that `config convert` writes, they have no effect: migrate them to
-mdrefine's own [suppression comments](configuration.md#suppression-comments).
+During the fallback, markdownlint inline comments and Prettier ignore comments
+and `requirePragma` apply. With an mdrefine configuration, including one that
+`config convert` writes, they have no effect: migrate them to mdrefine's own
+[suppression comments](configuration.md#suppression-comments).
 
 markdownlint's `disable`, `enable`, `disable-line`, `disable-next-line`,
 `disable-file`, and `enable-file` select enabled markdownlint checks by ID,

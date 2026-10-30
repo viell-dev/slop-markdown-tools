@@ -104,10 +104,10 @@ Known couplings:
   identity and the separate explicit latest route as CONTRIBUTING describes.
   These same-run workflow results are not cross-run report provenance.
 - Versions and requirements: `package.json`, the lockfile, the installation
-  commands in the README and `docs/quick-start.md`, the CI matrix in `ci.yml`
-  and CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version
-  also sets the `node-version` of the CI job labeled `22` and the major version
-  of `@types/node`, whose major updates `.github/dependabot.yml` ignores. The
+  commands in the README and the `docs/` pages, the CI matrix in `ci.yml` and
+  CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version also
+  sets the `node-version` of the CI job labeled `22` and the major version of
+  `@types/node`, whose major updates `.github/dependabot.yml` ignores. The
   development version, in `.nvmrc`, is also the `node-version` of the other
   workflows, the base image of `scripts/obsidian/Dockerfile`, and CONTRIBUTING's
   set-up section. The workflows name it themselves, because the Pages workflow

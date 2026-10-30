@@ -365,9 +365,12 @@ describe("documentation site", () => {
     for (const link of sidebar) expect(pages).toContain(link);
   });
   it("gives installation commands for the current version", () => {
-    for (const file of ["README.md", "docs/quick-start.md"]) {
+    // Release notes name the versions they describe; the other pages install the current one.
+    const files = [...pages.filter((page) => !page.startsWith("docs/release-notes/")), "README.md"];
+    for (const file of files) {
       const versions = [...read(file).matchAll(/mdrefine@(\d[\w.-]*)/g)].map((match) => match[1]);
-      expect(versions.length, file).toBeGreaterThan(0);
+      if (["README.md", "docs/quick-start.md"].includes(file))
+        expect(versions.length, file).toBeGreaterThan(0);
       for (const version of versions) expect(version, file).toBe(manifest.version);
     }
   });
@@ -650,7 +653,7 @@ describe("competitor fallback (#788)", () => {
     const quickStart = prose("docs/quick-start.md");
     expect(quickStart).not.toContain("Without a configuration file, the `recommended` rules apply");
     expect(quickStart).toContain("--no-competitor-config");
-    expect(quickStart).toContain("configuration.md#competitor-configuration-fallback");
+    expect(quickStart).toContain("configuration.md#fallback-to-markdownlint-and-prettier");
     expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
   });
   it("tells those upgrading how to keep the defaults", () => {
@@ -664,9 +667,7 @@ describe("competitor fallback (#788)", () => {
       run(repository, [...args, "--help"]).stdout.includes("--quiet");
     expect(takes(["lint"]) && takes(["format"])).toBe(true);
     expect(takes(["config", "explain"])).toBe(false);
-    const notices = prose("docs/cli.md")
-      .split("### Competitor fallback notices")[1]!
-      .split(" ### ")[0]!;
+    const notices = prose("docs/cli.md").split("### Fallback notices")[1]!.split(" ### ")[0]!;
     const sentences = notices.split(/(?<=\.) /).filter((text) => text.includes("`--quiet`"));
     expect(sentences.length).toBeGreaterThan(0);
     for (const sentence of sentences) {

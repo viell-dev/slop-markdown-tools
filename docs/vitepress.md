@@ -31,6 +31,19 @@ set them to match the site rather than to choose a formatting style.
 | `srcDir`              | Inferred      | Source directory relative to the workspace root.                        |
 | `anchor`              | `"vitepress"` | The VitePress slugger, or `"github"` for a site using `github-slugger`. |
 
+In the usual layout, a `docs/` folder holds the site's `.vitepress/` and its
+pages, and the configuration file sits at the repository's root. Root-relative
+links such as `/guide/install` then count from `docs/` without `srcDir`. When
+the site's own configuration sets a `srcDir`, such as `srcDir: "src"`, give the
+same folder from the workspace root:
+
+```jsonc
+{
+  "extends": ["recommended", "vitepress"],
+  "vitepress": { "srcDir": "docs/src" },
+}
+```
+
 `raw`, `v-pre`, and `code-group` are reserved built-in container names. An array
 of custom names replaces the inherited array. The tool does not infer these
 settings from VitePress configuration. Other renderer plugins, custom attribute
@@ -52,15 +65,16 @@ VitePress ends it and stays as written; an opening `---` that nothing closes
 keeps the whole page as written. TOML fences (`+++`) are ordinary Markdown here.
 Components and other syntax that only VitePress renders are preserved.
 
-Some blocks are read one way by VitePress, whose renderer is markdown-it, and
-another way by the tool, whose reading follows CommonMark. Those blocks are left
-as written: a block that a component line ends, such as a paragraph directly
-above `<MyComponent />`; a block where VitePress reads a table that the tool
-reads as something else, such as `* a | b` above `  --|--`, which VitePress
-shows as a table whose first cell holds the marker; and a paragraph with an
-inline footnote. Rules report nothing and change nothing there, because the tool
-cannot tell how VitePress shows them; with `reportUnreflowed: true`,
-`style/wrap` still reports a paragraph there that is too wide.
+Some blocks are read one way by VitePress, whose renderer is
+[markdown-it](glossary.md#parsers-and-syntax-trees), and another way by the
+tool, whose reading follows CommonMark. Those blocks are left as written: a
+block that a component line ends, such as a paragraph directly above
+`<MyComponent />`; a block where VitePress reads a table that the tool reads as
+something else, such as `* a | b` above `  --|--`, which VitePress shows as a
+table whose first cell holds the marker; and a paragraph with an inline
+footnote. Rules report nothing and change nothing there, because the tool cannot
+tell how VitePress shows them; with `reportUnreflowed: true`, `style/wrap` still
+reports a paragraph there that is too wide.
 
 With math enabled, `$` follows VitePress's inline conditions and `$$` may
 interrupt a paragraph or close on the same line. The tool never evaluates

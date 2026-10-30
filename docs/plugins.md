@@ -61,10 +61,17 @@ an `import` written in the configuration file, such as `sample-plugin`,
 `import` or `default` condition of its `exports`, or its `main` file. When the
 import finds no entry, Node.js's CommonJS rules are tried, so a package that
 declares only a `require` condition loads as well; a package with both is loaded
-through `import`. The lookup applies the conditions that Node.js applies: its
-defaults, those added with `--conditions` or `-C`, and without `node-addons`
-under `--no-addons`, from Node.js's command line or `NODE_OPTIONS`. Options set
-in other ways, such as a Node.js configuration file, are not seen.
+through `import`.
+
+<details>
+<summary>Node.js options that change the lookup</summary>
+
+The lookup applies the conditions that Node.js applies: its defaults, those
+added with `--conditions` or `-C`, and without `node-addons` under
+`--no-addons`, from Node.js's command line or `NODE_OPTIONS`. Options set in
+other ways, such as a Node.js configuration file, are not seen.
+
+</details>
 
 A plugin that cannot be loaded stops the command with exit code `2` and the
 message `Cannot load plugin "NAME" named in FILE: REASON`, where `REASON` is

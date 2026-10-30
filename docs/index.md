@@ -36,3 +36,6 @@ their checks with its rule here or the issue that tracks it.
 
 [Get started](quick-start.md), browse the [rules](rules.md), or see
 [examples](examples.md) of documents before and after formatting.
+
+The package and its command are `mdrefine`; the repository and this site keep
+the project's original name, `slop-markdown-tools`.

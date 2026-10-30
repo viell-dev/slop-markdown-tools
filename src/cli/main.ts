@@ -634,7 +634,7 @@ configCommand
     ])
       process.stderr.write(`mdrefine: ${message}\n`);
     process.stderr.write(
-      "mdrefine: competitor inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
+      "mdrefine: markdownlint and Prettier inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
     );
     if (flags.write) process.stderr.write(`mdrefine: created ${shown(target)}\n`);
   });
