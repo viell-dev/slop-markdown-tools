@@ -8,6 +8,19 @@ release's section is also its [GitHub
 release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes; the
 prereleases' notes there are longer than their entries here.
 
+## Unreleased
+
+### Changed
+
+- The documentation has an
+  [Upgrading](https://viell-dev.github.io/slop-markdown-tools/upgrading.html)
+  page with the steps for each release that needs them: the markdownlint and
+  Prettier fallback and the exit code of bare `format` in 0.6.0, and the
+  `mdtools` names removed in 0.5.0. Getting started, the command line,
+  configuration, and library pages no longer carry migration notes, and the JSON
+  report's example shows the current version
+  ([#810](https://github.com/viell-dev/slop-markdown-tools/issues/810)).
+
 ## 0.6.0 - 2026-10-30
 
 ### Changed

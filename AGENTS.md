@@ -360,7 +360,7 @@ only and remove superseded transition notes.
   `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
   `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
   comments use `mdrefine-*`. The legacy 0.4.x compatibility forms were removed
-  in 0.5.0; the changelog and migration guide retain that history.
+  in 0.5.0; the changelog and the upgrading page retain that history.
 - `src/syntax/` parses with micromark and mdast through the generated internal
   adapter and holds the Obsidian extensions; `src/config/` resolves presets,
   schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the

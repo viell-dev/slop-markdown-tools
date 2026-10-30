@@ -51,14 +51,6 @@ the [conversion behavior and
 comparison](integrations.md#coming-from-prettier-or-markdownlint) for
 precedence, formats, and remaining coverage gaps.
 
-### Earlier names
-
-Version 0.5.0 no longer discovers `mdtools.config.jsonc`, `.json`, `.mjs`, `.js`
-or `.cjs`, and the `mdtools-disable`, `mdtools-disable-next-line` and
-`mdtools-enable` comments no longer affect findings. Rename files and replace
-comment prefixes before upgrading from 0.4.x; see the [migration
-steps](cli.md#earlier-names). Formatting does not migrate them.
-
 ### File contents
 
 JSONC allows comments and trailing commas. A JSON or JSONC file may start with a

@@ -77,8 +77,7 @@ const result = format(files["Note.md"], { ...options, workspace });
 `resolveConfig(options)` returns the settings in effect for a document:
 `dialect`, `rules`, `ignore`, `resolve`, `codeFormatters`, and `vitepress`. It
 takes the `path`, `config`, `plugins`, and `defaultDialect` of `lint` and
-`format`, so their options serve as they are. The prereleases took these four as
-separate arguments; such a call throws an error that says so.
+`format`, so their options serve as they are.
 
 ## Workspaces
 
