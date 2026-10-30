@@ -35,7 +35,12 @@ describe("CLI defaults and discovery (#788)", () => {
     expect(written.stdout).toBe("");
     expect(written.stderr).not.toContain("Use --write");
     expect(await readFile(path.join(root, "note.md"), "utf8")).toBe("A _note_.\n");
-    expect(run(root, ["format"]).status).toBe(0);
+    // With nothing left to change, there is no next step to suggest.
+    for (const options of [[], ["--diff"]]) {
+      const clean = run(root, ["format", ...options]);
+      expect(clean.status).toBe(0);
+      expect(clean.stderr).toBe("1 file(s) processed; 0 would change.\n");
+    }
   });
   it("keeps remaining errors failing in every formatting mode", async () => {
     const root = await fixture({ "note.md": "[broken](missing.md)\n" });
