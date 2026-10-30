@@ -230,6 +230,14 @@ describe("competitor conversion (#669)", () => {
     expect(result.omitted.join("\n")).toContain("paragraph lines are not checked");
     expect(result.suggestions.join("\n")).toContain("width 97");
     expect(result.config.rules?.["style/wrap"]).toBeUndefined();
+    // A width that is not a number names no width rather than "NaN".
+    for (const lineLength of ["wide", -1, 2.5]) {
+      const suggestions = convertConfig({
+        markdownlint: { MD013: { line_length: lineLength } },
+      }).suggestions.join("\n");
+      expect(suggestions).toContain("Consider style/wrap to reflow paragraph lines.");
+      expect(suggestions).not.toContain("NaN");
+    }
   });
   it("maps MD009 code blocks and explains strict and MD031's safety limit without closed issues", () => {
     const result = convertConfig({

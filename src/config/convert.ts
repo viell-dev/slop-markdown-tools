@@ -720,8 +720,13 @@ export function convertConfig(input: {
         report.omitted.push(
           "MD013: paragraph lines are not checked; content/line-length checks headings, code and tables only.",
         );
+        // A width that is not a usable number, such as "wide", is reported as
+        // outside the range above; the suggestion then names no width.
+        const width = Number(options.lineLength ?? 80);
         report.suggestions.push(
-          `Consider style/wrap with width ${Number(options.lineLength ?? 80)} to reflow paragraph lines.`,
+          Number.isInteger(width) && width > 0
+            ? `Consider style/wrap with width ${width} to reflow paragraph lines.`
+            : "Consider style/wrap to reflow paragraph lines.",
         );
       }
       if (row.source === "MD007" && input.prettier) {
