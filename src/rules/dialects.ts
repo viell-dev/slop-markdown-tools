@@ -11,8 +11,8 @@ const githubAlerts = new Set<Dialect>(["github", "forgejo", "gitea", "vitepress"
 function calloutRule(obsidian: boolean): Rule {
   return {
     description: obsidian
-      ? "Use lowercase Obsidian callout types."
-      : "Use uppercase GitHub alert types.",
+      ? "Writes Obsidian callout types in lowercase."
+      : "Writes GitHub alert types in capitals, as in `[!NOTE]`.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({}),
@@ -69,7 +69,7 @@ export const dialectRules: Record<string, Rule> = {
   "github/alert-marker": calloutRule(false),
   "obsidian/callout-marker": calloutRule(true),
   "github/task-marker": {
-    description: "Use lowercase x in completed task markers.",
+    description: "Writes the mark of a completed task as a lowercase `x`.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({}),
@@ -91,7 +91,7 @@ export const dialectRules: Record<string, Rule> = {
     },
   },
   "obsidian/block-reference": {
-    description: "Report duplicate block identifiers.",
+    description: "Reports block identifiers that a note uses more than once.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -114,7 +114,7 @@ export const dialectRules: Record<string, Rule> = {
   },
   "forgejo/heading-id": {
     description:
-      "Report heading attribute ids that are not text, which Forgejo and Gitea before 1.26 cannot render.",
+      "Reports heading attributes whose `id` is not text, which can stop Forgejo and Gitea from rendering the document.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -150,7 +150,8 @@ export const dialectRules: Record<string, Rule> = {
     },
   },
   "obsidian/strict-line-breaks": {
-    description: "Require verified soft-line-break behavior before reflowing an Obsidian document.",
+    description:
+      'Reports notes that are not wrapped because Obsidian\'s "Strict line breaks" setting is not known to be on.',
     kind: "problem",
     schema: optionsSchema({}),
     check({ document, workspace }) {

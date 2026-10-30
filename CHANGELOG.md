@@ -34,6 +34,23 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   report's example shows the current version
   ([#810](https://github.com/viell-dev/slop-markdown-tools/issues/810)).
 
+- The rules reference has one page per rule, at `rules/<category>/<name>.html`.
+  Each page opens with what the rule does, its facts, an example, and its
+  options; edge cases, dialect notes, and related rules follow under their own
+  headings. The index lists the rules by category in plain words, and a link to
+  a rule's section of the former single page, such as `rules.html#stylewrap`,
+  continues to the rule's page
+  ([#811](https://github.com/viell-dev/slop-markdown-tools/issues/811)).
+
+- The built-in rules' descriptions, which `mdrefine rules` prints, are the
+  sentences of the rules index, in plain words. `mdrefine rules` lists the rules
+  sorted by ID, plugin rules among them, also with `--json`. Without a command,
+  `mdrefine` follows its help with
+  `mdrefine: no command given; try mdrefine lint`, and `mdrefine config` alone
+  names its commands. `format --help` describes `--write` as writing the
+  formatting changes to the files
+  ([#819](https://github.com/viell-dev/slop-markdown-tools/issues/819)).
+
 ## 0.6.0 - 2026-10-30
 
 [What's new in

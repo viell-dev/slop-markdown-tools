@@ -466,7 +466,7 @@ function comparableText(text: string): string {
 
 export const linkRules: Record<string, Rule> = {
   "links/valid": {
-    description: "Check local link destinations and dialect-specific heading/block references.",
+    description: "Reports local links and fragments whose target does not exist.",
     kind: "problem",
     schema: optionsSchema({
       ignoredFragments: {
@@ -556,7 +556,8 @@ export const linkRules: Record<string, Rule> = {
     },
   },
   "links/path": {
-    description: "Rewrite verified local destinations using the configured path and bracket style.",
+    description:
+      "Rewrites local link destinations to the configured path style, keeping their targets.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({
@@ -726,7 +727,7 @@ export const linkRules: Record<string, Rule> = {
     },
   },
   "links/notation": {
-    description: "Convert plain-label Obsidian links between Markdown and wikilink notation.",
+    description: "Converts Obsidian links between Markdown and wikilink notation.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({ style: { enum: ["markdown", "wiki"] } }),
@@ -781,7 +782,7 @@ export const linkRules: Record<string, Rule> = {
   },
   "links/undefined-reference": {
     description:
-      "Report full, collapsed, footnote, and optionally shortcut references whose label has no definition, which show as plain text.",
+      "Reports references whose label has no definition, which renderers show as plain text.",
     kind: "problem",
     schema: optionsSchema({
       shortcutSyntax: {
@@ -829,7 +830,7 @@ export const linkRules: Record<string, Rule> = {
     },
   },
   "links/unused-definition": {
-    description: "Report link and footnote definitions that no reference uses.",
+    description: "Reports link and footnote definitions that no reference uses.",
     kind: "problem",
     schema: optionsSchema({ ignoredDefinitions }),
     check({ document, options }) {
@@ -876,7 +877,7 @@ export const linkRules: Record<string, Rule> = {
     },
   },
   "links/empty": {
-    description: "Report links and images whose destination is empty or only #.",
+    description: "Reports links and images whose destination is empty or only `#`.",
     kind: "problem",
     schema: optionsSchema({ ignoredDefinitions }),
     check({ document, options }) {
@@ -913,7 +914,7 @@ export const linkRules: Record<string, Rule> = {
     },
   },
   "links/descriptive-text": {
-    description: "Report links whose whole text, such as here, does not say where they lead.",
+    description: 'Reports links whose whole text, such as "here", does not say where they lead.',
     kind: "problem",
     schema: optionsSchema({
       prohibitedTexts: {

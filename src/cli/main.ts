@@ -529,7 +529,7 @@ common(
   .description("Format documents: check with a diff (default), list changes, or write")
   .option("--check", "Fail if formatting changes would be needed, and name the files")
   .option("--diff", "Preview the diff; changes alone exit 0 (with --check, exit 1)")
-  .option("--write", "Write validated formatting changes")
+  .option("--write", "Write the formatting changes to the files")
   .action((inputs: string[], flags: Flags) => run("format", inputs, flags));
 // The options belong to `config`, which reads them before or after `explain`;
 // `explain` repeats them so that its help lists them.
@@ -653,11 +653,10 @@ program
       flags.competitorConfig,
     );
     const { plugins } = loaded;
-    const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
-      id,
-      kind: rule.kind,
-      description: rule.description,
-    }));
+    // Sorted by ID, as the rules reference lists them, plugin rules among the built-in ones.
+    const rules = Object.entries(ruleRegistry(plugins))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([id, rule]) => ({ id, kind: rule.kind, description: rule.description }));
     if (flags.json) process.stdout.write(JSON.stringify({ rules }, null, 2) + "\n");
     else
       for (const rule of rules)
@@ -728,8 +727,8 @@ for (const command of [...program.commands, ...configCommand.commands]) {
   const footer = footers[command.name()];
   if (footer) command.addHelpText("after", footer);
 }
+const args = process.argv.slice(2);
 try {
-  const args = process.argv.slice(2);
   if (args[0] === "check" || args[0] === "fix")
     throw new Error(
       `Unknown command '${args[0]}'; use 'mdrefine format --${args[0] === "check" ? "check" : "write"}' instead.`,
@@ -748,8 +747,14 @@ try {
   // Commander has printed the help, the version, or what is wrong with the
   // command line. Help and the version succeed; a usage error ends with code 2,
   // as in ESLint and Prettier, so that it does not pass for findings.
-  if (error instanceof CommanderError) process.exitCode = error.exitCode === 0 ? 0 : 2;
-  else {
+  if (error instanceof CommanderError) {
+    process.exitCode = error.exitCode === 0 ? 0 : 2;
+    // The help alone can read as a fault in the setup; say what was missing.
+    if (error.code === "commander.help" && !args.length)
+      process.stderr.write("mdrefine: no command given; try mdrefine lint\n");
+    else if (error.code === "commander.help" && args.length === 1 && args[0] === "config")
+      process.stderr.write("mdrefine: config needs a command: explain or convert\n");
+  } else {
     // A rule setting that cannot be used is found while a document is processed.
     const where = configurationFault(error) ? `Invalid configuration ${configuration!.name}: ` : "";
     process.stderr.write(

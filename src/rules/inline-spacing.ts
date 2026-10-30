@@ -275,7 +275,8 @@ const ends = (start: boolean, end: boolean) =>
 
 export const spacingRules: Record<string, Rule> = {
   "content/emphasis-spacing": {
-    description: "Report spaces just inside emphasis or strong markers, which then show as text.",
+    description:
+      "Reports spaces just inside emphasis markers, which make renderers show the markers as text.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -381,7 +382,8 @@ export const spacingRules: Record<string, Rule> = {
     },
   },
   "content/inline-code-spacing": {
-    description: "Report blank space at the ends of code spans that renderers show as code.",
+    description:
+      "Reports spaces at the ends of code spans that renderers show as part of the code.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -422,7 +424,7 @@ export const spacingRules: Record<string, Rule> = {
     },
   },
   "links/text-spacing": {
-    description: "Report blank space at the ends of link text, which becomes part of the link.",
+    description: "Reports spaces at the ends of link text, which become part of the link.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {

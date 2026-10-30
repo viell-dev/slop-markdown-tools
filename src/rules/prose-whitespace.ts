@@ -61,7 +61,7 @@ function headings(document: Document): Range[] {
 }
 
 export const proseSpace: Rule = {
-  description: "Collapse repeated prose spaces without moving line breaks.",
+  description: "Collapses repeated spaces between words without moving line breaks.",
   kind: "style",
   phase: "inline",
   schema: optionsSchema({}),
@@ -112,7 +112,7 @@ export const proseSpace: Rule = {
 };
 
 export const noTabs: Rule = {
-  description: "Report tabs and replace them where whitespace is not literal content.",
+  description: "Reports tabs, and replaces those in prose with spaces.",
   kind: "style",
   phase: "inline",
   schema: optionsSchema({

@@ -61,7 +61,7 @@ const barePattern =
 
 export const linkStyleRules: Record<string, Rule> = {
   "links/reversed": {
-    description: "Report likely reversed Markdown links without turning text into a link.",
+    description: "Reports likely reversed links, such as `(text)[https://example.com]`.",
     kind: "problem",
     schema: false,
     check({ document }) {
@@ -111,7 +111,7 @@ export const linkStyleRules: Record<string, Rule> = {
     },
   },
   "links/bare-url": {
-    description: "Report bare URLs and email addresses; bracket only equivalent literal links.",
+    description: "Writes bare URLs and email addresses as autolinks, in angle brackets.",
     kind: "style",
     phase: "inline",
     schema: false,
@@ -176,7 +176,7 @@ export const linkStyleRules: Record<string, Rule> = {
     },
   },
   "links/allowed-notation": {
-    description: "Restrict Markdown link and image notation without changing their meaning.",
+    description: "Reports the link and image forms that the options disallow.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema(
