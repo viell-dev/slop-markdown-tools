@@ -10,7 +10,7 @@ The command is `mdrefine`; with the package installed in a project, run it as
 | `lint [paths…]`         | Reports the findings of the enabled rules. Never writes.                                                       |
 | `format [paths…]`       | Prints a diff and fails on changes; lists changes with `--check`, or writes with `--write`.                    |
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
-| `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it exclusively.                      |
+| `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it, never replacing one.             |
 | `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
@@ -44,7 +44,7 @@ with either.
 | `--root <directory>`      | `lint`, `format` | The workspace root; see [the workspace root](#the-workspace-root).                                                                                                |
 | `--no-competitor-config`  | `lint`, `format` | Do not use markdownlint or Prettier settings when there is no mdrefine configuration; see the [fallback](configuration.md#fallback-to-markdownlint-and-prettier). |
 | `--config <file>`         | `lint`, `format` | Use this configuration file instead of searching for one.                                                                                                         |
-| `--dialect <name>`        | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                       |
+| `--dialect <dialect>`     | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                       |
 | `--exclude <path>`        | `lint`, `format` | Leave out a file or a directory. Repeat it for more.                                                                                                              |
 | `--json`                  | `lint`, `format` | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                  |
 | `--quiet`                 | `lint`, `format` | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                              |
@@ -157,11 +157,12 @@ nothing and `format -` prints the document unchanged, both with the
 `Skipped ignored input` warning, which `--no-warn-ignored` leaves out. A nested
 repository is no such rule: a path in one is read as that repository's document.
 `format -` prints the formatted document on stdout, or the diff with `--diff`,
-or nothing with `--check` alone, while `--check --diff` prints the diff and
-fails on changes; it cannot be combined with `--write`. `lint -` prints its
-findings. Neither prints a summary line. Stdin must be [UTF-8
-text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
-anything else stops the command with exit code `2` and a message such as
+or nothing with `--check` alone, which still exits `1` when the document would
+change, while `--check --diff` prints the diff and fails on changes; it cannot
+be combined with `--write`. `lint -` prints its findings. Neither prints a
+summary line. Stdin must be [UTF-8 text](#files-that-cannot-be-read-or-written),
+with or without a byte order mark; anything else stops the command with exit
+code `2` and a message such as
 `mdrefine: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
 
 The redirection above, in a POSIX shell or in `cmd`, passes the bytes unchanged.
@@ -187,8 +188,9 @@ rest of the output is dropped, and the exit code is the one that the run would
 have had. `format --check` names each document that would change, one per line
 after the findings; `--check --diff` prints the diff instead of that list. A
 preview ends with a hint to use `--write` to apply changes. A run selecting no
-documents prints a short notice on stderr, including with `--json`, without
-changing its exit code. A run over files prints a summary on stderr:
+documents prints a short notice on stderr, without changing its exit code; with
+`--json`, the report's empty `files` list says so instead. A run over files
+prints a summary on stderr:
 
 | Command          | Summary                                       |
 | ---------------- | --------------------------------------------- |
@@ -210,7 +212,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.6.0",
+  "version": "0.6.1",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [

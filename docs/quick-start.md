@@ -6,7 +6,7 @@ mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.6.0
+npm install --save-dev --save-exact mdrefine@0.6.1
 npx --no-install mdrefine --help
 ```
 
@@ -29,13 +29,13 @@ instead:
 - Run it once, without installing it in the folder:
 
   ```sh
-  npx mdrefine@0.6.0 lint
+  npx mdrefine@0.6.1 lint
   ```
 
 - Install it once for every folder, and run `mdrefine` without `npx`:
 
   ```sh
-  npm install --global mdrefine@0.6.0
+  npm install --global mdrefine@0.6.1
   mdrefine lint
   ```
 
@@ -46,9 +46,9 @@ vault](obsidian.md#install-for-a-vault).
 
 | Package manager | Install                                           | Run                  |
 | --------------- | ------------------------------------------------- | -------------------- |
-| pnpm            | `pnpm add --save-dev --save-exact mdrefine@0.6.0` | `pnpm exec mdrefine` |
-| Yarn            | `yarn add --dev --exact mdrefine@0.6.0`           | `yarn mdrefine`      |
-| Bun             | `bun add --dev --exact mdrefine@0.6.0`            | `bunx mdrefine`      |
+| pnpm            | `pnpm add --save-dev --save-exact mdrefine@0.6.1` | `pnpm exec mdrefine` |
+| Yarn            | `yarn add --dev --exact mdrefine@0.6.1`           | `yarn mdrefine`      |
+| Bun             | `bun add --dev --exact mdrefine@0.6.1`            | `bunx mdrefine`      |
 
 Use the command in the "Run" column where the pages say `npx mdrefine`.
 

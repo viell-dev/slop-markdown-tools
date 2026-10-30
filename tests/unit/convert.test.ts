@@ -200,7 +200,7 @@ describe("competitor conversion (#669)", () => {
       "Prettier requirePragma: applies during fallback only; has no effect with a written mdrefine configuration.",
     );
     expect(result.omitted).toContain(
-      "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
+      "Prettier insertPragma: not carried over; mdrefine does not write Prettier pragmas.",
     );
     expect(result.omitted.join("\n")).toContain("strict");
     expect(result.config.rules?.["content/html-element"]).toEqual(["error", {}]);

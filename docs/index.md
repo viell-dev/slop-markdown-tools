@@ -32,7 +32,7 @@ started](quick-start.md#preview-and-write) compares them.
 mdrefine is meant to replace a general-purpose linter and formatter, such as
 markdownlint and Prettier, for Markdown documents. The
 [comparison](integrations.md#coming-from-prettier-or-markdownlint) lists each of
-their checks with its rule here or the issue that tracks it.
+their checks with the rule that covers it and where it behaves differently.
 
 [Get started](quick-start.md), browse the [rules](rules.md), or see
 [examples](examples.md) of documents before and after formatting.

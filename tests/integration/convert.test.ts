@@ -1274,7 +1274,7 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     const result = run(yamlError, ["lint"]);
     expect(result.status).toBe(2);
     expect(result.stderr).toMatch(
-      /^mdrefine: Invalid competitor YAML in \.prettierrc: .*; use --no-competitor-config to bypass conversion\.\n$/,
+      /^mdrefine: Invalid YAML in \.prettierrc: .*; use --no-competitor-config to bypass conversion\.\n$/,
     );
     expect(run(yamlError, ["lint", "--no-competitor-config"]).status).toBe(0);
     const scalar = await fixture({ ".markdownlint.yaml": "true\n", "a.md": "text\n" });

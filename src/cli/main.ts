@@ -288,7 +288,11 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const { root, ...loaded } = await workspace(flags);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
-    throw new Error("stdin must be the only input and cannot be combined with --write.");
+    throw new Error(
+      mode === "lint"
+        ? "stdin must be the only input."
+        : "stdin must be the only input and cannot be combined with --write.",
+    );
   /** The text read from stdin, by the name it is given in the workspace. */
   let documents: Record<string, string> | undefined;
   if (stdin) {
@@ -757,10 +761,21 @@ try {
   // as in ESLint and Prettier, so that it does not pass for findings.
   if (error instanceof CommanderError) {
     process.exitCode = error.exitCode === 0 ? 0 : 2;
-    // The help alone can read as a fault in the setup; say what was missing.
-    if (error.code === "commander.help" && !args.length)
+    // Help printed in place of a missing or unknown command can read as a fault
+    // in the setup; say what was missing.
+    const asError = error.code === "commander.help" && error.exitCode !== 0;
+    if (asError && !args.length)
       process.stderr.write("mdrefine: no command given; try mdrefine lint\n");
-    else if (error.code === "commander.help" && args.length === 1 && args[0] === "config")
+    // Commander prints the whole help for `help bogus` without saying what was
+    // wrong, where `mdrefine bogus` says it.
+    else if (asError && args[0] === "help" && args.length === 2)
+      process.stderr.write(`mdrefine: unknown command '${args[1]}'\n`);
+    // `config` with options but no command, as `config --root .`, too.
+    else if (
+      asError &&
+      args[0] === "config" &&
+      !args.some((arg) => ["explain", "convert", "help"].includes(arg))
+    )
       process.stderr.write("mdrefine: config needs a command: explain or convert\n");
   } else {
     // A rule setting that cannot be used is found while a document is processed.

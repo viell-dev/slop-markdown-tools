@@ -30,20 +30,26 @@ describe("the command line", () => {
       expect(result.stdout, args.join(" ")).toBe("");
       expect(result.stderr, args.join(" ")).toBe(message);
     }
-    // Without a command, or with one that only groups others, the help goes to stderr, followed
-    // by a line that says what is missing.
+    // Without a command, with one that only groups others, or with an unknown one after
+    // `help`, the help goes to stderr, followed by a line that says what is missing.
     for (const [args, missing] of [
       [[], "mdrefine: no command given; try mdrefine lint\n"],
       [["config"], "mdrefine: config needs a command: explain or convert\n"],
-      [["help", "bogus"], undefined],
+      [["config", "--root", "."], "mdrefine: config needs a command: explain or convert\n"],
+      [["help", "bogus"], "mdrefine: unknown command 'bogus'\n"],
     ] as const) {
       const result = run(root, [...args]);
       expect(result.status, args.join(" ")).toBe(2);
       expect(result.stdout, args.join(" ")).toBe("");
       expect(result.stderr, args.join(" ")).toMatch(/^Usage: mdrefine /);
-      if (missing) expect(result.stderr.endsWith(`\n${missing}`), args.join(" ")).toBe(true);
-      else expect(result.stderr, args.join(" ")).not.toMatch(/no command given|needs a command/);
+      expect(result.stderr.endsWith(`\n${missing}`), args.join(" ")).toBe(true);
     }
+    // Stdin with another input names only the options that the command has.
+    const stdin = (command: string) => run(root, [command, "-", "note.md"], "A note.\n");
+    expect(stdin("lint").stderr).toBe("mdrefine: stdin must be the only input.\n");
+    expect(stdin("format").stderr).toBe(
+      "mdrefine: stdin must be the only input and cannot be combined with --write.\n",
+    );
     for (const args of [["--help"], ["help"], ["help", "lint"], ["lint", "--help"], ["-V"]]) {
       const result = run(root, args);
       expect(result.status, args.join(" ")).toBe(0);

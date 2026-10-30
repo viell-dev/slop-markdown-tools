@@ -69,7 +69,7 @@ repos:
       - id: mdrefine
         name: mdrefine
         language: node
-        additional_dependencies: ["mdrefine@0.6.0"]
+        additional_dependencies: ["mdrefine@0.6.1"]
         entry: mdrefine lint --max-warnings 0 --no-warn-ignored
         types: [markdown]
 ```
@@ -148,8 +148,7 @@ mdrefine is meant to replace these tools for Markdown. The tables below list
 every rule of markdownlint 0.42 and every Markdown option and formatting choice
 of Prettier 3.9, with the mdrefine rule that covers each and where it behaves
 differently. Each row follows the check's documented purpose, not the other
-tool's known defects. A row that says "None yet" or "Not yet" links the issue
-that tracks a missing part; keep the other tool for that check until it is done.
+tool's known defects.
 
 ### Configuration conversion and fallback
 
@@ -257,7 +256,7 @@ rule that no preset in your configuration enables, such as
 | markdownlint                             | mdrefine                                                                                                                                                                                                                                 |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MD001 `heading-increment`                | [`structure/heading-increment`](rules/structure/heading-increment.md), with block quotes checked apart, and `frontMatterTitle`, off by default                                                                                           |
-| MD003 `heading-style`                    | [`style/heading`](rules/style/heading.md), whose default converts underlined headings; `closing: "add"` writes closed ATX styles                                                                                                         |
+| MD003 `heading-style`                    | [`style/heading`](rules/style/heading.md), whose default converts underlined headings to `#` headings; `closing: "add"` writes closing `#` sequences                                                                                     |
 | MD004 `ul-style`                         | [`style/list-marker`](rules/style/list-marker.md), with `consistent` and `sublist`                                                                                                                                                       |
 | MD005 `list-indent`                      | [`style/list-indent`](rules/style/list-indent.md)                                                                                                                                                                                        |
 | MD007 `ul-indent`                        | [`style/list-indent`](rules/style/list-indent.md)'s `nestedIndent`, `startIndented`, and `startIndent`                                                                                                                                   |
@@ -336,10 +335,11 @@ footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
 
-Prettier keeps Setext headings; conversion uses `style/heading` to normalize
-them to ATX. mdrefine has no mode that keeps mixed Setext and ATX styles while
-normalizing heading spacing. Wrapping also leaves paragraphs with hard line
-breaks as written, where Prettier can wrap their individual lines.
+Prettier keeps underlined headings; conversion uses `style/heading` to write
+them as `#` headings. mdrefine has no mode that keeps a mix of underlined and
+`#` headings while normalizing heading spacing. Wrapping also leaves paragraphs
+with hard line breaks as written, where Prettier can wrap their individual
+lines.
 
 Language-only options such as `semi`, `trailingComma`, `quoteProps`,
 `jsxSingleQuote`, `bracketSpacing`, `bracketSameLine`, `arrowParens`,

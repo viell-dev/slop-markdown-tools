@@ -13,11 +13,11 @@ The file is named `mdrefine.config.jsonc`, `mdrefine.config.json`,
 finds it this way:
 
 1. `--config` names the file; nothing is searched.
-2. Otherwise, it looks in the directory that `--root` names, or else the current
-   directory.
-3. Then it looks in each directory above, and stops at the first one that is a
-   Git repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or at
-   the filesystem root.
+2. Otherwise, it starts in the directory that `--root` names, or else the
+   current directory.
+3. It looks in that directory and then in each one above, and stops at the first
+   directory that is a Git repository (holds `.git`) or an Obsidian vault (holds
+   `.obsidian`), the starting one included, or at the filesystem root.
 
 Two configuration files in one directory are an error. Configuration files do
 not cascade: a file in a subdirectory is not merged with one above it. The
