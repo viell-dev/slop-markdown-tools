@@ -497,10 +497,18 @@ export interface CompetitorCompatibility {
 export interface ConversionReport {
   /** Runtime provenance; never written into an mdrefine configuration. */
   compatibility: CompetitorCompatibility;
-  /** Configuration with no implicit preset. */
+  /** Configuration with no implicit preset, or `{}` when no source could be used. */
   config: Config;
   /** Configuration files read by the Node loader; empty for object conversion. */
   sources: string[];
+  /**
+   * Configuration files the Node loader found and did not use, each with the
+   * reason: a format it does not read, a Prettier configuration whose
+   * `.prettierignore` excludes all Markdown, or, for the fallback, a
+   * `.prettierignore` with negated entries. With no source to use, `config`
+   * is empty, so the defaults apply, and `sources` is empty.
+   */
+  unused: { file: string; reason: string }[];
   /** Settings not fully carried over, with reasons and applicable tracking issues. */
   omitted: string[];
   /** Conflicting settings and the choice made. */
@@ -518,6 +526,7 @@ export function convertConfig(input: {
     compatibility: { ...input, origins: {} },
     config: { extends: [], rules },
     sources: [],
+    unused: [],
     omitted: [],
     conflicts: [],
     suggestions: [],
@@ -711,8 +720,14 @@ export function convertConfig(input: {
         report.omitted.push(
           "MD013: paragraph lines are not checked; content/line-length checks headings, code and tables only.",
         );
+        // A width that is not a usable number, such as "wide", `true` or `null`,
+        // is reported as outside the range above; the suggestion then names no
+        // width. Without a setting, markdownlint's default of 80 applies.
+        const width = options.lineLength === undefined ? 80 : options.lineLength;
         report.suggestions.push(
-          `Consider style/wrap with width ${Number(options.lineLength ?? 80)} to reflow paragraph lines.`,
+          typeof width === "number" && Number.isInteger(width) && width > 0
+            ? `Consider style/wrap with width ${width} to reflow paragraph lines.`
+            : "Consider style/wrap to reflow paragraph lines.",
         );
       }
       if (row.source === "MD007" && input.prettier) {
