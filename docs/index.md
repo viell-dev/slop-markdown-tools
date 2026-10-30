@@ -9,8 +9,8 @@ hero:
       text: Get started
       link: /quick-start
     - theme: alt
-      text: Rules
-      link: /rules
+      text: Examples
+      link: /examples
 features:
   - title: Check, preview, then write
     details: Lint without changing files, read the diff, and write when ready. A JSON report and exit codes serve CI, scripts, and agents.
