@@ -694,6 +694,15 @@ export async function loadCompetitorConfig(
       addOverride(rebased, object(item.options, `the options of ${where}`));
     }
   }
+  // markdownlint-cli and editor extensions read `.markdownlintignore`, a file of the
+  // tools around markdownlint rather than one of its settings. It is not converted,
+  // so the documents it excludes are checked; say so instead of checking them silently.
+  const markdownlintIgnore = markdownlint ? await find([".markdownlintignore"]) : undefined;
+  if (markdownlintIgnore)
+    unused.set(
+      markdownlintIgnore,
+      'it is not converted, so the documents it excludes are checked; list its patterns under "ignore" in an mdrefine configuration',
+    );
   const negated = (ignoreText ?? "").split(/\r?\n/).filter((line) => line.startsWith("!"));
   if (ignoreFile && prettier && fallback && negated.length)
     // Independent ignore globs cannot re-include a document, so the fallback would

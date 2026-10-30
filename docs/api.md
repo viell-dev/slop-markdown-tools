@@ -340,19 +340,19 @@ default, converts as `loadConfig`'s in-memory fallback does: a `.prettierignore`
 with negated entries applies none of its patterns. It does not run scripts;
 `executeScripts` alone decides that. Its report's `unused` lists the files it
 found and did not use, each with a `reason`: a script it did not run, a TOML or
-JSON5 file, or a Prettier configuration whose `.prettierignore` excludes all
-Markdown. When it could use none, `sources` is empty and `config` is `{}`.
-`loadConfig` returns `LoadedConfig`, including an optional `conversion` report
-when the fallback found competitor files, and `compatibility` for the engine
-when it used them; when it used none, its `config` is `{}`, which applies the
-`recommended` preset. Its fallback also lists a `.prettierignore` with negated
-entries under `unused` and applies none of its patterns, while
-`loadCompetitorConfig` converts the other patterns and reports the negated ones
-in `omitted`. Pass `loaded.compatibility` along with `loaded.config` and
-`loaded.plugins` to `lint` or `format`; passing only the configuration uses
-native mdrefine behavior. `onCompatibilityWarning` in processing options
-receives comment notices; a host can deduplicate messages across documents as
-the CLI does. See [configuration
+JSON5 file, a Prettier configuration whose `.prettierignore` excludes all
+Markdown, or a `.markdownlintignore` beside a markdownlint configuration in use.
+When it could use none, `sources` is empty and `config` is `{}`. `loadConfig`
+returns `LoadedConfig`, including an optional `conversion` report when the
+fallback found competitor files, and `compatibility` for the engine when it used
+them; when it used none, its `config` is `{}`, which applies the `recommended`
+preset. Its fallback also lists a `.prettierignore` with negated entries under
+`unused` and applies none of its patterns, while `loadCompetitorConfig` converts
+the other patterns and reports the negated ones in `omitted`. Pass
+`loaded.compatibility` along with `loaded.config` and `loaded.plugins` to `lint`
+or `format`; passing only the configuration uses native mdrefine behavior.
+`onCompatibilityWarning` in processing options receives comment notices; a host
+can deduplicate messages across documents as the CLI does. See [configuration
 conversion](configuration.md#competitor-configuration-fallback).
 
 ```js

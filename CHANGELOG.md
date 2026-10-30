@@ -27,10 +27,11 @@ prereleases' notes there are longer than their entries here.
   checking documents; one with a negated entry never qualifies. The fallback
   applies none of the patterns of a `.prettierignore` with a negated entry,
   which conversion cannot express, rather than apply its exclusions without
-  their exceptions, which can select no documents. The fallback prints one line
-  on stderr for the settings it uses and one for each file it leaves out, with
-  paths from the workspace root, and none with `--quiet`; `config explain` lists
-  the files left out under `conversion.unused`
+  their exceptions, which can select no documents. `.markdownlintignore` is not
+  converted, so the documents it excludes are checked; the fallback names it.
+  The fallback prints one line on stderr for the settings it uses and one for
+  each file it leaves out, with paths from the workspace root, and none with
+  `--quiet`; `config explain` lists the files left out under `conversion.unused`
   ([#788](https://github.com/viell-dev/slop-markdown-tools/issues/788)).
 
 - An error about a rule setting that cannot be used, such as an unknown rule or
@@ -236,7 +237,14 @@ prereleases' notes there are longer than their entries here.
   retain their descendants when converting inside an excluded directory.
   Prettier brace literals and terminal globstars retain their matching branches;
   ignore conversion reports its case-sensitive approximation. Converted
-  overrides accumulate through `ruleUpdates`
+  overrides accumulate through `ruleUpdates`. A markdownlint-cli2 file without
+  `config` reads as markdownlint's defaults, as markdownlint-cli2 does, and
+  MD007's `start_indented` sets `style/quote-marker`'s `listItems` to false,
+  which the two would otherwise undo. The library exports `convertConfig`,
+  `competitorMappings` and the `ConversionReport`, `CompetitorMapping` and
+  `CompetitorCompatibility` types from `mdrefine`, and `loadConfig`,
+  `loadCompetitorConfig`, `competitorFiles` and `LoadedConfig` from
+  `mdrefine/node`; `lint` and `format` take a `compatibility` option
   ([#669](https://github.com/viell-dev/slop-markdown-tools/issues/669)). Without
   `--root`, `--write` creates the configuration where `lint` looks for the
   workspace's configuration and prints its path; `--config`, `--dialect`,

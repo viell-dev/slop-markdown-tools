@@ -491,7 +491,14 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
       );
     }
   }
-  if (mode === "format" && !flags.write && (!flags.check || flags.diff) && !stdin && !flags.json)
+  if (
+    mode === "format" &&
+    !flags.write &&
+    (!flags.check || flags.diff) &&
+    !stdin &&
+    !flags.json &&
+    changes.length > 0
+  )
     process.stderr.write("Use --write to apply formatting changes.\n");
   const errors = count("error") > 0;
   const tooManyWarnings = flags.maxWarnings !== undefined && count("warn") > flags.maxWarnings;
