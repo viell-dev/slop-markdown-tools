@@ -5,21 +5,23 @@ page](https://viell-dev.github.io/slop-markdown-tools/examples.html) walks
 through each one with its input and output. The integration tests run every
 example, so what is here matches what the tool does.
 
-Run the commands below from a built checkout (`npm ci && npm run build`). In a
-project that installs the package, the same files are under
-`node_modules/mdrefine/examples/`, and `npx mdrefine` replaces
-`node dist/cli/main.js`.
+The package ships these files under `node_modules/mdrefine/examples/`. To run
+the commands below, copy them into the project where you installed mdrefine,
+with `cp -r node_modules/mdrefine/examples .`, and run the commands from its
+root. In a built checkout (`npm ci && npm run build`), run them from its root
+with `node dist/cli/main.js` in place of `npx mdrefine`.
 
 ## Starting configurations
 
 Copy one to the root of your documents as `mdrefine.config.jsonc`.
 
-| File                               | For                                             |
-| ---------------------------------- | ----------------------------------------------- |
-| [`github.jsonc`](github.jsonc)     | Repositories rendered by GitHub                 |
-| [`forgejo.jsonc`](forgejo.jsonc)   | Codeberg and other Forgejo instances            |
-| [`gitea.jsonc`](gitea.jsonc)       | Gitea instances                                 |
-| [`obsidian.jsonc`](obsidian.jsonc) | Obsidian vaults, with vault-relative link paths |
+| File                                 | For                                               |
+| ------------------------------------ | ------------------------------------------------- |
+| [`github.jsonc`](github.jsonc)       | Repositories rendered by GitHub                   |
+| [`forgejo.jsonc`](forgejo.jsonc)     | Codeberg and other Forgejo instances              |
+| [`gitea.jsonc`](gitea.jsonc)         | Gitea instances                                   |
+| [`obsidian.jsonc`](obsidian.jsonc)   | Obsidian vaults, with vault-relative link paths   |
+| [`vitepress.jsonc`](vitepress.jsonc) | VitePress 2 sites, with explicit renderer options |
 
 Bare `format` prints a diff and exits `1` when a file would change. The `--diff`
 examples below preview changes without failing merely on differences; remaining
@@ -39,8 +41,8 @@ reports it afterwards.
   directory.
 
 ```sh
-node dist/cli/main.js lint --root examples/workspaces/repository-docs/before
-node dist/cli/main.js format --root examples/workspaces/repository-docs/before --diff
+npx mdrefine lint --root examples/workspaces/repository-docs/before
+npx mdrefine format --root examples/workspaces/repository-docs/before --diff
 ```
 
 Preview with `--diff` as above. To try `--write`, copy a `before/` tree
@@ -52,8 +54,8 @@ somewhere else first, so that the example stays as it is.
 one style rule, and a note that triggers both.
 
 ```sh
-node dist/cli/main.js lint --root examples/plugin
-node dist/cli/main.js format --root examples/plugin --diff
+npx mdrefine lint --root examples/plugin
+npx mdrefine format --root examples/plugin --diff
 ```
 
 ## Library
@@ -82,5 +84,5 @@ both read `workspaces/repository-docs/after`.
   `--json` report and counts diagnostics per rule:
 
 ```sh
-node dist/cli/main.js lint --root examples/plugin --json | node examples/automation/summarize-report.mjs
+npx mdrefine lint --root examples/plugin --json | node examples/automation/summarize-report.mjs
 ```
