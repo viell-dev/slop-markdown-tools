@@ -118,7 +118,7 @@ function quoteMarker(source: string, level: Level): number {
 }
 
 const quoteMarkerRule: Rule = {
-  description: "Write one space after each block quote marker.",
+  description: "Writes one space after each block quote marker, `>`.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({ listItems: { type: "boolean" } }),
@@ -263,7 +263,8 @@ function continuationLines(document: Document): Map<number, Nodes> {
 }
 
 const lazyContinuation: Rule = {
-  description: "Write the container markers and indentation on lazy continuation lines.",
+  description:
+    "Writes the quote markers and indentation on lines that continue a paragraph without them.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({}),

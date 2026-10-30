@@ -1006,8 +1006,8 @@ npm run docs:build && npm run docs:preview
 The preview's address includes the `/slop-markdown-tools/` base path. The site
 build fails on a link to a page that does not exist, and the tool's lint fails
 on a heading fragment that does not. The integration tests compare the examples
-page, the rule index and each rule section's facts, and the benchmark page with
-the code, and reject version annotations in the pages, so update them with the
+page, the rule index and each rule page's facts, and the benchmark page with the
+code, and reject version annotations in the pages, so update them with the
 behavior they describe. CI builds the site for every pull request. The site
 describes the newest stable release: the Pages workflow deploys it from that
 release's tag after the Release workflow publishes it, as
@@ -1027,7 +1027,8 @@ benchmark measured, and the versions of renderers and other tools are not
 history. The docs tests reject version annotations in the other pages outside a
 short list of such passages; add to that list only a passage of those kinds.
 
-Each rule's section in `docs/rules.md` follows one order:
+Each rule has a page, `docs/rules/<category>/<name>.md`, titled with its ID,
+which follows one order:
 
 1. One or two plain sentences on what the rule checks or changes, and why it
    matters where that is not obvious.
@@ -1036,15 +1037,24 @@ Each rule's section in `docs/rules.md` follows one order:
    the options.
 3. A short example: before and after, or reported and not reported.
 4. The options: a table where there are several, then a point for each.
-5. The details, in paragraphs or short lists that open with a bold label:
-   **Details:**, **Not checked:**, **Left as written:**, **Reported without a
-   fix:**, a dialect such as **In Obsidian:**, and **With other rules:**. Labels
-   rather than headings keep the page's outline to the rules and the anchors of
-   the rule index stable.
+5. Under the heading "Edge cases and advanced usage", the paragraphs or short
+   lists that open with **Details:**, **Not checked:**, **Left as written:**, or
+   **Reported without a fix:**.
+6. Under "Dialect notes", those that open with a dialect, such as **In
+   Obsidian:**, or a link to the dialect page that already says it.
+7. Under "Related rules", how the rule works with other rules.
 
-The rule index gives the severity at which each preset enables a rule and names
-the dialect presets. The docs tests compare the index and each section's facts
-with the presets in code.
+Leave out a heading that would have nothing under it. The common case comes
+first: an option's details stay with the options, and what a reader needs only
+for unusual input goes under the headings.
+
+The rule index, `docs/rules.md`, has one table per category, in alphabetical
+order of rule ID. Each row links the rule's page and gives the description that
+the rule's code declares, which `mdrefine rules` prints, its kind, the severity
+at which each preset enables it, and whether it takes options. The docs tests
+compare the index and each page's facts with the code. The site's sidebar lists
+the pages from the directory, and the index forwards a link to a rule's section
+of the former single page, such as `rules.html#stylewrap`, to its page.
 
 ## Pull requests
 

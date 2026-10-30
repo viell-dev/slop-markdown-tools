@@ -31,7 +31,7 @@ const styleRules: Record<string, Rule> = {
   "style/no-tabs": noTabs,
   "style/prose-space": proseSpace,
   "style/inline-code": {
-    description: "Use minimal backticks and join code spans using their CommonMark rendered value.",
+    description: "Writes code spans on one line, with the fewest backticks they need.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({}),
@@ -145,7 +145,7 @@ const styleRules: Record<string, Rule> = {
   "style/strong": markerRule("strong", "*"),
   "style/table": table,
   "style/final-newline": {
-    description: "End nonempty documents with a newline.",
+    description: "Ends a document that is not empty with a line break.",
     kind: "style",
     phase: "document",
     schema: optionsSchema({}),
@@ -163,7 +163,8 @@ const styleRules: Record<string, Rule> = {
     },
   },
   "style/heading": {
-    description: "Use ATX or Setext headings with single-space hash separators.",
+    description:
+      "Writes headings in one style, `#` headings by default, with one space after the hashes.",
     kind: "style",
     phase: "block",
     schema: optionsSchema({

@@ -74,8 +74,9 @@ Known couplings:
   change, including support for another renderer. The About description follows
   the README's opening description and retains the agent-maintained disclosure;
   topics include the supported renderers.
-- Rules: `docs/rules.md` has one index row and one section per rule, in
-  alphabetical order of rule ID; a new rule adds both.
+- Rules: `docs/rules.md` has one index row per rule, in alphabetical order of
+  rule ID, whose description is the rule's `description` in code, and
+  `docs/rules/<category>/<name>.md` has the rule's page; a new rule adds both.
 - The maintenance statement: the README's status section, which other documents
   link to rather than repeat.
 - Labels: `.github/labels.json`, GitHub, the issue templates,
@@ -468,13 +469,13 @@ only and remove superseded transition notes.
   unsafe edit rather than weakening a guard or removing historical protections
   during an unrelated extraction. Obsidian wrapping needs verified strict line
   breaks.
-- `docs.test.ts` compares the examples page, the rule index and each rule
-  section's presets, the preset table, the library pages, the installation
-  commands, and the changelog with the code, and rejects version annotations in
-  the pages; `benchmarks.test.ts` compares the benchmark page's headings and row
-  labels. Each example workspace's `after/` tree is exactly what
-  `format --write` makes of `before/`: regenerate it when formatting changes on
-  purpose, and treat an unexpected difference as a regression.
+- `docs.test.ts` compares the examples page, the rule index and each rule page's
+  presets, the preset table, the library pages, the installation commands, and
+  the changelog with the code, and rejects version annotations in the pages;
+  `benchmarks.test.ts` compares the benchmark page's headings and row labels.
+  Each example workspace's `after/` tree is exactly what `format --write` makes
+  of `before/`: regenerate it when formatting changes on purpose, and treat an
+  unexpected difference as a regression.
 - Replace the benchmark page's results only from a run of the Benchmark
   workflow; a local report names its machine's processor and is never published.
   Judge a change by the ratio columns or by runs before and after on one

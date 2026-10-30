@@ -307,7 +307,7 @@ try {
   );
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
+      /^(dist\/|docs\/(?:rules\/[a-z]+\/)?[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -332,6 +332,8 @@ try {
     "SECURITY.md",
     "examples/README.md",
     "examples/workspaces/obsidian-vault/before/.obsidian/app.json",
+    "docs/rules.md",
+    "docs/rules/style/wrap.md",
   ])
     assert(
       result.files.some((file) => file.path === required),

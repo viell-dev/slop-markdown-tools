@@ -181,7 +181,7 @@ Formatting:
   stays whole and exceeds the width. The width is a target, not a license to
   split syntax.
 - Paragraphs that wrapping cannot reconstruct safely are left as written;
-  [`style/wrap`](rules.md#stylewrap) lists them, and its `reportUnreflowed`
+  [`style/wrap`](rules/style/wrap.md) lists them, and its `reportUnreflowed`
   option reports them.
 - Emphasis inside a word keeps `*` when the configured marker is `_`, because
   `_` cannot mark emphasis there.

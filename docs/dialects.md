@@ -33,10 +33,10 @@ protected from formatting rather than parsed; see [Forgejo and
 Gitea](#forgejo-and-gitea). Syntax that no dialect knows, such as an Obsidian
 plugin's, is read as text: use a suppression comment or an `ignore` pattern for
 it. Site-generator syntax is read as text too, but its lines are kept:
-[`style/wrap`](rules.md#stylewrap) leaves a paragraph as written when one of its
-lines starts with a container such as Docusaurus's `:::note` or a template tag
-such as Liquid's `{% tab %}` or `{{ title }}`, because site generators read them
-by line.
+[`style/wrap`](rules/style/wrap.md) leaves a paragraph as written when one of
+its lines starts with a container such as Docusaurus's `:::note` or a template
+tag such as Liquid's `{% tab %}` or `{{ title }}`, because site generators read
+them by line.
 
 An alert's or callout's marker is read from the text, as GitHub reads it, so
 `> \[!NOTE]` and `> &#91;!NOTE]` are alerts too. Formatting keeps the line of
@@ -248,7 +248,7 @@ heading, its last text line, and still counts after a closing `#` sequence
 (`## Install ## {#setup}`). A block that is not valid, that is followed by more
 text, or whose `{` is escaped stays heading text. A custom anchor must be linked
 exactly as written and is never numbered. An `id` that is not text breaks
-rendering; [`forgejo/heading-id`](rules.md#forgejoheading-id) reports it. The
+rendering; [`forgejo/heading-id`](rules/forgejo/heading-id.md) reports it. The
 rules are those of Forgejo 16 and Gitea 1.26 and later.
 
 Formatting leaves a block as written, and changes nothing from the first `{` of

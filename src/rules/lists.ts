@@ -811,7 +811,7 @@ function bulletMarkers(analysis: Analysis, marker: string): (list: ListGroup) =>
 }
 
 const listMarker: Rule = {
-  description: "Use one bullet list marker, and the next one for a list that follows another.",
+  description: "Writes bullet lists with one marker, `-` by default.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({ marker: { enum: [...bullets, "consistent", "sublist"] } }),
@@ -888,7 +888,8 @@ function renumbered(digits: string[], numbering: string): string[] | undefined {
 }
 
 const orderedList: Rule = {
-  description: "Use one delimiter after list numbers, and number list items consistently.",
+  description:
+    "Writes ordered list numbers with one delimiter, and numbers the items consistently.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({
@@ -974,7 +975,7 @@ const reachOf = (item: Item, spacing = item.spacing) =>
 const spaces = { type: "integer", minimum: 1, maximum: 4 };
 
 const listIndent: Rule = {
-  description: "Indent list items consistently, with the configured spaces after the marker.",
+  description: "Indents list items consistently, with the configured spaces after the marker.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({
