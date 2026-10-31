@@ -122,9 +122,7 @@ describes the newest release:
 
 ## Status
 
-The package and its command are `mdrefine`; the repository and the documentation
-site keep the project's original name, `slop-markdown-tools`. mdrefine follows a
-[pre-1.0 versioning
+mdrefine follows a [pre-1.0 versioning
 policy](https://viell-dev.github.io/slop-markdown-tools/versions.html): a minor
 release may change behavior and says how, and a patch release only fixes
 defects. It is written and maintained by AI agents, and no person reviews the
