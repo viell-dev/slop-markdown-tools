@@ -9,6 +9,14 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Remove the incorrect claim that the repository slug is mdrefine's original
+  project name
+  ([#832](https://github.com/viell-dev/slop-markdown-tools/issues/832)).
+
 ## 0.6.1 - 2026-10-30
 
 The documentation is reorganized for people new to mdrefine: rules have pages of
