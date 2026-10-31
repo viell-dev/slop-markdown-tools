@@ -1,11 +1,10 @@
 # Releasing
 
-Agents publish a version when it is ready: its release pull request has merged
-and every check in this guide has passed. The repository owner authorized that
-for every release on 2026-10-18. The configured trusted publisher and the
-`NPM_PUBLISH_ENABLED` variable only make publication possible. Published
-versions, tags, and release assets are never replaced: a correction gets a new
-version.
+Agents have standing authority to publish routine releases within the project's
+agreed scope when the release pull request has merged and every check in this
+guide has passed. The configured trusted publisher and `NPM_PUBLISH_ENABLED`
+only make publication possible. Published versions, tags, and release assets are
+never replaced: a correction gets a new version.
 
 Dependency updates alone are not a reason to release. Once merged, they ship
 with the next release that fixes a defect or adds a feature. The exception is a
@@ -144,7 +143,7 @@ canonical workload sizes and host identity independently of a runner's exit
 status. Obsidian uses the verified app, installer and runtime versions in
 `scripts/obsidian/baseline.json` and its digest-pinned Docker base; reports
 include observed versions and the actual built-image ID/platform and declared
-base label. The [contributor guide](CONTRIBUTING.md#checks) explains baseline
+base label. The [contributor guide](CONTRIBUTING.md#tests) explains baseline
 advancement and the separate explicit latest route. Adversarial generation is
 weekly/manual discovery and never gates release. Each discovery since the last
 release receives an issue and is fixed within scope or recorded as a limit;
@@ -235,11 +234,11 @@ in on npmjs.com, in the package's **Settings** tab:
   without the second factor, and a change made by hand on the account, such as a
   dist-tag, asks for it too.
 
-The maintainer checks these after setting them up or changing them, not for each
-release; they were last checked on 2026-10-18. Only the maintainer's account can
-change them, and a successful publication already shows that the entry for this
-workflow exists. It cannot show that no other entry exists: npm accepts up to
-ten trusted publishers per package, and each of them can publish.
+The npm maintainer checks these after setup or changes, rather than for each
+release. Only that account can change them, and a successful publication already
+shows that the entry for this workflow exists. It cannot show that no other
+entry exists: npm accepts up to ten trusted publishers per package, and each of
+them can publish.
 
 ## Publish
 
@@ -259,13 +258,15 @@ any failure publishes nothing:
   workflow, event, repository or commit do not qualify; other required statuses
   retain their specified app identities and are never exempted. The gate needs
   the newest eligible CI producer attempt to succeed before accepting its latest
-  job results, even when an older attempt passed. A pending producer waits; an
-  unsuccessful completed producer fails. Optional Node 26 can delay completion,
-  but its allowed test failure does not fail the workflow or become a release
-  requirement. Whether a Node 26 timeout or cancellation leaves the CI run
-  successful is unverified; an unsuccessful run is rejected. The gate needs read
-  access to checks and Actions runs. It waits up to 40 minutes for CI that is
-  still running, so it can be dispatched right after the merge.
+  job results, even when an older attempt passed. Check-run identities determine
+  recency; carried rerun timestamps and null starts do not. A pending producer
+  waits even before its jobs appear; an unsuccessful completed producer fails.
+  Optional Node 26 can delay completion, but its allowed test failure does not
+  fail the workflow or become a release requirement. Whether a Node 26 timeout
+  or cancellation leaves the CI run successful is unverified; an unsuccessful
+  run is rejected. The gate needs read access to checks and Actions runs. It
+  waits up to 40 minutes for CI that is still running, so it can be dispatched
+  right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
