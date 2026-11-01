@@ -39,6 +39,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   conversion, matching Prettier's configuration search
   ([#793](https://github.com/viell-dev/slop-markdown-tools/issues/793)).
 
+### Maintenance
+
+- Update the task runner and typed lint tooling, and refresh the pnpm
+  installation check.
+
 ## 0.6.2 - 2026-11-01
 
 ### Security

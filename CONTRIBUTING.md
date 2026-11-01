@@ -357,7 +357,7 @@ warnings or advance an assertion merely to make installation/building succeed.
 
 - **TypeScript:** when updating `typescript-eslint`, recheck its [official
   support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. As of parser 8.71.2, that range is
+  installed parser's TypeScript peer. As of parser 8.72.0, that range is
   `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
   [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
   includes the target; remove it only after an unforced install, typed lint,

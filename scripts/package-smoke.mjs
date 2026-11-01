@@ -28,7 +28,7 @@ assert(npm, "Run this check through npm run test:package.");
  * sees only the dependencies that it declares. npm fetches it into the
  * repository's cache, so nothing is installed globally.
  */
-const pnpm = "pnpm@12.14.0";
+const pnpm = "pnpm@12.15.0";
 const directory = await realpath(await mkdtemp(path.join(tmpdir(), "mdrefine-package-")));
 const repository = await realpath(process.cwd());
 const relativeDirectory = path.relative(repository, directory);
