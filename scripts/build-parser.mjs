@@ -309,6 +309,7 @@ async function generateParser(options, attachDebugInfo) {
       autolink: 1,
       cjk: 1,
       code: 1,
+      document: 1,
       footnote: 1,
       footnoteSyntax: 1,
       htmlFlow: 1,
@@ -317,7 +318,7 @@ async function generateParser(options, attachDebugInfo) {
       text: 1,
     });
     assert.equal(redirected.size, 1);
-    assert.equal(transformed.size, 10);
+    assert.equal(transformed.size, 11);
     assert.deepEqual(editMapImporters.sort(compare), expectedImporters);
 
     const modules = Object.keys(chunk.modules);

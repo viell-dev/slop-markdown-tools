@@ -14,6 +14,12 @@ interface Case {
 }
 const cases: Case[] = [
   {
+    name: "lazy list continuation (#796)",
+    dialect: "github",
+    sizes: [2000, 8000],
+    source: (n) => "- a\n" + "line\n".repeat(n),
+  },
+  {
     name: "nested container transitions (#300/#527)",
     dialect: "obsidian",
     sizes: [500, 2000],

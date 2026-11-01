@@ -20,6 +20,7 @@ const kinds = {
   labelEnd: "labelEnd",
   footnoteSyntax: "footnoteSyntax",
   htmlFlow: "htmlFlow",
+  document: "document",
   cjk: "cjk",
 };
 const observerSource = `export const workStats = { reads: 0, writes: 0 };
@@ -162,7 +163,9 @@ export async function readReviewedSource(kind) {
     ? createRequire(path.join(micromark.directory, "index.js"))
     : here;
   const spec = sourceGuards[kinds[kind]];
-  const root = kind === "text" ? micromark : await packageRoot(parent.resolve(spec.name));
+  const root = ["text", "document"].includes(kind)
+    ? micromark
+    : await packageRoot(parent.resolve(spec.name));
   const filename = path.join(root.directory, spec.relative);
   const source = await readFile(filename, "utf8");
   assert.equal(root.metadata.name, spec.name);
@@ -174,9 +177,9 @@ export async function readReviewedSource(kind) {
 /** @typedef {{ work: number, signature: string[], arrayIdentity: boolean, survivorIdentity: boolean }} WorkResult */
 
 /**
- * @param {"editMap"|"text"|"code"|"attention"|"strike"|"autolink"|"labelEnd"|"footnoteSyntax"} kind
+ * @param {"editMap"|"text"|"code"|"attention"|"strike"|"autolink"|"labelEnd"|"footnoteSyntax"|"document"} kind
  * @param {"stock"|"fixed"} variant
- * @param {{labelMutant?: "none"|"nested"|"prefix"|"closer"}} [options]
+ * @param {{labelMutant?: "none"|"nested"|"prefix"|"closer", lazyMutant?: "none"|"cache"|"identity"|"bounds"}} [options]
  * @returns {Promise<Record<string, any>>}
  */
 export async function loadParserModule(kind, variant, options = {}) {
@@ -184,6 +187,7 @@ export async function loadParserModule(kind, variant, options = {}) {
   const coreAttention = variant === "fixed" ? await readReviewedSource("attention") : undefined;
   const labelKind = ["labelEnd", "footnoteSyntax"].includes(kind);
   assert(labelKind || options.labelMutant === undefined);
+  assert(kind === "document" || options.lazyMutant === undefined);
   const bundle = await rolldown({
     input: selected.filename,
     platform: "neutral",
@@ -209,6 +213,39 @@ export async function loadParserModule(kind, variant, options = {}) {
           }
           assert.equal(original, selected.source);
           let source = variant === "fixed" ? repairParserSource(kind, original) : original;
+          if (kind === "document") {
+            if (variant === "fixed") {
+              const mutant = options.lazyMutant ?? "none";
+              if (mutant === "cache")
+                source = labelOnce(
+                  source,
+                  "const known = mdrefineLazyContinuations.get(events);",
+                  "const known = undefined;",
+                );
+              if (mutant === "identity")
+                source = labelOnce(source, "events[known.index]?.[1] === known.token", "true");
+              if (mutant === "bounds")
+                source = labelOnce(
+                  source,
+                  "mdrefineSpansLine(known.token, lineStartOffset)",
+                  "true",
+                );
+            } else {
+              assert(options.lazyMutant === undefined || options.lazyMutant === "none");
+              // Derive the baseline from the pinned upstream search, not a
+              // separately maintained implementation of its predicate.
+              const start = source.indexOf("      let index = childFlow.events.length;");
+              const end = source.indexOf(
+                "\n\n      // Note: this algorithm for moving events",
+                start,
+              );
+              assert(start >= 0 && end > start);
+              const search = source.slice(start, end);
+              assert.equal(search.split("return;").length, 2);
+              source += `\nfunction mdrefineContinuesLazy(events, lineStartOffset) {\nconst childFlow = { events };\n${search.replace("return;", "return true;")}\nreturn false;\n}\n`;
+            }
+            source += "\nexport { mdrefineContinuesLazy };\n";
+          }
           if (labelKind)
             source = labelInstrumentation(source, kind, variant, options.labelMutant ?? "none");
           if (variant === "fixed" && ["attention", "strike"].includes(kind)) {

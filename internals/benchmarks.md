@@ -20,6 +20,19 @@ every transition. They still parse complete documents for references and
 container structure. Exact AST, event-identity and work-growth checks cover the
 correction; the benchmark page's tables have not been measured again with it.
 
+## Lazy list paragraphs
+
+Micromark 4.0.3 searches accumulated flow events backward after every lazy
+continuation line. A long list paragraph repeatedly finds the same open token
+near the beginning, so its searches approach quadratic work
+([#796](https://github.com/viell-dev/slop-markdown-tools/issues/796)). The adapter
+keeps a private positive witness by event array. Its index must still contain
+the same token, and the token's current bounds must still span the line;
+replacement, reordering or closing falls back to the upstream search. It does
+not cache absence or add token fields. Positioned trees, event observations,
+stale witnesses, deterministic work and the compiled runtime are checked. This
+correction does not bound arbitrary parser work or deeply nested containers.
+
 ## Large paragraphs
 
 A single paragraph of 70 kB made only of bracketed references such as `[a][b]`
