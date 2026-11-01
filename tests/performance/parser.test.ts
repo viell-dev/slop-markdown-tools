@@ -102,6 +102,11 @@ it.each(cases)("parses $name within the catastrophic-growth bound", (test) => {
           expect(counts.get("inlineCode")).toBe(1);
           expect(textContent(document.tree)).toBe("a b " + "c d ".repeat(input.count));
         }
+        if (test.name === "lazy list continuation (#796)") {
+          for (const type of ["list", "listItem", "paragraph", "text"])
+            expect(counts.get(type)).toBe(1);
+          expect(textContent(document.tree)).toBe("a\n" + "line\n".repeat(input.count).trimEnd());
+        }
       },
       1,
     ),

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { URL } from "node:url";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { readReviewedSource } from "./parser-module-probes.mjs";
 
