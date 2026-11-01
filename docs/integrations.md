@@ -223,10 +223,13 @@ Markdownlint compatibility also recognizes complete leading HTML heading tags
 for MD041 and keeps its treatment of HTML comment blocks before the initial
 heading. See [initial-heading](rules/structure/initial-heading.md) for empty
 documents, permitted preambles and HTML limits. MD022 keeps comment-aware
-blank-line counts around headings. These exemptions apply to markdownlint
-findings; an independent Prettier spacing preference still applies at warning
-severity. Native mdrefine configuration keeps the policies described on the
-rules' pages.
+blank-line counts around headings, including reports for protected boundaries
+around list-item headings and attached comments. Those reports require manual
+resolution to preserve list tightness and comment attachment; see
+[block-spacing](rules/style/block-spacing.md). These exemptions apply to
+markdownlint findings; an independent Prettier spacing preference still applies
+at warning severity. Native mdrefine configuration keeps the policies described
+on the rules' pages.
 
 markdownlint's `disable`, `enable`, `disable-line`, `disable-next-line`,
 `disable-file`, and `enable-file` select enabled markdownlint checks by ID,

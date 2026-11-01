@@ -204,3 +204,104 @@ it("keeps MD041 configuration and suppression comments around HTML headings", ()
     lint("<!-- markdownlint-disable MD041 -->\n<h2>Title</h2>\n", options({ MD041: true })),
   ).toEqual([]);
 });
+
+it.each(["\n", "\r\n"])("reports MD022 spacing above attached comments with %j (#849)", (eol) => {
+  const source = "text\n<!-- a -->\n# Title\n".replaceAll("\n", eol);
+  const settings = options({ MD022: { lines_above: 2 } });
+  const findings = lint(source, settings);
+  expect(findings).toEqual([
+    expect.objectContaining({ rule: "style/block-spacing", line: 3, severity: "error" }),
+  ]);
+  expect(findings[0]!.message).toContain("before the heading");
+  expect(findings[0]!.edit).toBeUndefined();
+  expect(Object.getOwnPropertySymbols(findings[0]!)).toEqual([]);
+  expect(checked(source, settings).output).toBe(source);
+  expect(lint(source, { config: settings.config })).toEqual([]);
+  expect(lint(source.replace(`<!-- a -->`, `${eol}<!-- a -->`), settings)).toEqual([]);
+});
+
+it.each([
+  ["- item\n  # Title\n  text\n", 2],
+  ["1. item\n   ## Title\n   text\n", 2],
+  ["> - item\n>   # Title\n>   text\n", 2],
+  ["- outer\n  - inner\n    # Title\n    text\n", 3],
+  ["- ```txt\n  item\n  ```\n  Title\n  -----\n  text\n", 4],
+] as const)("reports both MD022 boundaries inside %j (#850)", (text, line) => {
+  const settings = options({ MD022: true });
+  for (const eol of ["\n", "\r\n"]) {
+    const source = text.replaceAll("\n", eol);
+    const findings = lint(source, settings);
+    expect(findings).toHaveLength(2);
+    expect(findings.map((finding) => finding.line)).toEqual([line, line]);
+    expect(findings.map((finding) => finding.edit)).toEqual([undefined, undefined]);
+    expect(findings[0]!.message).toContain("before the heading");
+    expect(findings[1]!.message).toContain("after the heading");
+    expect(checked(source, settings).output).toBe(source);
+    expect(lint(source, { config: settings.config })).toEqual([]);
+  }
+});
+
+it("keeps a multiline list setext heading together when reporting MD022 below it", () => {
+  const source = "- item\n  Title\n  -----\n  text\n";
+  const settings = options({ MD022: true });
+  const findings = lint(source, settings);
+  expect(findings).toHaveLength(1);
+  expect(findings[0]).toMatchObject({ rule: "style/block-spacing", line: 1 });
+  expect(findings[0]!.message).toContain("after the heading");
+  expect(checked(source, settings).output).toBe(source);
+});
+
+it("counts ordinary blank lines, per-level options and document ends in list headings", () => {
+  for (const source of ["- # Title\n", "- item\n\n  # Title\n\n  text\n"])
+    expect(lint(source, options({ MD022: true }))).toEqual([]);
+  const source = "- item\n  ## Title\n  text\n";
+  expect(lint(source, options({ MD022: { lines_above: [2, 0], lines_below: [2, -1] } }))).toEqual(
+    [],
+  );
+  expect(
+    lint("- item\n  <!-- a -->\n  ## Title\n", options({ MD022: { lines_above: [2, 1] } })),
+  ).toEqual([]);
+});
+
+it("excludes front matter from MD022 list spacing unless explicitly included", () => {
+  const source = "---\nslug: page\n---\n- # Title\n";
+  expect(lint(source, options({ MD022: true }))).toEqual([]);
+  expect(lint(source, options({ MD022: { include_front_matter: true } }))).toEqual([
+    expect.objectContaining({ rule: "style/block-spacing", line: 4 }),
+  ]);
+});
+
+it.each([
+  "<!-- markdownlint-disable-file MD022 -->\n- item\n  # Title\n  text\n",
+  "- item\n  <!-- markdownlint-disable-next-line MD022 -->\n  # Title\n  text\n",
+  "- item\n  # Title <!-- markdownlint-disable-line MD022 -->\n  text\n",
+])(
+  "suppresses source-only MD022 reports without turning them into Prettier warnings: %j",
+  (source) => {
+    for (const settings of [
+      options({ MD022: true }),
+      options({ MD022: true }, {}),
+      options({}, {}),
+    ]) {
+      expect(lint(source, settings)).toEqual([]);
+      expect(checked(source, settings).output).toBe(source);
+    }
+  },
+);
+
+it("retains independent Prettier spacing when an attached-comment MD022 report is suppressed", () => {
+  const source = "<!-- markdownlint-disable-file MD022 -->\n\n# Earlier\n<!-- a -->\n# Title\n";
+  const settings = options({ MD022: { lines_above: 2 } }, {});
+  const findings = lint(source, settings);
+  expect(findings).toHaveLength(1);
+  expect(findings[0]).toMatchObject({ rule: "style/block-spacing", severity: "warn" });
+  expect(findings[0]!.edit).toBeDefined();
+  expect(checked(source, settings).output).toBe(source.replace("# Earlier\n", "# Earlier\n\n"));
+});
+
+it("does not invent a Prettier spacing requirement before a comment attached to a heading", () => {
+  const source = "<!-- markdownlint-disable-file MD022 -->\n\ntext\n<!-- a -->\n# Title\n";
+  const settings = options({ MD022: { lines_above: 2 } }, {});
+  expect(lint(source, settings)).toEqual([]);
+  expect(checked(source, settings).output).toBe(source);
+});

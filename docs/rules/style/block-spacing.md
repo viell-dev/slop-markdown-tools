@@ -183,6 +183,13 @@ means or what a comment applies to:
   shows that definition as text there, and a blank line above the table would
   hide it.
 
+During markdownlint fallback, MD022 still reports missing spacing above a
+heading with an attached HTML comment and around headings in list items. These
+reports have no automatic fix. Add any required blank lines before the attached
+comment; for a list, decide whether to make it loose or lower the required
+counts for that document. Native configuration keeps the boundaries above as
+written.
+
 ## Dialect notes
 
 **On GitHub:** dollar display math and an underlined title directly below it

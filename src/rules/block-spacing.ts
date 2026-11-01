@@ -2,6 +2,7 @@ import { githubDefinitionText } from "../syntax/github-definitions.js";
 import { walk } from "../syntax/walk.js";
 import type { Blockquote, Nodes, Root, RootContent } from "mdast";
 import { directive } from "../core/directives.js";
+import { compatibilityFinding, compatibilityRun } from "../core/source-checks.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { tagLine } from "../syntax/github-protections.js";
@@ -525,9 +526,38 @@ const blockSpacing: Rule = {
         if (directive(node.value)?.kind === "disable-next-line")
           directiveLines.add(node.position!.end.line);
       });
+    // MD022 still reports boundaries that native formatting keeps attached.
+    // No edit is safe here: blank lines can loosen lists or move a directive.
+    const reportHeading = (node: RootContent, above: boolean) => {
+      if (
+        !compatibilityRun() ||
+        node.type !== "heading" ||
+        node.position?.start.offset === undefined ||
+        node.position.end.offset === undefined
+      )
+        return;
+      const lines = linesFor(above ? counts.linesAbove : counts.linesBelow, node.depth);
+      if (lines <= 0) return;
+      const [start, end] = range(node);
+      findings.push(
+        compatibilityFinding(
+          {
+            start,
+            ...(!above ? { end } : {}),
+            message: `Use ${lines} blank line${lines === 1 ? "" : "s"} ${above ? "before" : "after"} the heading. Left as written to preserve block and comment attachment.`,
+          },
+          ["MD022"],
+        ),
+      );
+    };
     // Only the blocks of the document and of block quotes are compared. A
     // blank line between the blocks of a list item makes its list loose.
     walk(document.tree, (parent) => {
+      if (compatibilityRun() && parent.type === "listItem")
+        for (const node of parent.children) {
+          reportHeading(node, true);
+          reportHeading(node, false);
+        }
       if (parent.type !== "root" && parent.type !== "blockquote") return;
       // Live Preview reads headings/list markers inside ordinary quotes as
       // literal inline text, so their paragraph boundaries stay (#436).
@@ -542,8 +572,12 @@ const blockSpacing: Rule = {
         );
         if (!located) continue;
         const subject = subjectOf(document, parent, index, counts);
-        if (!subject || together(document, parent, index, directiveLines, includeFrontMatter))
+        if (!subject) continue;
+        if (together(document, parent, index, directiveLines, includeFrontMatter)) {
+          if (before.type === "html" && /^<!--[^]*-->$/.test(before.value.trim()))
+            reportHeading(after, true);
           continue;
+        }
         let end = range(before)[1];
         // VitePress's front matter takes in the line ending of its closing
         // line, which stays as written: new lines go after it.

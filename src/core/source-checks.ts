@@ -12,6 +12,8 @@ export interface Attribution {
   checks: string[];
   editChecks?: string[];
   parts?: Finding[];
+  /** A competitor-only report with no native or Prettier counterpart. */
+  sourceOnly?: true;
 }
 export type AttributedFinding = Finding & { [sourceChecks]?: Attribution };
 const recorded = new WeakMap<Finding, Attribution>();
@@ -32,6 +34,14 @@ export function compatibilityRun(): boolean {
 export function attributionOf(finding: Finding): Attribution | undefined {
   return (finding as AttributedFinding)[sourceChecks] ?? recorded.get(finding);
 }
+function record(finding: Finding, info: Attribution): Finding {
+  recorded.set(finding, info);
+  return compatibilityDepth > 0 ? Object.assign(finding, { [sourceChecks]: info }) : finding;
+}
+/** Report a source requirement that native formatting intentionally leaves alone. */
+export function compatibilityFinding(finding: Finding, checks: string[]): Finding {
+  return record(finding, { checks, sourceOnly: true });
+}
 export function attributed(
   finding: Finding,
   checks: string[],
@@ -43,8 +53,7 @@ export function attributed(
     ...(parts ? { parts } : {}),
     ...(editChecks ? { editChecks } : {}),
   };
-  recorded.set(finding, info);
-  return compatibilityDepth > 0 ? Object.assign(finding, { [sourceChecks]: info }) : finding;
+  return record(finding, info);
 }
 export function compatibilityParts(finding: Finding): Finding[] {
   const info = attributionOf(finding);
