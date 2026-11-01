@@ -440,6 +440,11 @@ describe("competitor conversion (#669)", () => {
 });
 
 describe("a .prettierignore that excludes all Markdown (#788)", () => {
+  it("uses only a Prettier-compatible entry as proof (#845)", () => {
+    expect(ignoresAllMarkdown("***/*.md\n")).toBe(false);
+    expect(ignoresAllMarkdown("***\n")).toBe(true);
+    expect(ignoresAllMarkdown("***/*.md\n*.md\n")).toBe(true);
+  });
   it.each([
     "**/*.md\n**/*.markdown\n",
     "*.md\n*.markdown",

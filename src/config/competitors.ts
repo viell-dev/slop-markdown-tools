@@ -24,9 +24,12 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
  * that cannot be established, the answer is no and the Prettier configuration
  * stays in use. A negated entry can re-include documents in ways that samples
  * cannot rule out, so a file with one never qualifies, nor does one with a
- * character class. Otherwise one entry by itself must ignore every sample `.md`
- * path, as Prettier reads it, with the `ignore` package and without regard to
- * letter case: names and directories of a character absent from the entries,
+ * character class. A long star run before a slash cannot establish it either:
+ * Prettier's bundled matcher can leave root files unmatched where `ignore`
+ * gives the run a zero-component globstar meaning.
+ * Otherwise one entry by itself must ignore every sample `.md` path, as Prettier
+ * reads it, with the `ignore` package and without regard to letter case: names
+ * and directories of a character absent from the entries,
  * and longer ones, and a file named only `.md`, which `?` cannot match, at the
  * root and at more depths than any entry has components. An entry can match a
  * name made of characters it does not contain only through wildcards, which
@@ -48,6 +51,8 @@ export function ignoresAllMarkdown(text: string): boolean {
       for (let level = 0; level <= depth; level++)
         probes.push(`${`${directory}/`.repeat(level)}${stem}.md`);
   return lines.some((line) => {
+    // Prettier's bundled matcher can leave root files unmatched for this entry (#845).
+    if (line.includes("***/")) return false;
     const matcher = gitignore({ allowRelativePaths: true }).add(line);
     return probes.every((probe) => matcher.ignores(probe));
   });

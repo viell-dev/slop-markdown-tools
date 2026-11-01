@@ -105,6 +105,61 @@ describe(".gitignore files", () => {
     const checked = run(root, ["lint", "--json", "index.md"]);
     expect(checked.status, checked.stdout).toBe(0);
   });
+  it.skipIf(!hasGit).each([
+    ["/**\n", []],
+    ["***/target.md\n", ["a/keep.md", "a/other.md", "c.md", "elsewhere.md"]],
+    ["a/****\n!a/keep.md\n", ["a/keep.md", "c.md", "elsewhere.md", "target.md"]],
+    [
+      "[[:constructor:]]*.md\n",
+      [
+        "a/deep/target.md",
+        "a/keep.md",
+        "a/other.md",
+        "a/target.md",
+        "c.md",
+        "elsewhere.md",
+        "target.md",
+      ],
+    ],
+  ] as const)("matches Git for %j (#843)", async (pattern, selected) => {
+    const names = [
+      "a/deep/target.md",
+      "a/keep.md",
+      "a/other.md",
+      "a/target.md",
+      "c.md",
+      "elsewhere.md",
+      "target.md",
+    ];
+    const root = await fixture({
+      ".gitignore": pattern,
+      ...Object.fromEntries(names.map((name) => [name, "Text.\n"])),
+    });
+    gitInit(root);
+    const ignored = gitIgnored(root, names);
+    expect(names.filter((name) => !ignored.includes(name))).toEqual(selected);
+    expect((await discover(root, [], [])).selected).toEqual(selected);
+  });
+  it.skipIf(!hasGit)("names the last matching rule that Git reports (#844)", async () => {
+    const root = await fixture({ ".gitignore": "*.md\ntarget.md\n", "target.md": "Text.\n" });
+    gitInit(root);
+    const checked = spawnSync("git", ["check-ignore", "-v", "-z", "--stdin"], {
+      cwd: root,
+      input: "target.md\0",
+      encoding: "utf8",
+    });
+    expect(checked.status, checked.stderr).toBe(0);
+    const fields = checked.stdout.split("\0");
+    expect(fields.slice(0, 4)).toEqual([".gitignore", "2", "target.md", "target.md"]);
+    const set = await discover(root, [path.join(root, "target.md")], []);
+    expect(set.selected).toEqual([]);
+    expect(set.skipped.map((item) => item.message)).toEqual([
+      `Skipped ignored input: target.md (matched by ${JSON.stringify(fields[2])} in ${fields[0]}). It is not processed.`,
+    ]);
+    const reported = run(root, ["lint", "--json", "target.md"]);
+    expect(reported.status, reported.stderr).toBe(0);
+    expect(parseReport(reported.stdout).skipped).toEqual(set.skipped);
+  });
 });
 
 describe("Git's ignore rules at the workspace's boundaries", () => {
