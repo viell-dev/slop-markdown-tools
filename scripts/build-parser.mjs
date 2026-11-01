@@ -58,14 +58,16 @@ const removedModuleLabels = new Set([
 
 /**
  * Check Rolldown's module-start comments against independently identified inputs.
- * RenderedModule.code identifies the comment channel even though its new plain
- * `// label` syntax is indistinguishable from an ordinary source comment.
- * Source URLs, banners and ordinary string contents are not path provenance.
+ * RenderedModule.code identifies known headers. A second generation with debug
+ * information disabled identifies the emission channel, including headers absent
+ * from the structured graph. Ordinary comments and strings remain in both modes.
  * @param {string} code
  * @param {ReadonlyMap<string, string | null>} moduleSources
+ * @param {string} codeWithoutMarkers
  */
-export function assertPortableModules(code, moduleSources) {
+export function assertPortableModules(code, moduleSources, codeWithoutMarkers) {
   let markers = 0;
+  const headers = new Set();
   const lines = code.split("\n");
   for (const [label, source] of moduleSources) {
     if (label === "mdrefine:entry") {
@@ -92,8 +94,15 @@ export function assertPortableModules(code, moduleSources) {
       `Review changed parser module marker: ${label}`,
     );
     markers += occurrences;
+    headers.add(header);
   }
   assert(markers, "Missing parser module markers");
+  assert.equal(typeof codeWithoutMarkers, "string", "Missing debug-disabled parser output");
+  assert.equal(
+    lines.filter((line) => !headers.has(line)).join("\n"),
+    codeWithoutMarkers,
+    "Review parser output missing from the module-marker graph",
+  );
 }
 
 /** @param {string} filename */
@@ -172,6 +181,22 @@ async function readLicense(root) {
  * @param {{ repositoryRoot?: string }} [options]
  */
 export async function bundleParser(options = {}) {
+  const marked = await generateParser(options, "simple");
+  const unmarked = await generateParser(options, "none");
+  assert.deepEqual(
+    { ...unmarked.manifest, runtimeSha256: marked.manifest.runtimeSha256 },
+    marked.manifest,
+    "Parser provenance changed between module-marker generations",
+  );
+  assertPortableModules(marked.code, marked.moduleSources, unmarked.code);
+  return { ...marked, codeWithoutMarkers: unmarked.code };
+}
+
+/**
+ * @param {{ repositoryRoot?: string }} options
+ * @param {"simple" | "none"} attachDebugInfo
+ */
+async function generateParser(options, attachDebugInfo) {
   const localSources = [];
   for (const file of [
     "scripts/build-parser.mjs",
@@ -222,6 +247,7 @@ export async function bundleParser(options = {}) {
     input: "mdrefine:entry",
     platform: "neutral",
     resolve: { conditionNames: ["import", "default"] },
+    experimental: { attachDebugInfo },
     plugins: [
       {
         name: "mdrefine-reviewed-parser-corrections",
@@ -380,7 +406,6 @@ export async function bundleParser(options = {}) {
       }),
     );
     assert.equal(moduleSources.size, modules.length, "Duplicate parser module labels");
-    assertPortableModules(chunk.code, moduleSources);
 
     for (const { file, sha256 } of localSources) {
       assert.equal(

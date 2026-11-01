@@ -329,6 +329,7 @@ it("records actual uppercase license filenames and unchanged raw provenance", as
 it("rebuilds reproducibly without touching dist", async () => {
   const again = await bundleParser();
   expect(again.code).toBe(bundle.code);
+  expect(again.codeWithoutMarkers).toBe(bundle.codeWithoutMarkers);
   expect(again.licenses).toBe(bundle.licenses);
   expect(again.declaration).toBe(bundle.declaration);
   expect(again.manifest).toEqual(bundle.manifest);
@@ -336,13 +337,14 @@ it("rebuilds reproducibly without touching dist", async () => {
 
 it("checks module provenance independently of arbitrary source comments", () => {
   const sources = bundle.moduleSources;
+  const unmarked = bundle.codeWithoutMarkers;
   // This checks the actual production-builder result. Existing graph assertions
   // independently retain all 78 modules, 76 inputs, transforms and licenses.
   expect(sources.size).toBe(78);
   expect(sources.has("\\0rolldown/runtime.js")).toBe(true);
   expect(sources.has("mdrefine:edit-map")).toBe(true);
   expect(sources.get("mdrefine:entry")).toBeNull();
-  expect(() => assertPortableModules(bundle.code, sources)).not.toThrow();
+  expect(() => assertPortableModules(bundle.code, sources, unmarked)).not.toThrow();
   const relative = [...sources.keys()].find((label) =>
     label.startsWith("node_modules/mdast-util-to-string/"),
   )!;
@@ -363,7 +365,7 @@ it("checks module provenance independently of arbitrary source comments", () => 
   ]) {
     const changed = bundle.code.replaceAll(`// ${relative}\n`, `// ${replacement}\n`);
     expect(changed, replacement).not.toBe(bundle.code);
-    expect(() => assertPortableModules(changed, sources), replacement).toThrow(
+    expect(() => assertPortableModules(changed, sources, unmarked), replacement).toThrow(
       "Review changed parser module marker",
     );
     // A change in Rolldown's actual module-header channel must fail even if it
@@ -373,17 +375,17 @@ it("checks module provenance independently of arbitrary source comments", () => 
       relative,
       sources.get(relative)!.replace(`// ${relative}\n`, `// ${replacement}\n`),
     );
-    expect(() => assertPortableModules(changed, changedSources), replacement).toThrow(
+    expect(() => assertPortableModules(changed, changedSources, unmarked), replacement).toThrow(
       "Unexpected parser module header",
     );
   }
   for (const marker of ["//", "// ", `//#region ${relative}`, `// ${relative}\n// ${relative}`]) {
     const changed = bundle.code.replaceAll(`// ${relative}`, marker);
-    expect(() => assertPortableModules(changed, sources), marker).toThrow(
+    expect(() => assertPortableModules(changed, sources, unmarked), marker).toThrow(
       "Review changed parser module marker",
     );
   }
-  expect(() => assertPortableModules("export {};\n", sources)).toThrow(
+  expect(() => assertPortableModules("export {};\n", sources, unmarked)).toThrow(
     "Review changed parser module marker",
   );
   for (const label of [
@@ -394,15 +396,66 @@ it("checks module provenance independently of arbitrary source comments", () => 
     expect(bundle.code).not.toContain(`// ${label}\n`);
     const changed = new Map(sources);
     changed.set(label, null);
-    expect(() => assertPortableModules(bundle.code, changed)).toThrow(
+    expect(() => assertPortableModules(bundle.code, changed, unmarked)).toThrow(
       "Unexpected parser module header",
     );
-    expect(() => assertPortableModules(`${bundle.code}\n// ${label}\n`, sources)).toThrow(
+    expect(() => assertPortableModules(`${bundle.code}\n// ${label}\n`, sources, unmarked)).toThrow(
       "Review changed parser module marker",
     );
   }
   // /code, /src and /build are also legitimate source fragments: no raw
   // repository-root substring test may classify them as emitted physical paths.
-  const ordinary = `${bundle.code}\n// /code /src /build\nconst unrelated = "/micromark-util-edit-map/";\n`;
-  expect(() => assertPortableModules(ordinary, sources)).not.toThrow();
+  const ordinary = '\n// /code /src /build\nconst unrelated = "/micromark-util-edit-map/";\n';
+  expect(() =>
+    assertPortableModules(bundle.code + ordinary, sources, unmarked + ordinary),
+  ).not.toThrow();
+});
+
+it("rejects output markers absent from the module graph (#851)", () => {
+  for (const label of [
+    "node_modules/not-in-graph/index.js",
+    "/outside/index.js",
+    "C:/outside path/index.js",
+    "\\\\server\\share\\index.js",
+    "mdrefine:unexpected",
+    "\\0rolldown/unreviewed.js",
+  ]) {
+    expect(() =>
+      assertPortableModules(
+        `${bundle.code}\n// ${label}\n`,
+        bundle.moduleSources,
+        bundle.codeWithoutMarkers,
+      ),
+    ).toThrow("Review parser output missing from the module-marker graph");
+  }
+  const missing = new Map(bundle.moduleSources);
+  missing.delete("\\0rolldown/runtime.js");
+  expect(() => assertPortableModules(bundle.code, missing, bundle.codeWithoutMarkers)).toThrow(
+    "Review parser output missing from the module-marker graph",
+  );
+  expect(() => {
+    // @ts-expect-error The independent emission witness is required.
+    assertPortableModules(bundle.code, bundle.moduleSources);
+  }).toThrow("Missing debug-disabled parser output");
+});
+
+it("preserves ordinary path comments and string contents in both emission modes", () => {
+  const ordinary = [
+    "\n// node_modules/not-in-graph/index.js",
+    "// C:/a path/index.js",
+    "const text = '// node_modules/not-in-graph/index.js';",
+    "const template = `source example:",
+    "// node_modules/template/index.js",
+    "`;\n",
+  ].join("\n");
+  expect(() =>
+    assertPortableModules(
+      bundle.code + ordinary,
+      bundle.moduleSources,
+      bundle.codeWithoutMarkers + ordinary,
+    ),
+  ).not.toThrow();
+  expect(() =>
+    assertPortableModules(bundle.code + ordinary, bundle.moduleSources, bundle.codeWithoutMarkers),
+  ).toThrow("Review parser output missing from the module-marker graph");
 });
