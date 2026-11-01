@@ -37,9 +37,12 @@ When no mdrefine configuration is found, the CLI converts the markdownlint and
 Prettier configurations that the same search finds, in memory, and uses the
 result in place of the `recommended` preset. The result uses no preset: it
 enables what those tools check. `--no-competitor-config` turns this fallback
-off; an explicit `--config` also bypasses it. The Node API's
-`loadConfig(start, explicit, competitorFallback)` accepts `false` as its third
-argument to turn it off. Portable `convertConfig({ markdownlint, prettier })`
+off; an explicit `--config` also bypasses it. Converted ignores, file selections
+and overrides use the [workspace root](cli.md#the-workspace-root), including an
+explicit `--root`. The Node API's
+`loadConfig(start, explicit, competitorFallback, workspaceRoot)` accepts `false`
+as its third argument to turn the fallback off, and an optional fourth argument
+to set the workspace root. Portable `convertConfig({ markdownlint, prettier })`
 converts objects without reading files. Neither changes dialect detection.
 
 JavaScript, TypeScript, TOML, and JSON5 configurations contribute nothing, and

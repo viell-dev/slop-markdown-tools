@@ -119,11 +119,15 @@ export async function searchConfig(start: string) {
   }
   return { directories, file, fallbackRoot };
 }
-/** Search for and load mdrefine settings; optionally convert competitor data without executing it. */
+/**
+ * Search for and load mdrefine settings; optionally convert competitor data without executing it.
+ * An explicit workspace root also sets the base for converted file patterns.
+ */
 export async function loadConfig(
   start: string,
   explicit?: string,
   competitorFallback = true,
+  workspaceRoot?: string,
 ): Promise<LoadedConfig> {
   const directories: string[] = [];
   let file = explicit ? path.resolve(explicit) : undefined;
@@ -134,6 +138,7 @@ export async function loadConfig(
     file = search.file;
     fallbackRoot = search.fallbackRoot;
   }
+  if (workspaceRoot !== undefined) fallbackRoot = path.resolve(workspaceRoot);
 
   if (!file && competitorFallback) {
     const conversion = await loadCompetitorConfig(directories, false, fallbackRoot, true);
@@ -202,7 +207,7 @@ export async function loadConfig(
     if (problem) throw new Error(`Invalid configuration in ${shown}: ${problem}`);
   }
   validateConfig(value);
-  const root = file ? path.dirname(file) : fallbackRoot;
+  const root = file && workspaceRoot === undefined ? path.dirname(file) : fallbackRoot;
   const plugins: Plugin[] = [];
   // Only a configuration file can name plugins, so there is a file to resolve them from.
   if (file)
