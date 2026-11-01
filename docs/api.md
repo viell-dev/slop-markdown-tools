@@ -332,7 +332,7 @@ These exports convert markdownlint and Prettier configurations, as
 | ----------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
 | `convertConfig({ markdownlint, prettier })`                                   | `mdrefine`      | Converts configuration objects into a `ConversionReport`. It never reads files or runs configuration code.     |
 | `competitorMappings`                                                          | `mdrefine`      | The `CompetitorMapping` rows that the conversion follows.                                                      |
-| `loadConfig(start, explicit?, competitorFallback?)`                           | `mdrefine/node` | Loads the configuration as the CLI does, with the fallback unless `competitorFallback` is `false`.             |
+| `loadConfig(start, explicit?, competitorFallback?, workspaceRoot?)`           | `mdrefine/node` | Loads the configuration as the CLI does, with the fallback unless `competitorFallback` is `false`.             |
 | `loadCompetitorConfig(directories, executeScripts?, destination?, fallback?)` | `mdrefine/node` | Converts the files found in `directories`, nearest first, as `config convert` does, into a `ConversionReport`. |
 | `competitorFiles`                                                             | `mdrefine/node` | The file names searched for each tool.                                                                         |
 
@@ -362,6 +362,12 @@ configuration whose `.prettierignore` excludes all Markdown, a `.prettierignore`
 with negated entries under the fallback, or a `.markdownlintignore` beside a
 markdownlint configuration in use. When it could use none, `sources` is empty
 and `config` is `{}`.
+
+`loadConfig`'s optional `workspaceRoot` sets the returned root and the base for
+converted file patterns, as the CLI's `--root` does. The configuration search
+still starts at `start`. Without it, the root is the configuration file's
+directory, the repository or vault boundary, or the starting directory when none
+is found.
 
 `loadConfig` returns a `LoadedConfig`. When the fallback found markdownlint or
 Prettier files, it includes their `conversion` report, and when it used them,
