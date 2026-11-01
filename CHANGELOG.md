@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Keep lists on their footnote label's line stable with `startIndented: true`
+  ([#802](https://github.com/viell-dev/slop-markdown-tools/issues/802)).
+
 - Match Git's whole-component asterisk runs, including re-inclusion after a
   trailing run
   ([#843](https://github.com/viell-dev/slop-markdown-tools/issues/843)).
