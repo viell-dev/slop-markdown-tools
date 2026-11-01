@@ -453,6 +453,37 @@ describe("competitor configuration CLI (#669)", () => {
 });
 
 describe("ancestor conversion and EditorConfig resolution", () => {
+  it("preserves matcher-backed components through rebasing and intersections (#837)", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always"}',
+      ".editorconfig":
+        "root=true\n[sub*/**]\nindent_size=4\n[**/doc*.md]\nmax_line_length=37\n[**/*.{js,ts}]\nindent_size=8\n",
+      "sub-guide/docs.md": "text\n",
+      "sub-guide/other.md": "text\n",
+    });
+    const child = path.join(root, "sub-guide");
+    const written = run(child, ["config", "convert", "--write", "--root", "."]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(written.stderr).not.toContain("not carried over");
+    const config = await readFile(path.join(child, "mdrefine.config.jsonc"), "utf8");
+    expect(config).not.toContain("undefined");
+    expect(config).not.toContain(".js");
+    expect(config).not.toContain(".ts");
+    for (const file of ["docs.md", "other.md"]) {
+      const reference = await prettierResolve(path.join(child, file), { editorconfig: true });
+      const result = run(child, ["config", "explain", file]);
+      expect(result.status, result.stderr).toBe(0);
+      const rules = parseExplanation(result.stdout).effective.rules;
+      expect(rules["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: reference?.tabWidth }),
+      ]);
+      expect(rules["style/wrap"]).toEqual([
+        "warn",
+        expect.objectContaining({ width: reference?.printWidth ?? 80 }),
+      ]);
+    }
+  });
   it.each(["prettier", "editorconfig", "prettierignore", "globs", "ignores"])(
     "writes and reads ancestor %s patterns in a child",
     async (family) => {

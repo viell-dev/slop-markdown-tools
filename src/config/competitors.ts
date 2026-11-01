@@ -93,15 +93,31 @@ export const competitorFiles = {
   ],
 } as const;
 
+/** Keep the source components available to conversion rather than synthesized extglobs. */
+function patternRows(matcher: Minimatch) {
+  // Keep brace branches separate: Minimatch can merge *.ts and *.tsx into an
+  // extglob that no longer exposes either literal extension.
+  return matcher.globSet.length <= 1
+    ? matcher.set
+    : matcher.globSet.flatMap(
+        (alternative) =>
+          new Minimatch(alternative, {
+            ...matcher.options,
+            nobrace: true,
+            nonegate: true,
+            nocomment: true,
+          }).set,
+      );
+}
+
 /** Reject globs whose final path component can only name another language. */
 function markdownPattern(pattern: string): boolean {
-  const matcher = new Minimatch(pattern);
-  return matcher.set.some((parts) => {
+  return patternRows(new Minimatch(pattern)).some((parts) => {
     const last = parts.at(-1);
     if (typeof last === "string") return /\.(md|markdown)$/i.test(last);
-    if (last instanceof RegExp) {
+    if (last !== undefined && last !== GLOBSTAR) {
       // A literal extension remains decidable even when the basename is a glob.
-      const extension = /\.([a-zA-Z0-9]+)$/.exec((last as RegExp & { _glob: string })._glob);
+      const extension = /\.([a-zA-Z0-9]+)$/.exec(last.pattern);
       return !extension || /^(md|markdown)$/i.test(extension[1]!);
     }
     return true;
@@ -154,8 +170,8 @@ function translatePattern(pattern: string, dialect: PatternDialect): string | un
 /** Intersect component globs exactly when one component contains the other. */
 function intersectPatterns(left: string, right: string): string[] {
   const results: string[] = [];
-  for (const a of new Minimatch(left, { dot: true }).set)
-    for (const b of new Minimatch(right, { dot: true }).set) {
+  for (const a of patternRows(new Minimatch(left, { dot: true })))
+    for (const b of patternRows(new Minimatch(right, { dot: true }))) {
       const visit = (i: number, j: number): string[][] => {
         if (i === a.length && j === b.length) return [[]];
         const x = a[i],
@@ -169,7 +185,7 @@ function intersectPatterns(left: string, right: string): string[] {
           if (y !== undefined)
             tails.push(
               ...visit(i, j + 1).map((tail) => [
-                y === GLOBSTAR ? "**" : typeof y === "string" ? literalPattern(y) : y._glob!,
+                y === GLOBSTAR ? "**" : typeof y === "string" ? literalPattern(y) : y.pattern,
                 ...tail,
               ]),
             );
@@ -180,7 +196,7 @@ function intersectPatterns(left: string, right: string): string[] {
           if (x !== undefined)
             tails.push(
               ...visit(i + 1, j).map((tail) => [
-                typeof x === "string" ? literalPattern(x) : x._glob!,
+                typeof x === "string" ? literalPattern(x) : x.pattern,
                 ...tail,
               ]),
             );
@@ -194,8 +210,8 @@ function intersectPatterns(left: string, right: string): string[] {
         } else if (typeof y === "string") {
           if (!x.test(y)) return [];
           component = literalPattern(y);
-        } else if (x._glob === y._glob || y._glob === "*") component = x._glob!;
-        else if (x._glob === "*") component = y._glob!;
+        } else if (x.pattern === y.pattern || y.pattern === "*") component = x.pattern;
+        else if (x.pattern === "*") component = y.pattern;
         else throw new Error("Unrepresentable glob intersection");
         return visit(i + 1, j + 1).map((tail) => [component, ...tail]);
       };
@@ -304,7 +320,7 @@ export async function loadCompetitorConfig(
       );
       return [];
     }
-    for (const parts of matcher.set) {
+    for (const parts of patternRows(matcher)) {
       let states = new Set([0]);
       const closure = () => {
         for (const index of states) if (parts[index] === GLOBSTAR) states.add(index + 1);
@@ -325,7 +341,11 @@ export async function loadCompetitorConfig(
         const rest = parts
           .slice(index)
           .map((part) =>
-            part === GLOBSTAR ? "**" : typeof part === "string" ? literalPattern(part) : part._glob,
+            part === GLOBSTAR
+              ? "**"
+              : typeof part === "string"
+                ? literalPattern(part)
+                : part.pattern,
           )
           .join("/");
         if (rest) results.push(rest);
