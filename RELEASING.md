@@ -1,11 +1,10 @@
 # Releasing
 
-Agents publish a version when it is ready: its release pull request has merged
-and every check in this guide has passed. The repository owner authorized that
-for every release on 2026-10-18. The configured trusted publisher and the
-`NPM_PUBLISH_ENABLED` variable only make publication possible. Published
-versions, tags, and release assets are never replaced: a correction gets a new
-version.
+Agents have standing authority to publish routine releases within the project's
+agreed scope when the release pull request has merged and every check in this
+guide has passed. The configured trusted publisher and `NPM_PUBLISH_ENABLED`
+only make publication possible. Published versions, tags, and release assets are
+never replaced: a correction gets a new version.
 
 Dependency updates alone are not a reason to release. Once merged, they ship
 with the next release that fixes a defect or adds a feature. The exception is a
@@ -103,11 +102,20 @@ On a branch, in one pull request:
 2. Rename the `Unreleased` section of `CHANGELOG.md` to
    `## VERSION - YYYY-MM-DD`, with the date of publication. The Release workflow
    takes the release notes from this section and fails without it.
-3. Update the pinned installation commands in `README.md` and
-   `docs/quick-start.md`, which the tests compare with the version, the
-   `version` default of `.github/workflows/release.yml`, and every example and
-   document that names the version.
-4. Refresh the indirect dependencies with `npm update`, so that the tests run
+3. Update the pinned installation commands in `README.md`,
+   `docs/quick-start.md`, and the other pages that name the version, which the
+   tests compare with it, the `version` default of
+   `.github/workflows/release.yml`, and every example and document that names
+   the version. When users need to do something to upgrade, add the release's
+   section to `docs/upgrading.md`.
+4. For a new minor version, write `docs/release-notes/X.Y.md`, titled "What's
+   new in X.Y": three to five highlights, then a heading for each change users
+   will notice, with a short example, and a link to the release's upgrading
+   steps rather than a copy of them. Open the changelog section with a link to
+   the page, as 0.6.0's does, so that the GitHub release opens with it too. The
+   docs tests require both for the version in `package.json`. A patch release
+   adds to its minor version's page only what users will notice.
+5. Refresh the indirect dependencies with `npm update`, so that the tests run
    with what a fresh installation of the package gets. The lockfile does not
    ship, and Dependabot updates only the direct dependencies. Check first that
    every updated package is at least seven days old and comes from its known
@@ -116,7 +124,7 @@ On a branch, in one pull request:
    publication time, maintainer and patch review, and verification in the
    release PR and #330. Keep the normal waiting period for other packages; a
    security exception does not waive checks or review.
-5. Run the checks below, push, and wait for CI.
+6. Run the checks below, push, and wait for CI.
 
 Apply the [contributor review policy](CONTRIBUTING.md#review-and-verification).
 The release normally gets one independent review of the coherent change range
@@ -135,7 +143,7 @@ canonical workload sizes and host identity independently of a runner's exit
 status. Obsidian uses the verified app, installer and runtime versions in
 `scripts/obsidian/baseline.json` and its digest-pinned Docker base; reports
 include observed versions and the actual built-image ID/platform and declared
-base label. The [contributor guide](CONTRIBUTING.md#checks) explains baseline
+base label. The [contributor guide](CONTRIBUTING.md#tests) explains baseline
 advancement and the separate explicit latest route. Adversarial generation is
 weekly/manual discovery and never gates release. Each discovery since the last
 release receives an issue and is fixed within scope or recorded as a limit;
@@ -226,11 +234,11 @@ in on npmjs.com, in the package's **Settings** tab:
   without the second factor, and a change made by hand on the account, such as a
   dist-tag, asks for it too.
 
-The maintainer checks these after setting them up or changing them, not for each
-release; they were last checked on 2026-10-18. Only the maintainer's account can
-change them, and a successful publication already shows that the entry for this
-workflow exists. It cannot show that no other entry exists: npm accepts up to
-ten trusted publishers per package, and each of them can publish.
+The npm maintainer checks these after setup or changes, rather than for each
+release. Only that account can change them, and a successful publication already
+shows that the entry for this workflow exists. It cannot show that no other
+entry exists: npm accepts up to ten trusted publishers per package, and each of
+them can publish.
 
 ## Publish
 
@@ -250,13 +258,15 @@ any failure publishes nothing:
   workflow, event, repository or commit do not qualify; other required statuses
   retain their specified app identities and are never exempted. The gate needs
   the newest eligible CI producer attempt to succeed before accepting its latest
-  job results, even when an older attempt passed. A pending producer waits; an
-  unsuccessful completed producer fails. Optional Node 26 can delay completion,
-  but its allowed test failure does not fail the workflow or become a release
-  requirement. Whether a Node 26 timeout or cancellation leaves the CI run
-  successful is unverified; an unsuccessful run is rejected. The gate needs read
-  access to checks and Actions runs. It waits up to 40 minutes for CI that is
-  still running, so it can be dispatched right after the merge.
+  job results, even when an older attempt passed. Check-run identities determine
+  recency; carried rerun timestamps and null starts do not. A pending producer
+  waits even before its jobs appear; an unsuccessful completed producer fails.
+  Optional Node 26 can delay completion, but its allowed test failure does not
+  fail the workflow or become a release requirement. Whether a Node 26 timeout
+  or cancellation leaves the CI run successful is unverified; an unsuccessful
+  run is rejected. The gate needs read access to checks and Actions runs. It
+  waits up to 40 minutes for CI that is still running, so it can be dispatched
+  right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository

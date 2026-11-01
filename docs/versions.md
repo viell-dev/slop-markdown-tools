@@ -33,7 +33,8 @@ A deliberate change of what formatting produces, such as a new default, a rule
 added to a preset, or a changed option, comes in a minor release, and so does a
 higher minimum Node.js version. Pin the exact version, as the
 [installation](quick-start.md#install) does, so that you choose when such a
-change reaches your documents.
+change reaches your documents. [Upgrading](upgrading.md) gives the steps for the
+releases that need them.
 
 ## Releases and channels
 

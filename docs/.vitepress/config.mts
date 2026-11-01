@@ -1,7 +1,70 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { slug } from "github-slugger";
 import { defineConfig } from "vitepress";
+
+// One collapsed group per rule category, listing the pages in docs/rules/<category>/.
+const rules = fileURLToPath(new URL("../rules/", import.meta.url));
+const categories: Record<string, string> = {
+  content: "Content",
+  forgejo: "Forgejo and Gitea",
+  github: "GitHub",
+  links: "Links",
+  obsidian: "Obsidian",
+  structure: "Structure",
+  style: "Style",
+};
+const ruleGroups = readdirSync(rules)
+  .sort()
+  .map((category) => ({
+    text: categories[category] ?? category,
+    collapsed: true,
+    items: readdirSync(path.join(rules, category))
+      .filter((name) => name.endsWith(".md"))
+      .sort()
+      .map((name) => {
+        const id = `${category}/${name.slice(0, -".md".length)}`;
+        return { text: id, link: `/rules/${id}` };
+      }),
+  }));
+
+// The release notes, one page per minor version in docs/release-notes/, newest first.
+const releaseNotes = readdirSync(fileURLToPath(new URL("../release-notes/", import.meta.url)))
+  .filter((name) => /^\d+\.\d+\.md$/.test(name))
+  .map((name) => name.slice(0, -".md".length))
+  .sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+  .map((version) => ({ text: `What's new in ${version}`, link: `/release-notes/${version}` }));
+// The version the site describes: the Pages workflow builds it from that release's tag.
+const { version } = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { version: string };
+
+type Item = { text: string; link: string; items?: unknown[]; collapsed?: boolean };
+const guide: Item[] = [
+  { text: "Getting started", link: "/quick-start" },
+  { text: "Examples", link: "/examples" },
+  { text: "Obsidian vaults", link: "/obsidian" },
+  { text: "Integrations", link: "/integrations" },
+];
+const reference: Item[] = [
+  { text: "Command line", link: "/cli" },
+  { text: "Configuration", link: "/configuration" },
+  { text: "Rules", link: "/rules", collapsed: true, items: ruleGroups },
+  { text: "Dialects", link: "/dialects" },
+  { text: "VitePress", link: "/vitepress" },
+  { text: "Library API", link: "/api" },
+  { text: "Plugins", link: "/plugins" },
+  { text: "Glossary", link: "/glossary" },
+];
+const releases: Item[] = [
+  ...releaseNotes,
+  { text: "Upgrading", link: "/upgrading" },
+  { text: "Changelog", link: "/changelog" },
+];
+// A menu in the top bar lists the pages without their nested sidebar groups.
+const menu = (items: Item[]) => items.map(({ text, link }) => ({ text, link }));
 
 export default defineConfig({
   // The configuration's JSON Schema, at the address that the configuration page gives.
@@ -32,44 +95,25 @@ export default defineConfig({
   },
   themeConfig: {
     nav: [
-      { text: "Get started", link: "/quick-start" },
-      { text: "Rules", link: "/rules" },
-      { text: "Reference", link: "/cli" },
-      { text: "Changelog", link: "/changelog" },
+      { text: "Guide", items: menu(guide) },
+      { text: "Reference", items: menu(reference) },
+      { text: "Examples", link: "/examples" },
+      { text: version, items: [...menu(releases), { text: "Versions", link: "/versions" }] },
       {
         text: "Contribute",
         link: "https://github.com/viell-dev/slop-markdown-tools/blob/main/CONTRIBUTING.md",
       },
     ],
     sidebar: [
+      { text: "Guide", items: guide },
+      { text: "Reference", items: reference },
       {
-        text: "Guide",
-        items: [
-          { text: "Getting started", link: "/quick-start" },
-          { text: "Examples", link: "/examples" },
-          { text: "Obsidian vaults", link: "/obsidian" },
-          { text: "Integrations", link: "/integrations" },
-        ],
-      },
-      {
-        text: "Reference",
-        items: [
-          { text: "Command line", link: "/cli" },
-          { text: "Configuration", link: "/configuration" },
-          { text: "Rules", link: "/rules" },
-          { text: "Dialects", link: "/dialects" },
-          { text: "VitePress", link: "/vitepress" },
-          { text: "Library API", link: "/api" },
-          { text: "Plugins", link: "/plugins" },
-        ],
-      },
-      {
-        text: "Project",
+        text: "About",
         items: [
           { text: "How it works and its limits", link: "/design" },
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Versions", link: "/versions" },
-          { text: "Changelog", link: "/changelog" },
+          ...releases,
         ],
       },
     ],

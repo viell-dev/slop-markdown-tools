@@ -57,6 +57,37 @@ skips, such as one that the configuration's `ignore` patterns match.
 starts with `-` from being read as an option. This hook checks each file as it
 is on disk, including changes that are not staged.
 
+With the [pre-commit](https://pre-commit.com/) framework, a hook in the
+repository's `.pre-commit-config.yaml` installs mdrefine in an environment of
+its own, with the computer's Node.js, and passes it the staged Markdown files;
+it needs no `package.json`:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: mdrefine
+        name: mdrefine
+        language: node
+        additional_dependencies: ["mdrefine@0.6.2"]
+        entry: mdrefine lint --max-warnings 0 --no-warn-ignored
+        types: [markdown]
+```
+
+With [lefthook](https://lefthook.dev/), installed in the project next to
+mdrefine, add to `lefthook.yml`:
+
+```yaml
+pre-commit:
+  commands:
+    mdrefine:
+      glob: "*.{md,markdown}"
+      run: npx --no-install mdrefine lint --max-warnings 0 --no-warn-ignored -- {staged_files}
+```
+
+Both skip the command when the commit changes no Markdown file, and lefthook's
+glob also matches files in subdirectories.
+
 ## Editors
 
 There is no editor extension or language server. An editor that can format a
@@ -90,19 +121,22 @@ Leave Markdown to mdrefine in this order:
 
 The order matters. Without an mdrefine configuration, mdrefine falls back to the
 Prettier configuration, but not once `.prettierignore` excludes all Markdown:
-Prettier then formats no Markdown in the workspace, so neither its options nor
-its ignore patterns describe your documents, and `config convert` and the
-fallback leave the Prettier configuration out and say so. This applies only
-where it can be established: one entry by itself must exclude every `.md` file,
-whatever its name and directory, evaluated as Prettier evaluates it, as a
-gitignore pattern without regard to letter case. A file with a negated (`!`)
-entry or a character class never qualifies, because its exceptions cannot be
-proved not to leave Prettier some Markdown, so it keeps the Prettier
-configuration in use. `*.md`, `**/*.md`, and `*` exclude all Markdown, with or
-without an entry for `.markdown`, because an entry for `.md` files alone is the
-usual way to leave Markdown to another tool. `docs/*.md`, `**/*.md` with
-`!README.md`, and even `**/*.md` with `!docs/`, which re-includes no document,
-do not.
+Prettier then formats no Markdown in the workspace, so its options do not
+describe your documents, and `config convert` and the fallback leave the
+Prettier configuration out and say so. A `.prettierignore` counts as excluding
+all Markdown only when that can be established, reading each entry as Prettier
+does, as a gitignore pattern without regard to letter case:
+
+- It counts when one entry by itself excludes every `.md` file, whatever its
+  name and directory, such as `*.md`, `**/*.md`, `*.MD`, or `*`. An entry for
+  `.markdown` is not needed: an entry for `.md` files alone is the usual way to
+  leave Markdown to another tool.
+- It does not count with only narrower entries, such as `docs/*.md`, or `/*.md`,
+  which leaves the Markdown in subdirectories to Prettier.
+- It never counts with a negated (`!`) entry or a character class such as
+  `*.[mM][dD]`, because then it cannot be proved to leave Prettier no Markdown:
+  `**/*.md` with `!README.md` does not count, nor even `**/*.md` with `!docs/`,
+  which re-includes no document.
 
 markdownlint and mdrefine can run side by side, but rules that overlap can
 disagree, such as markdownlint's emphasis style (MD049) and `style/emphasis`.
@@ -114,8 +148,7 @@ mdrefine is meant to replace these tools for Markdown. The tables below list
 every rule of markdownlint 0.42 and every Markdown option and formatting choice
 of Prettier 3.9, with the mdrefine rule that covers each and where it behaves
 differently. Each row follows the check's documented purpose, not the other
-tool's known defects. A row that says "None yet" or "Not yet" links the issue
-that tracks a missing part; keep the other tool for that check until it is done.
+tool's known defects.
 
 ### Configuration conversion and fallback
 
@@ -132,7 +165,7 @@ Without an mdrefine configuration, the same conversion runs in memory. Use
 its sources and converted settings. The search stops at the same repository or
 vault boundary as the ordinary configuration search. When none of the files
 found can be used, the `recommended` preset applies, as without them; the
-[notices](cli.md#competitor-fallback-notices) on stderr name each such file.
+[notices](cli.md#fallback-notices) on stderr name each such file.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.
@@ -155,7 +188,8 @@ or `package.yaml` key, Markdown overrides, and relevant `.editorconfig` values
 only when a Prettier configuration exists. JavaScript and TypeScript
 configurations are named without executing them and contribute nothing; the
 explicit convert command loads them through Node.js. TOML and JSON5 are not
-read, by either. An extensionless `.prettierrc` is read as YAML, as Prettier
+read, by either. `.prettierrc.jsonc` is not a Prettier configuration filename
+and is not searched. An extensionless `.prettierrc` is read as YAML, as Prettier
 reads it, so it can hold JSON; a JSON comment in it becomes part of the next key
 in Prettier too, which ignores that setting, and conversion reports it. A file
 that cannot be parsed is an error that names it. `.prettierignore` and
@@ -169,41 +203,27 @@ exceptions, which can leave nothing to check. `.markdownlintignore`, the ignore
 file of markdownlint-cli and editor extensions, is not converted: beside a
 markdownlint configuration in use, the documents it excludes are checked; add
 its patterns to `ignore` in an mdrefine configuration. The
-[notices](cli.md#competitor-fallback-notices) and `conversion.unused` say so.
+[notices](cli.md#fallback-notices) and `conversion.unused` say so.
 
-Pattern conversion is bounded by source dialect. Prettier overrides,
-EditorConfig sections, and markdownlint-cli2 globs support literal paths, `*`,
-`?`, and whole-component `**`. Brace alternatives must be flat comma lists,
-without nesting, empty alternatives, ranges, or `**` inside. Accepted escapes
-are backslash followed by another backslash or one of `#`, `?`, `!`, `*`, `[`,
-`]`, `{`, `}`, `(`, `)`, `+`, or `@`. Other escapes, character classes,
-unescaped parentheses, quoted patterns, and whole-pattern complements are
-reported with their source and pattern for manual migration rather than emitted.
-Prettier brace patterns also retain their literal spelling, and terminal `/**`
-also matches the file before that suffix. CLI2 negative globs are directory
-exclusions, and their descendants are expanded before rebasing. When several
-CLI2 positive globs need a combined selection, a literal comma outside braces or
-a brace alternative cannot be represented in that union: the selection is
-reported and omitted. A single positive glob keeps its ordinary meaning.
+Patterns convert within the subset of glob syntax that each source documents. A
+pattern outside it, such as a character class or a negated `.prettierignore`
+entry, is reported with its source for manual migration rather than converted.
+Prettier matches ignore patterns without regard to letter case, while converted
+patterns match case exactly; conversion says so once per `.prettierignore`. The
+[maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
+list the exact subsets.
 
-`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`, the
-same accepted escapes, root anchors, and directory suffixes; braces and
-parentheses stay literal. Character classes, trailing whitespace, and negated
-entries are reported rather than emitted. Prettier matches ignore patterns
-without regard to letter case; converted patterns match case exactly. Conversion
-reports this approximation once per `.prettierignore` file.
+During the fallback, markdownlint inline comments and Prettier ignore comments
+and `requirePragma` apply. With an mdrefine configuration, including one that
+`config convert` writes, they have no effect: migrate them to mdrefine's own
+[suppression comments](configuration.md#suppression-comments).
 
-All subsets reject `.`, `..`, and empty path components, and absolute paths,
-including Windows drive and UNC spellings on every platform. A leading `/` in
-EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
-`.prettierignore` marks a directory; these are permitted boundaries rather than
-empty components. Every emitted pattern is rebased into the destination subtree;
-unrepresentable intersections are also reported for manual migration.
-
-During the competitor fallback, markdownlint inline comments and Prettier ignore
-comments and `requirePragma` apply. With an mdrefine configuration, including
-one that `config convert` writes, they have no effect: migrate them to
-mdrefine's own [suppression comments](configuration.md#suppression-comments).
+Markdownlint compatibility also keeps MD041's treatment of HTML comment blocks
+before the initial heading and MD022's comment-aware blank-line counts around
+headings. These exemptions apply to markdownlint findings; an independent
+Prettier spacing preference still applies at warning severity. Native mdrefine
+configuration keeps the policies described on the rules' pages.
 
 markdownlint's `disable`, `enable`, `disable-line`, `disable-next-line`,
 `disable-file`, and `enable-file` select enabled markdownlint checks by ID,
@@ -215,27 +235,14 @@ source order for the whole file and uses the configuration converter. Unknown
 names or checks without counterparts suppress nothing and are reported once per
 run, with a tracking issue where available.
 
-Each rule retains its enabled competitor origins outside the configuration.
-Disabling a markdownlint check leaves Prettier's choice active at warning
-severity, using Prettier's own options in that region. Stated markdownlint
-options still win where both sources are active. Each distinct set of active
-checks is converted with Prettier's choices and the same file override patches.
-The engine evaluates each distinct rule setting once per inspection and selects
-its findings in the corresponding regions. This also recalculates dependent
-options: disabling MD022 restores MD012's own blank-line maximum.
-
-Shared destinations attribute findings to their source checks: `style/heading`
-(MD003, MD019, MD021, MD023), `style/list-indent` (MD005, MD007, MD030), and
-`style/table` (MD055, MD060). Table rows and list operations retain active check
-diagnostics even when the construct starts in a suppressed region.
-`style/block-spacing` (MD022, MD031, MD032, MD058) attributes findings to their
-named block, and `structure/unspaced-heading` (MD018, MD020) distinguishes
-ordinary and closed ATX candidates. A combined edit is withheld when it needs a
-suppressed check; active diagnostics remain. For every rule, an edit crossing
-regions is accepted only when each region proposes the same replacement and
-authorizes its checks. This can leave a whole table or list as written when a
-partial repair is unavailable. Every proposal still passes the ordinary edit and
-semantic safety checks.
+Where these comments turn a markdownlint check off in part of a file, a Prettier
+style that covers the same thing stays on there, at warning severity, when a
+Prettier configuration is in use; a rule that carries several checks reports
+each under the check that found it. An edit is made only where every part of the
+file that it touches allows it, so a table or list can stay as written when only
+part of it is suppressed. The [maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#comments-during-the-fallback)
+describe how the rules are evaluated per region.
 
 Prettier's `ignore` preserves the next parsed node; `ignore-start` and
 `ignore-end` preserve a top-level range, with blank lines before the comments.
@@ -251,63 +258,63 @@ markdownlint enables its default rule set; template, proper-name, notation, and
 column-style checks require configuration. mdrefine's presets enable fewer: a
 rule that no preset in your configuration enables, such as
 `structure/heading-punctuation`, needs an entry under `rules`. Each rule's
-[section](rules.md) names its presets.
+[page](rules.md) names its presets.
 
-| markdownlint                             | mdrefine                                                                                                                                                                                                                                |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MD001 `heading-increment`                | [`structure/heading-increment`](rules.md#structureheading-increment), with block quotes checked apart, and `frontMatterTitle`, off by default                                                                                           |
-| MD003 `heading-style`                    | [`style/heading`](rules.md#styleheading), whose default converts underlined headings; `closing: "add"` writes closed ATX styles                                                                                                         |
-| MD004 `ul-style`                         | [`style/list-marker`](rules.md#stylelist-marker), with `consistent` and `sublist`                                                                                                                                                       |
-| MD005 `list-indent`                      | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                                                                                        |
-| MD007 `ul-indent`                        | [`style/list-indent`](rules.md#stylelist-indent)'s `nestedIndent`, `startIndented`, and `startIndent`                                                                                                                                   |
-| MD009 `no-trailing-spaces`               | [`style/trailing-space`](rules.md#styletrailing-space): `hardBreakSpaces`, `listItemEmptyLines`, and report-only `codeBlocks`; strict cleanup outside hard breaks                                                                       |
-| MD010 `no-hard-tabs`                     | [`style/no-tabs`](rules.md#styleno-tabs); literal content is report-only                                                                                                                                                                |
-| MD011 `no-reversed-links`                | [`links/reversed`](rules.md#linksreversed)                                                                                                                                                                                              |
-| MD012 `no-multiple-blanks`               | [`style/blank-lines`](rules.md#styleblank-lines), with `maximum`                                                                                                                                                                        |
-| MD013 `line-length`                      | [`style/wrap`](rules.md#stylewrap), which wraps paragraphs instead of only reporting. [`content/line-length`](rules.md#contentline-length) reports headings, code blocks, and tables                                                    |
-| MD014 `commands-show-output`             | [`content/shell-prompt`](rules.md#contentshell-prompt), for shell and unlabeled code blocks, with `$` and `%` prompts                                                                                                                   |
-| MD018 `no-missing-space-atx`             | [`structure/unspaced-heading`](rules.md#structureunspaced-heading), which leaves Obsidian tags and issue references alone                                                                                                               |
-| MD019 `no-multiple-space-atx`            | [`style/heading`](rules.md#styleheading)                                                                                                                                                                                                |
-| MD020 `no-missing-space-closed-atx`      | [`structure/unspaced-heading`](rules.md#structureunspaced-heading), for paragraph text such as `#Heading#`                                                                                                                              |
-| MD021 `no-multiple-space-closed-atx`     | [`style/heading`](rules.md#styleheading); removes closing `#` by default or normalizes retained separators                                                                                                                              |
-| MD022 `blanks-around-headings`           | [`style/block-spacing`](rules.md#styleblock-spacing), with `linesAbove`, `linesBelow`, and `includeFrontMatter`; counts that `style/blank-lines` would remove are refused                                                               |
-| MD023 `heading-start-left`               | [`style/heading`](rules.md#styleheading); preserves container prefixes                                                                                                                                                                  |
-| MD024 `no-duplicate-heading`             | [`structure/duplicate-heading`](rules.md#structureduplicate-heading); `siblingsOnly` defaults to `true`                                                                                                                                 |
-| MD025 `single-title`                     | [`structure/single-title`](rules.md#structuresingle-title)                                                                                                                                                                              |
-| MD026 `no-trailing-punctuation`          | [`structure/heading-punctuation`](rules.md#structureheading-punctuation), which reads headings as renderers show them and leaves abbreviations, ellipses, and emoji shortcodes alone                                                    |
-| MD027 `no-multiple-space-blockquote`     | [`style/quote-marker`](rules.md#stylequote-marker), with `listItems`                                                                                                                                                                    |
-| MD028 `no-blanks-blockquote`             | [`structure/split-quote`](rules.md#structuresplit-quote), except before an alert or callout                                                                                                                                             |
-| MD029 `ol-prefix`                        | [`style/ordered-list`](rules.md#styleordered-list); `same` repeats the existing start; conversion reports that `one` and `zero` start-number checks are not carried over, because the rendered first number is preserved                |
-| MD030 `list-marker-space`                | [`style/list-indent`](rules.md#stylelist-indent), with the same four spacings                                                                                                                                                           |
-| MD031 `blanks-around-fences`             | [`style/block-spacing`](rules.md#styleblock-spacing); outside list items and footnote definitions, as with `list_items: false`                                                                                                          |
-| MD032 `blanks-around-lists`              | [`style/block-spacing`](rules.md#styleblock-spacing)                                                                                                                                                                                    |
-| MD033 `no-inline-html`                   | [`content/html-element`](rules.md#contenthtml-element), with `allowedElements` and `tableAllowedElements`                                                                                                                               |
-| MD034 `no-bare-urls`                     | [`links/bare-url`](rules.md#linksbare-url)                                                                                                                                                                                              |
-| MD035 `hr-style`                         | [`style/thematic-break`](rules.md#stylethematic-break), with exact break text or `consistent`                                                                                                                                           |
-| MD036 `no-emphasis-as-heading`           | [`structure/emphasis-heading`](rules.md#structureemphasis-heading), whatever the paragraph's line length                                                                                                                                |
-| MD037 `no-space-in-emphasis`             | [`content/emphasis-spacing`](rules.md#contentemphasis-spacing), reported only where the parser reads emphasis once the spaces are gone; not a single `*` or `_` with spaces on both sides at both ends, such as `a * b * c`             |
-| MD038 `no-space-in-code`                 | [`content/inline-code-spacing`](rules.md#contentinline-code-spacing), reported only, next to a letter or digit; not spaces that show syntax or indentation, as in `- `, or that a backtick at an end of the code needs                  |
-| MD039 `no-space-in-links`                | [`links/text-spacing`](rules.md#linkstext-spacing), reported only, because moving the spaces changes the link text and where they belong depends on the text around the link                                                            |
-| MD040 `fenced-code-language`             | [`content/code-language`](rules.md#contentcode-language)                                                                                                                                                                                |
-| MD041 `first-line-heading`               | [`structure/initial-heading`](rules.md#structureinitial-heading)                                                                                                                                                                        |
-| MD042 `no-empty-links`                   | [`links/empty`](rules.md#linksempty)                                                                                                                                                                                                    |
-| MD043 `required-headings`                | [`structure/heading-template`](rules.md#structureheading-template), checking the document's own outline only                                                                                                                            |
-| MD044 `proper-names`                     | [`content/proper-names`](rules.md#contentproper-names), reported only, skipping inline code and, by default, code blocks                                                                                                                |
-| MD045 `no-alt-text`                      | [`content/image-alt`](rules.md#contentimage-alt), also HTML `<img>` without `alt`; `alt=""` marks a decorative image, and `aria-hidden="true"` counts outside GitHub                                                                    |
-| MD046 `code-block-style`                 | [`style/code-block`](rules.md#stylecode-block), with `consistent`, `fenced`, or `indented`; indented blocks are fenced where that is safe, outside VitePress, and other findings are reported only                                      |
-| MD047 `single-trailing-newline`          | [`style/final-newline`](rules.md#stylefinal-newline)                                                                                                                                                                                    |
-| MD048 `code-fence-style`                 | [`style/code-fence`](rules.md#stylecode-fence)                                                                                                                                                                                          |
-| MD049 `emphasis-style`                   | [`style/emphasis`](rules.md#styleemphasis). Includes `marker: "consistent"`                                                                                                                                                             |
-| MD050 `strong-style`                     | [`style/strong`](rules.md#stylestrong). Includes `marker: "consistent"`                                                                                                                                                                 |
-| MD051 `link-fragments`                   | [`links/valid`](rules.md#linksvalid), which also checks that local files exist. Includes `ignored_pattern` as `ignoredFragments`, and `exactCase`, the inverse of `ignore_case`: `ignore_case: true` is `exactCase: false`, the default |
-| MD052 `reference-links-images`           | [`links/undefined-reference`](rules.md#linksundefined-reference), which also checks footnotes. Includes `shortcutSyntax`, and `ignoredLabels` with default `[]`                                                                         |
-| MD053 `link-image-reference-definitions` | [`links/unused-definition`](rules.md#linksunused-definition), which also checks footnotes, with `ignoredDefinitions`                                                                                                                    |
-| MD054 `link-image-style`                 | [`links/allowed-notation`](rules.md#linksallowed-notation)                                                                                                                                                                              |
-| MD055 `table-pipe-style`                 | [`style/table`](rules.md#styletable), with `pipeStyle` for explicit borders, document consistency, or per-table consistency; required pipes are retained                                                                                |
-| MD056 `table-column-count`               | [`content/table-columns`](rules.md#contenttable-columns)                                                                                                                                                                                |
-| MD058 `blanks-around-tables`             | [`style/block-spacing`](rules.md#styleblock-spacing); next to blocks other than headings and lists where every renderer reads the same blocks                                                                                           |
-| MD059 `descriptive-link-text`            | [`links/descriptive-text`](rules.md#linksdescriptive-text), with `prohibited_texts` as `prohibitedTexts`, also for Obsidian wikilinks                                                                                                   |
-| MD060 `table-column-style`               | [`style/table`](rules.md#styletable), aligned, compact, or tight, with `alignedDelimiter`. A formatter selects a target style rather than accepting `any`                                                                               |
+| markdownlint                             | mdrefine                                                                                                                                                                                                                                 |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MD001 `heading-increment`                | [`structure/heading-increment`](rules/structure/heading-increment.md), with block quotes checked apart, and `frontMatterTitle`, off by default                                                                                           |
+| MD003 `heading-style`                    | [`style/heading`](rules/style/heading.md), whose default converts underlined headings to `#` headings; `closing: "add"` writes closing `#` sequences                                                                                     |
+| MD004 `ul-style`                         | [`style/list-marker`](rules/style/list-marker.md), with `consistent` and `sublist`                                                                                                                                                       |
+| MD005 `list-indent`                      | [`style/list-indent`](rules/style/list-indent.md)                                                                                                                                                                                        |
+| MD007 `ul-indent`                        | [`style/list-indent`](rules/style/list-indent.md)'s `nestedIndent`, `startIndented`, and `startIndent`                                                                                                                                   |
+| MD009 `no-trailing-spaces`               | [`style/trailing-space`](rules/style/trailing-space.md): `hardBreakSpaces`, `listItemEmptyLines`, and report-only `codeBlocks`; strict cleanup outside hard breaks                                                                       |
+| MD010 `no-hard-tabs`                     | [`style/no-tabs`](rules/style/no-tabs.md); literal content is report-only                                                                                                                                                                |
+| MD011 `no-reversed-links`                | [`links/reversed`](rules/links/reversed.md)                                                                                                                                                                                              |
+| MD012 `no-multiple-blanks`               | [`style/blank-lines`](rules/style/blank-lines.md), with `maximum`                                                                                                                                                                        |
+| MD013 `line-length`                      | [`style/wrap`](rules/style/wrap.md), which wraps paragraphs instead of only reporting. [`content/line-length`](rules/content/line-length.md) reports headings, code blocks, and tables                                                   |
+| MD014 `commands-show-output`             | [`content/shell-prompt`](rules/content/shell-prompt.md), for shell and unlabeled code blocks, with `$` and `%` prompts                                                                                                                   |
+| MD018 `no-missing-space-atx`             | [`structure/unspaced-heading`](rules/structure/unspaced-heading.md), which leaves Obsidian tags and issue references alone                                                                                                               |
+| MD019 `no-multiple-space-atx`            | [`style/heading`](rules/style/heading.md)                                                                                                                                                                                                |
+| MD020 `no-missing-space-closed-atx`      | [`structure/unspaced-heading`](rules/structure/unspaced-heading.md), for paragraph text such as `#Heading#`                                                                                                                              |
+| MD021 `no-multiple-space-closed-atx`     | [`style/heading`](rules/style/heading.md); removes closing `#` by default or normalizes retained separators                                                                                                                              |
+| MD022 `blanks-around-headings`           | [`style/block-spacing`](rules/style/block-spacing.md), with `linesAbove`, `linesBelow`, and `includeFrontMatter`; counts that `style/blank-lines` would remove are refused                                                               |
+| MD023 `heading-start-left`               | [`style/heading`](rules/style/heading.md); preserves container prefixes                                                                                                                                                                  |
+| MD024 `no-duplicate-heading`             | [`structure/duplicate-heading`](rules/structure/duplicate-heading.md); `siblingsOnly` defaults to `true`                                                                                                                                 |
+| MD025 `single-title`                     | [`structure/single-title`](rules/structure/single-title.md)                                                                                                                                                                              |
+| MD026 `no-trailing-punctuation`          | [`structure/heading-punctuation`](rules/structure/heading-punctuation.md), which reads headings as renderers show them and leaves abbreviations, ellipses, and emoji shortcodes alone                                                    |
+| MD027 `no-multiple-space-blockquote`     | [`style/quote-marker`](rules/style/quote-marker.md), with `listItems`                                                                                                                                                                    |
+| MD028 `no-blanks-blockquote`             | [`structure/split-quote`](rules/structure/split-quote.md), except before an alert or callout                                                                                                                                             |
+| MD029 `ol-prefix`                        | [`style/ordered-list`](rules/style/ordered-list.md); `same` repeats the existing start; conversion reports that `one` and `zero` start-number checks are not carried over, because the rendered first number is preserved                |
+| MD030 `list-marker-space`                | [`style/list-indent`](rules/style/list-indent.md), with the same four spacings                                                                                                                                                           |
+| MD031 `blanks-around-fences`             | [`style/block-spacing`](rules/style/block-spacing.md); outside list items and footnote definitions, as with `list_items: false`                                                                                                          |
+| MD032 `blanks-around-lists`              | [`style/block-spacing`](rules/style/block-spacing.md)                                                                                                                                                                                    |
+| MD033 `no-inline-html`                   | [`content/html-element`](rules/content/html-element.md), with `allowedElements` and `tableAllowedElements`                                                                                                                               |
+| MD034 `no-bare-urls`                     | [`links/bare-url`](rules/links/bare-url.md)                                                                                                                                                                                              |
+| MD035 `hr-style`                         | [`style/thematic-break`](rules/style/thematic-break.md), with exact break text or `consistent`                                                                                                                                           |
+| MD036 `no-emphasis-as-heading`           | [`structure/emphasis-heading`](rules/structure/emphasis-heading.md), whatever the paragraph's line length                                                                                                                                |
+| MD037 `no-space-in-emphasis`             | [`content/emphasis-spacing`](rules/content/emphasis-spacing.md), reported only where the parser reads emphasis once the spaces are gone; not a single `*` or `_` with spaces on both sides at both ends, such as `a * b * c`             |
+| MD038 `no-space-in-code`                 | [`content/inline-code-spacing`](rules/content/inline-code-spacing.md), reported only, next to a letter or digit; not spaces that show syntax or indentation, as in `- `, or that a backtick at an end of the code needs                  |
+| MD039 `no-space-in-links`                | [`links/text-spacing`](rules/links/text-spacing.md), reported only, because moving the spaces changes the link text and where they belong depends on the text around the link                                                            |
+| MD040 `fenced-code-language`             | [`content/code-language`](rules/content/code-language.md)                                                                                                                                                                                |
+| MD041 `first-line-heading`               | [`structure/initial-heading`](rules/structure/initial-heading.md)                                                                                                                                                                        |
+| MD042 `no-empty-links`                   | [`links/empty`](rules/links/empty.md)                                                                                                                                                                                                    |
+| MD043 `required-headings`                | [`structure/heading-template`](rules/structure/heading-template.md), checking the document's own outline only                                                                                                                            |
+| MD044 `proper-names`                     | [`content/proper-names`](rules/content/proper-names.md), reported only, skipping inline code and, by default, code blocks                                                                                                                |
+| MD045 `no-alt-text`                      | [`content/image-alt`](rules/content/image-alt.md), also HTML `<img>` without `alt`; `alt=""` marks a decorative image, and `aria-hidden="true"` counts outside GitHub                                                                    |
+| MD046 `code-block-style`                 | [`style/code-block`](rules/style/code-block.md), with `consistent`, `fenced`, or `indented`; indented blocks are fenced where that is safe, outside VitePress, and other findings are reported only                                      |
+| MD047 `single-trailing-newline`          | [`style/final-newline`](rules/style/final-newline.md)                                                                                                                                                                                    |
+| MD048 `code-fence-style`                 | [`style/code-fence`](rules/style/code-fence.md)                                                                                                                                                                                          |
+| MD049 `emphasis-style`                   | [`style/emphasis`](rules/style/emphasis.md). Includes `marker: "consistent"`                                                                                                                                                             |
+| MD050 `strong-style`                     | [`style/strong`](rules/style/strong.md). Includes `marker: "consistent"`                                                                                                                                                                 |
+| MD051 `link-fragments`                   | [`links/valid`](rules/links/valid.md), which also checks that local files exist. Includes `ignored_pattern` as `ignoredFragments`, and `exactCase`, the inverse of `ignore_case`: `ignore_case: true` is `exactCase: false`, the default |
+| MD052 `reference-links-images`           | [`links/undefined-reference`](rules/links/undefined-reference.md), which also checks footnotes. Includes `shortcutSyntax`, and `ignoredLabels` with default `[]`                                                                         |
+| MD053 `link-image-reference-definitions` | [`links/unused-definition`](rules/links/unused-definition.md), which also checks footnotes, with `ignoredDefinitions`                                                                                                                    |
+| MD054 `link-image-style`                 | [`links/allowed-notation`](rules/links/allowed-notation.md)                                                                                                                                                                              |
+| MD055 `table-pipe-style`                 | [`style/table`](rules/style/table.md), with `pipeStyle` for explicit borders, document consistency, or per-table consistency; required pipes are retained                                                                                |
+| MD056 `table-column-count`               | [`content/table-columns`](rules/content/table-columns.md)                                                                                                                                                                                |
+| MD058 `blanks-around-tables`             | [`style/block-spacing`](rules/style/block-spacing.md); next to blocks other than headings and lists where every renderer reads the same blocks                                                                                           |
+| MD059 `descriptive-link-text`            | [`links/descriptive-text`](rules/links/descriptive-text.md), with `prohibited_texts` as `prohibitedTexts`, also for Obsidian wikilinks                                                                                                   |
+| MD060 `table-column-style`               | [`style/table`](rules/style/table.md), aligned, compact, or tight, with `alignedDelimiter`. A formatter selects a target style rather than accepting `any`                                                                               |
 
 markdownlint's comments such as `<!-- markdownlint-disable -->` correspond to
 mdrefine's [suppression comments](configuration.md#suppression-comments), and
@@ -335,10 +342,11 @@ footnote outlines. See each rule's reference for its exact contract.
 
 ### Prettier
 
-Prettier keeps Setext headings; conversion uses `style/heading` to normalize
-them to ATX. mdrefine has no mode that keeps mixed Setext and ATX styles while
-normalizing heading spacing. Wrapping also leaves paragraphs with hard line
-breaks as written, where Prettier can wrap their individual lines.
+Prettier keeps underlined headings; conversion uses `style/heading` to write
+them as `#` headings. mdrefine has no mode that keeps a mix of underlined and
+`#` headings while normalizing heading spacing. Wrapping also leaves paragraphs
+with hard line breaks as written, where Prettier can wrap their individual
+lines.
 
 Language-only options such as `semi`, `trailingComma`, `quoteProps`,
 `jsxSingleQuote`, `bracketSpacing`, `bracketSameLine`, `arrowParens`,
@@ -348,35 +356,35 @@ Markdown rule. External embedded-code formatting needs explicit code tools.
 Parser, plugin, range, and file-context settings are reported rather than
 executed or used to change dialect detection.
 
-| Prettier                                         | mdrefine                                                                                                                                                              |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `proseWrap: "always"` and `printWidth`           | [`style/wrap`](rules.md#stylewrap) and its `width`                                                                                                                    |
-| `proseWrap: "preserve"`, the default             | Turn `style/wrap` off and enable [`style/prose-space`](rules.md#styleprose-space)                                                                                     |
-| `proseWrap: "never"`                             | [`style/wrap`](rules.md#stylewrap) with `mode: "never"`, preserving the same safety exceptions as wrapping                                                            |
-| `tabWidth`, for nested lists                     | [`style/list-indent`](rules.md#stylelist-indent)'s `nestedIndent`                                                                                                     |
-| `useTabs`                                        | Nothing to set: Prettier indents Markdown with spaces either way                                                                                                      |
-| `endOfLine`                                      | [`style/line-ending`](rules.md#styleline-ending), opt-in; literal content keeps its bytes                                                                             |
-| `embeddedLanguageFormatting`                     | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                                                                                |
-| `singleQuote` and other title delimiters         | [`style/link-title`](rules.md#stylelink-title): double, single, parentheses, or consistent; keeps delimiters where conversion would need escapes                      |
-| `requirePragma` and `insertPragma`               | `requirePragma` applies during fallback; `insertPragma` is not carried over, and no pragma applies with an mdrefine configuration                                     |
-| `<!-- prettier-ignore -->` and its start and end | Honored during fallback; with a written configuration use [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments) and its relatives                      |
-| `_` for emphasis, `**` for strong text           | [`style/emphasis`](rules.md#styleemphasis), [`style/strong`](rules.md#stylestrong)                                                                                    |
-| `#` headings without closing `#`                 | [`style/heading`](rules.md#styleheading), with one space after `#` and no heading-owned indentation                                                                   |
-| `-` for bullets, alternating for adjacent lists  | [`style/list-marker`](rules.md#stylelist-marker)                                                                                                                      |
-| `1.` and numbering                               | [`style/ordered-list`](rules.md#styleordered-list); `auto` repeats a number when the first two items share it, where Prettier counts up unless the second number is 1 |
-| One space after list markers, list indentation   | [`style/list-indent`](rules.md#stylelist-indent)                                                                                                                      |
-| Backtick fences as short as the code allows      | [`style/code-fence`](rules.md#stylecode-fence), which also removes space before the info string                                                                       |
-| `---` for thematic breaks                        | [`style/thematic-break`](rules.md#stylethematic-break)                                                                                                                |
-| Aligned tables                                   | [`style/table`](rules.md#styletable), with `padding: "alignment"` and display-column widths                                                                           |
-| Trailing spaces removed, hard breaks kept        | [`style/trailing-space`](rules.md#styletrailing-space), with `hardBreakSpaces: 2` for exact two-space breaks                                                          |
-| Repeated blank lines collapsed                   | [`style/blank-lines`](rules.md#styleblank-lines)                                                                                                                      |
-| Blank lines around blocks                        | [`style/block-spacing`](rules.md#styleblock-spacing), for headings, lists, fences, and tables                                                                         |
-| Final newline                                    | [`style/final-newline`](rules.md#stylefinal-newline)                                                                                                                  |
-| Code spans with the fewest backticks             | [`style/inline-code`](rules.md#styleinline-code)                                                                                                                      |
-| One space after `>`                              | [`style/quote-marker`](rules.md#stylequote-marker)                                                                                                                    |
-| Markers on lazy continuation lines               | [`style/lazy-continuation`](rules.md#stylelazy-continuation); footnote definitions keep their first line on the label's line                                          |
-| One space in link reference definitions          | [`style/definition-spacing`](rules.md#styledefinition-spacing); keeps multiline definitions and Obsidian spacing                                                      |
-| YAML front matter                                | Covered by configuring an external [front matter formatter](configuration.md#front-matter-formatters)                                                                 |
+| Prettier                                         | mdrefine                                                                                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proseWrap: "always"` and `printWidth`           | [`style/wrap`](rules/style/wrap.md) and its `width`                                                                                                                    |
+| `proseWrap: "preserve"`, the default             | Turn `style/wrap` off and enable [`style/prose-space`](rules/style/prose-space.md)                                                                                     |
+| `proseWrap: "never"`                             | [`style/wrap`](rules/style/wrap.md) with `mode: "never"`, preserving the same safety exceptions as wrapping                                                            |
+| `tabWidth`, for nested lists                     | [`style/list-indent`](rules/style/list-indent.md)'s `nestedIndent`                                                                                                     |
+| `useTabs`                                        | Nothing to set: Prettier indents Markdown with spaces either way                                                                                                       |
+| `endOfLine`                                      | [`style/line-ending`](rules/style/line-ending.md), opt-in; literal content keeps its bytes                                                                             |
+| `embeddedLanguageFormatting`                     | Opt-in [code formatters](configuration.md#code-formatters), selected by fence language                                                                                 |
+| `singleQuote` and other title delimiters         | [`style/link-title`](rules/style/link-title.md): double, single, parentheses, or consistent; keeps delimiters where conversion would need escapes                      |
+| `requirePragma` and `insertPragma`               | `requirePragma` applies during fallback; `insertPragma` is not carried over, and no pragma applies with an mdrefine configuration                                      |
+| `<!-- prettier-ignore -->` and its start and end | Honored during fallback; with a written configuration use [`<!-- mdrefine-disable -->`](configuration.md#suppression-comments) and its relatives                       |
+| `_` for emphasis, `**` for strong text           | [`style/emphasis`](rules/style/emphasis.md), [`style/strong`](rules/style/strong.md)                                                                                   |
+| `#` headings without closing `#`                 | [`style/heading`](rules/style/heading.md), with one space after `#` and no heading-owned indentation                                                                   |
+| `-` for bullets, alternating for adjacent lists  | [`style/list-marker`](rules/style/list-marker.md)                                                                                                                      |
+| `1.` and numbering                               | [`style/ordered-list`](rules/style/ordered-list.md); `auto` repeats a number when the first two items share it, where Prettier counts up unless the second number is 1 |
+| One space after list markers, list indentation   | [`style/list-indent`](rules/style/list-indent.md)                                                                                                                      |
+| Backtick fences as short as the code allows      | [`style/code-fence`](rules/style/code-fence.md), which also removes space before the info string                                                                       |
+| `---` for thematic breaks                        | [`style/thematic-break`](rules/style/thematic-break.md)                                                                                                                |
+| Aligned tables                                   | [`style/table`](rules/style/table.md), with `padding: "alignment"` and display-column widths                                                                           |
+| Trailing spaces removed, hard breaks kept        | [`style/trailing-space`](rules/style/trailing-space.md), with `hardBreakSpaces: 2` for exact two-space breaks                                                          |
+| Repeated blank lines collapsed                   | [`style/blank-lines`](rules/style/blank-lines.md)                                                                                                                      |
+| Blank lines around blocks                        | [`style/block-spacing`](rules/style/block-spacing.md), for headings, lists, fences, and tables                                                                         |
+| Final newline                                    | [`style/final-newline`](rules/style/final-newline.md)                                                                                                                  |
+| Code spans with the fewest backticks             | [`style/inline-code`](rules/style/inline-code.md)                                                                                                                      |
+| One space after `>`                              | [`style/quote-marker`](rules/style/quote-marker.md)                                                                                                                    |
+| Markers on lazy continuation lines               | [`style/lazy-continuation`](rules/style/lazy-continuation.md); footnote definitions keep their first line on the label's line                                          |
+| One space in link reference definitions          | [`style/definition-spacing`](rules/style/definition-spacing.md); keeps multiline definitions and Obsidian spacing                                                      |
+| YAML front matter                                | Covered by configuring an external [front matter formatter](configuration.md#front-matter-formatters)                                                                  |
 
 Prettier keeps line breaks by default (`proseWrap: "preserve"`), while
 `recommended` wraps at 80 columns. `style/wrap` keeps the lines of

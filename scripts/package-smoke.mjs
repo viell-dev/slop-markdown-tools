@@ -28,7 +28,7 @@ assert(npm, "Run this check through npm run test:package.");
  * sees only the dependencies that it declares. npm fetches it into the
  * repository's cache, so nothing is installed globally.
  */
-const pnpm = "pnpm@12.14.0";
+const pnpm = "pnpm@12.15.0";
 const directory = await realpath(await mkdtemp(path.join(tmpdir(), "mdrefine-package-")));
 const repository = await realpath(process.cwd());
 const relativeDirectory = path.relative(repository, directory);
@@ -63,7 +63,7 @@ const consumerModule = `import {
   builtInRules, configSchema, format, lint, parse, presets, resolveConfig, unifiedDiff,
   type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink, type FormatResult, type CodeFormatter,
 } from ${named()};
-import { discoverWorkspace, formatWithCode, type DiscoverOptions, type Skipped, type WorkspaceDiscovery, type CodeFormatOptions } from ${named("/node")};
+import { discoverWorkspace, formatWithCode, loadConfig, type DiscoverOptions, type Skipped, type WorkspaceDiscovery, type CodeFormatOptions } from ${named("/node")};
 const schema: JsonSchema = { type: "object", properties: { level: { type: "integer" } } };
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem", schema,
@@ -95,6 +95,7 @@ builtInRules["style/wrap"] = builtInRules["style/emphasis"]!;
 void configSchema.properties;
 const discoverOptions: DiscoverOptions = { root: ".", inputs: [], documents: { "a.md": "Text" } };
 const discovery: WorkspaceDiscovery = await discoverWorkspace(discoverOptions);
+const loadedRoot: string = (await loadConfig(".", undefined, false, ".")).root; void loadedRoot;
 const skipped: readonly Skipped[] = discovery.skipped; void skipped;
 const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
 const codeTool: CodeFormatter = { id: "javascript", languages: ["js"], command: "formatter", args: [] };
@@ -214,6 +215,20 @@ process.stdout.write([format("A *small* note.\\n").output.trim(), typeof discove
     `A _small_ note.|function|function|mdrefine configuration|${manifest.version}`,
   );
   // The filesystem entry discovers the consumer's own documents.
+  await mkdir(path.join(project, "root-probe/.git"), { recursive: true });
+  assert.equal(
+    runNode(
+      [
+        "--input-type=module",
+        "-e",
+        `import {loadConfig} from ${named("/node")};
+const loaded = await loadConfig("./root-probe", undefined, false, ".");
+process.stdout.write(String(loaded.root === process.cwd()));`,
+      ],
+      project,
+    ),
+    "true",
+  );
   await writeFile(path.join(project, "note.md"), "A *small* note.\n");
   assert.equal(
     runNode(
@@ -307,7 +322,7 @@ try {
   );
   assert(
     result.files.every((file) =>
-      /^(dist\/|docs\/[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
+      /^(dist\/|docs\/(?:rules\/[a-z]+\/)?[^/]+\.md$|examples\/|(?:README|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|SECURITY)\.md$|LICENSE$|THIRD_PARTY_NOTICES$|config\.schema\.json$|package\.json$)/.test(
         file.path,
       ),
     ),
@@ -332,6 +347,8 @@ try {
     "SECURITY.md",
     "examples/README.md",
     "examples/workspaces/obsidian-vault/before/.obsidian/app.json",
+    "docs/rules.md",
+    "docs/rules/style/wrap.md",
   ])
     assert(
       result.files.some((file) => file.path === required),

@@ -567,7 +567,7 @@ export function convertConfig(input: {
   if (input.prettier) {
     const p = input.prettier;
     report.omitted.push(
-      "Prettier headings: Setext headings become ATX; mixed heading-style preservation has no counterpart.",
+      "Prettier headings: underlined headings become `#` headings; mixed heading-style preservation has no counterpart.",
     );
     for (const row of competitorMappings.filter((r) => !r.source.startsWith("MD"))) {
       if (row.defaults || (row.rule && !row.options && !["singleQuote"].includes(row.source)))
@@ -578,7 +578,7 @@ export function convertConfig(input: {
         );
       else if (row.source === "insertPragma" && p.insertPragma === true)
         report.omitted.push(
-          "Prettier insertPragma: not carried over; mdrefine does not write competitor comments.",
+          "Prettier insertPragma: not carried over; mdrefine does not write Prettier pragmas.",
         );
       else if (row.issue && !row.source.endsWith("Pragma") && (row.source in p || row.defaults))
         report.omitted.push(`Prettier ${row.source}: incomplete; #${row.issue}.`);

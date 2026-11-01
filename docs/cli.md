@@ -3,12 +3,6 @@
 The command is `mdrefine`; with the package installed in a project, run it as
 `npx mdrefine`.
 
-## Earlier names
-
-Use `mdrefine`, `mdrefine.config.*`, and `mdrefine-disable` comments. For
-migration from the `mdtools` names, see the [changelog](changelog.md).
-Formatting does not rename files or migrate comments.
-
 ## Commands
 
 | Command                 | What it does                                                                                                   |
@@ -16,19 +10,22 @@ Formatting does not rename files or migrate comments.
 | `lint [paths…]`         | Reports the findings of the enabled rules. Never writes.                                                       |
 | `format [paths…]`       | Prints a diff and fails on changes; lists changes with `--check`, or writes with `--write`.                    |
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
-| `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it exclusively.                      |
+| `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it, never replacing one.             |
 | `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
 Help and the version are printed on stdout, with exit code `0`. Without a
-command, `mdrefine` prints the help on stderr and exits with code `2`, as it
-does for every mistake on the command line, such as an unknown option.
+command, `mdrefine` prints the help on stderr, followed by
+`mdrefine: no command given; try mdrefine lint`, and exits with code `2`, as it
+does for every mistake on the command line, such as an unknown option. `config`
+without `explain` or `convert` does the same with its own help.
 
-`rules` prints one line per rule: its ID, kind, and description, separated by
-tabs. It looks for the configuration from the current directory, as `lint` does,
-or searches from `--root <directory>`, or reads the one that `--config` names.
-With `--json` it prints `{ "rules": [...] }`, each rule an object with its `id`,
-`kind`, and `description`.
+`rules` prints one line per rule, sorted by ID: its ID, kind, and description,
+separated by tabs. The descriptions of the built-in rules are those of the
+[rules](rules.md) index. It looks for the configuration from the current
+directory, as `lint` does, or searches from `--root <directory>`, or reads the
+one that `--config` names. With `--json` it prints `{ "rules": [...] }`, in the
+same order, each rule an object with its `id`, `kind`, and `description`.
 
 With configured [code formatters](configuration.md#code-formatters), every
 `format` mode also formats selected fenced code. `lint` checks Markdown rules
@@ -38,24 +35,34 @@ block and keeping other safe edits.
 
 ## Options
 
-`lint` and `format` accept these options; the last three are for `format` only.
-`--check --diff` combines the two; `--write` cannot be combined with either.
+`lint` and `format` take these options; the second column says which. For
+`format`, `--check --diff` combines the two, and `--write` cannot be combined
+with either.
 
-| Option                    | Meaning                                                                                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--root <directory>`      | The workspace root. Without it, the configuration file's directory; else the Git repository or vault where the search for one stopped; else the current directory. |
-| `--no-competitor-config`  | Disable competitor configuration fallback.                                                                                                                         |
-| `--config <file>`         | Use this configuration file instead of searching for one.                                                                                                          |
-| `--dialect <name>`        | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                        |
-| `--exclude <path>`        | Leave out a file or a directory. Repeat it for more.                                                                                                               |
-| `--json`                  | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                   |
-| `--quiet`                 | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                               |
-| `--no-warn-ignored`       | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                                 |
-| `--stdin-filepath <file>` | The path of the document read from [stdin](#read-from-stdin).                                                                                                      |
-| `--max-warnings <count>`  | Exit with code `1` when there are more warnings than this.                                                                                                         |
-| `--check`                 | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                   |
-| `--diff`                  | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                           |
-| `--write`                 | Write the changes.                                                                                                                                                 |
+| Option                    | Commands         | Meaning                                                                                                                                                           |
+| ------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--root <directory>`      | `lint`, `format` | The workspace root; see [the workspace root](#the-workspace-root).                                                                                                |
+| `--no-competitor-config`  | `lint`, `format` | Do not use markdownlint or Prettier settings when there is no mdrefine configuration; see the [fallback](configuration.md#fallback-to-markdownlint-and-prettier). |
+| `--config <file>`         | `lint`, `format` | Use this configuration file instead of searching for one.                                                                                                         |
+| `--dialect <dialect>`     | `lint`, `format` | Read documents in this [dialect](dialects.md), replacing the configuration's own `dialect`.                                                                       |
+| `--exclude <path>`        | `lint`, `format` | Leave out a file or a directory. Repeat it for more.                                                                                                              |
+| `--json`                  | `lint`, `format` | Print one [JSON report](#json-report) on stdout instead of text.                                                                                                  |
+| `--quiet`                 | `lint`, `format` | Report errors only. Warnings are left out of the output, the JSON report, and the counts, `--max-warnings` included.                                              |
+| `--no-warn-ignored`       | `lint`, `format` | Leave out the warning for a named file or directory that is [ignored](#which-files-are-processed).                                                                |
+| `--stdin-filepath <file>` | `lint`, `format` | The path of the document read from [stdin](#read-from-stdin).                                                                                                     |
+| `--max-warnings <count>`  | `lint`, `format` | Exit with code `1` when there are more warnings than this.                                                                                                        |
+| `--check`                 | `format`         | Exit with code `1`, naming the documents, when any would change. Writes nothing.                                                                                  |
+| `--diff`                  | `format`         | Print a unified diff; changes alone exit `0`. Combine with `--check` to fail on changes.                                                                          |
+| `--write`                 | `format`         | Write the changes.                                                                                                                                                |
+
+### The workspace root
+
+The workspace is the set of documents that a command checks, and the files that
+their links can reach. Its root is the directory that `--root` names. Without
+it, the root is the directory of the configuration file that the search finds;
+without one, the Git repository or vault where the search stopped; and else the
+current directory. Paths in the output and the JSON report are relative to the
+current directory and to the root, respectively.
 
 Bare `format` on files prints a unified diff and exits `1` if any document would
 change, or `0` if none would. Explicit `format --diff` is an exit-`0` preview
@@ -70,10 +77,11 @@ and `lint --fix` suggest the matching `format` mode.
 
 ## Which files are processed
 
-Without paths, a command processes every document of the workspace, including
-files above the current directory when run from a subdirectory. Paths, absolute
-or relative to the current directory, narrow the selection to those files and
-directories; the rest of the workspace still counts for checking links.
+Without paths, a command processes every document of the
+[workspace](#the-workspace-root), including files above the current directory
+when run from a subdirectory. Paths, absolute or relative to the current
+directory, narrow the selection to those files and directories; the rest of the
+workspace still counts for checking links.
 
 - Files whose names end in `.md` or `.markdown`, in any case, are documents. A
   file named on the command line is read as Markdown whatever its name. Other
@@ -91,24 +99,9 @@ directories; the rest of the workspace still counts for checking links.
   the ignore rules; the JSON report still lists the input in `skipped`, and the
   other warnings, such as the one for a workspace root that Git ignores, still
   print.
-- Git's ignore rules apply as in Git. A path is checked against each
-  `.gitignore` from the deepest up to the repository's top level, including
-  those above the workspace root, then the repository's `.git/info/exclude`,
-  then the global excludes file (`core.excludesFile`, by default
-  `~/.config/git/ignore`), and the first with a pattern that matches decides. So
-  a negated pattern includes a file again, but nothing below an excluded
-  directory can be included, and nothing in a workspace root that Git ignores is
-  processed, except files that Git tracks, which it never ignores. Inside a
-  nested repository only its own rules and settings apply, and outside a
-  repository only the workspace's `.gitignore` files. The tool asks Git, in each
-  repository, which global excludes file it reads, whether it ignores letter
-  case (`core.ignorecase`, which Git turns on when it creates a repository on a
-  file system that ignores case, as Windows and macOS do by default), and which
-  files it tracks. Without Git installed, that file is not read, tracked files
-  are ignored like the others, and letter case is ignored on Windows and macOS
-  and not elsewhere. The configuration's `ignore` and `overrides` patterns match
-  case exactly on every system, so that a shared configuration applies to the
-  same files everywhere.
+- Git's ignore rules apply as Git applies them, including the global excludes
+  file and files that Git tracks; see [how Git ignore rules are
+  applied](#how-git-ignore-rules-are-applied).
 - A path that does not exist and contains `*`, `?`, `[`, or `{` is a pattern,
   such as `"docs/**/*.md"`, which the CLI expands itself, so it works quoted in
   PowerShell, cmd, and npm scripts. It is relative to the current directory,
@@ -124,6 +117,26 @@ directories; the rest of the workspace still counts for checking links.
 
 To check only the files that changed, pass them as arguments; see [Git
 hooks](integrations.md#git-hooks).
+
+### How Git ignore rules are applied
+
+Git's ignore rules apply as in Git. A path is checked against each `.gitignore`
+from the deepest up to the repository's top level, including those above the
+workspace root, then the repository's `.git/info/exclude`, then the global
+excludes file (`core.excludesFile`, by default `~/.config/git/ignore`), and the
+first with a pattern that matches decides. So a negated pattern includes a file
+again, but nothing below an excluded directory can be included, and nothing in a
+workspace root that Git ignores is processed, except files that Git tracks,
+which it never ignores. Inside a nested repository only its own rules and
+settings apply, and outside a repository only the workspace's `.gitignore`
+files. The tool asks Git, in each repository, which global excludes file it
+reads, whether it ignores letter case (`core.ignorecase`, which Git turns on
+when it creates a repository on a file system that ignores case, as Windows and
+macOS do by default), and which files it tracks. Without Git installed, that
+file is not read, tracked files are ignored like the others, and letter case is
+ignored on Windows and macOS and not elsewhere. The configuration's `ignore` and
+`overrides` patterns match case exactly on every system, so that a shared
+configuration applies to the same files everywhere.
 
 ## Read from stdin
 
@@ -144,11 +157,12 @@ nothing and `format -` prints the document unchanged, both with the
 `Skipped ignored input` warning, which `--no-warn-ignored` leaves out. A nested
 repository is no such rule: a path in one is read as that repository's document.
 `format -` prints the formatted document on stdout, or the diff with `--diff`,
-or nothing with `--check` alone, while `--check --diff` prints the diff and
-fails on changes; it cannot be combined with `--write`. `lint -` prints its
-findings. Neither prints a summary line. Stdin must be [UTF-8
-text](#files-that-cannot-be-read-or-written), with or without a byte order mark;
-anything else stops the command with exit code `2` and a message such as
+or nothing with `--check` alone, which still exits `1` when the document would
+change, while `--check --diff` prints the diff and fails on changes; it cannot
+be combined with `--write`. `lint -` prints its findings. Neither prints a
+summary line. Stdin must be [UTF-8 text](#files-that-cannot-be-read-or-written),
+with or without a byte order mark; anything else stops the command with exit
+code `2` and a message such as
 `mdrefine: stdin is not UTF-8 text (it starts with a UTF-16LE byte order mark)`.
 
 The redirection above, in a POSIX shell or in `cmd`, passes the bytes unchanged.
@@ -169,11 +183,14 @@ Without `--json`, findings go to stderr, one per line, as
 directory to the document, with forward slashes, as Prettier names files, so
 that a terminal or an editor can open it. `format` prints its diff on stdout
 with the same paths, so that `patch -p1` or `git apply` applies it in the same
-directory. `format --check` names each document that would change, one per line
+directory. When the program reading the output stops early, as `head` does, the
+rest of the output is dropped, and the exit code is the one that the run would
+have had. `format --check` names each document that would change, one per line
 after the findings; `--check --diff` prints the diff instead of that list. A
 preview ends with a hint to use `--write` to apply changes. A run selecting no
-documents prints a short notice on stderr, including with `--json`, without
-changing its exit code. A run over files prints a summary on stderr:
+documents prints a short notice on stderr, without changing its exit code; with
+`--json`, the report's empty `files` list says so instead. A run over files
+prints a summary on stderr:
 
 | Command          | Summary                                       |
 | ---------------- | --------------------------------------------- |
@@ -195,7 +212,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.6.2",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [
@@ -264,7 +281,97 @@ document cannot be read or written; each problem is reported for its own file,
 and the exit code is then `2`. A document with a rule whose edits were refused,
 or that a rule failed on, is written with the other rules' edits.
 
-## Files that cannot be read or written
+A directory that cannot be read is skipped with a warning, and a document that
+cannot be read or written is reported for its own file; see [reliability
+details](#reliability-details).
+
+## Configuration commands
+
+`config explain <file>` prints, as JSON, the configuration in effect for one
+document; [inspect the result](configuration.md#inspect-the-result) describes
+its fields. It reads `--config`, `--no-competitor-config`, `--root`, and
+`--dialect`, before or after `explain`.
+
+### Fallback notices
+
+When `lint`, `format`, or `config explain` runs on the
+[fallback](configuration.md#fallback-to-markdownlint-and-prettier), it prints
+notices on stderr, with paths from the workspace root: one line for each
+markdownlint or Prettier configuration file that it found and does not use, with
+the reason, and one line that names the files it uses and counts the conversion
+notes, as in:
+
+```text
+mdrefine: not using prettier.config.mjs: the fallback does not run JavaScript or TypeScript; "mdrefine config convert" can convert it
+mdrefine: no mdrefine configuration; using markdownlint settings from .markdownlint.json (3 conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)
+```
+
+When it uses none of the files it found, the last line says that the defaults
+apply instead. A `.prettierignore` with a negated (`!`) entry, which conversion
+cannot express, is not used either: none of its patterns apply, so the documents
+it excludes are checked, and a line says so:
+
+```text
+mdrefine: not using .prettierignore: its negated entries (!README.md) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration
+```
+
+`config convert` instead converts the other patterns of such a file and reports
+the negated entries. With `lint` and `format`, `--quiet` leaves the notices out;
+`config explain` takes no `--quiet`. The notices never go to stdout, so the JSON
+report of `--json` is unchanged.
+
+With the fallback, `config explain` adds a `conversion` object to its JSON:
+
+| Field           | Meaning                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`        | The converted settings, which use no preset; `{}` when no file could be used and the defaults apply.                                        |
+| `sources`       | The files whose settings were converted, as absolute paths.                                                                                 |
+| `unused`        | The files that were found and not used, each as `{ "file", "reason" }`.                                                                     |
+| `omitted`       | The settings that were not carried over or only in part, with the reason and any issue that tracks the missing part.                        |
+| `conflicts`     | The settings of the two tools that disagreed, and which one won.                                                                            |
+| `suggestions`   | mdrefine checks worth considering that the markdownlint or Prettier configuration does not enable.                                          |
+| `compatibility` | The original markdownlint and Prettier settings and the checks behind each converted rule, which the fallback uses to honor their comments. |
+
+`rules` accepts `--no-competitor-config` too. Its list describes the available
+rules rather than the effective settings, so it does not print fallback notices;
+use `config explain` to inspect conversion and its report.
+
+### Convert a configuration
+
+`config convert` converts the markdownlint and Prettier configurations that the
+search finds, as the fallback does, and prints the result on stdout as an
+`mdrefine.config.jsonc`. It runs JavaScript and TypeScript configurations, which
+the fallback never does. Its report goes to stderr: each file converted, each
+file not used and why, the settings not carried over with their reasons and the
+issues that track them, the conflicts it resolved, and suggested checks.
+
+| Option               | Meaning                                                                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--root <directory>` | Search from this directory, and write the file there. Without it, see below.                                                                                                                                                                                     |
+| `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced. |
+
+Without `--root`, the search starts from the current directory, and the file
+goes where `lint` run from there looks for the workspace's configuration: beside
+the mdrefine configuration that the search finds, else at the root of the Git
+repository or vault where the search stopped, else in the current directory. The
+written configuration then takes the place of the fallback that `lint` used from
+that directory, so it applies the same settings to the same documents. With
+`--root` naming a subdirectory, it is a configuration for that subtree, whose
+patterns are rebased into it, and `lint` finds it only from that directory or
+below.
+
+`config convert` accepts only `--root` and `--write`. The other configuration
+options, such as `--config`, choose what `config explain` reads, and are usage
+errors with `convert`, before or after it. So is a `--root` that does not exist
+or is not a directory. These errors, finding no configuration to convert, and
+finding only files that it cannot use end the command with exit code `2`.
+
+## Reliability details
+
+These sections describe what happens when the file system refuses a read or a
+write, and what writing keeps of each file.
+
+### Files that cannot be read or written
 
 A directory that the system does not let the tool read is skipped: it is
 reported once as a warning, or in the report's `skipped` list, and the rest of
@@ -273,8 +380,8 @@ entered or the reverse, one whose `.gitignore` cannot be read, and a nested
 repository whose `.git/info/exclude` cannot be read. The warning does not change
 the exit code and is not counted by `--max-warnings`. A link into a skipped
 directory is reported as not checkable rather than missing; see
-[`links/valid`](rules.md#linksvalid). Naming the directory, or a path inside it,
-on the command line is an error. To leave a directory out without a warning,
+[`links/valid`](rules/links/valid.md). Naming the directory, or a path inside
+it, on the command line is an error. To leave a directory out without a warning,
 list it in a `.gitignore`.
 
 A selected document that cannot be read gets an `engine/unreadable-file` error;
@@ -341,80 +448,3 @@ that matter in version control or a backup. A program that reads the file at
 that moment can see it half written too. A crash during the trial write can
 leave the trial file behind; it is named `.mdrefine-` followed by a random name
 and `.tmp`, holds no document text, and can be deleted.
-
-## Configuration commands
-
-`config explain <file>` prints, as JSON, the configuration in effect for one
-document; [inspect the result](configuration.md#inspect-the-result) describes
-its fields. It reads `--config`, `--no-competitor-config`, `--root`, and
-`--dialect`, before or after `explain`.
-
-### Competitor fallback notices
-
-When `lint`, `format`, or `config explain` runs on the [competitor
-fallback](configuration.md#competitor-configuration-fallback), it prints notices
-on stderr, with paths from the workspace root: one line for each markdownlint or
-Prettier configuration file that it found and does not use, with the reason, and
-one line that names the files it uses and counts the conversion notes, as in:
-
-```text
-mdrefine: not using prettier.config.mjs: the fallback does not run JavaScript or TypeScript; "mdrefine config convert" can convert it
-mdrefine: no mdrefine configuration; using markdownlint settings from .markdownlint.json (3 conversion note(s): mdrefine config explain <file>; opt out: --no-competitor-config)
-```
-
-When it uses none of the files it found, the last line says that the defaults
-apply instead. A `.prettierignore` with a negated (`!`) entry, which conversion
-cannot express, is not used either: none of its patterns apply, so the documents
-it excludes are checked, and a line says so:
-
-```text
-mdrefine: not using .prettierignore: its negated entries (!README.md) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration
-```
-
-`config convert` instead converts the other patterns of such a file and reports
-the negated entries. With `lint` and `format`, `--quiet` leaves the notices out;
-`config explain` takes no `--quiet`. The notices never go to stdout, so the JSON
-report of `--json` is unchanged.
-
-With the fallback, `config explain` adds a `conversion` object to its JSON:
-
-| Field           | Meaning                                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config`        | The converted settings, which use no preset; `{}` when no file could be used and the defaults apply.                                         |
-| `sources`       | The files whose settings were converted, as absolute paths.                                                                                  |
-| `unused`        | The files that were found and not used, each as `{ "file", "reason" }`.                                                                      |
-| `omitted`       | The settings that were not carried over or only in part, with the reason and any issue that tracks the missing part.                         |
-| `conflicts`     | The settings of the two tools that disagreed, and which one won.                                                                             |
-| `suggestions`   | mdrefine checks worth considering that the competitor configuration does not enable.                                                         |
-| `compatibility` | The original competitor settings and the competitor checks behind each converted rule, which the fallback uses to honor competitor comments. |
-
-`rules` accepts `--no-competitor-config` too. Its list describes the available
-rules rather than the effective settings, so it does not print fallback notices;
-use `config explain` to inspect conversion and its report.
-
-### Convert a configuration
-
-`config convert` converts the markdownlint and Prettier configurations that the
-search finds, as the fallback does, and prints the result on stdout as an
-`mdrefine.config.jsonc`. It runs JavaScript and TypeScript configurations, which
-the fallback never does. Its report goes to stderr: each file converted, each
-file not used and why, the settings not carried over with their reasons and the
-issues that track them, the conflicts it resolved, and suggested checks.
-
-| Option               | Meaning                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--root <directory>` | Search from this directory, and write the file there. Without it, the search starts from the current directory, and the file goes where `lint` run from there looks for the workspace's configuration: beside the mdrefine configuration that the search finds, else at the root of the Git repository or vault where the search stopped, else in the current directory. |
-| `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced.                                                                                                         |
-
-Without `--root`, the written configuration takes the place of the fallback that
-`lint` used from that directory, so it applies the same settings to the same
-documents. With `--root` naming a subdirectory, it is a configuration for that
-subtree, whose patterns are rebased into it, and `lint` finds it only from that
-directory or below.
-
-`config convert` does not take `--config`, `--dialect`, or
-`--no-competitor-config`, which choose the configuration that `config explain`
-reads. Given before or after `convert`, each is a usage error. So is a `--root`
-that does not exist or is not a directory. These errors, finding no
-configuration to convert, and finding only files that it cannot use end the
-command with exit code `2`.

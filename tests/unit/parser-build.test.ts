@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { beforeAll, expect, expectTypeOf, it } from "vitest";
-import { assertPortableRegions, bundleParser } from "../../scripts/build-parser.mjs";
+import { assertPortableModules, bundleParser } from "../../scripts/build-parser.mjs";
 import {
   repairParserSource,
   repairReviewedParserSource,
@@ -334,16 +334,18 @@ it("rebuilds reproducibly without touching dist", async () => {
   expect(again.manifest).toEqual(bundle.manifest);
 });
 
-it("checks emitted region provenance rather than arbitrary source substrings", () => {
-  const labels = new Set(
-    [...bundle.code.matchAll(/^\/\/#region ([^\r\n]+)$/gm)].map((match) => match[1]!),
-  );
+it("checks module provenance independently of arbitrary source comments", () => {
+  const sources = bundle.moduleSources;
   // This checks the actual production-builder result. Existing graph assertions
   // independently retain all 78 modules, 76 inputs, transforms and licenses.
-  expect(labels).toContain("\\0rolldown/runtime.js");
-  expect(labels).toContain("mdrefine:edit-map");
-  expect(() => assertPortableRegions(bundle.code, labels)).not.toThrow();
-  const relative = [...labels].find((label) => label.startsWith("node_modules/"))!;
+  expect(sources.size).toBe(78);
+  expect(sources.has("\\0rolldown/runtime.js")).toBe(true);
+  expect(sources.has("mdrefine:edit-map")).toBe(true);
+  expect(sources.get("mdrefine:entry")).toBeNull();
+  expect(() => assertPortableModules(bundle.code, sources)).not.toThrow();
+  const relative = [...sources.keys()].find((label) =>
+    label.startsWith("node_modules/mdast-util-to-string/"),
+  )!;
   expect(relative).toBeDefined();
   for (const replacement of [
     "/outside/index.js",
@@ -359,23 +361,48 @@ it("checks emitted region provenance rather than arbitrary source substrings", (
     "mdrefine:unexpected",
     "\\0rolldown/unreviewed.js",
   ]) {
-    const changed = bundle.code.replaceAll(`//#region ${relative}\n`, `//#region ${replacement}\n`);
+    const changed = bundle.code.replaceAll(`// ${relative}\n`, `// ${replacement}\n`);
     expect(changed, replacement).not.toBe(bundle.code);
-    expect(() => assertPortableRegions(changed, labels), replacement).toThrow(
-      /(?:Nonportable|Unexpected) parser region label/,
+    expect(() => assertPortableModules(changed, sources), replacement).toThrow(
+      "Review changed parser module marker",
+    );
+    // A change in Rolldown's actual module-header channel must fail even if it
+    // affects a pre-DCE module whose comment is absent from the final chunk.
+    const changedSources = new Map(sources);
+    changedSources.set(
+      relative,
+      sources.get(relative)!.replace(`// ${relative}\n`, `// ${replacement}\n`),
+    );
+    expect(() => assertPortableModules(changed, changedSources), replacement).toThrow(
+      "Unexpected parser module header",
     );
   }
-  for (const marker of ["//#region", "//#region ", "//#regions unexpected"]) {
-    const changed = bundle.code.replaceAll(`//#region ${relative}`, marker);
-    expect(() => assertPortableRegions(changed, labels), marker).toThrow(
-      /(?:Malformed parser region header|Missing parser region label)/,
+  for (const marker of ["//", "// ", `//#region ${relative}`, `// ${relative}\n// ${relative}`]) {
+    const changed = bundle.code.replaceAll(`// ${relative}`, marker);
+    expect(() => assertPortableModules(changed, sources), marker).toThrow(
+      "Review changed parser module marker",
     );
   }
-  expect(() => assertPortableRegions("export {};\n", labels)).toThrow(
-    "Missing parser region headers",
+  expect(() => assertPortableModules("export {};\n", sources)).toThrow(
+    "Review changed parser module marker",
   );
+  for (const label of [
+    "node_modules/devlop/lib/default.js",
+    "node_modules/get-east-asian-width/lookup-data.js",
+  ]) {
+    expect(sources.get(label)).toMatch(`// ${label}\n`);
+    expect(bundle.code).not.toContain(`// ${label}\n`);
+    const changed = new Map(sources);
+    changed.set(label, null);
+    expect(() => assertPortableModules(bundle.code, changed)).toThrow(
+      "Unexpected parser module header",
+    );
+    expect(() => assertPortableModules(`${bundle.code}\n// ${label}\n`, sources)).toThrow(
+      "Review changed parser module marker",
+    );
+  }
   // /code, /src and /build are also legitimate source fragments: no raw
   // repository-root substring test may classify them as emitted physical paths.
   const ordinary = `${bundle.code}\n// /code /src /build\nconst unrelated = "/micromark-util-edit-map/";\n`;
-  expect(() => assertPortableRegions(ordinary, labels)).not.toThrow();
+  expect(() => assertPortableModules(ordinary, sources)).not.toThrow();
 });

@@ -51,7 +51,7 @@ function containedRows(source: string, node: Table): [number, number][] | undefi
 }
 
 const table: Rule = {
-  description: "Format GFM table padding and pipes while preserving inline source.",
+  description: "Pads table cells to their column's width and writes the delimiter row to match.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({

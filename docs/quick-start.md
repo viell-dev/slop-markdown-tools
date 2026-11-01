@@ -2,14 +2,11 @@
 
 ## Install
 
-When upgrading from 0.4.x, complete the [naming migration](cli.md#earlier-names)
-before installing 0.6.0.
-
 mdrefine needs Node.js 22.12 or newer. Install the package in the project that
 holds your documents:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.6.0
+npm install --save-dev --save-exact mdrefine@0.6.2
 npx --no-install mdrefine --help
 ```
 
@@ -18,43 +15,44 @@ from downloading a package when the project has none; the examples below leave
 it out. The exact version lets you choose when a release that formats
 differently reaches your documents; see [versions](versions.md).
 
-## Lint
+The commands work the same in PowerShell and cmd, apart from reading a file
+through stdin with `<`, which the [command line](cli.md#read-from-stdin) page
+covers.
 
-Run the commands from the root of your documents, or point them there with
-`--root`:
+### Without a Node.js project
 
-```sh
-npx mdrefine lint
-```
+`npm install` in a folder without `package.json` creates `package.json`,
+`package-lock.json`, and a `node_modules` folder there. In a repository of
+another language, add `node_modules/` to its `.gitignore`, or use one of these
+instead:
 
-`lint` reports what the enabled rules find and never changes a file. Without
-paths it checks every document of the workspace: each file ending in `.md` or
-`.markdown` below the configuration file's directory, or else below the Git
-repository or vault you run it in; see [which files are
-processed](cli.md#which-files-are-processed). Add `--json` for a report that
-scripts can read, or `--max-warnings 0` to fail on warnings too.
+- Run it once, without installing it in the folder:
 
-## Preview and write
+  ```sh
+  npx mdrefine@0.6.2 lint
+  ```
 
-```sh
-npx mdrefine format
-npx mdrefine format --diff
-npx mdrefine format --write
-npx mdrefine format --check
-```
+- Install it once for every folder, and run `mdrefine` without `npx`:
 
-Bare `format` prints what formatting would change and exits `1` when any file
-would change. `--diff` prints the same preview with exit `0` when no errors
-remain and `--max-warnings` is not exceeded. `--check --diff` prints the diff
-and fails on changes. `--write` writes the changes. `--check` writes nothing,
-names each document that would change, and then exits with code `1`, which is
-the check to run in CI. `format` changes only what its rules target, and refuses
-any change that would alter what a document means. It can still report problems
-that need a person, such as a broken link; remaining errors exit `1` in every
-mode. Operational failures exit `2`. Stdin prints the formatted document by
-default and does not fail merely because formatting changed it.
+  ```sh
+  npm install --global mdrefine@0.6.2
+  mdrefine lint
+  ```
 
-## Choose a preset and a dialect
+For an Obsidian vault, see [install for a
+vault](obsidian.md#install-for-a-vault).
+
+### Other package managers
+
+| Package manager | Install                                           | Run                  |
+| --------------- | ------------------------------------------------- | -------------------- |
+| pnpm            | `pnpm add --save-dev --save-exact mdrefine@0.6.2` | `pnpm exec mdrefine` |
+| Yarn            | `yarn add --dev --exact mdrefine@0.6.2`           | `yarn mdrefine`      |
+| Bun             | `bun add --dev --exact mdrefine@0.6.2`            | `bunx mdrefine`      |
+
+Use the command in the "Run" column where the pages say `npx mdrefine`.
+
+## Choose where your documents render
 
 Create `mdrefine.config.jsonc` at the root of your documents:
 
@@ -69,29 +67,97 @@ Create `mdrefine.config.jsonc` at the root of your documents:
 The `$schema` line lets your editor complete and check the settings; see [JSON
 Schema](configuration.md#json-schema).
 
-`recommended` wraps prose at 80 columns; writes emphasis as `_text_`, strong
-text as `**text**`, list items as `- item` and `1. item`, headings with `#`,
-code fences with backticks, and thematic breaks as `---`; aligns tables; removes
-trailing spaces and repeated blank lines; separates headings, lists, code
-fences, and tables from adjacent blocks with a blank line where safe; ends every
-file with a line break; and checks local links. It also warns about
-[problems](rules.md) that show on the rendered page, such as a reference without
-a definition, a skipped heading level, or an image without alternative text. The
-second [preset](configuration.md#presets) names where your documents are
-rendered and so their [dialect](dialects.md): replace `github` with `forgejo`
-(or `codeberg`), `gitea`, `obsidian`, or `vitepress`. Match a VitePress site's
-[renderer options](vitepress.md#renderer-options) explicitly. For plain
-CommonMark, keep only `recommended` and add `"dialect": "commonmark"`.
+`extends` names **presets**, sets of rule settings. `recommended` checks and
+formats any Markdown; see [what it
+does](configuration.md#what-recommended-does). The second preset names where
+your documents are rendered, which sets their **dialect**: the syntax they are
+read in, such as GitHub's alerts or Obsidian's wikilinks. Use the line for your
+renderer:
+
+| Documents rendered by       | `extends`                      | Also                                                           |
+| --------------------------- | ------------------------------ | -------------------------------------------------------------- |
+| GitHub                      | `["recommended", "github"]`    |                                                                |
+| Codeberg or another Forgejo | `["recommended", "forgejo"]`   |                                                                |
+| Gitea                       | `["recommended", "gitea"]`     |                                                                |
+| Obsidian                    | `["recommended", "obsidian"]`  | Put the file next to `.obsidian/`; see [vaults](obsidian.md)   |
+| VitePress                   | `["recommended", "vitepress"]` | Match its [renderer options](vitepress.md#renderer-options)    |
+| Another CommonMark renderer | `["recommended"]`              | Add `"dialect": "commonmark"`; there is no `commonmark` preset |
+
+## Lint
+
+Run the commands from the root of your documents, or point them there with
+`--root`:
+
+```sh
+npx mdrefine lint
+```
+
+`lint` reports what the enabled rules find and never changes a file. With the
+[README's example](https://github.com/viell-dev/slop-markdown-tools#example)
+saved as `README.md`, it prints:
+
+```text
+README.md:1:1: warn style/wrap: Reflow paragraph to 80 columns.
+README.md:1:26: warn style/emphasis: Use "_" for emphasis.
+README.md:1:38: warn style/emphasis: Use "_" for emphasis.
+README.md:1:41: warn style/emphasis: Use "_" for emphasis.
+README.md:1:50: warn style/emphasis: Use "_" for emphasis.
+README.md:1:57: warn style/emphasis: Use "_" for emphasis.
+README.md:1:66: warn style/emphasis: Use "_" for emphasis.
+README.md:3:5: warn github/alert-marker: Use NOTE for the callout type.
+README.md:4:62: warn style/strong: Use "**" for strong.
+README.md:4:71: warn style/strong: Use "**" for strong.
+README.md:6:1: warn style/table: Format table padding and pipes.
+1 file(s) linted; 0 error(s), 11 warning(s).
+```
+
+Each line gives the file, line, and column, the severity, the rule, and what to
+change. Add `--json` for a report that scripts can read, or `--max-warnings 0`
+to fail on warnings too.
+
+Without paths, the commands check every document of the workspace: each file
+ending in `.md` or `.markdown` below the configuration file's directory, or else
+below the Git repository or vault you run them in. See [which files are
+processed](cli.md#which-files-are-processed).
+
+## Preview and write
+
+| Command          | Writes files | Prints                      | Exits `1` when                        |
+| ---------------- | ------------ | --------------------------- | ------------------------------------- |
+| `lint`           | No           | Findings                    | It finds errors                       |
+| `format`         | No           | The diff                    | A file would change, or errors remain |
+| `format --diff`  | No           | The diff                    | Errors remain                         |
+| `format --check` | No           | The files that would change | A file would change, or errors remain |
+| `format --write` | Yes          | How many files it wrote     | Errors remain                         |
+
+Each of them also exits `1` with more warnings than `--max-warnings` allows, and
+`2` when it cannot run, such as with a configuration that is not valid. Run
+`format --check` in CI, or `format --check --diff` to see the diff as well. Read
+from stdin, `format` prints the formatted document instead, and does not fail
+only because formatting changed it.
+
+```sh
+npx mdrefine format
+npx mdrefine format --write
+```
+
+`format` changes only what its rules target, and refuses any change that would
+alter what a document means. It can still report problems that need a person,
+such as a broken link, which remain errors after `--write`.
+
+## No configuration file?
 
 Without a configuration file, documents are read as GitHub Markdown, or as
 Obsidian notes inside a vault. The rules then come from a markdownlint or
 Prettier configuration in the workspace, if there is one that mdrefine can read:
-it [converts](configuration.md#competitor-configuration-fallback) their settings
-and says so on stderr. Pass `--no-competitor-config` to leave them out. Without
-such a configuration, the `recommended` rules apply. A configuration file is
-still worth creating: it enables the rules for your renderer and makes the
-dialect explicit. `npx mdrefine config convert --write` creates one from the
+it [converts](configuration.md#fallback-to-markdownlint-and-prettier) their
+settings and says so on stderr. Pass `--no-competitor-config` to leave them out.
+Without such a configuration, the `recommended` rules apply. A configuration
+file is still worth creating: it enables the rules for your renderer and makes
+the dialect explicit. `npx mdrefine config convert --write` creates one from the
 markdownlint or Prettier settings.
+
+## Change a rule
 
 Change a rule under `rules`:
 
@@ -118,3 +184,4 @@ This wraps at 100 columns and leaves emphasis markers as they are.
   Prettier or markdownlint.
 - [Obsidian vaults](obsidian.md) and [examples](examples.md) of documents before
   and after formatting.
+- [Glossary](glossary.md): the terms these pages use.

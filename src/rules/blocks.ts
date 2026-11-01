@@ -213,7 +213,7 @@ export function underlineEdit(document: Document, node: Heading): Edit | undefin
 }
 
 const codeFenceRule: Rule = {
-  description: "Write code fences with one marker and the length their content needs.",
+  description: "Writes code fences with one marker, only as long as their content needs.",
   kind: "style",
   phase: "block",
   schema: schema({ marker: { enum: ["```", "~~~", "consistent"] } }),
@@ -276,7 +276,7 @@ function lastBlock(node: Nodes): Nodes {
   return node;
 }
 const thematicBreak: Rule = {
-  description: "Write thematic breaks with one marker.",
+  description: "Writes thematic breaks as one exact text, `---` by default.",
   kind: "style",
   phase: "block",
   schema: schema({
@@ -410,7 +410,7 @@ function contentBlocks(document: Document): [number, number][] {
   return merged(blocks);
 }
 const blankLines: Rule = {
-  description: "Limit blank lines in a row and remove those around the document.",
+  description: "Limits blank lines in a row, and removes those at the start and end of a document.",
   kind: "style",
   phase: "document",
   // Fewer than one blank line would join the blocks that it separates.
@@ -495,7 +495,7 @@ const prose = new Set([
   "delete",
 ]);
 const trailingSpace: Rule = {
-  description: "Remove spaces and tabs at the end of lines outside code and HTML.",
+  description: "Removes spaces and tabs at the end of lines, keeping hard line breaks.",
   kind: "style",
   phase: "document",
   schema: schema({

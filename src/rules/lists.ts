@@ -811,7 +811,7 @@ function bulletMarkers(analysis: Analysis, marker: string): (list: ListGroup) =>
 }
 
 const listMarker: Rule = {
-  description: "Use one bullet list marker, and the next one for a list that follows another.",
+  description: "Writes bullet lists with one marker, `-` by default.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({ marker: { enum: [...bullets, "consistent", "sublist"] } }),
@@ -888,7 +888,8 @@ function renumbered(digits: string[], numbering: string): string[] | undefined {
 }
 
 const orderedList: Rule = {
-  description: "Use one delimiter after list numbers, and number list items consistently.",
+  description:
+    "Writes ordered list numbers with one delimiter, and numbers the items consistently.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({
@@ -974,7 +975,7 @@ const reachOf = (item: Item, spacing = item.spacing) =>
 const spaces = { type: "integer", minimum: 1, maximum: 4 };
 
 const listIndent: Rule = {
-  description: "Indent list items consistently, with the configured spaces after the marker.",
+  description: "Indents list items consistently, with the configured spaces after the marker.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({
@@ -1010,10 +1011,17 @@ const listIndent: Rule = {
       const reach = new Map<Item, number>();
       const lowest = new Map<Item, number>();
       for (const list of unit.lists) {
+        const first = list.items[0]!;
+        // A footnote's first-line prefix ends at its first block. Adding
+        // indentation there would extend that prefix again on every pass.
+        const listInitial =
+          list.parent?.type === "footnoteDefinition" &&
+          first.first === list.parent.position!.start.line - 1
+            ? 0
+            : initial;
         // Below text an indented marker can be a continuation; preserve that
         // boundary rather than guessing.
-        const first = list.items[0]!;
-        if (initial > 0 && (!list.parent || list.parent.type !== "listItem")) {
+        if (listInitial > 0 && (!list.parent || list.parent.type !== "listItem")) {
           if (
             first.first > 0 &&
             /\S/.test(
@@ -1055,7 +1063,10 @@ const listIndent: Rule = {
               ? 0
               : // A list after another one must not reach that list's last item,
                 // which a list left as written would otherwise take it into.
-                Math.max(0, Math.min(initial, (before ? (lowest.get(before) ?? 0) : Infinity) - 1));
+                Math.max(
+                  0,
+                  Math.min(listInitial, (before ? (lowest.get(before) ?? 0) : Infinity) - 1),
+                );
         const marks: Op[] = [];
         const changes = new Map<Item, number>();
         let possible = true;

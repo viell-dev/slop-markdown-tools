@@ -3,13 +3,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { Ajv } from "ajv";
+import GithubSlugger from "github-slugger";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { ParseError } from "jsonc-parser";
 import type { Code, Nodes, RootContent } from "mdast";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import * as library from "../../src/index.js";
-import { manifest, repository, run } from "../support/cli.js";
+import { fixture, manifest, repository, run } from "../support/cli.js";
 
 const { builtInRules, dialectAliases, dialects, lint, parse, presets, range } = library;
 const read = (file: string) => readFileSync(path.join(repository, file), "utf8");
@@ -26,12 +27,12 @@ const isCode = (node: RootContent | undefined, lang: string): node is Code =>
 describe("rules reference", () => {
   const file = "docs/rules.md";
   const source = read(file);
-  const page = blocks(file);
-  const index = page.find((node) => node.type === "table");
-  // The index's rows, as the source text of each cell: rule, kind, `recommended`, dialect presets, options.
-  const rows =
-    index?.type === "table"
-      ? index.children
+  const index = blocks(file).filter((node) => node.type === "table");
+  // The index's rows, as the source text of each cell: rule, description, kind, `recommended`,
+  // dialect presets, options.
+  const rows = index.flatMap((table) =>
+    table.type === "table"
+      ? table.children
           .slice(1)
           .map((row) =>
             row.children.map((cell) =>
@@ -40,8 +41,9 @@ describe("rules reference", () => {
                 : "",
             ),
           )
-      : [];
-  const listed = rows.map(([rule]) => /^`([^`]+)`$/.exec(rule ?? "")?.[1] ?? String(rule));
+      : [],
+  );
+  const listed = rows.map(([rule]) => /^\[`([^`]+)`\]\(rules\/\1\.md\)$/.exec(rule ?? "")?.[1]);
   /** The presets that enable a rule, with the severity they give it. */
   const enabling = (rule: string) =>
     Object.entries(presets).flatMap(([name, preset]) => {
@@ -49,7 +51,8 @@ describe("rules reference", () => {
       const severity = typeof value === "string" ? value : value?.[0];
       return severity && severity !== "off" ? [{ name, severity }] : [];
     });
-  it("has one index row for every built-in rule, in alphabetical order", () => {
+  it("has one index row for every built-in rule, linking its page, in alphabetical order", () => {
+    expect(listed).not.toContain(undefined);
     expect([...listed].sort()).toEqual(Object.keys(builtInRules).sort());
     expect(listed).toEqual([...listed].sort());
   });
@@ -60,7 +63,7 @@ describe("rules reference", () => {
     ).length > 0;
   /**
    * A preset cell: for each severity, `warn` or `error`, followed by the presets that give it
-   * when the column holds several presets, else ❌.
+   * when the column holds several presets, else —.
    */
   const cell = (enabled: { name: string; severity: string }[], named: boolean) =>
     enabled.length
@@ -72,12 +75,16 @@ describe("rules reference", () => {
             return [named ? `\`${severity}\` in ${list}` : `\`${severity}\``];
           })
           .join("; ")
-      : "❌";
-  it("gives each rule's kind, presets with their severity, and options as the code does", () => {
-    for (const [index, [, kind, recommended, dialectPresets, options]] of rows.entries()) {
+      : "—";
+  it("gives each rule's description, kind, presets with their severity, and options as the code does", () => {
+    for (const [
+      index,
+      [, description, kind, recommended, dialectPresets, options],
+    ] of rows.entries()) {
       const rule = listed[index]!;
-      const style = builtInRules[rule]?.kind === "style";
-      expect(kind, rule).toBe(style ? "🎨" : "🔍");
+      // `mdrefine rules` prints the same description.
+      expect(description, rule).toBe(builtInRules[rule]?.description);
+      expect(kind, rule).toBe(builtInRules[rule]?.kind === "style" ? "Style" : "Problem");
       const enabled = enabling(rule);
       expect(recommended, rule).toBe(
         cell(
@@ -91,54 +98,65 @@ describe("rules reference", () => {
           true,
         ),
       );
-      expect(options, rule).toBe(hasOptions(rule) ? "✅" : "❌");
+      expect(options, rule).toBe(hasOptions(rule) ? "Yes" : "—");
     }
   });
-  it("opens each rule's section with what it does, then its kind, presets, dialects, and options", () => {
-    const facts =
-      /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
-    page.forEach((node, at) => {
-      if (node.type !== "heading" || node.depth !== 2 || node.children[0]?.type !== "inlineCode")
-        return;
-      const rule = node.children[0].value;
+  it("has a page for every rule, and no other", () => {
+    const rulePages = pages.filter((page) => page.startsWith("docs/rules/"));
+    expect(rulePages.sort()).toEqual(
+      Object.keys(builtInRules)
+        .sort()
+        .map((rule) => `docs/rules/${rule}.md`),
+    );
+  });
+  const facts =
+    /^\*\*(Style|Problem) rule\*\*, (fixed by `format`|reported only)\. Presets: (.+?)\. Dialects: (.+?)\. Options: (.+?)\.$/;
+  it.each(Object.keys(builtInRules).sort())(
+    "%s's page opens with what it does, then its kind, presets, dialects, and options",
+    (rule) => {
+      const file = `docs/rules/${rule}.md`;
+      const source = read(file);
+      const page = blocks(file);
+      const title = page[0];
+      expect(title?.type === "heading" && title.depth === 1 && title.children[0]).toEqual(
+        expect.objectContaining({ type: "inlineCode", value: rule }),
+      );
       // The opening says what the rule does, in prose rather than a label or the facts.
-      const opening = page[at + 1];
+      const opening = page[1];
       const opened = opening ? source.slice(...range(opening)) : "";
-      expect(opening?.type, `${rule}: ${opened}`).toBe("paragraph");
-      expect(opened, rule).not.toMatch(/^\*\*/);
-      const next = page[at + 2];
+      expect(opening?.type, opened).toBe("paragraph");
+      expect(opened).not.toMatch(/^\*\*/);
+      const next = page[2];
       const text = next ? source.slice(...range(next)).replace(/\s+/g, " ") : "";
       const match = facts.exec(text);
-      expect(match, `${rule}: ${text}`).not.toBeNull();
+      expect(match, text).not.toBeNull();
       const [, kind, fixes, presetsText = "", , optionsText] = match!;
       const style = builtInRules[rule]?.kind === "style";
-      expect(kind, rule).toBe(style ? "Style" : "Problem");
-      expect(fixes, rule).toBe(style ? "fixed by `format`" : "reported only");
+      expect(kind).toBe(style ? "Style" : "Problem");
+      expect(fixes).toBe(style ? "fixed by `format`" : "reported only");
       // Each preset with the severity it gives the rule, as in "`recommended` (warn)".
       const stated =
         presetsText === "none"
           ? []
           : presetsText.split(", ").map((preset) => {
               const found = /^`([^`]+)` \((warn|error)\)$/.exec(preset);
-              expect(found, `${rule}: ${preset}`).not.toBeNull();
+              expect(found, preset).not.toBeNull();
               return `${found![1]} ${found![2]}`;
             });
-      expect(stated.sort(), rule).toEqual(
+      expect(stated.sort()).toEqual(
         enabling(rule)
           .map(({ name, severity }) => `${name} ${severity}`)
           .sort(),
       );
-      expect(optionsText === "none", rule).toBe(!hasOptions(rule));
-    });
-  });
-  it("has a section for every rule, in the order of the index", () => {
-    const sections = page.flatMap((node) =>
-      node.type === "heading" && node.depth === 2 && node.children[0]?.type === "inlineCode"
-        ? [node.children[0].value]
-        : [],
-    );
-    expect(sections).toEqual(listed);
-  });
+      expect(optionsText === "none").toBe(!hasOptions(rule));
+      // The common case comes first; the rest follows under these headings, in this order.
+      const sections = page.flatMap((node) =>
+        node.type === "heading" && node.depth === 2 ? [source.slice(...range(node))] : [],
+      );
+      const order = ["## Edge cases and advanced usage", "## Dialect notes", "## Related rules"];
+      expect(sections).toEqual(order.filter((heading) => sections.includes(heading)));
+    },
+  );
 });
 
 describe("configuration and dialect references", () => {
@@ -215,6 +233,26 @@ describe("configuration snippets", () => {
   });
 });
 
+describe("getting started", () => {
+  it("shows the real lint output and result for the README's example", async () => {
+    const [before, after] = blocks("README.md").filter((node) => isCode(node, "markdown"));
+    const page = blocks("docs/quick-start.md");
+    const config = page.find((node) => isCode(node, "jsonc"));
+    const output = page.find((node) => isCode(node, "text"));
+    expect(before && after && config && output).toBeTruthy();
+    const root = await fixture({
+      "README.md": `${(before as Code).value}\n`,
+      "mdrefine.config.jsonc": (config as Code).value,
+    });
+    // A terminal shows both streams; the findings and the summary are on stderr.
+    const linted = run(root, ["lint"]);
+    expect(linted.stdout + linted.stderr).toBe(`${(output as Code).value}\n`);
+    // The README says that `format --write` with these presets turns it into its second block.
+    expect(run(root, ["format", "--write"]).status).toBe(0);
+    expect(readFileSync(path.join(root, "README.md"), "utf8")).toBe(`${(after as Code).value}\n`);
+  });
+});
+
 describe("examples page", () => {
   const page = blocks("docs/examples.md");
   const shown = page.flatMap((node, index) => {
@@ -240,12 +278,15 @@ describe("examples page", () => {
     expect(`${node.value}\n`).toBe(read(file));
   });
   it.each(commands)("shows the real output of: $command", ({ command, output }) => {
-    // A documented command is `node <script> <arguments>`, optionally piped into another one.
+    // A documented command is `npx mdrefine <arguments>`, which the built command runs here, or
+    // `node <script> <arguments>`, optionally piped into another one.
     let input: string | undefined;
     let printed = "";
     for (const stage of command.split(" | ")) {
-      const [program, ...args] = stage.split(" ");
-      expect(program).toBe("node");
+      const [program, ...rest] = stage.split(" ");
+      const installed = program === "npx" && rest[0] === "mdrefine";
+      expect(installed || program === "node", stage).toBe(true);
+      const args = installed ? ["dist/cli/main.js", ...rest.slice(1)] : rest;
       const result = spawnSync(process.execPath, args, {
         cwd: repository,
         input,
@@ -267,23 +308,75 @@ describe("examples page", () => {
       for (const name of names) expect(text, name).toContain(`examples/${name}`);
     }
   });
+  it("lists every starting configuration in the examples' README too", () => {
+    const text = read("examples/README.md");
+    const configurations = readdirSync(path.join(repository, "examples")).filter((name) =>
+      name.endsWith(".jsonc"),
+    );
+    expect(configurations.length).toBeGreaterThan(4);
+    for (const name of configurations) expect(text, name).toContain(`(${name})`);
+  });
+});
+
+describe("links to the repository", () => {
+  // The pages link maintainer notes and guides in the repository by their GitHub address, which
+  // neither the site build nor the tool's link check follows.
+  const base = "https://github.com/viell-dev/slop-markdown-tools/blob/main/";
+  const links = [...pages, "README.md"].flatMap((file) =>
+    [
+      ...read(file).matchAll(
+        /https:\/\/github\.com\/viell-dev\/slop-markdown-tools\/blob\/main\/([\w./-]+\.md)(?:#([\w-]+))?/g,
+      ),
+    ].map((match) => ({ file, target: match[1]!, fragment: match[2] })),
+  );
+  it("name files and headings that exist", () => {
+    expect(links.some(({ target }) => target.startsWith("internals/"))).toBe(true);
+    for (const { file, target, fragment } of links) {
+      expect(
+        readdirSync(path.join(repository, path.dirname(target))),
+        `${file}: ${base}${target}`,
+      ).toContain(path.basename(target));
+      if (!fragment) continue;
+      const source = read(target);
+      const slugger = new GithubSlugger();
+      const anchors = blocks(target).flatMap((node) =>
+        node.type === "heading"
+          ? [slugger.slug(source.slice(...range(node)).replace(/^#+\s*/, ""))]
+          : [],
+      );
+      expect(anchors, `${file}: ${base}${target}#${fragment}`).toContain(fragment);
+    }
+  });
 });
 
 describe("documentation site", () => {
-  it("links every page from the sidebar, and only pages that exist", () => {
-    const config = read("docs/.vitepress/config.mts");
-    const sidebar = [...config.matchAll(/link: "\/([a-z0-9/-]+)"/g)].map(
-      (match) => `docs/${match[1]}.md`,
-    );
+  it("links every page from the sidebar, and only pages that exist", async () => {
+    type Item = { link?: string; items?: Item[] };
+    // The site's configuration, which generates the rule pages' part of the sidebar.
+    const configuration = pathToFileURL(path.join(repository, "docs/.vitepress/config.mts"));
+    const { default: config } = (await import(configuration.href)) as {
+      default: { themeConfig: { sidebar: Item[] } };
+    };
+    const links = (items: Item[]): string[] =>
+      items.flatMap((item) => [...(item.link ? [item.link] : []), ...links(item.items ?? [])]);
+    const sidebar = links(config.themeConfig.sidebar).map((link) => `docs${link}.md`);
+    expect(sidebar).toContain("docs/rules/style/wrap.md");
     for (const page of pages) if (page !== "docs/index.md") expect(sidebar).toContain(page);
     for (const link of sidebar) expect(pages).toContain(link);
   });
   it("gives installation commands for the current version", () => {
-    for (const file of ["README.md", "docs/quick-start.md"]) {
+    // Release notes name the versions they describe; the other pages install the current one.
+    const files = [...pages.filter((page) => !page.startsWith("docs/release-notes/")), "README.md"];
+    for (const file of files) {
       const versions = [...read(file).matchAll(/mdrefine@(\d[\w.-]*)/g)].map((match) => match[1]);
-      expect(versions.length, file).toBeGreaterThan(0);
+      if (["README.md", "docs/quick-start.md"].includes(file))
+        expect(versions.length, file).toBeGreaterThan(0);
       for (const version of versions) expect(version, file).toBe(manifest.version);
     }
+  });
+  it("shows the current version in the JSON report's example", () => {
+    const versions = [...read("docs/cli.md").matchAll(/^ {2}"version": "([^"]+)",$/gm)];
+    expect(versions.map((match) => match[1])).toEqual([manifest.version]);
   });
   it("fits a line of the default wrap width into a code block", () => {
     // The site shows formatted output, so a code block must hold a line of the default wrap
@@ -358,26 +451,6 @@ describe("version annotations", () => {
    */
   const allowed: [file: string, text: string, reason: string][] = [
     [
-      "docs/configuration.md",
-      "Version 0.5.0 no longer discovers",
-      "the migration note for the earlier names",
-    ],
-    [
-      "docs/configuration.md",
-      "before upgrading from 0.4.x",
-      "the migration note for the earlier names",
-    ],
-    [
-      "docs/quick-start.md",
-      "When upgrading from 0.4.x, complete the naming migration before installing 0.6.0.",
-      "an upgrade instruction that points to the migration steps",
-    ],
-    [
-      "docs/benchmarks.md",
-      "The figures below precede the internal parser adapter introduced in 0.4.1.",
-      "the version the measurements were taken with",
-    ],
-    [
       "docs/versions.md",
       "Before 1.0, the second number plays the part of the first",
       "the versioning policy",
@@ -449,7 +522,12 @@ describe("version annotations", () => {
   ])("allows %j", (source) => {
     expect(annotated(readable(source))).toEqual([]);
   });
-  const checked = [...pages.filter((page) => page !== "docs/changelog.md"), "README.md"];
+  // The changelog, the upgrading steps, and the release notes are the history that the other
+  // pages leave out.
+  const history = (page: string) =>
+    ["docs/changelog.md", "docs/upgrading.md"].includes(page) ||
+    page.startsWith("docs/release-notes/");
+  const checked = [...pages.filter((page) => !history(page)), "README.md"];
   it.each(checked)("%s describes its version without history", (file) => {
     let rest = text(file);
     for (const [owner, passage] of allowed)
@@ -551,6 +629,17 @@ describe("changelog", () => {
     for (const [index, line] of lines.entries())
       if (index > 0 && lines[index - 1] && line) expect(line).toMatch(/^\s*(?:[-*+] |\d+[.)] |#)/);
   });
+  it("links a minor release's notes page from its section, which exists", () => {
+    // A release such as 0.7.0 needs docs/release-notes/0.7.md, which RELEASING.md asks for.
+    const [major, minor, patch] = manifest.version.split(/[.-]/);
+    const line = `${major}.${minor}`;
+    const page = `docs/release-notes/${line}.md`;
+    expect(pages).toContain(page);
+    expect(read(page).startsWith(`# What's new in ${line}\n`)).toBe(true);
+    // The GitHub release of X.Y.0 opens with the link, as its changelog section does.
+    const link = `[What's new in ${line}](https://viell-dev.github.io/slop-markdown-tools/release-notes/${line}.html)`;
+    if (patch === "0") expect(notes(manifest.version).stdout.startsWith(link)).toBe(true);
+  });
   it("refuses a version that has no section", () => {
     const result = notes("0.0.0-none.0");
     expect(result.status).toBe(1);
@@ -564,25 +653,21 @@ describe("competitor fallback (#788)", () => {
     const quickStart = prose("docs/quick-start.md");
     expect(quickStart).not.toContain("Without a configuration file, the `recommended` rules apply");
     expect(quickStart).toContain("--no-competitor-config");
-    expect(quickStart).toContain("configuration.md#competitor-configuration-fallback");
+    expect(quickStart).toContain("configuration.md#fallback-to-markdownlint-and-prettier");
     expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
   });
   it("tells those upgrading how to keep the defaults", () => {
-    // The newest section, before or after its release: `Unreleased` or a version.
-    const newest = prose("CHANGELOG.md").split(/ ## /)[1]!;
-    const changed = newest.split("### Changed")[1]!.split(/ ### /)[0]!;
-    expect(changed).toContain("instead of the `recommended` preset");
-    expect(changed).toContain("--no-competitor-config");
-    expect(changed).toContain("mdrefine config convert --write");
+    const steps = prose("docs/upgrading.md").split("## 0.6.0")[1]!.split(/ ## /)[0]!;
+    expect(steps).toContain("instead of the `recommended` preset");
+    expect(steps).toContain("--no-competitor-config");
+    expect(steps).toContain("mdrefine config convert --write");
   });
   it("ascribes --quiet only to the commands that take it", () => {
     const takes = (args: string[]) =>
       run(repository, [...args, "--help"]).stdout.includes("--quiet");
     expect(takes(["lint"]) && takes(["format"])).toBe(true);
     expect(takes(["config", "explain"])).toBe(false);
-    const notices = prose("docs/cli.md")
-      .split("### Competitor fallback notices")[1]!
-      .split(" ### ")[0]!;
+    const notices = prose("docs/cli.md").split("### Fallback notices")[1]!.split(" ### ")[0]!;
     const sentences = notices.split(/(?<=\.) /).filter((text) => text.includes("`--quiet`"));
     expect(sentences.length).toBeGreaterThan(0);
     for (const sentence of sentences) {

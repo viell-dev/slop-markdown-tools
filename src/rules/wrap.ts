@@ -1126,7 +1126,7 @@ function wrapParagraph(
 }
 
 const wrap: Rule = {
-  description: "Reflow paragraphs using configurable width and protected inline atoms.",
+  description: "Reflows paragraphs to fill the line width, 80 columns by default.",
   kind: "style",
   phase: "block",
   schema: optionsSchema({

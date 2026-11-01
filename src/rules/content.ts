@@ -74,7 +74,7 @@ function promptOnly(code: string): string | undefined {
 
 export const contentRules: Record<string, Rule> = {
   "content/html-element": {
-    description: "Report HTML elements, apart from the allowed ones.",
+    description: "Reports HTML elements, apart from the allowed ones.",
     kind: "problem",
     schema: optionsSchema({
       allowedElements: {
@@ -113,7 +113,7 @@ export const contentRules: Record<string, Rule> = {
 
   "content/proper-names": properNames,
   "content/image-alt": {
-    description: "Report images, Markdown or HTML, without alternative text.",
+    description: "Reports images, Markdown or HTML, without alternative text.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -145,7 +145,7 @@ export const contentRules: Record<string, Rule> = {
     },
   },
   "content/table-columns": {
-    description: "Report table rows with more or fewer cells than the header row.",
+    description: "Reports table rows with more or fewer cells than the header row.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -174,7 +174,7 @@ export const contentRules: Record<string, Rule> = {
   },
   "content/shell-prompt": {
     description:
-      "Report shell code blocks whose every command has a prompt and that show no output.",
+      "Reports shell code blocks in which every command has a prompt and no output is shown.",
     kind: "problem",
     schema: optionsSchema({}),
     check({ document }) {
@@ -194,7 +194,8 @@ export const contentRules: Record<string, Rule> = {
     },
   },
   "content/code-language": {
-    description: "Check fenced code block languages and their info strings.",
+    description:
+      "Reports fenced code blocks that name no language, or one that the options disallow.",
     kind: "problem",
     schema: optionsSchema({
       allowedLanguages: { type: "array", items: { type: "string", minLength: 1 }, default: [] },

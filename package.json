@@ -1,6 +1,6 @@
 {
   "name": "mdrefine",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Configurable Markdown linting and formatting for CommonMark, GitHub, Forgejo, Gitea, Obsidian, and VitePress",
   "keywords": [
     "markdown",
@@ -56,6 +56,7 @@
     "dist",
     "config.schema.json",
     "docs/*.md",
+    "docs/rules/*/*.md",
     "examples",
     "README.md",
     "CHANGELOG.md",
@@ -123,7 +124,7 @@
     "diff": "9.0.0",
     "entities": "8.1.0",
     "github-slugger": "2.0.0",
-    "ignore": "7.0.12",
+    "ignore": "7.0.14",
     "import-meta-resolve": "4.2.0",
     "jsonc-parser": "3.3.1",
     "markdown-it": "14.3.3",
@@ -143,7 +144,7 @@
     "micromark-factory-space": "2.1.0",
     "micromark-util-character": "2.1.1",
     "micromark-util-types": "2.0.3",
-    "minimatch": "10.2.6",
+    "minimatch": "11.0.1",
     "string-width": "8.3.0",
     "yaml": "2.9.1"
   },
@@ -165,11 +166,11 @@
     "micromark-extension-gfm-autolink-literal": "2.1.0",
     "micromark-extension-gfm-footnote": "2.1.0",
     "micromark-extension-gfm-strikethrough": "2.1.0",
-    "npm-run-all2": "9.0.3",
+    "npm-run-all2": "9.0.4",
     "prettier": "3.9.10",
-    "rolldown": "1.2.14",
+    "rolldown": "1.2.15",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.2",
+    "typescript-eslint": "8.72.0",
     "vitepress": "2.0.0-alpha.20",
     "vitest": "5.0.5"
   },

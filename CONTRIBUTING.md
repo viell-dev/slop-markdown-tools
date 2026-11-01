@@ -192,10 +192,10 @@ advisory filter. Fixes confined to unshipped build/test code still follow the
 policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
 The independently managed Obsidian harness is a separate dependency tree.
 
-`scripts/parser-patches.mjs` pins the eleven corrected source modules by
-package, version and SHA-256, with exact source anchors. Its existing per-kind
-guards also own each correction's rationale, links to the permanent dependency
-index [#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) and
+`scripts/parser-patches.mjs` pins corrected source modules by package, version
+and SHA-256, with exact source anchors. Its existing per-kind guards also own
+each correction's rationale, links to the permanent dependency index
+[#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) and
 dedicated issues, mdrefine maintainer ownership, and removal/revisit evidence.
 The generated manifest derives that tracking from the guards; it is not a second
 issue inventory. Upstream source merges, published fixes and verified local
@@ -240,7 +240,7 @@ distinguishes its local additions. When upgrading a corrected dependency:
    differences and verify the generated/runtime and package evidence below.
 
 The builder also checks the neutral import/default bundle graph, portable
-emitted module-region paths, all three EditMap redirects and the 34-package
+emitted module-start labels, all three EditMap redirects and the complete
 license graph in `scripts/parser-packages.json`. A dependency refresh that
 changes these gates requires source review, differential AST/event checks, the
 regression suite and package/browser/renderer checks before updating the
@@ -357,7 +357,7 @@ warnings or advance an assertion merely to make installation/building succeed.
 
 - **TypeScript:** when updating `typescript-eslint`, recheck its [official
   support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. As of parser 8.71.2, that range is
+  installed parser's TypeScript peer. As of parser 8.72.0, that range is
   `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
   [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
   includes the target; remove it only after an unforced install, typed lint,
@@ -410,11 +410,11 @@ warnings or advance an assertion merely to make installation/building succeed.
   not adoption evidence.
 - **Rolldown:** advance the manifest pin and exact version assertion in
   `scripts/build-parser.mjs` together only after reviewing its emission, runtime
-  helpers, portable module-region labels, neutral import/default graph,
-  corrected sources and package/license identities. Apply the source and
-  maintained-copy reconciliation above rather than resetting hashes until a
-  build passes. Run the parser parity/work, browser, full, installed-package and
-  applicable native checks before accepting new expectations.
+  helpers, portable module-start labels, neutral import/default graph, corrected
+  sources and package/license identities. Apply the source and maintained-copy
+  reconciliation above rather than resetting hashes until a build passes. Run
+  the parser parity/work, browser, full, installed-package and applicable native
+  checks before accepting new expectations.
 - **Host images:** retain the existing [Forge digest
   procedure](#what-the-checks-prove) and Obsidian baseline procedure below. Node
   Docker major updates remain deliberate LTS changes coordinated with the
@@ -527,26 +527,27 @@ selects discovery: one fresh seed and 100 documents. `SEEDS` selects a list,
 `SEED` adds a seed (`none` adds none), `COUNT` sets documents per seed, and
 `OBSIDIAN_VERSION` and `OBSIDIAN_INSTALLER_VERSION` override the app and
 installer independently. They default to the verified versions in
-`scripts/obsidian/baseline.json`, currently 1.14.5 for both. Realistic
-generation uses separated blocks, proper container prefixes, closed fences and
-documented dialect syntax. Existing adversarial seed behavior is retained.
-`REDUCE`, a comma-separated list of generated documents from a report, shortens
-each to the lines that still show its difference, and `PROBE`, a JSON array of
-documents, only shows each in Obsidian. Live Preview is compared by its lines'
-text and styles, with the characters that it shows as written left out where
-only the source differs, and Reading view by its HTML. List-number normalization
-applies to styled ordered markers and source-only list prefixes before lines
-join; ordinary numbers and numeric hash-prefixed text retain their digits. The
-check requires the editor to finish parsing the whole note and publish that
-syntax tree before collecting styles; incomplete parsing fails the run. Empty
-table source rows with no text or embed are ignored. Table widgets ignore their
-known focus and active-handle classes and a generated cell editor only when the
-cell also retains its rendered preview. Rendered content, styles, code spacing,
-alignment, link destinations, and row counts remain significant. A host control
-activates header, code, and link cells with real input and checks those negative
-cases; nested authored tables and editor-only payload remain intact. Boundary
-regressions in `tests/fixtures/renderers/obsidian-boundaries.mjs` are shared
-with the unit suite, including the long synthetic note in
+`scripts/obsidian/baseline.json`; read its `app` and `installer` fields for the
+selected versions. Realistic generation uses separated blocks, proper container
+prefixes, closed fences and documented dialect syntax. Existing adversarial seed
+behavior is retained. `REDUCE`, a comma-separated list of generated documents
+from a report, shortens each to the lines that still show its difference, and
+`PROBE`, a JSON array of documents, only shows each in Obsidian. Live Preview is
+compared by its lines' text and styles, with the characters that it shows as
+written left out where only the source differs, and Reading view by its HTML.
+List-number normalization applies to styled ordered markers and source-only list
+prefixes before lines join; ordinary numbers and numeric hash-prefixed text
+retain their digits. The check requires the editor to finish parsing the whole
+note and publish that syntax tree before collecting styles; incomplete parsing
+fails the run. Empty table source rows with no text or embed are ignored. Table
+widgets ignore their known focus and active-handle classes and a generated cell
+editor only when the cell also retains its rendered preview. Rendered content,
+styles, code spacing, alignment, link destinations, and row counts remain
+significant. A host control activates header, code, and link cells with real
+input and checks those negative cases; nested authored tables and editor-only
+payload remain intact. Boundary regressions in
+`tests/fixtures/renderers/obsidian-boundaries.mjs` are shared with the unit
+suite, including the long synthetic note in
 `tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
 delimiter of styled list lines, including checkbox widgets, and normalizes
 spaces within and around italic and bold runs while keeping styled characters,
@@ -877,25 +878,15 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   `npm run check:live` for GitHub's settings, the newest release, npm, and the
   deployed site, by hand after releases and setting changes. Prose still needs
   reading.
-- **A release is the tested commit.** The Release workflow requires CI to have
-  passed on the commit it releases (`scripts/release-evidence.mjs`), runs all
-  three renderer checks there, refuses a version or tag that exists, and
-  publishes the tarball it tested. Built-in verify/coverage checks must have
-  that SHA and Actions app identity, with a check suite from this repository's
-  `ci.yml` push/main run. PR events are rejected because they can test a
-  synthetic merge tree. Other required checks retain their own app identities. A
-  newer queued/running CI producer or rerun waits even before its jobs appear;
-  the completed producer must succeed, then its newest individual check results
-  must pass. Check-run identities determine recency; carried rerun timestamps
-  and null starts do not. Optional Node 26 can delay completion, but its allowed
-  test failure does not fail the workflow or become a release requirement.
+- **A release is the tested commit.** The Release workflow enforces the
+  [publication evidence contract](RELEASING.md#publish), runs fresh native
+  checks, refuses an existing version/tag, and publishes the tarball it tested.
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
-  and wrong-producer results. Hosted preparation reuses static/unit/performance/
-  integration evidence, then `release:pack` freshly builds and checks the exact
-  tarball, installed consumers and declarations. A fresh full-root npm audit
-  includes development inputs whose code is bundled into that tarball;
-  `metadata.test.ts` rejects an omitted, narrowed or non-gating release audit.
-  No build receipt crosses jobs.
+  and wrong-producer results; `metadata.test.ts` rejects an omitted, narrowed or
+  non-gating release audit. Hosted preparation reuses eligible CI evidence, then
+  freshly builds and tests the exact tarball and installed consumers. No build
+  receipt crosses jobs. The [release guide](RELEASING.md) owns commands,
+  prerequisites and recovery.
 
 `scripts/native-checks.mjs` owns native PR classification. Shared source,
 parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared
@@ -989,11 +980,16 @@ only from such a run.
 
 ## Documentation
 
-The site's source is `docs/`, built by VitePress. The tool formats and lints the
-repository's own Markdown at 80 columns; Prettier formats everything else and
-leaves Markdown alone. The fixtures in `tests/fixtures/` and the documents of
-`examples/workspaces/` and `examples/plugin/notes/` are left unformatted on
-purpose.
+The site's source is `docs/`, built by VitePress. A user page explains what a
+reader needs to use the tool; the details that only maintainers need, such as
+lists of individual protections, internal limits, and parser work, go to the
+[maintainer notes](internals/README.md) in `internals/`, which the site does not
+build and the package does not ship, and the page links them by their GitHub
+address. How the checks run belongs in this guide, not in the user pages. The
+tool formats and lints the repository's own Markdown at 80 columns; Prettier
+formats everything else and leaves Markdown alone. The fixtures in
+`tests/fixtures/` and the documents of `examples/workspaces/` and
+`examples/plugin/notes/` are left unformatted on purpose.
 
 ```sh
 npm run format:docs        # format the Markdown
@@ -1006,8 +1002,8 @@ npm run docs:build && npm run docs:preview
 The preview's address includes the `/slop-markdown-tools/` base path. The site
 build fails on a link to a page that does not exist, and the tool's lint fails
 on a heading fragment that does not. The integration tests compare the examples
-page, the rule index and each rule section's facts, and the benchmark page with
-the code, and reject version annotations in the pages, so update them with the
+page, the rule index and each rule page's facts, and the benchmark page with the
+code, and reject version annotations in the pages, so update them with the
 behavior they describe. CI builds the site for every pull request. The site
 describes the newest stable release: the Pages workflow deploys it from that
 release's tag after the Release workflow publishes it, as
@@ -1021,13 +1017,14 @@ A page describes the behavior of the version it documents, without version
 history: no notes such as "after 0.4.0", "since", "added in", or "unreleased".
 The site is built from a release tag, so it never shows unreleased behavior, and
 the changelog's `Unreleased` section lists what `main` adds; a page on `main`
-describes `main`. History belongs in `CHANGELOG.md` and in migration steps such
-as the CLI's [earlier names](docs/cli.md#earlier-names). The versioning policy,
-the version a benchmark measured, and the versions of renderers and other tools
-are not history. The docs tests reject version annotations outside a short list
-of such passages; add to that list only a passage of those kinds.
+describes `main`. History belongs in `CHANGELOG.md` and in the steps of the
+[upgrading](docs/upgrading.md) page. The versioning policy, the version a
+benchmark measured, and the versions of renderers and other tools are not
+history. The docs tests reject version annotations in the other pages outside a
+short list of such passages; add to that list only a passage of those kinds.
 
-Each rule's section in `docs/rules.md` follows one order:
+Each rule has a page, `docs/rules/<category>/<name>.md`, titled with its ID,
+which follows one order:
 
 1. One or two plain sentences on what the rule checks or changes, and why it
    matters where that is not obvious.
@@ -1036,24 +1033,30 @@ Each rule's section in `docs/rules.md` follows one order:
    the options.
 3. A short example: before and after, or reported and not reported.
 4. The options: a table where there are several, then a point for each.
-5. The details, in paragraphs or short lists that open with a bold label:
-   **Details:**, **Not checked:**, **Left as written:**, **Reported without a
-   fix:**, a dialect such as **In Obsidian:**, and **With other rules:**. Labels
-   rather than headings keep the page's outline to the rules and the anchors of
-   the rule index stable.
+5. Under the heading "Edge cases and advanced usage", the paragraphs or short
+   lists that open with **Details:**, **Not checked:**, **Left as written:**, or
+   **Reported without a fix:**.
+6. Under "Dialect notes", those that open with a dialect, such as **In
+   Obsidian:**, or a link to the dialect page that already says it.
+7. Under "Related rules", how the rule works with other rules.
 
-The rule index gives the severity at which each preset enables a rule and names
-the dialect presets. The docs tests compare the index and each section's facts
-with the presets in code.
+Leave out a heading that would have nothing under it. The common case comes
+first: an option's details stay with the options, and what a reader needs only
+for unusual input goes under the headings.
+
+The rule index, `docs/rules.md`, has one table per category, in alphabetical
+order of rule ID. Each row links the rule's page and gives the description that
+the rule's code declares, which `mdrefine rules` prints, its kind, the severity
+at which each preset enables it, and whether it takes options. The docs tests
+compare the index and each page's facts with the code. The site's sidebar lists
+the pages from the directory, and the index forwards a link to a rule's section
+of the former single page, such as `rules.html#stylewrap`, to its page.
 
 ## Pull requests
 
-Every change to `main` goes through a pull request with passing CI, and is
-merged with a merge commit; `main` requires the three verify checks, the native
-PR decision, `Unit coverage` and resolved review threads, but no approval from a
-second account. Contributions are made under the MIT license. Keep discussion
-respectful and about reproducible behavior; harassment and disclosure of private
-data are not acceptable.
+Every change to `main` goes through a pull request under the [repository
+enforcement](#repository-enforcement) procedure below. Contributions are made
+under the MIT license; follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 - Describe the problem, the resulting behavior, and the decisions made and why,
   for a reader who will not read the diff. Link the issue.
@@ -1067,7 +1070,11 @@ data are not acceptable.
 - Update every document, example, and test that describes what you changed, in
   the same pull request, and add the change to the `Unreleased` section of
   [CHANGELOG.md](CHANGELOG.md). The first change after a release starts that
-  section above the newest version's, because a release renames it.
+  section above the newest version's, because a release renames it. Write each
+  entry in one or two lines that say what a user will notice, with its issue
+  link; the documentation and the issue hold the details. Changes that users do
+  not see, such as tests, CI, and internal reorganization, go under
+  `### Maintenance`, one line each.
 - A change to the command line, the configuration, the JSON report, or the
   library that is not a defect fix waits for the next minor release; see the
   [versioning
@@ -1084,22 +1091,26 @@ GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
 `Native checks` aggregate in `native.yml`. All bind to GitHub Actions, app
 15368; renaming or adding a required check needs recorded/live ruleset checks,
 the producer mapping in `scripts/release-evidence.mjs`, and
-`tests/integration/release-evidence.test.ts` kept aligned. The aggregate rejects
-missing or unsuccessful applicable host calls and explicitly reports
-inapplicability. Keep the coordinator unfiltered and read-only on
-`pull_request`, including forks. An applicable external-host outage blocks
-merge; investigate it without waiving evidence or weakening the ruleset.
-`release-evidence.mjs` excludes exactly that PR-only check/app pair from its
-exact-commit requirements because Release calls all three native workflows
-afresh. Every other required check and unit coverage still must pass on the
-release commit. Built-in CI evidence must come from this repository's `ci.yml`
-push/main run for that exact SHA; PR checks can test a synthetic merge tree and
-cannot substitute. Hosted preparation reuses those static/test results and runs
-`release:pack` to build and test the actual publication artifact. Standalone
-`release:prepare` still runs the complete checks. The Node.js 26 job is not
-required. Zero required approvals is deliberate for a single-account,
-agent-maintained repository; PRs, passing checks, and resolved review threads
-remain mandatory.
+`tests/integration/release-evidence.test.ts` kept aligned. The native aggregate
+requires successful applicable hosts and explicit inapplicability, as the [check
+map](#what-the-checks-prove) describes. An applicable external-host outage
+blocks merge; investigate it without waiving evidence or weakening the ruleset.
+The Node.js 26 job is not required. Zero required approvals is deliberate for a
+single-account, agent-maintained repository; PRs, passing checks, and resolved
+review threads remain mandatory.
+
+Merge with a merge commit after checking the exact head:
+`gh pr merge --merge --match-head-commit SHA`. Squash and rebase merging are
+disabled so that each commit keeps its message and attribution. Branches must be
+up to date; when `main` advances, merge it into the task branch and validate the
+updated head before pushing and merging. GitHub deletes merged PR branches.
+Fast-forward local `main` before new work, then prune finished task branches and
+stale tracking refs without disturbing active work.
+
+The release procedure owns [exact-commit publication
+evidence](RELEASING.md#publish) and [hosted versus local
+preparation](RELEASING.md#prepare-without-publishing). PR checks may test a
+synthetic merge tree and cannot substitute for the release's push/main evidence.
 
 ## Review and verification
 

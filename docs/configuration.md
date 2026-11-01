@@ -2,7 +2,7 @@
 
 One configuration controls both `lint` and `format`. Without an mdrefine
 configuration file, the settings of a markdownlint or Prettier configuration
-apply, [converted](#competitor-configuration-fallback); without one of those
+apply, [converted](#fallback-to-markdownlint-and-prettier); without one of those
 either, the `recommended` preset applies. Either way, the dialect is
 [assumed](dialects.md#the-assumed-dialect).
 
@@ -10,54 +10,51 @@ either, the `recommended` preset applies. Either way, the dialect is
 
 The file is named `mdrefine.config.jsonc`, `mdrefine.config.json`,
 `mdrefine.config.mjs`, `mdrefine.config.js`, or `mdrefine.config.cjs`. The CLI
-looks for it in the directory given with `--root`, or else the current
-directory, and then in each directory above, up to the first one that is a Git
-repository (holds `.git`) or an Obsidian vault (holds `.obsidian`), or the
-filesystem root. Two configuration files in one directory are an error.
-`--config` names a file explicitly. The directory of the configuration file is
-the workspace root unless `--root` names another; without a configuration file,
-it is the repository or vault where the search stopped, or else the current
-directory. Configuration files do not cascade: a file in a subdirectory is not
-merged with one above it.
+finds it this way:
 
-### Competitor configuration fallback
+1. `--config` names the file; nothing is searched.
+2. Otherwise, it starts in the directory that `--root` names, or else the
+   current directory.
+3. It looks in that directory and then in each one above, and stops at the first
+   directory that is a Git repository (holds `.git`) or an Obsidian vault (holds
+   `.obsidian`), the starting one included, or at the filesystem root.
+
+Two configuration files in one directory are an error. Configuration files do
+not cascade: a file in a subdirectory is not merged with one above it. The
+directory of the file that is found is usually the [workspace
+root](cli.md#the-workspace-root).
+
+Outside a Git repository or a vault, the search goes on up to the filesystem
+root, so a configuration in a parent folder, such as your home directory,
+applies. So does a markdownlint or Prettier configuration there, such as
+`~/.prettierrc`, through the [fallback](#fallback-to-markdownlint-and-prettier).
+To stop the search at your documents, create a configuration there or make the
+folder a Git repository.
+
+### Fallback to markdownlint and Prettier
 
 When no mdrefine configuration is found, the CLI converts the markdownlint and
 Prettier configurations that the same search finds, in memory, and uses the
 result in place of the `recommended` preset. The result uses no preset: it
 enables what those tools check. `--no-competitor-config` turns this fallback
-off; an explicit `--config` also bypasses it. The Node API's
-`loadConfig(start, explicit, competitorFallback)` accepts `false` as its third
-argument to turn it off. Portable `convertConfig({ markdownlint, prettier })`
+off; an explicit `--config` also bypasses it. Converted ignores, file selections
+and overrides use the [workspace root](cli.md#the-workspace-root), including an
+explicit `--root`. The Node API's
+`loadConfig(start, explicit, competitorFallback, workspaceRoot)` accepts `false`
+as its third argument to turn the fallback off, and an optional fourth argument
+to set the workspace root. Portable `convertConfig({ markdownlint, prettier })`
 converts objects without reading files. Neither changes dialect detection.
 
-A file that the fallback cannot read contributes nothing: a JavaScript or
-TypeScript configuration, which it never runs, and a TOML or JSON5 one. Neither
-does a Prettier configuration in a workspace whose `.prettierignore` [excludes
-all Markdown](integrations.md#next-to-prettier-or-markdownlint), because
-Prettier does not format Markdown there. A `.prettierignore` with a negated
-entry, which conversion cannot express, applies none of its patterns. When no
-file found can be used, the
-`recommended` preset applies, as without any of them. The CLI names each file
-that it does not use, and why, on stderr, with a line for the settings that
-apply; see [fallback notices](cli.md#competitor-fallback-notices).
-
-`mdrefine config convert` prints the converted configuration, and `--write`
-creates `mdrefine.config.jsonc` where `lint` looks for the workspace's
-configuration, or in the directory that `--root` names. The explicit command may
-execute competitor JavaScript settings; fallback loading never does. See
-[convert a configuration](cli.md#convert-a-configuration) for its options, and
-the [conversion behavior and
-comparison](integrations.md#coming-from-prettier-or-markdownlint) for
-precedence, formats, and remaining coverage gaps.
-
-### Earlier names
-
-Version 0.5.0 no longer discovers `mdtools.config.jsonc`, `.json`, `.mjs`, `.js`
-or `.cjs`, and the `mdtools-disable`, `mdtools-disable-next-line` and
-`mdtools-enable` comments no longer affect findings. Rename files and replace
-comment prefixes before upgrading from 0.4.x; see the [migration
-steps](cli.md#earlier-names). Formatting does not migrate them.
+JavaScript, TypeScript, TOML, and JSON5 configurations contribute nothing, and
+neither does a Prettier configuration whose `.prettierignore` excludes all
+Markdown. When no file found can be used, the `recommended` preset applies. The
+CLI names each file that it uses or leaves out on stderr; see [fallback
+notices](cli.md#fallback-notices). `mdrefine config convert --write` saves the
+converted configuration as a file; see [convert a
+configuration](cli.md#convert-a-configuration).
+[Integrations](integrations.md#configuration-conversion-and-fallback) describes
+what is converted, which files are read, and how markdownlint's and Prettier's
+comments apply during the fallback.
 
 ### File contents
 
@@ -158,11 +155,32 @@ setting for a rule replaces an earlier one as a whole, options included. A
 plugin's presets are named with the plugin's name as a prefix, such as
 `sample/recommended`, and presets may extend other presets; a cycle is an error.
 
-`recommended` enables [`style/block-spacing`](rules.md#styleblock-spacing) at
-`warn`, separating headings, lists, code fences, and tables from adjacent blocks
-with a blank line where safe. `lint` reports missing separators, and `format`
-adds them. To keep compact spacing, set
-`"rules": { "style/block-spacing": "off" }`.
+### What `recommended` does
+
+`recommended` sets no dialect, so it suits any document. Its rules report at
+`warn`, except broken links, at `error`. `format` fixes everything in the first
+five points:
+
+- Wraps prose at 80 columns.
+- Writes emphasis as `_text_`, strong text as `**text**`, bullets as `- item`,
+  and ordered lists with `.`, numbered consistently, and indents list items
+  consistently.
+- Writes headings with `#`, code fences with backticks, thematic breaks as
+  `---`, and one space after a block quote's `>`, also on lines that continue a
+  quote without it.
+- Aligns tables.
+- Removes trailing spaces and repeated blank lines, puts a blank line around
+  headings, lists, code fences, and tables where that is safe, and ends every
+  file with a line break.
+- Reports local links whose file or heading does not exist.
+- Reports problems that show on the rendered page: a reference without a
+  definition, a definition that nothing uses, an empty link, a skipped heading
+  level, an image without alternative text, and a table row with the wrong
+  number of cells.
+
+The [rules](rules.md) index lists each of these rules. To leave one out, turn it
+off under `rules`, such as `"rules": { "style/block-spacing": "off" }` for
+compact spacing.
 
 ## Rules and severity
 
@@ -316,28 +334,29 @@ and merges the named options into their current options.
 
 ```jsonc
 {
-  "extends": [],
+  "extends": ["recommended", "github"],
   "overrides": [
     {
-      "files": ["**/*.md"],
-      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
-    },
-    {
       "files": ["docs/**/*.md"],
-      "ruleUpdates": { "style/wrap": { "severity": "warn" } },
+      "ruleUpdates": { "style/wrap": { "options": { "width": 72 } } },
     },
   ],
 }
 ```
 
-The first override stores a width without turning wrapping on; the second turns
-it on for `docs/`, using that width. A rule absent so far starts off. Setting
-severity to `off` keeps its options, so a later patch can enable it again.
-Options merge shallowly: a nested object replaces the earlier nested object.
-Each override applies its `rules` first as whole-setting replacements, then its
-`ruleUpdates`. Matching overrides run in order, with presets' overrides before
-local overrides. Enabled rules validate the final merged options when they run;
-a partial patch need not supply every required option by itself.
+Below `docs/`, this wraps at 72 columns, with the severity and the other options
+that `recommended` gives `style/wrap`. The same override under `rules` would
+replace the whole setting, so it would have to repeat the severity.
+
+A patch can also prepare a rule that is off: its options are stored without
+turning it on, and a later override can turn it on with `"severity": "warn"`. A
+rule absent so far starts off. Setting severity to `off` keeps its options, so a
+later patch can enable it again. Options merge shallowly: a nested object
+replaces the earlier nested object. Each override applies its `rules` first as
+whole-setting replacements, then its `ruleUpdates`. Matching overrides run in
+order, with presets' overrides before local overrides. Enabled rules validate
+the final merged options when they run; a partial patch need not supply every
+required option by itself.
 
 Patterns are globs, such as `docs/**/*.md`, matched against paths relative to
 the workspace root, with forward slashes. A pattern matches files whose names
@@ -399,13 +418,13 @@ that cannot be loaded stops the command with exit code `2`.
 
 ## Suppression comments
 
-Competitor comments apply only during the [competitor configuration
-fallback](#competitor-configuration-fallback). A hand-written mdrefine
+markdownlint's and Prettier's comments apply only during the
+[fallback](#fallback-to-markdownlint-and-prettier). A hand-written mdrefine
 configuration or one written by `config convert` ignores all markdownlint and
 Prettier comments and pragmas. The [conversion
 guide](integrations.md#coming-from-prettier-or-markdownlint) describes their
 scopes and how shared rules behave. There is no configuration setting that
-enables competitor comments.
+enables their comments.
 
 ```markdown
 <!-- mdrefine-disable style/wrap -->
@@ -441,7 +460,7 @@ npx mdrefine config explain notes/example.md
 ```
 
 It reads `--config`, `--no-competitor-config`, `--root`, and `--dialect`, before
-or after `explain`. When the settings come from the [competitor
-fallback](#competitor-configuration-fallback), the JSON also has a `conversion`
-object, with the converted settings, the files used and not used, and what was
-not carried over; see [fallback notices](cli.md#competitor-fallback-notices).
+or after `explain`. When the settings come from the
+[fallback](#fallback-to-markdownlint-and-prettier), the JSON also has a
+`conversion` object, with the converted settings, the files used and not used,
+and what was not carried over; see [fallback notices](cli.md#fallback-notices).

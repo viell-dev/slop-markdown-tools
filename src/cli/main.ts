@@ -39,6 +39,14 @@ interface Flags {
 const manifest = JSON.parse(
   await readFile(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
 ) as { version: string };
+// A reader that stops early, as `head` does, closes the pipe. The rest of the
+// output then has nowhere to go: drop it, and let the run end with the exit code
+// it would have had, so that a pipeline with `pipefail` still sees a failure.
+for (const stream of [process.stdout, process.stderr])
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code !== "EPIPE") throw error;
+    stream.write = () => true;
+  });
 // Subcommands inherit these settings, so they come before the commands.
 const program = new Command()
   .name("mdrefine")
@@ -133,6 +141,7 @@ async function workspace(flags: Flags) {
     path.resolve(flags.root ?? "."),
     flags.config,
     flags.competitorConfig,
+    flags.root,
   );
   // Notices about the run, not findings: --quiet leaves them out, as it leaves out warnings.
   if (loaded.conversion && !flags.quiet)
@@ -149,7 +158,7 @@ async function workspace(flags: Flags) {
         ? { name: `converted from ${converted.join(", ")}` }
         : {}),
   };
-  return { ...loaded, root: path.resolve(flags.root ?? loaded.root), config };
+  return { ...loaded, config };
 }
 /** The configuration of the run, to name in an error that it causes later. */
 let configuration: { config: Config; plugins: Plugin[]; name?: string } | undefined;
@@ -280,7 +289,11 @@ async function run(mode: "lint" | "format", inputs: string[], flags: Flags) {
   const { root, ...loaded } = await workspace(flags);
   const stdin = inputs.includes("-");
   if (stdin && (inputs.length !== 1 || flags.write))
-    throw new Error("stdin must be the only input and cannot be combined with --write.");
+    throw new Error(
+      mode === "lint"
+        ? "stdin must be the only input."
+        : "stdin must be the only input and cannot be combined with --write.",
+    );
   /** The text read from stdin, by the name it is given in the workspace. */
   let documents: Record<string, string> | undefined;
   if (stdin) {
@@ -529,7 +542,7 @@ common(
   .description("Format documents: check with a diff (default), list changes, or write")
   .option("--check", "Fail if formatting changes would be needed, and name the files")
   .option("--diff", "Preview the diff; changes alone exit 0 (with --check, exit 1)")
-  .option("--write", "Write validated formatting changes")
+  .option("--write", "Write the formatting changes to the files")
   .action((inputs: string[], flags: Flags) => run("format", inputs, flags));
 // The options belong to `config`, which reads them before or after `explain`;
 // `explain` repeats them so that its help lists them.
@@ -634,7 +647,7 @@ configCommand
     ])
       process.stderr.write(`mdrefine: ${message}\n`);
     process.stderr.write(
-      "mdrefine: competitor inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
+      "mdrefine: markdownlint and Prettier inline comments and pragmas apply during fallback only, are not converted, and have no effect with an mdrefine configuration; use mdrefine-disable comments instead.\n",
     );
     if (flags.write) process.stderr.write(`mdrefine: created ${shown(target)}\n`);
   });
@@ -653,11 +666,10 @@ program
       flags.competitorConfig,
     );
     const { plugins } = loaded;
-    const rules = Object.entries(ruleRegistry(plugins)).map(([id, rule]) => ({
-      id,
-      kind: rule.kind,
-      description: rule.description,
-    }));
+    // Sorted by ID, as the rules reference lists them, plugin rules among the built-in ones.
+    const rules = Object.entries(ruleRegistry(plugins))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([id, rule]) => ({ id, kind: rule.kind, description: rule.description }));
     if (flags.json) process.stdout.write(JSON.stringify({ rules }, null, 2) + "\n");
     else
       for (const rule of rules)
@@ -728,8 +740,8 @@ for (const command of [...program.commands, ...configCommand.commands]) {
   const footer = footers[command.name()];
   if (footer) command.addHelpText("after", footer);
 }
+const args = process.argv.slice(2);
 try {
-  const args = process.argv.slice(2);
   if (args[0] === "check" || args[0] === "fix")
     throw new Error(
       `Unknown command '${args[0]}'; use 'mdrefine format --${args[0] === "check" ? "check" : "write"}' instead.`,
@@ -748,8 +760,25 @@ try {
   // Commander has printed the help, the version, or what is wrong with the
   // command line. Help and the version succeed; a usage error ends with code 2,
   // as in ESLint and Prettier, so that it does not pass for findings.
-  if (error instanceof CommanderError) process.exitCode = error.exitCode === 0 ? 0 : 2;
-  else {
+  if (error instanceof CommanderError) {
+    process.exitCode = error.exitCode === 0 ? 0 : 2;
+    // Help printed in place of a missing or unknown command can read as a fault
+    // in the setup; say what was missing.
+    const asError = error.code === "commander.help" && error.exitCode !== 0;
+    if (asError && !args.length)
+      process.stderr.write("mdrefine: no command given; try mdrefine lint\n");
+    // Commander prints the whole help for `help bogus` without saying what was
+    // wrong, where `mdrefine bogus` says it.
+    else if (asError && args[0] === "help" && args.length === 2)
+      process.stderr.write(`mdrefine: unknown command '${args[1]}'\n`);
+    // `config` with options but no command, as `config --root .`, too.
+    else if (
+      asError &&
+      args[0] === "config" &&
+      !args.some((arg) => ["explain", "convert", "help"].includes(arg))
+    )
+      process.stderr.write("mdrefine: config needs a command: explain or convert\n");
+  } else {
     // A rule setting that cannot be used is found while a document is processed.
     const where = configurationFault(error) ? `Invalid configuration ${configuration!.name}: ` : "";
     process.stderr.write(

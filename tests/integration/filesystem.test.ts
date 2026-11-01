@@ -351,6 +351,19 @@ describe("filesystem safeguards", () => {
     const root = await fixture({ ".obsidian/app.json": "{}", "sub/note.md": "text" });
     expect((await loadConfig(path.join(root, "sub"))).root).toBe(root);
   });
+  it.each(["defaults", "fallback", "native", "explicit"] as const)(
+    "uses an explicit loader workspace root with %s (#791)",
+    async (kind) => {
+      const files: Record<string, string> = { "sub/note.md": "text\n" };
+      if (kind === "fallback") files[".prettierrc"] = "{}";
+      if (kind === "native" || kind === "explicit") files["mdrefine.config.json"] = "{}";
+      const root = await fixture(files);
+      const child = path.join(root, "sub");
+      const explicit = kind === "explicit" ? path.join(root, "mdrefine.config.json") : undefined;
+      expect((await loadConfig(child, explicit)).root).toBe(root);
+      expect((await loadConfig(child, explicit, true, child)).root).toBe(child);
+    },
+  );
   it("recognizes a vault by its .obsidian folder", async () => {
     const root = await fixture({
       ".obsidian/app.json": "{}",

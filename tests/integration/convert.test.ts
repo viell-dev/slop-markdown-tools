@@ -8,6 +8,32 @@ import { fixture, run } from "../support/cli.js";
 import { parseConfig, parseExplanation, parseReport } from "../support/json.js";
 
 describe("competitor configuration CLI (#669)", () => {
+  it("keeps markdownlint comment exemptions in fallback only (#801)", async () => {
+    const source =
+      "<!-- markdownlint-disable MD019 -->\n#  Title\n<!-- markdownlint-enable MD019 -->\n";
+    const root = await fixture({
+      ".markdownlint.json": JSON.stringify({
+        default: false,
+        MD019: true,
+        MD022: true,
+        MD041: true,
+      }),
+      "note.md": source,
+    });
+    const fallback = run(root, ["lint", "--json", "note.md"]);
+    expect(fallback.status, fallback.stderr).toBe(0);
+    expect(parseReport(fallback.stdout).files[0]!.diagnostics).toEqual([]);
+    const formatted = run(root, ["format", "--write", "note.md"]);
+    expect(formatted.status, formatted.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    const converted = run(root, ["config", "convert", "--write"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    const native = run(root, ["lint", "--json", "note.md"]);
+    expect(native.status).toBe(1);
+    expect(parseReport(native.stdout).files[0]!.diagnostics.map((finding) => finding.rule)).toEqual(
+      expect.arrayContaining(["structure/initial-heading", "style/block-spacing"]),
+    );
+  });
   it("combines cli2 inheritance and globs, and preserves ignore selection", async () => {
     const root = await fixture({
       ".markdownlint-cli2.jsonc": JSON.stringify({
@@ -453,6 +479,37 @@ describe("competitor configuration CLI (#669)", () => {
 });
 
 describe("ancestor conversion and EditorConfig resolution", () => {
+  it("preserves matcher-backed components through rebasing and intersections (#837)", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always"}',
+      ".editorconfig":
+        "root=true\n[sub*/**]\nindent_size=4\n[**/doc*.md]\nmax_line_length=37\n[**/*.{js,ts}]\nindent_size=8\n",
+      "sub-guide/docs.md": "text\n",
+      "sub-guide/other.md": "text\n",
+    });
+    const child = path.join(root, "sub-guide");
+    const written = run(child, ["config", "convert", "--write", "--root", "."]);
+    expect(written.status, written.stderr).toBe(0);
+    expect(written.stderr).not.toContain("not carried over");
+    const config = await readFile(path.join(child, "mdrefine.config.jsonc"), "utf8");
+    expect(config).not.toContain("undefined");
+    expect(config).not.toContain(".js");
+    expect(config).not.toContain(".ts");
+    for (const file of ["docs.md", "other.md"]) {
+      const reference = await prettierResolve(path.join(child, file), { editorconfig: true });
+      const result = run(child, ["config", "explain", file]);
+      expect(result.status, result.stderr).toBe(0);
+      const rules = parseExplanation(result.stdout).effective.rules;
+      expect(rules["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: reference?.tabWidth }),
+      ]);
+      expect(rules["style/wrap"]).toEqual([
+        "warn",
+        expect.objectContaining({ width: reference?.printWidth ?? 80 }),
+      ]);
+    }
+  });
   it.each(["prettier", "editorconfig", "prettierignore", "globs", "ignores"])(
     "writes and reads ancestor %s patterns in a child",
     async (family) => {
@@ -877,6 +934,161 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     return parseExplanation(result.stdout);
   };
 
+  it.each(["Prettier", "cli2 ignores", "cli2 globs"] as const)(
+    "rebases %s selection onto an explicit workspace root (#791)",
+    async (kind) => {
+      const settings: Record<string, string> =
+        kind === "Prettier"
+          ? { ".prettierrc": "{}", ".prettierignore": "/sub/skip.md\n" }
+          : {
+              ".markdownlint-cli2.jsonc": JSON.stringify({
+                config: { default: false, MD047: true },
+                ...(kind === "cli2 ignores"
+                  ? { ignores: ["sub/skip.md"] }
+                  : { globs: ["sub/**/*.md", "!sub/skip.md"] }),
+              }),
+            };
+      const root = await fixture({
+        ...settings,
+        "outside.md": "text\n",
+        "sub/keep.md": "text\n",
+        "sub/skip.md": "text\n",
+        "sub/deep/skip.md": "text\n",
+      });
+      const child = path.join(root, "sub");
+      const selected = ["deep/skip.md", "keep.md"];
+      if (kind === "Prettier") {
+        const reference: string[] = [];
+        for (const file of ["deep/skip.md", "keep.md", "skip.md"])
+          if (
+            !(
+              await getFileInfo(path.join(child, file), {
+                ignorePath: path.join(root, ".prettierignore"),
+              })
+            ).ignored
+          )
+            reference.push(file);
+        expect(reference).toEqual(selected);
+      }
+      for (const [cwd, argument] of [
+        [root, "sub"],
+        [child, "."],
+      ] as const)
+        for (const command of ["lint", "format"]) {
+          const result = run(cwd, [command, "--root", argument, "--json"]);
+          expect(result.status, result.stderr).toBe(0);
+          expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(selected);
+        }
+      const ordinary = [
+        ...(kind === "cli2 globs" ? [] : ["outside.md"]),
+        ...selected.map((file) => `sub/${file}`),
+      ];
+      for (const cwd of [root, child]) {
+        const result = run(cwd, ["lint", "--json"]);
+        expect(result.status, result.stderr).toBe(0);
+        expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(ordinary);
+      }
+    },
+  );
+  it("rebases fallback overrides onto an explicit workspace root (#791)", async () => {
+    const root = await fixture({
+      ".prettierrc": JSON.stringify({
+        proseWrap: "always",
+        overrides: [{ files: "sub/*.md", options: { printWidth: 31 } }],
+      }),
+      ".editorconfig": "root=true\n[*]\nindent_size=3\n[sub/*.md]\nindent_size=5\n",
+      "sub/keep.md": "text\n",
+      "sub/deep/keep.md": "text\n",
+    });
+    const child = path.join(root, "sub");
+    for (const file of ["keep.md", "deep/keep.md"]) {
+      const reference = await prettierResolve(path.join(child, file), { editorconfig: true });
+      for (const [cwd, argument, document] of [
+        [root, "sub", `sub/${file}`],
+        [child, ".", file],
+      ] as const) {
+        const result = run(cwd, ["config", "explain", document, "--root", argument]);
+        expect(result.status, result.stderr).toBe(0);
+        const rules = parseExplanation(result.stdout).effective.rules;
+        expect(rules["style/wrap"]).toEqual(["warn", { width: reference?.printWidth ?? 80 }]);
+        expect(rules["style/list-indent"]).toEqual([
+          "warn",
+          expect.objectContaining({ nestedIndent: reference?.tabWidth }),
+        ]);
+      }
+    }
+  });
+
+  it("retains Prettier settings when its matcher does not ignore root Markdown (#845)", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always","printWidth":31}',
+      ".prettierignore": "***/*.md\n",
+      "a.md": messy,
+      "deep/a.md": messy,
+    });
+    for (const [file, ignored] of [
+      ["a.md", false],
+      ["deep/a.md", true],
+    ] as const)
+      expect(
+        (
+          await getFileInfo(path.join(root, file), {
+            ignorePath: path.join(root, ".prettierignore"),
+          })
+        ).ignored,
+      ).toBe(ignored);
+    const reference = await prettierResolve(path.join(root, "a.md"));
+    expect(reference?.printWidth).toBe(31);
+    expect(explained(root).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    expect(converted.stderr).toContain(
+      "pattern ***/*.md not carried over: outside the supported gitignore subset",
+    );
+  });
+
+  it("does not discover .prettierrc.jsonc, which Prettier ignores (#793)", async () => {
+    const root = await fixture({
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":31}',
+      "a.md": messy,
+    });
+    expect(await prettierResolve(path.join(root, "a.md"))).toBeNull();
+    const fallback = explained(root);
+    expect(fallback.effective.rules).toEqual(defaults(root));
+    const converted = run(root, ["config", "convert", "--write"]);
+    expect(converted.status).toBe(2);
+    expect(converted.stdout).toBe("");
+    expect(converted.stderr).toBe("mdrefine: No markdownlint or Prettier configuration found.\n");
+    expect(await exists(path.join(root, "mdrefine.config.jsonc"))).toBe(false);
+  });
+  it("still discovers .prettierrc.json beside the ignored JSONC filename", async () => {
+    const root = await fixture({
+      ".prettierrc.json": '{"proseWrap":"always","printWidth":31}',
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":19}',
+      "a.md": messy,
+    });
+    const reference = await prettierResolve(path.join(root, "a.md"));
+    expect(reference?.printWidth).toBe(31);
+    expect(explained(root).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    expect(converted.stderr).not.toContain(".prettierrc.jsonc");
+  });
+
   it.each([
     "**/*.md\n**/*.markdown\n",
     "*.md\n*.markdown\n",
@@ -1274,7 +1486,7 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     const result = run(yamlError, ["lint"]);
     expect(result.status).toBe(2);
     expect(result.stderr).toMatch(
-      /^mdrefine: Invalid competitor YAML in \.prettierrc: .*; use --no-competitor-config to bypass conversion\.\n$/,
+      /^mdrefine: Invalid YAML in \.prettierrc: .*; use --no-competitor-config to bypass conversion\.\n$/,
     );
     expect(run(yamlError, ["lint", "--no-competitor-config"]).status).toBe(0);
     const scalar = await fixture({ ".markdownlint.yaml": "true\n", "a.md": "text\n" });

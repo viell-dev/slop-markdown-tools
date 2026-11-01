@@ -24,9 +24,12 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
  * that cannot be established, the answer is no and the Prettier configuration
  * stays in use. A negated entry can re-include documents in ways that samples
  * cannot rule out, so a file with one never qualifies, nor does one with a
- * character class. Otherwise one entry by itself must ignore every sample `.md`
- * path, as Prettier reads it, with the `ignore` package and without regard to
- * letter case: names and directories of a character absent from the entries,
+ * character class. A long star run before a slash cannot establish it either:
+ * Prettier's bundled matcher can leave root files unmatched where `ignore`
+ * gives the run a zero-component globstar meaning.
+ * Otherwise one entry by itself must ignore every sample `.md` path, as Prettier
+ * reads it, with the `ignore` package and without regard to letter case: names
+ * and directories of a character absent from the entries,
  * and longer ones, and a file named only `.md`, which `?` cannot match, at the
  * root and at more depths than any entry has components. An entry can match a
  * name made of characters it does not contain only through wildcards, which
@@ -48,6 +51,8 @@ export function ignoresAllMarkdown(text: string): boolean {
       for (let level = 0; level <= depth; level++)
         probes.push(`${`${directory}/`.repeat(level)}${stem}.md`);
   return lines.some((line) => {
+    // Prettier's bundled matcher can leave root files unmatched for this entry (#845).
+    if (line.includes("***/")) return false;
     const matcher = gitignore({ allowRelativePaths: true }).add(line);
     return probes.every((probe) => matcher.ignores(probe));
   });
@@ -89,19 +94,34 @@ export const competitorFiles = {
     ".prettierrc.cts",
     "prettier.config.cts",
     ".prettierrc.toml",
-    ".prettierrc.jsonc",
   ],
 } as const;
 
+/** Keep the source components available to conversion rather than synthesized extglobs. */
+function patternRows(matcher: Minimatch) {
+  // Keep brace branches separate: Minimatch can merge *.ts and *.tsx into an
+  // extglob that no longer exposes either literal extension.
+  return matcher.globSet.length <= 1
+    ? matcher.set
+    : matcher.globSet.flatMap(
+        (alternative) =>
+          new Minimatch(alternative, {
+            ...matcher.options,
+            nobrace: true,
+            nonegate: true,
+            nocomment: true,
+          }).set,
+      );
+}
+
 /** Reject globs whose final path component can only name another language. */
 function markdownPattern(pattern: string): boolean {
-  const matcher = new Minimatch(pattern);
-  return matcher.set.some((parts) => {
+  return patternRows(new Minimatch(pattern)).some((parts) => {
     const last = parts.at(-1);
     if (typeof last === "string") return /\.(md|markdown)$/i.test(last);
-    if (last instanceof RegExp) {
+    if (last !== undefined && last !== GLOBSTAR) {
       // A literal extension remains decidable even when the basename is a glob.
-      const extension = /\.([a-zA-Z0-9]+)$/.exec((last as RegExp & { _glob: string })._glob);
+      const extension = /\.([a-zA-Z0-9]+)$/.exec(last.pattern);
       return !extension || /^(md|markdown)$/i.test(extension[1]!);
     }
     return true;
@@ -154,8 +174,8 @@ function translatePattern(pattern: string, dialect: PatternDialect): string | un
 /** Intersect component globs exactly when one component contains the other. */
 function intersectPatterns(left: string, right: string): string[] {
   const results: string[] = [];
-  for (const a of new Minimatch(left, { dot: true }).set)
-    for (const b of new Minimatch(right, { dot: true }).set) {
+  for (const a of patternRows(new Minimatch(left, { dot: true })))
+    for (const b of patternRows(new Minimatch(right, { dot: true }))) {
       const visit = (i: number, j: number): string[][] => {
         if (i === a.length && j === b.length) return [[]];
         const x = a[i],
@@ -169,7 +189,7 @@ function intersectPatterns(left: string, right: string): string[] {
           if (y !== undefined)
             tails.push(
               ...visit(i, j + 1).map((tail) => [
-                y === GLOBSTAR ? "**" : typeof y === "string" ? literalPattern(y) : y._glob!,
+                y === GLOBSTAR ? "**" : typeof y === "string" ? literalPattern(y) : y.pattern,
                 ...tail,
               ]),
             );
@@ -180,7 +200,7 @@ function intersectPatterns(left: string, right: string): string[] {
           if (x !== undefined)
             tails.push(
               ...visit(i + 1, j).map((tail) => [
-                typeof x === "string" ? literalPattern(x) : x._glob!,
+                typeof x === "string" ? literalPattern(x) : x.pattern,
                 ...tail,
               ]),
             );
@@ -194,8 +214,8 @@ function intersectPatterns(left: string, right: string): string[] {
         } else if (typeof y === "string") {
           if (!x.test(y)) return [];
           component = literalPattern(y);
-        } else if (x._glob === y._glob || y._glob === "*") component = x._glob!;
-        else if (x._glob === "*") component = y._glob!;
+        } else if (x.pattern === y.pattern || y.pattern === "*") component = x.pattern;
+        else if (x.pattern === "*") component = y.pattern;
         else throw new Error("Unrepresentable glob intersection");
         return visit(i + 1, j + 1).map((tail) => [component, ...tail]);
       };
@@ -304,7 +324,7 @@ export async function loadCompetitorConfig(
       );
       return [];
     }
-    for (const parts of matcher.set) {
+    for (const parts of patternRows(matcher)) {
       let states = new Set([0]);
       const closure = () => {
         for (const index of states) if (parts[index] === GLOBSTAR) states.add(index + 1);
@@ -325,7 +345,11 @@ export async function loadCompetitorConfig(
         const rest = parts
           .slice(index)
           .map((part) =>
-            part === GLOBSTAR ? "**" : typeof part === "string" ? literalPattern(part) : part._glob,
+            part === GLOBSTAR
+              ? "**"
+              : typeof part === "string"
+                ? literalPattern(part)
+                : part.pattern,
           )
           .join("/");
         if (rest) results.push(rest);
@@ -347,7 +371,7 @@ export async function loadCompetitorConfig(
   };
   const read = async (file: string, chain: string[] = []): Promise<Values> => {
     if (chain.includes(file))
-      throw new Error(`Cyclic competitor extends: ${[...chain, file].map(shown).join(" -> ")}`);
+      throw new Error(`Cyclic extends: ${[...chain, file].map(shown).join(" -> ")}`);
     sources.push(file);
     let value: unknown;
     if (/\.[cm]?[jt]s$/.test(file)) {
@@ -376,7 +400,7 @@ export async function loadCompetitorConfig(
       if (/\.jsonc?$/.test(file)) {
         const errors: ParseError[] = [];
         value = json(text, errors, { allowTrailingComma: true });
-        if (errors.length) throw new Error(`Invalid competitor JSON in ${shown(file)}${bypass}`);
+        if (errors.length) throw new Error(`Invalid JSON in ${shown(file)}${bypass}`);
       } else {
         // Prettier reads an extensionless .prettierrc as YAML too, with the same
         // parser, so JSON reads as JSON there, and a JSON comment joins the key after it.
@@ -384,7 +408,7 @@ export async function loadCompetitorConfig(
           value = text.trim() ? (yaml(text) as unknown) : {};
         } catch (error) {
           throw new Error(
-            `Invalid competitor YAML in ${shown(file)}: ${reason(error).split("\n")[0]!.replace(/:$/, "")}${bypass}`,
+            `Invalid YAML in ${shown(file)}: ${reason(error).split("\n")[0]!.replace(/:$/, "")}${bypass}`,
             { cause: error },
           );
         }

@@ -314,7 +314,7 @@ function htmlPairProtection(document: Document): (start: number, end: number) =>
 
 function markerRule(type: "emphasis" | "strong", fallback: string): Rule {
   return {
-    description: `Choose ${type} delimiters without reprinting their contents.`,
+    description: `Writes ${type === "strong" ? "strong emphasis" : "emphasis"} with one marker, \`${fallback}\` by default.`,
     kind: "style",
     phase: "inline",
     schema: optionsSchema({ marker: { enum: ["*", "_", "consistent"] } }),
