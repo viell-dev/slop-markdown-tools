@@ -9,6 +9,13 @@ const openTag =
 
 const closeTag = /<\/([A-Za-z][A-Za-z0-9-]*)[ \t\r\n]*>/y;
 
+/** The name of a complete CommonMark tag at the beginning of raw HTML. */
+function htmlTagName(html: string): string | undefined {
+  openTag.lastIndex = closeTag.lastIndex = 0;
+  const tag = openTag.exec(html) ?? closeTag.exec(html);
+  return tag?.[1]?.toLowerCase();
+}
+
 const attribute =
   /([A-Za-z_:][\w.:-]*)(?:[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n"'=<>`]+)))?/g;
 
@@ -250,4 +257,13 @@ function htmlViewUncertain(node: Nodes, options: HtmlViewOptions = {}): boolean 
     node.children.some((child) => htmlViewUncertain(child, { ...options, flow: false }))
   );
 }
-export { htmlTokens, htmlAnchors, htmlHeadings, htmlText, htmlView, htmlFlow, htmlViewUncertain };
+export {
+  htmlTagName,
+  htmlTokens,
+  htmlAnchors,
+  htmlHeadings,
+  htmlText,
+  htmlView,
+  htmlFlow,
+  htmlViewUncertain,
+};

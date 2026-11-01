@@ -6,6 +6,7 @@ import { lineEnd, lineStart } from "../syntax/source.js";
 import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { walk } from "../syntax/walk.js";
 import { headingAttributes } from "../workspace/heading-attributes.js";
+import { htmlTagName } from "../workspace/html.js";
 import { obsidianTag, optionsSchema } from "./shared.js";
 import { compatibilityRun } from "../core/source-checks.js";
 
@@ -20,6 +21,14 @@ function content(nodes: RootContent[]): RootContent[] {
     const comment = text.slice(4, -3);
     return comment.startsWith(">") || comment.startsWith("->") || comment.endsWith("-");
   });
+}
+
+/** MD041 recognizes a leading HTML heading tag as well as Markdown headings. */
+function initialHeadingLevel(node?: RootContent): number | undefined {
+  if (node?.type === "heading") return node.depth;
+  if (!compatibilityRun() || node?.type !== "html") return undefined;
+  const name = htmlTagName(node.value.trimStart());
+  return name && /^h[1-6]$/.test(name) ? Number(name[1]) : undefined;
 }
 /**
  * The headings of a document, in source order, as separate outlines: the
@@ -364,10 +373,24 @@ export const structureRules: Record<string, Rule> = {
         return [];
       const level = (options.level as number | undefined) ?? 1;
       const blocks = content(document.tree.children);
-      const first = options.allowPreamble
-        ? blocks.find((node) => node.type === "heading")
-        : blocks[0];
-      return first?.type === "heading" && first.depth === level
+      const index = options.allowPreamble
+        ? blocks.findIndex((node) => initialHeadingLevel(node) !== undefined)
+        : 0;
+      let first = blocks[index];
+      // MD041 reparses malformed HTML flow. Retain the previous Markdown-only
+      // reading after an unknown prefix rather than skip an earlier tag (#854).
+      const uncertainPreamble =
+        compatibilityRun() &&
+        options.allowPreamble &&
+        blocks
+          .slice(0, index < 0 ? blocks.length : index)
+          .some(
+            (node) => node.type === "html" && htmlTagName(node.value.trimStart()) === undefined,
+          );
+      if (uncertainPreamble) first = blocks.find((node) => node.type === "heading");
+      // MD041 leaves an empty scan (including permitted preamble) unreported.
+      if (compatibilityRun() && !first && !uncertainPreamble) return [];
+      return initialHeadingLevel(first) === level
         ? []
         : [
             {

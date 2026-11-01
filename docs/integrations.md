@@ -219,11 +219,14 @@ and `requirePragma` apply. With an mdrefine configuration, including one that
 `config convert` writes, they have no effect: migrate them to mdrefine's own
 [suppression comments](configuration.md#suppression-comments).
 
-Markdownlint compatibility also keeps MD041's treatment of HTML comment blocks
-before the initial heading and MD022's comment-aware blank-line counts around
-headings. These exemptions apply to markdownlint findings; an independent
-Prettier spacing preference still applies at warning severity. Native mdrefine
-configuration keeps the policies described on the rules' pages.
+Markdownlint compatibility also recognizes complete leading HTML heading tags
+for MD041 and keeps its treatment of HTML comment blocks before the initial
+heading. See [initial-heading](rules/structure/initial-heading.md) for empty
+documents, permitted preambles and HTML limits. MD022 keeps comment-aware
+blank-line counts around headings. These exemptions apply to markdownlint
+findings; an independent Prettier spacing preference still applies at warning
+severity. Native mdrefine configuration keeps the policies described on the
+rules' pages.
 
 markdownlint's `disable`, `enable`, `disable-line`, `disable-next-line`,
 `disable-file`, and `enable-file` select enabled markdownlint checks by ID,

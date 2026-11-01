@@ -9,6 +9,15 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Recognize leading HTML headings, empty input and permitted preambles during
+  markdownlint's initial-heading fallback
+  ([#848](https://github.com/viell-dev/slop-markdown-tools/issues/848),
+  [#853](https://github.com/viell-dev/slop-markdown-tools/issues/853)).
+
 ## 0.6.3 - 2026-11-01
 
 0.6.3 corrects configuration fallback, ignore matching, heading checks around

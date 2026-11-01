@@ -56,6 +56,13 @@ in TOML, where indentation is allowed. It matches text rather than parsing the
 metadata; use a custom pattern for other textual forms. Use
 [overrides](../../configuration.md#overrides) to exempt generated documents.
 
+During markdownlint fallback, MD041 also recognizes a complete HTML heading tag
+at the start of a block. Empty or comment-only documents pass, as does a
+permitted preamble without a heading. The native rule keeps its Markdown-only
+heading policy and reports a document with no heading. Malformed tags and mixed
+comment blocks retain a [compatibility
+limit](https://github.com/viell-dev/slop-markdown-tools/issues/854).
+
 ## Related rules
 
 [`style/heading`](../style/heading.md) turns underlined headings into `#`
