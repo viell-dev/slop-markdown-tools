@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.6.3 - 2026-11-01
+
+0.6.3 corrects configuration fallback, ignore matching, heading checks around
+HTML comments and footnote lists. [What's new in
+0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html#in-063)
+summarizes the fixes. No upgrading steps are needed.
 
 ### Fixed
 
