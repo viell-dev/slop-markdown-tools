@@ -18,6 +18,27 @@ function names(name: string) {
         row.tags?.includes(key)),
   );
 }
+/** MD022 treats comment text and quote markers as blank, including unmatched delimiters. */
+function markdownlintBlankLine(line: string): boolean {
+  let at = 0;
+  let open = line.indexOf("<!--");
+  let close = line.indexOf("-->");
+  let visible = false;
+  while (at < line.length) {
+    if (close >= 0 && (open < 0 || close < open)) {
+      // An unmatched closer discards everything before it in markdownlint.
+      visible = false;
+      at = close + 3;
+    } else {
+      visible ||= /[^\s>]/.test(line.slice(at, open < 0 ? line.length : open));
+      if (open < 0 || close < 0) return !visible;
+      at = close + 3;
+    }
+    if (open >= 0 && open < at) open = line.indexOf("<!--", at);
+    close = line.indexOf("-->", at);
+  }
+  return !visible;
+}
 function comments(document: Document) {
   const result: {
     value: string;
@@ -157,6 +178,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
   }).rules;
   const source = document.source;
   const starts = lineStarts(source);
+  const hasCommentDelimiters = source.includes("<!--") || source.includes("-->");
   const lineAt = (offset: number) => {
     let low = 0;
     let high = starts.length;
@@ -168,6 +190,67 @@ export function competitorComments(document: Document, options: ProcessOptions) 
     return low - 1;
   };
   const found = comments(document);
+  let headingEdges: Map<number, { line: number; depth: number; above: boolean }> | undefined;
+  const blankLines = new Map<number, boolean>();
+  let commentLines: string[] | undefined;
+  const headingAlreadySpaced = (finding: Finding, variant: RuleSetting | undefined) => {
+    if (!hasCommentDelimiters) return false;
+    if (!headingEdges) {
+      headingEdges = new Map();
+      walk(document.tree, "heading", (node) => {
+        const position = node.position;
+        if (position?.start.offset === undefined || position.end.offset === undefined) return;
+        headingEdges!.set(position.start.offset, {
+          line: position.start.line - 1,
+          depth: node.depth,
+          above: true,
+        });
+        headingEdges!.set(position.end.offset, {
+          line: position.end.line - 1,
+          depth: node.depth,
+          above: false,
+        });
+      });
+    }
+    const edge = headingEdges.get(finding.start);
+    if (!edge) return false;
+    const settings = typeof variant === "string" || !variant ? {} : (variant[1] ?? {});
+    const requested = edge.above ? settings.linesAbove : settings.linesBelow;
+    const count = Number(
+      Array.isArray(requested) ? (requested[edge.depth - 1] ?? 1) : (requested ?? 1),
+    );
+    for (let distance = 1; distance <= count; distance++) {
+      const line = edge.line + (edge.above ? -distance : distance);
+      const start = starts[line];
+      // Like markdownlint, no blank is needed beyond the document's ends.
+      if (start === undefined) return true;
+      let blank = blankLines.get(line);
+      if (blank === undefined) {
+        if (!commentLines) {
+          // Markdownlint masks comment bodies before checking lines. In a
+          // multiline body, tabs and `>` are content rather than blank quotes.
+          const parts: string[] = [];
+          let from = 0;
+          for (const comment of found) {
+            parts.push(
+              source.slice(from, comment.start + 4),
+              source
+                .slice(comment.start + 4, comment.end - 3)
+                .replace(/[^ \r\n]/g, ".")
+                .replace(/(?<=^|[^ ]) +(?=[\r\n])/g, (spaces) => ".".repeat(spaces.length)),
+            );
+            from = comment.end - 3;
+          }
+          parts.push(source.slice(from));
+          commentLines = parts.join("").split(/\r\n|\r|\n/);
+        }
+        blank = markdownlintBlankLine(commentLines[line]!);
+        blankLines.set(line, blank);
+      }
+      if (!blank) return false;
+    }
+    return true;
+  };
   const prettierRanges: Interval[] = [];
   let requirePragma = compat.prettier?.requirePragma === true;
   for (const override of compat.pragmaOverrides ?? [])
@@ -405,6 +488,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
                 ? "MD058"
                 : undefined;
         checks = checks.filter((id) => id === check);
+        if (checks.includes("MD022") && headingAlreadySpaced(finding, variant)) checks = [];
       } else if (rule === "structure/unspaced-heading") {
         const check = finding.message.includes("add spaces inside the hashes") ? "MD020" : "MD018";
         checks = checks.filter((id) => id === check);

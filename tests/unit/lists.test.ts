@@ -184,6 +184,42 @@ describe("style/ordered-list", () => {
 
 describe("style/list-indent", () => {
   const config = only({ "style/list-indent": "warn" });
+  it.each(dialects.filter((dialect) => dialect !== "commonmark"))(
+    "keeps a list on its footnote label's line in %s without repeated indentation",
+    (dialect) => {
+      const cases: [string, string, boolean?][] = [
+        ["[^1]: - item\n", "[^1]: - item\n"],
+        ["[^long]:   1. item\n", "[^long]:   1. item\n"],
+        [
+          "[^1]: -   first\n        continuation\n    -   second\n",
+          "[^1]: - first\n      continuation\n    - second\n",
+          // Existing Obsidian protection keeps continuation indentation.
+          true,
+        ],
+        ["[^1]: - parent\n      - child\n", "[^1]: - parent\n        - child\n"],
+      ];
+      for (const newline of ["\n", "\r\n"])
+        for (const startIndent of [1, 2, 3])
+          for (const [before, after, preserveInObsidian] of cases) {
+            const source = before.replaceAll("\n", newline);
+            const output = (
+              dialect === "obsidian" && preserveInObsidian ? before : after
+            ).replaceAll("\n", newline);
+            const configured = only(
+              {
+                "style/list-indent": [
+                  "warn",
+                  { startIndented: true, startIndent, nestedIndent: 4 },
+                ],
+              },
+              dialect,
+            );
+            expect(formatted(source, configured)).toBe(output);
+            expect(lint(output, { config: configured }).filter((item) => item.edit)).toEqual([]);
+            expect(format(source, { config: only({}, dialect) }).output).toBe(source);
+          }
+    },
+  );
   it.each([
     ["-   a\n-   b\n", "- a\n- b\n"],
     ["1.  a\n2.  b\n", "1. a\n2. b\n"],
