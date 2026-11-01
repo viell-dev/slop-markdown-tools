@@ -17,6 +17,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   project name
   ([#832](https://github.com/viell-dev/slop-markdown-tools/issues/832)).
 
+### Maintenance
+
+- Consolidate contributor and release procedures and remove redundant state and
+  history from agent guidance
+  ([#836](https://github.com/viell-dev/slop-markdown-tools/issues/836)).
+
 ## 0.6.1 - 2026-10-30
 
 The documentation is reorganized for people new to mdrefine: rules have pages of

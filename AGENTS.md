@@ -5,9 +5,11 @@ documents. The [README](./README.md#status) states how the project is
 maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test
 layout, documentation workflow, and pull request rules, and
 [RELEASING.md](./RELEASING.md) the release procedure; follow them and do not
-repeat them here. User and API documentation belongs in `docs/`, and the details
-that users do not need, such as lists of individual protections and internal
-limits, in the [maintainer notes](./internals/README.md).
+repeat them here. Issues and PRs own investigations, decisions, progress and
+verification receipts; keep live guidance focused on current instructions and
+useful explanations. User and API documentation belongs in `docs/`, and the
+details that users do not need, such as lists of individual protections and
+internal limits, in the [maintainer notes](./internals/README.md).
 
 ## Repository boundary
 
@@ -311,22 +313,11 @@ reversals, and do not revert until authorized.
 
 Some environments ignore `AGENTS.md` globally; force-add it when needed.
 
-Merge with a merge commit after checking the exact head:
-`gh pr merge --merge --match-head-commit SHA`. Squash and rebase merging are
-disabled, so that each commit keeps its message and attribution. The ruleset
-requires branches to be up to date, so after each merge the other open PRs need
-`main` merged in and CI run again. GitHub deletes a merged PR's branch;
-fast-forward the local `main` before new work, and prune stale tracking refs and
-local task branches.
+Follow CONTRIBUTING's [merge and repository enforcement
+procedure](./CONTRIBUTING.md#repository-enforcement). Release evidence belongs
+in [RELEASING.md](./RELEASING.md#publish).
 
-Follow CONTRIBUTING's [repository
-enforcement](./CONTRIBUTING.md#repository-enforcement) policy and RELEASING's
-exact-commit evidence requirements. Keep recorded/live rulesets, workflow
-identities, `scripts/release-evidence.mjs` producer mapping and
-`tests/integration/release-evidence.test.ts` aligned when changing a required
-check.
-
-Other repository settings, each recorded here with its reason when it changes:
+Repository-specific settings and safeguards:
 
 - GitHub Actions may run only actions that GitHub owns, pinned by full commit
   SHA. A workflow that needs another action, or a tag instead of a SHA, fails to
@@ -350,177 +341,50 @@ Maintainers enforce the [code of conduct](./CODE_OF_CONDUCT.md): hide or edit a
 comment, lock a conversation, or close an item that breaks it, and say why where
 it helps.
 
-## Technical map
+## Implementation safeguards
 
-Paths below describe the current implementation. Scoped internal reorganizations
-are allowed: retain public entry points and synchronous APIs, the dependency
-direction between layers, rendering and edit safety, parser source/license
-identity, and platform/test isolation. Update affected instructions, navigation
-and verification claims in the owning refactor PR; describe implemented layouts
-only and remove superseded transition notes.
+Use the [contributor guide](./CONTRIBUTING.md#dependencies) for parser builds,
+source reconciliation and package boundaries, its [test
+guide](./CONTRIBUTING.md#tests) for suite ownership, and the [maintainer
+notes](./internals/README.md) for renderer-specific limits. Paths are
+navigation, not mandatory accumulation points. Internal reorganizations must
+preserve the contracts below.
 
-- TypeScript ESM compiled with `tsc`. The package exports `dist/index.js` as
-  `mdrefine`, `dist/node.js` as `mdrefine/node`, and the `mdrefine` command at
-  `dist/cli/main.js`. Configuration uses `mdrefine.config.*`, and suppression
-  comments use `mdrefine-*`. The legacy 0.4.x compatibility forms were removed
-  in 0.5.0; the changelog and the upgrading page retain that history.
-- `src/syntax/` parses with micromark and mdast through the generated internal
-  adapter and holds the Obsidian extensions; `src/config/` resolves presets,
-  schemas, overrides, and plugins; `src/core/` runs rules, suppressions, and the
-  edit engine; `src/rules/` holds the built-in rules; `src/workspace/` resolves
-  link targets and handles discovery, reading as UTF-8, and writes; `src/cli/`
-  connects them. The main entry never touches the filesystem. `mdrefine/node`
-  exposes `src/workspace/discovery.ts`, which the CLI uses for discovery and
-  per-document options, so change the two together.
-- `src/workspace/files.ts` owns filesystem discovery and selection, Git-ignore
-  and vault description helpers, and skipped-entry identity and wording.
-  `selection.ts` applies literal exclusions without pruning link targets;
-  `lookup.ts` supplies synchronous on-demand lookup beneath unlisted entries.
-  `writes.ts` owns in-place writes, preflight checks and recovery, while the CLI
-  keeps sequential batch processing and per-file failure reporting. Keep these
-  concerns separate and preserve lazy reads and filesystem safety; the paths
-  describe their current owners.
-- Shared rule helpers currently start at `src/rules/shared.ts`, edit protections
-  at `protections.ts`, and source-line primitives at `src/syntax/source.ts`.
-  These are navigation, not mandatory accumulation points: give a cohesive
-  concern a focused module when useful. Rule modules must not import the
-  `style.ts` aggregator. Workspace HTML, anchor collection, target indexing, and
-  link resolution are separate modules behind `src/workspace/index.ts`; keep its
-  public entry stable.
-- Consumers require fresh, verified generated output. `scripts/build.mjs` stages
-  the portable parser and TypeScript product; `with-build.mjs` may reuse that
-  exact output only inside its live invocation, after checking its receipt.
-  Fresh generated output is the contract, not repeated builder invocation.
-  Standalone commands prepare their own build. Restart after input, installation
-  or output changes; do not copy receipts across invocations or jobs.
-  Publication replaces individual files, not the whole directory atomically.
-  Keep consumers outside overlapping builders and preserve intentional parser
-  rebuild tests. `parser-patches.mjs` owns each corrected source's identity,
-  rationale, dependency links, maintenance owner and removal conditions.
-  `scripts/parser-adaptations/*.ts` holds the maintained algorithms, checked by
-  TypeScript and ESLint; the small `parser-adaptations.mjs` loader inserts their
-  JavaScript into pinned upstream scopes. Keep these fragments, their types and
-  compiler configuration in manifest provenance and recursive receipt inputs.
-  `parser-packages.json` pins the complete graph's license identities. Keep all
-  four generated distribution artifacts together. See
-  [CONTRIBUTING.md](./CONTRIBUTING.md#what-the-checks-prove) for the
-  verification map and its limits.
-- Parser dependency roles follow installed runtime and declaration reachability.
-  The five bundled-only extension factories are development inputs; public
-  mdast/plugin types and utilities used outside the bundle remain production
-  dependencies. GFM bundles table/task-list tokenizers while VitePress imports
-  them directly, so a future adaptation must account for both paths. Keep the
-  shipped internal shim free of build-only type forwards and preserve native
-  selection for semantic build inputs regardless of npm's dev label. See
-  [CONTRIBUTING.md](./CONTRIBUTING.md#dependencies) for the current boundary.
-- `src/code/` is the Node host for configured code tools. Keep execution out of
-  ordinary rules and the portable entry. Its internal fingerprint path permits
-  only selected code values and must cover alternative readings; the ordinary
-  fingerprint stays exact. Fences and diagnostic locations are shared through
-  `src/syntax/fences.ts` and `src/core/diagnostics.ts`.
-- `src/syntax/vitepress/` keeps the positioned projection, synchronous secondary
-  reading, Vue whitespace, and literal URL rules separate. Its guard must retain
-  the selected-code exception without relaxing other literal values. Static
-  anchors and bounded host-supplied includes live in
-  `src/workspace/vitepress.ts`. Keep actual VitePress/Vue rendering and full
-  builds in integration tests.
-- Generated VitePress cache/temp files are ignored at every site root, including
-  the published `examples/workspaces/vitepress-site` before/after projects. Keep
-  their `.vitepress/config.mts` files checked and included in the examples.
-- `src/config/load.ts` locates a plugin not named by path with
-  `import-meta-resolve`, a port of Node.js's import resolution, and then with
-  CommonJS resolution, because Node.js has no supported call that resolves an
-  import from another file's location. Its conditions copy Node.js's defaults
-  plus those the process was started with (`--conditions`, `--no-addons`, also
-  in `NODE_OPTIONS`); recheck them when the supported Node.js range changes.
-- The dialect assumed when nothing names one is chosen in `resolveConfig`: the
-  caller's `defaultDialect`, which the CLI sets to `obsidian` inside a vault,
-  else `fallbackDialect` (`github`), which `createWorkspace` also uses.
-  `src/workspace/vault.ts` holds the one rule for which vault a document belongs
-  to; discovery applies it to the directories it visits and `enclosingVault` to
-  other paths, so change both together. Do not add another fallback: a dialect
-  that reads a construct as a paragraph lets wrapping destroy it without
-  tripping the semantic check.
-- `src/syntax/math.ts` is the project's own dollar-math tokenizer, adapted from
-  `micromark-extension-math` (notice in `THIRD_PARTY_NOTICES`, which ships) so
-  that the package does not install KaTeX. `parse.ts` picks the conditions per
-  dialect, and `tests/support/math-renderers.ts` records what the renderers
-  rendered and how to observe them again. Apply a condition to a dialect only
-  when its renderer was observed to apply it.
-- `src/core/engine.ts` orchestrates inline, block, then document phases, with
-  convergence checks and overlapping edits deferred to the next pass.
-  `rule-registry.ts` owns registration and synchronous options/schema
-  validation, including the shared identity-keyed schema cache. `semantics.ts`
-  owns semantic fingerprints, anchor provenance and refusal locations;
-  `protection-edits.ts` checks edits against renderer boundaries. Keep the
-  engine's existing exports and lazy workspace callbacks stable when changing
-  these internal seams.
-- `src/syntax/renderer-protections.ts` owns one `RendererProtections` result
-  cached by positioned root. List, GitHub, forge and VitePress list collectors
-  are separate; `forge-protections.ts` retains native table continuations,
-  paragraph-hidden tables and URL-adjacent hard breaks without requesting
-  another parse, and `vitepress/lists.ts` keeps the lists whose markers decide
-  markdown-it's table and component readings. `obsidian-protections.ts` orders
-  Obsidian passes over one shared leaf projection, with code and HTML collectors
-  in focused modules. List text seeds physical fences; joined footnotes seed
-  paragraph/table state; Setext readings precede Tab continuation; both
-  structural and line passes finish underlines before table collection; escaping
-  HTML endpoints precede list-marker checks. Retain original nodes where
-  possible, exact UTF-16 positions, Set order and lazy projections. These paths
-  locate current ownership, not future mandatory accumulation points. Fix an
-  unsafe edit rather than weakening a guard or removing historical protections
-  during an unrelated extraction. Obsidian wrapping needs verified strict line
-  breaks.
-- `docs.test.ts` compares the examples page, the rule index and each rule page's
-  presets, the preset table, the library pages, the installation commands, and
-  the changelog with the code, and rejects version annotations in the pages;
-  `benchmarks.test.ts` compares the benchmark page's headings and row labels.
-  Each example workspace's `after/` tree is exactly what `format --write` makes
-  of `before/`: regenerate it when formatting changes on purpose, and treat an
-  unexpected difference as a regression.
-- Replace the benchmark page's results only from a run of the Benchmark
-  workflow; a local report names its machine's processor and is never published.
-  Judge a change by the ratio columns or by runs before and after on one
-  machine.
-- The Vitest projects run unit tests, performance checks, then integration tests
-  (`sequence.groupOrder`). Performance files run serially, outside unit
-  coverage; unit and integration workers are capped at four so CPU-heavy
-  properties and CLI subprocesses do not overwhelm a runner. In Linux 24 CI, the
-  required `Unit coverage` job owns unit evidence on a separate runner;
-  `check:ci` runs static checks, performance/integration, and installed
-  packages. Other matrix environments retain their full suites. Keep these
-  evidence and resource boundaries without repeating Linux 24 unit work;
-  preserve meaningful coverage rather than a duplicate run.
-- Workspace memory lifecycle checks retain their parser mocks in the performance
-  suite. `tests/support/workspace-memory.mjs` shares the synthetic fixture and
-  collection protocol with `workspace-memory-child.mjs`, which measures the
-  freshly prepared compiled product outside the runner's heap. Preserve the
-  single sample, source-size allowance, cached-answer checks and failing actual
-  retention controls. Each full-size warm-up and measured corpus must use
-  disjoint paths, basenames and full source content; prefilled cache keys can
-  otherwise hide growth. Content guards retain only bounded digests. Wrapper
-  collection is not evidence about primitive text.
-- Test navigation follows product responsibilities: `engine.test.ts` covers
-  phase execution and semantic acceptance; `config.test.ts` and
-  `plugins.test.ts` cover configuration and registration/schema contracts.
-  Engine ranges, front matter and renderer protections have separate suites;
-  rule families and native comparison normalizers do too. Reusable parser probes
-  and compiled-product coverage support live in `tests/support/parser/`, and the
-  shared CLI workspace/permission lifecycle in `tests/support/cli.ts`. Keep a
-  suite's mocks, cleanup and deliberate cache assertions together when splitting
-  it: each Vitest file has its own module isolation. Authored native corpora
-  live once in `tests/fixtures/renderers/`, shared by host execution, unit
-  regressions and independent report plans. Preserve fixture names, order and
-  source bytes, and update all consumers and native path selection on moves.
-  These paths locate current ownership, not a required taxonomy or a reason to
-  append unrelated tests to an existing file.
-- The tool formats Markdown at 80 columns, and Prettier excludes it. VitePress
-  builds the site, with heading anchors generated as GitHub generates them, so
-  that the tool's link check validates the site's fragments; CI builds it for
-  every PR, and the Pages workflow deploys it from the newest stable release's
-  tag, or from a `site-VERSION` branch of corrections to that release's
-  documentation (RELEASING.md). Do not commit its cache or output. VitePress 2
-  is pinned to an alpha to avoid the Vite 5 vulnerabilities of the stable line.
+- Keep public entry points and synchronous APIs stable. The portable `mdrefine`
+  entry must not touch the filesystem or execute configured tools; those belong
+  to the Node host. Keep CLI discovery and `mdrefine/node` behavior aligned.
+  Keep shipped internal declarations free of build-only type forwards.
+- Rules must not import the `style.ts` aggregator. Keep parsing, configuration,
+  rule execution, workspace lookup and writes independently owned, with lazy
+  reads and callbacks preserved.
+- Dialect selection has one chain: the caller's `defaultDialect` (the CLI uses
+  `obsidian` inside a vault), then `fallbackDialect` (`github`). Discovery and
+  on-demand paths must agree on vault membership. Another fallback can let
+  wrapping destroy syntax without changing that parser's reading.
+- Preserve renderer collectors' exact UTF-16 positions, original nodes, Set
+  order and lazy projections, reusing root-cached results rather than parsing
+  again. Obsidian passes share one leaf projection: list text seeds physical
+  fences, joined footnotes seed paragraph/table state, Setext readings precede
+  Tab continuation, both structural and line passes finish underlines before
+  table collection, and escaping HTML endpoints precede list-marker checks. Fix
+  unsafe edits rather than removing guards during an extraction. Obsidian
+  wrapping needs verified strict line breaks.
+- The configured-code fingerprint may vary only selected code values, including
+  their alternative readings. The ordinary fingerprint remains exact; preserve
+  that distinction in VitePress's secondary guard too. Keep actual VitePress/Vue
+  rendering and full builds in integration tests.
+- Plugin lookup follows Node.js import conditions, including process flags and
+  `NODE_OPTIONS`, before CommonJS fallback. Recheck these defaults when changing
+  the supported Node.js range; Node.js has no supported resolver for an import
+  from another file's location.
+- Apply a dollar-math condition to a dialect only when its renderer was observed
+  to apply it. `tests/support/math-renderers.ts` records those observations.
+- Each example workspace's `after/` tree must be exactly what formatting
+  `before/` produces. Regenerate it for intentional output changes and treat
+  unexpected differences as regressions. Keep generated VitePress cache/temp
+  files ignored at every example site root and its configuration checked.
+- Publish benchmark results only from the Benchmark workflow. Local output names
+  its machine's processor; use same-machine comparisons for diagnosis.
 
 ## Releases
 
