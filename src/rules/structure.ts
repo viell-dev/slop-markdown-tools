@@ -7,9 +7,19 @@ import { vitepressTokens } from "../syntax/vitepress/projection.js";
 import { walk } from "../syntax/walk.js";
 import { headingAttributes } from "../workspace/heading-attributes.js";
 import { obsidianTag, optionsSchema } from "./shared.js";
+import { compatibilityRun } from "../core/source-checks.js";
 
 function content(nodes: RootContent[]): RootContent[] {
-  return nodes.filter((node) => !["yaml", "toml"].includes(node.type));
+  const markdownlint = compatibilityRun();
+  return nodes.filter((node) => {
+    if (["yaml", "toml"].includes(node.type)) return false;
+    if (!markdownlint || node.type !== "html") return true;
+    // MD041 skips valid HTML flow comments; native initial-heading counts them.
+    const text = node.value;
+    if (!text.startsWith("<!--") || !text.endsWith("-->")) return true;
+    const comment = text.slice(4, -3);
+    return comment.startsWith(">") || comment.startsWith("->") || comment.endsWith("-");
+  });
 }
 /**
  * The headings of a document, in source order, as separate outlines: the
