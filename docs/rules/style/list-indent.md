@@ -57,7 +57,9 @@ After:
   [`style/quote-marker`](../style/quote-marker.md)'s `listItems` to `false` with
   it. Four or more columns would make code, so the rule keeps lists as written
   for those values. A first-level list directly below nonblank text also stays,
-  because indentation can make it continue that text.
+  because indentation can make it continue that text. A list that starts on its
+  footnote label's line keeps its marker position; its marker spacing and nested
+  lists still follow their options where safe.
 
 ## Edge cases and advanced usage
 

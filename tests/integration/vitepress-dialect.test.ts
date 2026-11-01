@@ -44,6 +44,28 @@ const fixtures = [
   "Image ![wide](./a.png){width=200 height=100} and text.\n",
 ];
 
+it("preserves footnote lists while applying startIndented (#802)", async () => {
+  const render = await renderer({});
+  const config: Config = {
+    extends: [],
+    dialect: "vitepress",
+    rules: { "style/list-indent": ["warn", { startIndented: true }] },
+  };
+  for (const [source, output] of [
+    ["Note[^1].\n\n[^1]: - item\n", "Note[^1].\n\n[^1]: - item\n"],
+    [
+      "Note[^1].\n\n[^1]: -   first\n        continuation\n    -   second\n",
+      "Note[^1].\n\n[^1]: - first\n      continuation\n    - second\n",
+    ],
+  ] as const) {
+    const result = format(source, { config });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.output).toBe(output);
+    expect(await render(result.output)).toBe(await render(source));
+    expect(format(result.output, { config }).output).toBe(result.output);
+  }
+});
+
 it.each([false, true])(
   "wraps paragraphs whose braces and `^[` are code with math=%s (#755)",
   async (math) => {
