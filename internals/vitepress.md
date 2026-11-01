@@ -37,6 +37,11 @@ blocks containing raw HTML or mustaches keep their previous reading. The primary
 fingerprint still applies unchanged
 ([#863](https://github.com/viell-dev/slop-markdown-tools/issues/863)).
 
+Written aliases such as `&#169;` and `&copy;` can remain distinct even as
+singletons; built-in rules do not rewrite their spelling. After a major change
+to the HTML decoder or VitePress's Vue decoder, compare named and numeric
+references against real Vue parsing again before relying on their agreement.
+
 ## Include expansion
 
 An expansion of <code>&lt;!-- @include: path --&gt;</code> stops after 64
