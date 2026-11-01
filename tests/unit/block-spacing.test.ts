@@ -13,6 +13,16 @@ describe("style/block-spacing", () => {
     );
     return output;
   }
+  it.each(["\n", "\r\n", "\r"])("keeps opaque VitePress table boundaries with %j (#800)", (eol) => {
+    const source = "- item\n  |a|b|\n  |-|-|\n|a|b|\n|-|-|\n<MyComponent />\n".replaceAll(
+      "\n",
+      eol,
+    );
+    expect(spaced(source, "vitepress")).toBe(source);
+    // Ordinary HTML with a delimiter-like line retains its normal separator.
+    const html = "- item\n<div>\n|-|-|\n</div>\n".replaceAll("\n", eol);
+    expect(spaced(html, "vitepress")).toBe(html.replace(`- item${eol}`, `- item${eol}${eol}`));
+  });
   describe("standalone Obsidian comment boundaries (#357)", () => {
     it.each([
       "%%c%%\nalpha\n---\n",

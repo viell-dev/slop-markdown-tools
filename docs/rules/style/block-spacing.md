@@ -209,6 +209,9 @@ and a table, list, or unclosed code fence that it reads where the parser reads
 something else. A line of quote markers inside a block quote that both readings
 place in a list item, as between `- > a` and `  > # Heading`, is still added.
 
+Table text grouped with a neighboring Vue component keeps its boundary above as
+written. Tables outside that retained region can still be formatted.
+
 **In Obsidian:** existing blank lines are added to only when they are empty,
 because Obsidian can read a line of blank space as text. A table is separated
 only from a heading above it: Live Preview shows the rows of a table directly

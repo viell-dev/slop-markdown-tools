@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Avoid refused spacing proposals before table text grouped with a VitePress
+  component, retaining safe table formatting nearby
+  ([#800](https://github.com/viell-dev/slop-markdown-tools/issues/800)).
 - Bound nested directive work during markdownlint's initial-heading HTML-flow
   inspection, reporting an incomplete check without changing the document
   ([#858](https://github.com/viell-dev/slop-markdown-tools/issues/858)).

@@ -108,6 +108,35 @@ it("reads the blocks that style/block-spacing keeps together as VitePress does (
   }
 });
 
+it("keeps table text grouped with a component without refused spacing (#800)", async () => {
+  const render = await renderer({});
+  const original = "- item\n  |a|b|\n  |-|-|\n|a|b|\n|-|-|\n<MyComponent />\n";
+  for (const eol of ["\n", "\r\n", "\r"]) {
+    const source = original.replaceAll("\n", eol);
+    const config: Config = { extends: ["recommended", "vitepress"], dialect: "vitepress" };
+    const result = format(source, { config, path: "page.md" });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.output).toBe(
+      "- item\n  | a   | b   |\n  | --- | --- |\n|a|b|\n|-|-|\n<MyComponent />\n".replaceAll(
+        "\n",
+        eol,
+      ),
+    );
+    expect(await render(result.output)).toBe(await render(source));
+    expect(semanticFingerprint(parse(result.output, "vitepress"))).toBe(
+      semanticFingerprint(parse(source, "vitepress")),
+    );
+    expect(format(result.output, { config }).output).toBe(result.output);
+    // The separator preserves real rendering but changes the opaque primary
+    // representation. Keep the engine's preservation check intact.
+    const separated = source.replace(`  |-|-|${eol}`, `  |-|-|${eol}${eol}`);
+    expect(await render(separated)).toBe(await render(source));
+    expect(semanticFingerprint(parse(separated, "vitepress"))).not.toBe(
+      semanticFingerprint(parse(source, "vitepress")),
+    );
+  }
+});
+
 it("leaves the lists and lazy lines that VitePress reads otherwise as written (#763, #769)", async () => {
   const render = await renderer({});
   const config: Config = { extends: ["recommended", "vitepress"], dialect: "vitepress" };
