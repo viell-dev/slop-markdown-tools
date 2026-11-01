@@ -42,26 +42,37 @@ export { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
 const hash = (text) => createHash("sha256").update(text).digest("hex");
 const slash = (filename) => filename.replaceAll("\\", "/");
 const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
-const virtualRegions = new Map([
+const virtualLabels = new Map([
   ["mdrefine:entry", "mdrefine:entry"],
   ["mdrefine:edit-map", "mdrefine:edit-map"],
-  // Rolldown 1.2.14 emits this helper even when it is absent from chunk.modules.
   ["\0rolldown/runtime.js", "\\0rolldown/runtime.js"],
+]);
+// The final DCE pass drops these two module-start comments. RenderedModule.code
+// still starts with them, and live declarations may remain in the final chunk.
+// Keep their absence explicit: emission changes require review independently of
+// graph membership.
+const removedModuleLabels = new Set([
+  "node_modules/devlop/lib/default.js",
+  "node_modules/get-east-asian-width/lookup-data.js",
 ]);
 
 /**
- * Check Rolldown's physical-path output channel against the reviewed graph.
+ * Check Rolldown's module-start comments against independently identified inputs.
+ * RenderedModule.code identifies the comment channel even though its new plain
+ * `// label` syntax is indistinguishable from an ordinary source comment.
  * Source URLs, banners and ordinary string contents are not path provenance.
  * @param {string} code
- * @param {ReadonlySet<string>} graphLabels
+ * @param {ReadonlyMap<string, string | null>} moduleSources
  */
-export function assertPortableRegions(code, graphLabels) {
-  let regions = 0;
-  for (const match of code.matchAll(/^\/\/#region([^\r\n]*)/gm)) {
-    assert(match[1].startsWith(" "), "Malformed parser region header");
-    const label = match[1].slice(1);
-    assert(label, "Missing parser region label");
-    if (![...virtualRegions.values()].includes(label)) {
+export function assertPortableModules(code, moduleSources) {
+  let markers = 0;
+  const lines = code.split("\n");
+  for (const [label, source] of moduleSources) {
+    if (label === "mdrefine:entry") {
+      assert.equal(source, null, "Review changed parser entry emission");
+      continue;
+    }
+    if (![...virtualLabels.values()].includes(label)) {
       assert(
         !path.posix.isAbsolute(label) &&
           !path.win32.isAbsolute(label) &&
@@ -69,13 +80,20 @@ export function assertPortableRegions(code, graphLabels) {
           !label.includes("\\") &&
           !label.includes(":") &&
           label.split("/").every((part) => part && part !== "." && part !== ".."),
-        `Nonportable parser region label: ${label}`,
+        `Nonportable parser module label: ${label}`,
       );
     }
-    assert(graphLabels.has(label), `Unexpected parser region label: ${label}`);
-    regions++;
+    const header = `// ${label}`;
+    assert(source?.startsWith(`${header}\n`), `Unexpected parser module header: ${label}`);
+    const occurrences = lines.filter((line) => line === header).length;
+    assert.equal(
+      occurrences,
+      removedModuleLabels.has(label) ? 0 : 1,
+      `Review changed parser module marker: ${label}`,
+    );
+    markers += occurrences;
   }
-  assert(regions, "Missing parser region headers");
+  assert(markers, "Missing parser module markers");
 }
 
 /** @param {string} filename */
@@ -172,7 +190,7 @@ export async function bundleParser(options = {}) {
   const repositoryRoot = await realpath(path.resolve(options.repositoryRoot ?? defaultRoot));
   const resolveFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
   const bundlerRoot = await packageForFile(resolveFromRoot.resolve("rolldown"));
-  assert.equal(bundlerRoot.metadata.version, "1.2.14", "Review changed parser bundler");
+  assert.equal(bundlerRoot.metadata.version, "1.2.15", "Review changed parser bundler");
   const factories = new Map();
   for (const name of [
     "mdast-util-from-markdown",
@@ -284,11 +302,11 @@ export async function bundleParser(options = {}) {
     const physicalModules = new Set(modules.filter((id) => path.isAbsolute(id)));
     for (const id of modules) {
       assert(
-        physicalModules.has(id) || virtualRegions.has(id),
+        physicalModules.has(id) || virtualLabels.has(id),
         `Unexpected parser virtual module: ${id}`,
       );
     }
-    const regionLabels = new Set(virtualRegions.values());
+    const moduleLabels = new Map(virtualLabels);
     const roots = new Map();
     /** @type {Map<string, { file: string, sha256: string }>} */
     const inputs = new Map();
@@ -315,7 +333,7 @@ export async function bundleParser(options = {}) {
           "micromark-util-edit-map",
           "Unadapted EditMap remains in parser graph",
         );
-        regionLabels.add(slash(relative));
+        moduleLabels.set(filename, slash(relative));
       }
       const previous = inputs.get(input.file);
       if (previous)
@@ -354,7 +372,15 @@ export async function bundleParser(options = {}) {
     expectedPackages.sort((a, b) => compare(a.name, b.name) || compare(a.version, b.version));
     assert.deepEqual(packages, expectedPackages, "Review changed parser package/license graph");
     assert.equal(packages.length, 34);
-    assertPortableRegions(chunk.code, regionLabels);
+    const moduleSources = new Map(
+      Object.entries(chunk.modules).map(([id, module]) => {
+        const label = moduleLabels.get(id);
+        assert(label, `Missing parser module label: ${id}`);
+        return [label, module.code];
+      }),
+    );
+    assert.equal(moduleSources.size, modules.length, "Duplicate parser module labels");
+    assertPortableModules(chunk.code, moduleSources);
 
     for (const { file, sha256 } of localSources) {
       assert.equal(
@@ -406,7 +432,15 @@ export async function bundleParser(options = {}) {
     const inputHashes = await Promise.all(
       inputFiles.map(async (file) => [file, hash(await readFile(file))]),
     );
-    return { code: chunk.code, declaration, licenses, manifest, inputFiles, inputHashes };
+    return {
+      code: chunk.code,
+      declaration,
+      licenses,
+      manifest,
+      inputFiles,
+      inputHashes,
+      moduleSources,
+    };
   } finally {
     await bundle.close();
   }
