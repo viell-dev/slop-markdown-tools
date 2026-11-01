@@ -9,6 +9,14 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Stop discovering `.prettierrc.jsonc` during fallback and configuration
+  conversion, matching Prettier's configuration search
+  ([#793](https://github.com/viell-dev/slop-markdown-tools/issues/793)).
+
 ## 0.6.2 - 2026-11-01
 
 ### Security

@@ -908,6 +908,41 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     return parseExplanation(result.stdout);
   };
 
+  it("does not discover .prettierrc.jsonc, which Prettier ignores (#793)", async () => {
+    const root = await fixture({
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":31}',
+      "a.md": messy,
+    });
+    expect(await prettierResolve(path.join(root, "a.md"))).toBeNull();
+    const fallback = explained(root);
+    expect(fallback.effective.rules).toEqual(defaults(root));
+    const converted = run(root, ["config", "convert", "--write"]);
+    expect(converted.status).toBe(2);
+    expect(converted.stdout).toBe("");
+    expect(converted.stderr).toBe("mdrefine: No markdownlint or Prettier configuration found.\n");
+    expect(await exists(path.join(root, "mdrefine.config.jsonc"))).toBe(false);
+  });
+  it("still discovers .prettierrc.json beside the ignored JSONC filename", async () => {
+    const root = await fixture({
+      ".prettierrc.json": '{"proseWrap":"always","printWidth":31}',
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":19}',
+      "a.md": messy,
+    });
+    const reference = await prettierResolve(path.join(root, "a.md"));
+    expect(reference?.printWidth).toBe(31);
+    expect(explained(root).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    expect(converted.stderr).not.toContain(".prettierrc.jsonc");
+  });
+
   it.each([
     "**/*.md\n**/*.markdown\n",
     "*.md\n*.markdown\n",
