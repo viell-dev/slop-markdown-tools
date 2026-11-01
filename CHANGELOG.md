@@ -13,6 +13,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Update the shipped glob matcher for the minimatch pattern-amplification
+  advisory, preserving configuration conversion with its new matcher API
+  ([#837](https://github.com/viell-dev/slop-markdown-tools/issues/837)).
+
 - Remove the incorrect claim that the repository slug is mdrefine's original
   project name
   ([#832](https://github.com/viell-dev/slop-markdown-tools/issues/832)).
