@@ -188,7 +188,8 @@ or `package.yaml` key, Markdown overrides, and relevant `.editorconfig` values
 only when a Prettier configuration exists. JavaScript and TypeScript
 configurations are named without executing them and contribute nothing; the
 explicit convert command loads them through Node.js. TOML and JSON5 are not
-read, by either. An extensionless `.prettierrc` is read as YAML, as Prettier
+read, by either. `.prettierrc.jsonc` is not a Prettier configuration filename
+and is not searched. An extensionless `.prettierrc` is read as YAML, as Prettier
 reads it, so it can hold JSON; a JSON comment in it becomes part of the next key
 in Prettier too, which ignores that setting, and conversion reports it. A file
 that cannot be parsed is an error that names it. `.prettierignore` and

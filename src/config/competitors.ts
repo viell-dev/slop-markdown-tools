@@ -89,7 +89,6 @@ export const competitorFiles = {
     ".prettierrc.cts",
     "prettier.config.cts",
     ".prettierrc.toml",
-    ".prettierrc.jsonc",
   ],
 } as const;
 

@@ -908,6 +908,126 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     return parseExplanation(result.stdout);
   };
 
+  it.each(["Prettier", "cli2 ignores", "cli2 globs"] as const)(
+    "rebases %s selection onto an explicit workspace root (#791)",
+    async (kind) => {
+      const settings: Record<string, string> =
+        kind === "Prettier"
+          ? { ".prettierrc": "{}", ".prettierignore": "/sub/skip.md\n" }
+          : {
+              ".markdownlint-cli2.jsonc": JSON.stringify({
+                config: { default: false, MD047: true },
+                ...(kind === "cli2 ignores"
+                  ? { ignores: ["sub/skip.md"] }
+                  : { globs: ["sub/**/*.md", "!sub/skip.md"] }),
+              }),
+            };
+      const root = await fixture({
+        ...settings,
+        "outside.md": "text\n",
+        "sub/keep.md": "text\n",
+        "sub/skip.md": "text\n",
+        "sub/deep/skip.md": "text\n",
+      });
+      const child = path.join(root, "sub");
+      const selected = ["deep/skip.md", "keep.md"];
+      if (kind === "Prettier") {
+        const reference: string[] = [];
+        for (const file of ["deep/skip.md", "keep.md", "skip.md"])
+          if (
+            !(
+              await getFileInfo(path.join(child, file), {
+                ignorePath: path.join(root, ".prettierignore"),
+              })
+            ).ignored
+          )
+            reference.push(file);
+        expect(reference).toEqual(selected);
+      }
+      for (const [cwd, argument] of [
+        [root, "sub"],
+        [child, "."],
+      ] as const)
+        for (const command of ["lint", "format"]) {
+          const result = run(cwd, [command, "--root", argument, "--json"]);
+          expect(result.status, result.stderr).toBe(0);
+          expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(selected);
+        }
+      const ordinary = [
+        ...(kind === "cli2 globs" ? [] : ["outside.md"]),
+        ...selected.map((file) => `sub/${file}`),
+      ];
+      for (const cwd of [root, child]) {
+        const result = run(cwd, ["lint", "--json"]);
+        expect(result.status, result.stderr).toBe(0);
+        expect(parseReport(result.stdout).files.map((file) => file.path)).toEqual(ordinary);
+      }
+    },
+  );
+  it("rebases fallback overrides onto an explicit workspace root (#791)", async () => {
+    const root = await fixture({
+      ".prettierrc": JSON.stringify({
+        proseWrap: "always",
+        overrides: [{ files: "sub/*.md", options: { printWidth: 31 } }],
+      }),
+      ".editorconfig": "root=true\n[*]\nindent_size=3\n[sub/*.md]\nindent_size=5\n",
+      "sub/keep.md": "text\n",
+      "sub/deep/keep.md": "text\n",
+    });
+    const child = path.join(root, "sub");
+    for (const file of ["keep.md", "deep/keep.md"]) {
+      const reference = await prettierResolve(path.join(child, file), { editorconfig: true });
+      for (const [cwd, argument, document] of [
+        [root, "sub", `sub/${file}`],
+        [child, ".", file],
+      ] as const) {
+        const result = run(cwd, ["config", "explain", document, "--root", argument]);
+        expect(result.status, result.stderr).toBe(0);
+        const rules = parseExplanation(result.stdout).effective.rules;
+        expect(rules["style/wrap"]).toEqual(["warn", { width: reference?.printWidth ?? 80 }]);
+        expect(rules["style/list-indent"]).toEqual([
+          "warn",
+          expect.objectContaining({ nestedIndent: reference?.tabWidth }),
+        ]);
+      }
+    }
+  });
+
+  it("does not discover .prettierrc.jsonc, which Prettier ignores (#793)", async () => {
+    const root = await fixture({
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":31}',
+      "a.md": messy,
+    });
+    expect(await prettierResolve(path.join(root, "a.md"))).toBeNull();
+    const fallback = explained(root);
+    expect(fallback.effective.rules).toEqual(defaults(root));
+    const converted = run(root, ["config", "convert", "--write"]);
+    expect(converted.status).toBe(2);
+    expect(converted.stdout).toBe("");
+    expect(converted.stderr).toBe("mdrefine: No markdownlint or Prettier configuration found.\n");
+    expect(await exists(path.join(root, "mdrefine.config.jsonc"))).toBe(false);
+  });
+  it("still discovers .prettierrc.json beside the ignored JSONC filename", async () => {
+    const root = await fixture({
+      ".prettierrc.json": '{"proseWrap":"always","printWidth":31}',
+      ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":19}',
+      "a.md": messy,
+    });
+    const reference = await prettierResolve(path.join(root, "a.md"));
+    expect(reference?.printWidth).toBe(31);
+    expect(explained(root).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    expect(converted.stderr).not.toContain(".prettierrc.jsonc");
+  });
+
   it.each([
     "**/*.md\n**/*.markdown\n",
     "*.md\n*.markdown\n",

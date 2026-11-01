@@ -9,6 +9,18 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Apply fallback ignores, file selections and overrides relative to an explicit
+  `--root` workspace, so excluded files stay excluded and scoped settings apply
+  ([#791](https://github.com/viell-dev/slop-markdown-tools/issues/791)).
+
+- Stop discovering `.prettierrc.jsonc` during fallback and configuration
+  conversion, matching Prettier's configuration search
+  ([#793](https://github.com/viell-dev/slop-markdown-tools/issues/793)).
+
 ## 0.6.2 - 2026-11-01
 
 ### Security

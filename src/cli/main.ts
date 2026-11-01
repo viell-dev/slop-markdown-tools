@@ -141,6 +141,7 @@ async function workspace(flags: Flags) {
     path.resolve(flags.root ?? "."),
     flags.config,
     flags.competitorConfig,
+    flags.root,
   );
   // Notices about the run, not findings: --quiet leaves them out, as it leaves out warnings.
   if (loaded.conversion && !flags.quiet)
@@ -157,7 +158,7 @@ async function workspace(flags: Flags) {
         ? { name: `converted from ${converted.join(", ")}` }
         : {}),
   };
-  return { ...loaded, root: path.resolve(flags.root ?? loaded.root), config };
+  return { ...loaded, config };
 }
 /** The configuration of the run, to name in an error that it causes later. */
 let configuration: { config: Config; plugins: Plugin[]; name?: string } | undefined;
