@@ -13,14 +13,19 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Bound nested directive work during markdownlint's initial-heading HTML-flow
+  inspection, reporting an incomplete check without changing the document
+  ([#858](https://github.com/viell-dev/slop-markdown-tools/issues/858)).
 - Report markdownlint heading-spacing requirements above attached comments and
   inside list items, preserving their formatting
   ([#849](https://github.com/viell-dev/slop-markdown-tools/issues/849),
   [#850](https://github.com/viell-dev/slop-markdown-tools/issues/850)).
-- Recognize leading HTML headings, empty input and permitted preambles during
-  markdownlint's initial-heading fallback
+- Match markdownlint's initial-heading fallback for HTML headings and raw HTML
+  flow, empty input and permitted preambles
   ([#848](https://github.com/viell-dev/slop-markdown-tools/issues/848),
-  [#853](https://github.com/viell-dev/slop-markdown-tools/issues/853)).
+  [#853](https://github.com/viell-dev/slop-markdown-tools/issues/853),
+  [#854](https://github.com/viell-dev/slop-markdown-tools/issues/854),
+  [#860](https://github.com/viell-dev/slop-markdown-tools/issues/860)).
 
 ## 0.6.3 - 2026-11-01
 

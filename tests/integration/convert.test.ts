@@ -8,6 +8,54 @@ import { fixture, run } from "../support/cli.js";
 import { parseConfig, parseExplanation, parseReport } from "../support/json.js";
 
 describe("competitor configuration CLI (#669)", () => {
+  it("reports the MD041 directive work limit and permits recovery (#858)", async () => {
+    const source = `<script x=>\n\n${":::a\n".repeat(250)}<h1>\n${":::\n".repeat(250)}\n</script>\n`;
+    const root = await fixture({
+      ".markdownlint.json": JSON.stringify({ default: false, MD041: true }),
+      "note.md": source,
+    });
+    const result = run(root, ["lint", "--json", "note.md"]);
+    expect(result.status, result.stderr).toBe(1);
+    const findings = parseReport(result.stdout).files[0]!.diagnostics;
+    expect(findings).toEqual([
+      expect.objectContaining({
+        rule: "structure/initial-heading",
+      }),
+    ]);
+    expect(findings[0]!.message).toContain("directive work limit");
+    expect(run(root, ["format", "--write", "note.md"]).status).toBe(1);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    await writeFile(
+      path.join(root, ".markdownlint.json"),
+      JSON.stringify({ default: false, MD041: false }),
+    );
+    const recovered = run(root, ["lint", "--json", "note.md"]);
+    expect(recovered.status, recovered.stderr).toBe(0);
+    expect(parseReport(recovered.stdout).files[0]!.diagnostics).toEqual([]);
+  });
+  it("keeps HTML-flow MD041 parsing in fallback only (#854)", async () => {
+    for (const source of [
+      "<h1 x=>Title</h1>\n",
+      "<h1 x=>![<h1>](image.png)\n",
+      '<div\n  class="a"\n>\n<h1>Title</h1>\n</div>\n',
+    ]) {
+      const root = await fixture({
+        ".markdownlint.json": JSON.stringify({ default: false, MD041: true }),
+        "note.md": source,
+      });
+      const fallback = run(root, ["lint", "--json", "note.md"]);
+      expect(fallback.status, fallback.stderr).toBe(0);
+      expect(parseReport(fallback.stdout).files[0]!.diagnostics).toEqual([]);
+      expect(run(root, ["format", "--write", "note.md"]).status).toBe(0);
+      expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+      expect(run(root, ["config", "convert", "--write"]).status).toBe(0);
+      const native = run(root, ["lint", "--json", "note.md"]);
+      expect(native.status).toBe(1);
+      expect(
+        parseReport(native.stdout).files[0]!.diagnostics.map((finding) => finding.rule),
+      ).toEqual(["structure/initial-heading"]);
+    }
+  });
   it("reports protected MD022 boundaries without changing native policy (#849, #850)", async () => {
     for (const source of ["text\n<!-- a -->\n# Title\n", "- item\n  # Title\n  text\n"]) {
       const root = await fixture({

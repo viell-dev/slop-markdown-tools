@@ -58,8 +58,10 @@ declare module "micromark-util-types" {
  *   after it. A dollar that cannot end it is part of it, which is how Reading
  *   view has it, and so is an escaped one. Doubled dollars delimit any text up
  *   to the next doubled dollars.
+ * - `markdownlint`: stock math syntax for internal HTML-flow inspection, with
+ *   no renderer's word/space conditions and closing runs of exactly equal size.
  */
-export type MathConditions = "forge" | "github" | "obsidian";
+export type MathConditions = "forge" | "github" | "obsidian" | "markdownlint";
 
 const space = 32;
 const dollar = 36;
@@ -68,6 +70,7 @@ const underscore = 95;
 
 function mathText(conditions: MathConditions): Construct {
   const obsidian = conditions === "obsidian";
+  const stock = conditions === "markdownlint";
   // In Obsidian, a single dollar that opened nothing was read to the end of its
   // text, and every later dollar was refused as its close. A dollar between the
   // two would be refused the same closes, so it opens nothing either. Without
@@ -84,7 +87,7 @@ function mathText(conditions: MathConditions): Construct {
     )
       return false;
     // Obsidian alone starts math right after a letter or a digit.
-    return obsidian || !asciiAlphanumeric(code);
+    return stock || obsidian || !asciiAlphanumeric(code);
   };
   const tokenize: Tokenizer = function (effects, ok, nok) {
     const opened = this.now().offset;
@@ -125,6 +128,7 @@ function mathText(conditions: MathConditions): Construct {
       if (code === dollar) {
         token = effects.enter("mathTextSequence");
         size = 0;
+        if (stock) return sequenceCloseSame(code);
         if (!obsidian) return sequenceCloseNext(code);
         return sizeOpen === 1 ? sequenceCloseFitting(code) : sequenceCloseSame(code);
       }
@@ -155,7 +159,7 @@ function mathText(conditions: MathConditions): Construct {
       before = code;
       // Forgejo, Gitea, and Obsidian keep an escaped dollar in the formula. For
       // GitHub an escaped dollar is a dollar like any other, and ends it.
-      return conditions !== "github" && code === backslash ? escaped : data;
+      return !stock && conditions !== "github" && code === backslash ? escaped : data;
     };
     const escaped: State = (code) => {
       // A backslash takes a dollar or another backslash with it; before anything
@@ -374,7 +378,7 @@ const tokenizeMathFenced: Tokenizer = function (effects, ok, nok) {
   };
   return start;
 };
-/** The micromark syntax for dollar math, with the conditions of one renderer. */
+/** Dollar math with a renderer's conditions or markdownlint's stock reading. */
 export function math(conditions: MathConditions): Extension {
   const mathFlow: Construct = {
     tokenize(effects, ok, nok) {

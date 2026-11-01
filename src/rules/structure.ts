@@ -1,6 +1,7 @@
 import type { Emphasis, Heading, Nodes, PhrasingContent, Root, RootContent, Strong } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
+import { firstHtmlInFlow } from "../syntax/html-flow.js";
 import { range, reread, startsWithMarker, textContent } from "../syntax/parse.js";
 import { lineEnd, lineStart } from "../syntax/source.js";
 import { vitepressTokens } from "../syntax/vitepress/projection.js";
@@ -23,11 +24,17 @@ function content(nodes: RootContent[]): RootContent[] {
   });
 }
 
-/** MD041 recognizes a leading HTML heading tag as well as Markdown headings. */
-function initialHeadingLevel(node?: RootContent): number | undefined {
+/** MD041 recognizes Markdown headings or the first inline HTML tag in a flow. */
+function initialHeadingLevel(node?: RootContent): number | "limited" | undefined {
   if (node?.type === "heading") return node.depth;
   if (!compatibilityRun() || node?.type !== "html") return undefined;
-  const name = htmlTagName(node.value.trimStart());
+  const source = node.value.trimStart();
+  let name = htmlTagName(source.slice(0, lineEnd(source, 0)));
+  if (name === undefined) {
+    const reading = firstHtmlInFlow(node.value);
+    if (reading.limited) return "limited";
+    name = htmlTagName(reading.html ?? "");
+  }
   return name && /^h[1-6]$/.test(name) ? Number(name[1]) : undefined;
 }
 /**
@@ -373,24 +380,27 @@ export const structureRules: Record<string, Rule> = {
         return [];
       const level = (options.level as number | undefined) ?? 1;
       const blocks = content(document.tree.children);
-      const index = options.allowPreamble
-        ? blocks.findIndex((node) => initialHeadingLevel(node) !== undefined)
-        : 0;
-      let first = blocks[index];
-      // MD041 reparses malformed HTML flow. Retain the previous Markdown-only
-      // reading after an unknown prefix rather than skip an earlier tag (#854).
-      const uncertainPreamble =
-        compatibilityRun() &&
-        options.allowPreamble &&
-        blocks
-          .slice(0, index < 0 ? blocks.length : index)
-          .some(
-            (node) => node.type === "html" && htmlTagName(node.value.trimStart()) === undefined,
-          );
-      if (uncertainPreamble) first = blocks.find((node) => node.type === "heading");
+      let first: RootContent | undefined;
+      let firstLevel: number | undefined;
+      for (const block of blocks) {
+        const depth = initialHeadingLevel(block);
+        if (depth === "limited")
+          return [
+            {
+              start: range(block)[0],
+              message:
+                "MD041 HTML-flow inspection reached its directive work limit. Simplify nested directives or disable MD041 in markdownlint configuration.",
+            },
+          ];
+        if (!options.allowPreamble || depth !== undefined) {
+          first = block;
+          firstLevel = depth;
+          break;
+        }
+      }
       // MD041 leaves an empty scan (including permitted preamble) unreported.
-      if (compatibilityRun() && !first && !uncertainPreamble) return [];
-      return initialHeadingLevel(first) === level
+      if (compatibilityRun() && !first) return [];
+      return firstLevel === level
         ? []
         : [
             {
