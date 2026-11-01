@@ -60,8 +60,8 @@ During markdownlint fallback, MD041 also recognizes HTML headings. In a raw HTML
 block, a malformed opener can leave a later heading tag as the first tag that
 counts. Tags inside code spans, math or directive attributes do not count. Empty
 or comment-only documents pass, as does a permitted preamble without a heading.
-The native rule keeps its Markdown-only heading policy and reports a document
-with no heading.
+Wrapped multiline tags use the same inline reading. The native rule keeps its
+Markdown-only heading policy and reports a document with no heading.
 
 Unusually deep block directives in that compatibility reading can reach a work
 limit. MD041 then reports that its HTML-flow inspection could not complete,

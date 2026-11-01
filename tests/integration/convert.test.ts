@@ -34,7 +34,11 @@ describe("competitor configuration CLI (#669)", () => {
     expect(parseReport(recovered.stdout).files[0]!.diagnostics).toEqual([]);
   });
   it("keeps HTML-flow MD041 parsing in fallback only (#854)", async () => {
-    for (const source of ["<h1 x=>Title</h1>\n", "<h1 x=>![<h1>](image.png)\n"]) {
+    for (const source of [
+      "<h1 x=>Title</h1>\n",
+      "<h1 x=>![<h1>](image.png)\n",
+      '<div\n  class="a"\n>\n<h1>Title</h1>\n</div>\n',
+    ]) {
       const root = await fixture({
         ".markdownlint.json": JSON.stringify({ default: false, MD041: true }),
         "note.md": source,

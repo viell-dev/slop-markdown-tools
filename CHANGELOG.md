@@ -24,7 +24,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   flow, empty input and permitted preambles
   ([#848](https://github.com/viell-dev/slop-markdown-tools/issues/848),
   [#853](https://github.com/viell-dev/slop-markdown-tools/issues/853),
-  [#854](https://github.com/viell-dev/slop-markdown-tools/issues/854)).
+  [#854](https://github.com/viell-dev/slop-markdown-tools/issues/854),
+  [#860](https://github.com/viell-dev/slop-markdown-tools/issues/860)).
 
 ## 0.6.3 - 2026-11-01
 

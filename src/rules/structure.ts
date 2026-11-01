@@ -28,7 +28,8 @@ function content(nodes: RootContent[]): RootContent[] {
 function initialHeadingLevel(node?: RootContent): number | "limited" | undefined {
   if (node?.type === "heading") return node.depth;
   if (!compatibilityRun() || node?.type !== "html") return undefined;
-  let name = htmlTagName(node.value.trimStart());
+  const source = node.value.trimStart();
+  let name = htmlTagName(source.slice(0, lineEnd(source, 0)));
   if (name === undefined) {
     const reading = firstHtmlInFlow(node.value);
     if (reading.limited) return "limited";

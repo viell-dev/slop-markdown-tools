@@ -67,25 +67,28 @@ markdownlint suppression and comment-aware blank-line counts. Native spacing
 keeps list tightness and comment attachment; compatibility reports the source
 requirement without making an unsafe edit.
 
-MD041 recognizes a complete leading HTML tag without reparsing. Other HTML flow
-uses the bundled parser with markdownlint's GFM, stock math and block-directive
-syntax, with HTML flow and indented code disabled. Inline directives stay off.
-The compiler captures the first inline HTML token before image labels collapse
-their children into alt text; a finished-tree walk would lose those tags. Code,
-math and directive attributes keep their token boundaries. This reading only
-selects a compatibility diagnostic; it does not change native syntax or
-formatting. The original flow's position locates the report, and each scanned
-flow is read once.
+MD041 recognizes a complete single-line leading HTML tag without reparsing.
+Other HTML flow uses the bundled parser with markdownlint's GFM, stock math and
+block-directive syntax, with HTML flow and indented code disabled. Inline
+directives stay off. The compiler captures the first inline HTML token before
+image labels collapse their children into alt text; a finished-tree walk would
+lose those tags. Code, math and directive attributes keep their token
+boundaries. This reading only selects a compatibility diagnostic; it does not
+change native syntax or formatting. The original flow's position locates the
+report, and each scanned flow is read once.
 
-The complete-tag fast path rejects blank lines within the tag, as inline HTML
-cannot span them; blank lines elsewhere in the flow do not disable that path.
-Nested directive containers can repeatedly tokenize their bodies. Each
-compatibility reading wraps its own flow constructs and counts their consumed
-codes, including rolled-back reads, with a budget of the greater of 4096 or 16
-times the source's UTF-16 length. Exhaustion aborts that reading with a
-dedicated error caught only by identity. It becomes an ordinary MD041 diagnostic
-with no edit, retaining markdownlint suppression and reporting that inspection
-could not complete. Other exceptions still surface as engine failures.
+The fast path reads only the first physical line. Multiline raw tags can cross
+paragraph interruptions and differ from the first inline token; they use the
+bounded reader. A complete multiline tag returned as an actual inline token
+still counts. Blank lines elsewhere in a single-line opener's flow do not
+disable its fast path. Nested directive containers can repeatedly tokenize their
+bodies. Each compatibility reading wraps its own flow constructs and counts
+their consumed codes, including rolled-back reads, with a budget of the greater
+of 4096 or 16 times the source's UTF-16 length. Exhaustion aborts that reading
+with a dedicated error caught only by identity. It becomes an ordinary MD041
+diagnostic with no edit, retaining markdownlint suppression and reporting that
+inspection could not complete. Other exceptions still surface as engine
+failures.
 
 This bounds the newly exposed directive work
 ([#858](https://github.com/viell-dev/slop-markdown-tools/issues/858)), rather
