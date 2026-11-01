@@ -1,7 +1,7 @@
 import type { Extension as MdastExtension } from "mdast-util-from-markdown";
 import type { Code, Construct, Extension, State } from "micromark-util-types";
 import { describe, expect, it } from "vitest";
-import { format, lint } from "../../src/index.js";
+import { builtInRules, format, lint, parse, semanticFingerprint } from "../../src/index.js";
 import type { Config, Plugin } from "../../src/index.js";
 
 // Rules that read changed text again read it with the document's plugins (#752).
@@ -66,6 +66,81 @@ const only = (rule: string, options?: Record<string, unknown>): Config => ({
 });
 
 describe("rules that read changed text again use the document's plugins (#752)", () => {
+  it.each(["\n", "\r\n", "\r"])("keeps plugin block markers with %j line endings (#777)", (eol) => {
+    const original = "a ".repeat(39) + "@@x b";
+    const safe = "ordinary ".repeat(16).trimEnd();
+    for (const dialect of [
+      "commonmark",
+      "github",
+      "forgejo",
+      "gitea",
+      "obsidian",
+      "vitepress",
+    ] as const) {
+      for (const prefix of ["", "> ", "- ", "- > "]) {
+        // Container prefixes consume width; keep @@x at the actual wrap edge.
+        const paragraph = "a ".repeat(39 - prefix.length / 2) + "@@x b";
+        const source = `${prefix}${paragraph}${eol}${eol}${safe}${eol}`;
+        const config: Config = { extends: [], dialect, rules: { "style/wrap": "warn" } };
+        const options = {
+          plugins: [atLines],
+          config,
+          workspace: { resolve: () => ({ status: "external" as const }), strictLineBreaks: true },
+        };
+        const result = format(source, options);
+        expect(result.diagnostics, dialect + prefix).toEqual([]);
+        expect(result.output.startsWith(prefix + paragraph + eol), dialect + prefix).toBe(true);
+        expect(result.output).not.toBe(source);
+        expect(semanticFingerprint(parse(result.output, dialect, "document.md", [atLines]))).toBe(
+          semanticFingerprint(parse(source, dialect, "document.md", [atLines])),
+        );
+        expect(format(result.output, options).output).toBe(result.output);
+      }
+    }
+    // Here the four-column prefix moves the break before the last "a", so
+    // @@x remains inside the line. This is safe and must still wrap.
+    const safeContainer = `- > ${original}${eol}`;
+    const safeResult = format(safeContainer, { plugins: [atLines], config: only("style/wrap") });
+    expect(safeResult.diagnostics).toEqual([]);
+    expect(safeResult.output).toContain(`${eol}  > a @@x b`);
+    const source = original + eol;
+    const config = only("style/wrap", { reportUnreflowed: true });
+    expect(lint(source, { plugins: [atLines], config })).toEqual([
+      expect.objectContaining({
+        rule: "style/wrap",
+        message: "Paragraph not reflowed: syntax plugin block structure (width 80 columns).",
+      }),
+    ]);
+    expect(format(source, { config: only("style/wrap") }).output).toContain(`${eol}@@x b`);
+  });
+  it("rereads only changed candidates when syntax plugins are present (#777)", () => {
+    let reads = 0;
+    const plugin: Plugin = {
+      name: "count-reads",
+      syntax: {
+        micromark: {},
+        mdast: {
+          transforms: [
+            (tree) => {
+              reads++;
+              return tree;
+            },
+          ],
+        },
+      },
+    };
+    const wide = "word ".repeat(30).trimEnd();
+    const document = parse(`${wide}\n\nShort.\n\n${wide}\n`, "commonmark", "document.md", [plugin]);
+    reads = 0;
+    const findings = builtInRules["style/wrap"]!.check({ document, options: { width: 40 } });
+    expect(findings).toHaveLength(2);
+    expect(reads).toBe(2);
+    const normal = parse(wide, "commonmark");
+    const rulesOnly = parse(wide, "commonmark", "document.md", [{ name: "rules-only", rules: {} }]);
+    expect(
+      builtInRules["style/wrap"]!.check({ document: rulesOnly, options: { width: 40 } }),
+    ).toEqual(builtInRules["style/wrap"]!.check({ document: normal, options: { width: 40 } }));
+  });
   it("style/wrap breaks after a definition-like start that the plugin reads as text", () => {
     const source = "[a]: b " + "x".repeat(80) + "\n";
     const config = only("style/wrap");

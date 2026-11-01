@@ -235,6 +235,10 @@ inline events that a custom tokenizer or resolver can observe; the other parser
 corrections still apply. Rule-only plugins keep the optimized inline resolvers.
 The syntax extension types and their order remain the same.
 
+Wrapping keeps a paragraph as written when the proposed lines would open a
+different block under its syntax plugins. Safe paragraphs still wrap;
+`style/wrap`'s `reportUnreflowed` option can report the retained paragraph.
+
 This is not a remark plugin adapter. Existing micromark extensions can be
 reused, but a remark plugin that changes the tree must be rewritten as a rule
 that proposes edits. A plugin cannot replace link resolution; a library host can
