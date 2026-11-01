@@ -147,8 +147,8 @@ function obsidianTabBreak(paragraph: Paragraph, source: string): Range | undefin
 const obsidianOpaque = new Set(["inlineCode", "inlineMath", "wikiLink", "obsidianHighlight"]);
 
 /**
- * Whether text that the parser read as a paragraph or a heading's text has a
- * table delimiter row as its second line. GitHub reads a table there, and so
+ * Whether non-table source text has a table delimiter row as its second line.
+ * GitHub reads a table there, and so
  * does the parser, except directly below a table that ends in a list item or
  * block quote, where it reads the lines as text (issue #283). Joining the lines
  * or adding a blank line above them would change what GitHub or the parser

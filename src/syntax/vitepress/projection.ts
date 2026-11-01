@@ -15,6 +15,11 @@ interface Projection {
 const readings = new WeakMap<Root, Projection>();
 const codeTexts = new WeakMap<InlineCode, string>();
 const hiddenLists = new WeakSet<RootContent>();
+const componentBlocks = new WeakSet<RootContent>();
+/** Whether the projection made this block opaque around a Vue component. */
+export function isComponentBlock(node: RootContent): boolean {
+  return componentBlocks.has(node);
+}
 /**
  * Whether `node` is a block left opaque for a component that holds a list at
  * either end, which another marker on a list beside it would join (#769).
@@ -267,6 +272,7 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
       value: source.slice(start.offset, end.offset),
       position: { start, end },
     };
+    componentBlocks.add(replacement);
     children.push(replacement);
     if (original[part.first]!.type === "list" || original[part.last]!.type === "list")
       hiddenLists.add(replacement);

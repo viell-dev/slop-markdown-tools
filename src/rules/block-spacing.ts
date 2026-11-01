@@ -9,7 +9,7 @@ import { tagLine } from "../syntax/github-protections.js";
 import { rendererProtections } from "../syntax/renderer-protections.js";
 import { continuesListBlock } from "../syntax/list-protections.js";
 import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
-import { vitepressTokens } from "../syntax/vitepress/projection.js";
+import { isComponentBlock, vitepressTokens } from "../syntax/vitepress/projection.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { codeFence } from "../syntax/fences.js";
 import { countBelow } from "../syntax/source.js";
@@ -424,9 +424,10 @@ function together(
   // reads the next table as a paragraph, or as the text of a heading
   // underlined below it, while GitHub reads a table, and a blank line would
   // make it a table there as well.
+  // VitePress can keep that text opaque with a neighboring component (#800).
   if (
     document.dialect !== "commonmark" &&
-    (after.type === "paragraph" || after.type === "heading") &&
+    (after.type === "paragraph" || after.type === "heading" || isComponentBlock(after)) &&
     misreadTable(source.slice(afterStart, afterEnd))
   )
     return true;
