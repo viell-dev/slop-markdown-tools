@@ -184,3 +184,8 @@ break would disappear in Vue's output; see
 [preservation](../../vitepress.md#preservation). `reportUnreflowed` reports such
 a paragraph with that reason. Braces and `^[` in a code span are code, so a
 paragraph with nothing else of the kind wraps.
+
+A multiline code span that retains its continuation indentation also keeps its
+paragraph as written. Ordinary multiline spans whose joined code text agrees
+with VitePress's reading can still join and wrap; `reportUnreflowed` identifies
+the retained continuation whitespace.

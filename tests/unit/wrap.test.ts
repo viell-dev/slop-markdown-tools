@@ -1425,6 +1425,45 @@ describe("VitePress syntax that keeps a paragraph (#755)", () => {
 });
 
 describe("multiline code spans", () => {
+  it.each(["\n", "\r\n", "\r"])(
+    "keeps VitePress continuation code whitespace with %j (#782)",
+    (eol) => {
+      const config: Config = {
+        extends: [],
+        dialect: "vitepress",
+        rules: { "style/wrap": ["warn", { width: 40 }] },
+      };
+      for (const text of [
+        "Before `one\n   two` after.\n",
+        "Before `one\n   ` after.\n",
+        "Before ` one\n   two ` after.\n",
+        "Before ` \n   ` after.\n",
+        "- Before `one\n    two` after.\n",
+      ]) {
+        const source = text.replaceAll("\n", eol);
+        expect(verify(source, config).output).toBe(source);
+      }
+      for (const [source, expected] of [
+        ["Before `one\ntwo` after.\n", "Before `one two` after.\n"],
+        ["- Before `one\n  two` after.\n", "- Before `one two` after.\n"],
+        ["> Before `one\n> two` after.\n", "> Before `one two` after.\n"],
+      ])
+        expect(verify(source!.replaceAll("\n", eol), config).output).toBe(
+          expected!.replaceAll("\n", eol),
+        );
+      const wide = `${"Words ".repeat(8)}\`one${eol}   two\` after.${eol}`;
+      const reported = verify(wide, {
+        ...config,
+        rules: { "style/wrap": ["warn", { width: 40, reportUnreflowed: true }] },
+      });
+      expect(reported.output).toBe(wide);
+      expect(
+        reported.diagnostics.some((finding) =>
+          finding.message.includes("VitePress continuation whitespace"),
+        ),
+      ).toBe(true);
+    },
+  );
   const config: Config = {
     extends: [],
     rules: { "style/inline-code": "warn", "style/wrap": ["warn", { width: 40 }] },

@@ -1,12 +1,13 @@
 import type { Document, RuleContext } from "../core/types.js";
 import { walk } from "../syntax/walk.js";
 import stringWidth from "string-width";
-import type { Paragraph, Parents } from "mdast";
+import type { InlineCode, Paragraph, Parents } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
-import { vitepressProtection } from "../syntax/vitepress/projection.js";
+import { vitepressCodeText, vitepressProtection } from "../syntax/vitepress/projection.js";
 import {
+  codeSpanContent,
   frontMatterReading,
   labelEnd,
   lazyIndentation,
@@ -344,6 +345,20 @@ interface InlineAtom {
   joining: Joining;
 }
 
+/** Whether joining a code span's lines preserves its known renderer reading. */
+function codeJoining(node: InlineCode): Joining {
+  // Lazy continuation indentation stays in the span (#339).
+  if (lazyIndentation(node)) return { reason: "code span continuing on an indented lazy line" };
+  const vitepress = vitepressCodeText(node);
+  if (vitepress !== undefined) {
+    const content = codeSpanContent(node);
+    const joined =
+      /^ [^]* $/.test(content) && /[^ ]/.test(content) ? content.slice(1, -1) : content;
+    if (vitepress !== joined) return { reason: "code span with VitePress continuation whitespace" };
+  }
+  return "code";
+}
+
 /**
  * Inline containers whose text reflow wraps like the paragraph's own: a line
  * ending in them renders as a space, like one between words. Their delimiters,
@@ -417,11 +432,7 @@ function inlineAtoms(
         atoms.push({
           from: a,
           to: b,
-          // The spaces that start a lazy continuation line stay in the span,
-          // which joining would drop, as after `>* ` with no space (issue #339).
-          joining: lazyIndentation(child)
-            ? { reason: "code span continuing on an indented lazy line" }
-            : "code",
+          joining: codeJoining(child),
         });
       else if ((child.type === "image" || child.type === "imageReference") && labelEnd(child)) {
         const close = labelEnd(child)!;
