@@ -8,6 +8,32 @@ import { fixture, run } from "../support/cli.js";
 import { parseConfig, parseExplanation, parseReport } from "../support/json.js";
 
 describe("competitor configuration CLI (#669)", () => {
+  it("keeps markdownlint comment exemptions in fallback only (#801)", async () => {
+    const source =
+      "<!-- markdownlint-disable MD019 -->\n#  Title\n<!-- markdownlint-enable MD019 -->\n";
+    const root = await fixture({
+      ".markdownlint.json": JSON.stringify({
+        default: false,
+        MD019: true,
+        MD022: true,
+        MD041: true,
+      }),
+      "note.md": source,
+    });
+    const fallback = run(root, ["lint", "--json", "note.md"]);
+    expect(fallback.status, fallback.stderr).toBe(0);
+    expect(parseReport(fallback.stdout).files[0]!.diagnostics).toEqual([]);
+    const formatted = run(root, ["format", "--write", "note.md"]);
+    expect(formatted.status, formatted.stderr).toBe(0);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+    const converted = run(root, ["config", "convert", "--write"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    const native = run(root, ["lint", "--json", "note.md"]);
+    expect(native.status).toBe(1);
+    expect(parseReport(native.stdout).files[0]!.diagnostics.map((finding) => finding.rule)).toEqual(
+      expect.arrayContaining(["structure/initial-heading", "style/block-spacing"]),
+    );
+  });
   it("combines cli2 inheritance and globs, and preserves ignore selection", async () => {
     const root = await fixture({
       ".markdownlint-cli2.jsonc": JSON.stringify({

@@ -13,6 +13,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Avoid false initial-heading and heading-spacing findings around HTML comments
+  during markdownlint fallback
+  ([#801](https://github.com/viell-dev/slop-markdown-tools/issues/801)).
+
 - Keep lists on their footnote label's line stable with `startIndented: true`
   ([#802](https://github.com/viell-dev/slop-markdown-tools/issues/802)).
 
