@@ -13,8 +13,8 @@ user page links a note where a reader may want the detail.
 - [Configuration conversion notes](conversion.md): the glob subsets that
   conversion accepts, and how markdownlint's and Prettier's comments apply per
   region during the fallback.
-- [VitePress notes](vitepress.md): retained component boundaries and limits of
-  include expansion.
+- [VitePress notes](vitepress.md): retained component and code boundaries, and
+  limits of include expansion.
 - [Benchmark notes](benchmarks.md): the parser regression and corrections behind
   the benchmark page's limits.
 

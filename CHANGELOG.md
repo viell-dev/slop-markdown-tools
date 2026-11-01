@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Avoid refused wrapping of VitePress code spans that retain continuation
+  indentation, while keeping ordinary multiline code joinable
+  ([#782](https://github.com/viell-dev/slop-markdown-tools/issues/782)).
 - Avoid refused spacing proposals before table text grouped with a VitePress
   component, retaining safe table formatting nearby
   ([#800](https://github.com/viell-dev/slop-markdown-tools/issues/800)).

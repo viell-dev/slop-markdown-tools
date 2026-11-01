@@ -108,6 +108,28 @@ it("reads the blocks that style/block-spacing keeps together as VitePress does (
   }
 });
 
+it("keeps code-span continuation indentation while formatting other paragraphs (#782)", async () => {
+  const render = await renderer({});
+  const original =
+    "grove ~*_~b_~b *b.x* _~ `a _ quarry\n   `yonder  cedar` *grove iris* __anchor__ `juniper  birch` fern kettle `delta pebble`\n";
+  for (const eol of ["\n", "\r\n", "\r"]) {
+    const source = (original + "\nLater *ordinary* words with `one\ntwo` here.\n").replaceAll(
+      "\n",
+      eol,
+    );
+    const config: Config = { extends: ["recommended", "vitepress"], dialect: "vitepress" };
+    const result = format(source, { config, path: "page.md" });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.output.startsWith(original.replaceAll("\n", eol))).toBe(true);
+    expect(result.output).toContain("Later _ordinary_ words with `one two` here.");
+    expect(await render(result.output)).toBe(await render(source));
+    expect(semanticFingerprint(parse(result.output, "vitepress"))).toBe(
+      semanticFingerprint(parse(source, "vitepress")),
+    );
+    expect(format(result.output, { config }).output).toBe(result.output);
+  }
+});
+
 it("keeps table text grouped with a component without refused spacing (#800)", async () => {
   const render = await renderer({});
   const original = "- item\n  |a|b|\n  |-|-|\n|a|b|\n|-|-|\n<MyComponent />\n";
