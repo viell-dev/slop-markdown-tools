@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Wrap VitePress body entities without false unsafe-edit refusals, preserving
+  heading anchors and context-sensitive entity distinctions
+  ([#863](https://github.com/viell-dev/slop-markdown-tools/issues/863)).
 - Avoid refused wrapping of VitePress code spans that retain continuation
   indentation, while keeping ordinary multiline code joinable
   ([#782](https://github.com/viell-dev/slop-markdown-tools/issues/782)).

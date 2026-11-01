@@ -130,6 +130,79 @@ it("keeps code-span continuation indentation while formatting other paragraphs (
   }
 });
 
+it("wraps body entities with equal actual VitePress/Vue output (#863)", async () => {
+  const render = await renderer({});
+  const source =
+    "- saddle needle __ember__ *zephyr amber* candle anchor basket \n" +
+    "  * engine fern walnut [kettle signal](page.md) lantern ribbon\n" +
+    "    __lantern__ &copy;\n";
+  const config: Config = { extends: ["recommended", "vitepress"], dialect: "vitepress" };
+  const result = format(source, { config });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.output).toContain("**lantern**\n    &copy;");
+  expect(await render(result.output)).toBe(await render(source));
+  expect(format(result.output, { config }).output).toBe(result.output);
+  for (const entity of [
+    "&copy;",
+    "&amp;",
+    "\\&",
+    "&#169;",
+    "&#xA9;",
+    "&#xD800;",
+    "&#0;",
+    "&NotEqualTilde;",
+  ]) {
+    const before = `**x** ${entity}\nTail\n`;
+    const after = `**x**\n${entity}\nTail\n`;
+    expect(await render(after), entity).toBe(await render(before));
+    expect(semanticFingerprint(parse(after, "vitepress")), entity).toBe(
+      semanticFingerprint(parse(before, "vitepress")),
+    );
+  }
+});
+
+it("still rejects entity changes with unequal actual VitePress/Vue output (#863)", async () => {
+  const render = await renderer({});
+  const pairs = [
+    ...["&#x80;", "&#xFFFF;", "&#xFDD0;", "&#1;"].map((entity) => [
+      `**x** ${entity}\nTail\n`,
+      `**x**\n${entity}\nTail\n`,
+    ]),
+    ["**x** &copy;\nTail\n====\n", "**x**\n&copy;\nTail\n====\n"],
+    ["![x &copy; tail](a.png)\n", "![x\n&copy; tail](a.png)\n"],
+    ["&#123;&#123; 1 + 2 &#125;&#125;\n", "{{ 1 + 2 }}\n"],
+    ["`a`&NewLine;`b`\n", "`a` `b`\n"],
+    ["Before &amp;copy; after.\n", "Before &copy; after.\n"],
+    ["Before \\&copy; after.\n", "Before &copy; after.\n"],
+  ];
+  for (const [before, after] of pairs) {
+    expect(await render(after!), before).not.toBe(await render(before!));
+    expect(semanticFingerprint(parse(after!, "vitepress")), before).not.toBe(
+      semanticFingerprint(parse(before!, "vitepress")),
+    );
+    const plugin: Plugin = {
+      name: "unsafe",
+      rules: {
+        replace: {
+          description: "Propose a rendered entity change",
+          kind: "style",
+          check: () => [
+            { start: 0, message: "Replace", edit: { start: 0, end: before!.length, text: after! } },
+          ],
+        },
+      },
+    };
+    const result = format(before!, {
+      plugins: [plugin],
+      config: { extends: [], dialect: "vitepress", rules: { "unsafe/replace": "warn" } },
+    });
+    expect(result.output, before).toBe(before);
+    expect(result.diagnostics, before).toContainEqual(
+      expect.objectContaining({ rule: "engine/unsafe-format" }),
+    );
+  }
+});
+
 it("keeps table text grouped with a component without refused spacing (#800)", async () => {
   const render = await renderer({});
   const original = "- item\n  |a|b|\n  |-|-|\n|a|b|\n|-|-|\n<MyComponent />\n";

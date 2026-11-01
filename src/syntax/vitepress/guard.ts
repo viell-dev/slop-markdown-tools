@@ -1,5 +1,6 @@
 import type { Code } from "mdast";
 import type Token from "markdown-it/lib/token.mjs";
+import { decodeHTML } from "entities/decode";
 import type { Document, Workspace } from "../../core/types.js";
 import { walk } from "../walk.js";
 import { frontmatterEnd } from "./reader.js";
@@ -8,6 +9,17 @@ import { inlineElement, onlyWhitespace } from "./whitespace.js";
 import { vitepressPage } from "./paths.js";
 
 const newline = (text: string) => text.replace(/\r\n|\r/g, "\n");
+
+/** Use upstream's joined spelling only when Vue reads the same body text. */
+function bodyText(token: Token): string {
+  if (token.info === "entity") {
+    // MarkdownIt rejects some numeric references that Vue's HTML reader keeps.
+    // Whitespace affects Vue's element gaps, and braces can form expressions.
+    if (!/[ \t\r\n\f{}]/.test(token.content) && decodeHTML(token.markup) === token.content)
+      return token.markup;
+  } else if (token.info === "escape" && token.content === "&") return "&amp;";
+  return token.content;
+}
 
 /** VitePress's non-mdast reading, including Vue's newline-only element gaps. */
 export function vitepressSemantics(
@@ -32,7 +44,7 @@ export function vitepressSemantics(
         }
       : value;
   };
-  const tokenValue = (token: Token): unknown => {
+  const tokenValue = (token: Token, bodyEntities = false): unknown => {
     const attributes = token.attrs?.map(([name, value]) => [
       name,
       name === "src" ||
@@ -45,7 +57,7 @@ export function vitepressSemantics(
           ? url(value)
           : value,
     ]);
-    let content = newline(token.content);
+    let content = newline(bodyEntities && token.type === "text" ? bodyText(token) : token.content);
     if (token.type === "text") return { type: "text", content: content.replace(/[ \t\n]+/g, " ") };
     if (token.type === "inline") content = "";
     if (token.type === "fence" || token.type === "code_block") {
@@ -64,11 +76,21 @@ export function vitepressSemantics(
       token.type.startsWith("container_")
         ? { info: token.info.trim() }
         : {}),
-      ...(token.children ? { children: inline(token.children) } : {}),
+      ...(token.children
+        ? {
+            children: inline(
+              token.children,
+              bodyEntities &&
+                token.type === "inline" &&
+                !token.content.includes("{{") &&
+                !token.children.some((child) => child.type === "html_inline"),
+            ),
+          }
+        : {}),
       ...(token.type === "footnote_ref" ? { meta: token.meta as unknown } : {}),
     };
   };
-  function inline(tokens: Token[]): unknown[] {
+  function inline(tokens: Token[], bodyEntities: boolean): unknown[] {
     const result: unknown[] = [];
     let text: string[] = [];
     let endsWithSpace = false;
@@ -112,10 +134,17 @@ export function vitepressSemantics(
           inlineElement(after, false)
         ))
           add({ type: "text", content: " " });
-      } else add(tokenValue(token));
+      } else add(tokenValue(token, bodyEntities));
     }
     flush();
     return result;
+  }
+  const tokens: unknown[] = [];
+  let heading = false;
+  for (const token of vitepressTokens(document)) {
+    if (token.type === "heading_open") heading = true;
+    tokens.push(tokenValue(token, !heading && token.type === "inline"));
+    if (token.type === "heading_close") heading = false;
   }
   const end = frontmatterEnd(document.source);
   return {
@@ -124,6 +153,6 @@ export function vitepressSemantics(
         ? approvedFrontMatter
         : document.source.slice(0, end),
     ),
-    tokens: vitepressTokens(document).map(tokenValue),
+    tokens,
   };
 }
