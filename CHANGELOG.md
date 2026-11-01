@@ -41,6 +41,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Update the parser bundler and check its module-start comments against the
+  reviewed module graph.
+
 - Update the task runner and typed lint tooling, and refresh the pnpm
   installation check.
 

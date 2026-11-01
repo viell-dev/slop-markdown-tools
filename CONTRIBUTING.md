@@ -240,7 +240,7 @@ distinguishes its local additions. When upgrading a corrected dependency:
    differences and verify the generated/runtime and package evidence below.
 
 The builder also checks the neutral import/default bundle graph, portable
-emitted module-region paths, all three EditMap redirects and the complete
+emitted module-start labels, all three EditMap redirects and the complete
 license graph in `scripts/parser-packages.json`. A dependency refresh that
 changes these gates requires source review, differential AST/event checks, the
 regression suite and package/browser/renderer checks before updating the
@@ -410,11 +410,11 @@ warnings or advance an assertion merely to make installation/building succeed.
   not adoption evidence.
 - **Rolldown:** advance the manifest pin and exact version assertion in
   `scripts/build-parser.mjs` together only after reviewing its emission, runtime
-  helpers, portable module-region labels, neutral import/default graph,
-  corrected sources and package/license identities. Apply the source and
-  maintained-copy reconciliation above rather than resetting hashes until a
-  build passes. Run the parser parity/work, browser, full, installed-package and
-  applicable native checks before accepting new expectations.
+  helpers, portable module-start labels, neutral import/default graph, corrected
+  sources and package/license identities. Apply the source and maintained-copy
+  reconciliation above rather than resetting hashes until a build passes. Run
+  the parser parity/work, browser, full, installed-package and applicable native
+  checks before accepting new expectations.
 - **Host images:** retain the existing [Forge digest
   procedure](#what-the-checks-prove) and Obsidian baseline procedure below. Node
   Docker major updates remain deliberate LTS changes coordinated with the
