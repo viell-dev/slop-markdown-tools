@@ -258,6 +258,13 @@ hosts. Source changes continue to select all native hosts. Generated output
 stays under `dist/syntax/`; keep its manifest and complete license file in the
 package.
 
+For module comments, a second generation with debug information disabled must
+have identical input provenance. Removing only independently identified
+module-header lines from the normal output must reproduce that second output
+byte for byte. This catches headers absent from the structured graph without
+classifying paths in ordinary comments or strings. Only the normal generation is
+published.
+
 Any external `plugin.syntax` adds a per-parser compatibility marker. It selects
 the original attention, strikethrough and CJK resolvers while retaining the
 EditMap, text/code compaction, footnote-position and autolink repairs. The
@@ -410,11 +417,12 @@ warnings or advance an assertion merely to make installation/building succeed.
   not adoption evidence.
 - **Rolldown:** advance the manifest pin and exact version assertion in
   `scripts/build-parser.mjs` together only after reviewing its emission, runtime
-  helpers, portable module-start labels, neutral import/default graph, corrected
-  sources and package/license identities. Apply the source and maintained-copy
-  reconciliation above rather than resetting hashes until a build passes. Run
-  the parser parity/work, browser, full, installed-package and applicable native
-  checks before accepting new expectations.
+  helpers, portable module-start labels and debug-disabled emission comparison,
+  neutral import/default graph, corrected sources and package/license
+  identities. Apply the source and maintained-copy reconciliation above rather
+  than resetting hashes until a build passes. Run the parser parity/work,
+  browser, full, installed-package and applicable native checks before accepting
+  new expectations.
 - **Host images:** retain the existing [Forge digest
   procedure](#what-the-checks-prove) and Obsidian baseline procedure below. Node
   Docker major updates remain deliberate LTS changes coordinated with the
@@ -818,6 +826,8 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   compatibility, token identity, source guards, provenance and deterministic
   work. Fragment source is checked directly by TypeScript/ESLint; parser-build
   checks reject extra runtime boundaries and bind maintained source/tracking.
+  Marked and debug-disabled generation comparisons reject module headers absent
+  from the structured graph while preserving ordinary comments and strings.
   `build-output.test.ts` changes fragment source, shared types and configuration
   to prove that a live receipt rejects them. `parser-writer.test.ts` checks
   actual output, concurrent builders, unchanged timestamps and recovery. Every
