@@ -63,6 +63,12 @@ or comment-only documents pass, as does a permitted preamble without a heading.
 The native rule keeps its Markdown-only heading policy and reports a document
 with no heading.
 
+Unusually deep block directives in that compatibility reading can reach a work
+limit. MD041 then reports that its HTML-flow inspection could not complete,
+without proposing an edit. Simplify the nesting or set `MD041: false` in the
+markdownlint configuration to skip that check. This limit does not affect the
+native rule.
+
 ## Related rules
 
 [`style/heading`](../style/heading.md) turns underlined headings into `#`

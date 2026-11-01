@@ -9,11 +9,14 @@ const openTag =
 
 const closeTag = /<\/([A-Za-z][A-Za-z0-9-]*)[ \t\r\n]*>/y;
 
-/** The name of a complete CommonMark tag at the beginning of raw HTML. */
+/** The name of a complete inline CommonMark tag at the beginning of raw HTML. */
 function htmlTagName(html: string): string | undefined {
   openTag.lastIndex = closeTag.lastIndex = 0;
   const tag = openTag.exec(html) ?? closeTag.exec(html);
-  return tag?.[1]?.toLowerCase();
+  // A raw flow tag may span a blank line; an inline HTML token cannot.
+  return tag && !/\n[ \t]*\n/.test(tag[0].replace(/\r\n?/g, "\n"))
+    ? tag[1]?.toLowerCase()
+    : undefined;
 }
 
 const attribute =

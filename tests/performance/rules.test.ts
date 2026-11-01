@@ -12,6 +12,32 @@ import type { Config, Dialect, RuleSetting } from "../../src/index.js";
 import { scaling } from "./scaling.js";
 const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
 
+it("bounds MD041 HTML-flow directive nesting (#858)", () => {
+  const converted = convertConfig({ markdownlint: { default: false, MD041: true } });
+  const configured = { config: converted.config, compatibility: converted.compatibility };
+  const source = (count: number) =>
+    `<script x=>\n\n${":::a\n".repeat(count)}<h1>\n${":::\n".repeat(count)}\n</script>\n`;
+  expect(lint(source(5), configured)).toEqual([]);
+  expect(lint(source(5).replace("<h1>", "<h2>"), configured)).toHaveLength(1);
+  expect(
+    scaling(
+      [250, 1000],
+      source,
+      (input) => lint(input, configured),
+      (findings) => {
+        expect(findings).toEqual([
+          expect.objectContaining({
+            rule: "structure/initial-heading",
+          }),
+        ]);
+        expect(findings[0]!.message).toContain("directive work limit");
+        expect(findings[0]!.edit).toBeUndefined();
+      },
+      1,
+    ),
+  ).toBeLessThan(10);
+});
+
 it.each(["prose", "references", "code"])(
   "keeps MD041 HTML-flow reparsing linear for %s (#854)",
   (shape) => {

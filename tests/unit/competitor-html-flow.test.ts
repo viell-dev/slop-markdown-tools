@@ -5,6 +5,9 @@ function settings(options: Record<string, unknown> = {}) {
   const converted = convertConfig({ markdownlint: { default: false, MD041: options } });
   return { config: converted.config, compatibility: converted.compatibility };
 }
+function nestedDirectives(count: number) {
+  return `<script x=>\n\n${":::a\n".repeat(count)}<h1>\n${":::\n".repeat(count)}\n</script>\n`;
+}
 function unchanged(source: string, options: Record<string, unknown> = {}) {
   const configured = settings(options);
   const result = format(source, configured);
@@ -80,4 +83,55 @@ it("keeps directives effective and native heading policy unchanged", () => {
       configured,
     ),
   ).toEqual([]);
+});
+
+it.each(["\n", "\r\n", "\r"])("reparses tags containing a blank line with %j", (eol) => {
+  for (const opener of ["<pre\n\nx>", "<script\n\nx>", "<pre\n\n>"]) {
+    const source = `${opener}\n<h1>a</h1>\n</pre>\n`.replaceAll("\n", eol);
+    expect(lint(source, settings())).toEqual([]);
+    expect(lint(source, settings({ level: 2, allow_preamble: true }))).toEqual([
+      expect.objectContaining({ rule: "structure/initial-heading", line: 1 }),
+    ]);
+    unchanged(source);
+  }
+});
+
+it("keeps complete leading tags on the fast path even with a deeply nested body", () => {
+  const source = nestedDirectives(2500).replace("<script x=>", "<script>");
+  const findings = lint(source, settings());
+  expect(findings).toHaveLength(1);
+  expect(findings[0]!.message).not.toContain("work limit");
+  unchanged(source);
+});
+
+it("reports bounded directive inspection without edits or leaked state (#858)", () => {
+  const source = nestedDirectives(250);
+  for (const options of [{}, { allow_preamble: true }]) {
+    const findings = lint(source, settings(options));
+    expect(findings).toEqual([
+      expect.objectContaining({
+        rule: "structure/initial-heading",
+        line: 1,
+      }),
+    ]);
+    expect(findings[0]!.message).toContain("directive work limit");
+    expect(findings[0]!.edit).toBeUndefined();
+    unchanged(source, options);
+  }
+  expect(lint(nestedDirectives(5), settings())).toEqual([]);
+  expect(lint(`<!-- markdownlint-disable-file MD041 -->\n${source}`, settings())).toEqual([]);
+  const native = lint(source, { config: settings().config });
+  expect(native).toHaveLength(1);
+  expect(native[0]!.message).not.toContain("work limit");
+});
+
+it("accepts ordinary sibling and nested directives without reaching the work limit", () => {
+  for (const body of [
+    ":::a\ntext\n:::\n\n".repeat(200),
+    `${":::a\n".repeat(5)}text\n${":::\n".repeat(5)}`,
+  ]) {
+    const source = `<script x=>\n\n${body}\n<h1>\n</script>\n`;
+    expect(lint(source, settings())).toEqual([]);
+    unchanged(source);
+  }
 });

@@ -76,3 +76,20 @@ math and directive attributes keep their token boundaries. This reading only
 selects a compatibility diagnostic; it does not change native syntax or
 formatting. The original flow's position locates the report, and each scanned
 flow is read once.
+
+The complete-tag fast path rejects blank lines within the tag, as inline HTML
+cannot span them; blank lines elsewhere in the flow do not disable that path.
+Nested directive containers can repeatedly tokenize their bodies. Each
+compatibility reading wraps its own flow constructs and counts their consumed
+codes, including rolled-back reads, with a budget of the greater of 4096 or 16
+times the source's UTF-16 length. Exhaustion aborts that reading with a
+dedicated error caught only by identity. It becomes an ordinary MD041 diagnostic
+with no edit, retaining markdownlint suppression and reporting that inspection
+could not complete. Other exceptions still surface as engine failures.
+
+This bounds the newly exposed directive work
+([#858](https://github.com/viell-dev/slop-markdown-tools/issues/858)), rather
+than all parser work; native deep-list cost is a separate investigation
+([#859](https://github.com/viell-dev/slop-markdown-tools/issues/859)). Remove or
+revise the workaround only after an upstream or local parser change passes the
+nesting regression, ordinary directive controls and reference comparisons.

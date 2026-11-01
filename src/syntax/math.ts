@@ -61,7 +61,6 @@ declare module "micromark-util-types" {
  * - `markdownlint`: stock math syntax for internal HTML-flow inspection, with
  *   no renderer's word/space conditions and closing runs of exactly equal size.
  */
-// Markdownlint's internal HTML-flow reading uses the stock, unrestricted syntax.
 export type MathConditions = "forge" | "github" | "obsidian" | "markdownlint";
 
 const space = 32;

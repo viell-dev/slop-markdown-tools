@@ -24,12 +24,16 @@ function content(nodes: RootContent[]): RootContent[] {
   });
 }
 
-/** MD041 recognizes a leading HTML heading tag as well as Markdown headings. */
-function initialHeadingLevel(node?: RootContent): number | undefined {
+/** MD041 recognizes Markdown headings or the first inline HTML tag in a flow. */
+function initialHeadingLevel(node?: RootContent): number | "limited" | undefined {
   if (node?.type === "heading") return node.depth;
   if (!compatibilityRun() || node?.type !== "html") return undefined;
-  const name =
-    htmlTagName(node.value.trimStart()) ?? htmlTagName(firstHtmlInFlow(node.value) ?? "");
+  let name = htmlTagName(node.value.trimStart());
+  if (name === undefined) {
+    const reading = firstHtmlInFlow(node.value);
+    if (reading.limited) return "limited";
+    name = htmlTagName(reading.html ?? "");
+  }
   return name && /^h[1-6]$/.test(name) ? Number(name[1]) : undefined;
 }
 /**
@@ -379,6 +383,14 @@ export const structureRules: Record<string, Rule> = {
       let firstLevel: number | undefined;
       for (const block of blocks) {
         const depth = initialHeadingLevel(block);
+        if (depth === "limited")
+          return [
+            {
+              start: range(block)[0],
+              message:
+                "MD041 HTML-flow inspection reached its directive work limit. Simplify nested directives or disable MD041 in markdownlint configuration.",
+            },
+          ];
         if (!options.allowPreamble || depth !== undefined) {
           first = block;
           firstLevel = depth;
