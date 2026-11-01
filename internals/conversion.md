@@ -66,3 +66,13 @@ no independent Prettier origin. They still use the active rule variant,
 markdownlint suppression and comment-aware blank-line counts. Native spacing
 keeps list tightness and comment attachment; compatibility reports the source
 requirement without making an unsafe edit.
+
+MD041 recognizes a complete leading HTML tag without reparsing. Other HTML flow
+uses the bundled parser with markdownlint's GFM, stock math and block-directive
+syntax, with HTML flow and indented code disabled. Inline directives stay off.
+The compiler captures the first inline HTML token before image labels collapse
+their children into alt text; a finished-tree walk would lose those tags. Code,
+math and directive attributes keep their token boundaries. This reading only
+selects a compatibility diagnostic; it does not change native syntax or
+formatting. The original flow's position locates the report, and each scanned
+flow is read once.

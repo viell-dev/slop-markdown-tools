@@ -1,8 +1,50 @@
 import { expect, it } from "vitest";
-import { applyEdits, builtInRules, createWorkspace, format, parse } from "../../src/index.js";
+import {
+  applyEdits,
+  builtInRules,
+  convertConfig,
+  createWorkspace,
+  format,
+  lint,
+  parse,
+} from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
 import { scaling } from "./scaling.js";
 const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+
+it.each(["prose", "references", "code"])(
+  "keeps MD041 HTML-flow reparsing linear for %s (#854)",
+  (shape) => {
+    const converted = convertConfig({
+      markdownlint: { default: false, MD041: { allow_preamble: true } },
+    });
+    const configured = { config: converted.config, compatibility: converted.compatibility };
+    const source = (count: number) => {
+      const body =
+        shape === "references"
+          ? "[a][missing] ".repeat(count)
+          : shape === "code"
+            ? "`<h1>` and ".repeat(count)
+            : "ordinary text ".repeat(count);
+      return `<script bad=>\n\n[a]: /target\n\n${body}\n</h1>\n</script>\n`;
+    };
+    // A tag in code is not a heading; the actual first tag decides the level.
+    expect(lint(source(1000).replace("\n</h1>", "\n</h2>"), configured)).toEqual([
+      expect.objectContaining({ rule: "structure/initial-heading", line: 1 }),
+    ]);
+    expect(
+      scaling(
+        [1000, 4000],
+        source,
+        (input) => lint(input, configured),
+        (findings) => {
+          expect(findings).toEqual([]);
+        },
+        1,
+      ),
+    ).toBeLessThan(10);
+  },
+);
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "commonmark"): Config {
   return { extends: [], dialect, rules };
