@@ -212,7 +212,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.6.2",
+  "version": "0.6.3",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [
