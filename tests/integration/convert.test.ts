@@ -8,6 +8,27 @@ import { fixture, run } from "../support/cli.js";
 import { parseConfig, parseExplanation, parseReport } from "../support/json.js";
 
 describe("competitor configuration CLI (#669)", () => {
+  it("reports protected MD022 boundaries without changing native policy (#849, #850)", async () => {
+    for (const source of ["text\n<!-- a -->\n# Title\n", "- item\n  # Title\n  text\n"]) {
+      const root = await fixture({
+        ".markdownlint.json": JSON.stringify({ default: false, MD022: { lines_above: 2 } }),
+        "note.md": source,
+      });
+      const fallback = run(root, ["lint", "--json", "note.md"]);
+      expect(fallback.status, fallback.stderr).toBe(1);
+      const findings = parseReport(fallback.stdout).files[0]!.diagnostics;
+      expect(findings.length).toBe(source.startsWith("text") ? 1 : 2);
+      expect(findings.every((finding) => finding.rule === "style/block-spacing")).toBe(true);
+      expect(findings.every((finding) => !finding.edit)).toBe(true);
+      const formatted = run(root, ["format", "--write", "note.md"]);
+      expect(formatted.status, formatted.stderr).toBe(1);
+      expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+      expect(run(root, ["config", "convert", "--write"]).status).toBe(0);
+      const native = run(root, ["lint", "--json", "note.md"]);
+      expect(native.status, native.stderr).toBe(0);
+      expect(parseReport(native.stdout).files[0]!.diagnostics).toEqual([]);
+    }
+  });
   it("accepts an HTML initial heading in markdownlint fallback only (#848)", async () => {
     const source = "<!-- note -->\n<h1>Title</h1>\n";
     const root = await fixture({

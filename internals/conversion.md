@@ -60,3 +60,9 @@ regions is accepted only when each region proposes the same replacement and
 authorizes its checks. This can leave a whole table or list as written when a
 partial repair is unavailable. Every proposal still passes the ordinary edit and
 semantic safety checks.
+
+Additional MD022 reports at native-protected heading boundaries have no edit and
+no independent Prettier origin. They still use the active rule variant,
+markdownlint suppression and comment-aware blank-line counts. Native spacing
+keeps list tightness and comment attachment; compatibility reports the source
+requirement without making an unsafe edit.

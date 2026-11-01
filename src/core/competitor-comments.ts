@@ -178,7 +178,6 @@ export function competitorComments(document: Document, options: ProcessOptions) 
   }).rules;
   const source = document.source;
   const starts = lineStarts(source);
-  const hasCommentDelimiters = source.includes("<!--") || source.includes("-->");
   const lineAt = (offset: number) => {
     let low = 0;
     let high = starts.length;
@@ -194,7 +193,6 @@ export function competitorComments(document: Document, options: ProcessOptions) 
   const blankLines = new Map<number, boolean>();
   let commentLines: string[] | undefined;
   const headingAlreadySpaced = (finding: Finding, variant: RuleSetting | undefined) => {
-    if (!hasCommentDelimiters) return false;
     if (!headingEdges) {
       headingEdges = new Map();
       walk(document.tree, "heading", (node) => {
@@ -212,15 +210,25 @@ export function competitorComments(document: Document, options: ProcessOptions) 
         });
       });
     }
-    const edge = headingEdges.get(finding.start);
+    // A report-only "below" finding locates the whole heading, including a
+    // setext underline, while its end identifies the boundary to measure.
+    const edge = headingEdges.get(
+      attributionOf(finding)?.sourceOnly ? (finding.end ?? finding.start) : finding.start,
+    );
     if (!edge) return false;
     const settings = typeof variant === "string" || !variant ? {} : (variant[1] ?? {});
     const requested = edge.above ? settings.linesAbove : settings.linesBelow;
     const count = Number(
       Array.isArray(requested) ? (requested[edge.depth - 1] ?? 1) : (requested ?? 1),
     );
+    const metadata = document.tree.children[0];
+    const contentLine =
+      metadata && ["yaml", "toml"].includes(metadata.type) && metadata.position
+        ? metadata.position.end.line - (metadata.position.end.column === 1 ? 1 : 0)
+        : 0;
     for (let distance = 1; distance <= count; distance++) {
       const line = edge.line + (edge.above ? -distance : distance);
+      if (edge.above && !settings.includeFrontMatter && line < contentLine) return true;
       const start = starts[line];
       // Like markdownlint, no blank is needed beyond the document's ends.
       if (start === undefined) return true;
@@ -494,7 +502,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
         checks = checks.filter((id) => id === check);
       }
       const markdownlint = checks.some((id) => !suppressed(id, finding.start));
-      const fromPrettier = origins.some((id) => !id.startsWith("MD"));
+      const fromPrettier = !attribution?.sourceOnly && origins.some((id) => !id.startsWith("MD"));
       const start = finding.edit?.start ?? finding.start;
       const end = finding.edit?.end ?? finding.end ?? start;
       const ignored = !!compat.prettier && intersects(prettier, start, end);
