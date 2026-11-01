@@ -102,6 +102,7 @@ joined or broken, that is, one that:
   renderers can read as a hard break even when the primary parser reads a soft
   line ending;
 - has lines whose container markers the tool cannot reproduce;
+- would open a different block when a syntax plugin reads the wrapped lines;
 - opens a block quote with an alert or callout marker such as `[!NOTE]` in the
   CommonMark dialect; in the other dialects only the line with the marker, and
   an Obsidian callout's title on it, stays as it is, and the body is wrapped. A

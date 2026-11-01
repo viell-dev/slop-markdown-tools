@@ -9,6 +9,7 @@ import { vitepressCodeText, vitepressProtection } from "../syntax/vitepress/proj
 import {
   codeSpanContent,
   frontMatterReading,
+  hasSyntaxPlugins,
   labelEnd,
   lazyIndentation,
   range,
@@ -612,6 +613,7 @@ function blankLineComments(document: Document): ReadonlySet<Paragraph> {
 
 interface WrapContext extends Pick<RuleContext, "document" | "options"> {
   blankCommentParagraphs: ReadonlySet<Paragraph>;
+  syntaxPlugins: boolean;
   width: number;
   measure: (text: string) => number;
   unit: string;
@@ -1119,6 +1121,16 @@ function wrapParagraph(
     return;
   }
   const replacement = output.join(newline + continuation);
+  // Unknown flow constructs can begin at any new line. Check the unprefixed
+  // candidate once, rather than guessing markers or repeatedly refilling it.
+  if (
+    replacement !== original &&
+    context.syntaxPlugins &&
+    !oneParagraph(output.join("\n"), document)
+  ) {
+    reportSkipped("syntax plugin block structure");
+    return;
+  }
   if (replacement !== original)
     findings.push({
       start,
@@ -1166,6 +1178,7 @@ const wrap: Rule = {
       unit,
       newline,
       blankCommentParagraphs: blankLineComments(document),
+      syntaxPlugins: hasSyntaxPlugins(document),
     };
     walk(document.tree, "paragraph", (node, index, parent) =>
       wrapParagraph(node, index, parent, context, findings),

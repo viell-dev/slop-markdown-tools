@@ -235,6 +235,10 @@ export function githubFileReading(tree: Root): Root {
 }
 /** The plugins and VitePress options that `parse` read each returned tree with. */
 const readers = new WeakMap<Root, { plugins: readonly Plugin[]; vitepress: VitePressOptions }>();
+/** Whether this document was read with syntax extensions supplied by plugins. */
+export function hasSyntaxPlugins(document: Document): boolean {
+  return readers.get(document.tree)?.plugins.some((plugin) => plugin.syntax !== undefined) ?? false;
+}
 /**
  * Read `text` as `parse` read `document`: in its dialect, with its path,
  * plugins and VitePress options. Rules that check what changed text would mean

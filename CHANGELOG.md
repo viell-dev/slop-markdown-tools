@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Keep paragraphs whose wrapped lines would open a syntax plugin's block,
+  avoiding refused edits while retaining safe wrapping nearby
+  ([#777](https://github.com/viell-dev/slop-markdown-tools/issues/777)).
 - Wrap VitePress body entities without false unsafe-edit refusals, preserving
   heading anchors and context-sensitive entity distinctions
   ([#863](https://github.com/viell-dev/slop-markdown-tools/issues/863)).
