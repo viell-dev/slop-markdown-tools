@@ -13,6 +13,17 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Match Git's whole-component asterisk runs, including re-inclusion after a
+  trailing run
+  ([#843](https://github.com/viell-dev/slop-markdown-tools/issues/843)).
+
+- Name the last matching Git ignore rule when explaining a skipped input
+  ([#844](https://github.com/viell-dev/slop-markdown-tools/issues/844)).
+
+- Retain Prettier settings when its bundled ignore matcher leaves root Markdown
+  files unignored
+  ([#845](https://github.com/viell-dev/slop-markdown-tools/issues/845)).
+
 - Apply fallback ignores, file selections and overrides relative to an explicit
   `--root` workspace, so excluded files stay excluded and scoped settings apply
   ([#791](https://github.com/viell-dev/slop-markdown-tools/issues/791)).

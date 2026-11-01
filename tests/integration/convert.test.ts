@@ -993,6 +993,41 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     }
   });
 
+  it("retains Prettier settings when its matcher does not ignore root Markdown (#845)", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always","printWidth":31}',
+      ".prettierignore": "***/*.md\n",
+      "a.md": messy,
+      "deep/a.md": messy,
+    });
+    for (const [file, ignored] of [
+      ["a.md", false],
+      ["deep/a.md", true],
+    ] as const)
+      expect(
+        (
+          await getFileInfo(path.join(root, file), {
+            ignorePath: path.join(root, ".prettierignore"),
+          })
+        ).ignored,
+      ).toBe(ignored);
+    const reference = await prettierResolve(path.join(root, "a.md"));
+    expect(reference?.printWidth).toBe(31);
+    expect(explained(root).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual([
+      "warn",
+      { width: reference!.printWidth },
+    ]);
+    expect(converted.stderr).toContain(
+      "pattern ***/*.md not carried over: outside the supported gitignore subset",
+    );
+  });
+
   it("does not discover .prettierrc.jsonc, which Prettier ignores (#793)", async () => {
     const root = await fixture({
       ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":31}',
