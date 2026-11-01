@@ -24,6 +24,24 @@ them. A disagreement keeps the paragraph split, with a reason available to
 engine's preservation contract
 ([#782](https://github.com/viell-dev/slop-markdown-tools/issues/782)).
 
+## Body entity spelling
+
+VitePress's text joining restores an entity's written spelling only when it
+joins another text token. Its singleton can retain the decoded value. The
+secondary fingerprint compares eligible body singletons with that same written
+spelling, without modifying the cached reader tokens. The HTML decoder must
+agree with the singleton value: some numeric references render differently in
+these two positions. Whitespace and brace entities remain literal because of
+Vue's gaps and expressions. Headings, image alt children, code, and inline
+blocks containing raw HTML or mustaches keep their previous reading. The primary
+fingerprint still applies unchanged
+([#863](https://github.com/viell-dev/slop-markdown-tools/issues/863)).
+
+Written aliases such as `&#169;` and `&copy;` can remain distinct even as
+singletons; built-in rules do not rewrite their spelling. After a major change
+to the HTML decoder or VitePress's Vue decoder, compare named and numeric
+references against real Vue parsing again before relying on their agreement.
+
 ## Include expansion
 
 An expansion of <code>&lt;!-- @include: path --&gt;</code> stops after 64
