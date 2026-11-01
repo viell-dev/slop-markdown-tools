@@ -41,6 +41,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Refresh the Obsidian verification image to the Node.js 24.22.1 security
+  release, retaining the pinned app and installer.
+
 - Update the parser bundler and check its module-start comments against the
   reviewed module graph.
 
