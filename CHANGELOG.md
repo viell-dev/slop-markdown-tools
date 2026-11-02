@@ -9,7 +9,13 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.6.4 - 2026-11-02
+
+0.6.4 corrects heading checks during markdownlint fallback, avoids refused
+formatting around VitePress and plugin syntax, and speeds up long lazy list
+paragraphs. [What's new in
+0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html#in-064)
+summarizes the fixes. No upgrading steps are needed.
 
 ### Fixed
 
@@ -41,6 +47,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   [#853](https://github.com/viell-dev/slop-markdown-tools/issues/853),
   [#854](https://github.com/viell-dev/slop-markdown-tools/issues/854),
   [#860](https://github.com/viell-dev/slop-markdown-tools/issues/860)).
+
+### Maintenance
+
+- Verify parser module-comment provenance in both directions
+  ([#851](https://github.com/viell-dev/slop-markdown-tools/issues/851)).
 
 ## 0.6.3 - 2026-11-01
 
