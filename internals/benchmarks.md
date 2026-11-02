@@ -33,6 +33,19 @@ not cache absence or add token fields. Positioned trees, event observations,
 stale witnesses, deterministic work and the compiled runtime are checked. This
 correction does not bound arbitrary parser work or deeply nested containers.
 
+## Deeply nested lists
+
+Deep list nesting has a separate cost
+([#859](https://github.com/viell-dev/slop-markdown-tools/issues/859)). At each
+open list, micromark checks whether the remaining line is blank and scans its
+indentation again. The tree compiler also traverses and rebuilds descendant
+event slices for each enclosing list. Both perform cubic work in nesting depth
+on a list that adds one level per line; that fixture's byte size is quadratic in
+depth. The same cost reproduces in stock upstream. The lazy-line correction
+above does not address these traversals, and no general parser CPU or nesting
+bound is promised. The issue retains matched-size controls, exact trees,
+profiling and deterministic work counts for a future correction.
+
 ## Large paragraphs
 
 A single paragraph of 70 kB made only of bracketed references such as `[a][b]`
