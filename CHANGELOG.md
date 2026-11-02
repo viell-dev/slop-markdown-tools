@@ -48,6 +48,11 @@ summarizes the fixes. No upgrading steps are needed.
   [#854](https://github.com/viell-dev/slop-markdown-tools/issues/854),
   [#860](https://github.com/viell-dev/slop-markdown-tools/issues/860)).
 
+### Maintenance
+
+- Verify parser module-comment provenance in both directions
+  ([#851](https://github.com/viell-dev/slop-markdown-tools/issues/851)).
+
 ## 0.6.3 - 2026-11-01
 
 0.6.3 corrects configuration fallback, ignore matching, heading checks around
