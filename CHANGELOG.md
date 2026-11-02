@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Avoid repeated event searches in long lazy list paragraphs, preserving syntax
+  plugin observations and falling back when a cached token changes
+  ([#796](https://github.com/viell-dev/slop-markdown-tools/issues/796)).
 - Keep paragraphs whose wrapped lines would open a syntax plugin's block,
   avoiding refused edits while retaining safe wrapping nearby
   ([#777](https://github.com/viell-dev/slop-markdown-tools/issues/777)).

@@ -14,6 +14,12 @@ interface Case {
 }
 const cases: Case[] = [
   {
+    name: "lazy list continuation (#796)",
+    dialect: "github",
+    sizes: [2000, 8000],
+    source: (n) => "- a\n" + "line\n".repeat(n),
+  },
+  {
     name: "nested container transitions (#300/#527)",
     dialect: "obsidian",
     sizes: [500, 2000],
@@ -95,6 +101,11 @@ it.each(cases)("parses $name within the catastrophic-growth bound", (test) => {
         if (test.name === "multiline code-span merging") {
           expect(counts.get("inlineCode")).toBe(1);
           expect(textContent(document.tree)).toBe("a b " + "c d ".repeat(input.count));
+        }
+        if (test.name === "lazy list continuation (#796)") {
+          for (const type of ["list", "listItem", "paragraph", "text"])
+            expect(counts.get(type)).toBe(1);
+          expect(textContent(document.tree)).toBe("a\n" + "line\n".repeat(input.count).trimEnd());
         }
       },
       1,

@@ -833,10 +833,13 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   actual output, concurrent builders, unchanged timestamps and recovery. Every
   pull request. `parser-emphasis-production` checks actual compiled-product
   batch calls in an isolated V8 coverage session, including lazy readings and
-  four missing-registration mutants. `obsidian-openers` bounds failed
-  literal-suffix scans; `obsidian-probe-metadata` checks complete and
-  interrupted capture bookkeeping. Tokenizer identity cases partition the full
-  deterministic corpus into contiguous batches under the unchanged unit
+  four missing-registration mutants. `parser-lazy-lines` checks live witnesses,
+  positioned trees, resolver observations and deterministic event work;
+  `parser-lazy-production` binds the built runtime and checks actual helper
+  hits, event work, and missing-helper/cache-bypass mutants. `obsidian-openers`
+  bounds failed literal-suffix scans; `obsidian-probe-metadata` checks complete
+  and interrupted capture bookkeeping. Tokenizer identity cases partition the
+  full deterministic corpus into contiguous batches under the unchanged unit
   deadline, retaining every source, selection and identity assertion. These
   checks do not prove native-host behavior or compatibility with arbitrary
   event-history rewrites by external extensions. Mixed and multiple raw emphasis

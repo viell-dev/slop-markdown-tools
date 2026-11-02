@@ -68,6 +68,20 @@ const specs = {
         "Remove after an adopted mdast-util-from-markdown correction includes GFM footnote indentation in list-tail scanning and preserves exact tight/loose LF/CRLF ranges and spread across footnote dialects; retain the separate defensive range guards.",
     },
   },
+  document: {
+    name: "micromark",
+    version: "4.0.3",
+    relative: "lib/initialize/document.js",
+    hash: "81ba0ecd6105c92a3b1f40490c67bf9b02e765894430ece35257b2f4a80f2dc3",
+    provenance: "mdrefine#796: reuse a live spanning-token witness for lazy continuation",
+    tracking: {
+      dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/796"],
+      owner: "mdrefine maintaining agents",
+      removalCondition:
+        "Remove after an adopted compatible micromark correction bounds repeated lazy-line event searches while preserving exact positioned trees, event/token/point observations and stale-witness controls, including external syntax. Retain membership and current-bound checks until equivalent safety is demonstrated.",
+    },
+  },
   text: {
     name: "micromark",
     version: "4.0.3",
@@ -258,6 +272,18 @@ function repair(kind, source) {
       source,
       'tailEvent[1].type === "listItemIndent")',
       'tailEvent[1].type === "listItemIndent" || tailEvent[1].type === "gfmFootnoteDefinitionIndent")',
+    );
+  if (kind === "document")
+    return (
+      section(
+        source,
+        "      let index = childFlow.events.length;",
+        "\n\n      // Note: this algorithm for moving events",
+        () =>
+          "      let index;\n      if (mdrefineContinuesLazy(childFlow.events, lineStartOffset)) return;",
+      ) +
+      "\n" +
+      parserAdaptationSource("lazy-line")
     );
   // Upstream lets complete (type 7) HTML interrupt a paragraph on a lazy line,
   // which ends the container there; the specification does not (#762). GitHub's
