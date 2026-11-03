@@ -877,9 +877,11 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   four parser artifacts. Every pull request. Per-file publication is not a
   directory transaction; concurrent edits require a fresh invocation.
 - **Cost grows with the input as expected.** `tests/performance/` compares
-  growth and checks that memory is released; `large-inputs.test.ts` formats
-  documents beyond the engine's argument limits, each in its own process. Every
-  pull request. The parser's deterministic unit work gates fail on the original
+  growth and checks that memory is released. `wrap.test.ts` covers isolated
+  rereading with syntax plugins in CommonMark and VitePress, including body
+  paragraphs beginning with `---`. `large-inputs.test.ts` formats documents
+  beyond the engine's argument limits, each in its own process. Every pull
+  request. The parser's deterministic unit work gates fail on the original
   algorithms; its public timing checks are broad catastrophic-growth bounds, and
   some original algorithms pass them at the selected sizes. Timing alone does
   not establish that a parser defect is fixed. The Benchmark workflow's

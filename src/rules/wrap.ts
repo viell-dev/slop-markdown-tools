@@ -487,7 +487,11 @@ export function lineWidth(text: string, measure: (text: string) => number): numb
 
 /** Whether text reads as a single paragraph, as the document is read. */
 function oneParagraph(text: string, document: Document): boolean {
-  const { children } = reread(document, text).tree;
+  // This is existing paragraph content, not document metadata. A blank line
+  // prevents VitePress's document-start --- reading from hiding its body while
+  // leaving every candidate line exposed to the parser and syntax plugins.
+  const source = document.dialect === "vitepress" && /^---(?!-)/.test(text) ? "\n" + text : text;
+  const { children } = reread(document, source).tree;
   return children.length === 1 && children[0]!.type === "paragraph";
 }
 

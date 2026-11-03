@@ -130,6 +130,32 @@ it("keeps code-span continuation indentation while formatting other paragraphs (
   }
 });
 
+it("wraps plugin paragraphs without treating them as document front matter (#869)", async () => {
+  const render = await renderer({});
+  const plugin: Plugin = { name: "empty-syntax", syntax: { micromark: {}, mdast: {} } };
+  const config: Config = {
+    extends: [],
+    dialect: "vitepress",
+    rules: { "style/wrap": ["warn", { width: 48 }] },
+  };
+  const paragraph =
+    "--- gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma";
+  for (const prefix of ["", "> ", "- ", "- > "])
+    for (const before of ["Intro.\n\n", "---\ntitle: Entry\n---\n\n"]) {
+      const source = before + prefix + paragraph + "\n";
+      const options = { config, plugins: [plugin] };
+      const result = format(source, options);
+      expect(result.output, before + prefix).not.toBe(source);
+      expect(result.output).toBe(format(source, { config }).output);
+      expect(result.diagnostics).toEqual([]);
+      expect(await render(result.output)).toBe(await render(source));
+      expect(semanticFingerprint(parse(result.output, "vitepress", "document.md", [plugin]))).toBe(
+        semanticFingerprint(parse(source, "vitepress", "document.md", [plugin])),
+      );
+      expect(format(result.output, options).output).toBe(result.output);
+    }
+});
+
 it("wraps body entities with equal actual VitePress/Vue output (#863)", async () => {
   const render = await renderer({});
   const source =

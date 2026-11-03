@@ -11,6 +11,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Wrap VitePress body paragraphs beginning with `---` when syntax plugins are
+  enabled, while retaining actual plugin block boundaries
+  ([#869](https://github.com/viell-dev/slop-markdown-tools/issues/869)).
+
 ### Maintenance
 
 - Refresh the MathJax speech engine and remove its obsolete xmldom override
