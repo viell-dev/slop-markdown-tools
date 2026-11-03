@@ -214,6 +214,11 @@ patterns match case exactly; conversion says so once per `.prettierignore`. The
 notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
 list the exact subsets.
 
+For overlapping EditorConfig sections, conversion retains the intersections it
+can represent exactly, including separate brace alternatives. Branches proved
+disjoint need no overlap notice. Any unsupported remainder is reported for
+manual migration while the other exact intersections remain in use.
+
 During the fallback, markdownlint inline comments and Prettier ignore comments
 and `requirePragma` apply. With an mdrefine configuration, including one that
 `config convert` writes, they have no effect: migrate them to mdrefine's own

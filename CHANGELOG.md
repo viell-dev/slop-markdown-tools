@@ -11,6 +11,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Changed
+
+- Preserve supported EditorConfig intersection branches independently
+  ([#840](https://github.com/viell-dev/slop-markdown-tools/issues/840)).
+
 ### Maintenance
 
 - Retain lazy-HTML scaling windows in failed assertions for Windows triage
