@@ -92,7 +92,9 @@ failures.
 
 This bounds the newly exposed directive work
 ([#858](https://github.com/viell-dev/slop-markdown-tools/issues/858)), rather
-than all parser work; native deep-list cost is a separate investigation
-([#859](https://github.com/viell-dev/slop-markdown-tools/issues/859)). Remove or
+than all parser work. This known grammar also uses the builtin deep-list
+corrections
+([#859](https://github.com/viell-dev/slop-markdown-tools/issues/859)); they do
+not replace the directive budget or provide a general parser bound. Remove or
 revise the workaround only after an upstream or local parser change passes the
 nesting regression, ordinary directive controls and reference comparisons.

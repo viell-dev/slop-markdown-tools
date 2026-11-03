@@ -17,6 +17,8 @@ const kinds = {
   strike: "strike",
   autolink: "autolink",
   footnote: "footnote",
+  blankLine: "blankLine",
+  list: "list",
   labelEnd: "labelEnd",
   footnoteSyntax: "footnoteSyntax",
   htmlFlow: "htmlFlow",
@@ -177,7 +179,7 @@ export async function readReviewedSource(kind) {
 /** @typedef {{ work: number, signature: string[], arrayIdentity: boolean, survivorIdentity: boolean }} WorkResult */
 
 /**
- * @param {"editMap"|"text"|"code"|"attention"|"strike"|"autolink"|"labelEnd"|"footnoteSyntax"|"document"} kind
+ * @param {"editMap"|"text"|"code"|"attention"|"strike"|"autolink"|"labelEnd"|"footnote"|"blankLine"|"list"|"footnoteSyntax"|"document"|"htmlFlow"|"cjk"} kind
  * @param {"stock"|"fixed"} variant
  * @param {{labelMutant?: "none"|"nested"|"prefix"|"closer", lazyMutant?: "none"|"cache"|"identity"|"bounds"}} [options]
  * @returns {Promise<Record<string, any>>}
@@ -213,6 +215,12 @@ export async function loadParserModule(kind, variant, options = {}) {
           }
           assert.equal(original, selected.source);
           let source = variant === "fixed" ? repairParserSource(kind, original) : original;
+          if (kind === "footnote" && variant === "fixed")
+            source += "\nexport { mdrefinePrepareLists };\n";
+          if (kind === "blankLine" && variant === "stock")
+            source += `\nexport function mdrefineCheckBlankLine(effects, ok, nok) {
+              return effects.check(blankLine, ok, nok);
+            }\n`;
           if (kind === "document") {
             if (variant === "fixed") {
               const mutant = options.lazyMutant ?? "none";

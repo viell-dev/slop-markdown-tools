@@ -59,13 +59,47 @@ const specs = {
     relative: "lib/index.js",
     hash: "dd0cd20672558ab4ca548b4f7e442e850863228915fff8eafd6d987d29fb107b",
 
-    provenance: "mdrefine#280: include GFM footnote indentation in list-tail scanning",
+    provenance:
+      "mdrefine#280/#859: footnote-aware list tails and builtin indexed single-merge list preparation; original preparation for external syntax",
     tracking: {
       dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
-      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/280"],
+      issues: [
+        "https://github.com/viell-dev/slop-markdown-tools/issues/280",
+        "https://github.com/viell-dev/slop-markdown-tools/issues/859",
+      ],
       owner: "mdrefine maintaining agents",
       removalCondition:
-        "Remove after an adopted mdast-util-from-markdown correction includes GFM footnote indentation in list-tail scanning and preserves exact tight/loose LF/CRLF ranges and spread across footnote dialects; retain the separate defensive range guards.",
+        "Retire each part after an adopted compatible correction includes footnote-aware list tails and bounds repeated nested-list walks/copies, preserving exact positioned trees, item spread, token/point observations, builtin work and compiled/package/native evidence. Reconcile the maintained preparation copy on every source upgrade; retain original preparation for external syntax until equivalent safety is demonstrated.",
+    },
+  },
+  blankLine: {
+    name: "micromark-core-commonmark",
+    version: "2.0.4",
+    relative: "lib/blank-line.js",
+    hash: "ef542164abcf6a5e6806720105146feba7e340a1f6d8c08c840707208ca76d69",
+    provenance:
+      "mdrefine#859: tokenizer-local checked whitespace spans for builtin list continuations",
+    tracking: {
+      dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/859"],
+      owner: "mdrefine maintaining agents",
+      removalCondition:
+        "Remove after an adopted compatible correction bounds repeated builtin whitespace checks while preserving exact trees, token/point observations, checked stream/line bounds, tabs, backtracking, original unmarked/extension paths and compiled/package/native evidence. The original grammar and check remain authoritative.",
+    },
+  },
+  list: {
+    name: "micromark-core-commonmark",
+    version: "2.0.4",
+    relative: "lib/list.js",
+    hash: "86115cefb14f3d7076cfe28a6f06dd805ae4e024b0897eaa897d64db1966c7e4",
+    provenance:
+      "mdrefine#859: route builtin continuation checks through the checked whitespace-span helper",
+    tracking: {
+      dependencyIndex: "https://github.com/viell-dev/slop-markdown-tools/issues/330",
+      issues: ["https://github.com/viell-dev/slop-markdown-tools/issues/859"],
+      owner: "mdrefine maintaining agents",
+      removalCondition:
+        "Retire this bridge with the checked blank-line helper after upstream adoption passes exact range/spread and plugin observations, whitespace work mutants, compiled reachability and package/native checks; keep original extension and unmarked checks until equivalent safety is demonstrated.",
     },
   },
   document: {
@@ -261,17 +295,59 @@ function rewriteStrike(source) {
     parserAdaptationSource("strike")
   );
 }
+function repairListPreparation(source) {
+  const original = once(
+    source,
+    'tailEvent[1].type === "listItemIndent")',
+    'tailEvent[1].type === "listItemIndent" || tailEvent[1].type === "gfmFootnoteDefinitionIndent")',
+  );
+  return (
+    section(
+      original,
+      "    /** @type {Array<number>} */\n    const listStack = [];",
+      "\n    index = -1;\n    while (++index < events.length)",
+      (legacy) => {
+        const fallback = once(legacy, "    let index = -1;\n", "")
+          .split("\n")
+          .map((line) => "  " + line)
+          .join("\n");
+        return (
+          "    let index = -1;\n" +
+          "    const builtin = mdrefinePrepareLists(events);\n" +
+          "    if (builtin) events = builtin;\n" +
+          "    else {\n" +
+          fallback +
+          "\n    }\n"
+        );
+      },
+    ) +
+    "\n" +
+    parserAdaptationSource("list-prepare")
+  );
+}
 /** @param {string} kind @param {string} source @returns {string} */
 function repair(kind, source) {
   if (kind === "labelEnd") return repairLabelEnd(source);
   if (kind === "footnoteSyntax") return repairFootnoteSyntax(source);
   if (kind === "editMap")
     return once(source, "    vecs.push(events.slice());\n    events.length = 0;\n", "");
-  if (kind === "footnote")
+  if (kind === "footnote") return repairListPreparation(source);
+  if (kind === "blankLine")
+    return (
+      source +
+      "\n" +
+      parserAdaptationSource("blank-line") +
+      "\nexport { mdrefineCheckBlankLine };\n"
+    );
+  if (kind === "list")
     return once(
-      source,
-      'tailEvent[1].type === "listItemIndent")',
-      'tailEvent[1].type === "listItemIndent" || tailEvent[1].type === "gfmFootnoteDefinitionIndent")',
+      once(
+        source,
+        "import { blankLine } from './blank-line.js';",
+        "import { blankLine, mdrefineCheckBlankLine } from './blank-line.js';",
+      ),
+      "return effects.check(blankLine, onBlank, notBlank);",
+      "return mdrefineCheckBlankLine.call(self, effects, onBlank, notBlank);",
     );
   if (kind === "document")
     return (

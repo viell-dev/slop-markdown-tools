@@ -370,10 +370,13 @@ export function parse(
   const tree = (withFrontMatter: boolean, withMath = true): Root => {
     const codeSpans = codeSpanRecording();
     const extensions = [codeSpans.syntax];
-    // External syntax may observe/mutate inline history. Keep its existing
-    // attention/strike/CJK fallback and original nonempty label lookup/scan.
+    // External syntax may observe/mutate event history or tokenizer state. Keep
+    // its original container checks/preparation, attention/strike/CJK fallback
+    // and nonempty label lookup/scan, even if it supplies a builtin marker.
     if (plugins.some((plugin) => plugin.syntax !== undefined)) {
-      extensions.push({ disable: { null: ["mdrefineDeferredInline"] } });
+      extensions.push({
+        disable: { null: ["mdrefineDeferredInline", "mdrefineOriginalContainers"] },
+      });
     } else {
       // #94 trusted-label proof obligations, shared by ALL lazy readings:
       // (a) Core IDs come only from factoryLabel: bare '[' is rejected and
@@ -398,8 +401,16 @@ export function parse(
       // New constructs/resolvers/disable entries/definition writers require
       // re-proving these properties or keeping that grammar off this marker.
       // Empty-dictionary shortcuts need none of (a)-(e) and run on both paths.
+      // #859's independent container marker permits whitespace-suffix proofs
+      // and indexed list preparation only for these known builtin grammars.
       extensions.push({
-        disable: { null: ["mdrefineBuiltinLabels", "mdrefineHomogeneousAttention"] },
+        disable: {
+          null: [
+            "mdrefineBuiltinLabels",
+            "mdrefineHomogeneousAttention",
+            "mdrefineBuiltinContainers",
+          ],
+        },
       });
     }
     const mdastExtensions = [labelEndTree, codeSpans.tree];

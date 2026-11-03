@@ -3,6 +3,25 @@ import { parse, textContent } from "../../src/index.js";
 import type { Dialect, Document } from "../../src/index.js";
 import type { Nodes } from "mdast";
 import { scaling } from "./scaling.js";
+import { nestedList } from "../support/parser/parser-containers.mjs";
+import { verifyNestedTree } from "../support/parser/parser-containers-production.mjs";
+
+it("bounds deep-list growth against its quadratic source size (#859)", () => {
+  // Four times the depth means sixteen times the bytes, unlike the linear
+  // families below. The deterministic compiled work gate rejects both defects.
+  expect(
+    scaling(
+      [100, 400],
+      (count) => ({ count, source: nestedList(count) }),
+      ({ source }) => parse(source, "github"),
+      (document, input) => {
+        expect(document.source).toBe(input.source);
+        verifyNestedTree(document.tree, input.count, input.source.length);
+      },
+      1,
+    ),
+  ).toBeLessThan(32);
+});
 
 interface Case {
   name: string;

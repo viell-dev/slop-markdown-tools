@@ -230,10 +230,12 @@ fields: the semantic comparison looks at every field except `position` and
 for that; test the extension's meaning and its source preservation.
 
 The parser retains the original attention and strikethrough resolvers, including
-CJK emphasis, when any syntax plugin is present. This preserves the intermediate
-inline events that a custom tokenizer or resolver can observe; the other parser
-corrections still apply. Rule-only plugins keep the optimized inline resolvers.
-The syntax extension types and their order remain the same.
+CJK emphasis, and container blank checks and list preparation when any syntax
+plugin is present. This preserves intermediate events and tokenizer
+observations, with their original performance limits for long paragraphs and
+deep lists. The other parser corrections still apply. Rule-only plugins keep the
+optimized inline and container routines. The syntax extension types and their
+order remain the same.
 
 Wrapping keeps a paragraph as written when the proposed lines would open a
 different block under its syntax plugins. Safe paragraphs still wrap, including

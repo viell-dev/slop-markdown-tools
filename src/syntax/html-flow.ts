@@ -52,7 +52,7 @@ export function firstHtmlInFlow(source: string): { html: string | undefined; lim
         gfmFootnote(),
         gfmTable(),
         math("markdownlint"),
-        { disable: { null: ["codeIndented", "htmlFlow"] } },
+        { disable: { null: ["codeIndented", "htmlFlow", "mdrefineBuiltinContainers"] } },
       ],
       mdastExtensions: [
         ...treeExtensions,
