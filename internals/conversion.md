@@ -37,6 +37,23 @@ EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
 empty components. Every emitted pattern is rebased into the destination subtree;
 unrepresentable intersections are also reported for manual migration.
 
+Overlapping EditorConfig sections accumulate their raw values before deriving
+Prettier options. Intersections retain exact paths from brace alternatives and
+globstar alignments independently. Literal components are compared directly or
+tested against a glob; glob components intersect when equal or when one is `*`.
+Different fixed terminal ASCII extensions prove a component pair disjoint. The
+proof compares extensions without regard to ASCII letter case while emitted
+patterns keep their source case; case-only extension differences stay unproven.
+An unsupported component comparison omits that branch and marks the
+source-pattern pair incomplete; its other exact intersections remain. The report
+keeps a manual-migration notice for incomplete pairs and for an intersection
+that cannot be processed.
+
+All rebased alternatives of one section emit their raw values before its
+intersections. Intersections follow the previous resolved states' order, moving
+an updated scope to the end so a sibling alternative cannot overwrite inherited
+values in an exact intersection.
+
 ## Comments during the fallback
 
 Each rule retains its enabled competitor origins outside the configuration.

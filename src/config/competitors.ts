@@ -114,6 +114,11 @@ function patternRows(matcher: Minimatch) {
       );
 }
 
+/** A fixed terminal extension remains decidable when the basename is a glob. */
+function literalExtension(pattern: string): string | undefined {
+  return /\.([a-zA-Z0-9]+)$/.exec(pattern)?.[1]?.toLowerCase();
+}
+
 /** Reject globs whose final path component can only name another language. */
 function markdownPattern(pattern: string): boolean {
   return patternRows(new Minimatch(pattern)).some((parts) => {
@@ -121,8 +126,8 @@ function markdownPattern(pattern: string): boolean {
     if (typeof last === "string") return /\.(md|markdown)$/i.test(last);
     if (last !== undefined && last !== GLOBSTAR) {
       // A literal extension remains decidable even when the basename is a glob.
-      const extension = /\.([a-zA-Z0-9]+)$/.exec(last.pattern);
-      return !extension || /^(md|markdown)$/i.test(extension[1]!);
+      const extension = literalExtension(last.pattern);
+      return !extension || extension === "md" || extension === "markdown";
     }
     return true;
   });
@@ -171,9 +176,10 @@ function translatePattern(pattern: string, dialect: PatternDialect): string | un
   return pattern.replace(/^#/, "\\#");
 }
 
-/** Intersect component globs exactly when one component contains the other. */
-function intersectPatterns(left: string, right: string): string[] {
+/** Retain exact intersections while reporting any unsupported branches. */
+function intersectPatterns(left: string, right: string): { patterns: string[]; complete: boolean } {
   const results: string[] = [];
+  let complete = true;
   for (const a of patternRows(new Minimatch(left, { dot: true })))
     for (const b of patternRows(new Minimatch(right, { dot: true }))) {
       const visit = (i: number, j: number): string[][] => {
@@ -216,7 +222,15 @@ function intersectPatterns(left: string, right: string): string[] {
           component = literalPattern(y);
         } else if (x.pattern === y.pattern || y.pattern === "*") component = x.pattern;
         else if (x.pattern === "*") component = y.pattern;
-        else throw new Error("Unrepresentable glob intersection");
+        else {
+          const xExtension = literalExtension(x.pattern),
+            yExtension = literalExtension(y.pattern);
+          if (xExtension && yExtension && xExtension !== yExtension) return [];
+          // Other alignments and brace alternatives can still contribute
+          // exact intersections; this branch remains a reported omission.
+          complete = false;
+          return [];
+        }
         return visit(i + 1, j + 1).map((tail) => [component, ...tail]);
       };
       results.push(
@@ -225,7 +239,7 @@ function intersectPatterns(left: string, right: string): string[] {
         ),
       );
     }
-  return [...new Set(results.filter(Boolean))];
+  return { patterns: [...new Set(results.filter(Boolean))], complete };
 }
 
 /** Derive Prettier options only after EditorConfig keys and removals accumulate. */
@@ -636,20 +650,23 @@ export async function loadCompetitorConfig(
         values = {};
         return;
       }
-      const additions = new Map<string, Values>();
-      for (const pattern of patterns) {
-        additions.set(pattern, values);
-        for (const [previous, state] of editorStates) {
+      // Rebased alternatives belong to one section. Emit their raw values
+      // before intersections so a sibling cannot overwrite inherited state.
+      const additions = new Map(patterns.map((pattern) => [pattern, values]));
+      for (const [previous, state] of editorStates)
+        for (const pattern of patterns) {
+          const omission = `${shown(file)}: overlapping EditorConfig sections ${previous} and ${pattern} not carried over exactly.`;
           try {
-            for (const intersection of intersectPatterns(previous, pattern))
+            const intersections = intersectPatterns(previous, pattern);
+            for (const intersection of intersections.patterns) {
+              additions.delete(intersection);
               additions.set(intersection, { ...state, ...values });
+            }
+            if (!intersections.complete) omitted.push(omission);
           } catch {
-            omitted.push(
-              `${shown(file)}: overlapping EditorConfig sections ${previous} and ${pattern} not carried over exactly.`,
-            );
+            omitted.push(omission);
           }
         }
-      }
       for (const [pattern, state] of additions) {
         // Keep resolved states in emission order, including when a later section
         // updates an existing scope. Its intersections must win over older states.

@@ -825,6 +825,13 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   update pins through a tested PR. A weekly run tests the pinned hosts, not an
   automatically upgraded server. Server HTML checks math recognition/source, not
   browser KaTeX layout or custom instance settings.
+- **Configuration conversion preserves supported scopes and inherited values.**
+  Unit `convert.test.ts` checks individual option mappings. Integration
+  `convert.test.ts` and `editorconfig-intersections.test.ts` exercise fallback
+  and written configuration, comparing effective settings with Prettier's own
+  resolution. Exact and disjoint brace branches, ancestor rebasing, coupled
+  EditorConfig values and notices for unsupported remainders are checked on
+  every pull request. Reported omissions still require manual migration.
 - **Output is deterministic and formatting converges.** The unit tests format
   their output again and expect no change, and each example workspace's `after/`
   tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
