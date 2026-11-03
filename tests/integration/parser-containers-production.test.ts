@@ -4,6 +4,8 @@ import { verifyContainerProduction } from "../support/parser/parser-containers-p
 it("bounds both compiled deep-list traversals with original-grammar controls (#859)", async () => {
   const result = await verifyContainerProduction();
   expect(result.runtimeSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(result.observationComparisons).toBe(18);
+  expect(result.observationCacheHits).toBeGreaterThan(0);
 });
 
 it.each([

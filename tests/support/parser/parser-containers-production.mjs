@@ -165,5 +165,78 @@ export async function verifyContainerProduction(mutant = "none") {
     assert(fallback.work.blankCodes > builtin.work.blankCodes);
     assert(fallback.work.listVisits > builtin.work.listVisits);
   }
-  return { runtimeSha256, results };
+  // Direct compiler listeners select the actual generated fast path; going
+  // through a public syntax plugin would intentionally select the fallback.
+  const observe = (input, extension) => {
+    for (const key of Object.keys(probe.mdrefineContainerWork))
+      probe.mdrefineContainerWork[key] = 0;
+    const tokens = new Map();
+    const points = new Map();
+    const trace = [];
+    const id = (map, value) => {
+      if (!map.has(value)) map.set(value, map.size);
+      return map.get(value);
+    };
+    const listener = (kind) =>
+      function (token) {
+        trace.push([
+          kind,
+          id(tokens, token),
+          Object.keys(token),
+          Object.fromEntries(
+            Object.entries(token).filter(
+              ([, value]) =>
+                value === null ||
+                ["string", "number", "boolean", "undefined"].includes(typeof value),
+            ),
+          ),
+          id(points, token.start),
+          { ...token.start },
+          id(points, token.end),
+          { ...token.end },
+          this.stack.map((node) => node.type),
+          this.sliceSerialize(token),
+        ]);
+      };
+    const tree = probe.fromMarkdown(input, {
+      extensions: [probe.gfm(), extension],
+      mdastExtensions: [
+        ...gfmFromMarkdown(),
+        {
+          beforeEnter: listener("enter"),
+          afterExit: listener("exit"),
+        },
+      ],
+    });
+    return { tree, trace, work: { ...probe.mdrefineContainerWork } };
+  };
+  const sources = [
+    "- a\n\t- b\n\t\t- c\n",
+    "- a\n\n  - b\n\n    - c\n\n- d\n",
+    "[^n]: - a\n  - b\n\n    - c\n",
+    "> - a\n>   - b\n>\n>   - c\n",
+    "1. a\n   1. b\n      - c\n\n2. d\n",
+    nestedList(6) + "\n\n",
+  ];
+  let observationComparisons = 0;
+  let observationCacheHits = 0;
+  for (const input of sources)
+    for (const eol of ["\n", "\r\n", "\r"]) {
+      const source = input.replaceAll("\n", eol);
+      const fast = observe(source, builtinContainers);
+      const fallback = observe(source, originalContainers);
+      assert(fast.work.fastLists > 0, "observed compiler did not select the generated fast path");
+      assert.equal(fallback.work.fastLists, 0, "observed compiler did not select the fallback");
+      assert.equal(
+        fallback.work.blankHits,
+        0,
+        "observed compiler did not retain original blank checks",
+      );
+      assert.deepEqual(fast.tree, fallback.tree, source);
+      assert.deepEqual(fast.trace, fallback.trace, source);
+      observationComparisons++;
+      observationCacheHits += fast.work.blankHits;
+    }
+  assert(observationCacheHits > 0, "observed compiler did not reach the generated blank cache");
+  return { runtimeSha256, results, observationComparisons, observationCacheHits };
 }

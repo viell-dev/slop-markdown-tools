@@ -56,6 +56,11 @@ counters measure the two targeted traversals, not all parser CPU or memory; no
 general parser or nesting bound is promised. The issue retains matched-size
 controls, profiling and paired measurements.
 
+Micromark still copies its open token stack on each attempt/check. Very deep
+lists retain this smaller cubic-in-depth term; correcting it would require a
+separate tokenizer change. The local fixes above do not claim to remove that
+cost, and the upstream reporting hold remains in effect.
+
 ## Large paragraphs
 
 A single paragraph of 70 kB made only of bracketed references such as `[a][b]`

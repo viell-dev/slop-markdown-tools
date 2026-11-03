@@ -851,9 +851,11 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   checks restored whitespace cursors, original-marker precedence, list
   identities and extension observations. `parser-containers-production` binds
   both fragments to the built runtime and rejects missing-helper, cache-bypass
-  and repeated-descendant-scan mutants. The deep-list timing case accounts for
-  its quadratic byte size; work counters bound the two traversals, not all
-  parser work. `obsidian-openers` bounds failed literal-suffix scans;
+  and repeated-descendant-scan mutants. Direct generated-compiler listeners also
+  compare fast/fallback observations for tabbed, loose, quoted, ordered and
+  footnote lists with LF/CRLF/CR. The deep-list timing case accounts for its
+  quadratic byte size; work counters bound the two traversals, not all parser
+  work. `obsidian-openers` bounds failed literal-suffix scans;
   `obsidian-probe-metadata` checks complete and interrupted capture bookkeeping.
   Tokenizer identity cases partition the full deterministic corpus into
   contiguous batches under the unchanged unit deadline, retaining every source,
