@@ -23,17 +23,23 @@ CLI2 positive globs need a combined selection, a literal comma outside braces or
 a brace alternative cannot be represented in that union: the selection is
 reported and omitted. A single positive glob keeps its ordinary meaning.
 
-`.prettierignore` supports literal paths, `*`, `?`, whole-component `**`, the
-same accepted escapes, root anchors, and directory suffixes; braces and
-parentheses stay literal. Character classes, trailing whitespace, and negated
-entries are reported rather than emitted. Prettier matches ignore patterns
-without regard to letter case; converted patterns match case exactly. Conversion
-reports this approximation once per `.prettierignore` file.
+`.prettierignore` and a participating CLI1 `.markdownlintignore` support literal
+paths, `*`, `?`, whole-component `**`, the same accepted escapes, root anchors,
+and directory suffixes; braces and parentheses stay literal. Character classes,
+trailing whitespace, and negated entries are reported rather than emitted.
+Prettier and CLI1 match ignore patterns without regard to letter case; converted
+patterns match case exactly. Conversion reports this approximation once per
+ignore file. An initial UTF-8 byte-order mark is discarded before interpreting
+the first line; other characters remain intact. The same translation handles
+both sources independently: negation disables only its own file during fallback,
+and an unreadable participating file is an error. A discovered CLI2
+configuration keeps its own selection and leaves the legacy ignore file unused;
+an ignore file alone does not activate the markdownlint fallback.
 
 All subsets reject `.`, `..`, and empty path components, and absolute paths,
 including Windows drive and UNC spellings on every platform. A leading `/` in
-EditorConfig or `.prettierignore` is a source-root anchor, and a trailing `/` in
-`.prettierignore` marks a directory; these are permitted boundaries rather than
+EditorConfig or either ignore file is a source-root anchor, and a trailing `/`
+in an ignore file marks a directory; these are permitted boundaries rather than
 empty components. Every emitted pattern is rebased into the destination subtree;
 unrepresentable intersections are also reported for manual migration.
 

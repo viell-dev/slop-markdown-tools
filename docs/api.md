@@ -353,15 +353,18 @@ Conversion writes nothing but `config`.
 `executeScripts` is `true`; it is `false` by default. `destination`, by default
 the last search directory, is the workspace root that converted file patterns
 become relative to. With `fallback`, `false` by default, it converts as
-`loadConfig`'s fallback does: a `.prettierignore` with negated entries applies
-none of its patterns, where it otherwise converts the other patterns and reports
-the negated ones in `omitted`. `fallback` never runs scripts; `executeScripts`
-alone decides that. The report's `unused` lists the files found and not used,
-each with a `reason`: a script it did not run, a TOML or JSON5 file, a Prettier
-configuration whose `.prettierignore` excludes all Markdown, a `.prettierignore`
-with negated entries under the fallback, or a `.markdownlintignore` beside a
-markdownlint configuration in use. When it could use none, `sources` is empty
-and `config` is `{}`.
+`loadConfig`'s fallback does: a participating `.prettierignore` or legacy
+`.markdownlintignore` with negated entries applies none of that file's patterns,
+where it otherwise converts the other patterns and reports the negated ones in
+`omitted`. Other ignore files still apply. `fallback` never runs scripts;
+`executeScripts` alone decides that. The report's `unused` lists the files found
+and not used, each with a `reason`: a script it did not run, a TOML or JSON5
+file, a Prettier configuration whose `.prettierignore` excludes all Markdown, an
+ignore file with negated entries under the fallback, or a legacy
+`.markdownlintignore` when CLI2 configuration is present. Otherwise the legacy
+ignore file participates with standalone markdownlint settings, as
+[integrations](integrations.md#configuration-conversion-and-fallback) describes.
+When it could use none, `sources` is empty and `config` is `{}`.
 
 `loadConfig`'s optional `workspaceRoot` sets the returned root and the base for
 converted file patterns, as the CLI's `--root` does. The configuration search

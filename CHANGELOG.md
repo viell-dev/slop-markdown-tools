@@ -15,6 +15,14 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 - Preserve supported EditorConfig intersection branches independently
   ([#840](https://github.com/viell-dev/slop-markdown-tools/issues/840)).
+- Convert legacy `.markdownlintignore` exclusions alongside standalone
+  markdownlint settings
+  ([#803](https://github.com/viell-dev/slop-markdown-tools/issues/803)).
+
+### Fixed
+
+- Honor the first ignore pattern after a UTF-8 byte-order mark
+  ([#877](https://github.com/viell-dev/slop-markdown-tools/issues/877)).
 
 ### Maintenance
 

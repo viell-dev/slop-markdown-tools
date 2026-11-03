@@ -500,7 +500,7 @@ describe("competitor configuration CLI (#669)", () => {
       .rules;
     expect(Object.keys(rules)).toEqual(["style/final-newline"]);
   });
-  it("names an unconverted .markdownlintignore instead of checking its files silently", async () => {
+  it("carries .markdownlintignore only with participating markdownlint settings", async () => {
     const root = await fixture({
       ".markdownlint.json": '{"default":true}',
       ".markdownlintignore": "docs/\n",
@@ -512,17 +512,15 @@ describe("competitor configuration CLI (#669)", () => {
         conversion: { sources: string[]; unused: { file: string; reason: string }[] };
       }
     ).conversion;
-    expect(conversion.sources).toEqual([path.join(root, ".markdownlint.json")]);
-    expect(conversion.unused).toEqual([
-      {
-        file: path.join(root, ".markdownlintignore"),
-        reason:
-          'it is not converted, so the documents it excludes are checked; list its patterns under "ignore" in an mdrefine configuration',
-      },
+    expect(conversion.sources).toEqual([
+      path.join(root, ".markdownlint.json"),
+      path.join(root, ".markdownlintignore"),
     ]);
+    expect(conversion.unused).toEqual([]);
     const linted = run(root, ["lint"]);
-    expect(linted.stderr).toContain("not using .markdownlintignore: it is not converted");
-    expect(linted.stderr).toContain("docs/a.md");
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(linted.stderr).not.toContain("not using .markdownlintignore");
+    expect(linted.stderr).not.toContain("docs/a.md");
     // Without a markdownlint configuration in use, the file is no fallback source.
     const prettierOnly = await fixture({
       ".prettierrc.json": "{}",
