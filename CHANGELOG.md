@@ -13,6 +13,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Avoid repeated blank-line scans and descendant event rebuilding in deeply
+  nested builtin lists, preserving list positions and looseness; syntax plugins
+  retain their original container routines
+  ([#859](https://github.com/viell-dev/slop-markdown-tools/issues/859)).
 - Wrap VitePress body paragraphs beginning with `---` when syntax plugins are
   enabled, while retaining actual plugin block boundaries
   ([#869](https://github.com/viell-dev/slop-markdown-tools/issues/869)).

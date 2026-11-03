@@ -307,6 +307,7 @@ async function generateParser(options, attachDebugInfo) {
     assert.deepEqual(Object.fromEntries([...counts].sort(([a], [b]) => compare(a, b))), {
       attention: 1,
       autolink: 1,
+      blankLine: 1,
       cjk: 1,
       code: 1,
       document: 1,
@@ -314,11 +315,12 @@ async function generateParser(options, attachDebugInfo) {
       footnoteSyntax: 1,
       htmlFlow: 1,
       labelEnd: 1,
+      list: 1,
       strike: 1,
       text: 1,
     });
     assert.equal(redirected.size, 1);
-    assert.equal(transformed.size, 11);
+    assert.equal(transformed.size, 13);
     assert.deepEqual(editMapImporters.sort(compare), expectedImporters);
 
     const modules = Object.keys(chunk.modules);

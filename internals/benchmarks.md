@@ -41,10 +41,25 @@ open list, micromark checks whether the remaining line is blank and scans its
 indentation again. The tree compiler also traverses and rebuilds descendant
 event slices for each enclosing list. Both perform cubic work in nesting depth
 on a list that adds one level per line; that fixture's byte size is quadratic in
-depth. The same cost reproduces in stock upstream. The lazy-line correction
-above does not address these traversals, and no general parser CPU or nesting
-bound is promised. The issue retains matched-size controls, exact trees,
-profiling and deterministic work counts for a future correction.
+depth. The same cost reproduces in stock upstream.
+
+For builtin grammars, the adapter retains a tokenizer-local proof of a scanned
+whitespace suffix, checking both chunk cursor bounds and the physical line
+before reusing it. List preparation indexes container ends, visits each list's
+own events, then merges synthetic item events once in upstream postorder. It
+retains token identities, item ranges, looseness and footnote indentation.
+Syntax plugins and unmarked factory callers keep the original routines and their
+deep-list cost; an explicit original marker overrides builtin opt-in. Positioned
+trees, compiler observations, cursor restores, deterministic work and
+missing-helper/cache/descendant-scan mutants cover these corrections. The work
+counters measure the two targeted traversals, not all parser CPU or memory; no
+general parser or nesting bound is promised. The issue retains matched-size
+controls, profiling and paired measurements.
+
+Micromark still copies its open token stack on each attempt/check. Very deep
+lists retain this smaller cubic-in-depth term; correcting it would require a
+separate tokenizer change. The local fixes above do not claim to remove that
+cost, and the upstream reporting hold remains in effect.
 
 ## Large paragraphs
 
