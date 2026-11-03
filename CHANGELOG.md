@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.6.5 - 2026-11-03
+
+0.6.5 speeds up deeply nested lists and corrects VitePress paragraph wrapping
+with syntax plugins. [What's new in
+0.6](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.6.html#in-065)
+describes both fixes. No upgrading steps are needed.
 
 ### Fixed
 
@@ -25,6 +30,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 - Refresh the MathJax speech engine and remove its obsolete xmldom override
   ([#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)).
+- Refresh eligible indirect dependencies used by syntax extensions,
+  documentation and verification tools.
 
 ## 0.6.4 - 2026-11-02
 
