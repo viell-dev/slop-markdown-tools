@@ -318,16 +318,23 @@ it("applies many edits with insertions at both ends", () => {
 });
 
 it("applies edits with linear scaling", () => {
-  expect(
-    scaling(
-      // The smaller pair varied from 5x to 11x on Node 26 despite more warm-up.
-      // This larger pair keeps the same bound and rejects the former assembler.
-      [8000, 32000],
-      editWorkload,
-      ({ source, edits }) => applyEdits(source, edits),
-      (output, { expected }) => expect(output).toBe(expected),
-    ),
-  ).toBeLessThan(10);
+  // Compare equal work: four small documents against one large document.
+  // The 2.5 bound retains the former allowance of 10 at four times the work.
+  // Short equal-work windows can miss a CPU-quota period on only one side
+  // (#795). Target 200 ms, with preparation bounded by the 32-call cap.
+  const sizes: [number, number] = [8000, 32000];
+  const measurement = measureScaling(
+    sizes,
+    (count) => Array.from({ length: sizes[1] / count }, () => editWorkload(count)),
+    (inputs) => inputs.map(({ source, edits }) => applyEdits(source, edits)),
+    (outputs, inputs) => {
+      expect(outputs).toHaveLength(inputs.length);
+      outputs.forEach((output, index) => expect(output).toBe(inputs[index]!.expected));
+    },
+    32,
+    200,
+  );
+  expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(2.5);
 });
 
 it.each([

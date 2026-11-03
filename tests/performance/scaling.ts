@@ -8,12 +8,14 @@ export function scaling<Input, Output>(
   run: (input: Input) => Output,
   verify: (output: Output, input: Input) => void,
   maxCalls = 8,
+  targetMs = 25,
 ): number {
-  return measureScaling(sizes, prepare, run, verify, maxCalls).ratio;
+  return measureScaling(sizes, prepare, run, verify, maxCalls, targetMs).ratio;
 }
 
 export interface ScalingMeasurement {
   sizes: readonly [number, number];
+  targetMs: number;
   warmup: number[];
   calibration: number[];
   calls: number;
@@ -21,13 +23,17 @@ export interface ScalingMeasurement {
   ratio: number;
 }
 
-/** Retain scalar timing evidence for an assertion's failure message. */
+/**
+ * Retain scalar timing evidence. targetMs sets the calibration goal; maxCalls
+ * bounds both preparation and the number of operations in a measured window.
+ */
 export function measureScaling<Input, Output>(
   sizes: readonly [number, number],
   prepare: (size: number) => Input,
   run: (input: Input) => Output,
   verify: (output: Output, input: Input) => void,
   maxCalls = 8,
+  targetMs = 25,
 ): ScalingMeasurement {
   const elapsed = (inputs: Input[]): number => {
     const outputs: Output[] = [];
@@ -42,7 +48,7 @@ export function measureScaling<Input, Output>(
   const calibration = Array.from({ length: 3 }, () => elapsed([prepare(sizes[0])]));
   // One bounded call count for both sizes targets a measurable small batch.
   // Cap preparation too: fast scans can need expensive, freshly parsed trees.
-  const calls = Math.max(1, Math.min(maxCalls, Math.ceil(25 / Math.min(...calibration))));
+  const calls = Math.max(1, Math.min(maxCalls, Math.ceil(targetMs / Math.min(...calibration))));
   const fastest = [Infinity, Infinity];
   const samples: [number[], number[]] = [[], []];
   for (let round = 0; round < 4; round++) {
@@ -55,6 +61,7 @@ export function measureScaling<Input, Output>(
   }
   return {
     sizes: [...sizes],
+    targetMs,
     warmup,
     calibration,
     calls,

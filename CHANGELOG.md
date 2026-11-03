@@ -15,6 +15,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 - Retain lazy-HTML scaling windows in failed assertions for Windows triage
   ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
+- Balance edit-scaling workloads and extend their timing windows under
+  contention
+  ([#795](https://github.com/viell-dev/slop-markdown-tools/issues/795)).
 
 ## 0.6.5 - 2026-11-03
 
