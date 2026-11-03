@@ -906,7 +906,12 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   some original algorithms pass them at the selected sizes. Timing alone does
   not establish that a parser defect is fixed. The Benchmark workflow's
   reference timings run for changes to `benchmarks/` and by hand, and the
-  benchmark page documents the known limits.
+  benchmark page documents the known limits. A failed lazy-HTML range timing
+  assertion includes its sizes, warm-up and calibration durations, call count,
+  and four windows per size in milliseconds. Its ratio still uses each size's
+  fastest window; these diagnostics do not identify GC or contention as a cause
+  or resolve the intermittent Windows failure in
+  [#826](https://github.com/viell-dev/slop-markdown-tools/issues/826).
 - **Public descriptions agree with the package.** `docs.test.ts`,
   `benchmarks.test.ts`, and `metadata.test.ts` on every pull request;
   `npm run check:live` for GitHub's settings, the newest release, npm, and the

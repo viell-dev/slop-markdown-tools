@@ -4,7 +4,7 @@ import { applyEdits, format, lint, parse, resolveConfig } from "../../src/index.
 import type { Config, Document, Plugin, ProcessOptions } from "../../src/index.js";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import { collectGithubLazyHtmlProtections } from "../../src/syntax/github-protections.js";
-import { scaling } from "./scaling.js";
+import { measureScaling, scaling } from "./scaling.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
 it("scans a comment's long marker line without quadratic backtracking (#492)", () => {
@@ -369,28 +369,25 @@ it.each([
           ] as const,
       ),
     );
-    expect(
-      scaling(
-        sizes,
-        (count) => ({ documents: documents.get(count)!, count }),
-        ({ documents }) =>
-          documents.map((document) => {
-            const found = new Set<Nodes>();
-            collectGithubLazyHtmlProtections(document, found);
-            return found;
-          }),
-        (results, { documents, count }) => {
-          expect(results).toHaveLength(documents.length);
-          results.forEach((found, index) => {
-            expect(found.size).toBe(regions(count));
-            for (const node of found)
-              expect(node.position!.end.offset).toBeLessThanOrEqual(
-                documents[index]!.source.length,
-              );
-          });
-        },
-      ),
-    ).toBeLessThan(2.5);
+    const measurement = measureScaling(
+      sizes,
+      (count) => ({ documents: documents.get(count)!, count }),
+      ({ documents }) =>
+        documents.map((document) => {
+          const found = new Set<Nodes>();
+          collectGithubLazyHtmlProtections(document, found);
+          return found;
+        }),
+      (results, { documents, count }) => {
+        expect(results).toHaveLength(documents.length);
+        results.forEach((found, index) => {
+          expect(found.size).toBe(regions(count));
+          for (const node of found)
+            expect(node.position!.end.offset).toBeLessThanOrEqual(documents[index]!.source.length);
+        });
+      },
+    );
+    expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(2.5);
   },
   // Parsing the documents takes most of the time.
   120_000,
