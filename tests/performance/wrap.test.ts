@@ -4,28 +4,34 @@ import type { Plugin } from "../../src/index.js";
 import { scaling } from "./scaling.js";
 const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
 
-it("checks changed paragraphs with syntax plugins in linear time (#777)", () => {
-  const plugin: Plugin = { name: "extra-syntax", syntax: { micromark: {}, mdast: {} } };
-  const paragraph = "word ".repeat(30).trimEnd();
-  const growth = scaling(
-    [500, 2000],
-    (count) => ({
-      count,
-      document: parse(`${paragraph}\n\n`.repeat(count), "commonmark", "document.md", [plugin]),
-    }),
-    ({ document }) => builtInRules["style/wrap"]!.check({ document, options: { width: 40 } }),
-    (findings, { count }) => {
-      expect(findings).toHaveLength(count);
-      expect(
-        findings.every((finding) =>
-          finding.edit?.text.split("\n").every((line) => line.length <= 40),
-        ),
-      ).toBe(true);
-    },
-    1,
-  );
-  expect(growth).toBeLessThan(10);
-}, 60_000);
+it.each(["commonmark", "vitepress"] as const)(
+  "checks changed %s paragraphs with syntax plugins in linear time (#777/#869)",
+  (dialect) => {
+    const plugin: Plugin = { name: "extra-syntax", syntax: { micromark: {}, mdast: {} } };
+    const paragraph = (dialect === "vitepress" ? "--- " : "") + "word ".repeat(30).trimEnd();
+    const growth = scaling(
+      [500, 2000],
+      (count) => ({
+        count,
+        document: parse("Intro.\n\n" + `${paragraph}\n\n`.repeat(count), dialect, "document.md", [
+          plugin,
+        ]),
+      }),
+      ({ document }) => builtInRules["style/wrap"]!.check({ document, options: { width: 40 } }),
+      (findings, { count }) => {
+        expect(findings).toHaveLength(count);
+        expect(
+          findings.every((finding) =>
+            finding.edit?.text.split("\n").every((line) => line.length <= 40),
+          ),
+        ).toBe(true);
+      },
+      1,
+    );
+    expect(growth).toBeLessThan(10);
+  },
+  60_000,
+);
 
 it("reflows many paragraphs in linear time regardless of the line ending", () => {
   // Exercise the rule directly: the edit application and diagnostic positioning

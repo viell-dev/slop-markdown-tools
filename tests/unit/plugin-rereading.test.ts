@@ -113,34 +113,86 @@ describe("rules that read changed text again use the document's plugins (#752)",
     ]);
     expect(format(source, { config: only("style/wrap") }).output).toContain(`${eol}@@x b`);
   });
-  it("rereads only changed candidates when syntax plugins are present (#777)", () => {
-    let reads = 0;
-    const plugin: Plugin = {
-      name: "count-reads",
-      syntax: {
-        micromark: {},
-        mdast: {
-          transforms: [
-            (tree) => {
-              reads++;
-              return tree;
-            },
-          ],
+  it.each(["commonmark", "vitepress"] as const)(
+    "rereads only changed %s candidates when syntax plugins are present (#777/#869)",
+    (dialect) => {
+      let reads = 0;
+      const plugin: Plugin = {
+        name: "count-reads",
+        syntax: {
+          micromark: {},
+          mdast: {
+            transforms: [
+              (tree) => {
+                reads++;
+                return tree;
+              },
+            ],
+          },
         },
-      },
-    };
-    const wide = "word ".repeat(30).trimEnd();
-    const document = parse(`${wide}\n\nShort.\n\n${wide}\n`, "commonmark", "document.md", [plugin]);
-    reads = 0;
-    const findings = builtInRules["style/wrap"]!.check({ document, options: { width: 40 } });
-    expect(findings).toHaveLength(2);
-    expect(reads).toBe(2);
-    const normal = parse(wide, "commonmark");
-    const rulesOnly = parse(wide, "commonmark", "document.md", [{ name: "rules-only", rules: {} }]);
-    expect(
-      builtInRules["style/wrap"]!.check({ document: rulesOnly, options: { width: 40 } }),
-    ).toEqual(builtInRules["style/wrap"]!.check({ document: normal, options: { width: 40 } }));
-  });
+      };
+      const wide = (dialect === "vitepress" ? "--- " : "") + "word ".repeat(30).trimEnd();
+      const document = parse(`Intro.\n\n${wide}\n\nShort.\n\n${wide}\n`, dialect, "document.md", [
+        plugin,
+      ]);
+      reads = 0;
+      const findings = builtInRules["style/wrap"]!.check({ document, options: { width: 40 } });
+      expect(findings).toHaveLength(2);
+      expect(reads).toBe(2);
+      const normal = parse(wide, "commonmark");
+      const rulesOnly = parse(wide, "commonmark", "document.md", [
+        { name: "rules-only", rules: {} },
+      ]);
+      expect(
+        builtInRules["style/wrap"]!.check({ document: rulesOnly, options: { width: 40 } }),
+      ).toEqual(builtInRules["style/wrap"]!.check({ document: normal, options: { width: 40 } }));
+    },
+  );
+  it.each(["\n", "\r\n", "\r"])(
+    "wraps existing VitePress --- paragraphs without hiding plugin blocks with %j (#869)",
+    (eol) => {
+      const empty: Plugin = { name: "empty-syntax", syntax: { micromark: {}, mdast: {} } };
+      const rulesOnly: Plugin = { name: "rules-only", rules: {} };
+      const config: Config = {
+        extends: [],
+        dialect: "vitepress",
+        rules: { "style/wrap": ["warn", { width: 48, reportUnreflowed: true }] },
+      };
+      const paragraph =
+        "--- gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma";
+      for (const prefix of ["", "> ", "- ", "- > "]) {
+        const source = `Intro.${eol}${eol}${prefix}${paragraph}${eol}`;
+        const expected = format(source, { config }).output;
+        expect(expected, prefix).not.toBe(source);
+        for (const plugin of [empty, rulesOnly]) {
+          const options = { config, plugins: [plugin] };
+          const result = format(source, options);
+          expect(result.output, prefix + plugin.name).toBe(expected);
+          expect(result.diagnostics.filter(({ rule }) => rule.startsWith("engine/"))).toEqual([]);
+          expect(
+            semanticFingerprint(parse(result.output, "vitepress", "document.md", [plugin])),
+          ).toBe(semanticFingerprint(parse(source, "vitepress", "document.md", [plugin])));
+          expect(format(result.output, options).output).toBe(result.output);
+        }
+        const hazardous = `Intro.${eol}${eol}${prefix}--- ${"a ".repeat(22 - prefix.length / 2)}@@x b${eol}`;
+        expect(format(hazardous, { config }).output, prefix).not.toBe(hazardous);
+        const held = format(hazardous, { config, plugins: [atLines] });
+        expect(held.output, prefix).toBe(hazardous);
+        expect(held.diagnostics, prefix).toHaveLength(1);
+        expect(held.diagnostics[0]?.rule, prefix).toBe("style/wrap");
+        expect(held.diagnostics[0]?.message, prefix).toContain("syntax plugin block structure");
+      }
+      const frontMatter = `---${eol}title: Entry${eol}---${eol}${eol}`;
+      const withMetadata = frontMatter + paragraph + eol;
+      const options = { config, plugins: [empty] };
+      expect(format(withMetadata, options).output).toBe(format(withMetadata, { config }).output);
+      expect(format(withMetadata, options).output.startsWith(frontMatter)).toBe(true);
+      const unclosed = `--- title remains opaque${eol}${paragraph}${eol}`;
+      expect(format(unclosed, options).output).toBe(unclosed);
+      const fourDashes = paragraph.replace("---", "----") + eol;
+      expect(format(fourDashes, options).output).toBe(format(fourDashes, { config }).output);
+    },
+  );
   it("style/wrap breaks after a definition-like start that the plugin reads as text", () => {
     const source = "[a]: b " + "x".repeat(80) + "\n";
     const config = only("style/wrap");
