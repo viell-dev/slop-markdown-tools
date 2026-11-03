@@ -192,25 +192,30 @@ read, by either. `.prettierrc.jsonc` is not a Prettier configuration filename
 and is not searched. An extensionless `.prettierrc` is read as YAML, as Prettier
 reads it, so it can hold JSON; a JSON comment in it becomes part of the next key
 in Prettier too, which ignores that setting, and conversion reports it. A file
-that cannot be parsed is an error that names it. `.prettierignore` and
-markdownlint-cli2 `ignores` and `globs` become `ignore`. Negated
-`.prettierignore` patterns cannot be converted: `config convert` reports them
-for manual migration and converts the other patterns, so review its `ignore`
-before using it. The fallback, which has no such review, applies none of the
-patterns of a `.prettierignore` with a negated entry: it checks the documents
+that cannot be parsed is an error that names it. `.prettierignore`, active
+`.markdownlintignore` files, and markdownlint-cli2 `ignores` and `globs` become
+`ignore`. The legacy `.markdownlintignore` belongs to markdownlint-cli (CLI1).
+It participates with standalone markdownlint settings when no CLI2 configuration
+is present. CLI2 does not read that file, so it is named as unused alongside a
+CLI2 configuration. An ignore file alone does not activate the fallback. When
+CLI1 and Prettier ignore files both participate, their exclusions combine.
+
+Negated entries in either ignore file cannot be converted: `config convert`
+reports them for manual migration and converts the other patterns, so review its
+`ignore` before using it. The fallback, which has no such review, applies none
+of that file's patterns when it has a negated entry: it checks the documents
 that the file excludes rather than apply the exclusions without their
-exceptions, which can leave nothing to check. `.markdownlintignore`, the ignore
-file of markdownlint-cli and editor extensions, is not converted: beside a
-markdownlint configuration in use, the documents it excludes are checked; add
-its patterns to `ignore` in an mdrefine configuration. The
-[notices](cli.md#fallback-notices) and `conversion.unused` say so.
+exceptions, which can leave nothing to check. Other participating ignore files
+still apply. The [notices](cli.md#fallback-notices) and `conversion.unused`
+identify unused sources and explain why.
 
 Patterns convert within the subset of glob syntax that each source documents. A
 pattern outside it, such as a character class or a negated `.prettierignore`
 entry, is reported with its source for manual migration rather than converted.
-Prettier matches ignore patterns without regard to letter case, while converted
-patterns match case exactly; conversion says so once per `.prettierignore`. The
-[maintainer
+An initial UTF-8 byte-order mark in an ignore file is discarded before reading
+its first pattern. Prettier and CLI1 match ignore patterns without regard to
+letter case, while converted patterns match case exactly; conversion says so
+once per ignore file. The [maintainer
 notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/conversion.md#patterns)
 list the exact subsets.
 

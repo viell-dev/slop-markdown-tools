@@ -269,9 +269,9 @@ function editorOptions(raw: Values): Values {
 
 /**
  * Read competitors only in directories the mdrefine search already visited, nearest first.
- * For the in-memory `fallback`, a `.prettierignore` whose negated entries conversion
- * cannot express applies none of its patterns, so its documents are checked rather than
- * none; conversion for a written configuration reports those entries for manual migration.
+ * For the in-memory `fallback`, negated entries in `.prettierignore` or an active
+ * `.markdownlintignore` prevent that file's patterns from applying, so its documents
+ * are checked; written conversion reports those entries for manual migration.
  */
 export async function loadCompetitorConfig(
   directories: readonly string[],
@@ -735,42 +735,36 @@ export async function loadCompetitorConfig(
       addOverride(rebased, object(item.options, `the options of ${where}`));
     }
   }
-  // markdownlint-cli and editor extensions read `.markdownlintignore`, a file of the
-  // tools around markdownlint rather than one of its settings. It is not converted,
-  // so the documents it excludes are checked; say so instead of checking them silently.
-  const markdownlintIgnore = markdownlint ? await find([".markdownlintignore"]) : undefined;
-  if (markdownlintIgnore)
-    unused.set(
-      markdownlintIgnore,
-      'it is not converted, so the documents it excludes are checked; list its patterns under "ignore" in an mdrefine configuration',
-    );
-  const negated = (ignoreText ?? "").split(/\r?\n/).filter((line) => line.startsWith("!"));
-  if (ignoreFile && prettier && fallback && negated.length)
+  /** Carry each gitignore-style source independently of other ignore files. */
+  const carryIgnoreFile = (file: string, text: string, tool: string) => {
+    const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+    const negated = lines.filter((line) => line.startsWith("!"));
     // Independent ignore globs cannot re-include a document, so the fallback would
     // apply the exclusions without their exceptions and could check nothing.
-    unused.set(
-      ignoreFile,
-      `its negated entries (${negated.join(", ")}) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration`,
-    );
-  else if (ignoreFile && ignoreText !== undefined && prettier) {
-    sources.push(ignoreFile);
+    if (fallback && negated.length) {
+      unused.set(
+        file,
+        `its negated entries (${negated.join(", ")}) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration`,
+      );
+      return;
+    }
+    sources.push(file);
     omitted.push(
-      `${shown(ignoreFile)}: Prettier matches its patterns without regard to letter case; the converted patterns match case exactly.`,
+      `${shown(file)}: ${tool} matches its patterns without regard to letter case; the converted patterns match case exactly.`,
     );
     ignore.push(
-      ...ignoreText
-        .split(/\r?\n/)
+      ...lines
         .filter((line) => line && !line.startsWith("#"))
         .flatMap((line) => {
           if (line.startsWith("!")) {
             omitted.push(
-              `${shown(ignoreFile)}: negated pattern ${line} cannot be represented by independent ignore globs.`,
+              `${shown(file)}: negated pattern ${line} cannot be represented by independent ignore globs.`,
             );
             return [];
           }
           if (translatePattern(line, "gitignore") === undefined) {
             omitted.push(
-              `${shown(ignoreFile)}: pattern ${line} not carried over: outside the supported gitignore subset.`,
+              `${shown(file)}: pattern ${line} not carried over: outside the supported gitignore subset.`,
             );
             return [];
           }
@@ -778,12 +772,30 @@ export async function loadCompetitorConfig(
           const pattern = line.replace(/^\//, "").replace(/\/$/, "");
           const prefix = !rooted && !pattern.includes("/") ? "**/" : "";
           return [
-            ...(!line.endsWith("/") ? rebase(`${prefix}${pattern}`, ignoreFile, "gitignore") : []),
-            ...rebase(`${prefix}${pattern}/**`, ignoreFile, "gitignore"),
+            ...(!line.endsWith("/") ? rebase(`${prefix}${pattern}`, file, "gitignore") : []),
+            ...rebase(`${prefix}${pattern}/**`, file, "gitignore"),
           ];
         }),
     );
+  };
+  // CLI1 reads this file. CLI2 does not, so a discovered CLI2 configuration
+  // keeps its own selection.
+  const markdownlintIgnore = markdownlint ? await find([".markdownlintignore"]) : undefined;
+  if (markdownlintIgnore) {
+    if (cli2File)
+      unused.set(
+        markdownlintIgnore,
+        "markdownlint-cli2 does not read this file; its patterns do not apply while a CLI2 configuration is present",
+      );
+    else
+      carryIgnoreFile(
+        markdownlintIgnore,
+        await readFile(markdownlintIgnore, "utf8"),
+        "markdownlint-cli",
+      );
   }
+  if (ignoreFile && ignoreText !== undefined && prettier)
+    carryIgnoreFile(ignoreFile, ignoreText, "Prettier");
   if (prettier && overrides.length && !report.config.rules?.["style/wrap"])
     report.config = {
       ...report.config,

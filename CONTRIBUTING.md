@@ -831,7 +831,12 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   and written configuration, comparing effective settings with Prettier's own
   resolution. Exact and disjoint brace branches, ancestor rebasing, coupled
   EditorConfig values and notices for unsupported remainders are checked on
-  every pull request. Reported omissions still require manual migration.
+  every pull request. `competitor-ignores.test.ts` checks CLI1 selection,
+  ancestor rebasing, CLI2/Prettier coexistence, BOM-prefixed first patterns,
+  per-file negation recovery and read errors. Its selection fixtures were
+  compared with the installed reference CLI during implementation; repeat that
+  comparison when changing the imported semantics. Reported omissions still
+  require manual migration.
 - **Output is deterministic and formatting converges.** The unit tests format
   their output again and expect no change, and each example workspace's `after/`
   tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
