@@ -9,6 +9,13 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Maintenance
+
+- Refresh the MathJax speech engine and remove its obsolete xmldom override
+  ([#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)).
+
 ## 0.6.4 - 2026-11-02
 
 0.6.4 corrects heading checks during markdownlint fallback, avoids refused
