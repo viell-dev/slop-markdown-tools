@@ -175,10 +175,5 @@
     "vitepress": "2.0.0-alpha.20",
     "vitest": "5.0.5"
   },
-  "overrides": {
-    "speech-rule-engine@4.1.4": {
-      "@xmldom/xmldom": "0.9.12"
-    }
-  },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }

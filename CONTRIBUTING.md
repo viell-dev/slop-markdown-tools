@@ -297,11 +297,10 @@ Recheck these predicates when changing a builtin resolver or construct.
 
 The VitePress reading uses markdown-it 14.3.3 with the same plugin generation as
 the pinned VitePress 2 reference, including its parser security fixes. Its
-development-only MathJax reference pulls speech-rule-engine 4.1.4, which pins
-vulnerable xmldom 0.9.10; the scoped override selects patched 0.9.12. Keep the
-override until that dependency accepts a fixed version, and check both the
-actual math renderer and the audit when changing it. Tracking issue:
-[#481](https://github.com/viell-dev/slop-markdown-tools/issues/481).
+development-only MathJax reference uses speech-rule-engine 4.1.5, which accepts
+patched xmldom through `^0.9.12` without an override. Check the resolved
+version, actual math renderer and full audit when changing this chain. Adoption
+evidence: [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481).
 
 Unbundled indirect dependencies can declare version ranges. The repository's
 development lockfile is not shipped or imposed on consumers, so a fresh
@@ -388,11 +387,11 @@ warnings or advance an assertion merely to make installation/building succeed.
   ignored. Existing decisions:
   [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591) through
   [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594), and
-  [#612](https://github.com/viell-dev/slop-markdown-tools/pull/612). Keep the
-  scoped MathJax transitive override under
-  [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481) until a
-  compatible published dependency removes the vulnerable pin and the renderer,
-  audit and package checks verify its adoption.
+  [#612](https://github.com/viell-dev/slop-markdown-tools/pull/612). The
+  compatible speech-rule-engine 4.x update accepts patched xmldom without an
+  override; [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)
+  records the source, renderer, audit and installed-package checks for its
+  adoption.
 - **WebdriverIO:** `wdio-obsidian-service` 3.3.0 declares a webdriverio
   `^9.18.1` peer. Retain WDIO major ignores until a service release supports the
   target. Review its coherent WDIO packages and launcher together, then test the
