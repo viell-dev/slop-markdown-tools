@@ -212,7 +212,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.6.5",
+  "version": "0.7.0",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [
@@ -307,9 +307,10 @@ mdrefine: no mdrefine configuration; using markdownlint settings from .markdownl
 ```
 
 When it uses none of the files it found, the last line says that the defaults
-apply instead. A `.prettierignore` with a negated (`!`) entry, which conversion
-cannot express, is not used either: none of its patterns apply, so the documents
-it excludes are checked, and a line says so:
+apply instead. A `.prettierignore` or active `.markdownlintignore` with a
+negated (`!`) entry, which conversion cannot express, is not used either: none
+of its patterns apply, so the documents it excludes are checked, and a line says
+so:
 
 ```text
 mdrefine: not using .prettierignore: its negated entries (!README.md) cannot be converted, so none of its patterns apply and the documents it excludes are checked; "mdrefine config convert" reports them for manual migration

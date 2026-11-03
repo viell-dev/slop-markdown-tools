@@ -10,6 +10,40 @@ version and the new one, oldest first. Install the exact version, as the
 [installation](quick-start.md#install) does, so that you choose when a release
 reaches your documents; see [versions](versions.md).
 
+## 0.7.0
+
+### Workspaces that use converted settings
+
+**Who:** workspaces without an mdrefine configuration that use standalone
+markdownlint settings and a `.markdownlintignore`, or Prettier settings with
+overlapping EditorConfig sections or a BOM-prefixed `.prettierignore`. The same
+changes apply when regenerating a written configuration with `config convert`.
+
+**What changed:** supported legacy ignore patterns now exclude documents that
+were previously checked. Supported EditorConfig intersection branches now keep
+their effective settings even when another branch needs manual migration. An
+initial UTF-8 byte-order mark no longer hides an ignore file's first pattern.
+The [release
+notes](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.7.html)
+show examples and remaining limits.
+
+**Steps:** preview the converted configuration and read its notices before
+adopting it:
+
+```sh
+npx mdrefine config convert
+```
+
+Review the selected files and effective formatting options. To keep a chosen
+file selection instead of using the fallback, put the desired rules and `ignore`
+patterns in an explicit mdrefine configuration. Existing mdrefine configurations
+do not import competitor settings automatically.
+
+**Check:** `npx mdrefine lint --json` lists the documents checked, and
+`npx mdrefine config explain notes.md` shows the effective settings for a
+representative document. Review conversion notices for any patterns that need
+manual migration.
+
 ## 0.6.0
 
 ### Workspaces with markdownlint or Prettier settings
