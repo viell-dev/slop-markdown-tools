@@ -286,6 +286,38 @@ describe("tables in lists and block quotes (#710)", () => {
     expect(result.diagnostics.map((item) => [item.rule, item.line])).toEqual([["style/table", 1]]);
     expect(lint("> | a | b |\n> |---|---|\n> | c | d |\n", { config })).toHaveLength(1);
   });
+  it.each(["\n", "\r\n", "\r"])(
+    "formats Obsidian tables after their callout title or at an item's start with %j (#759)",
+    (eol) => {
+      for (const [before, first, rest] of [
+        ["> [!NOTE] Title\n", "> ", "> "],
+        ["> [!tip]\n", "> ", "> "],
+        ["> [!note]- Folded title\n", "> ", "> "],
+        ["- parent\n", "  - ", "    "],
+        ["1. parent\n", "   1. ", "      "],
+      ]) {
+        const input = (before + nested(first!, rest!)).replaceAll("\n", eol);
+        const expected = (before + nested(first!, rest!, formatted)).replaceAll("\n", eol);
+        expect(check(input, {}, "obsidian")).toBe(expected);
+        const result = format(input, {
+          config: { extends: [], dialect: "obsidian", rules: { "style/table": "warn" } },
+        });
+        expect(result.diagnostics).toEqual([]);
+      }
+    },
+  );
+  it("keeps Obsidian's paragraph, Tab, footnote and malformed-callout table holds (#759)", () => {
+    const input = "| a | b |\n|---|---|\n| ccc | d |\n";
+    for (const source of [
+      "> Text\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
+      "> [!NOTE] Title\n> body text\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
+      "> \\[!NOTE] Title\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
+      nested(">\t", ">\t"),
+      "- parent\n  text\n" + nested("  ", "  "),
+      "Text\n[^a]: parent\n" + nested("    - ", "      ") + "\nText[^a].\n",
+    ])
+      expect(check(source, {}, "obsidian")).toBe(source);
+  });
   it.each(["github", "forgejo", "gitea", "obsidian", "vitepress", "commonmark"] as const)(
     "agrees with the recommended rules around nested tables in %s",
     (dialect) => {

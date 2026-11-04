@@ -165,16 +165,18 @@ note shows there, the tool keeps the text as written:
   item or list, the list's markers and spacing stay, including those of lists
   nested in its last item and the following list's markers.
 - A table that Obsidian reads otherwise. Obsidian reads a table directly below a
-  line of paragraph text as more of the text, a one-column table whose header
-  line does not end with a pipe, as in `Name` and `--:` below it, as text, and a
-  line without a pipe as the end of a table, where CommonMark's tables read a
-  row. Reading view reads a line with a pipe above a delimiter row that starts
-  with `- `, as in `Name | Value` and `- | -` below it, as a table, where
-  CommonMark reads a paragraph and a list. No rule changes such a table, those
-  rows, or that line and list. Live Preview also shows the rows of a table
-  directly below a fenced code block, a thematic break, or an HTML block as
-  text, where Reading view shows a table, so `style/block-spacing` adds no blank
-  line there.
+  line of paragraph text in the same block as more of the text, a one-column
+  table whose header line does not end with a pipe, as in `Name` and `--:` below
+  it, as text, and a line without a pipe as the end of a table, where
+  CommonMark's tables read a row. Reading view reads a line with a pipe above a
+  delimiter row that starts with `- `, as in `Name | Value` and `- | -` below
+  it, as a table, where CommonMark reads a paragraph and a list. No rule changes
+  such a table, those rows, or that line and list. Live Preview also shows the
+  rows of a table directly below a fenced code block, a thematic break, or an
+  HTML block as text, where Reading view shows a table, so `style/block-spacing`
+  adds no blank line there. A table starting its own list item or immediately
+  following its callout's single-line title is a separate block and formats
+  normally (#759).
 
 These protections also apply to the reading of TOML front matter (`+++`) as
 paragraph text: a table or footnote definition directly below its closing fence

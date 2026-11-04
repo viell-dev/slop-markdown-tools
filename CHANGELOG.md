@@ -11,6 +11,13 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Format Obsidian tables directly below a callout's title or starting a nested
+  list item below parent text. Tables continuing paragraph text or using Tab
+  container prefixes keep their rendering protections
+  ([#759](https://github.com/viell-dev/slop-markdown-tools/issues/759)).
+
 ### Maintenance
 
 - Retry transient GitHub server errors during release CI evidence lookup

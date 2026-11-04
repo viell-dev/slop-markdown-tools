@@ -309,6 +309,28 @@ export const fixtures = [
     source: "> [!tip]\n> | a | b |\n> |---|---|\n> | ccc | d |\n",
   },
   {
+    // #759: these tables start their own block, unlike a paragraph continuation.
+    name: "table below a titled collapsible callout",
+    source: "> [!NOTE]+ Title\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n",
+  },
+  {
+    name: "table starting a nested list item below parent text",
+    source: "- parent\n  - | a | b |\n    |---|---|\n    | 1 | 2 |\n",
+  },
+  {
+    name: "table starting an ordered nested item below parent text",
+    source: "1. parent\n   1. | a | b |\n      |---|---|\n      | 1 | 2 |\n",
+  },
+  {
+    // Reading view shows the literal rows as indented code; padding must stay.
+    name: "table with a Tab after its quote marker",
+    source: ">\t| a | b |\n>\t|---|---|\n>\t| 1 | 2 |\n",
+  },
+  {
+    name: "table continuing a callout body paragraph",
+    source: "> [!NOTE] Title\n> body text\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n",
+  },
+  {
     name: "table in a quoted list item",
     source: "> - An item\n>\n>   | a | b |\n>   |---|---|\n>   | ccc | d |\n",
   },
