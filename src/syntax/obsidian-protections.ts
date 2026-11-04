@@ -101,14 +101,16 @@ function obsidianBlocks(document: Document): ObsidianBlocks {
       tableOpeners.add(node.children[0]);
     if (node.type === "blockquote") {
       const [title, table] = node.children;
+      const start = title?.position?.start.offset;
       if (
         title?.type === "paragraph" &&
         table?.type === "table" &&
         title.position &&
+        start !== undefined &&
         title.position.start.line === title.position.end.line &&
-        /^\[![\w-]+\][+-]?(?:[ \t]|$)/.test(
-          document.source.slice(title.position.start.offset, title.position.end.offset),
-        )
+        // Obsidian requires zero or one space after the quote marker (#360, #883).
+        /> ?$/.test(document.source.slice(Math.max(0, start - 2), start)) &&
+        /^\[![\w-]+\][+-]?(?:[ \t]|$)/.test(document.source.slice(start, title.position.end.offset))
       )
         tableOpeners.add(table);
     }

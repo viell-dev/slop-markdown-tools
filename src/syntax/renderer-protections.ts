@@ -204,9 +204,10 @@ export interface RendererProtections {
    * In the Obsidian dialect, the tables that Obsidian reads otherwise, and the
    * lines around them (issue #359): a table directly below a line of paragraph
    * text in the same block, which Obsidian reads as more of the text; a
-   * one-column table whose header line does not end with a pipe, which it reads as text; the rows of
-   * a table from the first without a pipe, which ends the table there; and a
-   * line with a pipe above a list item that reads as a delimiter row, as
+   * one-column table whose header line does not end with a pipe, which it reads
+   * as text; the rows of a table from the first without a pipe, which ends the
+   * table there; and a line with a pipe above a list item that reads as a
+   * delimiter row, as
    * `x | y` and `- | -` do, which Reading view reads as a table. Each counts
    * from the line break or line where Obsidian's reading starts to differ.
    * Also the final physical table line directly above a compact hyphen
