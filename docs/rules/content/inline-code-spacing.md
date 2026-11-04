@@ -48,5 +48,5 @@ because Live Preview ends it at its line.
 
 This is a rule of its own rather than an option of
 [`style/inline-code`](../style/inline-code.md): that rule only makes edits that
-keep the code as renderers show it, and no edit of the padding does, so there is
-nothing to fix, only to report.
+keep the code as renderers show it, and no edit of blank space that they show
+does, so there is nothing to fix, only to report.

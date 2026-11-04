@@ -260,6 +260,9 @@ describe("style/inline-code", () => {
       ["Use ``  a  ``.", "Use `  a  `."],
       ["Use ``   ``.", "Use `   `."],
       ["Use `` a ``.", "Use `a`."],
+      ["Use ` a `.", "Use `a`."],
+      ["Use ` - `.", "Use `-`."],
+      ["Use `  a `.", "Use ` a`."],
       ["Use ``a`` and ```b```.", "Use `a` and `b`."],
     ] as const) {
       const config = only(rule, dialect);
@@ -275,6 +278,22 @@ describe("style/inline-code", () => {
       const markdown = new MarkdownIt();
       expect(markdown.render(output)).toBe(markdown.render(source));
     }
+  });
+  it.each(dialects)("names what each edit changes on %s (#886)", (dialect) => {
+    const padding = "Remove the padding that the code span does not need.";
+    const backticks = "Use the fewest backticks for the code span.";
+    for (const [source, message] of [
+      ["Use ` - `.\n", padding],
+      ["Use `  a `.\n", padding],
+      ["Use `` `a ``.\n", undefined],
+      ["Use ``` ``a ```.\n", backticks],
+      ["Use ``  `a ``.\n", padding],
+      ["Use ``a``.\n", backticks],
+      ["Use `` a ``.\n", backticks],
+      ["Use `a`.\n", undefined],
+      ["Use `  a  `.\n", undefined],
+    ] as const)
+      expect(lint(source, { config: only(rule, dialect) })[0]?.message).toBe(message);
   });
   it.each(dialects)("keeps earlier potential backtick partners on %s", (dialect) => {
     for (const source of ["A ` stray and ``code``.", "A \\`` stray and ``code``."])
