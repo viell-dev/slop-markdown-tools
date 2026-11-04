@@ -427,3 +427,67 @@ process.stdout.write([typeof module.evaluate, typeof module.requiredChecks].join
     },
   );
 });
+
+describe("release-evidence CLI server recovery (#880)", () => {
+  it.each(["producer", "checks"] as const)(
+    "re-reads the complete snapshot after a transient %s lookup failure",
+    async (failAt) => {
+      const source = read("scripts/release-evidence.mjs");
+      const anchor = 'import { execFileSync } from "node:child_process";';
+      expect(source.split(anchor)).toHaveLength(2);
+      // Replace only the transport in the copied CLI. Validation, polling,
+      // retry timing and the actual command entry still execute unchanged.
+      const root = await fixture({
+        "package.json": JSON.stringify({
+          repository: { url: "https://github.com/example/project.git" },
+        }),
+        ".github/rulesets/main.json": read(".github/rulesets/main.json"),
+        "scripts/release-evidence.mjs": source.replace(
+          anchor,
+          'import { execFileSync } from "./fake-gh.mjs";',
+        ),
+        "scripts/fake-gh.mjs": `
+import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+const producer = ${JSON.stringify(producer)}, checks = ${JSON.stringify(passing())};
+const calls = []; let failed = false;
+export function execFileSync(command, args) {
+  assert.equal(command, "gh");
+  assert.deepEqual(args.slice(0, 3), ["api", "--paginate", "--slurp"]);
+  const endpoint = args.at(-1);
+  calls.push(endpoint);
+  writeFileSync(new URL("../calls.json", import.meta.url), JSON.stringify(calls));
+  const isProducer = endpoint.includes("/actions/workflows/ci.yml/runs?");
+  if (!failed && isProducer === ${failAt === "producer"}) {
+    failed = true;
+    throw Object.assign(new Error("synthetic API failure"), { stderr: "gh: HTTP 500\\n" });
+  }
+  return JSON.stringify(isProducer ? [{ workflow_runs: [producer] }] : [{ check_runs: checks }]);
+}
+`,
+      });
+      const result = spawnSync(
+        process.execPath,
+        [path.join(root, "scripts/release-evidence.mjs"), commit],
+        {
+          cwd: root,
+          encoding: "utf8",
+          windowsHide: true,
+          timeout: 10000,
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`CI of ${commit}:`);
+      expect(result.stdout).toContain("Unit coverage: success");
+      expect(result.stderr).toContain("retry 1/2");
+      const calls = JSON.parse(readFileSync(path.join(root, "calls.json"), "utf8")) as string[];
+      expect(
+        calls.filter((endpoint) => endpoint.includes("/actions/workflows/ci.yml/runs?")),
+      ).toHaveLength(2);
+      expect(calls.filter((endpoint) => endpoint.includes("/check-runs?"))).toHaveLength(
+        failAt === "producer" ? 1 : 2,
+      );
+    },
+  );
+});

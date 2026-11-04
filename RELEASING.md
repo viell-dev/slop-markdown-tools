@@ -264,9 +264,13 @@ any failure publishes nothing:
   Optional Node 26 can delay completion, but its allowed test failure does not
   fail the workflow or become a release requirement. Whether a Node 26 timeout
   or cancellation leaves the CI run successful is unverified; an unsuccessful
-  run is rejected. The gate needs read access to checks and Actions runs. It
-  waits up to 40 minutes for CI that is still running, so it can be dispatched
-  right after the merge.
+  run is rejected. The gate needs read access to checks and Actions runs. HTTP
+  500, 502, 503 and 504 lookups retry the complete producer/check snapshot at
+  most twice, after 1 and 2 seconds, within the original deadline. A retry
+  discards the earlier producer; persistent errors, other API errors and
+  malformed responses fail closed. Actual unsuccessful CI is never retried by
+  this gate. It waits up to 40 minutes for CI that is still running, so it can
+  be dispatched right after the merge.
 - The Rendering, Obsidian and Forges workflows find no difference before and
   after formatting at that commit. Each compares its regression fixtures and
   realistic documents at seeds 1–5. Forgejo/Gitea also compare actual repository
