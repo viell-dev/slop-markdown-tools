@@ -128,7 +128,8 @@ as written when a row needs one.
 - A table directly after a list item's closing code fence keeps its literal
   rows: Live Preview shows them as source text. A table after a heading,
   indented code, a root fence, or a blank line still formats.
-- In a list or block quote, the same protections apply: a table directly below a
-  line of text, including a callout's title line, or a table whose container
-  prefixes hold a Tab, stays as written. A blank line below the callout's title
-  lets the table format.
+- In a list or block quote, a table directly below paragraph text in the same
+  block stays as written. A table starting its own list item or immediately
+  following a callout's single-line title formats normally. A table whose
+  container prefixes hold a Tab stays as written: Reading view can show those
+  rows as literal code.

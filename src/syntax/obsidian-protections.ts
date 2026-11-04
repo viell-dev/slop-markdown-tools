@@ -64,6 +64,7 @@ export interface ObsidianBlocks {
   containerHtml: Set<Nodes>;
   quotedLeaves: Set<Nodes>;
   quotedItems: Set<Nodes>;
+  tableOpeners: Set<Nodes>;
 }
 
 /** The one positioned leaf projection reused by all Obsidian boundary passes. */
@@ -71,6 +72,8 @@ function obsidianBlocks(document: Document): ObsidianBlocks {
   const containerHtml = new Set<Nodes>();
   const quotedLeaves = new Set<Nodes>();
   const quotedItems = new Set<Nodes>();
+  /** Tables that start their own item, or follow only their callout's title (#759). */
+  const tableOpeners = new Set<Nodes>();
   /**
    * Leaf blocks in document order, and whether each starts a list item, also
    * inside a container that does, as in `- > a`.
@@ -94,6 +97,21 @@ function obsidianBlocks(document: Document): ObsidianBlocks {
     quoted: boolean,
     quotedItem: boolean,
   ) => {
+    if (node.type === "listItem" && node.children[0]?.type === "table")
+      tableOpeners.add(node.children[0]);
+    if (node.type === "blockquote") {
+      const [title, table] = node.children;
+      if (
+        title?.type === "paragraph" &&
+        table?.type === "table" &&
+        title.position &&
+        title.position.start.line === title.position.end.line &&
+        /^\[![\w-]+\][+-]?(?:[ \t]|$)/.test(
+          document.source.slice(title.position.start.offset, title.position.end.offset),
+        )
+      )
+        tableOpeners.add(table);
+    }
     if (node.type === "footnoteDefinition") footnotes.push([node, order.length]);
     if (leaves.has(node.type) || !("children" in node)) {
       order.push([node, item]);
@@ -119,7 +137,16 @@ function obsidianBlocks(document: Document): ObsidianBlocks {
   };
   collect(document.tree, false, undefined, undefined, false, false, false);
 
-  return { order, footnotes, inFootnotes, openers, containerHtml, quotedLeaves, quotedItems };
+  return {
+    order,
+    footnotes,
+    inFootnotes,
+    openers,
+    containerHtml,
+    quotedLeaves,
+    quotedItems,
+    tableOpeners,
+  };
 }
 
 /** Ordered Obsidian boundary passes share one leaf projection and reading-paragraph state. */
@@ -162,7 +189,7 @@ export function collectObsidianProtections(
   const indentLists = new Set<List>();
   if (document.dialect === "obsidian") {
     const blocks = obsidianBlocks(document);
-    const { order, footnotes, inFootnotes, openers, quotedLeaves } = blocks;
+    const { order, footnotes, inFootnotes, openers, quotedLeaves, tableOpeners } = blocks;
     /** Footnote definitions that Reading view reads as paragraph text. */
     const joined = new Set<Nodes>();
     const lines = source.split(lineEndingPattern);
@@ -1113,7 +1140,9 @@ export function collectObsidianProtections(
           // heading, list, quote, or fence in the parser or Live Preview (#505).
           tableContinuation(leaf);
           const rows = source.slice(start, end).split(lineEndingPattern);
-          if (below) {
+          // A preceding leaf in another item, or the callout title alone,
+          // does not continue paragraph text into this table (#759).
+          if (below && !tableOpeners.has(leaf)) {
             let at = previous.position!.end.offset!;
             while (source[at - 1] === " " || source[at - 1] === "\t") at--;
             tableText.add(startingAt(leaf, at));
