@@ -291,6 +291,7 @@ describe("tables in lists and block quotes (#710)", () => {
     (eol) => {
       for (const [before, first, rest] of [
         ["> [!NOTE] Title\n", "> ", "> "],
+        [">[!NOTE] Title\n", "> ", "> "],
         ["> [!tip]\n", "> ", "> "],
         ["> [!note]- Folded title\n", "> ", "> "],
         ["- parent\n", "  - ", "    "],
@@ -306,17 +307,23 @@ describe("tables in lists and block quotes (#710)", () => {
       }
     },
   );
-  it("keeps Obsidian's paragraph, Tab, footnote and malformed-callout table holds (#759)", () => {
+  it.each(["\n", "\r\n", "\r"])("keeps Obsidian's table holds with %j (#759, #883)", (eol) => {
     const input = "| a | b |\n|---|---|\n| ccc | d |\n";
     for (const source of [
       "> Text\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
       "> [!NOTE] Title\n> body text\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
       "> \\[!NOTE] Title\n" + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
+      ...["  ", "   ", "\t", " \t"].map(
+        (gap) => `>${gap}[!NOTE] Title\n` + input.replaceAll(/^/gm, "> ").trimEnd() + "\n",
+      ),
+      ">>  [!NOTE] Title\n" + input.replaceAll(/^/gm, ">> ").trimEnd() + "\n",
       nested(">\t", ">\t"),
       "- parent\n  text\n" + nested("  ", "  "),
       "Text\n[^a]: parent\n" + nested("    - ", "      ") + "\nText[^a].\n",
     ])
-      expect(check(source, {}, "obsidian")).toBe(source);
+      expect(check(source.replaceAll("\n", eol), {}, "obsidian")).toBe(
+        source.replaceAll("\n", eol),
+      );
   });
   it.each(["github", "forgejo", "gitea", "obsidian", "vitepress", "commonmark"] as const)(
     "agrees with the recommended rules around nested tables in %s",

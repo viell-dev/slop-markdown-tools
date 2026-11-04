@@ -133,3 +133,6 @@ as written when a row needs one.
   following a callout's single-line title formats normally. A table whose
   container prefixes hold a Tab stays as written: Reading view can show those
   rows as literal code.
+- A callout marker must follow its quote marker with zero or one space. A marker
+  after extra spaces or a Tab keeps the paragraph-continuation protection for a
+  table below it.

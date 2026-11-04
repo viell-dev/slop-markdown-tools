@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.7.1 - 2026-11-04
+
+0.7.1 formats tables in two additional Obsidian layouts while preserving the
+native rendering protections. [What's new in
+0.7](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.7.html#in-071)
+describes the fix. No upgrading steps are needed.
 
 ### Fixed
 

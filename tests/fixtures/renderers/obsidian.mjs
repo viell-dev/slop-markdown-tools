@@ -331,6 +331,19 @@ export const fixtures = [
     source: "> [!NOTE] Title\n> body text\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n",
   },
   {
+    // #883: extra spaces keep the marker as paragraph text, not a callout title.
+    name: "table below a callout-like marker after two spaces",
+    source: ">  [!NOTE] Title\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n",
+  },
+  {
+    name: "table below a callout-like marker after a Tab",
+    source: ">\t[!NOTE] Title\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n",
+  },
+  {
+    name: "table below a nested callout-like marker after two spaces",
+    source: ">>  [!NOTE] Title\n>> | a | b |\n>> |---|---|\n>> | 1 | 2 |\n",
+  },
+  {
     name: "table in a quoted list item",
     source: "> - An item\n>\n>   | a | b |\n>   |---|---|\n>   | ccc | d |\n",
   },
