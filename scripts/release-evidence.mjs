@@ -165,6 +165,42 @@ function ciWorkflowRuns(repository, commit) {
   return JSON.parse(pages).flatMap((page) => page.workflow_runs);
 }
 
+/** Read one complete snapshot, retrying only explicit transient GitHub server errors.
+ * Each retry discards the producer too, rather than mixing it with later check runs.
+ * @param {string} repository
+ * @param {string} commit
+ * @param {Check[]} required
+ * @param {number} deadline The original polling deadline; retries never restart it.
+ */
+export async function readEvidence(repository, commit, required, deadline) {
+  for (let retry = 0; ; retry++) {
+    try {
+      const workflowRuns = ciWorkflowRuns(repository, commit);
+      return evaluate(checkRuns(repository, commit), required, {
+        commit,
+        repository,
+        workflowRuns,
+      });
+    } catch (error) {
+      const stderr =
+        error && typeof error === "object" && "stderr" in error ? String(error.stderr) : "";
+      const status = /^gh: (?:[^\r\n]* )?\(?HTTP (\d{3})\)?\r?$/m.exec(stderr)?.[1];
+      const wait = 1000 * 2 ** retry;
+      if (
+        !["500", "502", "503", "504"].includes(status ?? "") ||
+        retry >= 2 ||
+        Date.now() + wait >= deadline
+      )
+        throw error;
+      process.stderr.write(
+        `GitHub API HTTP ${status}; retrying the complete CI evidence lookup in ${wait} ms (retry ${retry + 1}/2).\n`,
+      );
+      await delay(wait);
+      if (Date.now() >= deadline) throw error;
+    }
+  }
+}
+
 async function main() {
   const commit = process.argv[2];
   if (!/^[0-9a-f]{40}$/.test(commit ?? "")) {
@@ -182,12 +218,7 @@ async function main() {
   const minutes = Number(process.env.WAIT_MINUTES || 40);
   const deadline = Date.now() + minutes * 60 * 1000;
   for (;;) {
-    const workflowRuns = ciWorkflowRuns(repository, commit);
-    const { state, lines } = evaluate(checkRuns(repository, commit), required, {
-      commit,
-      repository,
-      workflowRuns,
-    });
+    const { state, lines } = await readEvidence(repository, commit, required, deadline);
     if (state === "success" || state === "failure" || Date.now() > deadline) {
       process.stdout.write(`CI of ${commit}:\n${lines.map((line) => `- ${line}`).join("\n")}\n`);
       if (state === "success") return;

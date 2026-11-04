@@ -938,11 +938,14 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   [publication evidence contract](RELEASING.md#publish), runs fresh native
   checks, refuses an existing version/tag, and publishes the tarball it tested.
   `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
-  and wrong-producer results; `metadata.test.ts` rejects an omitted, narrowed or
-  non-gating release audit. Hosted preparation reuses eligible CI evidence, then
-  freshly builds and tests the exact tarball and installed consumers. No build
-  receipt crosses jobs. The [release guide](RELEASING.md) owns commands,
-  prerequisites and recovery.
+  and wrong-producer results and exercises recovery through the actual command
+  entry. `release-api.test.ts` checks bounded server-error recovery, deadline
+  and fail-closed controls, including a fresh producer read after a failed check
+  lookup. `metadata.test.ts` rejects an omitted, narrowed or non-gating release
+  audit. Hosted preparation reuses eligible CI evidence, then freshly builds and
+  tests the exact tarball and installed consumers. No build receipt crosses
+  jobs. The [release guide](RELEASING.md) owns commands, prerequisites and
+  recovery.
 
 `scripts/native-checks.mjs` owns native PR classification. Shared source,
 parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared

@@ -9,6 +9,13 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Maintenance
+
+- Retry transient GitHub server errors during release CI evidence lookup
+  ([#880](https://github.com/viell-dev/slop-markdown-tools/issues/880)).
+
 ## 0.7.0 - 2026-11-03
 
 [What's new in
