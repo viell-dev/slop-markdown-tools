@@ -15,7 +15,7 @@ import {
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
-import { expect, it } from "vitest";
+import { expect, it, onTestFailed } from "vitest";
 import { assertDistFiles, buildProduct, ordinaryFiles, verifyBuild } from "../../scripts/build.mjs";
 import { withBuild } from "../../scripts/with-build.mjs";
 import { fixture, linkDirectory, repository } from "../support/cli.js";
@@ -345,10 +345,39 @@ setInterval(() => {}, 1000);
 }, 60000);
 
 it("excludes abandoned staging output from the actual code-check commands", async () => {
+  const startedAt = new Date().toISOString();
+  const started = performance.now();
+  const phases: { phase: string; elapsedMs: number }[] = [];
+  const children: unknown[] = [];
+  const mark = (phase: string): void => {
+    phases.push({ phase, elapsedMs: performance.now() - started });
+  };
+  onTestFailed(() => {
+    console.error(
+      "Abandoned-staging failure phases:",
+      JSON.stringify(
+        {
+          node: process.version,
+          platform: process.platform,
+          startedAt,
+          elapsedMs: performance.now() - started,
+          phases,
+          children,
+          resources: process.resourceUsage(),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+  mark("create-fixture");
   const staging = await mkdtemp(path.join(repository, ".mdrefine-build-interrupted-"));
   const generated = path.join(staging, "generated.js");
   try {
     await writeFile(generated, "deliberately invalid generated javascript ( ;\n");
+    mark("eslint");
+    const lintStartedAt = new Date().toISOString();
+    const lintStarted = performance.now();
     const linted = spawnSync(
       process.execPath,
       [path.join(repository, "node_modules/eslint/bin/eslint.js"), generated, "--no-warn-ignored"],
@@ -357,10 +386,33 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
         encoding: "utf8",
         timeout: 20000,
         windowsHide: true,
+        // Capture startup/configuration boundaries in the existing stderr pipe.
+        // These are printed only if this test fails; parent state is untouched.
+        env: {
+          ...process.env,
+          DEBUG: [process.env.DEBUG, "eslint:cli,eslint:config-loader,eslint:eslint"]
+            .filter(Boolean)
+            .join(","),
+          DEBUG_COLORS: "0",
+        },
       },
     );
+    children.push({
+      name: "eslint",
+      startedAt: lintStartedAt,
+      elapsedMs: performance.now() - lintStarted,
+      status: linted.status,
+      signal: linted.signal,
+      error: linted.error?.message,
+      stdout: linted.stdout,
+      stderr: linted.stderr,
+    });
+    mark("eslint-result");
     expect(linted.error).toBeUndefined();
     expect(linted.status, linted.stdout + linted.stderr).toBe(0);
+    mark("prettier");
+    const formatStartedAt = new Date().toISOString();
+    const formatStarted = performance.now();
     const formatted = spawnSync(
       process.execPath,
       [path.join(repository, "node_modules/prettier/bin/prettier.cjs"), "--check", generated],
@@ -371,11 +423,24 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
         windowsHide: true,
       },
     );
+    children.push({
+      name: "prettier",
+      startedAt: formatStartedAt,
+      elapsedMs: performance.now() - formatStarted,
+      status: formatted.status,
+      signal: formatted.signal,
+      error: formatted.error?.message,
+      stdout: formatted.stdout,
+      stderr: formatted.stderr,
+    });
+    mark("prettier-result");
     expect(formatted.error).toBeUndefined();
     expect(formatted.status, formatted.stdout + formatted.stderr).toBe(0);
   } finally {
+    mark("cleanup");
     expect(path.dirname(await realpath(staging))).toBe(await realpath(repository));
     await rm(generated, { force: true });
     await rmdir(staging);
+    mark("cleanup-complete");
   }
 });

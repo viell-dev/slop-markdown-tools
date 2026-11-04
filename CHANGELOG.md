@@ -9,6 +9,15 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Maintenance
+
+- Retain failure phase diagnostics for linked-checkout builds and abandoned
+  staging code checks to investigate intermittent Windows timeouts
+  ([#786](https://github.com/viell-dev/slop-markdown-tools/issues/786),
+  [#827](https://github.com/viell-dev/slop-markdown-tools/issues/827)).
+
 ## 0.7.1 - 2026-11-04
 
 0.7.1 formats tables in two additional Obsidian layouts while preserving the
