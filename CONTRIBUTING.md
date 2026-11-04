@@ -924,18 +924,18 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   not establish that a parser defect is fixed. The Benchmark workflow's
   reference timings run for changes to `benchmarks/` and by hand, and the
   benchmark page documents the known limits. `lazy-html-work.test.ts` gates the
-  GitHub lazy HTML collector on counted work rather than time, because correct
-  code timed up to 3.1 times slower on shared runners while a real quadratic can
-  sit below that
-  ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
+  GitHub lazy HTML collector's growth on counted work for its document shapes,
+  because timing could not separate correct code from a real quadratic on shared
+  runners ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
   `document-work.ts` counts the characters and tree properties read, including
-  inside native searches, and V8's block counts, which also see loops over local
-  data; each misses some quadratic variants alone. A source use that it cannot
-  count fails the check. The counts do not cover native calls on local data or
+  inside native searches, and V8's block counts in `src/syntax/`, which also see
+  loops over local data; each misses some quadratic variants alone. A source use
+  that it cannot count fails the check. Counting shows nothing about shapes
+  outside the fixtures, native calls on local data, loops elsewhere, or
   allocation cost. The collector's timing check remains a broad bound for
-  catastrophic growth. Lazy-HTML range and edit-application timing checks compare
-  equal work across different document sizes. The edit check targets 200 ms per
-  window with a 32-call cap after reproducing quota-period sampling bias
+  catastrophic growth. Lazy-HTML range and edit-application timing checks
+  compare equal work across different document sizes. The edit check targets 200
+  ms per window with a 32-call cap after reproducing quota-period sampling bias
   ([#795](https://github.com/viell-dev/slop-markdown-tools/issues/795)); other
   scaling checks retain the 25 ms target and eight-call default cap. Failed
   assertions in these two checks include sizes, the timing target, warm-up and

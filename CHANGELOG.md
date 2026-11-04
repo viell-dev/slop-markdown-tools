@@ -24,8 +24,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   staging code checks to investigate intermittent Windows timeouts
   ([#786](https://github.com/viell-dev/slop-markdown-tools/issues/786),
   [#827](https://github.com/viell-dev/slop-markdown-tools/issues/827)).
-- Check the GitHub lazy HTML collector's growth by counting its work instead of
-  timing it, which failed intermittently on shared CI runners
+- Check the GitHub lazy HTML collector's growth by counting its work, and keep
+  its timing check only as a broad bound, because timing failed intermittently
+  on shared CI runners
   ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
 
 ## 0.7.1 - 2026-11-04

@@ -378,10 +378,10 @@ it.each(lazyHtmlCases)(
         });
       },
     );
-    // A broad bound for catastrophic growth only. Timed windows on a shared
-    // runner differed by up to 3.1 times with correct code (#826), and a real
-    // quadratic can sit below that, so no timing bound separates them.
-    // lazy-html-work.test.ts gates this collector's growth on counted work.
+    // A broad bound for catastrophic growth only. CI measured up to 3.14 with
+    // correct code (#826), and a deliberately quadratic collector measured 2.6
+    // to 2.7 on developer machines (#797), so a tight timing bound fails on
+    // noise. lazy-html-work.test.ts gates this collector's growth on counted work.
     expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(10);
   },
   // Parsing the documents takes most of the time.

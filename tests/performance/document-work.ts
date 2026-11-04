@@ -37,7 +37,7 @@ export function countDocumentReads<Result>(
     {
       get(_, key) {
         if (key === "length") return source.length;
-        if (key in methods) return methods[key];
+        if (Object.hasOwn(methods, key)) return methods[key];
         // Not a regular expression: the counter below would count its own test.
         const index = typeof key === "string" ? Number(key) : NaN;
         if (!Number.isInteger(index)) throw new Error(`Uncounted source use: ${String(key)}`);
@@ -81,36 +81,38 @@ export function countDocumentReads<Result>(
 }
 
 /**
- * Count how many times V8 enters the blocks of the script whose URL contains
- * `script`, which includes loops over local data. V8 only counts blocks in
+ * Count how many times V8 enters the blocks of scripts whose URL contains
+ * `scripts`, which includes loops over local data. V8 only counts blocks in
  * functions compiled after this starts, so nothing may call the code under test
- * first. Measuring throws in that case rather than reporting a partial count.
+ * first: measuring throws if a function that ran lacks block counts.
  *
  * This shares V8's coverage counters: keep it out of the unit project, whose
  * coverage run reads them too.
  */
-export function blockCounter(script: string) {
+export function blockCounter(scripts: string) {
   const session = new Session();
   session.connect();
   session.post("Profiler.enable");
   session.post("Profiler.startPreciseCoverage", { callCount: true, detailed: true });
   /** Reading the counters resets them. A same-thread session replies synchronously. */
   const take = () => {
-    const scripts: Profiler.ScriptCoverage[] = [];
+    const taken: Profiler.ScriptCoverage[] = [];
     session.post("Profiler.takePreciseCoverage", (error, coverage) => {
-      if (!error) scripts.push(...coverage.result);
+      if (!error) taken.push(...coverage.result);
     });
-    return scripts;
+    return taken;
   };
   return {
     measure<Result>(run: () => Result): { result: Result; blocks: number } {
       take();
       const result = run();
+      // A function's first range covers all of it, so a count there means it ran.
       const functions = take()
-        .filter(({ url }) => url.includes(script))
-        .flatMap(({ functions }) => functions);
-      if (!functions.some(({ isBlockCoverage }) => isBlockCoverage))
-        throw new Error(`V8 reported no block counts for ${script}`);
+        .filter(({ url }) => url.includes(scripts))
+        .flatMap(({ functions }) => functions)
+        .filter(({ ranges }) => ranges[0]!.count > 0);
+      if (!functions.length || !functions.every(({ isBlockCoverage }) => isBlockCoverage))
+        throw new Error(`V8 did not report block counts for all that ran in ${scripts}`);
       const ranges = functions.flatMap(({ ranges }) => ranges);
       return { result, blocks: ranges.reduce((total, { count }) => total + count, 0) };
     },
