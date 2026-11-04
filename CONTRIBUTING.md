@@ -853,29 +853,30 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   from the structured graph while preserving ordinary comments and strings.
   `build-output.test.ts` changes fragment source, shared types and configuration
   to prove that a live receipt rejects them. `parser-writer.test.ts` checks
-  actual output, concurrent builders, unchanged timestamps and recovery. Every
-  pull request. `parser-emphasis-production` checks actual compiled-product
-  batch calls in an isolated V8 coverage session, including lazy readings and
-  four missing-registration mutants. `parser-lazy-lines` checks live witnesses,
-  positioned trees, resolver observations and deterministic event work;
-  `parser-lazy-production` binds the built runtime and checks actual helper
-  hits, event work, and missing-helper/cache-bypass mutants. `parser-containers`
-  checks restored whitespace cursors, original-marker precedence, list
-  identities and extension observations. `parser-containers-production` binds
-  both fragments to the built runtime and rejects missing-helper, cache-bypass
-  and repeated-descendant-scan mutants. Direct generated-compiler listeners also
-  compare fast/fallback observations for tabbed, loose, quoted, ordered and
-  footnote lists with LF/CRLF/CR. The deep-list timing case accounts for its
-  quadratic byte size; work counters bound the two traversals, not all parser
-  work. `obsidian-openers` bounds failed literal-suffix scans;
-  `obsidian-probe-metadata` checks complete and interrupted capture bookkeeping.
-  Tokenizer identity cases partition the full deterministic corpus into
-  contiguous batches under the unchanged unit deadline, retaining every source,
-  selection and identity assertion. These checks do not prove native-host
-  behavior or compatibility with arbitrary event-history rewrites by external
-  extensions. Mixed and multiple raw emphasis pairs can still copy their
-  interiors; syntax plugins retain the original attention/strike resolvers and
-  their cost. The [dependency
+  actual output, concurrent builders, unchanged timestamps and recovery. Its
+  linked-checkout test retains body phase times and dependency-copy progress on
+  failure. Every pull request. `parser-emphasis-production` checks actual
+  compiled-product batch calls in an isolated V8 coverage session, including
+  lazy readings and four missing-registration mutants. `parser-lazy-lines`
+  checks live witnesses, positioned trees, resolver observations and
+  deterministic event work; `parser-lazy-production` binds the built runtime and
+  checks actual helper hits, event work, and missing-helper/cache-bypass
+  mutants. `parser-containers` checks restored whitespace cursors,
+  original-marker precedence, list identities and extension observations.
+  `parser-containers-production` binds both fragments to the built runtime and
+  rejects missing-helper, cache-bypass and repeated-descendant-scan mutants.
+  Direct generated-compiler listeners also compare fast/fallback observations
+  for tabbed, loose, quoted, ordered and footnote lists with LF/CRLF/CR. The
+  deep-list timing case accounts for its quadratic byte size; work counters
+  bound the two traversals, not all parser work. `obsidian-openers` bounds
+  failed literal-suffix scans; `obsidian-probe-metadata` checks complete and
+  interrupted capture bookkeeping. Tokenizer identity cases partition the full
+  deterministic corpus into contiguous batches under the unchanged unit
+  deadline, retaining every source, selection and identity assertion. These
+  checks do not prove native-host behavior or compatibility with arbitrary
+  event-history rewrites by external extensions. Mixed and multiple raw emphasis
+  pairs can still copy their interiors; syntax plugins retain the original
+  attention/strike resolvers and their cost. The [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) lists
   the corrections and remaining limits.
 - **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
@@ -904,10 +905,13 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   preparation, concurrent product builders, live/exited child-writer temporary
   files, linked/lowercase-drive script dispatch, side-effect-free imports,
   abandoned-staging checks, linked-output rejection, and receipt identity,
-  invalidation and cleanup. The package smoke check independently compares the
-  tarball's complete `dist` file set with the compiler's expected names plus the
-  four parser artifacts. Every pull request. Per-file publication is not a
-  directory transaction; concurrent edits require a fresh invocation.
+  invalidation and cleanup. A failed abandoned-staging check retains child
+  durations, results and output, including ESLint startup/configuration traces.
+  These failure hooks cannot report an abruptly terminated worker or OS process.
+  The package smoke check independently compares the tarball's complete `dist`
+  file set with the compiler's expected names plus the four parser artifacts.
+  Every pull request. Per-file publication is not a directory transaction;
+  concurrent edits require a fresh invocation.
 - **Cost grows with the input as expected.** `tests/performance/` compares
   growth and checks that memory is released. `wrap.test.ts` covers isolated
   rereading with syntax plugins in CommonMark and VitePress, including body

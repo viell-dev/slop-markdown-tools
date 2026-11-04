@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, rm, rmdir, stat, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import { buildParser, bundleParser } from "../../scripts/build-parser.mjs";
 import { parserAdaptationFiles } from "../../scripts/parser-adaptations.mjs";
 import { fixture, linkDirectory, repository } from "../support/cli.js";
@@ -58,6 +58,36 @@ async function completeArtifacts(directory: string, oracle = expected): Promise<
 
 describe("the actual generated-parser writer", { concurrent: false }, () => {
   it("runs the command-line build through a linked checkout path", async () => {
+    const startedAt = new Date().toISOString();
+    const started = performance.now();
+    const phases: { phase: string; elapsedMs: number }[] = [];
+    let copiedPackages = 0;
+    let copyingPackage: string | undefined;
+    const mark = (phase: string): void => {
+      phases.push({ phase, elapsedMs: performance.now() - started });
+    };
+    // Keep the passing path in memory; a failed body (including a timeout)
+    // reports its last reached boundary without changing the work or deadline.
+    onTestFailed(() => {
+      console.error(
+        "Linked-checkout failure phases:",
+        JSON.stringify(
+          {
+            node: process.version,
+            platform: process.platform,
+            startedAt,
+            elapsedMs: performance.now() - started,
+            phases,
+            copiedPackages,
+            copyingPackage,
+            resources: process.resourceUsage(),
+          },
+          null,
+          2,
+        ),
+      );
+    });
+    mark("read-inputs");
     const files: Record<string, string> = {};
     for (const name of [
       "package.json",
@@ -73,6 +103,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
         path.join(repository, name),
         "utf8",
       );
+    mark("create-fixture");
     const root = await fixture(files);
     const source = path.join(root, "dev/micromark-util-edit-map/source");
     // Checkout ancestors named dev or micromark-util-edit-map are legitimate;
@@ -80,6 +111,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
     // The graph must stay inside the checkout;
     // canonical containment rejects outside inputs on every platform. Only
     // the build tool stays shared.
+    mark("copy-dependencies");
     const packages = JSON.parse(
       await readFile(path.join(repository, "scripts/parser-packages.json"), "utf8"),
     ) as { name: string }[];
@@ -89,6 +121,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       const name = pending.pop()!;
       if (copied.has(name)) continue;
       copied.add(name);
+      copyingPackage = name;
       const installed = path.join(repository, "node_modules", name);
       const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8")) as {
         dependencies?: Record<string, string>;
@@ -100,7 +133,10 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
         recursive: true,
         dereference: true,
       });
+      copiedPackages++;
+      copyingPackage = undefined;
     }
+    mark("link-checkout");
     for (const name of ["rolldown", "typescript"])
       await linkDirectory(
         path.join(repository, "node_modules", name),
@@ -110,9 +146,12 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
     await linkDirectory(source, linked);
     // Compare against the actual builder at this copied root and require the
     // same portable bytes as the original checkout.
+    mark("physical-oracle");
     const oracle = await expectedArtifacts(source);
     expect(oracle).toEqual(expected);
+    mark("linked-oracle");
     expect(await expectedArtifacts(linked)).toEqual(expected);
+    mark("command-line-build");
     const output = execFileSync(process.execPath, [path.join(linked, "scripts/build-parser.mjs")], {
       cwd: linked,
       encoding: "utf8",
@@ -120,9 +159,11 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       windowsHide: true,
     });
     expect(output).toContain("Parser adapter ready (4 artifacts changed).");
+    mark("verify-artifacts");
     await completeArtifacts(path.join(source, "dist/syntax"), oracle);
 
     for (const checkout of [source, linked]) {
+      mark(checkout === source ? "physical-import-guard" : "linked-import-guard");
       const code = `process.argv[1] = ${JSON.stringify(path.join(checkout, "package.json", "child"))};
 const module = await import(${JSON.stringify(pathToFileURL(path.join(checkout, "scripts/build-parser.mjs")).href)});
 process.stdout.write(typeof module.buildParser);`;
@@ -142,6 +183,7 @@ process.stdout.write(typeof module.buildParser);`;
     // A package's actual dev entry is different from the checkout's ancestor.
     // Redirect an unadapted entry inside this owned copy, retaining its exact
     // source bytes, package version and license. It must still be rejected.
+    mark("development-entry-rejection");
     const packageRoot = path.join(source, "node_modules/micromark-extension-gfm");
     const packageFile = path.join(packageRoot, "package.json");
     const metadata = JSON.parse(await readFile(packageFile, "utf8")) as { exports: string };
@@ -156,6 +198,7 @@ process.stdout.write(typeof module.buildParser);`;
       }),
     ).rejects.toThrow("Unexpected development parser input");
     expect(await readdir(root)).not.toContain("development-output");
+    mark("complete");
   });
 
   it("rejects a parser graph physically outside its checkout before writing artifacts", async () => {
