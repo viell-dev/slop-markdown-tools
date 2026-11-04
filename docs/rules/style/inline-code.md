@@ -1,9 +1,9 @@
 # `style/inline-code`
 
-Writes each code span with the fewest backticks that its content allows, and
-joins a code span that is written across lines onto one line. Some editors, such
-as Obsidian's Live Preview, show a split code span differently from the rendered
-page.
+Writes each code span with the fewest backticks that its content allows and only
+the padding that it needs, and joins a code span that is written across lines
+onto one line. Some editors, such as Obsidian's Live Preview, show a split code
+span differently from the rendered page.
 
 **Style rule**, fixed by `format`. Presets: none. Dialects: all. Options: none.
 
@@ -21,11 +21,16 @@ Run `npm run build` before the tests.
 ```
 
 **Backticks:** a span gets the fewest backticks whose run does not occur in its
-content, so ``` ``a`` ``` becomes `` `a` ``. Padding keeps backticks at the
-content's edges separate from the delimiters and preserves CommonMark's
-single-space stripping. Table cell escapes stay intact. A span keeps its
-delimiters where shortening them could pair with an earlier run in the same
-inline block.
+content, so ``` ``a`` ``` becomes `` `a` ``. Table cell escapes stay intact. A
+span keeps its delimiters where shortening them could pair with an earlier run
+in the same inline block.
+
+**Padding:** renderers take one space off each end of a code span when both ends
+have one, so `` ` - ` `` shows the same code as `` `-` ``, and the rule writes
+it that way. A span keeps a space at each end where it needs one: to separate a
+backtick at the content's edge from the delimiters, or to keep spaces that
+renderers would otherwise take off. To show the spaces around a separator, put
+text on both sides of it, as in `` `A - B` ``.
 
 **Joining:** a line break inside a code span renders as a space, so the content
 stays the same, and the spaces and tabs that start the next line are left out,
@@ -52,11 +57,15 @@ would read differently:
 
 ## Dialect notes
 
-**In Obsidian:** a span stays split where an `==` or `[[` left as text on the
-joined lines could open a highlight or wikilink. A multiline span with one or
-two backticks, and the following source in its inline block, stay as written:
-Live Preview resets short code at the physical newline. Earlier independent
-inline text and later paragraphs can still format. The [boundary
+**In Obsidian:** Live Preview shows a span's padding as it is written, where
+Reading view takes it off as other renderers do. The rule follows Reading view,
+so removing the padding also removes those spaces from Live Preview.
+
+A span stays split where an `==` or `[[` left as text on the joined lines could
+open a highlight or wikilink. A multiline span with one or two backticks, and
+the following source in its inline block, stay as written: Live Preview resets
+short code at the physical newline. Earlier independent inline text and later
+paragraphs can still format. The [boundary
 protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md#boundary-protections)
 describe the conservative cases.
 

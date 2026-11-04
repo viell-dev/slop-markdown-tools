@@ -31,7 +31,8 @@ const styleRules: Record<string, Rule> = {
   "style/no-tabs": noTabs,
   "style/prose-space": proseSpace,
   "style/inline-code": {
-    description: "Writes code spans on one line, with the fewest backticks they need.",
+    description:
+      "Writes code spans on one line, with the fewest backticks and only the padding they need.",
     kind: "style",
     phase: "inline",
     schema: optionsSchema({}),
@@ -134,7 +135,9 @@ const styleRules: Record<string, Rule> = {
           end,
           message: /[\r\n]/.test(original)
             ? "Join the code span onto one line."
-            : "Use the fewest backticks for the code span.",
+            : marker.length === originalLength
+              ? "Remove the padding that the code span does not need."
+              : "Use the fewest backticks for the code span.",
           edit: { start, end, text },
         });
       });

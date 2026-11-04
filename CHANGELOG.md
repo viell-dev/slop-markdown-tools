@@ -11,6 +11,13 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- `style/inline-code` names the padding when that is all it removes, instead of
+  asking for fewer backticks, and its page describes which padding it removes
+  and how that shows in Obsidian's Live Preview
+  ([#886](https://github.com/viell-dev/slop-markdown-tools/issues/886)).
+
 ### Maintenance
 
 - Retain failure phase diagnostics for linked-checkout builds and abandoned
