@@ -57,12 +57,15 @@ async function completeArtifacts(directory: string, oracle = expected): Promise<
 }
 
 describe("the actual generated-parser writer", { concurrent: false }, () => {
+  // The whole test took 11 to 17 seconds on passing hosted Windows runs, and its
+  // three builds alone took 15 on a loaded runner (#786), which the integration
+  // default leaves too little room for. Its child processes keep shorter limits.
   it("runs the command-line build through a linked checkout path", async () => {
     const startedAt = new Date().toISOString();
     const started = performance.now();
     const phases: { phase: string; elapsedMs: number }[] = [];
     let copiedPackages = 0;
-    let copyingPackage: string | undefined;
+    const copyingPackages = new Set<string>();
     const mark = (phase: string): void => {
       phases.push({ phase, elapsedMs: performance.now() - started });
     };
@@ -79,7 +82,7 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
             elapsedMs: performance.now() - started,
             phases,
             copiedPackages,
-            copyingPackage,
+            copyingPackages: [...copyingPackages],
             resources: process.resourceUsage(),
           },
           null,
@@ -116,26 +119,37 @@ describe("the actual generated-parser writer", { concurrent: false }, () => {
       await readFile(path.join(repository, "scripts/parser-packages.json"), "utf8"),
     ) as { name: string }[];
     const pending = packages.map(({ name }) => name);
-    const copied = new Set<string>();
+    const closure = new Set<string>();
     while (pending.length) {
       const name = pending.pop()!;
-      if (copied.has(name)) continue;
-      copied.add(name);
-      copyingPackage = name;
-      const installed = path.join(repository, "node_modules", name);
-      const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8")) as {
-        dependencies?: Record<string, string>;
-      };
+      if (closure.has(name)) continue;
+      closure.add(name);
+      const metadata = JSON.parse(
+        await readFile(path.join(repository, "node_modules", name, "package.json"), "utf8"),
+      ) as { dependencies?: Record<string, string> };
       // Bundlers resolve imports before tree shaking; include dependencies
       // whose code is absent from the final 34-package runtime graph too.
       pending.push(...Object.keys(metadata.dependencies ?? {}));
-      await cp(installed, path.join(source, "node_modules", name), {
-        recursive: true,
-        dereference: true,
-      });
-      copiedPackages++;
-      copyingPackage = undefined;
     }
+    // The closure is hundreds of tiny files, and a loaded Windows runner spent
+    // 26 ms on each (#786). Skip what the build never reads and overlap the rest:
+    // the artifact comparison below rejects a copy that lost anything it needs.
+    await Promise.all(
+      [...closure].map(async (name) => {
+        copyingPackages.add(name);
+        await cp(
+          path.join(repository, "node_modules", name),
+          path.join(source, "node_modules", name),
+          {
+            recursive: true,
+            dereference: true,
+            filter: (file) => !/(?:\.d\.ts(?:\.map)?|[\\/]readme\.md)$/i.test(file),
+          },
+        );
+        copyingPackages.delete(name);
+        copiedPackages++;
+      }),
+    );
     mark("link-checkout");
     for (const name of ["rolldown", "typescript"])
       await linkDirectory(
@@ -199,7 +213,7 @@ process.stdout.write(typeof module.buildParser);`;
     ).rejects.toThrow("Unexpected development parser input");
     expect(await readdir(root)).not.toContain("development-output");
     mark("complete");
-  });
+  }, 60_000);
 
   it("rejects a parser graph physically outside its checkout before writing artifacts", async () => {
     const root = await fixture({

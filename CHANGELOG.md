@@ -28,6 +28,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   its timing check only as a broad bound, because timing failed intermittently
   on shared CI runners
   ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
+- Copy only what the linked-checkout parser test's build reads, in parallel, and
+  give the test its own deadline, after a hosted Windows failure showed that
+  copying took half of the time
+  ([#786](https://github.com/viell-dev/slop-markdown-tools/issues/786)).
 
 ## 0.7.1 - 2026-11-04
 
