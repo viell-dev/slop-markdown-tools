@@ -654,8 +654,9 @@ operation. For scaling checks, warm both measured sizes on separate inputs, use
 fresh inputs for every timed call, and alternate their order. Verify every
 result outside the clock. Compare growth instead of imposing a wall-clock speed
 requirement; where recoverable, check that the former slow algorithm fails the
-comparison. Garbage-collection checks also run outside coverage, which changes
-execution and allocation costs.
+comparison. When a slow variant and shared-runner noise overlap, count the work
+instead, as `lazy-html-work.test.ts` does. Garbage-collection checks also run
+outside coverage, which changes execution and allocation costs.
 
 Memory checks await V8's asynchronous `last-resort` major collection, which
 releases compilation caches and collects until its root set is stable. A regular
@@ -922,17 +923,24 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   some original algorithms pass them at the selected sizes. Timing alone does
   not establish that a parser defect is fixed. The Benchmark workflow's
   reference timings run for changes to `benchmarks/` and by hand, and the
-  benchmark page documents the known limits. Lazy-HTML range and
-  edit-application checks compare equal work across different document sizes.
-  The edit check targets 200 ms per window with a 32-call cap after reproducing
-  quota-period sampling bias
+  benchmark page documents the known limits. `lazy-html-work.test.ts` gates the
+  GitHub lazy HTML collector's growth on counted work for its document shapes,
+  because timing could not separate correct code from a real quadratic on shared
+  runners ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
+  `document-work.ts` counts the characters and tree properties read, including
+  inside native searches, and V8's block counts in `src/syntax/`, which also see
+  loops over local data; each misses some quadratic variants alone. A source use
+  that it cannot count fails the check. Counting shows nothing about shapes
+  outside the fixtures, native calls on local data, loops elsewhere, or
+  allocation cost. The collector's timing check remains a broad bound for
+  catastrophic growth. Lazy-HTML range and edit-application timing checks
+  compare equal work across different document sizes. The edit check targets 200
+  ms per window with a 32-call cap after reproducing quota-period sampling bias
   ([#795](https://github.com/viell-dev/slop-markdown-tools/issues/795)); other
   scaling checks retain the 25 ms target and eight-call default cap. Failed
   assertions in these two checks include sizes, the timing target, warm-up and
   calibration durations, call count, and four windows per size in milliseconds.
-  Their ratios use each size's fastest window. These diagnostics alone do not
-  resolve the separate intermittent Windows failure in
-  [#826](https://github.com/viell-dev/slop-markdown-tools/issues/826).
+  Their ratios use each size's fastest window.
 - **Public descriptions agree with the package.** `docs.test.ts`,
   `benchmarks.test.ts`, and `metadata.test.ts` on every pull request;
   `npm run check:live` for GitHub's settings, the newest release, npm, and the
