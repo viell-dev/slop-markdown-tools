@@ -172,7 +172,7 @@
     "rolldown": "1.2.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
-    "vitepress": "2.0.0-alpha.20",
+    "vitepress": "2.0.0-alpha.21",
     "vitest": "5.0.5"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
