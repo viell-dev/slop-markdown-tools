@@ -65,11 +65,14 @@ name, which works inside this repository and wherever the package is installed.
 
 ```sh
 node examples/library/format-string.mjs
+node examples/library/sentence-wrapping.mjs
 node examples/library/lint-folder.mjs
 node examples/library/lint-workspace.mjs
 ```
 
 [`format-string.mjs`](library/format-string.mjs) formats one string.
+[`sentence-wrapping.mjs`](library/sentence-wrapping.mjs) starts recognized
+sentences on separate lines while wrapping long sentences to the width.
 [`lint-folder.mjs`](library/lint-folder.mjs) reads a folder of GitHub Markdown,
 builds the workspace that link checks need, and prints diagnostics.
 [`lint-workspace.mjs`](library/lint-workspace.mjs) does the same with

@@ -22,6 +22,7 @@ function complete(renderer: string) {
       item.widths.map((width, widthIndex) => ({
         name: item.name,
         width,
+        ...(item.wrapMode ? { wrapMode: item.wrapMode } : {}),
         attempted: true,
         completed: true,
         changed: renderer !== "forges" && documentIndex === 0 && widthIndex === 0,
@@ -65,6 +66,15 @@ function complete(renderer: string) {
 }
 
 describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (renderer) => {
+  it("requires the explicitly selected sentence-wrapping mode", () => {
+    const report = complete(renderer);
+    const sentence = report.documents.find((item) => item.wrapMode === "sentences")!;
+    expect(sentence).toBeDefined();
+    delete sentence.wrapMode;
+    expect(() => validateRendererEvidence(report, renderer)).toThrow(
+      "Incorrect native wrapping mode",
+    );
+  });
   it("allows unchanged documents without freezing changed counts", () => {
     const report = complete(renderer);
     expect(() => validateRendererEvidence(report, renderer)).not.toThrow();

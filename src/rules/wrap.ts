@@ -20,6 +20,7 @@ import { type Range, located, holds, obsidianTag } from "./shared.js";
 import { obsidianOpaque, obsidianTabBreak, goldmarkForges, misreadTable } from "./protections.js";
 import { capturedLineBreak, lineBounds, lineBreak, lineEnding } from "../syntax/source.js";
 import { optionsSchema } from "./shared.js";
+import { sentenceBreaks } from "./sentence-breaks.js";
 
 /**
  * Where dollar math could begin or end at the edge of a line although it does
@@ -839,13 +840,14 @@ function fillLines(
   continuation: string,
   width: number,
   measure: (text: string) => number,
+  sentences?: ReadonlySet<number>,
 ): string[] {
   const lines: string[] = [];
   let line = atoms.slice(0, first).join(" ");
   let linePrefix = prefix;
   for (let i = first; i < atoms.length; i++) {
     const candidate = `${line} ${atoms[i]}`;
-    if (lineWidth(linePrefix + candidate, measure) > width) {
+    if (sentences?.has(i) || lineWidth(linePrefix + candidate, measure) > width) {
       lines.push(line);
       line = atoms[i]!;
       linePrefix = continuation;
@@ -946,7 +948,7 @@ function wrapParagraph(
 
   // The alternative reading can treat apparent prose as literal YAML/TOML.
   // Joining it would change that metadata even if the primary prose tree agrees.
-  if (options.mode === "never") {
+  if (options.mode === "never" || options.mode === "sentences") {
     const metadata = frontMatterReading(document.tree)?.children[0];
     if (metadata && range(node)[0] < range(metadata)[1]) return;
   }
@@ -1089,10 +1091,12 @@ function wrapParagraph(
       (fenceStart.test(atoms[0]!) && !oneParagraph(atoms[0]!, document)))
   )
     atoms.splice(0, 2, `${atoms[0]} ${atoms[1]}`);
+  const sentences =
+    options.mode === "sentences" ? sentenceBreaks(document, node, atoms) : undefined;
   let output =
     options.mode === "never"
       ? [atoms.join(" ")]
-      : fillLines(atoms, 1, prefix, continuation, width, measure);
+      : fillLines(atoms, 1, prefix, continuation, width, measure, sentences);
   // A paragraph that starts like a link reference definition becomes one
   // when a line ends after the definition's destination or title. Keep
   // words on the first line until the lines read as one paragraph again.
@@ -1110,7 +1114,7 @@ function wrapParagraph(
   if (output.length > 1 && atoms[0]!.startsWith("[") && definitionStart.test(atoms.join(" "))) {
     let first = atoms.findIndex((atom) => atom.includes("]:")) + 1;
     while (output.length > 1 && !oneParagraph(output.join("\n"), document))
-      output = fillLines(atoms, ++first, prefix, continuation, width, measure);
+      output = fillLines(atoms, ++first, prefix, continuation, width, measure, sentences);
   }
   // Live Preview hides the destination after `[`, a label, and `]:` at a
   // line's content start, including container continuations, so no reflowed line
@@ -1142,7 +1146,9 @@ function wrapParagraph(
       message:
         options.mode === "never"
           ? "Join paragraph onto one line."
-          : `Reflow paragraph to ${width} ${unit}.`,
+          : options.mode === "sentences"
+            ? `Reflow paragraph by sentence to ${width} ${unit}.`
+            : `Reflow paragraph to ${width} ${unit}.`,
       edit: { start, end, text: replacement },
     });
   if (
@@ -1157,7 +1163,7 @@ const wrap: Rule = {
   kind: "style",
   phase: "block",
   schema: optionsSchema({
-    mode: { enum: ["always", "never"] },
+    mode: { enum: ["always", "never", "sentences"] },
     width: { type: "integer", minimum: 20, maximum: 500 },
     measure: { enum: ["columns", "codepoints"] },
     reportUnreflowed: { type: "boolean" },

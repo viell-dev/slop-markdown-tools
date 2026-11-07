@@ -11,6 +11,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Added
+
+- `style/wrap` can start recognized sentences on separate lines and wrap long
+  sentences to the width with `mode: "sentences"`
+  ([#898](https://github.com/viell-dev/slop-markdown-tools/issues/898)).
+
 ### Fixed
 
 - `style/inline-code` names the padding when that is all it removes, instead of

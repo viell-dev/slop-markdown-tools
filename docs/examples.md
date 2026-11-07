@@ -458,6 +458,37 @@ no final newline.
 changed: true; remaining diagnostics: 0
 ```
 
+[`examples/library/sentence-wrapping.mjs`](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/library/sentence-wrapping.mjs)
+shows the opt-in [sentence wrapping](rules/style/wrap.md) mode, which keeps
+recognized sentences on separate lines while wrapping long ones to the width:
+
+```js
+// Keep source diffs local to a sentence, wrapping long sentences to the width.
+//
+//   node examples/library/sentence-wrapping.mjs
+import { format } from "mdrefine";
+
+const source =
+  "The service records each request. Operators can inspect the log. Retries use the same identifier.\n";
+const result = format(source, {
+  config: {
+    extends: ["recommended", "github"],
+    rules: { "style/wrap": ["warn", { mode: "sentences", width: 80 }] },
+  },
+});
+process.stdout.write(result.output);
+```
+
+```sh
+node examples/library/sentence-wrapping.mjs
+```
+
+```text
+The service records each request.
+Operators can inspect the log.
+Retries use the same identifier.
+```
+
 To check links between documents, the script reads the files and passes them to
 `createWorkspace()`:
 

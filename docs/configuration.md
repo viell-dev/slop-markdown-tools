@@ -80,6 +80,10 @@ does not accept; the message names the setting, as in
 }
 ```
 
+For smaller prose diffs, `style/wrap` also offers
+[`mode: "sentences"`](rules/style/wrap.md), which wraps long sentences
+independently and starts recognized sentences on separate lines.
+
 | Key              | Value                                          | Purpose                                                              |
 | ---------------- | ---------------------------------------------- | -------------------------------------------------------------------- |
 | `$schema`        | A string                                       | Ignored by the tool; gives an editor the [JSON Schema](#json-schema) |

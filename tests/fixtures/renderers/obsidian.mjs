@@ -8,9 +8,11 @@
 // is synthetic.
 
 import { boundaryFixtures } from "./obsidian-boundaries.mjs";
+import { sentenceFixture } from "./common.mjs";
 
-/** @type {{ name: string, source: string }[]} */
+/** @type {{ name: string, source: string, wrapMode?: string }[]} */
 export const fixtures = [
+  sentenceFixture,
   ...boundaryFixtures,
   {
     // #682: one space after quote markers; a tag and a callout's marker keep theirs.

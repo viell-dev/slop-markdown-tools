@@ -1,5 +1,12 @@
 // Authored-document controls shared by GitHub and the forge comparisons.
+export const sentenceFixture = {
+  name: "sentence-wrapping",
+  wrapMode: "sentences",
+  source:
+    "First **sentence.** Second sentence with a [link](https://example.com). Next sentence uses `First. Second.` as code.\n\n- First sentence. Second sentence in the list.\n\n> First sentence. Second sentence in the quote.\n\nFirst sentence.  \nSecond sentence keeps its hard break. Third sentence.\n",
+};
 export const commonFixtures = [
+  sentenceFixture,
   {
     name: "prose",
     source:
