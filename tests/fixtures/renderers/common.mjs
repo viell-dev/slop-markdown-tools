@@ -3,7 +3,7 @@ export const referenceFixture = {
   name: "inline-to-reference-links",
   referenceLinks: true,
   source:
-    '# [The guide](https://example.com/setup "Setup")\n\nRead [the guide](https://example.com/setup "Setup").\n\n![The picture](https://example.com/picture.png "Picture")\n',
+    '# [The guide](https://example.com/setup "Setup")\n\n> [!NOTE] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup").\n\n![The picture](https://example.com/picture.png "Picture")\n',
 };
 export const sentenceFixture = {
   name: "sentence-wrapping",

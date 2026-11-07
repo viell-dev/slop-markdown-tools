@@ -1,6 +1,6 @@
 import type { Definition, Image, Link, Nodes, Root } from "mdast";
 import type { Diagnostic, Document, Edit, Plugin, Workspace } from "./types.js";
-import { labelEnd, otherReading, parse, range } from "../syntax/parse.js";
+import { labelEnd, otherReading, parse, range, startsWithMarker } from "../syntax/parse.js";
 import { lineBreak } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { normalizeLabel } from "../rules/links.js";
@@ -53,6 +53,21 @@ function definitions(tree: Root) {
   return result;
 }
 
+/** Marker lines are parsed separately by the callout/alert title guard. */
+function calloutTitles(document: Document): [number, number][] {
+  const titles: [number, number][] = [];
+  if (document.dialect === "commonmark") return titles;
+  walk(document.tree, "blockquote", (quote) => {
+    let first: Nodes | undefined = quote.children[0];
+    while (first && first.type !== "paragraph" && "children" in first) first = first.children[0];
+    if (first?.type !== "paragraph") return;
+    const [start, end] = range(first);
+    const header = document.source.slice(start, end).split(lineBreak, 1)[0]!;
+    if (startsWithMarker(header, first)) titles.push([start, start + header.length]);
+  });
+  return titles;
+}
+
 /**
  * Verify against actual first-match definitions, then compare the complete document.
  * Only the planned references and appended root definitions receive a projection.
@@ -65,6 +80,12 @@ export function verifyReferenceConversion(
   additions: readonly Addition[],
   workspace?: Workspace,
 ): boolean {
+  // Live Preview displays definition lines and treats reference images as embeds.
+  if (
+    before.dialect === "obsidian" &&
+    (additions.length || conversions.some(({ node }) => node.type === "image"))
+  )
+    return false;
   const original = readings(before);
   const candidate = readings(after);
   if (original.length !== candidate.length) return false;
@@ -169,6 +190,7 @@ export function convertReferences(
   const selected = new Set(diagnostics.map((item) => item.start));
   if (!selected.size) return undefined;
   const { source } = document;
+  const titles = calloutTitles(document);
   const existing = definitions(document.tree);
   const used = new Set<string>();
   walk(document.tree, (node) => {
@@ -203,14 +225,18 @@ export function convertReferences(
     if (!selected.has(start) || start < previousEnd || close === undefined) return;
     if (!supportedResource(document, node)) return;
     if (changesForgeHeading(document, start, end)) return;
+    if (titles.some(([from, to]) => start < to && end > from)) return;
+    if (document.dialect === "obsidian" && node.type === "image") return;
     const raw = source.slice(start, end);
     if (!(raw.startsWith("[") || raw.startsWith("![")) || source.slice(close, close + 2) !== "](")
       return;
-    const body = source.slice(close + 2, end - 1).trim();
+    // CommonMark keeps Unicode whitespace in destinations; only ASCII space is padding.
+    const body = source.slice(close + 2, end - 1).replace(/^ +| +$/g, "");
     // A generated definition has one line; don't reinterpret multiline resources.
     if (/[\r\n]/.test(body)) return;
     const key = identity(node);
     const shared = reusable.get(key);
+    if (document.dialect === "obsidian" && !shared) return;
     while (reserved.has(`mdrefine-link-${number}`)) number++;
     const label = shared?.label ?? `mdrefine-link-${number}`;
     const identifier = shared?.identifier ?? label;

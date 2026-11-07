@@ -48,6 +48,9 @@ the comparison, as do alternative readings and VitePress's secondary guard. The
 verified result establishes the next ordinary comparison baseline. The public
 `semanticFingerprint` still distinguishes inline and reference source
 structures; ordinary rules and plugins cannot request this exception.
+Callout/alert marker-line links and anchor-sensitive forge heading links stay
+inline. In Obsidian, Live Preview requires images to stay inline and links to
+reuse an existing, already-used definition; the converter adds no definitions.
 
 Obsidian's structural rules also apply a general conservative [boundary
 policy](obsidian.md#visible-boundary-refusals). Held style edits produce a

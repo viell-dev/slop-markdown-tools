@@ -14,8 +14,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 ### Added
 
 - `links/allowed-notation` can convert disallowed inline links and images to
-  full references with explicit `fixTo: "full"`
-  ([#899](https://github.com/viell-dev/slop-markdown-tools/issues/899)).
+  full references with explicit `fixTo: "full"`. Obsidian links can reuse
+  existing, already-used definitions; its images stay inline to preserve Live
+  Preview ([#899](https://github.com/viell-dev/slop-markdown-tools/issues/899)).
 
 - `style/wrap` can start recognized sentences on separate lines and wrap long
   sentences to the width with `mode: "sentences"`

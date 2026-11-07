@@ -10,7 +10,7 @@ import { walk } from "../../src/syntax/walk.js";
 import { formatted, only, refusals } from "../support/rules.js";
 import { normalizeHtml } from "../../scripts/rendering.mjs";
 
-const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"];
+const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "vitepress"];
 const rule = "links/allowed-notation";
 const rules = { [rule]: ["warn", { inline: false, fixTo: "full" }] } as const;
 const render = (source: string) => [
@@ -71,6 +71,49 @@ describe("explicit inline-to-reference conversion", () => {
       '[a][mdrefine-link-1] [b][mdrefine-link-1] ![c][mdrefine-link-1] [d][mdrefine-link-2] [e][mdrefine-link-3]\n\n[mdrefine-link-1]: /url\n[mdrefine-link-2]: /url ""\n[mdrefine-link-3]: /url "Title"\n',
     );
     expect(render(output)).toEqual(render(source));
+  });
+
+  it.each(["\u00a0", "\u2028"])("keeps Unicode destination whitespace %j", (space) => {
+    const source = `[a](/u${space}) and [y](/b).\n`;
+    const output = formatted(source, only(rules));
+    expect(output).toContain("[a][mdrefine-link-1] and [y][mdrefine-link-2].");
+    expect(output).toContain(`[mdrefine-link-1]: /u${space}\n`);
+    expect(render(output)).toEqual(render(source));
+  });
+
+  it.each([
+    "> [!NOTE] See [x](/a)\n> body\n",
+    "> [!tip]- See [x](/a)\n> body\n",
+    "> \\[!NOTE] See [x](/a)\n> body\n",
+    "> &#91;!NOTE] See [x](/a)\n> body\n",
+    "> > [!NOTE] See [x](/a)\n> > body\n",
+    "> - [!NOTE] See [x](/a)\n>   body\n",
+  ])("keeps marker-line links while converting other links: %j", (header) => {
+    const source = header + "\n[y](/b)\n";
+    const output = formatted(source, only(rules, "github"));
+    expect(output.startsWith(header)).toBe(true);
+    expect(output).toContain("[y][mdrefine-link-1]");
+    expect(render(output)).toEqual(render(source));
+    expect(
+      lint(output, { config: only(rules, "github") }).filter((item) => item.rule === rule),
+    ).toHaveLength(1);
+  });
+
+  it("converts ordinary quoted marker text in CommonMark", () => {
+    const source = "> [!note] See [x](/a)\n> body\n";
+    const output = formatted(source, only(rules));
+    expect(output).toContain("See [x][mdrefine-link-1]");
+    expect(render(output)).toEqual(render(source));
+  });
+
+  it("reuses only existing definitions for Obsidian links and keeps images inline", () => {
+    const source =
+      "> [!note] See [x](/a)\n> body\n\n[used][r] [y](/b) [new](/c) ![alt|100](/b)\n\n[r]: /b\n";
+    const output = formatted(source, only(rules, "obsidian"));
+    expect(output).toBe(source.replace("[y](/b)", "[y][r]"));
+    expect(render(output)).toEqual(render(source));
+    expect(formatted("[y](/b)\n", only(rules, "obsidian"))).toBe("[y](/b)\n");
+    expect(formatted("[y](/b)\n\n[r]: /b\n", only(rules, "obsidian"))).toBe("[y](/b)\n\n[r]: /b\n");
   });
 
   it("reuses only unique, already-used definitions and keeps every authored definition", () => {
@@ -264,25 +307,28 @@ describe("explicit inline-to-reference conversion", () => {
 });
 
 describe("scoped reference-conversion proof", () => {
-  function proof({
-    prefix = "",
-    destination = "/url",
-    extra = "",
-    title = "",
-    resource = "/url",
-    extraInline = {},
-    extraReference = {},
-  } = {}) {
+  function proof(
+    {
+      prefix = "",
+      destination = "/url",
+      extra = "",
+      title = "",
+      resource = "/url",
+      extraInline = {},
+      extraReference = {},
+    } = {},
+    dialect: Dialect = "commonmark",
+  ) {
     const source = `${prefix}[a](${resource})\n`;
     const candidate = `${prefix}[a][r]\n\n[r]: ${destination}${title}\n${extra}`;
-    const before = parse(source, "commonmark");
+    const before = parse(source, dialect);
     let node: Link | undefined;
     walk(before.tree, "link", (found) => {
       node = found;
     });
     if (!node) throw new Error("Missing test link");
     Object.assign(node, extraInline);
-    const after = parse(candidate, "commonmark");
+    const after = parse(candidate, dialect);
     walk(after.tree, "linkReference", (reference) => Object.assign(reference, extraReference));
     return verifyReferenceConversion(
       before,
@@ -300,6 +346,9 @@ describe("scoped reference-conversion proof", () => {
   }
   it("accepts the exact transformation", () => {
     expect(proof()).toBe(true);
+  });
+  it("independently refuses new Obsidian definitions", () => {
+    expect(proof({}, "obsidian")).toBe(false);
   });
   it("rejects activation of an untouched undefined shortcut", () => {
     expect(proof({ prefix: "Keep [r] literal. " })).toBe(false);

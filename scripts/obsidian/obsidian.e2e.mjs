@@ -9,7 +9,7 @@ import process from "node:process";
 import { browser, expect } from "@wdio/globals";
 import { obsidianPage } from "wdio-obsidian-service";
 
-const { createWorkspace, format } = await import("/repo/dist/index.js");
+const { createWorkspace, format, parse } = await import("/repo/dist/index.js");
 const { documentSeed, generateDocument, normalizeHtml } =
   await import("/repo/scripts/rendering.mjs");
 const { fixtures } = await import("/repo/tests/fixtures/renderers/obsidian.mjs");
@@ -1386,6 +1386,13 @@ describe("Obsidian before and after formatting", function () {
       `Obsidian ${version}. Profile ${profile}, seeds ${seeds.join(",")}, count ${count}.`,
     );
     const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+    // Obsidian conversion reuses authored labels rather than generating new ones.
+    const fullReferences = (source) => {
+      const count = (node) =>
+        (node.type === "linkReference" && node.referenceType === "full" ? 1 : 0) +
+        ("children" in node ? node.children.reduce((sum, child) => sum + count(child), 0) : 0);
+      return count(parse(source, "obsidian").tree);
+    };
     const differences = [];
     let compared = 0;
     try {
@@ -1400,7 +1407,8 @@ describe("Obsidian before and after formatting", function () {
             referenceLinks,
           );
           record.changed = output !== source;
-          if (referenceLinks) record.convertedReferences = output.includes("[mdrefine-link-1]");
+          if (referenceLinks)
+            record.convertedReferences = fullReferences(output) > fullReferences(source);
           const captured = record.changed ? Object.keys(views) : ["livePreview", "reading"];
           record.views = captured.map((name) => ({
             name,

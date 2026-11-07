@@ -12,7 +12,13 @@ import { referenceFixture, sentenceFixture } from "./common.mjs";
 
 /** @type {{ name: string, source: string, wrapMode?: string, referenceLinks?: boolean }[]} */
 export const fixtures = [
-  referenceFixture,
+  {
+    ...referenceFixture,
+    // Live Preview shows new definitions and misreads reference images. Only
+    // links with an existing used definition convert; the sized image stays inline.
+    source:
+      '# [The guide](https://example.com/setup "Setup")\n\n> [!note] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup") and [the existing link][guide].\n\n![The picture|100](https://example.com/picture.png "Picture")\n\n[guide]: https://example.com/setup "Setup"\n',
+  },
   sentenceFixture,
   ...boundaryFixtures,
   {
