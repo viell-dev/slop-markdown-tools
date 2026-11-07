@@ -135,10 +135,17 @@ const modes = [
   ["gfm", config],
 ];
 /** The renderings of `source` in each mode in which formatting changes it. */
-async function renderings(source, record) {
+async function renderings(source, record, wrapMode) {
   const result = [];
   for (const [mode, modeConfig] of modes) {
-    const output = format(source, { config: modeConfig }).output;
+    const output = format(source, {
+      config: wrapMode
+        ? {
+            ...modeConfig,
+            rules: { ...modeConfig.rules, "style/wrap": ["warn", { mode: wrapMode }] },
+          }
+        : modeConfig,
+    }).output;
     const changed = output !== source;
     if (!changed) {
       record.views.push({ name: mode, changed, status: "unchanged" });
@@ -172,7 +179,7 @@ const report = createRendererReport("github", options);
 report.identity = { service: "GitHub Markdown API", version: "externally-uncontrolled" };
 const checkpoint = () =>
   writeFileSync(path.join(options.out, "report.json"), JSON.stringify(report, null, 2) + "\n");
-const cases = githubFixtures.map(({ name, source }) => ({ name: `fixture-${name}`, source }));
+const cases = githubFixtures.map((fixture) => ({ ...fixture, name: `fixture-${fixture.name}` }));
 for (const seed of options.seeds)
   for (let index = 0; index < options.count; index++) {
     const source = generateDocument(documentSeed(seed, index), "github", options.profile);
@@ -188,9 +195,9 @@ try {
     );
     report.controls.push({ name: `${mode}-text-difference`, passed: true });
   }
-  for (const { name, source } of cases) {
-    const record = startDocument(report, name, 80);
-    const rendered = await renderings(source, record);
+  for (const { name, source, wrapMode } of cases) {
+    const record = startDocument(report, name, 80, wrapMode);
+    const rendered = await renderings(source, record, wrapMode);
     record.changed = record.views.some((view) => view.changed);
     record.completed = true;
     if (rendered.length) report.compared++;

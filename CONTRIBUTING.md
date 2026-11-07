@@ -793,9 +793,11 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   explicitly reports hosts that are inapplicable. The Release workflow runs all
   three checks afresh and validates their reports at its exact commit.
   `renderer-evidence.mjs` independently reconstructs intended fixture/generated
-  document names, widths, views and calibration controls. Reports distinguish
-  planned documents from attempted/completed formatting cases and changed
-  output; unchanged cases are legitimate and need no redundant host request. A
+  document names, widths, views, explicitly selected wrapping modes and
+  calibration controls. The shared sentence-wrapping fixture opts into that mode
+  on GitHub, both forges, and both Obsidian views. Reports distinguish planned
+  documents from attempted/completed formatting cases and changed output;
+  unchanged cases are legitimate and need no redundant host request. A
   deterministic gate still requires at least one document comparison. Every
   expected view records comparison or unchanged output. Actual repository file
   views remain mandatory even when unchanged. Deterministic consumers bind the

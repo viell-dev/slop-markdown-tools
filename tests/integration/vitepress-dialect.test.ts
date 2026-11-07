@@ -15,6 +15,38 @@ const { createSSRApp } = require("vue") as typeof import("vue");
 const { renderToString } = require("vue/server-renderer") as typeof import("vue/server-renderer");
 afterEach(() => disposeMdItInstance());
 
+it.each([false, true])(
+  "preserves actual VitePress/Vue output with sentence wrapping and math=%s",
+  async (math) => {
+    const render = await renderer({ math });
+    const config: Config = {
+      extends: [],
+      dialect: "vitepress",
+      vitepress: { math },
+      rules: { "style/wrap": ["warn", { mode: "sentences", width: 40 }] },
+    };
+    const sources = [
+      "First **sentence.** Second sentence.\n",
+      "Read [the guide.](https://example.com) Next sentence.\n",
+      "- First sentence. Second sentence in a list.\n\n> First sentence. Second sentence in a quote.\n",
+      "Use `First. Second.` carefully. Next sentence.\n",
+      "Use `one` `two`. Next sentence.\n",
+      "Math $x.y$ stays here. Next sentence.\n",
+      "First sentence&#46; Next sentence.\n",
+    ];
+    for (const source of sources) {
+      const result = format(source, { config });
+      expect(
+        result.diagnostics.filter((item) => item.rule.startsWith("engine/")),
+        source,
+      ).toEqual([]);
+      expect(await render(result.output), source).toBe(await render(source));
+      expect(format(result.output, { config }).output, source).toBe(result.output);
+    }
+    expect(format(sources[0]!, { config }).output).toBe("First **sentence.**\nSecond sentence.\n");
+  },
+);
+
 const fixtures = [
   'Read the notes [installation guide](./install.md){target="_blank" rel="noopener"} in a new tab.\n',
   "[a](#x)\n[b](#y)\n",

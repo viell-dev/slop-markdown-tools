@@ -229,6 +229,13 @@ describe("plugin", () => {
 });
 
 describe("library scripts", () => {
+  it("sentence-wrapping.mjs demonstrates the opt-in mode through the public entry", () => {
+    const result = node("examples/library/sentence-wrapping.mjs");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toBe(
+      "The service records each request.\nOperators can inspect the log.\nRetries use the same identifier.\n",
+    );
+  });
   it("format-string.mjs formats through the package's public entry point", () => {
     const result = node("examples/library/format-string.mjs");
     expect(result.status, result.stderr).toBe(0);

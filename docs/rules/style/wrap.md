@@ -1,9 +1,10 @@
 # `style/wrap`
 
 Reflows each paragraph so that its lines fill the width, 80 columns by default,
-without exceeding it, or, with `mode: "never"`, joins each paragraph onto one
-line. A line break inside a paragraph renders as a space, so the rendered text
-stays the same, and short lines keep diffs small.
+without exceeding it. With `mode: "sentences"`, recognized sentences start on
+separate lines; `mode: "never"` joins each paragraph onto one line. A line break
+inside a paragraph renders as a space, so the rendered text stays the same, and
+short lines keep diffs small.
 
 **Style rule**, fixed by `format`. Presets: `recommended` (warn). Dialects: all.
 Options: `mode`, `width`, `measure`, `reportUnreflowed`, `reportUnbreakable`.
@@ -22,13 +23,13 @@ change to one sentence shows up as a
 small diff.
 ```
 
-| Option              | Values                        | Default     |
-| ------------------- | ----------------------------- | ----------- |
-| `mode`              | `"always"` or `"never"`       | `"always"`  |
-| `width`             | An integer from 20 to 500     | `80`        |
-| `measure`           | `"columns"` or `"codepoints"` | `"columns"` |
-| `reportUnreflowed`  | `true` or `false`             | `false`     |
-| `reportUnbreakable` | `true` or `false`             | `false`     |
+| Option              | Values                                  | Default     |
+| ------------------- | --------------------------------------- | ----------- |
+| `mode`              | `"always"`, `"never"`, or `"sentences"` | `"always"`  |
+| `width`             | An integer from 20 to 500               | `80`        |
+| `measure`           | `"columns"` or `"codepoints"`           | `"columns"` |
+| `reportUnreflowed`  | `true` or `false`                       | `false`     |
+| `reportUnbreakable` | `true` or `false`                       | `false`     |
 
 - `mode`: `always` wraps at `width`. `never` joins each paragraph onto one line,
   so `First line` followed by `second line` becomes `First line second line`. It
@@ -36,7 +37,9 @@ small diff.
   wrapping does, and ignores `width`, `reportUnreflowed`, and
   `reportUnbreakable`, since the long lines are intended.
   [`content/line-length`](../content/line-length.md) can still check headings,
-  code, and tables.
+  code, and tables. `sentences` starts each recognized sentence on a new line
+  where it is safe, wrapping a long sentence to `width` independently. It does
+  not add blank lines or change the default preset's wrapping.
 - `width`: the longest line, in the unit of `measure`.
 - `measure`: `columns` counts display columns, so a wide character such as `漢`
   counts two. `codepoints` counts Unicode code points: a character outside the
@@ -51,6 +54,51 @@ small diff.
 The two report options propose no edits and use the rule's severity. To make
 them fail a check, set the rule to `error` or pass `--max-warnings 0`;
 `format --check` checks only for edits.
+
+**Sentence wrapping:**
+
+To keep reflow from an edit within its sentence, use:
+
+```json
+{ "rules": { "style/wrap": ["warn", { "mode": "sentences", "width": 80 }] } }
+```
+
+Before:
+
+```markdown
+The service records each request. Operators can inspect the log. Retries use the same identifier.
+```
+
+After:
+
+```markdown
+The service records each request.
+Operators can inspect the log.
+Retries use the same identifier.
+```
+
+Sentence recognition uses fixed English-oriented punctuation and abbreviation
+heuristics, independent of the machine's locale and ICU version. It examines the
+neighboring prose words; it does not identify a document's language or guarantee
+grammatical sentence boundaries. For example, `Dr. Smith` stays together, but
+`e.g. Apples` can start a line at `Apples`, and a sentence ending inside a curly
+quotation can remain joined to the following text. Other languages' punctuation
+may work, but their abbreviation conventions are not covered; an Arabic question
+mark is not recognized. Disable this rule to keep authored sentence boundaries
+instead.
+
+The text of emphasis and links contributes to recognition; code, math, images
+and other opaque constructs do not contribute punctuation. Closing markup stays
+attached to its text. Only existing whitespace between safe wrapping atoms can
+become a line ending. Adjacent CJK sentences such as `第一句。第二句！`
+therefore stay adjacent. When a boundary is not recognized or cannot safely
+break, ordinary width wrapping applies. Long sentences can still reflow across
+several lines, and an edit need not produce a smaller diff in every paragraph.
+
+All protections below apply to sentence wrapping, including hard breaks,
+container structure, and Obsidian's strict-line-break requirement. Existing soft
+line endings are normalized before recognition, so earlier wrapping does not
+influence subsequent sentence detection.
 
 **Breaking lines:**
 

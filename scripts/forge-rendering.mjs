@@ -189,13 +189,18 @@ for (const image of images) {
     const found = [];
     let compared = 0,
       fileViews = 0;
-    async function compare(name, source, view, renderer, force = false) {
+    async function compare(name, source, view, renderer, force = false, wrapMode) {
       const record = startDocument(
         report,
         `${image.name}/${view === "repository-file" ? "repository-" : ""}${name}`,
         80,
+        wrapMode,
       );
-      const output = format(source, { config }).output;
+      const output = format(source, {
+        config: wrapMode
+          ? { ...config, rules: { "style/wrap": ["warn", { mode: wrapMode }] } }
+          : config,
+      }).output;
       record.changed = output !== source;
       if (output === source && !force) {
         record.views.push({ name: view, changed: false, status: "unchanged" });
@@ -231,7 +236,8 @@ for (const image of images) {
       knownSources(image.name).forEach((source, index) =>
         cases.push({ name: `known-${index}`, source }),
       );
-    for (const { name, source } of cases) await compare(name, source, "file-api", render);
+    for (const { name, source, wrapMode } of cases)
+      await compare(name, source, "file-api", render, false, wrapMode);
     for (const fixture of fileFixtures) {
       let sha;
       await compare(

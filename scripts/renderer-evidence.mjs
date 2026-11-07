@@ -22,15 +22,21 @@ export const obsidianWidths = [80, 30];
 
 /**
  * The intended workload, independently reconstructed by producers and consumers.
- * @returns {{ documents: { name: string, widths: number[], views: string[] }[], controls: string[] }}
+ * @returns {{ documents: { name: string, widths: number[], views: string[], wrapMode?: string }[], controls: string[] }}
  */
 export function rendererPlan(renderer, { profile, seeds, count }) {
   assert(["github", "obsidian", "forges"].includes(renderer), "Unknown renderer");
   const documents = [],
     controls = [];
   const add = (host, fixtures, views, widths, prefix = "") => {
-    const append = (name) => documents.push({ name: `${prefix}${name}`, widths, views });
-    for (const fixture of fixtures) append(fixture.name);
+    const append = (name, wrapMode) =>
+      documents.push({
+        name: `${prefix}${name}`,
+        widths,
+        views,
+        ...(wrapMode ? { wrapMode } : {}),
+      });
+    for (const fixture of fixtures) append(fixture.name, fixture.wrapMode);
     for (const seed of seeds)
       for (let index = 0; index < count; index++)
         append(host === "obsidian" ? `generated ${seed}/${index}` : `generated-${seed}-${index}`);
@@ -42,7 +48,7 @@ export function rendererPlan(renderer, { profile, seeds, count }) {
   if (renderer === "github") {
     add(
       "github",
-      githubFixtures.map((item) => ({ name: `fixture-${item.name}` })),
+      githubFixtures.map((item) => ({ ...item, name: `fixture-${item.name}` })),
       ["markdown", "gfm"],
       [80],
     );
@@ -74,8 +80,16 @@ export function rendererPlan(renderer, { profile, seeds, count }) {
 }
 
 /** Records survive a failed attempt; a completed formatting attempt may be unchanged. */
-export function startDocument(report, name, width) {
-  const record = { name, width, attempted: true, completed: false, changed: null, views: [] };
+export function startDocument(report, name, width, wrapMode) {
+  const record = {
+    name,
+    width,
+    ...(wrapMode ? { wrapMode } : {}),
+    attempted: true,
+    completed: false,
+    changed: null,
+    views: [],
+  };
   report.documents.push(record);
   return record;
 }
@@ -116,6 +130,7 @@ export function validateRendererReport(report, settings, renderer) {
   let compared = 0;
   for (const record of report.documents) {
     const planned = expected.documents.find((item) => item.name === record.name);
+    assert.equal(record.wrapMode, planned.wrapMode, "Incorrect native wrapping mode");
     assert.equal(record.attempted, true);
     assert.equal(record.completed, true, `Incomplete document: ${record.name}`);
     assert.equal(typeof record.changed, "boolean");

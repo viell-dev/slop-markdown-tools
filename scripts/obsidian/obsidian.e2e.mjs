@@ -674,11 +674,11 @@ function documents() {
 /** How many documents were written to the vault, which names the next ones. */
 let written = 0;
 /** A document's formatting at `width`, and the views in which Obsidian shows it differently. */
-async function compare(source, width, workspace) {
+async function compare(source, width, workspace, wrapMode = "always") {
   const config = {
     extends: ["recommended", "obsidian"],
     dialect: "obsidian",
-    rules: { "style/wrap": ["warn", { width }] },
+    rules: { "style/wrap": ["warn", { width, mode: wrapMode }] },
   };
   const result = format(source, { path: "Note.md", config, workspace });
   if (result.output === source) return { output: source, changed: [] };
@@ -1322,7 +1322,7 @@ describe("Obsidian before and after formatting", function () {
       for (const width of widths) {
         const named = all.find((item) => item.name === name);
         if (!named) continue;
-        const first = await compare(named.source, width, workspace);
+        const first = await compare(named.source, width, workspace, named.wrapMode);
         if (!first.changed.length) continue;
         const view = first.changed.includes("reading") ? "reading" : first.changed[0];
         // The document keeps its end: whether a line break ends it, which `style/final-newline`
@@ -1330,7 +1330,7 @@ describe("Obsidian before and after formatting", function () {
         const end = named.source.endsWith("\n") ? "\n" : "";
         const join = (lines) => lines.join("\n") + end;
         const still = async (lines) =>
-          (await compare(join(lines), width, workspace)).changed.includes(view);
+          (await compare(join(lines), width, workspace, named.wrapMode)).changed.includes(view);
         let lines = named.source.replace(/\n$/, "").split("\n");
         for (let changed = true; changed;) {
           changed = false;
@@ -1344,7 +1344,7 @@ describe("Obsidian before and after formatting", function () {
               } else at += size;
             }
         }
-        const last = await compare(join(lines), width, workspace);
+        const last = await compare(join(lines), width, workspace, named.wrapMode);
         reduced.push({
           name,
           width,
@@ -1371,9 +1371,14 @@ describe("Obsidian before and after formatting", function () {
     let compared = 0;
     try {
       for (const width of widths)
-        for (const { name, source } of documents()) {
-          const record = startDocument(report, name, width);
-          const { output, views, changed, before, after } = await compare(source, width, workspace);
+        for (const { name, source, wrapMode } of documents()) {
+          const record = startDocument(report, name, width, wrapMode);
+          const { output, views, changed, before, after } = await compare(
+            source,
+            width,
+            workspace,
+            wrapMode,
+          );
           record.changed = output !== source;
           const captured = record.changed ? Object.keys(views) : ["livePreview", "reading"];
           record.views = captured.map((name) => ({

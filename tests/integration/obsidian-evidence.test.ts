@@ -49,6 +49,7 @@ function captured(views: string[]) {
     },
     controls: obsidianControls.map((name) => ({ name, passed: true })),
   };
+  let recordedMode: string | undefined;
   const run = callback({
     ...settings,
     reduce: undefined,
@@ -58,14 +59,24 @@ function captured(views: string[]) {
     console: { log() {} },
     createWorkspace: () => ({}),
     widths: obsidianWidths,
-    documents: () => report.plan.documents.map(({ name }) => ({ name, source: "Synthetic.\n" })),
-    startDocument,
-    compare: () =>
-      Promise.resolve({
+    documents: () =>
+      report.plan.documents.map(({ name, wrapMode }) => ({
+        name,
+        wrapMode,
+        source: "Synthetic.\n",
+      })),
+    startDocument: (report: unknown, name: string, width: number, wrapMode?: string) => {
+      recordedMode = wrapMode;
+      return startDocument(report, name, width, wrapMode);
+    },
+    compare: (_source: string, _width: number, _workspace: unknown, wrapMode?: string) => {
+      expect(wrapMode).toBe(recordedMode);
+      return Promise.resolve({
         output: "Changed synthetic.\n",
         views: Object.fromEntries(views.map((name) => [name, ["same", "same"]])),
         changed: [],
-      }),
+      });
+    },
     checkpoint() {},
     validateRendererReport,
     classifyDifferences: () => ({ unexpected: [], known: [], stale: [] }),
