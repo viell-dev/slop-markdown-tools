@@ -190,11 +190,13 @@ export function convertReferences(
   const selected = new Set(diagnostics.map((item) => item.start));
   if (!selected.size) return undefined;
   const { source } = document;
-  const titles = calloutTitles(document);
+  const keptRanges = calloutTitles(document);
   const existing = definitions(document.tree);
   const used = new Set<string>();
   walk(document.tree, (node) => {
     if (node.type === "linkReference" || node.type === "imageReference") used.add(node.identifier);
+    // Obsidian also matches heading destinations by their authored inline source.
+    if (document.dialect === "obsidian" && node.type === "heading") keptRanges.push(range(node));
   });
   const reusable = new Map<string, { label: string; identifier: string }>();
   const identity = (node: Link | Image | Definition) =>
@@ -203,6 +205,12 @@ export function convertReferences(
     if (group.length !== 1 || !used.has(identifier) || identifier === "//") continue;
     const definition = group[0]!;
     if (!supportedResource(document, definition)) continue;
+    if (
+      document.dialect === "obsidian" &&
+      (!document.tree.children.includes(definition) ||
+        /[\r\n]/.test(source.slice(...range(definition))))
+    )
+      continue;
     const label = definitionLabel.exec(source.slice(...range(definition)))?.[1];
     if (!label || /[\r\n]/.test(label)) continue;
     const key = identity(definition);
@@ -225,7 +233,7 @@ export function convertReferences(
     if (!selected.has(start) || start < previousEnd || close === undefined) return;
     if (!supportedResource(document, node)) return;
     if (changesForgeHeading(document, start, end)) return;
-    if (titles.some(([from, to]) => start < to && end > from)) return;
+    if (keptRanges.some(([from, to]) => start < to && end > from)) return;
     if (document.dialect === "obsidian" && node.type === "image") return;
     const raw = source.slice(start, end);
     if (!(raw.startsWith("[") || raw.startsWith("![")) || source.slice(close, close + 2) !== "](")

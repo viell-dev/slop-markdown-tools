@@ -91,14 +91,15 @@ written, including data images. Hosts can reject these resources and show their
 authored notation as literal text, which conversion would change. Definitions
 containing tabs are never reused because reference parsers disagree about
 whether they are definitions or visible text. On Forgejo and Gitea, links in
-heading source that determines a generated anchor stay inline. Links on callout
-or alert marker lines also stay inline. Other eligible links can still convert
-in the same document.
+heading source that determines a generated anchor stay inline. All Obsidian
+heading links stay inline to preserve heading names used by other notes. Links
+on callout or alert marker lines also stay inline. Other eligible links can
+still convert in the same document.
 
-In Obsidian, only links that reuse an existing, already-used definition can
-convert. New definitions remain visible in Live Preview, and reference images
-are read as internal embeds there, so conversion keeps other links and all
-images inline, including sized images
+In Obsidian, only links that reuse an existing, already-used, top-level,
+single-line definition can convert. New definitions remain visible in Live
+Preview, and reference images are read as internal embeds there, so conversion
+keeps other links and all images inline, including sized images
 ([#908](https://github.com/viell-dev/slop-markdown-tools/issues/908)).
 
 Conversion does not generate collapsed or shortcut references, convert

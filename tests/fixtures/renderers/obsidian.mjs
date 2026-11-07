@@ -15,7 +15,8 @@ export const fixtures = [
   {
     ...referenceFixture,
     // Live Preview shows new definitions and misreads reference images. Only
-    // links with an existing used definition convert; the sized image stays inline.
+    // Body links with an existing used definition convert; the heading, callout
+    // title and sized image stay inline.
     source:
       '# [The guide](https://example.com/setup "Setup")\n\n> [!note] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup") and [the existing link][guide].\n\n![The picture|100](https://example.com/picture.png "Picture")\n\n[guide]: https://example.com/setup "Setup"\n',
   },

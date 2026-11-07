@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
-import type { Link } from "mdast";
+import type { Image, Link } from "mdast";
 import { createWorkspace, format, lint, parse, semanticFingerprint } from "../../src/index.js";
 import type { Dialect, Plugin } from "../../src/index.js";
 import { verifyReferenceConversion } from "../../src/core/reference-conversion.js";
@@ -114,6 +114,38 @@ describe("explicit inline-to-reference conversion", () => {
     expect(render(output)).toEqual(render(source));
     expect(formatted("[y](/b)\n", only(rules, "obsidian"))).toBe("[y](/b)\n");
     expect(formatted("[y](/b)\n\n[r]: /b\n", only(rules, "obsidian"))).toBe("[y](/b)\n\n[r]: /b\n");
+  });
+
+  it.each(["> [nested]: /a", "- [nested]: /a", "[nested]:\n  /a"])(
+    "keeps Obsidian reuse within top-level, single-line definitions: %s",
+    (definition) => {
+      const source = `[used][nested] [a](/a) [used][r] [b](/b)\n\n${definition}\n\n[r]: /b\n`;
+      const output = formatted(source, only(rules, "obsidian"));
+      expect(output).toBe(source.replace("[b](/b)", "[b][r]"));
+      expect(render(output)).toEqual(render(source));
+    },
+  );
+
+  it.each([
+    "# [The guide](/b)\n",
+    "[The guide](/b)\n===\n",
+    "> # [The guide](/b)\n",
+    "- # [The guide](/b)\n",
+  ])("preserves cross-note Obsidian heading destinations: %j", (heading) => {
+    const source = heading + "\nRead [body](/b) and [used][r].\n\n[r]: /b\n";
+    const other = "[[Note#[The guide](/b)]] and [[Note#The guide]]\n";
+    const check = (note: string) =>
+      lint(other, {
+        config: only({ "links/valid": "warn" }, "obsidian"),
+        path: "Other.md",
+        workspace: createWorkspace({ "Note.md": note, "Other.md": other }, { dialect: "obsidian" }),
+      });
+    expect(check(source)).toEqual([]);
+    const output = formatted(source, only(rules, "obsidian"), { path: "Note.md" });
+    expect(output.startsWith(heading)).toBe(true);
+    expect(output).toContain("Read [body][r] and [used][r].");
+    expect(check(output)).toEqual([]);
+    expect(render(output)).toEqual(render(source));
   });
 
   it("reuses only unique, already-used definitions and keeps every authored definition", () => {
@@ -350,6 +382,36 @@ describe("scoped reference-conversion proof", () => {
   it("independently refuses new Obsidian definitions", () => {
     expect(proof({}, "obsidian")).toBe(false);
   });
+  it.each([
+    ["commonmark", true],
+    ["obsidian", false],
+  ] as const)(
+    "checks converted images independently of new definitions (%s)",
+    (dialect, accepted) => {
+      const before = parse("![a](/url)\n\n[used][r]\n\n[r]: /url\n", dialect);
+      const after = parse("![a][r]\n\n[used][r]\n\n[r]: /url\n", dialect);
+      let image: Image | undefined;
+      walk(before.tree, "image", (node) => {
+        image = node;
+      });
+      if (!image) throw new Error("Missing test image");
+      expect(
+        verifyReferenceConversion(
+          before,
+          after,
+          [
+            {
+              node: image,
+              edit: { start: 0, end: range(image)[1], text: "![a][r]" },
+              identifier: "r",
+              at: 0,
+            },
+          ],
+          [],
+        ),
+      ).toBe(accepted);
+    },
+  );
   it("rejects activation of an untouched undefined shortcut", () => {
     expect(proof({ prefix: "Keep [r] literal. " })).toBe(false);
   });
