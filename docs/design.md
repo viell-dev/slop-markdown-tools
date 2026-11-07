@@ -49,9 +49,9 @@ verified result establishes the next ordinary comparison baseline. The public
 `semanticFingerprint` still distinguishes inline and reference source
 structures; ordinary rules and plugins cannot request this exception.
 Callout/alert marker-line links and anchor-sensitive forge heading links stay
-inline. Obsidian heading links also stay inline, preserving their source names
-for links from other notes. In Obsidian, Live Preview requires images to stay
-inline and links to reuse an existing, already-used, top-level, single-line
+inline. Links inside Obsidian headings also stay inline, preserving their source
+names for links from other notes. In Obsidian, Live Preview requires images to
+stay inline and links to reuse an existing, already-used, top-level, single-line
 definition; the converter adds no definitions.
 
 Obsidian's structural rules also apply a general conservative [boundary
