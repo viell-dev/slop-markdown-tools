@@ -767,7 +767,11 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   schema validation and identity-keyed schema caching. `engine-ranges`,
   `engine-front-matter` and `engine-*-protections` retain their respective
   selection and preservation regressions. `link-fingerprint.test.ts` covers
-  resolved target identity and literal URLs; the boundary regressions and
+  resolved target identity and literal URLs. `reference-conversion.test.ts`
+  checks the conversion-specific proof, label allocation, source retention,
+  suppression, ranges and interaction with other rules. Ordinary fingerprints
+  remain exact; only verified built-in inline to full-reference conversions
+  establish a new comparison baseline. Boundary regressions and
   `tests/performance/engine.test.ts` cover source ranges, ordered protection
   fields and bounded scans. These locations describe current ownership and
   evidence, rather than requiring future helpers to accumulate there. The rule
@@ -795,7 +799,9 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   `renderer-evidence.mjs` independently reconstructs intended fixture/generated
   document names, widths, views, explicitly selected wrapping modes and
   calibration controls. The shared sentence-wrapping fixture opts into that mode
-  on GitHub, both forges, and both Obsidian views. Reports distinguish planned
+  on GitHub, both forges, and both Obsidian views. Plans also identify documents
+  that explicitly enable inline-to-reference conversion; each host must record
+  that its reference fixture actually converted. Reports distinguish planned
   documents from attempted/completed formatting cases and changed output;
   unchanged cases are legitimate and need no redundant host request. A
   deterministic gate still requires at least one document comparison. Every

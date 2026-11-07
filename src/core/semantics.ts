@@ -17,6 +17,20 @@ import { lineBreak } from "../syntax/source.js";
 export function semanticFingerprint(document: Document, workspace?: Workspace): string {
   return JSON.stringify(semanticTree(document, workspace));
 }
+/** Internal conversion guard: project only verified references and newly added definitions. */
+export function semanticFingerprintWithReferences(
+  document: Document,
+  replacements: WeakMap<Nodes, Nodes>,
+  definitions: WeakSet<Nodes>,
+  workspace?: Workspace,
+): string {
+  return JSON.stringify(
+    semanticTree(document, workspace, undefined, undefined, undefined, {
+      replacements,
+      definitions,
+    }),
+  );
+}
 /** Internal host guard: replace only explicitly approved literal code values. */
 export function semanticFingerprintWithCode(
   document: Document,
@@ -48,6 +62,7 @@ function semanticTree(
   origins?: Map<unknown, Nodes>,
   codeValues?: WeakMap<Code, string>,
   frontMatter?: { node: Nodes; value: string; source: string },
+  references?: { replacements: WeakMap<Nodes, Nodes>; definitions: WeakSet<Nodes> },
 ): unknown {
   const githubHeadings = new Map<Nodes, string[]>();
   const githubSources = new Map<Nodes, string>();
@@ -90,6 +105,7 @@ function semanticTree(
   };
   // Keys are emitted in sorted order so the JSON text is canonical without a replacer.
   function normalize(node: Nodes, calloutHeader = false): unknown {
+    node = references?.replacements.get(node) ?? node;
     if (node.type === "wikiLink") {
       const link = node.embed
         ? { label: node.label, type: "embed", url: canonicalUrl(node.target, true) }
@@ -138,7 +154,10 @@ function semanticTree(
       const value = (node as unknown as Record<string, unknown>)[key];
       if (key === "position" || key === "data") continue;
       if (key === "children" && "children" in node) {
-        result.children = node.children.map((child, index) =>
+        const children = references
+          ? node.children.filter((child) => !references.definitions.has(child))
+          : node.children;
+        result.children = children.map((child, index) =>
           normalize(child, index === 0 && (node.type === "blockquote" || calloutHeader)),
         );
       } else if (key === "url" && typeof value === "string") result[key] = canonicalUrl(value);

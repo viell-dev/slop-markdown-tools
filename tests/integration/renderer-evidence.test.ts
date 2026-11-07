@@ -23,6 +23,7 @@ function complete(renderer: string) {
         name: item.name,
         width,
         ...(item.wrapMode ? { wrapMode: item.wrapMode } : {}),
+        ...(item.referenceLinks ? { referenceLinks: true, convertedReferences: true } : {}),
         attempted: true,
         completed: true,
         changed: renderer !== "forges" && documentIndex === 0 && widthIndex === 0,
@@ -66,6 +67,15 @@ function complete(renderer: string) {
 }
 
 describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (renderer) => {
+  it("requires actual opt-in reference conversion", () => {
+    const report = complete(renderer);
+    const reference = report.documents.find((item) => item.referenceLinks)!;
+    expect(reference).toBeDefined();
+    reference.convertedReferences = false;
+    expect(() => validateRendererEvidence(report, renderer)).toThrow(
+      "Reference conversion fixture did not convert",
+    );
+  });
   it("requires the explicitly selected sentence-wrapping mode", () => {
     const report = complete(renderer);
     const sentence = report.documents.find((item) => item.wrapMode === "sentences")!;

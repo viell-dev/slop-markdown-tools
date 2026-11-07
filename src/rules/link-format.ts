@@ -9,7 +9,7 @@ import { optionsSchema } from "./shared.js";
 const definitionLabel = /^\[(?:\\[\s\S]|[^\]\\])*\]:/;
 
 /** The positioned parser represents an explicit empty title as null too. */
-function emptyTitle(raw: string, definition: boolean): boolean {
+export function emptyTitle(raw: string, definition: boolean): boolean {
   const suffix = (
     definition ? /[ \t\r\n](?:""|''|\(\))[ \t]*$/ : /[ \t\r\n](?:""|''|\(\))[ \t\r\n]*\)$/
   ).exec(raw);

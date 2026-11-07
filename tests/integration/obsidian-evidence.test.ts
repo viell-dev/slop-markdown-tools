@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
+import { parse } from "../../src/index.js";
 import {
   createRendererReport,
   obsidianControls,
@@ -23,14 +24,14 @@ const callback = new Function(
   "scope",
   `const { reduce, probe, identifyHost, report, console, createWorkspace, widths,
     documents, startDocument, compare, obsidianPage, browser, classifyDifferences,
-    profile, seeds, count, checkpoint, validateRendererReport, expect } = scope;
+    profile, seeds, count, checkpoint, validateRendererReport, expect, parse } = scope;
   let run;
   const it = (_title, body) => { run = body; };
   ${harness.slice(start, end)}
   return run;`,
 ) as (scope: Record<string, unknown>) => (this: { skip(): never }) => Promise<void>;
 
-function captured(views: string[]) {
+function captured(views: string[], converts = true) {
   const settings = { profile: "realistic", seeds: [1], count: 0 };
   const report = {
     ...createRendererReport("obsidian", settings),
@@ -50,6 +51,7 @@ function captured(views: string[]) {
     controls: obsidianControls.map((name) => ({ name, passed: true })),
   };
   let recordedMode: string | undefined;
+  let recordedReferences: boolean | undefined;
   const run = callback({
     ...settings,
     reduce: undefined,
@@ -58,21 +60,40 @@ function captured(views: string[]) {
     identifyHost: async () => {},
     console: { log() {} },
     createWorkspace: () => ({}),
+    parse,
     widths: obsidianWidths,
     documents: () =>
-      report.plan.documents.map(({ name, wrapMode }) => ({
+      report.plan.documents.map(({ name, wrapMode, referenceLinks }) => ({
         name,
         wrapMode,
+        referenceLinks,
         source: "Synthetic.\n",
       })),
-    startDocument: (report: unknown, name: string, width: number, wrapMode?: string) => {
+    startDocument: (
+      report: unknown,
+      name: string,
+      width: number,
+      wrapMode?: string,
+      referenceLinks?: boolean,
+    ) => {
       recordedMode = wrapMode;
-      return startDocument(report, name, width, wrapMode);
+      recordedReferences = referenceLinks;
+      return startDocument(report, name, width, wrapMode, referenceLinks);
     },
-    compare: (_source: string, _width: number, _workspace: unknown, wrapMode?: string) => {
+    compare: (
+      _source: string,
+      _width: number,
+      _workspace: unknown,
+      wrapMode?: string,
+      referenceLinks?: boolean,
+    ) => {
       expect(wrapMode).toBe(recordedMode);
+      expect(referenceLinks).toBe(recordedReferences);
       return Promise.resolve({
-        output: "Changed synthetic.\n",
+        output:
+          referenceLinks && converts
+            ? "[Changed synthetic][guide].\n\n[guide]: /guide\n"
+            : "Changed synthetic.\n",
         views: Object.fromEntries(views.map((name) => [name, ["same", "same"]])),
         changed: [],
       });
@@ -102,4 +123,9 @@ it("records the actual captured views for every changed Obsidian document", asyn
 it("rejects a lost Reading capture instead of recording the planned view as completed", async () => {
   const evidence = captured(["livePreview"]);
   await expect(evidence.run()).rejects.toThrow("Missing or duplicate native views");
+});
+
+it("rejects a fixture that changed without actually converting a reference", async () => {
+  const evidence = captured(["livePreview", "reading"], false);
+  await expect(evidence.run()).rejects.toThrow("Reference conversion fixture did not convert");
 });

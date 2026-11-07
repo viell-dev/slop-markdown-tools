@@ -306,8 +306,10 @@ semantics remain the configured formatter's responsibility.
 - `builtInRules` holds the built-in rule objects, and `ruleRegistry(plugins)`
   returns a new table that adds the rules of plugins under their IDs.
 - `applyEdits(source, edits)` applies `{ start, end, text }` edits, which must
-  not overlap. `semanticFingerprint(document, workspace)` is the comparison that
-  `format` uses to refuse a change of meaning.
+  not overlap. `semanticFingerprint(document, workspace)` is the ordinary
+  comparison that `format` uses to refuse a change of meaning. It distinguishes
+  inline and reference source structures; the built-in full-reference conversion
+  uses a separate [internal proof](design.md#safety-model).
 
 `presets`, `builtInRules`, `dialects`, `dialectAliases`, and `configSchema` are
 shared by every caller in the process, so they are frozen and typed read-only;

@@ -179,14 +179,18 @@ export const linkStyleRules: Record<string, Rule> = {
     description: "Reports the link and image forms that the options disallow.",
     kind: "style",
     phase: "inline",
-    schema: optionsSchema(
-      Object.fromEntries(
-        ["autolink", "inline", "full", "collapsed", "shortcut", "urlInline"].map((name) => [
-          name,
-          { type: "boolean", default: true },
-        ]),
-      ),
-    ),
+    schema: {
+      ...optionsSchema({
+        ...Object.fromEntries(
+          ["autolink", "inline", "full", "collapsed", "shortcut", "urlInline"].map((name) => [
+            name,
+            { type: "boolean", default: true },
+          ]),
+        ),
+        fixTo: { enum: ["full"] },
+      }),
+      not: { required: ["fixTo", "full"], properties: { full: { const: false } } },
+    },
     check({ document, options }) {
       const findings: Finding[] = [];
       walk(document.tree, (node) => {
@@ -214,6 +218,7 @@ export const linkStyleRules: Record<string, Rule> = {
         const urlInline = notation === "inline" && node.type === "link" && text === node.url;
         if (options[notation] !== false && !(urlInline && options.urlInline === false)) return;
         const canFix =
+          options.fixTo !== "full" &&
           node.type === "link" &&
           notation === "inline" &&
           urlInline &&

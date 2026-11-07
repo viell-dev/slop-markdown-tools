@@ -8,10 +8,18 @@
 // is synthetic.
 
 import { boundaryFixtures } from "./obsidian-boundaries.mjs";
-import { sentenceFixture } from "./common.mjs";
+import { referenceFixture, sentenceFixture } from "./common.mjs";
 
-/** @type {{ name: string, source: string, wrapMode?: string }[]} */
+/** @type {{ name: string, source: string, wrapMode?: string, referenceLinks?: boolean }[]} */
 export const fixtures = [
+  {
+    ...referenceFixture,
+    // Live Preview shows new definitions and misreads reference images. Only
+    // Body links with an existing used definition convert; the heading, callout
+    // title and sized image stay inline.
+    source:
+      '# [The guide](https://example.com/setup "Setup")\n\n> [!note] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup") and [the existing link][guide].\n\n![The picture|100](https://example.com/picture.png "Picture")\n\n[guide]: https://example.com/setup "Setup"\n',
+  },
   sentenceFixture,
   ...boundaryFixtures,
   {

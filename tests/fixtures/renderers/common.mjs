@@ -1,4 +1,10 @@
 // Authored-document controls shared by GitHub and the forge comparisons.
+export const referenceFixture = {
+  name: "inline-to-reference-links",
+  referenceLinks: true,
+  source:
+    '# [The guide](https://example.com/setup "Setup")\n\n> [!NOTE] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup").\n\n![The picture](https://example.com/picture.png "Picture")\n',
+};
 export const sentenceFixture = {
   name: "sentence-wrapping",
   wrapMode: "sentences",
@@ -6,6 +12,7 @@ export const sentenceFixture = {
     "First **sentence.** Second sentence with a [link](https://example.com). Next sentence uses `First. Second.` as code.\n\n- First sentence. Second sentence in the list.\n\n> First sentence. Second sentence in the quote.\n\nFirst sentence.  \nSecond sentence keeps its hard break. Third sentence.\n",
 };
 export const commonFixtures = [
+  referenceFixture,
   sentenceFixture,
   {
     name: "prose",
