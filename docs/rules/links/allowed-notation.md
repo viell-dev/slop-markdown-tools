@@ -35,7 +35,7 @@ Each option allows its form when `true` and reports it when `false`:
 `urlInline: false` reports only an inline link whose displayed text equals its
 URL; `inline: false` reports all inline links and images.
 
-## Convert inline links to full references
+**Convert inline links to full references.**
 
 Enable conversion explicitly; no preset enables it:
 
@@ -90,7 +90,9 @@ Destinations with `javascript:`, `vbscript:`, `file:` or `data:` schemes stay as
 written, including data images. Hosts can reject these resources and show their
 authored notation as literal text, which conversion would change. Definitions
 containing tabs are never reused because reference parsers disagree about
-whether they are definitions or visible text.
+whether they are definitions or visible text. On Forgejo and Gitea, links in
+heading source that determines a generated anchor stay inline. Other eligible
+links can still convert in the same document.
 
 Conversion does not generate collapsed or shortcut references, convert
 references back to inline links, or remove, sort or move authored definitions.

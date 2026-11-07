@@ -151,7 +151,9 @@ async function renderings(source, record, wrapMode, referenceLinks) {
       },
     }).output;
     const changed = output !== source;
-    if (referenceLinks) record.convertedReferences = output.includes("[mdrefine-link-1]");
+    if (referenceLinks)
+      record.convertedReferences =
+        record.convertedReferences !== false && output.includes("[mdrefine-link-1]");
     if (!changed) {
       record.views.push({ name: mode, changed, status: "unchanged" });
       continue;

@@ -5,6 +5,7 @@ import { lineBreak } from "../syntax/source.js";
 import { walk } from "../syntax/walk.js";
 import { normalizeLabel } from "../rules/links.js";
 import { emptyTitle } from "../rules/link-format.js";
+import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { semanticFingerprint, semanticFingerprintWithReferences } from "./semantics.js";
 
 interface Conversion {
@@ -19,6 +20,7 @@ interface Addition {
   at: number;
 }
 const definitionLabel = /^\[((?:\\[\s\S]|[^\]\\])+)\]:/;
+const referenceFields = new Set(["identifier", "label", "referenceType"]);
 // markdown-it rejects these resources instead of hiding their definitions. Keep
 // their authored notation, including data images, rather than assuming host policy.
 const supportedDestination = (url: string) =>
@@ -110,16 +112,26 @@ export function verifyReferenceConversion(
         node.referenceType !== "full" ||
         node.identifier !== conversion.identifier ||
         range(node)[1] !== conversion.at + conversion.edit.text.length ||
+        Object.hasOwn(node, "url") ||
+        Object.hasOwn(node, "title") ||
         !target ||
         !supportedResource(after, target) ||
         target.url !== old.url ||
         title(after, target) !== title(before, old)
       )
         return false;
+      // Retain extension fields in the comparison. Only the known reference
+      // bookkeeping is replaced; a projection must not erase unknown meaning.
+      const properties = Object.fromEntries(
+        Object.entries(node as unknown as Record<string, unknown>).filter(
+          ([key]) => !referenceFields.has(key),
+        ),
+      );
       replacements.set(
         node,
         node.type === "linkReference"
           ? {
+              ...properties,
               type: "link",
               children: node.children,
               url: target.url,
@@ -127,6 +139,7 @@ export function verifyReferenceConversion(
               position: node.position!,
             }
           : {
+              ...properties,
               type: "image",
               alt: node.alt,
               url: target.url,
@@ -189,6 +202,7 @@ export function convertReferences(
     const close = labelEnd(node);
     if (!selected.has(start) || start < previousEnd || close === undefined) return;
     if (!supportedResource(document, node)) return;
+    if (changesForgeHeading(document, start, end)) return;
     const raw = source.slice(start, end);
     if (!(raw.startsWith("[") || raw.startsWith("![")) || source.slice(close, close + 2) !== "](")
       return;

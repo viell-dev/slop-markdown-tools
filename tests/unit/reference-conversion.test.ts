@@ -219,6 +219,22 @@ describe("explicit inline-to-reference conversion", () => {
     );
   });
 
+  it.each(["forgejo", "gitea"] as const)(
+    "keeps anchor-sensitive headings while converting the body (%s)",
+    (dialect) => {
+      const heading = '# [The guide](https://example.com/setup "Setup")\n';
+      const source = heading + '\nRead [the guide](https://example.com/setup "Setup").\n';
+      const output = formatted(source, only(rules, dialect));
+      expect(output.startsWith(heading)).toBe(true);
+      expect(output).toContain("Read [the guide][mdrefine-link-1].");
+      expect(render(output)).toEqual(render(source));
+      const custom = '# [The guide](https://example.com/setup "Setup") {#guide}\n';
+      expect(formatted(custom, only(rules, dialect))).toContain(
+        "# [The guide][mdrefine-link-1] {#guide}",
+      );
+    },
+  );
+
   it("still refuses a plugin's unrelated definition edit while conversion is enabled", () => {
     const source = "[a](/url) [existing][r]\n\n[r]: /original\n";
     const plugin: Plugin = {
@@ -254,6 +270,8 @@ describe("scoped reference-conversion proof", () => {
     extra = "",
     title = "",
     resource = "/url",
+    extraInline = {},
+    extraReference = {},
   } = {}) {
     const source = `${prefix}[a](${resource})\n`;
     const candidate = `${prefix}[a][r]\n\n[r]: ${destination}${title}\n${extra}`;
@@ -263,9 +281,12 @@ describe("scoped reference-conversion proof", () => {
       node = found;
     });
     if (!node) throw new Error("Missing test link");
+    Object.assign(node, extraInline);
+    const after = parse(candidate, "commonmark");
+    walk(after.tree, "linkReference", (reference) => Object.assign(reference, extraReference));
     return verifyReferenceConversion(
       before,
-      parse(candidate, "commonmark"),
+      after,
       [
         {
           node,
@@ -295,5 +316,19 @@ describe("scoped reference-conversion proof", () => {
       false,
     );
     expect(proof({ resource: '/url\t"Title"', title: ' "Title"' })).toBe(false);
+  });
+  it.each([{ extensionMeaning: "changed" }, { url: "/other" }, { title: "Other" }])(
+    "does not erase a reference extension field: %j",
+    (extraReference) => {
+      expect(proof({ extraReference })).toBe(false);
+    },
+  );
+  it("preserves matching extension fields", () => {
+    expect(
+      proof({
+        extraInline: { extensionMeaning: "same" },
+        extraReference: { extensionMeaning: "same" },
+      }),
+    ).toBe(true);
   });
 });

@@ -50,6 +50,7 @@ function captured(views: string[]) {
     controls: obsidianControls.map((name) => ({ name, passed: true })),
   };
   let recordedMode: string | undefined;
+  let recordedReferences: boolean | undefined;
   const run = callback({
     ...settings,
     reduce: undefined,
@@ -60,19 +61,34 @@ function captured(views: string[]) {
     createWorkspace: () => ({}),
     widths: obsidianWidths,
     documents: () =>
-      report.plan.documents.map(({ name, wrapMode }) => ({
+      report.plan.documents.map(({ name, wrapMode, referenceLinks }) => ({
         name,
         wrapMode,
+        referenceLinks,
         source: "Synthetic.\n",
       })),
-    startDocument: (report: unknown, name: string, width: number, wrapMode?: string) => {
+    startDocument: (
+      report: unknown,
+      name: string,
+      width: number,
+      wrapMode?: string,
+      referenceLinks?: boolean,
+    ) => {
       recordedMode = wrapMode;
-      return startDocument(report, name, width, wrapMode);
+      recordedReferences = referenceLinks;
+      return startDocument(report, name, width, wrapMode, referenceLinks);
     },
-    compare: (_source: string, _width: number, _workspace: unknown, wrapMode?: string) => {
+    compare: (
+      _source: string,
+      _width: number,
+      _workspace: unknown,
+      wrapMode?: string,
+      referenceLinks?: boolean,
+    ) => {
       expect(wrapMode).toBe(recordedMode);
+      expect(referenceLinks).toBe(recordedReferences);
       return Promise.resolve({
-        output: "Changed synthetic.\n",
+        output: referenceLinks ? "Changed synthetic [mdrefine-link-1].\n" : "Changed synthetic.\n",
         views: Object.fromEntries(views.map((name) => [name, ["same", "same"]])),
         changed: [],
       });
