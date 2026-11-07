@@ -8,10 +8,11 @@
 // is synthetic.
 
 import { boundaryFixtures } from "./obsidian-boundaries.mjs";
-import { sentenceFixture } from "./common.mjs";
+import { referenceFixture, sentenceFixture } from "./common.mjs";
 
-/** @type {{ name: string, source: string, wrapMode?: string }[]} */
+/** @type {{ name: string, source: string, wrapMode?: string, referenceLinks?: boolean }[]} */
 export const fixtures = [
+  referenceFixture,
   sentenceFixture,
   ...boundaryFixtures,
   {

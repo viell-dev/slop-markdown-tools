@@ -22,21 +22,22 @@ export const obsidianWidths = [80, 30];
 
 /**
  * The intended workload, independently reconstructed by producers and consumers.
- * @returns {{ documents: { name: string, widths: number[], views: string[], wrapMode?: string }[], controls: string[] }}
+ * @returns {{ documents: { name: string, widths: number[], views: string[], wrapMode?: string, referenceLinks?: boolean }[], controls: string[] }}
  */
 export function rendererPlan(renderer, { profile, seeds, count }) {
   assert(["github", "obsidian", "forges"].includes(renderer), "Unknown renderer");
   const documents = [],
     controls = [];
   const add = (host, fixtures, views, widths, prefix = "") => {
-    const append = (name, wrapMode) =>
+    const append = (name, wrapMode, referenceLinks) =>
       documents.push({
         name: `${prefix}${name}`,
         widths,
         views,
         ...(wrapMode ? { wrapMode } : {}),
+        ...(referenceLinks ? { referenceLinks: true } : {}),
       });
-    for (const fixture of fixtures) append(fixture.name, fixture.wrapMode);
+    for (const fixture of fixtures) append(fixture.name, fixture.wrapMode, fixture.referenceLinks);
     for (const seed of seeds)
       for (let index = 0; index < count; index++)
         append(host === "obsidian" ? `generated ${seed}/${index}` : `generated-${seed}-${index}`);
@@ -80,11 +81,12 @@ export function rendererPlan(renderer, { profile, seeds, count }) {
 }
 
 /** Records survive a failed attempt; a completed formatting attempt may be unchanged. */
-export function startDocument(report, name, width, wrapMode) {
+export function startDocument(report, name, width, wrapMode, referenceLinks) {
   const record = {
     name,
     width,
     ...(wrapMode ? { wrapMode } : {}),
+    ...(referenceLinks ? { referenceLinks: true } : {}),
     attempted: true,
     completed: false,
     changed: null,
@@ -131,6 +133,17 @@ export function validateRendererReport(report, settings, renderer) {
   for (const record of report.documents) {
     const planned = expected.documents.find((item) => item.name === record.name);
     assert.equal(record.wrapMode, planned.wrapMode, "Incorrect native wrapping mode");
+    assert.equal(
+      record.referenceLinks,
+      planned.referenceLinks,
+      "Incorrect native reference conversion",
+    );
+    if (planned.referenceLinks)
+      assert.equal(
+        record.convertedReferences,
+        true,
+        "Reference conversion fixture did not convert",
+      );
     assert.equal(record.attempted, true);
     assert.equal(record.completed, true, `Incomplete document: ${record.name}`);
     assert.equal(typeof record.changed, "boolean");

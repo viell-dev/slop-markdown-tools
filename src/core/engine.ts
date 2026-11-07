@@ -14,9 +14,10 @@ import { ambiguousObsidianEdit } from "../syntax/obsidian-boundaries.js";
 import { lineStarts } from "../syntax/source.js";
 import { suppressions } from "./directives.js";
 import { checkRanges, covers, holds, moved, shifted, widen } from "./scope.js";
-import { phases, prepare } from "./rule-registry.js";
+import { builtInRules, phases, prepare } from "./rule-registry.js";
 import { divergence, semanticFingerprint } from "./semantics.js";
 import { protectedEdit } from "./protection-edits.js";
+import { convertReferences } from "./reference-conversion.js";
 import type {
   Diagnostic,
   Document,
@@ -512,6 +513,57 @@ function formatText(
             break;
           }
           // Nothing was kept: the edits that overlapped refused ones get their turn.
+        }
+        // This built-in operation has a narrower, independently verified equivalence
+        // proof. No ordinary rule or plugin can opt out of the exact fingerprint.
+        const notation = "links/allowed-notation";
+        const conversion = setting(config.rules[notation] ?? "off");
+        if (
+          phase === "document" &&
+          conversion.severity !== "off" &&
+          conversion.options.fixTo === "full"
+        ) {
+          const candidates = inspect(
+            document,
+            config,
+            rules,
+            hosted,
+            (rule) => rule === builtInRules[notation],
+            options,
+          );
+          const suppressed = suppressions(document);
+          const protectedSource = protectedEdit(document);
+          const plan = convertReferences(
+            document,
+            candidates.filter((item) => item.rule === notation),
+            (edit) =>
+              (!scope || holds(scope, edit)) &&
+              !suppressed(notation, {
+                start: edit.start,
+                end: edit.end,
+                message: "Convert reference",
+                edit,
+              }) &&
+              !protectedSource(edit) &&
+              !ambiguousObsidianEdit(document, notation, edit) &&
+              !protectedVitePress(document, notation, {
+                start: edit.start,
+                message: "Convert reference",
+                edit,
+              }),
+            options.plugins,
+            workspace,
+          );
+          if (plan) {
+            accept(
+              plan.edits.map((edit) => ({ ...edit, rule: notation })),
+              plan.document.source,
+              plan.document,
+            );
+            // The verified conversion establishes the next exact baseline. Other edits
+            // must preserve that baseline, including every reference definition.
+            fingerprint = undefined;
+          }
         }
       }
       if (output === before) {

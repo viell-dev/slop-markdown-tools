@@ -189,19 +189,28 @@ for (const image of images) {
     const found = [];
     let compared = 0,
       fileViews = 0;
-    async function compare(name, source, view, renderer, force = false, wrapMode) {
+    async function compare(name, source, view, renderer, force = false, wrapMode, referenceLinks) {
       const record = startDocument(
         report,
         `${image.name}/${view === "repository-file" ? "repository-" : ""}${name}`,
         80,
         wrapMode,
+        referenceLinks,
       );
       const output = format(source, {
-        config: wrapMode
-          ? { ...config, rules: { "style/wrap": ["warn", { mode: wrapMode }] } }
-          : config,
+        config: {
+          ...config,
+          rules: {
+            ...config.rules,
+            ...(wrapMode ? { "style/wrap": ["warn", { mode: wrapMode }] } : {}),
+            ...(referenceLinks
+              ? { "links/allowed-notation": ["warn", { inline: false, fixTo: "full" }] }
+              : {}),
+          },
+        },
       }).output;
       record.changed = output !== source;
+      if (referenceLinks) record.convertedReferences = output.includes("[mdrefine-link-1]");
       if (output === source && !force) {
         record.views.push({ name: view, changed: false, status: "unchanged" });
         record.completed = true;
@@ -236,8 +245,8 @@ for (const image of images) {
       knownSources(image.name).forEach((source, index) =>
         cases.push({ name: `known-${index}`, source }),
       );
-    for (const { name, source, wrapMode } of cases)
-      await compare(name, source, "file-api", render, false, wrapMode);
+    for (const { name, source, wrapMode, referenceLinks } of cases)
+      await compare(name, source, "file-api", render, false, wrapMode, referenceLinks);
     for (const fixture of fileFixtures) {
       let sha;
       await compare(

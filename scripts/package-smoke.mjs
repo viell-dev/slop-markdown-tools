@@ -200,6 +200,25 @@ process.stdout.write(JSON.stringify(["github", "commonmark"].map(dialect =>
     ),
     "A _small_ note.\n",
   );
+  // Exercise the new internal conversion module through both installed entry routes.
+  for (const module of [true, false]) {
+    const load = module
+      ? `import {format} from ${named()};`
+      : `const {format} = require(${named()});`;
+    assert.equal(
+      runNode(
+        [
+          `--input-type=${module ? "module" : "commonjs"}`,
+          "-e",
+          `${load} process.stdout.write(format("[guide](https://example.com)\\n", {
+config: {extends: [], rules: {"links/allowed-notation": ["warn", {inline: false, fixTo: "full"}]}}
+}).output);`,
+        ],
+        project,
+      ),
+      "[guide][mdrefine-link-1]\n\n[mdrefine-link-1]: https://example.com\n",
+    );
+  }
   // CommonJS loads the ES modules with require(), and the JSON files that the package exports.
   assert.equal(
     runNode(

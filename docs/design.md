@@ -38,6 +38,17 @@ readings. The surrounding Markdown must keep its meaning. Ordinary Markdown
 formatting still compares these literal values exactly; the configured tool is
 responsible for program or metadata semantics.
 
+The opt-in [`links/allowed-notation`](rules/links/allowed-notation.md)
+conversion to full references runs at the end of the document phase. Its
+internal guard checks each new reference against the actual definition that it
+uses, including the destination and title, then compares the whole document with
+only those references projected back to inline form and the verified new
+definitions omitted. Existing definitions and untouched content remain part of
+the comparison, as do alternative readings and VitePress's secondary guard. The
+verified result establishes the next ordinary comparison baseline. The public
+`semanticFingerprint` still distinguishes inline and reference source
+structures; ordinary rules and plugins cannot request this exception.
+
 Obsidian's structural rules also apply a general conservative [boundary
 policy](obsidian.md#visible-boundary-refusals). Held style edits produce a
 finding under their original rule and severity. The comparisons with Obsidian
@@ -191,7 +202,8 @@ Formatting:
   quotes, are not aligned.
 - Footnotes and strikethrough are read but have no rules of their own. Reference
   definitions are checked; opt-in title and spacing rules preserve their
-  destinations and multiline layout.
+  destinations and multiline layout. Explicit inline-to-reference conversion can
+  append new definitions while retaining every authored definition.
 - Embedded code is formatted only by explicitly configured [external
   tools](configuration.md#code-formatters). Their output is checked for changes
   to surrounding Markdown, not for preservation of program semantics. Explicitly

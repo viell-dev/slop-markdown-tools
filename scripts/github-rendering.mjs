@@ -135,18 +135,23 @@ const modes = [
   ["gfm", config],
 ];
 /** The renderings of `source` in each mode in which formatting changes it. */
-async function renderings(source, record, wrapMode) {
+async function renderings(source, record, wrapMode, referenceLinks) {
   const result = [];
   for (const [mode, modeConfig] of modes) {
     const output = format(source, {
-      config: wrapMode
-        ? {
-            ...modeConfig,
-            rules: { ...modeConfig.rules, "style/wrap": ["warn", { mode: wrapMode }] },
-          }
-        : modeConfig,
+      config: {
+        ...modeConfig,
+        rules: {
+          ...modeConfig.rules,
+          ...(wrapMode ? { "style/wrap": ["warn", { mode: wrapMode }] } : {}),
+          ...(referenceLinks
+            ? { "links/allowed-notation": ["warn", { inline: false, fixTo: "full" }] }
+            : {}),
+        },
+      },
     }).output;
     const changed = output !== source;
+    if (referenceLinks) record.convertedReferences = output.includes("[mdrefine-link-1]");
     if (!changed) {
       record.views.push({ name: mode, changed, status: "unchanged" });
       continue;
@@ -195,9 +200,9 @@ try {
     );
     report.controls.push({ name: `${mode}-text-difference`, passed: true });
   }
-  for (const { name, source, wrapMode } of cases) {
-    const record = startDocument(report, name, 80, wrapMode);
-    const rendered = await renderings(source, record, wrapMode);
+  for (const { name, source, wrapMode, referenceLinks } of cases) {
+    const record = startDocument(report, name, 80, wrapMode, referenceLinks);
+    const rendered = await renderings(source, record, wrapMode, referenceLinks);
     record.changed = record.views.some((view) => view.changed);
     record.completed = true;
     if (rendered.length) report.compared++;
