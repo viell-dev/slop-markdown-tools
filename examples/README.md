@@ -5,6 +5,9 @@ page](https://viell-dev.github.io/slop-markdown-tools/examples.html) walks
 through each one with its input and output. The integration tests run every
 example, so what is here matches what the tool does.
 
+[reachability/](reachability/README.md) is a complete navigation-audit example
+with a disconnected cycle and explicit entry pages.
+
 The package ships these files under `node_modules/mdrefine/examples/`. To run
 the commands below, copy them into the project where you installed mdrefine,
 with `cp -r node_modules/mdrefine/examples .`, and run the commands from its

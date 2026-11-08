@@ -2,7 +2,7 @@ import { Ajv } from "ajv";
 import type { ValidateFunction } from "ajv";
 import { configSchema, dialects, validateConfig } from "../../src/index.js";
 import type { Config, Diagnostic, ResolvedConfig } from "../../src/index.js";
-import type { Skipped } from "../../src/node.js";
+import type { ReachabilityReport, Skipped } from "../../src/node.js";
 
 export interface CliReport {
   version: string;
@@ -127,6 +127,56 @@ function decode<T>(source: string, validate: ValidateFunction<T>): T {
 export const parseReport = (source: string): CliReport => decode(source, report);
 export const parseExplanation = (source: string): Explanation => decode(source, explanation);
 export const parseRules = (source: string): Rules => decode(source, rules);
+const audit = ajv.compile<ReachabilityReport & { version: string; mode: "audit-reachability" }>({
+  type: "object",
+  required: [
+    "version",
+    "mode",
+    "root",
+    "entries",
+    "documents",
+    "scanned",
+    "reachable",
+    "unreachable",
+    "complete",
+    "problems",
+  ],
+  properties: {
+    version: { type: "string" },
+    mode: { const: "audit-reachability" },
+    root: { type: "string" },
+    entries: strings,
+    documents: strings,
+    scanned: strings,
+    reachable: strings,
+    unreachable: strings,
+    complete: { type: "boolean" },
+    problems: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["path", "code", "message"],
+        properties: {
+          path: { type: "string" },
+          code: {
+            enum: [
+              "discovery",
+              "unreadable",
+              "boundary",
+              "unresolved-link",
+              "unsupported-navigation",
+            ],
+          },
+          message: { type: "string" },
+          destination: { type: "string" },
+          line: { type: "integer", minimum: 1 },
+          column: { type: "integer", minimum: 1 },
+        },
+      },
+    },
+  },
+});
+export const parseAudit = (source: string) => decode(source, audit);
 export function parseConfig(source: string): Config {
   const value: unknown = JSON.parse(source);
   validateConfig(value);

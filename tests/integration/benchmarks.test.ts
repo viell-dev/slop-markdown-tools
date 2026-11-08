@@ -31,6 +31,13 @@ describe("benchmark suite", () => {
     expect(report).toMatchObject({ quick: true, samples: 1 });
     expect(report.outputHash).toMatch(/^[0-9a-f]{64}$/);
     expect(report.results.map((result) => result.id)).toEqual([
+      ...[6, 12, 24].flatMap((count) =>
+        [1, 16].flatMap((fanout) =>
+          ["index", "collect", "traverse", "discovery", "audit"].map(
+            (step) => `reachability.${count}-${fanout}-${step}`,
+          ),
+        ),
+      ),
       "repository.parse",
       "repository.lint",
       "repository.format-changes",

@@ -12,7 +12,7 @@ import type {
 } from "../core/types.js";
 import { pathError } from "./access.js";
 import { discover, isIgnoredInput, vaultFor } from "./files.js";
-import type { Skipped } from "./files.js";
+import type { FileSet, Skipped } from "./files.js";
 import { createWorkspace } from "./index.js";
 import { unlistedLookup } from "./lookup.js";
 import { excludeSelection } from "./selection.js";
@@ -120,6 +120,22 @@ export async function discoverFrom(
   base: string,
   ignoreDocuments = true,
 ): Promise<WorkspaceDiscovery> {
+  return (await discoverContext(options, base, ignoreDocuments)).discovery;
+}
+
+/** Internal host access for audits that also traverse documents outside the selection. */
+export interface DiscoveryContext {
+  discovery: WorkspaceDiscovery;
+  set: FileSet;
+  targetOptions(name: string): Promise<ProcessOptions>;
+}
+
+/** Share discovery and its lazy dialect indexes without widening the public selection API. */
+export async function discoverContext(
+  options: DiscoverOptions,
+  base: string,
+  ignoreDocuments = true,
+): Promise<DiscoveryContext> {
   await checkRoot(options.root);
   // Which files to leave out does not depend on a document's dialect.
   const resolved = resolveConfig({ config: options.config, plugins: options.plugins });
@@ -195,7 +211,33 @@ export async function discoverFrom(
     indexes.set(key, workspace);
     return workspace;
   }
-  return {
+  function processOptions(name: string): ProcessOptions {
+    const vault = supplied.has(name) ? supplied.get(name) : vaultOf(set.vaults, name);
+    const assumed = assumedDialect(vault);
+    const { dialect, vitepress } = resolveConfig({
+      config: options.config,
+      path: name,
+      plugins: options.plugins,
+      defaultDialect: assumed,
+    });
+    let workspace = index(dialect, vitepress);
+    // Whether a note may be reflowed is a setting of its own vault.
+    if (vault?.strictLineBreaks !== undefined) {
+      let ofDialect = views.get(workspace);
+      if (!ofDialect) views.set(workspace, (ofDialect = new Map<Vault, Workspace>()));
+      const shared = workspace;
+      workspace = ofDialect.get(vault) ?? { ...shared, strictLineBreaks: vault.strictLineBreaks };
+      ofDialect.set(vault, workspace);
+    }
+    return {
+      path: name,
+      ...(options.config ? { config: options.config } : {}),
+      ...(options.plugins ? { plugins: options.plugins } : {}),
+      workspace,
+      ...(assumed ? { defaultDialect: assumed } : {}),
+    };
+  }
+  const discovery: WorkspaceDiscovery = {
     root: set.root,
     selected,
     skipped: set.skipped,
@@ -208,30 +250,20 @@ export async function discoverFrom(
     },
     options(name) {
       known(name);
-      const vault = supplied.has(name) ? supplied.get(name) : vaultOf(set.vaults, name);
-      const assumed = assumedDialect(vault);
-      const { dialect, vitepress } = resolveConfig({
-        config: options.config,
-        path: name,
-        plugins: options.plugins,
-        defaultDialect: assumed,
-      });
-      let workspace = index(dialect, vitepress);
-      // Whether a note may be reflowed is a setting of its own vault.
-      if (vault?.strictLineBreaks !== undefined) {
-        let ofDialect = views.get(workspace);
-        if (!ofDialect) views.set(workspace, (ofDialect = new Map<Vault, Workspace>()));
-        const shared = workspace;
-        workspace = ofDialect.get(vault) ?? { ...shared, strictLineBreaks: vault.strictLineBreaks };
-        ofDialect.set(vault, workspace);
+      return processOptions(name);
+    },
+  };
+  return {
+    discovery,
+    set,
+    async targetOptions(name) {
+      // A target in a folder discovery did not enter may have its own vault.
+      if (!Object.hasOwn(set.files, name)) {
+        const count = set.vaults.length;
+        await vaultFor(set, name);
+        if (set.vaults.length !== count) indexes.clear();
       }
-      return {
-        path: name,
-        ...(options.config ? { config: options.config } : {}),
-        ...(options.plugins ? { plugins: options.plugins } : {}),
-        workspace,
-        ...(assumed ? { defaultDialect: assumed } : {}),
-      };
+      return processOptions(name);
     },
   };
 }

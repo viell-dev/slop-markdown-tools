@@ -63,7 +63,7 @@ const consumerModule = `import {
   builtInRules, configSchema, format, lint, parse, presets, resolveConfig, unifiedDiff,
   type Config, type Dialect, type JsonSchema, type Plugin, type ProcessOptions, type WikiLink, type FormatResult, type CodeFormatter,
 } from ${named()};
-import { discoverWorkspace, formatWithCode, loadConfig, type DiscoverOptions, type Skipped, type WorkspaceDiscovery, type CodeFormatOptions } from ${named("/node")};
+import { auditReachability, discoverWorkspace, formatWithCode, loadConfig, type ReachabilityOptions, type ReachabilityReport, type DiscoverOptions, type Skipped, type WorkspaceDiscovery, type CodeFormatOptions } from ${named("/node")};
 const schema: JsonSchema = { type: "object", properties: { level: { type: "integer" } } };
 const plugin: Plugin = { name: "consumer", rules: { sample: {
   description: "Exercise the public types", kind: "problem", schema,
@@ -101,6 +101,8 @@ const prepared: ProcessOptions = discovery.options("a.md"); void prepared;
 const codeTool: CodeFormatter = { id: "javascript", languages: ["js"], command: "formatter", args: [] };
 const codeOptions: CodeFormatOptions = { config: { codeFormatters: [codeTool] }, cwd: "." };
 const codeResult: Promise<FormatResult> = formatWithCode("Text", codeOptions); void codeResult;
+const auditOptions: ReachabilityOptions = { root: ".", entries: ["a.md"] };
+const auditResult: ReachabilityReport = await auditReachability(auditOptions); void auditResult;
 for (const node of parse(output, "obsidian").tree.children) {
   if (node.type === "paragraph") for (const child of node.children) {
     if (child.type === "wikiLink") { const link: WikiLink = child; const target: string = link.target; void target; }
@@ -286,6 +288,45 @@ process.stdout.write(result.output);`,
   );
   // The command finds its own dependencies from where it is installed.
   const command = path.join(project, "node_modules", manifest.name, manifest.bin.mdrefine);
+  const auditRoot = path.join(project, "audit-probe");
+  await mkdir(auditRoot, { recursive: true });
+  await writeFile(path.join(auditRoot, "README.md"), "# Home\n");
+  await writeFile(path.join(auditRoot, "orphan.md"), "# Orphan\n");
+  await writeFile(path.join(auditRoot, "mdrefine.config.json"), '{"extends":["github"]}\n');
+  assert.equal(
+    runNode(
+      [
+        "--input-type=module",
+        "-e",
+        `import {auditReachability} from ${named("/node")};
+const r = await auditReachability({root: "./audit-probe", entries: ["README.md"]});
+if (!r.complete) throw new Error(JSON.stringify(r.problems));
+process.stdout.write(r.unreachable.join(","));`,
+      ],
+      project,
+    ),
+    "orphan.md",
+  );
+  const installedAudit = spawnSync(
+    process.execPath,
+    [
+      command,
+      "audit",
+      "reachability",
+      "--root",
+      auditRoot,
+      "--entry",
+      "README.md",
+      "--entry",
+      "orphan.md",
+      "--json",
+    ],
+    { cwd: project, encoding: "utf8", env: consumerEnvironment },
+  );
+  assert.equal(installedAudit.status, 0, installedAudit.stderr);
+  const auditReport = JSON.parse(installedAudit.stdout);
+  assert.equal(auditReport.complete, true);
+  assert.deepEqual(auditReport.unreachable, []);
   assert.equal(
     runNode([command, "format", "-", "--root", project], project, "A *small* note.\n"),
     "A _small_ note.\n",

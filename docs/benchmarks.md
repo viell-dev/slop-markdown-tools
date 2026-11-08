@@ -45,6 +45,30 @@ measurements call the package and touch no files; the command-line measurements
 start `mdrefine` as a process on files on disk, so they include start-up,
 finding and reading files, and printing.
 
+## Source navigation audit
+
+The Benchmark workflow also measures the [source navigation
+audit](reachability.md). Its report gives `Documents`, `Fanout` (one or up to
+sixteen outgoing links per page, capped by group size) and `Edges`. Each
+workspace has an independently known reachable group of 90% of its pages,
+rounded down, and a disconnected remainder. Every measured collection, traversal
+and full audit checks the exact expected result.
+
+| Step                               | What it measures                                                |
+| ---------------------------------- | --------------------------------------------------------------- |
+| Target index only                  | Building a fresh in-memory target index.                        |
+| Parse and resolve, including index | Collecting navigation from each source with a fresh index.      |
+| Traverse collected graph           | Following entries through the already collected directed graph. |
+| Discovery only                     | Finding eligible files without parsing their sources.           |
+| Full Node audit                    | Discovery, reads, parsing, resolution and traversal together.   |
+
+`Time` and `Fastest to slowest run` follow the other report tables.
+`Peak CLI memory` is a separate process measurement alongside the full Node
+audit. These are measurements, not timing regression gates, and do not establish
+a limit for arbitrary document sizes or syntax. Results for this new workload
+appear in the workflow's report; the older reference tables below do not contain
+navigation-audit measurements.
+
 ## Reference results
 
 - mdrefine 0.2.0; later releases have not been measured again.

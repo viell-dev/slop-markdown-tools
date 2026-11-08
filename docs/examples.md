@@ -244,6 +244,31 @@ tests format `before/` into `after/`, build both with VitePress, and compare the
 rendered page content. Start with [VitePress's renderer options](vitepress.md)
 when adapting it to a site.
 
+## Audit a documentation graph
+
+The shipped [reachability
+workspace](https://github.com/viell-dev/slop-markdown-tools/tree/main/examples/reachability)
+has a
+[README](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/reachability/README.md),
+a
+[guide](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/reachability/guide.md),
+an
+[archive](https://github.com/viell-dev/slop-markdown-tools/tree/main/examples/reachability/archive)
+and a
+[configuration](https://github.com/viell-dev/slop-markdown-tools/blob/main/examples/reachability/mdrefine.config.jsonc).
+All link destinations exist, but the archive's two pages form a disconnected
+cycle. From that workspace, run:
+
+```sh
+npx mdrefine audit reachability --entry README.md
+npx mdrefine audit reachability --entry README.md --entry archive/index.md
+```
+
+The first command reports both archive pages and exits with code 1. The second
+has no unreachable documents and exits with code 0. Neither writes. See
+[reachability](reachability.md) for exclusions, coverage problems and the JSON
+report.
+
 ## Write a plugin
 
 `examples/plugin/` adds two rules. A problem rule reports placeholder words. A

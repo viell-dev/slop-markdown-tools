@@ -212,6 +212,33 @@ document. Both throw for a name that is not selected. A root or input that
 cannot be used is an error in the CLI's words, such as
 `Input does not exist: notes/absent.md`.
 
+## Audit workspace navigation
+
+`auditReachability` from `mdrefine/node` performs the same read-only workspace
+audit as the [command line](reachability.md):
+
+```js
+import { auditReachability } from "mdrefine/node";
+
+const report = await auditReachability({
+  root: ".",
+  entries: ["README.md"],
+  exclude: ["drafts"],
+  config: { extends: ["recommended", "github"] },
+});
+console.log(report.complete, report.unreachable, report.problems);
+```
+
+`ReachabilityOptions` requires `root` and at least one entry in `entries`.
+Entries and exact reporting exclusions in `exclude` are relative to that root.
+Optional `config` and `plugins` are objects as for `discoverWorkspace`; the API
+does not search for configuration or load plugin names. Invalid entries or
+configuration throw. Read/coverage problems return `complete: false` and no
+unreachable findings. The `ReachabilityReport` fields and `ReachabilityProblem`
+codes follow the [report contract](reachability.md#reports-and-exit-codes),
+without the CLI's `version` and `mode`. This API never writes documents or runs
+code formatters. The portable `mdrefine` entry remains filesystem-free.
+
 ## Formatting embedded code
 
 `formatWithCode(source, options)` from `mdrefine/node` returns a
