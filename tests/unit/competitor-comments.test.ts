@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { format as prettier } from "prettier";
 import { convertConfig, format, lint, parse, semanticFingerprint } from "../../src/index.js";
 import type { ProcessOptions } from "../../src/index.js";
+import { hasPrettierPragma } from "../../src/core/competitor-comments.js";
 
 const ml = (values: Record<string, unknown> = {}): ProcessOptions => {
   const report = convertConfig({
@@ -120,6 +121,43 @@ it.each(["@format", "@prettier"])("matches Prettier requirePragma for %s", async
   expect(checked(`text\n\n${source}`, pretty({ requirePragma: true })).output).toBe(
     `text\n\n${source}`,
   );
+});
+it.each(["@format", "@prettier"])("recognizes complete leading pragma lines for %s", (pragma) => {
+  for (const eol of ["\n", "\r\n"]) {
+    const source = `<!-- Description\n  ${pragma}\n-->\n\n*one*\n`.replaceAll("\n", eol);
+    expect(checked(source, pretty({ requirePragma: true })).output).toContain("_one_");
+    expect(
+      checked(
+        source.replace(`${pragma}${eol}`, `${pragma} extra${eol}`),
+        pretty({
+          requirePragma: true,
+        }),
+      ).output,
+    ).toContain("*one*");
+  }
+});
+it.each([
+  ["<!-- @format -->", true],
+  [" \t\n<!--\n@prettier\n-->", true],
+  ["<!-- description @format -->", false],
+  ["<!-- description @format\n-->", false],
+  ["<!--\n@format -->", true],
+  ["<!--\n@prettier\n-->", true],
+  ["<!--\n@format", false],
+  ["<!--\n@format\n-- >", false],
+  ["<!--\n@format extra\n-->", false],
+  ["<!--\n@prettierExtra\n-->", false],
+  ["text\n<!-- @format -->", false],
+  ["<!--\n@format\n-->\n@prettier\n-->", true],
+  ["<!--\n-->\n@format\n<!--\n-->", true],
+  ["<!--\n-->\n@format", false],
+  ["<!--\ntext\r@format\rmore\n-->", true],
+  ["<!--\ntext\u2028@format\u2029more\n-->", true],
+  ["<!--\r@format\r-->", true],
+  ["<!-- description\r@format\r-->", false],
+  ["<!-- description\r@format\n-->", false],
+] as const)("preserves leading pragma recognition for %j", (source, expected) => {
+  expect(hasPrettierPragma(source)).toBe(expected);
 });
 it("keeps markdownlint findings in Prettier ignores, and Prettier edits under markdownlint disables", () => {
   const ignored = "<!-- prettier-ignore -->\n\n*one*\n";

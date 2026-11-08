@@ -33,6 +33,9 @@ existing configurations keep their defaults.
 
 ### Fixed
 
+- Bound Prettier-compatible pragma detection without changing which leading
+  comments enable formatting
+  ([#916](https://github.com/viell-dev/slop-markdown-tools/issues/916)).
 - Name conflicting reference-conversion options and the missing `audit`
   subcommand in error messages
   ([#913](https://github.com/viell-dev/slop-markdown-tools/issues/913),

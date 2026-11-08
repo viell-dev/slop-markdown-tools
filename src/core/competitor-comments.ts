@@ -157,6 +157,26 @@ function intersects(intervals: Interval[], start: number, end: number): boolean 
   }
   return low < intervals.length && intervals[low]!.start <= end;
 }
+/** Preserve Prettier's leading-comment recognition without repeated suffix searches. */
+export function hasPrettierPragma(body: string): boolean {
+  const source = body.trimStart();
+  if (!source.startsWith("<!--")) return false;
+  if (/^<!--\s*@(format|prettier)\s*-->/.test(source)) return true;
+  const firstLine = source.indexOf("\n", 4);
+  const closing = source.lastIndexOf("-->");
+  if (firstLine < 0 || closing < 0) return false;
+  const lastLine = source.lastIndexOf("\n", closing);
+  if (lastLine <= firstLine) return false;
+  // The old multiline matcher can span comments. Its last possible closing
+  // line suffices, and its m anchors recognize CR and Unicode separators too.
+  return source
+    .slice(firstLine + 1, lastLine)
+    .split(/[\r\n\u2028\u2029]/)
+    .some((line) => {
+      const marker = line.trim();
+      return marker === "@format" || marker === "@prettier";
+    });
+}
 export function competitorComments(document: Document, options: ProcessOptions) {
   const compat = options.compatibility;
   const emptyVariants: Record<string, RuleSetting[]> = {};
@@ -276,9 +296,7 @@ export function competitorComments(document: Document, options: ProcessOptions) 
     const end = closing.exec(source.slice(header[0].length - 1));
     if (end) body = source.slice(header[0].length - 1 + end.index + end[0].length);
   }
-  const pragma =
-    /^(?:<!--\s*@(format|prettier)\s*-->|<!--[^\n]*\n[\s\S]*?(?:^|\n)[^\S\n]*@(format|prettier)[^\S\n]*(?:$|\n)[\s\S]*?\n[^\n]*-->)/m;
-  if (requirePragma && body.trimStart().match(pragma)?.index !== 0)
+  if (requirePragma && !hasPrettierPragma(body))
     prettierRanges.push({ start: 0, end: source.length });
   let open: number | undefined;
   for (const comment of found) {
