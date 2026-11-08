@@ -117,7 +117,9 @@ punctuation or `_-`.
 
 **Reported without an autolink fix:** links with entities, escapes, spaces,
 angle brackets, ampersands, parentheses, or formatted labels, which stay as
-written, and the other disallowed forms.
+written, links inside Obsidian headings whose authored source can be a
+cross-note destination, and the other disallowed forms. Eligible body links
+still receive autolink fixes.
 
 ## Related rules
 

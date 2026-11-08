@@ -16,7 +16,7 @@ updates:
       # The type definitions follow the lowest supported Node.js version, 22.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # PR #591: VitePress alpha.20 peers mathjax3 ^4; v5 changes its backend.
+      # PR #591: VitePress alpha.21 peers mathjax3 ^4; v5 changes its backend.
       # The deferred mdit plugin lines below peer markdown-it 15, while the
       # current VitePress reading uses 14. See CONTRIBUTING's dependency procedure.
       # PRs #592-#594, #608, #610 and #611; compatible older lines remain eligible.
@@ -86,7 +86,7 @@ updates:
     cooldown:
       default-days: 7
     ignore:
-      # wdio-obsidian-service 3.3 needs WebdriverIO 9.
+      # wdio-obsidian-service 3.4 needs WebdriverIO 9.
       - dependency-name: "webdriverio"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@wdio/*"

@@ -847,6 +847,12 @@ try {
       !args.some((arg) => ["explain", "convert", "help"].includes(arg))
     )
       process.stderr.write("mdrefine: config needs a command: explain or convert\n");
+    else if (
+      asError &&
+      args[0] === "audit" &&
+      !args.some((arg) => ["reachability", "help"].includes(arg))
+    )
+      process.stderr.write("mdrefine: audit needs a command: reachability\n");
   } else {
     // A rule setting that cannot be used is found while a document is processed.
     const where = configurationFault(error) ? `Invalid configuration ${configuration!.name}: ` : "";

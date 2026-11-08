@@ -41,7 +41,7 @@ mdrefine needs Node.js 22.12 or newer. Install it in the project that holds your
 documents, then check them and apply the fixes:
 
 ```sh
-npm install --save-dev --save-exact mdrefine@0.7.1
+npm install --save-dev --save-exact mdrefine@0.8.0
 npx mdrefine lint
 npx mdrefine format --write
 ```

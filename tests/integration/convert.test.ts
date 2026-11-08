@@ -997,6 +997,29 @@ it("honors Prettier ignores and pragma overrides and deduplicates comment notice
   expect(run(root, ["format", "note.md", "--check"]).status).toBe(0);
 });
 
+it("retains pragma fallback behavior for repeated markers and complete comments (#916)", async () => {
+  const source = `<!--\n@format\n${"\n@format\n".repeat(1600)}`;
+  const root = await fixture({
+    ".prettierrc": '{"requirePragma":true}',
+    "note.md": source,
+  });
+  for (const command of ["lint", "format"]) {
+    const result = run(root, [command, "--root", root, "note.md", "--json"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(parseReport(result.stdout).files).toEqual([
+      expect.objectContaining({ diagnostics: [] }),
+    ]);
+    expect(await readFile(path.join(root, "note.md"), "utf8")).toBe(source);
+  }
+  await writeFile(
+    path.join(root, "note.md"),
+    "<!-- Description\r\n@prettier\r\n-->\r\n\r\n*one*\r\n",
+  );
+  const result = run(root, ["format", "--root", root, "note.md", "--write"]);
+  expect(result.status, result.stderr).toBe(0);
+  expect(await readFile(path.join(root, "note.md"), "utf8")).toContain("_one_");
+});
+
 it("reports a repeated unknown comment name only once across files", async () => {
   const source = "<!-- markdownlint-disable UNKNOWN -->\n\n*one*\n";
   const root = await fixture({

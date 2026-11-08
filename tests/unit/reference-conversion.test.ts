@@ -64,6 +64,14 @@ describe("explicit inline-to-reference conversion", () => {
     },
   );
 
+  it("names the conflicting reference target and allowed form (#913)", () => {
+    const options = { fixTo: "full", full: false };
+    expect(() => lint("", { config: only({ [rule]: ["warn", options] }) })).toThrow(
+      'Invalid options for links/allowed-notation: fixTo: "full" cannot be combined with full: false',
+    );
+    expect(() => lint("", { config: only({ [rule]: ["off", options] }) })).not.toThrow();
+  });
+
   it("shares only identical destinations and titles, including explicit empty titles", () => {
     const source = '[a](/url) [b](/url) ![c](/url) [d](/url "") [e](/url "Title")\n';
     const output = formatted(source, only(rules));

@@ -217,7 +217,7 @@ read the JSON report and the exit code.
 
 ```json
 {
-  "version": "0.7.1",
+  "version": "0.8.0",
   "mode": "lint",
   "root": "/home/user/project",
   "files": [

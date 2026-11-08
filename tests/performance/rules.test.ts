@@ -10,7 +10,33 @@ import {
 } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
 import { scaling } from "./scaling.js";
+import { hasPrettierPragma } from "../../src/core/competitor-comments.js";
 const markers = { "style/emphasis": "warn", "style/strong": "warn" } as const;
+
+it.each([
+  [
+    "an unclosed comment",
+    (count: number) => `<!--\n@format\n${"\n@format\n".repeat(count)}`,
+    false,
+  ],
+  [
+    "a closer before the markers",
+    (count: number) => `<!--\n-->${"\n@format\n".repeat(count)}`,
+    false,
+  ],
+  ["repeated openers", (count: number) => `<!--\n${"<!--\n@format\n".repeat(count)}`, false],
+  [
+    "a complete comment",
+    (count: number) => `<!--\n${"almost\n".repeat(count)}@prettier\n-->`,
+    true,
+  ],
+] as const)("keeps pragma detection linear for %s (#916)", (_name, source, expected) => {
+  expect(
+    scaling([400, 1600], source, hasPrettierPragma, (found) => {
+      expect(found).toBe(expected);
+    }),
+  ).toBeLessThan(10);
+});
 
 it("bounds MD041 HTML-flow directive nesting (#858)", () => {
   const converted = convertConfig({ markdownlint: { default: false, MD041: true } });
