@@ -1,8 +1,9 @@
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
-import { createWorkspace, lint, parse } from "../../src/index.js";
-import { githubAnchors } from "../../src/workspace/anchors.js";
+import { createWorkspace, format, lint, parse } from "../../src/index.js";
+import { forgeAnchors, githubAnchors } from "../../src/workspace/anchors.js";
+import { forgeAutolinkFixtures } from "../fixtures/renderers/forges.mjs";
 import type { Dialect } from "../../src/index.js";
 import { formatted, only } from "../support/rules.js";
 const dialects: Dialect[] = ["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"];
@@ -227,6 +228,32 @@ describe("link notation checks", () => {
       expect(lint(output, { config })).toHaveLength(1);
     }
   });
+
+  it.each(["forgejo", "gitea"] as const)(
+    "retains %s heading anchors while fixing body autolinks (#915)",
+    (dialect) => {
+      for (const fixture of forgeAutolinkFixtures)
+        for (const ending of ["\n", "\r\n"]) {
+          const source = fixture.source.replaceAll("\n", ending);
+          const config = only(
+            { "links/allowed-notation": ["warn", { urlInline: false }] },
+            dialect,
+          );
+          expect(lint(source, { config }), fixture.name).toHaveLength(2);
+          const output = formatted(source, config);
+          expect(output, fixture.name).toBe(fixture.output.replaceAll("\n", ending));
+          expect(forgeAnchors(parse(output, dialect))).toEqual(
+            forgeAnchors(parse(source, dialect)),
+          );
+          expect(lint(output, { config })).toHaveLength(
+            fixture.name.endsWith("explicit-id") ? 0 : 1,
+          );
+          expect(
+            format(source, { config: only({ "links/allowed-notation": "off" }, dialect) }).output,
+          ).toBe(source);
+        }
+    },
+  );
 });
 
 describe("rendered link preservation", () => {

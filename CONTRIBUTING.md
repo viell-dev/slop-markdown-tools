@@ -840,6 +840,9 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   missing, duplicate and incomplete cases, controls, views and host identities.
   Partial reports and existing failure artifacts survive failed attempts. This
   validates bookkeeping and trusted producers, not arbitrary fabricated reports.
+  Forge controls also run the opt-in autolink fix on shared authored heading
+  cases, asserting exact output and equal native HTML/anchors before accepting
+  their independently planned control records.
   `github-normalization.test.ts` and `obsidian-normalization.test.ts` check
   comparison normalization, including changes that must remain significant;
   these offline controls do not replace native calibration or host execution.
