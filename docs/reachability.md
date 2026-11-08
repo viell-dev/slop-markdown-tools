@@ -72,7 +72,9 @@ uncertain name lookup and traversal boundaries can hide edges. Local raw HTML
 links, embedded HTML and Markdown-looking text inside raw HTML, VitePress
 includes and custom/foreign elements or dynamic attributes, links inside
 Obsidian highlights, and syntax plugins can also add navigation this audit does
-not model. These are coverage problems, rather than proof of unreachability. The
+not model. This includes local HTML links inside raw-text wrappers such as
+`<textarea>` that GitHub's tag filter can escape while preserving their bodies
+as HTML. These are coverage problems, rather than proof of unreachability. The
 first version conservatively treats a coverage problem anywhere in the scanned
 documents as making the whole audit incomplete, including in a disconnected
 document. Rule-only plugins do not by themselves create a coverage problem.

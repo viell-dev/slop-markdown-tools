@@ -5,6 +5,27 @@ import { reachableFrom } from "../../src/audit/graph.js";
 
 describe("source navigation", () => {
   it.each([
+    "iframe",
+    "noembed",
+    "noframes",
+    "noscript",
+    "plaintext",
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+  ])("checks HTML exposed by GitHub filtering of %s", (tag) => {
+    const source = (body: string) => `<${tag}>${body}</${tag}>`;
+    expect(
+      navigation(parse(source('<a href="guide.md">Go</a>'), "github")).limits.length,
+    ).toBeGreaterThan(0);
+    expect(
+      navigation(parse(source('<a href="https://example.com">Web</a>'), "github")).limits,
+    ).toEqual([]);
+    expect(navigation(parse(source("Plain text"), "github")).limits).toEqual([]);
+  });
+  it.each([
     ["vitepress", '<a @click="go" href="guide.md">Go</a>'],
     ["vitepress", "<navigation />"],
     ["github", '> <a\n> href="guide.md">Go</a>'],

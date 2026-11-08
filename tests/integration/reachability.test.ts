@@ -29,6 +29,9 @@ describe("reachability audit", () => {
     ["github", '> <a\n> href="guide.md">Go</a>'],
     ["github", 'See[^a].\n\n[^a]: See[^b].\n[^b]: <a href="guide.md">Go</a>'],
     ["obsidian", 'See^[note]. <a href="guide.md">Go</a>'],
+    ["github", '<textarea><a href="guide.md">Go</a></textarea>'],
+    ["github", '<style><a href="guide.md">Go</a></style>'],
+    ["github", '<title><a href="guide.md">Go</a></title>'],
   ] as const)(
     "returns incomplete, never unreachable, for unmodeled %s HTML: %s",
     async (dialect, source) => {

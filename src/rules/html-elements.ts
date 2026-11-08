@@ -204,12 +204,14 @@ interface ScannedTag {
  * certain, and the raw-text element still open at its end. A comment, a
  * declaration or a tag that the value does not end, an abrupt comment such as
  * `<!-->`, CDATA, and `<!--` in raw text, such as a script's escapes, which
- * the renderers may read apart, are uncertain.
+ * the renderers may read apart, are uncertain. Set `skipRawText` to false
+ * to also read bodies that a renderer's tag filter may expose as HTML.
  */
 export function scan(
   html: string,
   inside: string | undefined,
   emit: (tag: ScannedTag) => void,
+  skipRawText = true,
 ): { certain: boolean; inside: string | undefined } {
   let at = 0;
   while (at < html.length) {
@@ -270,7 +272,7 @@ export function scan(
       ...(tag ? { attributes: attributeMap(tag[1]!) } : {}),
       selfClosing: tag?.[2] === "/",
     });
-    if (!close && rawText.has(name.toLowerCase())) inside = name.toLowerCase();
+    if (skipRawText && !close && rawText.has(name.toLowerCase())) inside = name.toLowerCase();
     at = end;
   }
   return { certain: true, inside };
