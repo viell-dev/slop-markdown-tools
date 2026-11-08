@@ -6,9 +6,7 @@ or execute the site's JavaScript configuration.
 
 Malformed Vue expressions, such as an unterminated `{{` interpolation, can cause
 wrapping edits to be refused. The document remains unchanged; correct the
-expression before formatting. Numeric whitespace entities can also trigger
-conservative wrapping refusals, tracked in
-[#905](https://github.com/viell-dev/slop-markdown-tools/issues/905).
+expression before formatting.
 
 ```jsonc
 {
