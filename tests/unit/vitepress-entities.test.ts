@@ -129,6 +129,14 @@ it.each([
   expect(fingerprint(before)).toBe(fingerprint(after));
 });
 
+it.each(["", " "])("keeps entity gaps before a hard break with prefix %j (#905)", (prefix) => {
+  for (const hardbreak of ["\\\n", "  \n"]) {
+    const before = `**a**${prefix}&NewLine;${hardbreak}**b**\n`;
+    const after = `**a**${prefix}&#32;${hardbreak}**b**\n`;
+    expect(fingerprint(before)).not.toBe(fingerprint(after));
+  }
+});
+
 it.each(["\n", "\r\n", "\r"])("wraps body entities with %j line endings (#863)", (eol) => {
   const original =
     "- saddle needle __ember__ *zephyr amber* candle anchor basket \n" +

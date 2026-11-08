@@ -127,7 +127,7 @@ export function vitepressSemantics(
         before &&
         after &&
         inlineElement(before, true) &&
-        inlineElement(after, false)
+        (after.type === "hardbreak" || inlineElement(after, false))
       )
         continue;
       result.push({ type: "text", content: content.replace(/[\t\n\f\r ]+/g, " ") });

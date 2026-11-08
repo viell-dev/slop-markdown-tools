@@ -290,6 +290,12 @@ it("still rejects entity changes with unequal actual VitePress/Vue output (#863)
     ["**a** &#13; **b**\n", "**a** **b**\n"],
     ["**a**&#13;![b](a.png)\n", "**a**&#32;![b](a.png)\n"],
     ["**a**&NewLine;**b**\n", "**a** **b**\n"],
+    ...["", " "].flatMap((prefix) =>
+      ["\\\n", "  \n"].map((hardbreak) => [
+        `**a**${prefix}&NewLine;${hardbreak}**b**\n`,
+        `**a**${prefix}&#32;${hardbreak}**b**\n`,
+      ]),
+    ),
   ];
   for (const [before, after] of pairs) {
     expect(await render(after!), before).not.toBe(await render(before!));
