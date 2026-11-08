@@ -161,10 +161,16 @@ export function prepare(options: ProcessOptions) {
         throw new Error(`Invalid options for ${name}: the rule takes no options`);
     } else if (rule.schema !== undefined && enabled.severity !== "off") {
       const validate = optionsValidator(name, rule.schema);
-      if (!validate(enabled.options))
-        throw new Error(
-          `Invalid options for ${name}: ${optionErrors(validate.errors ?? [], enabled.options)}`,
-        );
+      const referenceConflict =
+        name === "links/allowed-notation" &&
+        enabled.options.fixTo === "full" &&
+        enabled.options.full === false;
+      if (!validate(enabled.options)) {
+        const problem = referenceConflict
+          ? 'fixTo: "full" cannot be combined with full: false'
+          : optionErrors(validate.errors ?? [], enabled.options);
+        throw new Error(`Invalid options for ${name}: ${problem}`);
+      }
     }
   }
   // Blank lines that one rule requires and another removes cannot both be

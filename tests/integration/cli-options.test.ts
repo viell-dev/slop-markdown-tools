@@ -36,6 +36,8 @@ describe("the command line", () => {
       [[], "mdrefine: no command given; try mdrefine lint\n"],
       [["config"], "mdrefine: config needs a command: explain or convert\n"],
       [["config", "--root", "."], "mdrefine: config needs a command: explain or convert\n"],
+      [["audit"], "mdrefine: audit needs a command: reachability\n"],
+      [["audit", "--root", "."], "mdrefine: audit needs a command: reachability\n"],
       [["help", "bogus"], "mdrefine: unknown command 'bogus'\n"],
     ] as const) {
       const result = run(root, [...args]);
@@ -50,7 +52,14 @@ describe("the command line", () => {
     expect(stdin("format").stderr).toBe(
       "mdrefine: stdin must be the only input and cannot be combined with --write.\n",
     );
-    for (const args of [["--help"], ["help"], ["help", "lint"], ["lint", "--help"], ["-V"]]) {
+    for (const args of [
+      ["--help"],
+      ["help"],
+      ["help", "lint"],
+      ["lint", "--help"],
+      ["audit", "--help"],
+      ["-V"],
+    ]) {
       const result = run(root, args);
       expect(result.status, args.join(" ")).toBe(0);
       expect(result.stderr, args.join(" ")).toBe("");

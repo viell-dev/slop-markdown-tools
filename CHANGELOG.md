@@ -33,6 +33,10 @@ existing configurations keep their defaults.
 
 ### Fixed
 
+- Name conflicting reference-conversion options and the missing `audit`
+  subcommand in error messages
+  ([#913](https://github.com/viell-dev/slop-markdown-tools/issues/913),
+  [#914](https://github.com/viell-dev/slop-markdown-tools/issues/914)).
 - Preserve source-named Obsidian heading destinations during autolink fixes
   ([#909](https://github.com/viell-dev/slop-markdown-tools/issues/909)).
 - Avoid quadratic work when GitHub lazy HTML regions share a distant blank line
