@@ -150,6 +150,25 @@ describe("GitHub's reading of a lazy line that starts a type 7 HTML block (#762)
     expect(regions(root)).toEqual([[0, root.indexOf("\n\nAfter")]]);
   });
 
+  it.each(["", "\n", "\nAfter *y*.\n"])(
+    "keeps exact regions when alternating containers share a distant end: %j (#889)",
+    (suffix) => {
+      const unit = "- a\n<b>\n> q\n<b>\n";
+      for (const ending of ["\n", "\r\n"]) {
+        const body = unit.repeat(12).replaceAll("\n", ending);
+        const input = body + suffix.replaceAll("\n", ending);
+        const end = suffix ? body.length + ending.length : body.length;
+        const expected = Array.from({ length: 24 }, (_, index) => [
+          Math.floor(index / 2) * unit.replaceAll("\n", ending).length +
+            (index % 2 === 0 ? 0 : "- a\n<b>\n".replaceAll("\n", ending).length),
+          end,
+        ]);
+        expect(regions(input)).toEqual(expected);
+        expect(checked(input, configurations[1]!)).toBe(input.replace("After *y*", "After _y_"));
+      }
+    },
+  );
+
   it.each([
     // The line continues every container, so GitHub reads a paragraph too.
     ["- a\n  <b>\n  *w*\n", "- a\n  <b>\n  _w_\n"],

@@ -220,22 +220,20 @@ export function collectGithubLazyHtmlProtections(
   };
   visit(tree, []);
   const roots = tree.children;
-  for (const [unit, start, blankEnd] of regions) {
+  for (const [unit, , blankEnd] of regions) {
     let end = blankEnd;
-    // Top-level blocks that start before the blank line may continue past it
-    // in the primary reading, where GitHub starts afresh.
+    // Top-level blocks are ordered and nonoverlapping. Only the last block
+    // starting before the blank line can extend this region past that line.
+    // Searching it directly avoids revisiting every later block for regions
+    // that share a distant blank line (#889).
     let low = 0;
     let high = roots.length;
     while (low < high) {
       const middle = (low + high) >> 1;
-      if (roots[middle]!.position!.end.offset! <= start) low = middle + 1;
+      if (roots[middle]!.position!.start.offset! < blankEnd) low = middle + 1;
       else high = middle;
     }
-    for (let index = low; index < roots.length; index++) {
-      const root = roots[index]!.position!;
-      if (root.start.offset! >= end) break;
-      end = Math.max(end, root.end.offset!);
-    }
+    if (low > 0) end = Math.max(end, roots[low - 1]!.position!.end.offset!);
     boundaryText.add({
       ...unit,
       position: {

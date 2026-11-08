@@ -193,7 +193,9 @@ export const linkStyleRules: Record<string, Rule> = {
     },
     check({ document, options }) {
       const findings: Finding[] = [];
+      let headingEnd = 0;
       walk(document.tree, (node) => {
+        if (node.type === "heading" && document.dialect === "obsidian") headingEnd = range(node)[1];
         if (
           node.type !== "link" &&
           node.type !== "image" &&
@@ -222,6 +224,8 @@ export const linkStyleRules: Record<string, Rule> = {
           node.type === "link" &&
           notation === "inline" &&
           urlInline &&
+          // Obsidian also resolves authored heading source across notes (#909).
+          start >= headingEnd &&
           !node.title &&
           options.autolink !== false &&
           raw === `[${node.url}](${node.url})` &&

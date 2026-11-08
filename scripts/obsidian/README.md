@@ -7,7 +7,7 @@ dependencies are separate from the published mdrefine package.
 
 ## Download ownership
 
-`wdio-obsidian-service` 3.3.0 uses `obsidian-launcher` 3.3.0 to download the
+`wdio-obsidian-service` 3.4.0 uses `obsidian-launcher` 3.4.0 to download the
 Obsidian installer and application, and Electron's matching ChromeDriver. It
 supplies both executable paths before WebdriverIO starts:
 

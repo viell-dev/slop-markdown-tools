@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.8.0 - 2026-11-08
+
+[What's new in
+0.8](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.8.html)
+describes the new opt-in workflows with examples. No upgrading steps are needed;
+existing configurations keep their defaults.
 
 ### Added
 
@@ -28,12 +33,22 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Preserve source-named Obsidian heading destinations during autolink fixes
+  ([#909](https://github.com/viell-dev/slop-markdown-tools/issues/909)).
+- Avoid quadratic work when GitHub lazy HTML regions share a distant blank line
+  ([#889](https://github.com/viell-dev/slop-markdown-tools/issues/889)).
+
 - `style/inline-code` names the padding when that is all it removes, instead of
   asking for fewer backticks, and its page describes which padding it removes
   and how that shows in Obsidian's Live Preview
   ([#886](https://github.com/viell-dev/slop-markdown-tools/issues/886)).
 
 ### Maintenance
+
+- Review dependency cost and optional-installation behavior before adding
+  packages
+  ([#901](https://github.com/viell-dev/slop-markdown-tools/issues/901)).
+- Refresh compatible runtime, renderer-reference and verification dependencies.
 
 - Retain failure phase diagnostics for linked-checkout builds and abandoned
   staging code checks to investigate intermittent Windows timeouts

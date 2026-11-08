@@ -1,8 +1,14 @@
 # VitePress
 
-The `vitepress` dialect targets VitePress 2, verified against 2.0.0-alpha.20.
+The `vitepress` dialect targets VitePress 2, verified against 2.0.0-alpha.21.
 Select it explicitly; finding `.vitepress/` does not change the assumed dialect
 or execute the site's JavaScript configuration.
+
+Malformed Vue expressions, such as an unterminated `{{` interpolation, can cause
+wrapping edits to be refused. The document remains unchanged; correct the
+expression before formatting. Numeric whitespace entities can also trigger
+conservative wrapping refusals, tracked in
+[#905](https://github.com/viell-dev/slop-markdown-tools/issues/905).
 
 ```jsonc
 {

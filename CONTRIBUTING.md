@@ -148,6 +148,23 @@ target.
 
 ## Dependencies
 
+Before adding a dependency, establish the supported user need, compare existing
+project code and smaller alternatives, and assess the installed dependency tree,
+startup cost, platform support, licenses and continuing security maintenance.
+Use a runtime dependency when built-in functionality or public declarations need
+it; build-only inputs belong in development dependencies. Code bundled from a
+development input still counts as shipped code.
+
+A setting being opt-in does not alone justify an optional dependency.
+[`optionalDependencies`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#optionaldependencies)
+are installed by default; they permit missing or failed installations. Use them
+only when the feature has a supported, tested absence path and actionable
+diagnostics, including when consumers omit all optional packages. Consider a
+separate plugin or integration for a substantial capability most users do not
+need, weighing its installation and compatibility costs too. Record that
+decision with the feature rather than introducing a second installation model
+without a demonstrated benefit.
+
 Direct dependencies are pinned to exact versions, and the repository lockfile is
 committed. Direct updates therefore get an explicit review and release; release
 preparation also refreshes and tests eligible indirect dependencies, as
@@ -375,7 +392,7 @@ warnings or advance an assertion merely to make installation/building succeed.
 
 - **TypeScript:** when updating `typescript-eslint`, recheck its [official
   support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. As of parser 8.72.0, that range is
+  installed parser's TypeScript peer. As of parser 8.72.1, that range is
   `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
   [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
   includes the target; remove it only after an unforced install, typed lint,
@@ -390,7 +407,7 @@ warnings or advance an assertion merely to make installation/building succeed.
 - **VitePress and markdown-it:** inspect peers for the ignored markdown-it 15
   and attrs, container, emoji, footnote and tasklist plugin lines. The pinned
   plugins accept markdown-it 14; the deferred generation requires 15. The
-  separate MathJax plugin deferral exists because VitePress alpha.20 peers
+  separate MathJax plugin deferral exists because VitePress alpha.21 peers
   `markdown-it-mathjax3: ^4`; v5 changes the backend and adds native deasync,
   rather than itself declaring a markdown-it 15 peer. Keep the bounded ranges in
   the configuration until compatible peers return or a coordinated reference
@@ -404,7 +421,7 @@ warnings or advance an assertion merely to make installation/building succeed.
   override; [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)
   records the source, renderer, audit and installed-package checks for its
   adoption.
-- **WebdriverIO:** `wdio-obsidian-service` 3.3.0 declares a webdriverio
+- **WebdriverIO:** `wdio-obsidian-service` 3.4.0 declares a webdriverio
   `^9.18.1` peer. Retain WDIO major ignores until a service release supports the
   target. Review its coherent WDIO packages and launcher together, then test the
   actual Docker host, both views, controls and report identity. The service's

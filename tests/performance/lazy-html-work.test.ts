@@ -14,9 +14,14 @@ afterAll(() => counter.stop());
 // variants finish quickly rather than running for minutes under observation.
 const sizes = [200, 800] as const;
 
-function expectProportionalWork({ prefix, unit, regions }: (typeof lazyHtmlCases)[number]) {
+function expectProportionalWork({
+  prefix,
+  unit,
+  regions,
+  suffix = "",
+}: (typeof lazyHtmlCases)[number] & { suffix?: string }) {
   const [small, large] = sizes.map((count) => {
-    const document = parse(prefix + unit.repeat(count), "github");
+    const document = parse(prefix + unit.repeat(count) + suffix, "github");
     const {
       result: { result: found, reads },
       blocks,
@@ -49,13 +54,15 @@ it.each(lazyHtmlCases)(
   expectProportionalWork,
 );
 
-// Every region here shares a distant blank line, so each walks the top-level
-// blocks up to it.
-it.fails("does work in proportion to regions that share a distant blank line (#889)", () => {
-  expectProportionalWork({
-    name: "alternating containers",
-    prefix: "",
-    unit: "- a\n<b>\n> q\n<b>\n",
-    regions: (count) => 2 * count,
-  });
-});
+it.each(["", "\n"])(
+  "does work in proportion to regions with a shared distant end and suffix %j (#889)",
+  (suffix) => {
+    expectProportionalWork({
+      name: "alternating containers",
+      prefix: "",
+      unit: "- a\n<b>\n> q\n<b>\n",
+      suffix,
+      regions: (count) => 2 * count,
+    });
+  },
+);

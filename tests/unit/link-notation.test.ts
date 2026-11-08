@@ -1,7 +1,7 @@
 import { HtmlRenderer, Parser } from "commonmark";
 import MarkdownIt from "markdown-it";
 import { describe, expect, it } from "vitest";
-import { lint, parse } from "../../src/index.js";
+import { createWorkspace, lint, parse } from "../../src/index.js";
 import { githubAnchors } from "../../src/workspace/anchors.js";
 import type { Dialect } from "../../src/index.js";
 import { formatted, only } from "../support/rules.js";
@@ -190,6 +190,42 @@ describe("link notation checks", () => {
     expect(() =>
       lint("", { config: only({ "links/allowed-notation": ["warn", { inline: "no" }] }) }),
     ).toThrow("Invalid options");
+  });
+
+  it.each([
+    "# [https://example.com](https://example.com)\n",
+    "[https://example.com](https://example.com)\n===\n",
+    "> # [https://example.com](https://example.com)\n",
+    "- # **[https://example.com](https://example.com)**\n",
+  ])("preserves source-named Obsidian heading links during autolink fixes: %j", (heading) => {
+    for (const ending of ["\n", "\r\n"]) {
+      const source = `${heading}\n[https://example.com](https://example.com)\n`.replaceAll(
+        "\n",
+        ending,
+      );
+      const label = heading.includes("**")
+        ? "**[https://example.com](https://example.com)**"
+        : "[https://example.com](https://example.com)";
+      const other = `[[Note#${label}]] and [[Note#https://example.com]]\n`;
+      const check = (note: string) =>
+        lint(other, {
+          config: only({ "links/valid": "warn" }, "obsidian"),
+          path: "Other.md",
+          workspace: createWorkspace(
+            { "Note.md": note, "Other.md": other },
+            { dialect: "obsidian" },
+          ),
+        });
+      const config = only({ "links/allowed-notation": ["warn", { urlInline: false }] }, "obsidian");
+      expect(check(source)).toEqual([]);
+      expect(lint(source, { config })).toHaveLength(2);
+      const output = formatted(source, config);
+      expect(output).toBe(
+        `${heading.replaceAll("\n", ending)}${ending}<https://example.com>${ending}`,
+      );
+      expect(check(output)).toEqual([]);
+      expect(lint(output, { config })).toHaveLength(1);
+    }
   });
 });
 
