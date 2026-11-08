@@ -40,8 +40,8 @@ dialects keep their existing math readings.
 
 ## Forgejo and Gitea
 
-The repository's checks compare the tool's output with disposable Forgejo 17.0.0
-and Gitea 28.2.0 instances. Authored fixtures and realistic documents at fixed
+The repository's checks compare the tool's output with disposable Forgejo 17.0.1
+and Gitea 28.3.0 instances. Authored fixtures and realistic documents at fixed
 seeds are checked through their file-rendering APIs; actual repository file
 pages also check heading IDs, explicit targets and fragment links, including
 headings inside definition descriptions. The evidence covers those host versions

@@ -171,7 +171,7 @@ On GitHub, Forgejo, and Gitea, more fragments are valid:
 
 ## Forgejo and Gitea
 
-The tool's output is compared with Forgejo 17.0.0 and Gitea 28.2.0 at their
+The tool's output is compared with Forgejo 17.0.1 and Gitea 28.3.0 at their
 default rendering settings. Custom hard-break or math settings and themes are
 not covered.
 

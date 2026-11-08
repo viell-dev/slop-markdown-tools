@@ -20,6 +20,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   safe body links in the same document to format
   ([#915](https://github.com/viell-dev/slop-markdown-tools/issues/915)).
 
+### Maintenance
+
+- Refresh native rendering checks to Forgejo 17.0.1 and Gitea 28.3.0
+  ([#917](https://github.com/viell-dev/slop-markdown-tools/issues/917)).
+
 ## 0.8.0 - 2026-11-08
 
 [What's new in
