@@ -12,7 +12,7 @@ folder where it runs, and inside a vault they become part of the vault. Install
 it globally, or in a folder of its own, and point `--root` at the vault:
 
 ```sh
-npm install --global mdrefine@0.8.0
+npm install --global mdrefine@0.8.1
 mdrefine lint --root "/path/to/vault"
 ```
 
