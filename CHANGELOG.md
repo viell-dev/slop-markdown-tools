@@ -22,6 +22,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Update the parser build tool to Rolldown 1.2.16; generated runtime code is
+  unchanged ([#918](https://github.com/viell-dev/slop-markdown-tools/pull/918)).
 - Refresh native rendering checks to Forgejo 17.0.1 and Gitea 28.3.0
   ([#917](https://github.com/viell-dev/slop-markdown-tools/issues/917)).
 
