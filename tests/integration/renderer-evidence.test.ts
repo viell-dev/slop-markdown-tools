@@ -7,6 +7,7 @@ import {
   validateRendererReport,
 } from "../../scripts/renderer-evidence.mjs";
 import { images } from "../../scripts/forge-evidence.mjs";
+import { forgeAutolinkFixtures } from "../fixtures/renderers/forges.mjs";
 import baseline from "../../scripts/obsidian/baseline.json" with { type: "json" };
 
 function complete(renderer: string) {
@@ -65,6 +66,20 @@ function complete(renderer: string) {
     })),
   };
 }
+
+it("independently requires every forge heading-autolink control (#915)", () => {
+  for (const image of images)
+    for (const fixture of forgeAutolinkFixtures) {
+      const report = complete("forges");
+      const name = `${image.name}/${fixture.name}`;
+      expect(report.plan.controls).toContain(name);
+      report.plan.controls = report.plan.controls.filter((control) => control !== name);
+      report.controls = report.controls.filter((control) => control.name !== name);
+      expect(() => validateRendererEvidence(report, "forges")).toThrow(
+        "Native plan differs from intended workload",
+      );
+    }
+});
 
 describe.each(["github", "obsidian", "forges"])("%s complete native evidence", (renderer) => {
   it("requires actual opt-in reference conversion", () => {

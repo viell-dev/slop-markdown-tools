@@ -12,7 +12,11 @@ import { format } from "../dist/index.js";
 import { documentSeed, generateDocument } from "./rendering.mjs";
 import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
-import { forgeFixtures as fixtures, fileFixtures } from "../tests/fixtures/renderers/forges.mjs";
+import {
+  forgeFixtures as fixtures,
+  fileFixtures,
+  forgeAutolinkFixtures,
+} from "../tests/fixtures/renderers/forges.mjs";
 import { fileMarkup, forgeHtml } from "./forge-html.mjs";
 import { images, validateForgeEvidence } from "./forge-evidence.mjs";
 import {
@@ -186,6 +190,23 @@ for (const image of images) {
       true,
     );
     const config = { extends: ["recommended", image.name] };
+    for (const fixture of forgeAutolinkFixtures) {
+      const result = format(fixture.source, {
+        config: {
+          extends: [],
+          dialect: image.name,
+          rules: { "links/allowed-notation": ["warn", { urlInline: false }] },
+        },
+      });
+      assert.equal(result.output, fixture.output, `Incorrect ${image.name} ${fixture.name} output`);
+      assert(!result.diagnostics.some((item) => item.rule.startsWith("engine/")));
+      assert.equal(
+        forgeHtml(await render(fixture.source), fixture.source),
+        forgeHtml(await render(result.output), result.output),
+        `Changed ${image.name} ${fixture.name} rendering or heading anchors`,
+      );
+      report.controls.push({ name: `${image.name}/${fixture.name}`, passed: true });
+    }
     const found = [];
     let compared = 0,
       fileViews = 0;

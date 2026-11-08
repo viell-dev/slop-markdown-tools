@@ -1,4 +1,17 @@
 import { commonFixtures } from "./common.mjs";
+const inlineUrl = "[https://example.com](https://example.com)";
+// Opt-in fixes must retain generated anchors while allowing explicit-id headings (#915).
+export const forgeAutolinkFixtures = [
+  ["atx", `# ${inlineUrl}`, `# ${inlineUrl}`],
+  ["setext", `${inlineUrl}\n===`, `${inlineUrl}\n===`],
+  ["quoted", `> # ${inlineUrl}`, `> # ${inlineUrl}`],
+  ["nested", `- # **${inlineUrl}**`, `- # **${inlineUrl}**`],
+  ["explicit-id", `# ${inlineUrl} {#chosen}`, "# <https://example.com> {#chosen}"],
+].map(([name, heading, output]) => ({
+  name: `heading-autolink-${name}`,
+  source: `${heading}\n\nBody ${inlineUrl} here.\n`,
+  output: `${output}\n\nBody <https://example.com> here.\n`,
+}));
 // Shared authored regressions for native paragraph/table and hard-break readings.
 export const forgeBoundaryFixtures = [
   { name: "table-ordered-row", source: "Number | Description\n--- | ---\n2) | Second entry\n" },

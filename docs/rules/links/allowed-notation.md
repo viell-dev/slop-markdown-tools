@@ -118,8 +118,10 @@ punctuation or `_-`.
 **Reported without an autolink fix:** links with entities, escapes, spaces,
 angle brackets, ampersands, parentheses, or formatted labels, which stay as
 written, links inside Obsidian headings whose authored source can be a
-cross-note destination, and the other disallowed forms. Eligible body links
-still receive autolink fixes.
+cross-note destination, and links whose source determines a Forgejo or Gitea
+heading anchor or attribute block. The other disallowed forms remain reported
+without a fix. Eligible body links still receive autolink fixes; forge headings
+with a stable explicit ID can receive them too.
 
 ## Related rules
 

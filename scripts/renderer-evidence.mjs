@@ -1,7 +1,11 @@
 // Native workload contracts. Plans come from fixture ownership, never completed loop output.
 import assert from "node:assert/strict";
 import { githubFixtures } from "../tests/fixtures/renderers/common.mjs";
-import { forgeFixtures, fileFixtures } from "../tests/fixtures/renderers/forges.mjs";
+import {
+  forgeFixtures,
+  fileFixtures,
+  forgeAutolinkFixtures,
+} from "../tests/fixtures/renderers/forges.mjs";
 import { fixtures as obsidianFixtures } from "../tests/fixtures/renderers/obsidian.mjs";
 import baseline from "./obsidian/baseline.json" with { type: "json" };
 import { images, validateForgeEvidence } from "./forge-evidence.mjs";
@@ -67,6 +71,7 @@ export function rendererPlan(renderer, { profile, seeds, count }) {
           views: ["repository-file"],
         });
       controls.push(
+        ...forgeAutolinkFixtures.map((fixture) => `${image.name}/${fixture.name}`),
         ...["text-difference", "math-recognition", "repository-anchors"].map(
           (name) => `${image.name}/${name}`,
         ),

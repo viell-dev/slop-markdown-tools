@@ -9,6 +9,14 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Keep Forgejo and Gitea heading anchors intact during autolink fixes, allowing
+  safe body links in the same document to format
+  ([#915](https://github.com/viell-dev/slop-markdown-tools/issues/915)).
+
 ## 0.8.0 - 2026-11-08
 
 [What's new in
