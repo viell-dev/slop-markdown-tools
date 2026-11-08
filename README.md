@@ -84,6 +84,10 @@ conversion](https://viell-dev.github.io/slop-markdown-tools/integrations.html#co
   reads them.
 - **Checks local links** and their heading and block fragments, with each
   renderer's anchors.
+- **Audits source navigation.** An opt-in [reachability
+  audit](docs/reachability.md) finds Markdown documents unreachable from
+  explicit entry pages, and reports when incomplete reads or unknown navigation
+  prevent a conclusion.
 - **Extensible.** Plugins add rules, presets, and syntax, and a library runs the
   same engine without the command line.
 

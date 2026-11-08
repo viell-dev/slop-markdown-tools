@@ -13,6 +13,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Added
 
+- Audit Markdown source navigation from explicit entry pages with
+  `audit reachability` and the Node API, including coverage reports
+  ([#900](https://github.com/viell-dev/slop-markdown-tools/issues/900)).
+
 - `links/allowed-notation` can convert disallowed inline links and images to
   full references with explicit `fixTo: "full"`. Obsidian links can reuse
   existing, already-used definitions; its images stay inline to preserve Live

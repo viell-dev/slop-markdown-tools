@@ -757,6 +757,16 @@ cannot show. "Every pull request" means CI: Linux Node.js 24 runs `check:ci`
 with unit evidence in the separate `Unit coverage` job; other matrix jobs run
 `test:ci`. Each environment builds and tests its own installed package.
 
+- **Source navigation auditing is bounded and read-only.**
+  `reachability.test.ts` in the unit and integration projects covers actual
+  references, disconnected cycles, multiple entries, excluded transit pages,
+  coverage failures, dialect selection, boundaries, JSON/text output and zero
+  document writes. Installed package smoke checks exercise the audit through
+  `mdrefine/node` and the CLI. The Benchmark workflow compares discovery,
+  collection and traversal costs with exact correctness assertions; its times
+  are measurements, not pass/fail limits. Unsupported navigation and incomplete
+  reads must not produce definitive unreachable findings.
+
 - **Formatting keeps what a document means.** The engine orchestrates phases and
   refuses an edit that changes the parsed reading; `src/core/semantics.ts` owns
   fingerprints and refusal locations, and `protection-edits.ts` checks renderer

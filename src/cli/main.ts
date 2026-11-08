@@ -16,6 +16,7 @@ import { assumedDialect, checkRoot, discoverFrom } from "../workspace/discovery.
 import { enclosingVault } from "../workspace/vault.js";
 import { exists, refusal, refusalText } from "../workspace/access.js";
 import { decodeText, NotUtf8Error } from "../workspace/encoding.js";
+import { auditReachability } from "../audit/reachability.js";
 import { unifiedDiff } from "./diff.js";
 import type { Config, Diagnostic, DialectName, Plugin } from "../core/types.js";
 
@@ -50,7 +51,7 @@ for (const stream of [process.stdout, process.stderr])
 // Subcommands inherit these settings, so they come before the commands.
 const program = new Command()
   .name("mdrefine")
-  .description("Lint and format Markdown with explicit dialects and configurable rules.")
+  .description("Lint, format, and audit Markdown with explicit dialects and configurable rules.")
   .version(manifest.version, "-V, --version", "Print the version")
   .helpOption("-h, --help", "Print help for the command")
   .helpCommand("help [command]", "Print help for a command")
@@ -544,6 +545,74 @@ common(
   .option("--diff", "Preview the diff; changes alone exit 0 (with --check, exit 1)")
   .option("--write", "Write the formatting changes to the files")
   .action((inputs: string[], flags: Flags) => run("format", inputs, flags));
+const auditCommand = workspaceOptions(
+  program.command("audit").description("Audit workspace navigation; never writes documents"),
+);
+workspaceOptions(
+  auditCommand
+    .command("reachability")
+    .description("Find Markdown documents unreachable from explicit entry pages"),
+)
+  .requiredOption(
+    "--entry <path>",
+    "Entry document relative to the workspace root (repeatable)",
+    (value: string, previous: string[] = []) => [...previous, value],
+  )
+  .option(
+    "--exclude <path>",
+    "Exclude an exact file or directory from findings, retaining transit links (repeatable)",
+    (value: string, previous: string[] = []) => [...previous, value],
+  )
+  .option("--json", "Machine-readable audit and coverage report")
+  .addHelpText(
+    "after",
+    `
+The complete workspace is audited, regardless of the current directory. Entries must
+be eligible Markdown documents. Ignores and --exclude affect findings; readable
+linked documents may still carry navigation. Unknown navigation suppresses unreachable
+findings. External URLs and generated site navigation are outside this source graph.
+
+Exit codes: 0 complete with no findings; 1 complete with unreachable documents;
+2 invalid input or incomplete audit. No documents are written.
+
+Example: mdrefine audit reachability --entry README.md --entry docs/index.md --json`,
+  )
+  .action(async (_flags: unknown, command: Command) => {
+    const flags = command.optsWithGlobals<Flags & { entry: string[] }>();
+    const { root, config, plugins } = await workspace(flags);
+    const report = await auditReachability({
+      root,
+      entries: flags.entry,
+      config,
+      plugins,
+      ...(flags.exclude ? { exclude: flags.exclude.map((item) => path.resolve(item)) } : {}),
+    });
+    if (flags.json)
+      process.stdout.write(
+        JSON.stringify(
+          { version: manifest.version, mode: "audit-reachability", ...report },
+          null,
+          2,
+        ) + "\n",
+      );
+    else {
+      process.stdout.write(
+        `Reachability from ${report.entries.join(", ")} (${report.documents.length} eligible documents).\n`,
+      );
+      for (const problem of report.problems)
+        process.stderr.write(
+          `${problem.path}${problem.line ? `:${problem.line}${problem.column ? `:${problem.column}` : ""}` : ""}: ${problem.message}\n`,
+        );
+      for (const name of report.unreachable)
+        process.stdout.write(`${name}: Not reachable from the configured entry pages.\n`);
+      process.stdout.write(
+        report.complete
+          ? `${report.unreachable.length} unreachable document(s).\n`
+          : "Audit incomplete; unreachable findings were withheld.\n",
+      );
+    }
+    process.exitCode = report.complete ? (report.unreachable.length ? 1 : 0) : 2;
+  });
 // The options belong to `config`, which reads them before or after `explain`;
 // `explain` repeats them so that its help lists them.
 const configCommand = workspaceOptions(

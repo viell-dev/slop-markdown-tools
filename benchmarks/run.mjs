@@ -16,6 +16,9 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL, URL } from "node:url";
 import * as prettier from "prettier";
 import { createWorkspace, format, lint, parse } from "../dist/index.js";
+import { auditReachability, discoverWorkspace } from "../dist/node.js";
+import { navigation } from "../dist/audit/navigation.js";
+import { reachableFrom } from "../dist/audit/graph.js";
 import { longDocument, repositoryDocs, vault } from "./corpus.mjs";
 import { markdown } from "./report.mjs";
 
@@ -38,13 +41,14 @@ const progress = (text) => process.stderr.write(`${text}\n`);
 const byteLength = (sources) =>
   sources.reduce((total, source) => total + Buffer.byteLength(source), 0);
 /** Time `run` `samples` times, after one untimed warm-up unless told otherwise; `prepare` is never timed. */
-async function measure(run, { samples = sizes.samples, prepare, warm = true } = {}) {
+async function measure(run, { samples = sizes.samples, prepare, verify, warm = true } = {}) {
   const times = [];
   for (let index = warm ? -1 : 0; index < samples; index++) {
     await prepare?.();
     const start = performance.now();
-    await run();
+    const result = await run();
     if (index >= 0) times.push(performance.now() - start);
+    await verify?.(result);
   }
   times.sort((a, b) => a - b);
   const middle = times.length >> 1;
@@ -142,7 +146,7 @@ async function onDisk(corpus, use) {
       await writeFile(path.join(root, name), source);
     }
   };
-  const run = (args, { memory = false, command = [cli] } = {}) => {
+  const run = (args, { memory = false, command = [cli], expectedStatus = 0 } = {}) => {
     const preload = [
       "--import",
       pathToFileURL(path.join(repository, "benchmarks/peak-memory.mjs")).href,
@@ -152,7 +156,7 @@ async function onDisk(corpus, use) {
       stdio: "ignore",
       env: { ...process.env, MDREFINE_BENCHMARK_MEMORY: memoryFile },
     });
-    if (result.status !== 0)
+    if (result.status !== expectedStatus)
       throw new Error(`mdrefine ${args.join(" ")} exited with ${result.status}.`);
   };
   /** The most memory one more run of the command holds, including Node.js itself. */
@@ -167,7 +171,7 @@ async function onDisk(corpus, use) {
       "mdrefine.config.json": JSON.stringify(corpus.config),
       ...corpus.extraFiles,
     });
-    await use({ write, run, peakMemory });
+    await use({ root, write, run, peakMemory });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -268,6 +272,103 @@ async function moreFiles(count, measuredMain) {
 }
 
 const [small, medium, large] = sizes.files;
+/** Exact-count navigation workload: a reachable group and a disconnected cycle. */
+async function reachability(count, fanout) {
+  const split = Math.floor(count * 0.9);
+  const files = {};
+  let edges = 0;
+  for (let index = 0; index < count; index++) {
+    const start = index < split ? 0 : split;
+    const length = index < split ? split : count - split;
+    const destinations = Array.from(
+      { length: Math.min(fanout, length) },
+      (_, offset) => `page-${start + ((index - start + offset + 1) % length)}.md`,
+    );
+    edges += destinations.length;
+    files[`page-${index}.md`] =
+      `# Page ${index}\n\n${destinations.map((target) => `[Go](${target})`).join("\n")}\n`;
+  }
+  const size = { files: count, bytes: byteLength(Object.values(files)), edges, fanout };
+  const id = `${count}-${fanout}`;
+  const check = (graph) => {
+    if (graph.size !== count || reachableFrom(["page-0.md"], graph).size !== split)
+      throw new Error("Incorrect reachability benchmark result.");
+  };
+  const collect = () => {
+    const workspace = createWorkspace(files);
+    const graph = new Map();
+    for (const [name, source] of Object.entries(files)) {
+      const targets = navigation(parse(source, "github", name)).links.map((link) => {
+        const result = workspace.resolve(name, link.destination, "github");
+        if (result.status !== "resolved" || !result.target)
+          throw new Error("Unresolved benchmark edge.");
+        return result.target;
+      });
+      graph.set(name, targets);
+    }
+    return graph;
+  };
+  const graph = collect();
+  check(graph);
+  record(
+    "reachability",
+    `${id}-index`,
+    "Target index only",
+    await measure(() => createWorkspace(files)),
+    size,
+  );
+  record(
+    "reachability",
+    `${id}-collect`,
+    "Parse and resolve, including index",
+    await measure(collect, { verify: check }),
+    size,
+  );
+  record(
+    "reachability",
+    `${id}-traverse`,
+    "Traverse collected graph",
+    await measure(() => reachableFrom(["page-0.md"], graph), {
+      verify: (reached) => {
+        if (reached.size !== split) throw new Error("Incorrect benchmark traversal.");
+      },
+    }),
+    size,
+  );
+  const config = { extends: ["github"] };
+  await onDisk({ config }, async ({ root, write, peakMemory }) => {
+    await write(files);
+    record(
+      "reachability",
+      `${id}-discovery`,
+      "Discovery only",
+      await measure(async () => {
+        const discovery = await discoverWorkspace({ root, config });
+        if (discovery.selected.length !== count) throw new Error("Incomplete benchmark discovery.");
+      }),
+      size,
+    );
+    const audit = async () => {
+      const report = await auditReachability({ root, entries: ["page-0.md"], config });
+      if (
+        !report.complete ||
+        report.reachable.length !== split ||
+        report.unreachable.length !== count - split
+      )
+        throw new Error("Incorrect full audit benchmark result.");
+    };
+    const measured = await measure(audit);
+    const peakMemoryBytes = await peakMemory(
+      ["audit", "reachability", "--entry", "page-0.md", "--json"],
+      { expectedStatus: 1 },
+    );
+    record("reachability", `${id}-audit`, "Full Node audit", measured, {
+      ...size,
+      peakMemoryBytes,
+    });
+  });
+}
+for (const count of sizes.files) for (const fanout of [1, 16]) await reachability(count, fanout);
 const main = repositoryDocs(medium);
 const formattedMain = await library("repository", main, { reference: true });
 await library("vault", vault(medium));

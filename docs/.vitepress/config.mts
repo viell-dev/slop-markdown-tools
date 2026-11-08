@@ -50,6 +50,7 @@ const guide: Item[] = [
 ];
 const reference: Item[] = [
   { text: "Command line", link: "/cli" },
+  { text: "Source navigation audit", link: "/reachability" },
   { text: "Configuration", link: "/configuration" },
   { text: "Rules", link: "/rules", collapsed: true, items: ruleGroups },
   { text: "Dialects", link: "/dialects" },

@@ -104,6 +104,23 @@ export function markdown(report) {
           ];
         }),
     ),
+    "## Source navigation audit",
+    "",
+    "Each workload has a reachable group of 90% of its documents and a disconnected cycle.\n" +
+      "Fanout is capped by group size. Every measured collection, traversal and audit checks the exact result.\n" +
+      "Parsing/resolution includes a fresh target index; the full audit also includes discovery and file reads.\n",
+    table(
+      ["Documents", "Fanout", "Edges", "Step", "Time", "Fastest to slowest run", "Peak CLI memory"],
+      group("reachability").map((result) => [
+        count(result.files),
+        count(result.fanout),
+        count(result.edges),
+        result.label,
+        seconds(result.ms.median),
+        range(result.ms),
+        result.peakMemoryBytes ? megabytes(result.peakMemoryBytes) : "",
+      ]),
+    ),
     "## Larger documents",
     "",
     table(

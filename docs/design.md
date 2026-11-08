@@ -265,6 +265,10 @@ Syntax:
 
 Links:
 
+- The opt-in [reachability audit](reachability.md) follows modeled source
+  navigation from explicit entries. It does not model generated site navigation
+  and withholds unreachable findings whenever coverage is incomplete.
+
 - Links to the web are never fetched.
 - Obsidian's resolution by note name is not a complete copy of Obsidian's: a
   missing or ambiguous target is reported, never guessed. A directory is never

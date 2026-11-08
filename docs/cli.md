@@ -12,6 +12,7 @@ The command is `mdrefine`; with the package installed in a project, run it as
 | `config explain <file>` | Prints the configuration in effect for one document; see [configuration](configuration.md#inspect-the-result). |
 | `config convert`        | Prints a converted markdownlint/Prettier configuration; `--write` creates it, never replacing one.             |
 | `rules`                 | Lists the built-in rules and those of the configuration's plugins.                                             |
+| `audit reachability`    | Reports Markdown documents unreachable from explicit entry pages; never writes.                                |
 | `help [command]`        | Prints help. `--help` works for every command, and `--version` prints the version.                             |
 
 Help and the version are printed on stdout, with exit code `0`. Without a
@@ -34,6 +35,10 @@ failed tool reports `engine/code-formatter` and exits with `2`, retaining that
 block and keeping other safe edits.
 
 ## Options
+
+For the workspace audit's required `--entry`, reporting exclusions, coverage
+report and exit codes, see [reachability](reachability.md). The options below
+describe ordinary document linting and formatting.
 
 `lint` and `format` take these options; the second column says which. For
 `format`, `--check --diff` combines the two, and `--write` cannot be combined
