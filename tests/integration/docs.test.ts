@@ -417,7 +417,7 @@ describe("documentation site", () => {
       ["components/VPDoc.vue", '<div class="content"> <div class="content-container">'],
       ["components/VPDoc.vue", "@media (min-width: 60rem) { .VPDoc { padding: 3rem 2rem 0; }"],
       ["components/VPDoc.vue", "@media (min-width: 60rem) { .content { padding: 0 2rem 8rem; } }"],
-      ["components/VPDoc.vue", "padding-left: 2rem; width: 100%; max-width: 16rem; }"],
+      ["components/VPDoc.vue", "padding-inline-start: 2rem; width: 100%; max-width: 16rem; }"],
       ["components/VPDoc.vue", ".VPDoc.has-aside .content-container { max-width: 43rem; }"],
     ];
     for (const [file, rule] of expected) expect(theme(file), file).toContain(rule);
