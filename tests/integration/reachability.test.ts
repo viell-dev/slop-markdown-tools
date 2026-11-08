@@ -23,6 +23,77 @@ const documents = {
 };
 
 describe("reachability audit", () => {
+  it.each([
+    ["vitepress", '<a @click="go" href="guide.md">Go</a>'],
+    ["vitepress", "<navigation />"],
+    ["github", '> <a\n> href="guide.md">Go</a>'],
+    ["github", 'See[^a].\n\n[^a]: See[^b].\n[^b]: <a href="guide.md">Go</a>'],
+    ["obsidian", 'See^[note]. <a href="guide.md">Go</a>'],
+  ] as const)(
+    "returns incomplete, never unreachable, for unmodeled %s HTML: %s",
+    async (dialect, source) => {
+      const root = await fixture({ "README.md": source, "guide.md": "# Guide\n" });
+      const result = run(root, [
+        "audit",
+        "reachability",
+        "--root",
+        root,
+        "--dialect",
+        dialect,
+        "--entry",
+        "README.md",
+        "--json",
+      ]);
+      expect(result.status, result.stderr).toBe(2);
+      const report = parseAudit(result.stdout);
+      expect(report.complete).toBe(false);
+      expect(report.unreachable).toEqual([]);
+      expect(report.problems.length).toBeGreaterThan(0);
+      expect(report.problems.every((problem) => problem.code === "unsupported-navigation")).toBe(
+        true,
+      );
+      const text = run(root, [
+        "audit",
+        "reachability",
+        "--root",
+        root,
+        "--dialect",
+        dialect,
+        "--entry",
+        "README.md",
+      ]);
+      expect(text.status, text.stderr).toBe(2);
+      expect(text.stderr).not.toContain("undefined");
+      expect(text.stdout).toContain("findings were withheld");
+    },
+  );
+  it.each(["github", "vitepress"] as const)(
+    "preserves ordinary Markdown and excluded HTML controls in %s",
+    async (dialect) => {
+      const root = await fixture({
+        "README.md":
+          '[Guide](guide.md)\n\n`<navigation />`\n\n<!-- <a href="guide.md"> -->\n\n<a href="https://example.invalid">Web</a>\n\n[^unused]: <a href="unread.md">Unused</a>\n',
+        "guide.md": "# Guide\n",
+      });
+      const result = run(root, [
+        "audit",
+        "reachability",
+        "--root",
+        root,
+        "--dialect",
+        dialect,
+        "--entry",
+        "README.md",
+        "--json",
+      ]);
+      expect(result.status, result.stderr).toBe(0);
+      expect(parseAudit(result.stdout)).toMatchObject({
+        complete: true,
+        problems: [],
+        unreachable: [],
+      });
+    },
+  );
   it.each(['target="_blank"', "download"])(
     "withholds findings when VitePress bypasses page paths for %s",
     async (attribute) => {

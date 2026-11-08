@@ -4,6 +4,40 @@ import { navigation } from "../../src/audit/navigation.js";
 import { reachableFrom } from "../../src/audit/graph.js";
 
 describe("source navigation", () => {
+  it.each([
+    ["vitepress", '<a @click="go" href="guide.md">Go</a>'],
+    ["vitepress", "<navigation />"],
+    ["github", '> <a\n> href="guide.md">Go</a>'],
+    ["github", 'See[^a].\n\n[^a]: See[^b].\n[^b]: <a href="guide.md">Go</a>'],
+    ["obsidian", 'See^[note]. <a href="guide.md">Go</a>'],
+  ] as const)(
+    "records HTML coverage independently of display mapping for %s: %s",
+    (dialect, source) => {
+      expect(navigation(parse(source, dialect)).limits.length).toBeGreaterThan(0);
+    },
+  );
+  it.each(["github", "obsidian", "vitepress"] as const)(
+    "keeps opaque/code/comment/external-only HTML controls out of %s findings",
+    (dialect) => {
+      const source =
+        '`<a @click="go" href="guide.md">`\n\n```html\n<navigation />\n<a href="guide.md">Go</a>\n```\n\n<!-- <a href="guide.md"> [Note](guide.md) -->\n\n<div><!-- [Comment](guide.md) --></div>\n\n<a href=" https://example.com?tags[]=one ">Web</a>\n\n[^unused]: <a href="guide.md">Go</a>\n';
+      expect(navigation(parse(source, dialect)).limits).toEqual([]);
+    },
+  );
+  it.each([
+    "<pre>Plain code</pre>",
+    "<style>.note { color: red; }</style>",
+    '<area href="https://example.com">',
+    "<nav>Navigation</nav>",
+  ])("recognizes native VitePress HTML in %s", (source) => {
+    expect(navigation(parse(source, "vitepress")).limits).toEqual([]);
+  });
+  it.each(["commonmark", "github", "obsidian"] as const)(
+    "keeps VitePress include comments opaque in %s",
+    (dialect) => {
+      expect(navigation(parse("<!-- @include: guide.md -->", dialect)).limits).toEqual([]);
+    },
+  );
   it.each(['target="_blank"', "download"])(
     "does not normalize VitePress navigation with %s",
     (attribute) => {

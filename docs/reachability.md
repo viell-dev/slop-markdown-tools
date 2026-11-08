@@ -46,11 +46,12 @@ Such a stop makes the audit incomplete.
 
 The source graph includes Markdown links, used reference links, supported
 wikilinks and Markdown embeds. Reference links use the first definition for
-their label. A footnote's links count only when the footnote is referenced. Code
-examples, comments, unused reference/footnote definitions, ordinary images and
-attachments do not create document edges. A link with a bad heading fragment
-still reaches its known document; `links/valid` checks fragments separately.
-Wikilink display labels do not change their targets.
+their label. A footnote's links count only when the footnote is referenced.
+Markdown code spans and fenced or indented code blocks, comments, unused
+reference/footnote definitions, ordinary images and attachments do not create
+document edges. A link with a bad heading fragment still reaches its known
+document; `links/valid` checks fragments separately. Wikilink display labels do
+not change their targets.
 
 Targets resolve in the source document's dialect, including VitePress's modeled
 page paths and Obsidian's note-name lookup. The target document is parsed in its
@@ -68,9 +69,10 @@ page is undiscoverable by every means.
 
 Unreadable directories or documents, invalid UTF-8, unresolved local links,
 uncertain name lookup and traversal boundaries can hide edges. Local raw HTML
-links, VitePress includes and dynamic components, links inside Obsidian
-highlights, and syntax plugins can also add navigation this audit does not
-model. These are coverage problems, rather than proof of unreachability. The
+links, embedded HTML and Markdown-looking text inside raw HTML, VitePress
+includes and custom/foreign elements or dynamic attributes, links inside
+Obsidian highlights, and syntax plugins can also add navigation this audit does
+not model. These are coverage problems, rather than proof of unreachability. The
 first version conservatively treats a coverage problem anywhere in the scanned
 documents as making the whole audit incomplete, including in a disconnected
 document. Rule-only plugins do not by themselves create a coverage problem.

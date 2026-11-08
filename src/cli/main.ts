@@ -601,7 +601,7 @@ Example: mdrefine audit reachability --entry README.md --entry docs/index.md --j
       );
       for (const problem of report.problems)
         process.stderr.write(
-          `${problem.path}${problem.line ? `:${problem.line}:${problem.column}` : ""}: ${problem.message}\n`,
+          `${problem.path}${problem.line ? `:${problem.line}${problem.column ? `:${problem.column}` : ""}` : ""}: ${problem.message}\n`,
         );
       for (const name of report.unreachable)
         process.stdout.write(`${name}: Not reachable from the configured entry pages.\n`);

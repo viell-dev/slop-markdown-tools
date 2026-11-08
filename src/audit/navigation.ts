@@ -1,10 +1,9 @@
 import type { Definition, FootnoteDefinition, Nodes } from "mdast";
 import type { Document } from "../core/types.js";
-import { htmlStartTags } from "../rules/html-elements.js";
 import { walk } from "../syntax/walk.js";
-import { lineStarts } from "../syntax/source.js";
-import { diagnostic } from "../core/diagnostics.js";
 import { skipVitePressLink } from "../syntax/vitepress/links.js";
+import { vitepressTokens } from "../syntax/vitepress/projection.js";
+import { htmlNavigationLimit } from "./html.js";
 
 export interface NavigationLink {
   destination: string;
@@ -14,8 +13,8 @@ export interface NavigationLink {
 }
 export interface NavigationLimit {
   message: string;
-  line: number;
-  column: number;
+  line?: number;
+  column?: number;
 }
 
 /** Collect source navigation, not unused definitions, images, code, or unused footnotes. */
@@ -65,41 +64,31 @@ export function navigation(document: Document): {
         limits.push({ ...position(node), message: "Dynamic link destinations are not modeled." });
       else links.push({ destination, wiki: node.type === "wikiLink", ...position(node) });
     }
-    if (
-      (node.type === "html" && /<!--\s*@include\s*:/.test(node.value)) ||
-      (node.type === "obsidianHighlight" && node.value.includes("[")) ||
-      (node.type === "html" && node.value.includes("[") && !/^\s*<!--/.test(node.value))
-    )
+    if (node.type === "obsidianHighlight" && node.value.includes("["))
       limits.push({
         ...position(node),
-        message: "Navigation inside transclusions, highlights, or raw HTML is not fully modeled.",
+        message: "Navigation inside highlights is not fully modeled.",
       });
+    if (node.type === "html" && document.dialect !== "vitepress") {
+      const message = htmlNavigationLimit(node.value, document.dialect);
+      if (message) limits.push({ ...position(node), message });
+    }
     if ("children" in node)
       for (let index = node.children.length - 1; index >= 0; index--)
         stack.push(node.children[index]!);
   }
-  let starts: number[] | undefined;
-  for (const tag of htmlStartTags(document)) {
-    const href = tag.attributes.get("href") ?? tag.attributes.get("xlink:href");
-    const dynamic =
-      document.dialect === "vitepress" &&
-      (/[A-Z-]/.test(tag.name) ||
-        [...tag.attributes.keys()].some((name) => /^(?:[:@#]|v-)/.test(name)));
-    if (dynamic || (href && !href.startsWith("#") && !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href))) {
-      const location = diagnostic(
-        (starts ??= lineStarts(document.source)),
-        "audit/reachability",
-        "error",
-        {
-          start: tag.start,
-          message: "Local HTML links and dynamic components are not modeled as navigation.",
-        },
-      );
-      limits.push({
-        line: location.line,
-        column: location.column,
-        message: location.message,
-      });
+  if (document.dialect === "vitepress") {
+    // Vue accepts HTML that mdast reads as plain text, including @event attributes.
+    // Reuse the cached native token reading; do not infer absence from a display collector.
+    const pending = vitepressTokens(document).map((token) => ({ token, line: token.map?.[0] }));
+    while (pending.length) {
+      const { token, line } = pending.pop()!;
+      if (token.type === "html_block" || token.type === "html_inline") {
+        const message = htmlNavigationLimit(token.content, document.dialect);
+        if (message) limits.push({ message, ...(line === undefined ? {} : { line: line + 1 }) });
+      }
+      for (const child of token.children ?? [])
+        pending.push({ token: child, line: child.map?.[0] ?? line });
     }
   }
   return { links, limits };

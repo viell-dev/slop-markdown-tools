@@ -107,6 +107,10 @@ const vueHtml = new Set(
     "textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot"
   ).split(","),
 );
+/** Vue's native HTML vocabulary; foreign and custom elements are outside this set. */
+export function isVueHtmlTag(name: string): boolean {
+  return vueHtml.has(name.toLowerCase());
+}
 /** Vue's attribute syntax: a binding, an event, a slot, or a directive. */
 const vueAttribute = /^(?::|@|#|v-)/;
 /** CSS in a `style` attribute that hides the element. */
@@ -202,7 +206,7 @@ interface ScannedTag {
  * `<!-->`, CDATA, and `<!--` in raw text, such as a script's escapes, which
  * the renderers may read apart, are uncertain.
  */
-function scan(
+export function scan(
   html: string,
   inside: string | undefined,
   emit: (tag: ScannedTag) => void,
