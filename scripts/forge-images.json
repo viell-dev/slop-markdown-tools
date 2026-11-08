@@ -1,12 +1,12 @@
 [
   {
     "name": "forgejo",
-    "version": "17.0.0",
-    "image": "codeberg.org/forgejo/forgejo:17.0.0@sha256:06d38310de496a10186d952bdad5ca764c153c8023ede8dfa0944c79a1dc5412"
+    "version": "17.0.1",
+    "image": "codeberg.org/forgejo/forgejo:17.0.1@sha256:fcd19ff4ebc85fb098a67e8e1d0d5a84d07dd6e8a23edcfdfd5b71a6178953be"
   },
   {
     "name": "gitea",
-    "version": "28.2.0",
-    "image": "docker.gitea.com/gitea:28.2.0@sha256:30777c91280d973fa02be48b1ade735bd6859e8f6f7af3b4444d519437852504"
+    "version": "28.3.0",
+    "image": "docker.gitea.com/gitea:28.3.0@sha256:8967bf9deaf3c5c4adae13519436dc1b20c646ac83fe37ae810c933a1045227d"
   }
 ]
