@@ -215,7 +215,7 @@ async function generateParser(options, attachDebugInfo) {
   const repositoryRoot = await realpath(path.resolve(options.repositoryRoot ?? defaultRoot));
   const resolveFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
   const bundlerRoot = await packageForFile(resolveFromRoot.resolve("rolldown"));
-  assert.equal(bundlerRoot.metadata.version, "1.2.15", "Review changed parser bundler");
+  assert.equal(bundlerRoot.metadata.version, "1.2.16", "Review changed parser bundler");
   const factories = new Map();
   for (const name of [
     "mdast-util-from-markdown",
