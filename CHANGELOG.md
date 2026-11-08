@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Wrap VitePress body whitespace entities without discarding other paragraph
+  fixes, while preserving Vue's newline-only element gaps
+  ([#905](https://github.com/viell-dev/slop-markdown-tools/issues/905)).
 - Keep Forgejo and Gitea heading anchors intact during autolink fixes, allowing
   safe body links in the same document to format
   ([#915](https://github.com/viell-dev/slop-markdown-tools/issues/915)).
