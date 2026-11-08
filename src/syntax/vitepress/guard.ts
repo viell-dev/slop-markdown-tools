@@ -21,6 +21,14 @@ function bodyText(token: Token): string {
   return token.content;
 }
 
+/** Decode one complete reference at a time; escaped ampersands must not decode again. */
+function bodyWhitespace(text: string): string {
+  return text.replace(/&(?:#(?:x[\da-f]{1,6}|\d{1,7})|[a-z][a-z\d]{1,31});/gi, (reference) => {
+    const decoded = decodeHTML(reference);
+    return /^[\t\n\f\r ]$/.test(decoded) ? decoded : reference;
+  });
+}
+
 /** VitePress's non-mdast reading, including Vue's newline-only element gaps. */
 export function vitepressSemantics(
   document: Document,
@@ -57,7 +65,7 @@ export function vitepressSemantics(
           ? url(value)
           : value,
     ]);
-    let content = newline(bodyEntities && token.type === "text" ? bodyText(token) : token.content);
+    let content = newline(token.content);
     if (token.type === "text") return { type: "text", content: content.replace(/[ \t\n]+/g, " ") };
     if (token.type === "inline") content = "";
     if (token.type === "fence" || token.type === "code_block") {
@@ -90,7 +98,44 @@ export function vitepressSemantics(
       ...(token.type === "footnote_ref" ? { meta: token.meta as unknown } : {}),
     };
   };
+  function bodyInline(tokens: Token[]): unknown[] {
+    const result: unknown[] = [];
+    for (let index = 0; index < tokens.length;) {
+      const token = tokens[index]!;
+      if (token.type !== "text" && token.type !== "softbreak") {
+        result.push(tokenValue(token, true));
+        index++;
+        continue;
+      }
+      const from = index;
+      const chunks: string[] = [];
+      while (index < tokens.length) {
+        const next = tokens[index]!;
+        if (next.type !== "text" && next.type !== "softbreak") break;
+        chunks.push(next.type === "softbreak" ? "\n" : bodyWhitespace(bodyText(next)));
+        index++;
+      }
+      const content = chunks.join("");
+      if (!content) continue;
+      const before = tokens[from - 1];
+      const after = tokens[index];
+      // Keep newline provenance until Vue's element-gap decision. Empty text
+      // tokens join the run instead of hiding its actual bordering elements.
+      if (
+        /^[\t\n\f\r ]+$/.test(content) &&
+        /[\r\n]/.test(content) &&
+        before &&
+        after &&
+        inlineElement(before, true) &&
+        (after.type === "hardbreak" || inlineElement(after, false))
+      )
+        continue;
+      result.push({ type: "text", content: content.replace(/[\t\n\f\r ]+/g, " ") });
+    }
+    return result;
+  }
   function inline(tokens: Token[], bodyEntities: boolean): unknown[] {
+    if (bodyEntities) return bodyInline(tokens);
     const result: unknown[] = [];
     let text: string[] = [];
     let endsWithSpace = false;
@@ -134,7 +179,7 @@ export function vitepressSemantics(
           inlineElement(after, false)
         ))
           add({ type: "text", content: " " });
-      } else add(tokenValue(token, bodyEntities));
+      } else add(tokenValue(token));
     }
     flush();
     return result;

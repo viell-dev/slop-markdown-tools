@@ -31,11 +31,19 @@ joins another text token. Its singleton can retain the decoded value. The
 secondary fingerprint compares eligible body singletons with that same written
 spelling, without modifying the cached reader tokens. The HTML decoder must
 agree with the singleton value: some numeric references render differently in
-these two positions. Whitespace and brace entities remain literal because of
-Vue's gaps and expressions. Headings, image alt children, code, and inline
-blocks containing raw HTML or mustaches keep their previous reading. The primary
-fingerprint still applies unchanged
+these two positions
 ([#863](https://github.com/viell-dev/slop-markdown-tools/issues/863)).
+
+For eligible body text, a temporary view joins adjacent text and soft breaks. It
+decodes complete whitespace references once, using MarkdownIt's bounded
+reference syntax, and retains newline provenance until Vue's element-gap
+decision, before collapsing ASCII whitespace. A hard break is an element only at
+the right edge of that decision: its generated trailing newline also affects
+gaps after it. Escaped and double-encoded references do not decode again. Brace
+entities, headings, image alt children, code, and inline blocks containing raw
+HTML or mustaches keep their previous reading. The primary fingerprint still
+applies unchanged
+([#905](https://github.com/viell-dev/slop-markdown-tools/issues/905)).
 
 Written aliases such as `&#169;` and `&copy;` can remain distinct even as
 singletons; built-in rules do not rewrite their spelling. After a major change

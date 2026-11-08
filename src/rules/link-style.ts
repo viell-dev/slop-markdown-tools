@@ -2,6 +2,7 @@ import type { Nodes } from "mdast";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { range } from "../syntax/parse.js";
 import { walk } from "../syntax/walk.js";
+import { changesForgeHeading } from "../workspace/heading-attributes.js";
 import { insideInlineHtml, normalizeLabel } from "./links.js";
 import { optionsSchema } from "./shared.js";
 
@@ -226,6 +227,7 @@ export const linkStyleRules: Record<string, Rule> = {
           urlInline &&
           // Obsidian also resolves authored heading source across notes (#909).
           start >= headingEnd &&
+          !changesForgeHeading(document, start, end) &&
           !node.title &&
           options.autolink !== false &&
           raw === `[${node.url}](${node.url})` &&

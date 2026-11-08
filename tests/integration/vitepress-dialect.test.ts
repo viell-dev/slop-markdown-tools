@@ -209,6 +209,14 @@ it("wraps body entities with equal actual VitePress/Vue output (#863)", async ()
     "&#xD800;",
     "&#0;",
     "&NotEqualTilde;",
+    "&#9;",
+    "&#10;",
+    "&#12;",
+    "&#13;",
+    "&#32;",
+    "&#x20;",
+    "&Tab;",
+    "&NewLine;",
   ]) {
     const before = `**x** ${entity}\nTail\n`;
     const after = `**x**\n${entity}\nTail\n`;
@@ -217,7 +225,49 @@ it("wraps body entities with equal actual VitePress/Vue output (#863)", async ()
       semanticFingerprint(parse(before, "vitepress")),
     );
   }
+  for (const [before, after] of [
+    ["`a`\\\n&NewLine;`b`\n", "`a`\\\n&#32;`b`\n"],
+    ["**a**  \n&NewLine;**b**\n", "**a**  \n&#32;**b**\n"],
+  ]) {
+    expect(await render(after!)).toBe(await render(before!));
+    expect(semanticFingerprint(parse(after!, "vitepress"))).toBe(
+      semanticFingerprint(parse(before!, "vitepress")),
+    );
+  }
 });
+
+it.each([false, true])(
+  "wraps whitespace entities with equal actual Vue output and math=%s (#905)",
+  async (math) => {
+    const render = await renderer({ math });
+    const sources = [
+      "B%%\n&#32;\n",
+      'x [a.](u "t. U") &#32; ',
+      '> [a.](u "t. U") &#32;\n',
+      "Read [the guide](guide.md). &#32; Follow the next step carefully.\n",
+      "B%%\n&#32;\n\nThis is an ordinary paragraph that should wrap at twenty columns.\n",
+    ];
+    for (const source of sources)
+      for (const mode of ["always", "sentences"])
+        for (const eol of source.includes("\n") ? ["\n", "\r\n", "\r"] : ["\n"]) {
+          const input = source.replaceAll("\n", eol);
+          const config: Config = {
+            extends: [],
+            dialect: "vitepress",
+            vitepress: { math },
+            rules: { "style/wrap": ["warn", { mode, width: 20 }] },
+          };
+          const result = format(input, { config });
+          expect(result.diagnostics, input).toEqual([]);
+          expect(result.output, input).not.toBe(input);
+          expect(await render(result.output), input).toBe(await render(input));
+          expect(semanticFingerprint(parse(result.output, "vitepress"))).toBe(
+            semanticFingerprint(parse(input, "vitepress")),
+          );
+          expect(format(result.output, { config }).output).toBe(result.output);
+        }
+  },
+);
 
 it("still rejects entity changes with unequal actual VitePress/Vue output (#863)", async () => {
   const render = await renderer({});
@@ -232,6 +282,20 @@ it("still rejects entity changes with unequal actual VitePress/Vue output (#863)
     ["`a`&NewLine;`b`\n", "`a` `b`\n"],
     ["Before &amp;copy; after.\n", "Before &copy; after.\n"],
     ["Before \\&copy; after.\n", "Before &copy; after.\n"],
+    ["Before \\&#32; after.\n", "Before &#32; after.\n"],
+    ["Before &amp;#32; after.\n", "Before &#32; after.\n"],
+    ["Before &#38;#32; after.\n", "Before &#32; after.\n"],
+    ["Before &amp;NewLine; after.\n", "Before &NewLine; after.\n"],
+    ["`a` &NewLine; `b`\n", "`a` `b`\n"],
+    ["**a** &#13; **b**\n", "**a** **b**\n"],
+    ["**a**&#13;![b](a.png)\n", "**a**&#32;![b](a.png)\n"],
+    ["**a**&NewLine;**b**\n", "**a** **b**\n"],
+    ...["", " "].flatMap((prefix) =>
+      ["\\\n", "  \n"].map((hardbreak) => [
+        `**a**${prefix}&NewLine;${hardbreak}**b**\n`,
+        `**a**${prefix}&#32;${hardbreak}**b**\n`,
+      ]),
+    ),
   ];
   for (const [before, after] of pairs) {
     expect(await render(after!), before).not.toBe(await render(before!));
@@ -468,6 +532,22 @@ it("keeps approved embedded-code formatting available in the second reading", as
   const result = await formatWithCode(source, { cwd: root, config: configured });
   expect(result.diagnostics).toEqual([]);
   expect(result.output).toBe(source.replace("old", "formatted"));
+  expect((await formatWithCode(result.output, { cwd: root, config: configured })).output).toBe(
+    result.output,
+  );
+});
+
+it("keeps unselected fences exact beside body entity and approved code fixes (#905)", async () => {
+  const { root, config } = await setup();
+  const source = "B%%\n&#32;\n\n" + block() + "\n" + block("kept", "txt");
+  const configured: Config = {
+    ...config(),
+    dialect: "vitepress",
+    extends: ["recommended", "vitepress"],
+  };
+  const result = await formatWithCode(source, { cwd: root, config: configured });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.output).toBe(source.replace("B%%\n&#32;", "B%% &#32;").replace("old", "formatted"));
   expect((await formatWithCode(result.output, { cwd: root, config: configured })).output).toBe(
     result.output,
   );
