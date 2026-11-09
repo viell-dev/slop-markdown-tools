@@ -181,6 +181,9 @@ paragraph lines are reported as unchecked, with a suggestion to enable
 `style/wrap` at that width. The mapping follows intended behavior and retains
 mdrefine's safety guards.
 
+Prettier's `extends` field is reported as an unmapped option during fallback and
+conversion, without loading an inheritance file through that key.
+
 Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
 markdownlint-cli2 `config` (without one, a `.markdownlint.*` file or else
 markdownlint's defaults, as markdownlint-cli2 uses), Prettier's `package.json`

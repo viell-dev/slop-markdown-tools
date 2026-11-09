@@ -13,6 +13,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Treat Prettier `extends` as an unmapped option during fallback and conversion
+  ([#928](https://github.com/viell-dev/slop-markdown-tools/issues/928)).
 - Keep files and supplied buffers named `__proto__` available as local link
   targets ([#926](https://github.com/viell-dev/slop-markdown-tools/issues/926)).
 
