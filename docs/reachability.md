@@ -58,6 +58,10 @@ page paths and Obsidian's note-name lookup. The target document is parsed in its
 own configured dialect. No landing page is guessed for a directory, and
 ambiguous note names and unsupported YAML property aliases are not guessed.
 
+Markdown link destinations are literal paths: `[Guide]({{guide}}.md)` points to
+the file named `{{guide}}.md`, also in VitePress. Dynamic HTML navigation, such
+as VitePress's `<a :href="page">`, still makes the audit incomplete.
+
 The audit uses mdrefine's source reading, with its documented parser and
 [dialect limits](design.md#limits). External URLs are not fetched or followed.
 Website sidebars, route configuration, search and backlinks are outside this

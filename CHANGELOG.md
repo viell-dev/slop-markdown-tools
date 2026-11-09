@@ -18,6 +18,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#927](https://github.com/viell-dev/slop-markdown-tools/issues/927)).
 - Match Node.js's module conditions when synchronous ESM loading is disabled
   ([#924](https://github.com/viell-dev/slop-markdown-tools/issues/924)).
+- Audit literal brace filenames and ignore braces in external URLs without
+  withholding unreachable-document findings
+  ([#925](https://github.com/viell-dev/slop-markdown-tools/issues/925)).
 - Keep files and supplied buffers named `__proto__` available as local link
   targets ([#926](https://github.com/viell-dev/slop-markdown-tools/issues/926)).
 

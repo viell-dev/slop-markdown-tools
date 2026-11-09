@@ -23,7 +23,82 @@ const documents = {
 };
 
 describe("reachability audit", () => {
+  const braceDialects = [
+    "commonmark",
+    "github",
+    "forgejo",
+    "gitea",
+    "obsidian",
+    "vitepress",
+  ] as const;
+  it.each(
+    braceDialects.flatMap((dialect) =>
+      ["{{guide}}.md", "%7B%7Bguide%7D%7D.md"].map(
+        (destination) => [dialect, destination] as const,
+      ),
+    ),
+  )("audits literal brace destinations in %s: %s (#925)", async (dialect, destination) => {
+    const options = { ...config, dialect };
+    const root = await fixture({
+      "mdrefine.config.json": JSON.stringify(options),
+      "README.md": `[Guide](${destination})\n`,
+      "{{guide}}.md": "# Guide\n",
+      "orphan.md": "# Orphan\n",
+    });
+    const expected = {
+      complete: true,
+      reachable: ["README.md", "{{guide}}.md"],
+      unreachable: ["orphan.md"],
+      problems: [],
+    };
+    expect(
+      await auditReachability({ root, entries: ["README.md"], config: options }),
+    ).toMatchObject(expected);
+    const result = run(root, [
+      "audit",
+      "reachability",
+      "--root",
+      root,
+      "--entry",
+      "README.md",
+      "--json",
+    ]);
+    expect(result.status, result.stderr).toBe(1);
+    expect(parseAudit(result.stdout)).toMatchObject(expected);
+  });
+  it.each(braceDialects)(
+    "keeps brace external URLs outside %s graph coverage (#925)",
+    async (dialect) => {
+      const options = { ...config, dialect };
+      const root = await fixture({
+        "mdrefine.config.json": JSON.stringify(options),
+        "README.md": "[External](https://example.com/{{slug}})\n",
+        "orphan.md": "# Orphan\n",
+      });
+      const expected = {
+        complete: true,
+        reachable: ["README.md"],
+        unreachable: ["orphan.md"],
+        problems: [],
+      };
+      expect(
+        await auditReachability({ root, entries: ["README.md"], config: options }),
+      ).toMatchObject(expected);
+      const result = run(root, [
+        "audit",
+        "reachability",
+        "--root",
+        root,
+        "--entry",
+        "README.md",
+        "--json",
+      ]);
+      expect(result.status, result.stderr).toBe(1);
+      expect(parseAudit(result.stdout)).toMatchObject(expected);
+    },
+  );
   it.each([
+    ["vitepress", '<a :href="page">Guide</a>'],
     ["vitepress", '<a @click="go" href="guide.md">Go</a>'],
     ["vitepress", "<navigation />"],
     ["github", '> <a\n> href="guide.md">Go</a>'],
