@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Clarify that report-only wrap findings can fail `format --check` through error
+  severity or a warning limit
+  ([#929](https://github.com/viell-dev/slop-markdown-tools/issues/929)).
 - Honor each suppression comment when several share one HTML block, including
   next-line directives in lists and quotes
   ([#927](https://github.com/viell-dev/slop-markdown-tools/issues/927)).
