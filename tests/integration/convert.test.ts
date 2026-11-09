@@ -1,13 +1,65 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { resolveConfig as prettierResolve, getFileInfo } from "prettier";
 import { describe, expect, it } from "vitest";
 import { competitorFiles } from "../../src/config/competitors.js";
+import { loadConfig } from "../../src/node.js";
 import { exists } from "../../src/workspace/access.js";
 import { fixture, run } from "../support/cli.js";
 import { parseConfig, parseExplanation, parseReport } from "../support/json.js";
 
 describe("competitor configuration CLI (#669)", () => {
+  it.each([false, true])(
+    "omits Prettier extends without loading its target (file present %s) (#928)",
+    async (present) => {
+      const settings = { extends: "./extra.json", proseWrap: "always", printWidth: 100 };
+      const root = await fixture({
+        ".prettierrc.json": JSON.stringify(settings),
+        "note.md": "A short note.\n",
+        ...(present ? { "extra.json": JSON.stringify({ tabWidth: 6 }) } : {}),
+      });
+      expect(await prettierResolve(path.join(root, "note.md"))).toEqual(settings);
+      const prettier = spawnSync(
+        process.execPath,
+        [fileURLToPath(import.meta.resolve("prettier/bin/prettier.cjs")), "note.md", "--check"],
+        { cwd: root, encoding: "utf8", windowsHide: true },
+      );
+      expect(prettier.status, prettier.stderr).toBe(0);
+      expect(prettier.stderr).toContain("Ignored unknown option");
+      expect(prettier.stderr).toContain("extends");
+
+      const fallback = await loadConfig(root, undefined, true, root);
+      expect(fallback.config.rules?.["style/wrap"]).toEqual(["warn", { width: 100 }]);
+      expect(fallback.config.rules?.["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: 2 }),
+      ]);
+      expect(fallback.conversion?.sources).not.toContain(path.join(root, "extra.json"));
+      expect(fallback.conversion?.omitted).toContain(
+        "Prettier extends: no Markdown mapping; requires manual migration.",
+      );
+      const explained = run(root, ["config", "explain", "note.md"]);
+      expect(explained.status, explained.stderr).toBe(0);
+      expect(parseExplanation(explained.stdout).effective.rules["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: 2 }),
+      ]);
+      expect(explained.stdout).toContain(
+        "Prettier extends: no Markdown mapping; requires manual migration.",
+      );
+      const converted = run(root, ["config", "convert"]);
+      expect(converted.status, converted.stderr).toBe(0);
+      expect(parseConfig(converted.stdout).rules?.["style/list-indent"]).toEqual([
+        "warn",
+        expect.objectContaining({ nestedIndent: 2 }),
+      ]);
+      expect(parseConfig(converted.stdout).rules?.["style/wrap"]).toEqual(["warn", { width: 100 }]);
+      expect(converted.stderr).toContain("Prettier extends");
+    },
+  );
+
   it("reports the MD041 directive work limit and permits recovery (#858)", async () => {
     const source = `<script x=>\n\n${":::a\n".repeat(250)}<h1>\n${":::\n".repeat(250)}\n</script>\n`;
     const root = await fixture({
@@ -1395,23 +1447,6 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
       "Invalid files in Prettier overrides[0] in shared.json (reached from package.json)",
     ],
     [
-      "extends",
-      {
-        ".prettierrc.json": '{ "extends": "./base.json", "printWidth": 70 }',
-        "base.json": '{ "overrides": [{ "files": "*.md", "options": 7 }] }',
-      },
-      "Expected a configuration object in the options of Prettier overrides[0] in base.json (reached from .prettierrc.json)",
-    ],
-    [
-      "an extends chain from a package key",
-      {
-        "package.yaml": "prettier: ./shared.json\n",
-        "shared.json": '{ "extends": "./base.json" }',
-        "base.json": '{ "overrides": [7] }',
-      },
-      "Expected a configuration object in Prettier overrides[0] in base.json (reached from package.yaml)",
-    ],
-    [
       "the file itself",
       {
         ".prettierrc.json": '{ "extends": "./base.json", "overrides": [{ "files": [7] }] }',
@@ -1444,6 +1479,45 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
       }
     },
   );
+  it.each([
+    [
+      "a standalone Prettier file",
+      {
+        ".prettierrc.json": '{ "extends": "./base.json", "printWidth": 70 }',
+        "base.json": '{ "overrides": [{ "files": "*.md", "options": 7 }] }',
+      },
+    ],
+    [
+      "a package-named Prettier file",
+      {
+        "package.yaml": "prettier: ./shared.json\n",
+        "shared.json": '{ "extends": "./base.json" }',
+        "base.json": '{ "overrides": [7] }',
+      },
+    ],
+  ])("ignores invalid settings behind extends in %s (#928)", async (_kind, files) => {
+    const root = await fixture({ ...files, "a.md": "text\n" });
+    const prettier = spawnSync(
+      process.execPath,
+      [fileURLToPath(import.meta.resolve("prettier/bin/prettier.cjs")), "a.md", "--check"],
+      { cwd: root, encoding: "utf8", windowsHide: true },
+    );
+    expect(prettier.status, prettier.stderr).toBe(0);
+    const fallback = await loadConfig(root, undefined, true, root);
+    expect(fallback.conversion?.sources).not.toContain(path.join(root, "base.json"));
+    expect(fallback.conversion?.omitted).toContain(
+      "Prettier extends: no Markdown mapping; requires manual migration.",
+    );
+    const converted = run(root, ["config", "convert"]);
+    expect(converted.status, converted.stderr).toBe(0);
+    parseConfig(converted.stdout);
+    expect(converted.stderr).toContain("Prettier extends");
+    const linted = run(root, ["lint", "--json"]);
+    expect(linted.status, linted.stderr).toBe(0);
+    expect(parseReport(linted.stdout).files).toEqual([
+      expect.objectContaining({ path: "a.md", diagnostics: [] }),
+    ]);
+  });
   it.each([
     ["prettier.config.mjs", "export default { proseWrap: 'never' };", "does not run JavaScript"],
     [".prettierrc.cjs", "module.exports = { proseWrap: 'never' };", "does not run JavaScript"],

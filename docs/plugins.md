@@ -66,10 +66,16 @@ through `import`.
 <details>
 <summary>Node.js options that change the lookup</summary>
 
-The lookup applies the conditions that Node.js applies: its defaults, those
-added with `--conditions` or `-C`, and without `node-addons` under
-`--no-addons`, from Node.js's command line or `NODE_OPTIONS`. Options set in
-other ways, such as a Node.js configuration file, are not seen.
+The lookup follows Node.js's effective synchronous ES module support:
+`module-sync` is a default condition only when the process enables loading ES
+modules through `require()`. Disabling that support with `--no-require-module`
+or its legacy spelling `--no-experimental-require-module` removes the default
+condition. Explicitly adding `--conditions=module-sync` still enables it.
+
+Custom conditions added with `--conditions` or `-C`, and `node-addons` changes
+under `--no-addons` or `--addons`, are read from Node.js's command line and
+`NODE_OPTIONS`. For those options, settings supplied only through other routes,
+such as a Node.js configuration file, are not seen.
 
 </details>
 

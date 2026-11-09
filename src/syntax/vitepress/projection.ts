@@ -16,6 +16,11 @@ const readings = new WeakMap<Root, Projection>();
 const codeTexts = new WeakMap<InlineCode, string>();
 const hiddenLists = new WeakSet<RootContent>();
 const componentBlocks = new WeakSet<RootContent>();
+const projectedLiterals = new WeakSet<RootContent>();
+/** Whether the projection synthesized a literal block rather than parsed HTML. */
+export function isProjectedLiteral(node: RootContent): boolean {
+  return projectedLiterals.has(node);
+}
 /** Whether the projection made this block opaque around a Vue component. */
 export function isComponentBlock(node: RootContent): boolean {
   return componentBlocks.has(node);
@@ -286,7 +291,10 @@ export function recordVitePress(tree: Root, projection: Projection, source: stri
   }
   while (previous < original.length) children.push(original[previous++]!);
   tree.children = children;
-  for (const literal of projection.literals) tree.children.push(literal);
+  for (const literal of projection.literals) {
+    projectedLiterals.add(literal);
+    tree.children.push(literal);
+  }
   tree.children.sort((a, b) => a.position!.start.offset! - b.position!.start.offset!);
   readings.set(tree, projection);
   const fences = new Map(

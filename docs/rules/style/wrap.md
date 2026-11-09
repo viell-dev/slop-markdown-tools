@@ -52,8 +52,9 @@ small diff.
   spaces.
 
 The two report options propose no edits and use the rule's severity. To make
-them fail a check, set the rule to `error` or pass `--max-warnings 0`;
-`format --check` checks only for edits.
+them fail a check, set the rule to `error` or pass `--max-warnings 0`. These
+findings can fail `format --check` even when no formatting edits are needed;
+formatting differences also make that command fail.
 
 **Sentence wrapping:**
 

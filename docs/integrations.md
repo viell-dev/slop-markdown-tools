@@ -69,7 +69,7 @@ repos:
       - id: mdrefine
         name: mdrefine
         language: node
-        additional_dependencies: ["mdrefine@0.8.1"]
+        additional_dependencies: ["mdrefine@0.8.2"]
         entry: mdrefine lint --max-warnings 0 --no-warn-ignored
         types: [markdown]
 ```
@@ -180,6 +180,9 @@ style enabled. MD013 does not enable reflow: without Prettier wrapping,
 paragraph lines are reported as unchecked, with a suggestion to enable
 `style/wrap` at that width. The mapping follows intended behavior and retains
 mdrefine's safety guards.
+
+Prettier's `extends` field is reported as an unmapped option during fallback and
+conversion, without loading an inheritance file through that key.
 
 Fallback loading reads JSON, JSONC, and YAML, including markdownlint `extends`,
 markdownlint-cli2 `config` (without one, a `.markdownlint.*` file or else
