@@ -11,9 +11,15 @@ export const sentenceFixture = {
   source:
     "First **sentence.** Second sentence with a [link](https://example.com). Next sentence uses `First. Second.` as code.\n\n- First sentence. Second sentence in the list.\n\n> First sentence. Second sentence in the quote.\n\nFirst sentence.  \nSecond sentence keeps its hard break. Third sentence.\n",
 };
+export const tabSuppressionFixture = {
+  name: "tab-indented-suppression-927",
+  source:
+    "An *editable introduction*.\n\n- item\n\n\t<!-- mdrefine-disable-next-line -->\n\t*keep these markers*\n\n*format these markers*\n",
+};
 export const commonFixtures = [
   referenceFixture,
   sentenceFixture,
+  tabSuppressionFixture,
   {
     name: "adjacent-suppression-comments-927",
     source:

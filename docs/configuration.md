@@ -454,6 +454,10 @@ line after its closing `-->`. Directives inside code examples or quoted HTML
 attributes do nothing. HTML code and raw-text content is opaque within each
 parsed HTML node; it does not hide directives in later Markdown blocks.
 
+**In VitePress:** keep a directive in a separate Markdown block, with a blank
+line between it and a Vue component. Comments within an opaque component or
+literal VitePress block do not control rules.
+
 ## Inspect the result
 
 `config explain` prints, as JSON, the configuration in effect for one document:

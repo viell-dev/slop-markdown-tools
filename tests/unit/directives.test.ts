@@ -208,6 +208,66 @@ it("skips plugin HTML values whose source line mapping no longer matches (#927)"
   expect(format(source, { config, plugins: [plugin] }).output).toBe(source.replaceAll("*", "_"));
 });
 
+it.each(["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+  "maps partially consumed indentation tabs in %s directives (#927)",
+  (dialect) => {
+    const cases = [
+      "- item\n\n\t<!-- mdrefine-disable-next-line -->\n\t*keep*\n\n*change*\n",
+      "1. item\n\n\t<!-- mdrefine-disable -->\n\n*keep*\n",
+      "- item\n\n\t<!-- ordinary --> <!-- mdrefine-disable-next-line -->\n\t*keep*\n\n*change*\n",
+      "- item\n\n\t<!-- mdrefine-disable-next-line\n\tstyle/emphasis -->\n\t*keep*\n\n*change*\n",
+    ];
+    for (const source of cases) {
+      const found = directives(parse(source, dialect));
+      expect(found, source).toHaveLength(1);
+      expect(source.slice(found[0]!.start, found[0]!.end)).toMatch(/^<!--[\s\S]*-->$/);
+      const settings = { config: { ...config, dialect } };
+      const result = format(source, settings);
+      expect(result.output).toBe(source.replace("*change*", "_change_"));
+      expect(format(result.output, settings).changed).toBe(false);
+    }
+  },
+);
+
+it.each([
+  ["commonmark", true],
+  ["github", true],
+  ["forgejo", true],
+  ["gitea", true],
+  ["obsidian", true],
+  ["vitepress", false],
+] as const)("preserves the %s reading of a tabbed quote directive (#927)", (dialect, active) => {
+  const source = ">\t<!-- mdrefine-disable -->\n\n*keep*\n";
+  // VitePress already projects this entire quote as opaque Markdown; the
+  // other dialects retain a real parsed comment. Keep both baseline readings.
+  expect(directives(parse(source, dialect))).toHaveLength(active ? 1 : 0);
+  expect(format(source, { config: { ...config, dialect } }).output).toBe(
+    active ? source : source.replace("*keep*", "_keep_"),
+  );
+});
+
+it("rejects plugin HTML with different text on the same source lines (#927)", () => {
+  const plugin: Plugin = {
+    name: "rewritten-comment",
+    syntax: {
+      micromark: {},
+      mdast: {
+        transforms: [
+          (tree) =>
+            walk(tree, "html", (node) => {
+              node.value = node.value.replace("disable", "enable ");
+            }),
+        ],
+      },
+    },
+  };
+  const source = "<!-- mdrefine-disable -->\n\n*change*\n";
+  expect(directives(parse(source, "commonmark", "document.md", [plugin]))).toEqual([]);
+  expect(format(source, { config, plugins: [plugin] }).output).toBe(
+    source.replace("*change*", "_change_"),
+  );
+});
+
 it("applies mdrefine suppression regions and the next-line fast path", () => {
   const source = "<!-- mdrefine-disable -->\n\n*one*\n\n<!-- mdrefine-enable -->\n\n*two*\n";
   expect(format(source, { config }).output).toBe(source.replace("*two*", "_two_"));

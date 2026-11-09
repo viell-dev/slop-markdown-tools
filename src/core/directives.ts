@@ -43,11 +43,15 @@ export function directives(document: Document): (Directive & { start: number; en
     const valueEnds = valueLines.map((at) => lineEnd(value, at));
     const rawLines = identical ? [] : lineStarts(raw);
     const rawEnds = rawLines.map((at) => lineEnd(raw, at));
+    // A container can consume part of a tab; mdast represents its remaining
+    // columns as leading spaces. The non-indentation text must still match.
     if (
       valueLines.length !== rawLines.length ||
       valueLines.some(
         (from, line) =>
-          !raw.slice(rawLines[line], rawEnds[line]).endsWith(value.slice(from, valueEnds[line])),
+          !raw
+            .slice(rawLines[line], rawEnds[line])
+            .endsWith(value.slice(from, valueEnds[line]).replace(/^ +/, "")),
       )
     )
       return [];
