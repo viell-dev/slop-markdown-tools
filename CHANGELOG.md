@@ -29,6 +29,8 @@ describes the release line's workflows.
 - Audit literal brace filenames and ignore braces in external URLs without
   withholding unreachable-document findings
   ([#925](https://github.com/viell-dev/slop-markdown-tools/issues/925)).
+- Treat Prettier `extends` as an unmapped option during fallback and conversion
+  ([#928](https://github.com/viell-dev/slop-markdown-tools/issues/928)).
 - Keep files and supplied buffers named `__proto__` available as local link
   targets ([#926](https://github.com/viell-dev/slop-markdown-tools/issues/926)).
 

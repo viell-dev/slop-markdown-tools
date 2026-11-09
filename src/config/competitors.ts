@@ -383,7 +383,11 @@ export async function loadCompetitorConfig(
       });
     }
   };
-  const read = async (file: string, chain: string[] = []): Promise<Values> => {
+  const read = async (
+    file: string,
+    tool: "markdownlint" | "prettier",
+    chain: string[] = [],
+  ): Promise<Values> => {
     if (chain.includes(file))
       throw new Error(`Cyclic extends: ${[...chain, file].map(shown).join(" -> ")}`);
     sources.push(file);
@@ -440,10 +444,10 @@ export async function loadCompetitorConfig(
           delete result[key];
         }
     const nested =
-      file.includes("-cli2.") && result.config !== undefined
+      tool === "markdownlint" && file.includes("-cli2.") && result.config !== undefined
         ? object(result.config, `the config of ${shown(file)}`)
         : result;
-    if (nested.extends !== undefined) {
+    if (tool === "markdownlint" && nested.extends !== undefined) {
       const names = Array.isArray(nested.extends) ? nested.extends : [nested.extends];
       let base: Values = {};
       for (const name of names) {
@@ -452,7 +456,7 @@ export async function loadCompetitorConfig(
           (await exists(path.resolve(path.dirname(file), name))) || path.isAbsolute(name)
             ? path.resolve(path.dirname(file), name)
             : required(name, file);
-        base = { ...base, ...(await read(resolved, [...chain, file])) };
+        base = { ...base, ...(await read(resolved, tool, [...chain, file])) };
       }
       delete nested.extends;
       const merged = { ...base, ...nested };
@@ -475,7 +479,7 @@ export async function loadCompetitorConfig(
     competitorFiles.markdownlint.filter((name) => name.includes("-cli2.")),
   );
   const prettierFile = await find(competitorFiles.prettier);
-  let markdownlint = markdownFile ? await read(markdownFile) : undefined;
+  let markdownlint = markdownFile ? await read(markdownFile, "markdownlint") : undefined;
   let prettier: Values | undefined;
   let prettierSource: string | undefined;
   // The file that holds the Prettier options, which a package key can name.
@@ -515,12 +519,13 @@ export async function loadCompetitorConfig(
       prettierSource,
       `${shown(ignoreFile!)} excludes all Markdown, so Prettier does not format Markdown here`,
     );
-  else if (prettierSource === prettierFile && prettierFile) prettier = await read(prettierFile);
+  else if (prettierSource === prettierFile && prettierFile)
+    prettier = await read(prettierFile, "prettier");
   else if (prettierSource) {
     sources.push(prettierSource);
     if (typeof prettierKey === "string") {
       prettierData = required(prettierKey, prettierSource);
-      prettier = await read(prettierData);
+      prettier = await read(prettierData, "prettier");
     } else prettier = object(prettierKey, `the prettier key of ${shown(prettierSource)}`);
   }
   if (markdownFile && unread.has(markdownFile)) markdownlint = undefined;
@@ -531,7 +536,7 @@ export async function loadCompetitorConfig(
   }
   const ignore: string[] = [];
   if (cli2File) {
-    const wrapper = await read(cli2File);
+    const wrapper = await read(cli2File, "markdownlint");
     if (
       !unread.has(cli2File) &&
       (!markdownFile ||
@@ -717,7 +722,7 @@ export async function loadCompetitorConfig(
     ...(prettier ? { prettier } : {}),
   });
   if (prettier && Array.isArray(prettier.overrides)) {
-    // Name the file that holds the overrides, which a package key or extends can reach.
+    // Name the file that holds the overrides, which a package key can name.
     const holder = origins.get(prettier.overrides) ?? prettierSource!;
     const file =
       holder === prettierSource
