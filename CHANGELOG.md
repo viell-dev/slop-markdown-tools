@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.8.2 - 2026-11-09
+
+Honor adjacent suppression comments and correct configuration loading and
+navigation auditing. No upgrading steps are needed. [What's new in
+0.8](https://viell-dev.github.io/slop-markdown-tools/release-notes/0.8.html)
+describes the release line's workflows.
 
 ### Fixed
 
@@ -26,6 +31,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#925](https://github.com/viell-dev/slop-markdown-tools/issues/925)).
 - Keep files and supplied buffers named `__proto__` available as local link
   targets ([#926](https://github.com/viell-dev/slop-markdown-tools/issues/926)).
+
+### Maintenance
+
+- Refresh the documentation site's indirect Shiki dependencies to 4.6.0.
 
 ## 0.8.1 - 2026-11-08
 

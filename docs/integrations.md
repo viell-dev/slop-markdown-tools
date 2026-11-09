@@ -69,7 +69,7 @@ repos:
       - id: mdrefine
         name: mdrefine
         language: node
-        additional_dependencies: ["mdrefine@0.8.1"]
+        additional_dependencies: ["mdrefine@0.8.2"]
         entry: mdrefine lint --max-warnings 0 --no-warn-ignored
         types: [markdown]
 ```
