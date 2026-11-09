@@ -1,7 +1,7 @@
 import { githubDefinitionText } from "../syntax/github-definitions.js";
 import { walk } from "../syntax/walk.js";
 import type { Blockquote, Nodes, Root, RootContent } from "mdast";
-import { directive } from "../core/directives.js";
+import { directives } from "../core/directives.js";
 import { compatibilityFinding, compatibilityRun } from "../core/source-checks.js";
 import type { Document, Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
@@ -12,7 +12,7 @@ import { otherReading, range, startsWithMarker } from "../syntax/parse.js";
 import { isComponentBlock, vitepressTokens } from "../syntax/vitepress/projection.js";
 import { endsInOpenFence, takesLines } from "./blocks.js";
 import { codeFence } from "../syntax/fences.js";
-import { countBelow } from "../syntax/source.js";
+import { countBelow, lineStarts } from "../syntax/source.js";
 import { type Range } from "./shared.js";
 import { misreadTable } from "./protections.js";
 import { lineBounds, lineEnd, lineEnding, lineStart } from "../syntax/source.js";
@@ -522,11 +522,13 @@ const blockSpacing: Rule = {
     // document's reading can be part of a block above it (#426, #748).
     const others = otherContinuations(document);
     const directiveLines = new Set<number>();
-    if (source.includes("mdrefine-"))
-      walk(document.tree, "html", (node) => {
-        if (directive(node.value)?.kind === "disable-next-line")
-          directiveLines.add(node.position!.end.line);
-      });
+    const foundDirectives = directives(document);
+    if (foundDirectives.length) {
+      const starts = lineStarts(source);
+      for (const found of foundDirectives)
+        if (found.kind === "disable-next-line")
+          directiveLines.add(countBelow(starts, found.end + 1));
+    }
     // MD022 still reports boundaries that native formatting keeps attached.
     // No edit is safe here: blank lines can loosen lists or move a directive.
     const reportHeading = (node: RootContent, above: boolean) => {

@@ -15,6 +15,11 @@ export const commonFixtures = [
   referenceFixture,
   sentenceFixture,
   {
+    name: "adjacent-suppression-comments-927",
+    source:
+      "An *editable introduction*.\n\n<!-- ordinary --> <!-- mdrefine-disable style/emphasis -->\n\n*keep these markers*\n\n<!-- mdrefine-enable style/emphasis --><!-- ordinary -->\n\n*format these markers*\n\n<div><!-- mdrefine-disable-next-line style/emphasis --></div>\n# *keep heading markers*\n",
+  },
+  {
     name: "prose",
     source:
       "# A useful title\n\nA paragraph with *emphasis*, __strong text__ and a [link](https://example.com).\n",

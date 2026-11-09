@@ -448,7 +448,11 @@ other rules suppressed. It does not enable a rule that the configuration turns
 off. `mdrefine-disable-next-line` applies to the next line only, even when it is
 blank, so place it directly above the line. A suppressed rule reports nothing
 there and changes nothing that touches the region, so a paragraph that crosses
-into it is left as written. A directive inside code is code, not a directive.
+into it is left as written. Each comment takes effect in source order, including
+adjacent comments on one line. A next-line directive applies to the physical
+line after its closing `-->`. Directives inside code examples or quoted HTML
+attributes do nothing. HTML code and raw-text content is opaque within each
+parsed HTML node; it does not hide directives in later Markdown blocks.
 
 ## Inspect the result
 

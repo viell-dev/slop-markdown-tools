@@ -6,7 +6,33 @@ import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import { collectGithubLazyHtmlProtections } from "../../src/syntax/github-protections.js";
 import { lazyHtmlCases } from "./lazy-html-cases.js";
 import { measureScaling, scaling } from "./scaling.js";
+import { directives } from "../../src/core/directives.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
+
+it.each(["", "> <!-- x\n> --> "])(
+  "maps adjacent directive offsets without quadratic line scans under %j (#927)",
+  (prefix) => {
+    const measurement = measureScaling(
+      [500, 2000],
+      (count) => ({
+        document: parse(prefix + "<!--mdrefine-enable-->".repeat(count), "commonmark"),
+        count,
+      }),
+      ({ document }) => directives(document),
+      (found, { document, count }) => {
+        expect(found).toHaveLength(count);
+        for (const item of found) {
+          expect(item.kind).toBe("enable");
+          expect(document.source.slice(item.start, item.end)).toBe("<!--mdrefine-enable-->");
+        }
+      },
+      1,
+    );
+    // Four times the input allows generous runtime noise but rejects the
+    // repeated suffix scans measured during review (about sixteenfold growth).
+    expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(10);
+  },
+);
 
 it("scans a comment's long marker line without quadratic backtracking (#492)", () => {
   expect(
