@@ -21,6 +21,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Group compatibility regressions by provenance, attribution, dispatch and edit
+  boundaries
+  ([#934](https://github.com/viell-dev/slop-markdown-tools/issues/934)).
+- Follow Node.js's active module support in the condition-helper test
+  ([#941](https://github.com/viell-dev/slop-markdown-tools/issues/941)).
 - Route contributors to focused dependency, testing and verification guides
   ([#931](https://github.com/viell-dev/slop-markdown-tools/issues/931)).
 

@@ -654,7 +654,8 @@ describe("plugins named in a configuration", () => {
   );
 
   it("reads conditions from Node.js's options as Node.js does", () => {
-    const defaults = ["node", "import", "module-sync", "node-addons"];
+    const imports = ["node", "import", ...(process.features.require_module ? ["module-sync"] : [])];
+    const defaults = [...imports, "node-addons"];
     expect([...importConditions([], undefined)]).toEqual(defaults);
     expect([...importConditions(["--conditions", "a", "-C", "b", "--conditions=c"], "")]).toEqual([
       ...defaults,
@@ -663,17 +664,8 @@ describe("plugins named in a configuration", () => {
       "c",
     ]);
     // The environment comes first, so the command line has the last word on addons.
-    expect([...importConditions(["--addons"], "--no-addons")]).toEqual([
-      "node",
-      "import",
-      "module-sync",
-      "node-addons",
-    ]);
-    expect([...importConditions(["--no-addons"], "--addons")]).toEqual([
-      "node",
-      "import",
-      "module-sync",
-    ]);
+    expect([...importConditions(["--addons"], "--no-addons")]).toEqual(defaults);
+    expect([...importConditions(["--no-addons"], "--addons")]).toEqual(imports);
     // Quotes group a value with spaces, and a backslash keeps a quote inside one.
     expect([
       ...importConditions([], '  --conditions="two words" -C "say \\"hi\\""  --title=unrelated '),

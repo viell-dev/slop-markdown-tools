@@ -112,6 +112,15 @@ registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
 `engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
 specific contracts. The printed diff has `diff.test.ts`.
 
+Competitor-comment regressions are grouped by what they prove:
+`competitor-comments-provenance.test.ts` owns source provenance and pragma
+gates; `competitor-comments-attribution.test.ts` owns source-check attribution
+and fallback options; `competitor-comments-dispatch.test.ts` keeps the
+shared-rule dispatch, mock isolation and invocation-count evidence together; and
+`competitor-comments-edits.test.ts` owns edits crossing suppression boundaries.
+Their identical conversion setup lives in `tests/support/competitors.ts`;
+different source-tool defaulting stays local to the suite that needs it.
+
 `tests/support/` owns reusable assertions, formatting checks and CLI harness
 helpers. Its `parser/` directory holds reference-parser probes, regression
 assertions and the child-process support for compiled-product coverage. A
