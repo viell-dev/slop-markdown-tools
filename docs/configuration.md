@@ -16,20 +16,21 @@ finds it this way:
 2. Otherwise, it starts in the directory that `--root` names, or else the
    current directory.
 3. It looks in that directory and then in each one above, and stops at the first
-   directory that is a Git repository (holds `.git`) or an Obsidian vault (holds
-   `.obsidian`), the starting one included, or at the filesystem root.
+   directory that is a Git repository (holds `.git`) or an Obsidian vault (a
+   notes folder holding `.obsidian`), the starting one included, or at the
+   filesystem root.
 
 Two configuration files in one directory are an error. Configuration files do
 not cascade: a file in a subdirectory is not merged with one above it. The
 directory of the file that is found is usually the [workspace
 root](cli.md#the-workspace-root).
 
-Outside a Git repository or a vault, the search goes on up to the filesystem
-root, so a configuration in a parent folder, such as your home directory,
-applies. So does a markdownlint or Prettier configuration there, such as
-`~/.prettierrc`, through the [fallback](#fallback-to-markdownlint-and-prettier).
-To stop the search at your documents, create a configuration there or make the
-folder a Git repository.
+Outside a Git repository or an Obsidian vault, the search goes on up to the
+filesystem root, so a configuration in a parent folder, such as your home
+directory, applies. So does a markdownlint or Prettier configuration there, such
+as `~/.prettierrc`, through the
+[fallback](#fallback-to-markdownlint-and-prettier). To stop the search at your
+documents, create a configuration there or make the folder a Git repository.
 
 ### Fallback to markdownlint and Prettier
 

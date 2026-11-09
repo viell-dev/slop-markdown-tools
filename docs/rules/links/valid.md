@@ -1,8 +1,8 @@
 # `links/valid`
 
-Reports a local link, image, wikilink, embed, or reference definition whose
-target does not exist, and a fragment (`#heading`, `#^block`) that its target
-does not have. A target that is missing or ambiguous is reported, never guessed.
+Reports a local Markdown link, image, or reference definition whose target does
+not exist, and a fragment such as `#heading` that its target does not have. A
+target that is missing or ambiguous is reported, never guessed.
 
 **Problem rule**, reported only. Presets: `recommended` (error). Dialects: all.
 Options: `ignoredFragments`, `exactCase`.
@@ -13,6 +13,12 @@ Reported when `docs/guide.md` does not exist, or has no heading named "Setup":
 See the [guide](docs/guide.md#setup).
 ```
 
+**Obsidian:** the rule also checks note links such as `[[Note]]`, embeds such as
+`![[Note]]`, and block fragments such as `Note.md#^id`, which target text marked
+with `^id`. Obsidian's notes folder is called a vault; its [link
+policies](../../obsidian.md#choose-link-policies) describe the additional lookup
+forms.
+
 | Option             | Values                            | Default |
 | ------------------ | --------------------------------- | ------- |
 | `ignoredFragments` | A regular expression, as a string | `""`    |
@@ -21,10 +27,10 @@ See the [guide](docs/guide.md#setup).
 - `ignoredFragments`: a JavaScript regular expression for fragments that are not
   checked, such as `"^figure-"` for anchors that a site generator adds. It is
   tested, without flags, against the fragment after `#` with its percent escapes
-  decoded, such as `^id` for a block reference. A matching fragment is neither
-  reported missing nor reported as not checkable, while its file still has to
-  exist. The default, `""`, ignores none. A pattern that is not a valid regular
-  expression is a configuration error.
+  decoded, such as the fragment `^id` in an Obsidian block reference. A matching
+  fragment is neither reported missing nor reported as not checkable, while its
+  file still has to exist. The default, `""`, ignores none. A pattern that is
+  not a valid regular expression is a configuration error.
 - `exactCase`: with `true`, also report a fragment whose letter case differs
   from the anchor it reaches, for documents that are read in more than one
   renderer; it is reported with the anchor as the target spells it. By default a
@@ -41,16 +47,16 @@ See the [guide](docs/guide.md#setup).
 
 **Messages:**
 
-| Message                                  | Meaning                                                                                                      |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Missing local target: …`                | No file matches.                                                                                             |
-| `Ambiguous local target: …`              | Several files match, such as two notes whose names differ only by case.                                      |
-| `Missing fragment in …`                  | The target exists but has no such heading, block, or anchor.                                                 |
-| `Local target is a directory: …`         | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.           |
-| `Local target is outside the vault: …`   | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                            |
-| `Local target could not be checked: …`   | A directory that may hold it could not be read, the root is only part of a vault, or a link leaves the root. |
-| `Fragment could not be checked: …`       | The target exists but could not be read, or its anchors are not fully known.                                 |
-| `Fragment in … differs in letter case …` | With `exactCase` only: the fragment reaches its anchor because the renderer ignores case.                    |
+| Message                                  | Meaning                                                                                                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Missing local target: …`                | No file matches.                                                                                                                          |
+| `Ambiguous local target: …`              | Several files match, such as two notes whose names differ only by case.                                                                   |
+| `Missing fragment in …`                  | The target exists but has no such heading, block, or anchor.                                                                              |
+| `Local target is a directory: …`         | Obsidian Markdown links only; other dialects accept a link to a directory, which a site can serve.                                        |
+| `Local target is outside the vault: …`   | Obsidian only: the path leaves the note's vault, where Obsidian cannot follow it.                                                         |
+| `Local target could not be checked: …`   | A directory that may hold it could not be read, a link leaves the workspace root, or an Obsidian workspace covers only part of its vault. |
+| `Fragment could not be checked: …`       | The target exists but could not be read, or its anchors are not fully known.                                                              |
+| `Fragment in … differs in letter case …` | With `exactCase` only: the fragment reaches its anchor because the renderer ignores case.                                                 |
 
 ## Edge cases and advanced usage
 

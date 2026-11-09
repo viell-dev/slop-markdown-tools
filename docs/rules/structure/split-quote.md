@@ -37,7 +37,7 @@ renderers show, so the rule only reports. Quotes inside a list item or another
 quote are checked among their siblings. A plain quote after an alert is
 reported: its text may have been meant as part of the alert.
 
-**Not checked:** a quote whose first line opens with an alert's or callout's
-marker, such as `[!NOTE]` or `[!tip]`, after a blank line, because a blank line
-is the only way to write two alerts or callouts one after the other. The marker
-shows the quote's intent in every dialect.
+**Not checked:** a quote whose first line opens with an alert's or an Obsidian
+callout's marker, such as `[!NOTE]` or `[!tip]`, after a blank line, because a
+blank line is the only way to write two alerts or callouts one after the other.
+The marker shows the quote's intent in every dialect.

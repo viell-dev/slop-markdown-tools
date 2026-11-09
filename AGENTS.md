@@ -2,14 +2,17 @@
 
 This file holds what agents maintaining this repository need beyond its other
 documents. The [README](./README.md#status) states how the project is
-maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) holds the setup, checks, test
-layout, documentation workflow, and pull request rules, and
-[RELEASING.md](./RELEASING.md) the release procedure; follow them and do not
-repeat them here. Issues and PRs own investigations, decisions, progress and
-verification receipts; keep live guidance focused on current instructions and
-useful explanations. User and API documentation belongs in `docs/`, and the
-details that users do not need, such as lists of individual protections and
-internal limits, in the [maintainer notes](./internals/README.md).
+maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) is the entry guide for setup,
+ordinary checks, documentation and pull requests. Specialist procedures live in
+the [dependency guide](./internals/dependencies.md), [testing
+procedures](./internals/testing.md) and [verification
+map](./internals/verification.md); [RELEASING.md](./RELEASING.md) owns releases.
+Follow the applicable procedures and do not repeat them here. Issues and PRs own
+investigations, decisions, progress and verification receipts; keep live
+guidance focused on current instructions and useful explanations. User and API
+documentation belongs in `docs/`, and the details that users do not need, such
+as lists of individual protections and internal limits, in the [maintainer
+notes](./internals/README.md).
 
 ## Repository boundary
 
@@ -91,19 +94,21 @@ Known couplings:
 - Native PR classification: `scripts/native-checks.mjs` owns the conservative
   path and dependency-role contract; `native.yml` calls Rendering, Obsidian and
   Forges when applicable and always reports `Native checks`. Keep its tests,
-  each reusable host workflow, the ruleset, release evidence and CONTRIBUTING's
-  check map consistent in meaning. Shared/transitive inputs and unknown changes
-  select all hosts; host-specific inputs can differ. Dependency roles follow
-  actual native use and shared lockfile reachability, never npm's development
-  label alone. Consistent classification does not require identical broad path
-  lists. Check native imports and file reads before exempting a path.
+  each reusable host workflow, the ruleset, release evidence and the
+  [verification map](./internals/verification.md) consistent in meaning.
+  Shared/transitive inputs and unknown changes select all hosts; host-specific
+  inputs can differ. Dependency roles follow actual native use and shared
+  lockfile reachability, never npm's development label alone. Consistent
+  classification does not require identical broad path lists. Check native
+  imports and file reads before exempting a path.
 - Native report contracts: `scripts/renderer-evidence.mjs` derives plans from
   owned fixtures and settings independently of execution records. Deterministic
   consumers pass their expected host and canonical workload; never derive an
   expectation from completed records or accept a report's shrunken plan. Keep
   unchanged formatting attempts explicit. Obsidian's verified baseline belongs
   in `scripts/obsidian/baseline.json` and the Dockerfile; maintain observed host
-  identity and the separate explicit latest route as CONTRIBUTING describes.
+  identity and the separate explicit latest route as the [testing
+  procedures](./internals/testing.md#advancing-the-obsidian-baseline) describe.
   These same-run workflow results are not cross-run report provenance.
 - Versions and requirements: `package.json`, the lockfile, the installation
   commands in the README and the `docs/` pages, the CI matrix in `ci.yml` and
@@ -121,8 +126,9 @@ Known couplings:
   lockfile in `scripts/obsidian/`, which Dependabot updates on their own, with
   WebdriverIO's major version held at the one `wdio-obsidian-service` supports;
   the documents that `scripts/rendering.mjs` generates for the `obsidian`
-  syntax; and its description in CONTRIBUTING.md. Test in Docker, as this check
-  does, not in a profile of an installed application.
+  syntax; and its description in the [testing
+  procedures](./internals/testing.md#obsidian-host). Test in Docker, as this
+  check does, not in a profile of an installed application.
 
 `docs.test.ts` and `metadata.test.ts` compare the mechanically comparable
 couplings offline in CI. `npm run check:live` compares the live ones without
@@ -230,9 +236,12 @@ judgement.
 Follow [CONTRIBUTING.md](./CONTRIBUTING.md#review-and-verification) for author,
 independent and optional bot review, and its [bounded renderer
 work](./CONTRIBUTING.md#bounded-renderer-work) policy for discovery
-dispositions. The existing [verification
-map](./CONTRIBUTING.md#what-the-checks-prove) is authoritative; update it in the
-PR that changes a check.
+dispositions. The existing [verification map](./internals/verification.md) is
+authoritative; update it in the PR that changes a check.
+
+Apply the contributor guide's [audience and applicability
+guidance](./CONTRIBUTING.md#documentation) when writing or reviewing shared
+documentation; keep that requirement authoritative there.
 
 ## Project scope
 
@@ -301,10 +310,10 @@ reversals, and do not revert until authorized.
   merely to clear an alert; real sanitizer findings still need investigation.
 - Review the packed files before changing packaging. Keep dependencies and
   generated state inside the repository; commit the lockfile, not caches.
-- Follow CONTRIBUTING's [dependency update
-  procedure](./CONTRIBUTING.md#dependencies) for grouping, support-based ignores
-  and tool pins. Maintenance groups cross dependency fields and never replace
-  native-role or shipped-code classification.
+- Follow the [dependency update procedure](./internals/dependencies.md) for
+  grouping, support-based ignores and tool pins. Maintenance groups cross
+  dependency fields and never replace native-role or shipped-code
+  classification.
 - Decide which release a change belongs to when it is assigned, by the
   [versioning policy](./docs/versions.md): before 1.0, a change to the interface
   that is not a defect fix waits for the next minor release. Say so in the PR.

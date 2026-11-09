@@ -9,6 +9,21 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Explain optional application syntax where shared CLI, API and rule guidance
+  first uses it
+  ([#936](https://github.com/viell-dev/slop-markdown-tools/issues/936)).
+- Keep packaged contributor links usable through public source-only guides
+  ([#930](https://github.com/viell-dev/slop-markdown-tools/issues/930)).
+
+### Maintenance
+
+- Route contributors to focused dependency, testing and verification guides
+  ([#931](https://github.com/viell-dev/slop-markdown-tools/issues/931)).
+
 ## 0.8.2 - 2026-11-09
 
 Honor adjacent suppression comments and correct configuration loading and

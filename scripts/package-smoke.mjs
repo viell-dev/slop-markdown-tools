@@ -431,6 +431,47 @@ try {
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.equal(metadata.version, manifest.version);
   assert.deepEqual(metadata.bin, { mdrefine: "dist/cli/main.js" });
+  // Check maintained root documents from the actual installation. Source-only
+  // maintenance links must use public repository URLs rather than omitted files.
+  const documentationManifest = path.join(directory, "packed-documentation-files.json");
+  await writeFile(documentationManifest, JSON.stringify(result.files.map((file) => file.path)));
+  runNode(
+    [
+      "--input-type=module",
+      "-e",
+      `import assert from "node:assert/strict";
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
+import { parse } from ${named()};
+const root = process.argv[1];
+const packed = new Set(JSON.parse(await readFile(process.argv[2], "utf8")));
+const documents = ["README.md", "CHANGELOG.md", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "SECURITY.md"];
+let checked = 0;
+for (const file of documents) {
+  assert(packed.has(file), "Missing maintained document: " + file);
+  const source = await readFile(path.join(root, file), "utf8");
+  const pending = [parse(source, "github", file).tree];
+  while (pending.length) {
+    const node = pending.pop();
+    if (node.children) pending.push(...node.children);
+    if (!["link", "image", "definition"].includes(node.type)) continue;
+    const url = node.url;
+    if (url.startsWith("#") || url.startsWith("//") || URL.canParse(url)) continue;
+    const pathname = decodeURIComponent(url.split("#", 1)[0].split("?", 1)[0]);
+    if (!pathname) continue;
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), pathname));
+    assert(packed.has(target), file + ": target omitted from npm package: " + url);
+    assert((await stat(path.join(root, target))).isFile(), file + ": target is not a file: " + url);
+    checked++;
+  }
+}
+assert(checked > 0, "No local packaged documentation links were checked");
+console.log("Checked " + checked + " local Markdown targets in " + documents.length + " packaged root documents.");`,
+      installed,
+      documentationManifest,
+    ],
+    hoisted,
+  );
   assert(
     (await readFile(path.join(installed, metadata.bin.mdrefine), "utf8")).startsWith(
       "#!/usr/bin/env node\n",

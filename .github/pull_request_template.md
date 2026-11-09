@@ -17,7 +17,8 @@ this change, and how relevant open defects were resolved or accepted.
 - Commands and results, and the platforms they ran on; the regression example
   for any rendering defect.
 - The Native workflow's classification and applicable Rendering, Obsidian and
-  Forges runs (CONTRIBUTING.md, "What the checks prove").
+  Forges runs from the [verification
+  map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md).
 - What the evidence cannot show.
 - Review: the author's review of the complete diff after the checks passed, and
   whether an independent review was chosen, with its reason and the commit it

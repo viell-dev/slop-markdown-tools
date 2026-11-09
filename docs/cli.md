@@ -64,10 +64,17 @@ with either.
 
 The workspace is the set of documents that a command checks, and the files that
 their links can reach. Its root is the directory that `--root` names. Without
-it, the root is the directory of the configuration file that the search finds;
-without one, the Git repository or vault where the search stopped; and else the
-current directory. Paths in the output and the JSON report are relative to the
-current directory and to the root, respectively.
+it, the root is the directory of the configuration file that the search finds.
+Without a configuration, it is the first boundary where the upward search
+stopped: a Git repository or an Obsidian notes folder identified by `.obsidian`.
+If neither boundary was found, it is the current directory. Paths in the output
+and the JSON report are relative to the current directory and to the root,
+respectively.
+
+For Obsidian, the notes folder is called a vault. An explicit workspace root can
+cover only part of it; [links and vault
+boundaries](obsidian.md#a-workspace-root-inside-a-vault) explain how that
+affects checks and path rewriting.
 
 Bare `format` on files prints a unified diff and exits `1` if any document would
 change, or `0` if none would. Explicit `format --diff` is an exit-`0` preview
@@ -357,14 +364,12 @@ issues that track them, the conflicts it resolved, and suggested checks.
 | `--write`            | Create `mdrefine.config.jsonc` instead of printing it, and print its path, from the current directory, on stderr, as in `mdrefine: created ../mdrefine.config.jsonc`. An existing mdrefine configuration in that directory is an error, and no file is replaced. |
 
 Without `--root`, the search starts from the current directory, and the file
-goes where `lint` run from there looks for the workspace's configuration: beside
-the mdrefine configuration that the search finds, else at the root of the Git
-repository or vault where the search stopped, else in the current directory. The
-written configuration then takes the place of the fallback that `lint` used from
-that directory, so it applies the same settings to the same documents. With
-`--root` naming a subdirectory, it is a configuration for that subtree, whose
-patterns are rebased into it, and `lint` finds it only from that directory or
-below.
+goes in the [workspace root](#the-workspace-root) that `lint` run from there
+uses. The written configuration then takes the place of the fallback that `lint`
+used from that directory, so it applies the same settings to the same documents.
+With `--root` naming a subdirectory, it is a configuration for that subtree,
+whose patterns are rebased into it, and `lint` finds it only from that directory
+or below.
 
 `config convert` accepts only `--root` and `--write`. The other configuration
 options, such as `--config`, choose what `config explain` reads, and are usage
@@ -411,10 +416,10 @@ Windows PowerShell 5.1 writes for `>`, and a file that contains a NUL byte, as
 UTF-16 text without a mark does. Save such a file as UTF-8 to process it. A link
 to a heading in it is reported as `Fragment could not be checked`.
 
-A vault's `.obsidian/app.json` that cannot be read, or that is not valid JSON,
-gets a warning, and the vault's notes are not wrapped. When the system does not
-let the tool find out whether a directory is a vault, the command stops with
-exit code `2`, because reading notes in another dialect is not safe.
+For Obsidian notes, an `.obsidian/app.json` that cannot be read, or that is not
+valid JSON, gets a warning, and the notes are not wrapped. When the system does
+not let the tool find out whether a directory is an Obsidian vault, the command
+stops with exit code `2`, because reading notes in another dialect is not safe.
 
 `format --write` writes each changed file in place, into the existing file,
 which keeps everything about the file but its content; see

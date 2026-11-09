@@ -45,7 +45,7 @@ and the exceptions of [Forgejo and Gitea](../../dialects.md#forgejo-and-gitea):
 - Emphasis or strong text crossing an HTML region protected in Obsidian, or a
   block HTML/component line in VitePress. Delimiters on opposite sides do not
   form an editable pair in those readings. Independent pairs remain editable.
-- Emphasis that begins on the line of an alert's or a callout's marker and ends
+- Emphasis that begins on an alert or Obsidian callout marker line and ends
   below it.
 - Emphasis whose text holds a run of tildes that could mark strikethrough, one
   or two tildes or in Obsidian two, while the paragraph holds another: GitHub

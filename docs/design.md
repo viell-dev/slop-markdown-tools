@@ -47,12 +47,13 @@ definitions omitted. Existing definitions and untouched content remain part of
 the comparison, as do alternative readings and VitePress's secondary guard. The
 verified result establishes the next ordinary comparison baseline. The public
 `semanticFingerprint` still distinguishes inline and reference source
-structures; ordinary rules and plugins cannot request this exception.
-Callout/alert marker-line links and anchor-sensitive forge heading links stay
-inline. Links inside Obsidian headings also stay inline, preserving their source
-names for links from other notes. In Obsidian, Live Preview requires images to
-stay inline and links to reuse an existing, already-used, top-level, single-line
-definition; the converter adds no definitions.
+structures; ordinary rules and plugins cannot request this exception. Links on
+alert or Obsidian callout marker lines such as `> [!NOTE]`, and anchor-sensitive
+Forgejo/Gitea heading links, stay inline. Links inside Obsidian headings also
+stay inline, preserving their source names for links from other notes. In
+Obsidian, Live Preview requires images to stay inline and links to reuse an
+existing, already-used, top-level, single-line definition; the converter adds no
+definitions.
 
 Obsidian's structural rules also apply a general conservative [boundary
 policy](obsidian.md#visible-boundary-refusals). Held style edits produce a
@@ -276,8 +277,8 @@ Links:
 - When a directory cannot be read, a search by note name cannot be exact. A link
   that finds no readable note is reported as not checkable, and one that finds a
   single note is accepted but never rewritten.
-- With the workspace root inside a vault, links to notes outside the root cannot
-  be checked; see [Obsidian
+- With the workspace root inside an Obsidian vault (its notes folder), links to
+  notes outside the root cannot be checked; see [Obsidian
   vaults](obsidian.md#a-workspace-root-inside-a-vault).
 - Heading anchors are modeled as each renderer generates them, with these
   exceptions: character references inside tags that GitHub shows as text; on

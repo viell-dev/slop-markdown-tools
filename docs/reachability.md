@@ -44,14 +44,16 @@ Such a stop makes the audit incomplete.
 
 ## What counts as navigation
 
-The source graph includes Markdown links, used reference links, supported
-wikilinks and Markdown embeds. Reference links use the first definition for
-their label. A footnote's links count only when the footnote is referenced.
-Markdown code spans and fenced or indented code blocks, comments, unused
-reference/footnote definitions, ordinary images and attachments do not create
-document edges. A link with a bad heading fragment still reaches its known
-document; `links/valid` checks fragments separately. Wikilink display labels do
-not change their targets.
+The source graph includes Markdown links and used reference links. In the
+Obsidian dialect, it also follows note links such as `[[Note]]` and embeds such
+as `![[Note]]` when they resolve to Markdown documents. An embed displays
+another note's contents within the current note. Reference links use the first
+definition for their label. A footnote's links count only when the footnote is
+referenced. Markdown code spans and fenced or indented code blocks, comments,
+unused reference/footnote definitions, ordinary images and attachments do not
+create document edges. A link with a bad heading fragment still reaches its
+known document; `links/valid` checks fragments separately. An Obsidian display
+label, as in `[[Note|label]]`, does not change its target.
 
 Targets resolve in the source document's dialect, including VitePress's modeled
 page paths and Obsidian's note-name lookup. The target document is parsed in its

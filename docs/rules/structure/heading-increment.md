@@ -41,11 +41,11 @@ as a heading in the document, so its outline starts at the first heading.
 ## Edge cases and advanced usage
 
 **Details:** the first heading may have any level, unless `frontMatterTitle`
-counts a title before it. The headings of a block quote, which is also how
-callouts and alerts are written, and of a footnote are checked among themselves:
-a callout can start with a level-3 heading under any heading, and its headings
-do not count for the document's. A front-matter title belongs to the document's
-own outline, not to its quotes and footnotes.
+counts a title before it. The headings of each block quote and footnote are
+checked among themselves: a quote can start with a level-3 heading under any
+outside heading, and its headings do not count for the document's. A
+front-matter title belongs to the document's own outline, not to its quotes and
+footnotes.
 
 ## Related rules
 

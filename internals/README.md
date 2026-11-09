@@ -18,7 +18,17 @@ user page links a note where a reader may want the detail.
 - [Benchmark notes](benchmarks.md): the parser regression and corrections behind
   the benchmark page's limits.
 
-How the checks run and what they prove is in
-[CONTRIBUTING.md](../CONTRIBUTING.md#what-the-checks-prove). Keep a note
-accurate in the pull request that changes what it describes, as for the user
-documentation.
+Keep a note accurate in the pull request that changes what it describes, as for
+the user documentation.
+
+## Contributor procedures
+
+Start with [CONTRIBUTING.md](../CONTRIBUTING.md) for setup, ordinary checks,
+documentation and pull requests. The focused guides own specialist procedures:
+
+- [Dependencies](dependencies.md): additions, maintained-parser reconciliation,
+  updates, support-based ignores and tool pins.
+- [Testing procedures](testing.md): build ownership, suite/fixture layout,
+  native hosts and baseline updates, integration, performance and retention.
+- [Verification map](verification.md): what each check proves, native routing,
+  report contracts and evidence limits.

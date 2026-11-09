@@ -61,10 +61,13 @@ A document is read in the dialect that its configuration names, through
 `dialect`, a preset, or a matching override. When none does, `lint`, `format`,
 and `resolveConfig` assume `defaultDialect`, or `github` without it;
 `defaultDialect` accepts a dialect or an alias and never overrides a dialect
-that the configuration names. The library reads no files, so it cannot recognize
-a vault by itself. The CLI passes `obsidian` for a document with a `.obsidian`
-directory in its own directory or one above it, and gives the workspace that
-vault's `strictLineBreaks` setting; a host for vaults should do the same:
+that the configuration names.
+
+**Obsidian:** its notes folder, called a vault, contains a `.obsidian`
+directory. The library reads no files, so the host detects this membership. The
+CLI passes `obsidian` for a document with a `.obsidian` directory in its own
+directory or one above it, and gives the workspace that vault's
+`strictLineBreaks` setting; a host supporting Obsidian should do the same:
 
 ```ts
 // The host found `.obsidian/` at the root of the directory it read `files` from.
@@ -111,11 +114,11 @@ unverified fragment is not reported as missing.
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `dialect`          | The dialect that link targets are parsed in; `github` when omitted. Give the dialect of the documents that link into them.       |
 | `vitepress`        | The same [renderer options](vitepress.md#renderer-options) as the document's configuration. Included files need text or loaders. |
-| `strictLineBreaks` | `true` when the vault's "Strict line breaks" setting is verified on. Obsidian notes are wrapped only then.                       |
+| `strictLineBreaks` | Obsidian only: `true` when the vault's "Strict line breaks" setting is verified on. Its notes are wrapped only then.             |
 | `directories`      | Existing directories that hold no files; the others are known from `files`. A link to a directory resolves as `directory`.       |
 | `unreadable`       | Directories whose contents the host could not read. A link that may lead into one resolves as `unreadable`.                      |
 | `vaults`           | Directories below the root that are Obsidian vaults. An Obsidian link in one of their notes reaches only the vault's files.      |
-| `rootInVault`      | When the root is a directory inside a vault: its path from the vault's root, such as `Projects/Notes`.                           |
+| `rootInVault`      | Obsidian only: when the workspace root is inside a vault, its path from the vault's root, such as `Projects/Notes`.              |
 | `lookup`           | `(path, folded) => result`: what is at a path that `files` and `directories` do not hold; see below.                             |
 
 `lookup` lets a host leave files out of `files` and still have links to them
@@ -128,10 +131,10 @@ nothing is there. An Obsidian search by note name does not call it. A file
 result may set `ambiguous: true` when another file matches too; the workspace
 then reports an ambiguous target without reading either file's text.
 
-The CLI passes the directories it skipped as `unreadable`, the vaults it found
-as `vaults`, and `rootInVault` when it finds the vault above the root; [Obsidian
-vaults](obsidian.md#vaults-inside-a-larger-workspace) describes the effects. A
-rule asks the workspace where a link leads; [resolve links in a
+The CLI passes the directories it skipped as `unreadable`, any Obsidian vaults
+it found as `vaults`, and `rootInVault` when it finds the vault above the root;
+[Obsidian vaults](obsidian.md#vaults-inside-a-larger-workspace) describes the
+effects. A rule asks the workspace where a link leads; [resolve links in a
 rule](plugins.md#resolve-links-in-a-rule) describes the result. A host can also
 implement the `Workspace` interface itself.
 
@@ -182,9 +185,10 @@ for (const name of discovery.selected)
 It finds the files below `root` and selects documents as the CLI does: it honors
 Git's ignore rules and the configuration's `ignore` and `resolve` settings,
 leaves out nested repositories, symbolic links, and what the system does not let
-it read, and recognizes each document's vault. It reads no configuration file
-and writes nothing: pass the configuration as `config`, plugin objects as
-`plugins`, and write results yourself.
+it read, and records Obsidian vault membership from discovered `.obsidian`
+directories. It reads no configuration file and writes nothing: pass the
+configuration as `config`, plugin objects as `plugins`, and write results
+yourself.
 
 - `inputs` lists files, directories, and patterns to select, absolute or
   relative to `root`, not to the current directory, as the CLI [selects
@@ -398,8 +402,9 @@ When it could use none, `sources` is empty and `config` is `{}`.
 `loadConfig`'s optional `workspaceRoot` sets the returned root and the base for
 converted file patterns, as the CLI's `--root` does. The configuration search
 still starts at `start`. Without it, the root is the configuration file's
-directory, the repository or vault boundary, or the starting directory when none
-is found.
+directory, the Git repository or Obsidian vault boundary from the [configuration
+search](configuration.md#configuration-files), or the starting directory when
+none is found.
 
 `loadConfig` returns a `LoadedConfig`. When the fallback found markdownlint or
 Prettier files, it includes their `conversion` report, and when it used them,
