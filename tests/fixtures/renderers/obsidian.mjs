@@ -8,7 +8,7 @@
 // is synthetic.
 
 import { boundaryFixtures } from "./obsidian-boundaries.mjs";
-import { referenceFixture, sentenceFixture } from "./common.mjs";
+import { referenceFixture, sentenceFixture, tabSuppressionFixture } from "./common.mjs";
 
 /** @type {{ name: string, source: string, wrapMode?: string, referenceLinks?: boolean }[]} */
 export const fixtures = [
@@ -21,6 +21,7 @@ export const fixtures = [
       '# [The guide](https://example.com/setup "Setup")\n\n> [!note] See [the guide](https://example.com/setup "Setup")\n> A body line.\n\nRead [the guide](https://example.com/setup "Setup") and [the existing link][guide].\n\n![The picture|100](https://example.com/picture.png "Picture")\n\n[guide]: https://example.com/setup "Setup"\n',
   },
   sentenceFixture,
+  tabSuppressionFixture,
   ...boundaryFixtures,
   {
     // #682: one space after quote markers; a tag and a callout's marker keep theirs.

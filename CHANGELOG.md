@@ -13,6 +13,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Honor each suppression comment when several share one HTML block, including
+  next-line directives in lists and quotes
+  ([#927](https://github.com/viell-dev/slop-markdown-tools/issues/927)).
 - Keep files and supplied buffers named `__proto__` available as local link
   targets ([#926](https://github.com/viell-dev/slop-markdown-tools/issues/926)).
 
