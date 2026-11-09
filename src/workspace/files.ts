@@ -424,7 +424,8 @@ export async function discover(
     pattern,
     matcher: new Minimatch(pattern, { dot: true }),
   }));
-  const files: Record<string, WorkspaceSource> = {};
+  // Every filename must be an own entry, including __proto__ and supplied buffers.
+  const files = Object.create(null) as Record<string, WorkspaceSource>;
   const directories: string[] = [];
   const unlisted: string[] = [];
   const selected: string[] = [];
