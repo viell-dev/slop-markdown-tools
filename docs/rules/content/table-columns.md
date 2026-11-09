@@ -28,10 +28,13 @@ Not reported:
 
 ## Edge cases and advanced usage
 
-**Details:** a `|` separates cells inside code and wikilinks too, unless it is
-escaped as `\|`.
+**Details:** a `|` separates cells even inside code unless it is escaped as
+`\|`. In the Obsidian dialect this also applies inside note links such as
+`[[Note|label]]`: the label separator must be escaped when it belongs in a table
+cell.
 
 **Not checked:** the rows after a standalone colon-container boundary, such as
-`:::`, which ends the rows checked. Site generators read it as a container
-boundary, although GFM reads it and the following text as more rows. A cell
-written as `| ::: |` is checked normally.
+`:::`, which ends the rows checked. Site generators such as VitePress use colon
+markers to delimit special blocks, also called containers, while GFM reads the
+marker and following text as more rows. A cell written as `| ::: |` is checked
+normally.

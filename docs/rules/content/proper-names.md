@@ -50,11 +50,11 @@ and `GitHub Actions`. A Unicode letter, combining mark, number, or connector
 punctuation next to a name prevents a match: neither `myjavascript` nor
 `javascripts` matches `JavaScript`, and the same boundary applies in non-Latin
 scripts. Punctuation outside a name separates it from the text around it. A
-longer name takes precedence over a shorter one that overlaps it. An explicit
-wikilink alias is prose.
+longer name takes precedence over a shorter one that overlaps it. In Obsidian
+note links, the display label in `[[Note|label]]` is prose.
 
 **Not checked:** inline code, because a command or identifier often needs its
 exact spelling, and code blocks by default for the same reason; the bodies of
 HTML `script`, `style`, `code`, and `pre` elements; link destinations,
 autolinks, bare URLs and email addresses, image sources, front matter, math,
-comments, and wikilink targets.
+comments, and the targets of Obsidian note links such as `[[Note]]`.

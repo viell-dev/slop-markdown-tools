@@ -41,7 +41,8 @@ After:
 - a definition containing a tab, because commonmark.js reads a tab-separated
   definition as text where GitHub and markdown-it read a definition.
 
-**Not checked:** wikilinks and Obsidian embeds, which have no titles.
+**Not checked:** Obsidian note links (`[[Note]]`) and embeds (`![[Note]]`),
+which have no Markdown link titles.
 
 ## Dialect notes
 

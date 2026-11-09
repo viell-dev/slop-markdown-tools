@@ -162,10 +162,11 @@ configuration](cli.md#convert-a-configuration) describes its options.
 
 Without an mdrefine configuration, the same conversion runs in memory. Use
 `--no-competitor-config` to disable this fallback. `config explain <file>` shows
-its sources and converted settings. The search stops at the same repository or
-vault boundary as the ordinary configuration search. When none of the files
-found can be used, the `recommended` preset applies, as without them; the
-[notices](cli.md#fallback-notices) on stderr name each such file.
+its sources and converted settings. The search stops at the same boundaries as
+the [ordinary configuration search](configuration.md#configuration-files). When
+none of the files found can be used, the `recommended` preset applies, as
+without them; the [notices](cli.md#fallback-notices) on stderr name each such
+file.
 
 The result uses no preset. markdownlint's enabled checks map to their
 counterparts, including its default rule set unless `default: false` is set.

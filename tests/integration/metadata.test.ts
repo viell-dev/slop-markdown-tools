@@ -489,6 +489,9 @@ describe("labels", () => {
     for (const file of [
       "AGENTS.md",
       "CONTRIBUTING.md",
+      "internals/dependencies.md",
+      "internals/testing.md",
+      "internals/verification.md",
       "RELEASING.md",
       ".github/pull_request_template.md",
     ])

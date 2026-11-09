@@ -143,11 +143,13 @@ canonical workload sizes and host identity independently of a runner's exit
 status. Obsidian uses the verified app, installer and runtime versions in
 `scripts/obsidian/baseline.json` and its digest-pinned Docker base; reports
 include observed versions and the actual built-image ID/platform and declared
-base label. The [contributor guide](CONTRIBUTING.md#tests) explains baseline
-advancement and the separate explicit latest route. Adversarial generation is
-weekly/manual discovery and never gates release. Each discovery since the last
-release receives an issue and is fixed within scope or recorded as a limit;
-publication does not wait for adversarial discovery to stop producing cases.
+base label. The [testing
+procedures](internals/testing.md#advancing-the-obsidian-baseline) explain
+baseline advancement and the separate explicit latest route. Adversarial
+generation is weekly/manual discovery and never gates release. Each discovery
+since the last release receives an issue and is fixed within scope or recorded
+as a limit; publication does not wait for adversarial discovery to stop
+producing cases.
 
 The Forges workflow additionally validates both pinned host identities and
 nonzero actual repository-file comparisons with `validateForgeEvidence()`. Its

@@ -654,7 +654,8 @@ describe("competitor fallback (#788)", () => {
     expect(quickStart).not.toContain("Without a configuration file, the `recommended` rules apply");
     expect(quickStart).toContain("--no-competitor-config");
     expect(quickStart).toContain("configuration.md#fallback-to-markdownlint-and-prettier");
-    expect(quickStart).toContain("each file ending in `.md` or `.markdown`");
+    expect(quickStart).toContain("eligible `.md` and `.markdown` files below");
+    expect(quickStart).toContain("cli.md#the-workspace-root");
   });
   it("tells those upgrading how to keep the defaults", () => {
     const steps = prose("docs/upgrading.md").split("## 0.6.0")[1]!.split(/ ## /)[0]!;

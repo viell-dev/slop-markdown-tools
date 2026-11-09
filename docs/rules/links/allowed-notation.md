@@ -93,8 +93,9 @@ containing tabs are never reused because reference parsers disagree about
 whether they are definitions or visible text. On Forgejo and Gitea, links in
 heading source that determines a generated anchor stay inline. All links inside
 Obsidian headings stay inline to preserve heading names used by other notes.
-Links on callout or alert marker lines also stay inline. Other eligible links
-can still convert in the same document.
+Links on alert marker lines such as `> [!NOTE]`, or on Obsidian callout title
+lines, also stay inline. Other eligible links can still convert in the same
+document.
 
 In Obsidian, only links that reuse an existing, already-used, top-level,
 single-line definition can convert. New definitions remain visible in Live

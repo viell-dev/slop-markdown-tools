@@ -63,8 +63,9 @@ spans, and link titles and labels that span lines.
 **With `"backslash"`:** a break stays as spaces where a backslash would change
 what the line says: after another backslash, after a literal autolink such as
 `www.example.com`, which would take the backslash into its address, on the title
-line of an alert or callout, in a paragraph that starts like a link reference
-definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)` math.
+line of an alert or Obsidian callout, in a paragraph that starts like a link
+reference definition (`[label]:`), and on Forgejo and Gitea inside `\(...\)`
+math.
 
 ## Dialect notes
 

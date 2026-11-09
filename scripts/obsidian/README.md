@@ -1,9 +1,9 @@
 # Obsidian verification dependencies
 
 This Linux Docker harness runs the real Obsidian app in Live Preview and Reading
-view. Follow [CONTRIBUTING](../../CONTRIBUTING.md#tests) for workloads, the
-verified baseline, explicit latest checks and retained evidence. These
-dependencies are separate from the published mdrefine package.
+view. Follow the [testing procedures](../../internals/testing.md#obsidian-host)
+for workloads, the verified baseline, explicit latest checks and retained
+evidence. These dependencies are separate from the published mdrefine package.
 
 ## Download ownership
 

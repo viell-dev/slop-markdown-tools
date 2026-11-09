@@ -47,9 +47,9 @@ small diff.
 - `reportUnreflowed`: report a paragraph that is too wide but left as written,
   with the reason.
 - `reportUnbreakable`: report a line that stays too wide because of something
-  that cannot be split, also in paragraphs left as written. The line of an
-  alert's or a callout's marker counts as one such piece, even when it contains
-  spaces.
+  that cannot be split, also in paragraphs left as written. A marker line for an
+  alert (such as GitHub's `> [!NOTE]`) or an Obsidian callout counts as one such
+  piece, even when it contains spaces.
 
 The two report options propose no edits and use the rule's severity. To make
 them fail a check, set the rule to `error` or pass `--max-warnings 0`. These

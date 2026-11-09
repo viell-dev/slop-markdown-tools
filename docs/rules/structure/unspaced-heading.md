@@ -30,9 +30,9 @@ start the line, followed by a letter or a digit, also after a `*`, `_`, or
 backtick that opens emphasis or code. A line that ends with a run of `#` gets
 the advice to add spaces inside the hashes too. Only the first line of a
 paragraph is checked, after its container's markers, as in `> #Note` or
-`- #Item`, and, outside CommonMark, the line below an alert's or callout's
-marker, which starts its body. A paragraph's later lines are not checked,
-because wrapped text can start a line with any word.
+`- #Item`, and, outside CommonMark, the line below an alert's or an Obsidian
+callout's marker, which starts its body. A paragraph's later lines are not
+checked, because wrapped text can start a line with any word.
 
 **Not checked:** text that only resembles a heading:
 

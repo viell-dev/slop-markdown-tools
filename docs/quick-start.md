@@ -115,9 +115,9 @@ Each line gives the file, line, and column, the severity, the rule, and what to
 change. Add `--json` for a report that scripts can read, or `--max-warnings 0`
 to fail on warnings too.
 
-Without paths, the commands check every document of the workspace: each file
-ending in `.md` or `.markdown` below the configuration file's directory, or else
-below the Git repository or vault you run them in. See [which files are
+Without paths, the commands check the eligible `.md` and `.markdown` files below
+the [workspace root](cli.md#the-workspace-root), which `--root` selects
+explicitly or the configuration search determines. See [which files are
 processed](cli.md#which-files-are-processed).
 
 ## Preview and write

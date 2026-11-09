@@ -37,6 +37,6 @@ or fragment).
 - Citations such as `(Smith 2020)[1]`, cross-references such as
   `(see above)[note]`, versions such as `(see)[v1.2]`, and numeric references
   such as `(see)[p.12]` and `(1, 2)[0.5]`.
-- Footnotes, wikilinks, task markers, code, math, HTML, text inside authored
-  links and destinations, and parentheses inside a bare URL, such as
-  `https://example.com/(a)[b.md]`.
+- Footnotes, Obsidian note links and embeds (`[[Note]]` and `![[Note]]`), task
+  markers, code, math, HTML, text inside authored links and destinations, and
+  parentheses inside a bare URL, such as `https://example.com/(a)[b.md]`.

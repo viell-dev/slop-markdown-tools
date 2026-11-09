@@ -4,13 +4,31 @@ Issues and pull requests from people and from agents are welcome. The project is
 maintained by AI agents, as the [README](README.md#status) says, and its owner
 follows it through issue and pull request descriptions rather than code, so
 write them for a reader who has not seen the code. Agents maintaining the
-repository also follow [AGENTS.md](AGENTS.md). Everyone follows the [code of
-conduct](CODE_OF_CONDUCT.md).
+repository also follow
+[AGENTS.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/AGENTS.md).
+Everyone follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 If an agent wrote your issue or pull request, open it with a short note, such as
 a `> [!NOTE]` callout, that says so, names the model and the tool that ran it,
 and says whether you reviewed it. The maintaining agents mark their own posts
 the same way.
+
+## Choose a task
+
+After [setup](#set-up), follow the ordinary [checks](#checks) and [pull
+request](#pull-requests) path. These routes point to the additional procedure
+each change needs:
+
+| Change                             | Procedure                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User documentation                 | [Documentation](#documentation), including page and rule-writing guidance                                                                                                                                                                                                                                                                                                             |
+| Rule or engine behavior            | [Test ownership](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#tests) and [verification map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md)                                                                                                                                                                  |
+| Parser or dependencies             | [Dependency and parser maintenance](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/dependencies.md), then the [verification map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md)                                                                                                                                          |
+| Native renderer or harness         | [Host procedures](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#reference-and-github-rendering), [Obsidian baseline](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#advancing-the-obsidian-baseline), and [verification map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md) |
+| Release or current-site correction | [Release procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md)                                                                                                                                                                                                                                                                                          |
+
+The specialist guides live in the source repository; the links also work from
+the installed npm package. The headings below retain routes for older links.
 
 ## Report a defect
 
@@ -64,56 +82,9 @@ the library through `import` and `require()`, a shipped example, and TypeScript
 consumers of the published types. npm fetches the pinned pnpm into the
 repository's cache, and both installations can need access to the npm registry.
 
-Standalone `check`, `test` and its suite variants, `test:package`, `format:docs`
-and `format:docs:check` prepare a fresh product build. Raw steps such as
-`format:docs:write` consume prepared output through those wrappers.
-`scripts/build.mjs` generates the parser and compiles TypeScript in one unique
-staging directory, checks the expected files, then publishes individual files
-and prunes obsolete ordinary output. The live directory is not replaced
-atomically. Links in output are rejected; live writers' temporary files are
-preserved. Same-input deterministic builders may overlap, but consumers must
-wait for every builder. Do not edit source, configuration or installed
-dependencies during a build or its consumers. An interrupted publication
-requires a fresh standalone command.
-
-Temporary-file ownership uses a live process ID. An orphan whose ID has been
-reused can be preserved; receipt-verified consumers, including release package
-checks, reject that extra file. Raw `npm run build` and `npm pack`/prepack do
-not promise that consumer verification. After ruling out a live writer, remove
-only that exact ordinary temporary file. Process IDs are not a general lock or a
-transactional publication scheme.
-
-An interrupted process can leave its own ignored `.mdrefine-build-*` staging
-directory. After confirming that its owning build process has exited, resolve
-the exact directory path and check that it is an ordinary directory directly
-inside this checkout before removing that directory only. Never use wildcard
-cleanup, follow a link, or remove another live build's staging. Staging is
-excluded from ESLint as well as Git so abandoned output does not break checks.
-
-`scripts/with-build.mjs` owns one build and a temporary receipt for a bounded
-sequence of internal npm scripts. Linux 24's `check:ci` runs `check:static`,
-`test:nonunit` and `test:package:installed` together; the required, separate
-`Unit coverage` job supplies its unit results. `test:ci` runs the full tests and
-installed package check together. Each CI environment still builds and tests its
-own tarball. `release:prepare` similarly builds once for its checks and retained
-tarball. The receipt binds the canonical checkout, exact Node.js version,
-source/configuration and lockfile bytes, parser graph/package/license inputs,
-compiler files, and exact output names and hashes to the staged bytes. The
-already-built steps `check:static`, `test:package:installed` and
-`release:pack:built` reject a missing or changed context. The receipt expires
-with its owning process and is removed on normal success or failure; it is never
-shipped or reused by another job. Edits or dependency installation invalidate
-the owning invocation: restart it rather than saving or copying its receipt.
-This is verification of an unchanged build, not transactional support for
-editing inputs while tools run or a persistent dependency cache.
-
-All standalone Vitest projects use the same full product preparation, including
-unit, performance and coverage selections. This adds a TypeScript compile to
-their former parser-only startup and can report a product type error before
-those suites run. The single preparation contract keeps direct Vitest and
-project-filtered invocations predictable; orchestration still shares one build
-where the product is consumed again. Coverage remains on a separate runner;
-performance and integration are uninstrumented.
+For build ownership, staging recovery and invocation receipts, follow the
+[testing
+procedures](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#build-and-invocation-ownership).
 
 ESLint uses the project's TypeScript types when checking source and tests. It
 also checks the JavaScript scripts and examples with their existing environment
@@ -140,920 +111,44 @@ audit on Linux with Node.js 24, with unit coverage on a separate Linux 24
 runner; the build and tests on Linux with Node.js 22.12.0, the lowest version
 the package supports, on Windows with Node.js 24, and on Linux with Node.js 26,
 and `test:package` on all four. `main` requires the first three, `Unit coverage`
-and the PR-only `Native checks` decision described below. The Node.js 26 job is
-not required, so that a defect only the newest Node.js shows does not block
-unrelated merges; its failures get an issue. Windows covers file paths, access
-control lists, junctions, and the installed command; macOS is not a routine
-target.
+and the PR-only `Native checks` decision in the [verification
+map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md).
+The Node.js 26 job is not required, so that a defect only the newest Node.js
+shows does not block unrelated merges; its failures get an issue. Windows covers
+file paths, access control lists, junctions, and the installed command; macOS is
+not a routine target.
 
 ## Dependencies
 
-Before adding a dependency, establish the supported user need, compare existing
-project code and smaller alternatives, and assess the installed dependency tree,
-startup cost, platform support, licenses and continuing security maintenance.
-Use a runtime dependency when built-in functionality or public declarations need
-it; build-only inputs belong in development dependencies. Code bundled from a
-development input still counts as shipped code.
-
-A setting being opt-in does not alone justify an optional dependency.
-[`optionalDependencies`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#optionaldependencies)
-are installed by default; they permit missing or failed installations. Use them
-only when the feature has a supported, tested absence path and actionable
-diagnostics, including when consumers omit all optional packages. Consider a
-separate plugin or integration for a substantial capability most users do not
-need, weighing its installation and compatibility costs too. Record that
-decision with the feature rather than introducing a second installation model
-without a demonstrated benefit.
-
-Direct dependencies are pinned to exact versions, and the repository lockfile is
-committed. Direct updates therefore get an explicit review and release; release
-preparation also refreshes and tests eligible indirect dependencies, as
-described in the [release
-procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
-A parser update can affect output or performance, so those checks cover the
-complete resolved dependency graph.
-
-The internal parser adapter is generated by `scripts/build-parser.mjs` during
-fresh product preparation. Vitest verifies an orchestration-owned build or
-prepares its own, and maps only the parser's generated sibling import to that
-runtime. The tracked internal declaration shim describes the bundled factories
-using `micromark-util-types` and retains `fromMarkdown`'s upstream signature.
-Consumers receive the built runtime, manifest, declaration and complete
-third-party licenses; installation does not patch dependencies or invoke the
-builder. For development, install the parser dependencies inside the checkout; a
-linked or external package store outside that root is rejected. The build tool
-itself may be shared. Checkout directory names are independent of parser package
-identity.
-
-Installed dependencies serve runtime imports or published types, independently
-of whether the parser also bundles them. The five bundled-only factories from
-`micromark-extension-gfm`, its autolink-literal, footnote and strikethrough
-extensions, and `micromark-extension-cjk-friendly` are development inputs.
-`mdast-util-from-markdown`, `@types/mdast` and `micromark-util-types` remain
-production dependencies for public document and syntax-plugin declarations.
-Other parser utilities and mdast conversions still execute outside the bundle.
-In particular, GFM bundles its table/task-list tokenizers, while VitePress
-imports `micromark-extension-gfm-table` and
-`micromark-extension-gfm-task-list-item` directly; both remain installed. A
-future adaptation of either algorithm must cover both paths or deliberately
-share the reviewed implementation. Development parser inputs remain
-native-sensitive; their installation label does not change their semantic role.
-
-Code bundled from development inputs also counts as shipped code for security
-fixes and patch-release policy. Release preparation freshly audits the full root
-tree with `npm audit --include=dev --audit-level=high`, retaining CI's broad
-high-severity gate for bundled, installed and build/test dependencies. This may
-block preparation for a tooling advisory; it avoids maintaining a separate
-advisory filter. Fixes confined to unshipped build/test code still follow the
-[dependency-only release
-policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
-The independently managed Obsidian harness is a separate dependency tree.
-
-`scripts/parser-patches.mjs` pins corrected source modules by package, version
-and SHA-256, with exact source anchors. Its existing per-kind guards also own
-each correction's rationale, links to the permanent dependency index
-[#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) and
-dedicated issues, mdrefine maintainer ownership, and removal/revisit evidence.
-The generated manifest derives that tracking from the guards; it is not a second
-issue inventory. Upstream source merges, published fixes and verified local
-adoption are distinct states. Keep live upstream status in the dependency index,
-with stable origin facts and evidence-based removal predicates in source. The
-existing hold on further unsolicited micromark reports remains in effect.
-
-The maintained attention, strike, footnote, container, autolink and compaction
-algorithms live in `scripts/parser-adaptations/*.ts`, with explicit type-only
-declarations for bindings provided by their guarded upstream scopes. The small
-`scripts/parser-adaptations.mjs` loader compiles modern JavaScript and removes
-only parsed function/class declaration export modifiers and TypeScript's empty
-`export {};` module markers. Synchronous generator declarations are supported;
-literal contents are preserved. A final syntax check rejects remaining runtime
-imports, exports, compiler helpers and `import.meta`. Fragment typechecking uses
-only standard JavaScript libraries and no ambient Node.js types; host bindings
-must be declared explicitly. This is a scope contract, not a general JavaScript
-sandbox. Small anchored dispatch and registration changes remain in
-`parser-patches.mjs` and `parser-labels.mjs`. This is an internal adaptation,
-with no separately published parser package. The fragments, their shared types
-and compiler configuration enter generated provenance and recursive build
-receipt invalidation. Keep them out of the published source module graph:
-insertion preserves upstream bindings and the existing bundle closure. The
-parser runtime has no source map; compiled-product coverage binds its actual
-generated bytes to those maintained inputs, while instrumented probes derive
-from the same production repair functions.
-
-The fast attention, strike, footnote and list-preparation implementations are
-maintained copies, not reconstructions from the installed originals on each
-build. Every fragment names its reviewed upstream package, version, file and
-function or section, and distinguishes its local additions. When upgrading a
-corrected dependency:
-
-1. Diff the old and new upstream originals at those named locations before
-   changing the expected version, hash or anchors.
-2. Review each upstream change and port every relevant change into the
-   maintained copies, preserving the intended local corrections. These copies no
-   longer inherit upstream edits automatically; mdrefine maintainers own this
-   reconciliation even when the guarded fallback still builds.
-3. Compare the fast and original fallback paths, including complete positioned
-   trees, token/event observations, extension compatibility and work bounds,
-   before accepting the new source identities. Account for deliberate local
-   differences and verify the generated/runtime and package evidence below.
-
-The builder also checks the neutral import/default bundle graph, portable
-emitted module-start labels, all three EditMap redirects and the complete
-license graph in `scripts/parser-packages.json`. A dependency refresh that
-changes these gates requires source review, differential AST/event checks, the
-regression suite and package/browser/renderer checks before updating the
-expected identities. For an adaptation-source move, first capture bounded
-corrected-source and generated-artifact evidence, compare operations and
-literals independently of formatting, and preserve the original resolver
-branches and audited function identities. Update manifest/receipt inputs, source
-probes and compiled-product coverage together. A fragment compiler upgrade also
-requires reviewing its emission and helper/import rejection. A compatible
-upstream release permits removal only after each affected guard's evidence
-conditions pass; do not remove the separate local batching or cache protections
-merely because one upstream patch merged. Re-run the focused parser suites, full
-checks, actual npm and strict-pnpm installed consumers, and applicable native
-hosts. Source changes continue to select all native hosts. Generated output
-stays under `dist/syntax/`; keep its manifest and complete license file in the
-package.
-
-For module comments, a second generation with debug information disabled must
-have identical input provenance. Removing only independently identified
-module-header lines from the normal output must reproduce that second output
-byte for byte. This catches headers absent from the structured graph without
-classifying paths in ordinary comments or strings. Only the normal generation is
-published.
-
-Any external `plugin.syntax` adds a per-parser compatibility marker. It selects
-the original attention, strikethrough and CJK resolvers and container routines
-while retaining the EditMap, text/code compaction, footnote-position and
-autolink repairs. The marker is created in the shared tree factory so primary,
-projected, alternate and lazy front-matter readings use the same policy. Those
-original resolver and deep-list costs can remain with syntax plugins. Rule-only
-plugins keep the builtin optimized paths. Preserve both paths when changing the
-adapter.
-
-The separate builtin-container marker permits tokenizer-local whitespace-suffix
-proofs and indexed list preparation. A proof covers only the scanned physical
-line and inclusive chunk cursor interval; a rewind outside it rescans. Container
-ends must form a matched stack before preparation mutates tokens. Lists keep
-upstream postorder, item ranges and spread bookkeeping, with descendant skips
-and one final synthetic-event merge. External syntax gets the original marker,
-which takes precedence even if a plugin supplies builtin opt-in. The internal
-MD041 HTML-flow grammar opts in too, retaining its separate directive budget.
-Recheck these assumptions when changing any trusted container grammar.
-
-Nested-label proofs and footnote-prefix caches are a separate builtin opt-in.
-Any external syntax retains the original nonempty reference lookup and
-potential-footnote tokenizer; empty dictionaries may shortcut on either path.
-The shared factory also selects that policy for lazy plain/GitHub readings. Both
-GFM and VitePress obtain their footnote factory from the generated adapter.
-`parser.defined` and an initialized `parser.gfmFootnotes` are upstream arrays of
-normalized identifier strings. Keep them as arrays when extending definitions;
-objects that only provide `includes` or other array-like methods are
-unsupported. Before adding a builtin text construct, resolver, disable entry or
-definition writer, re-prove the documented label invariants or leave that
-grammar off the trusted-label marker. Destination cache guards alone do not
-establish them.
-
-The shared factory also opts builtin grammars into batching a single pair of
-homogeneous emphasis runs. The adapter verifies the actual source, event
-boundaries and registered resolver identities before batching. Unknown resolver
-identities or a missing final text resolver retain the existing matcher. On the
-builtin path, empty and nonclosing runs avoid its scratch arrays. Mixed and
-multiple raw pairs can still copy their interiors repeatedly. External syntax
-retains the original resolver and its cost, including its nonclosing-run path.
-Recheck these predicates when changing a builtin resolver or construct.
-
-The VitePress reading uses markdown-it 14.3.3 with the same plugin generation as
-the pinned VitePress 2 reference, including its parser security fixes. Its
-development-only MathJax reference uses speech-rule-engine 4.1.5, which accepts
-patched xmldom through `^0.9.12` without an override. Check the resolved
-version, actual math renderer and full audit when changing this chain. Adoption
-evidence: [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481).
-
-Unbundled indirect dependencies can declare version ranges. The repository's
-development lockfile is not shipped or imposed on consumers, so a fresh
-installation of the same mdrefine version can resolve newer indirect
-dependencies than its release checks used. Consumers that need a repeatable
-dependency graph should keep their own lockfile and use its frozen-install
-command, such as `npm ci` or `pnpm install --frozen-lockfile`.
-
-`@types/node` stays on the major version of the lowest supported Node.js
-version, 22, so that the type check rejects interfaces that Node.js 22 does not
-have; the CI job on 22.12.0 catches those that later 22.x releases added.
+The [dependency
+guide](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/dependencies.md)
+owns additions, parser reconciliation, security handling, update groups, ignored
+version lines and tool pins.
 
 ### Update groups
 
-Dependabot proposes updates weekly, using the groups in
-[`.github/dependabot.yml`](.github/dependabot.yml). Parser syntax, mdast tree
-extensions and public types form one group across production and development
-declarations. Their compatible generations need not share a major number:
-from-markdown 2 uses micromark 4, mdast types 4 and unist types 3. The VitePress
-group keeps its markdown-it generation and plugins together. Other offline
-references, including `mdast-util-to-hast`, form a separate group. Ordinary
-development tools are the fallback, with explicit exclusions; Rolldown and
-TypeScript remain individually proposed because their emission changes need
-focused review. Specific groups precede the fallback; Dependabot selects the
-first matching group.
-
-Routine groups select minor and patch updates; majors remain separate proposals
-until a maintainer deliberately coordinates a compatible migration. Check
-prerelease changes, including VitePress alpha updates, explicitly rather than
-assuming their grouping or compatibility. A minor update can also change peers:
-the ignored mdit plugin lines are examples. Group membership, an unchanged major
-and npm's development label establish neither peer compatibility nor semantic
-safety. The [native classification](#what-the-checks-prove) still follows actual
-imports and complete resolved-graph reachability; shared inputs and semantic
-build tools remain native-sensitive.
-
-Close a proposal the pinned dependencies cannot accept and add a bounded
-version-line ignore with its reason and revisit condition, leaving compatible
-older lines eligible. Update `tests/integration/dependency-policy.test.ts` with
-the policy change so unrelated compatible updates can proceed.
-
-Version proposals wait at least seven days after publication, leaving time for a
-broken or compromised release to be found. Security updates are not delayed by
-Dependabot's cooldown. Apply the [release procedure](RELEASING.md) when adopting
-a security fix early; its documented exception waives neither verification nor
-review and covers shipped bundled code as well as installed dependencies. A
-merged update ships with the next release under that procedure.
+See [update
+groups](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/dependencies.md#update-groups).
 
 ### Revisiting ignores and tool pins
 
-During assigned dependency maintenance and release preparation, inspect the
-existing ignores and tool pins, including the literal pnpm pin outside the
-manifests. Check the proposed version's publication time, known maintainers,
-release changes, engines and peers in its published manifest; for example,
-`npm view NAME@VERSION peerDependencies engines --json` and
-`npm view NAME time maintainers --json`. Follow upstream support documentation
-as well as installable peer ranges. Keep an ignore while the required support or
-verification is missing. Do not force peers, disable unsupported-version
-warnings or advance an assertion merely to make installation/building succeed.
-
-- **TypeScript:** when updating `typescript-eslint`, recheck its [official
-  support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. As of parser 8.72.1, that range is
-  `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
-  [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
-  includes the target; remove it only after an unforced install, typed lint,
-  typechecking and full/package checks pass. A compiler upgrade also requires
-  the parser-fragment emission review described above and applicable native
-  checks.
-- **Node types:** retain the `@types/node` major ignore while the lowest
-  supported Node.js major remains 22. A deliberate support change updates
-  engines, types, minimum-version CI and public requirements together; the
-  development or newest advisory CI version alone does not justify advancing
-  these types. Keep actual execution on the exact supported minimum.
-- **VitePress and markdown-it:** inspect peers for the ignored markdown-it 15
-  and attrs, container, emoji, footnote and tasklist plugin lines. The pinned
-  plugins accept markdown-it 14; the deferred generation requires 15. The
-  separate MathJax plugin deferral exists because VitePress alpha.21 peers
-  `markdown-it-mathjax3: ^4`; v5 changes the backend and adds native deasync,
-  rather than itself declaring a markdown-it 15 peer. Keep the bounded ranges in
-  the configuration until compatible peers return or a coordinated reference
-  migration passes actual VitePress builds/rendering, math, full and installed
-  package checks. Reassess for a security advisory even while a range is
-  ignored. Existing decisions:
-  [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591) through
-  [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594), and
-  [#612](https://github.com/viell-dev/slop-markdown-tools/pull/612). The
-  compatible speech-rule-engine 4.x update accepts patched xmldom without an
-  override; [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)
-  records the source, renderer, audit and installed-package checks for its
-  adoption.
-- **WebdriverIO:** `wdio-obsidian-service` 3.4.0 declares a webdriverio
-  `^9.18.1` peer. Retain WDIO major ignores until a service release supports the
-  target. Review its coherent WDIO packages and launcher together, then test the
-  actual Docker host, both views, controls and report identity. The service's
-  `obsidian` API dependency is not the downloaded app or installer identity.
-  Follow the [baseline and latest-route procedure](#tests) independently; no
-  forced major is an established remedy for the separate harness defects in
-  [#639](https://github.com/viell-dev/slop-markdown-tools/issues/639) and
-  [#640](https://github.com/viell-dev/slop-markdown-tools/issues/640). The
-  harness's [download ownership and provided-binary
-  boundary](scripts/obsidian/README.md) explains its local dependency
-  replacement, executable checks and removal conditions, including the separate
-  serialization override. General automatic browser downloads are disabled in
-  this harness.
-- **pnpm:** `scripts/package-smoke.mjs` pins the tool fetched through npm into
-  the repository cache. Dependabot does not update that literal. After the
-  age/support review, inspect the target's installation route, platform and
-  option changes, then advance the literal in a tested PR. Run the actual npm
-  and strict-pnpm package consumers on the existing CI matrix, including the
-  supported minimum Node.js and Windows. Preserve disabled hoisting and checks
-  of commands, library use and published types; a registry engine range alone is
-  not adoption evidence.
-- **Rolldown:** advance the manifest pin and exact version assertion in
-  `scripts/build-parser.mjs` together only after reviewing its emission, runtime
-  helpers, portable module-start labels and debug-disabled emission comparison,
-  neutral import/default graph, corrected sources and package/license
-  identities. Apply the source and maintained-copy reconciliation above rather
-  than resetting hashes until a build passes. Run the parser parity/work,
-  browser, full, installed-package and applicable native checks before accepting
-  new expectations.
-- **Host images:** retain the existing [Forge digest
-  procedure](#what-the-checks-prove) and Obsidian baseline procedure below. Node
-  Docker major updates remain deliberate LTS changes coordinated with the
-  development major. Patch/digest proposals stay enabled; complete a verified
-  baseline change rather than freezing the image or bypassing its agreement
-  checks.
+See [ignores and tool
+pins](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/dependencies.md#revisiting-ignores-and-tool-pins).
 
 ## Tests
 
-| Command                    | Runs                                  |
-| -------------------------- | ------------------------------------- |
-| `npm test`                 | The build, then all three suites      |
-| `npm run test:unit`        | A fresh build, then the unit suite    |
-| `npm run test:performance` | Complexity and retention checks       |
-| `npm run test:coverage`    | Unit tests with coverage reports      |
-| `npm run test:integration` | The build, then the integration suite |
-
-The unit, performance, and integration suites run in that order. Performance
-files run one at a time, apart from coverage and the processes that integration
-tests start. Unit and integration runs each use at most four workers, or the
-machine's available parallelism when it has fewer.
-
-`test:coverage` uses V8 coverage and writes an HTML report and
-`coverage-summary.json` to `coverage/unit/`. It includes every production
-TypeScript file, including files unit tests never execute. CI publishes the
-`unit-coverage` artifact for 14 days, without a coverage threshold. These are
-unit-coverage figures: performance cases, integration subprocesses, and
-installed package checks are not included, and the command does not replace
-those checks. This required job is the Linux 24 unit run; `check:ci` selects
-only performance and integration with `test:nonunit`. Other matrix environments
-run all three projects without coverage. Local `check` and `npm test` still run
-all three projects.
-
-`tests/unit/` imports from `src/`; renderer checks also read their fixture and
-probe sources. It does not run the CLI. A defect in how a rule reads or rewrites
-Markdown belongs here, as the smallest synthetic document that shows it, usually
-checked together with the contracts of every formatting change: formatting the
-output again changes nothing, the parsed meaning is unchanged, and disabling the
-rule leaves the source as written. Inline and heading rules have
-`inline-rules.test.ts` and `heading-rules.test.ts`; block spacing has
-`block-spacing.test.ts`, list rules have `lists.test.ts`, and quote markers and
-lazy continuation lines have `containers.test.ts`. Code fences, thematic breaks
-and blank space are in `blocks.test.ts`, problem rules in `references.test.ts`,
-`structure.test.ts` and `content.test.ts`, the shared reading of HTML elements
-and its rules in `html-elements.test.ts`, wrapping in `wrap.test.ts` and
-`callout-wrap.test.ts`, link rules in `link-rules.test.ts`, and workspace
-resolution in `links.test.ts`. That resolution suite keeps its shared
-heading-attribute mock and cache assertions together. Dollar math is in
-`math.test.ts` against the renderers' output recorded in
-`tests/support/math-renderers.ts`. Engine execution, configuration and plugin
-registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
-`engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
-specific contracts. The printed diff has `diff.test.ts`.
-
-`tests/support/` owns reusable assertions, formatting checks and CLI harness
-helpers. Its `parser/` directory holds reference-parser probes, regression
-assertions and the child-process support for compiled-product coverage. A
-support file is not a discovered test suite. These locations are navigation, not
-a mandatory taxonomy: group tests by what they prove, retaining shared mocks,
-lifecycle and deliberate cache assertions when file isolation matters. Keep the
-three Vitest projects' selection, ordering and worker limits when moving suites,
-and compare discovery before and after a move.
-
-Authored native fixtures have one owner in `tests/fixtures/renderers/`:
-`common.mjs` shares controls between GitHub and the forges, `forges.mjs` adds
-file/API cases, and `obsidian.mjs` includes `obsidian-boundaries.mjs` and its
-`obsidian/` text fixtures. Unit boundary regressions and native runners consume
-that same corpus; `scripts/renderer-evidence.mjs` independently builds expected
-plans from it. Preserve names, order and source bytes during moves, and update
-every runner, plan and native routing check instead of copying a corpus.
-
-The safety check compares the parser's readings, so `renderers.test.ts` also
-compares the HTML of two other implementations, commonmark.js and markdown-it,
-before and after formatting. Its inputs are documents that
-`scripts/rendering.mjs` generates from fixed seeds and the CommonMark
-specification's examples in `tests/fixtures/commonmark/`. Each known difference
-is listed with its issue and must still differ, so that a fix shows up as an
-entry to remove; a new one fails the test. The Rendering workflow compares
-GitHub's rendering in the same way, through its Markdown API, every week, for
-pull requests with an [applicable native input](#what-the-checks-prove), and in
-the Release workflow. Run it by hand with
-`gh workflow run rendering.yml --ref BRANCH`. PR and release runs use authored
-fixtures and the realistic profile at fixed seeds 1–5, 25 documents each. By
-hand, select `-f profile=adversarial -f seed=N` to reproduce discovery, or omit
-the seed for a new one. Locally, after a build, use
-`node scripts/github-rendering.mjs` for the fixed gate, or add
-`--profile adversarial --seed N` for discovery. It needs an authenticated `gh`;
-the report records the profile, actual seeds and reproduction command. The
-GitHub comparison verifies rendered code text against the parsed source before
-accepting highlighting-wrapper and final-line variations. Code values, language,
-metadata, and actual content differences remain significant; raw HTML `pre`
-elements are compared strictly. Only generated footnote identifiers established
-by the response's footnote section and generated math response attributes are
-normalized; visible hexadecimal text, ordinary URLs and anchors, and
-source-authored reserved HTML remain significant.
-
-HTML renderers cannot stand in for Obsidian, whose Live Preview editor and
-Reading view read some Markdown otherwise. `npm run check:obsidian` builds the
-repository, runs Obsidian in Docker, formats the documents of
-`tests/fixtures/renderers/obsidian.mjs` and generated documents in the Obsidian
-dialect, and compares what both views show before and after. Docker must be
-running. The image, from `scripts/obsidian/Dockerfile`, holds a virtual display
-and WebdriverIO with `wdio-obsidian-service`, which downloads Obsidian at run
-time into the `mdrefine-obsidian-cache` volume, because Obsidian's terms do not
-allow redistributing it; the check keeps its own dependencies in
-`scripts/obsidian/package.json`. It writes `artifacts/obsidian/report.json`,
-with screenshots of the first differences. `PROFILE=realistic` is the default:
-the fixtures and seeds 1–5, ten documents per seed. `PROFILE=adversarial`
-selects discovery: one fresh seed and 100 documents. `SEEDS` selects a list,
-`SEED` adds a seed (`none` adds none), `COUNT` sets documents per seed, and
-`OBSIDIAN_VERSION` and `OBSIDIAN_INSTALLER_VERSION` override the app and
-installer independently. They default to the verified versions in
-`scripts/obsidian/baseline.json`; read its `app` and `installer` fields for the
-selected versions. Realistic generation uses separated blocks, proper container
-prefixes, closed fences and documented dialect syntax. Existing adversarial seed
-behavior is retained. `REDUCE`, a comma-separated list of generated documents
-from a report, shortens each to the lines that still show its difference, and
-`PROBE`, a JSON array of documents, only shows each in Obsidian. Live Preview is
-compared by its lines' text and styles, with the characters that it shows as
-written left out where only the source differs, and Reading view by its HTML.
-List-number normalization applies to styled ordered markers and source-only list
-prefixes before lines join; ordinary numbers and numeric hash-prefixed text
-retain their digits. The check requires the editor to finish parsing the whole
-note and publish that syntax tree before collecting styles; incomplete parsing
-fails the run. Empty table source rows with no text or embed are ignored. Table
-widgets ignore their known focus and active-handle classes and a generated cell
-editor only when the cell also retains its rendered preview. Rendered content,
-styles, code spacing, alignment, link destinations, and row counts remain
-significant. A host control activates header, code, and link cells with real
-input and checks those negative cases; nested authored tables and editor-only
-payload remain intact. Boundary regressions in
-`tests/fixtures/renderers/obsidian-boundaries.mjs` are shared with the unit
-suite, including the long synthetic note in
-`tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
-delimiter of styled list lines, including checkbox widgets, and normalizes
-spaces within and around italic and bold runs while keeping styled characters,
-code, highlights, and decorations significant. Unchecked checkbox widgets retain
-their presence and count even with no text. Styled fence delimiters ignore only
-their terminal spaces and tabs; code body whitespace and internal info-string
-spacing remain significant. A host control checks both the normalization and
-those negative cases. Native heading lines and Setext underlines retain heading
-boundaries independently of optional blank separators; host controls retain
-changes to their count, levels, text, styles, and embeds, including
-single-character underlines and empty headings. Unstyled records emptied by
-punctuation normalization are omitted after grouping, so their removal cannot
-join visible paragraphs. Styled records, code, and widgets remain significant.
-For the default Obsidian theme, a lone unattributed paragraph directly inside a
-list item has no extra spacing and is compared as inline content. Multiple
-paragraphs, attributed paragraphs, and other block boundaries remain
-significant; a deterministic host control checks these cases on every comparison
-run. The Obsidian workflow runs the check for pull requests with an [applicable
-native input](#what-the-checks-prove), in the Release workflow, and by hand with
-`gh workflow run obsidian.yml --ref BRANCH`, with the inputs `profile`, `seed`,
-`count`, `obsidian-version`, and `obsidian-installer-version`; its `obsidian`
-artifact holds the report and screenshots. It fails when the check compared
-nothing. PR and release gates require realistic fixed-seed evidence;
-weekly/manual adversarial runs are discovery only. Both profiles retain the
-native calibration controls.
-
-PR/release checks pin the app, installer and Docker base digest. Weekly checks
-explicitly request `latest` for both app and installer; manual inputs also
-default to `latest`, including a manual realistic run. Local checks default to
-the pinned baseline; set both version variables to `latest` for drift checks. To
-advance the baseline, verify the official Obsidian release and Docker digest,
-run the realistic native workload and controls, and update `baseline.json`, the
-Dockerfile's base and identity label together in a tested PR. Record the
-observed Electron and Chrome versions in the baseline. Recheck the deliberate
-latest route. A Docker updater proposal changing only `FROM`, or an edit
-changing only the identity label, must fail agreement checks until its assignee
-verifies and completes that coordinated update. These failures keep an update
-reviewable; do not add an all-version ignore or weaken the checks to clear them.
-App and installer versions remain independently selected. Do not upgrade
-dependencies incidentally. The base digest does not freeze apt repository
-contents: each report records the inspected built image ID and platform, and the
-runner starts that exact ID. The `declaredBase` field is the image's declared
-base label, mechanically checked against the Dockerfile's `FROM` and
-`baseline.json`; it is not independent inspection of base ancestry. Reports read
-app, installer, Electron and Chrome versions from the running application;
-requested versions alone cannot certify a host.
-
-Probe mode writes `probes.json` and `probe-metadata.json`. The companion records
-the actual app, installer and renderer versions separately from the requested
-versions, the inspected image ID/platform and declared base label, and hashes of
-the input, executed spec file (`specSha256`), and completed capture. The spec
-hash covers `obsidian.e2e.mjs`; it does not hash the Docker image or the
-complete harness configuration. Interrupted captures retain a null capture hash.
-
-`tests/integration/` runs the built CLI as a child process in temporary
-workspaces, and runs `examples/` and `benchmarks/` as they are, without the
-machine's user and system Git settings, which would change what Git ignores. A
-defect in what the tool selects, prints, writes, or how it exits belongs here:
-`cli.test.ts` and `cli-options.test.ts` for command behavior and options,
-`cli-defaults.test.ts` and `cli-obsidian.test.ts` for dialect detection,
-`cli-config.test.ts` for configuration errors, `filesystem.test.ts` for write
-safeguards, `cli-access.test.ts` for access failures, `cli-encoding.test.ts` for
-UTF-8 handling, `selection.test.ts` for which files a run selects, compared with
-Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
-`mdrefine/node`, `code-formatters.test.ts` and `code-command.test.ts` for the
-opt-in code tools, `examples.test.ts` and `docs.test.ts` for the examples and
-documentation, `metadata.test.ts` for what the package, the README, the site,
-the issue forms, and the workflows say about the same facts, and
-`release-evidence.test.ts` for the Release workflow's check of CI.
-`tests/support/cli.ts` holds the shared harness: `fixture()` writes a temporary
-workspace, `run()` starts the CLI, `restrict()` and `denyRead()` take away read
-permission on Unix and on Windows, `denyWrite()` takes away write permission on
-Windows, `windowsTool()` runs a program of Windows such as `icacls.exe`, and
-`linkDirectory()` links a directory, as a junction on Windows. Tests that need
-Unix permission modes are skipped on Windows and for the root user, and one that
-links a file needs `canSymlink`.
-
-A test marked `it.fails` reproduces a confirmed defect that is not fixed yet and
-names its issue; remove the marker with the fix. `tests/performance/` guards
-against algorithms whose cost grows faster than their input and memory that
-should have been released; add a regression check there with the fix for such a
-defect. Keep substantive output assertions alongside the measurements, and
-exclude preparation costs only when the check is specifically about a later
-operation. For scaling checks, warm both measured sizes on separate inputs, use
-fresh inputs for every timed call, and alternate their order. Verify every
-result outside the clock. Compare growth instead of imposing a wall-clock speed
-requirement; where recoverable, check that the former slow algorithm fails the
-comparison. When a slow variant and shared-runner noise overlap, count the work
-instead, as `lazy-html-work.test.ts` does. Garbage-collection checks also run
-outside coverage, which changes execution and allocation costs.
-
-Memory checks await V8's asynchronous `last-resort` major collection, which
-releases compilation caches and collects until its root set is stable. A regular
-major collection does not promise that condition. Deterministic lifecycle checks
-follow parsed documents and trees with WeakRefs and verify cached answers
-without reloading source. The residual retained-text check runs the same
-synthetic workload in a fresh Node process using the actual compiled product,
-prepared or verified by Vitest's normal build setup. Its heap excludes the
-runner, mocks and other test work; a distinct reported PID checks that boundary.
-The child warms two discarded full-size workspaces before its baseline, using
-disjoint paths, basenames and full source content for each warm-up and the
-measured workspace. Equal-length filler substitutions preserve construct kinds
-and sizes; measured defaults remain unchanged. Content guards retain only
-SHA-256 digests, never raw text. It keeps the measured workspace live across its
-single fixed sample and checks cached answers again. The input size and
-one-third allowance stay unchanged: no retry, selected minimum or larger limit.
-Deliberate anchor-copy and cached-source retention must still fail on runtimes
-where those mutants keep actual text alive. Primitive strings cannot be WeakRef
-targets, and collecting a wrapper would not prove their backing storage was
-released.
-
-The finite corpora and concrete path-key/source-key controls check added
-retention for those identities. A bounded cache that is already full before the
-baseline can replace entries without growing across the sample; this check does
-not establish universal absence of source retention.
-
-The measured child writes numeric failure evidence for #413 under
-`artifacts/workspace-memory/`; CI uploads only its `report.json` files,
-including the isolation/collection protocol and fixed measured delta. Child
-failure, timeout, signal or malformed output fails the parent check. To inspect
-retaining paths in a disposable container containing only synthetic inputs and
-no credentials, set `MDREFINE_MEMORY_HEAP_SNAPSHOT=1` for that test. A full heap
-can contain process secrets, so it is never captured or uploaded automatically.
-Snapshot generation can itself collect or transform the heap; it cannot replace
-or explain away the original measurement.
-
-To reproduce a bounded source-retention control, first run `npm run build` from
-the checkout. Save this JavaScript as a temporary `.mjs` file and run it with
-`node` from the checkout to prepare an owned copy with its own ESM package
-boundary and resolvable dependencies:
-
-```js
-import { cp, mkdtemp, realpath, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
-const checkout = process.cwd();
-const directory = await mkdtemp(path.join(tmpdir(), "mdrefine-memory-"));
-await cp("dist", path.join(directory, "dist"), { recursive: true });
-await writeFile(path.join(directory, "package.json"), JSON.stringify({ type: "module" }));
-await symlink(
-  await realpath("node_modules"),
-  path.join(directory, "node_modules"),
-  process.platform === "win32" ? "junction" : "dir",
-);
-console.log({
-  directory,
-  runner: path.join(checkout, "tests/support/workspace-memory-child.mjs"),
-  product: path.join(directory, "dist/index.js"),
-});
-```
-
-Edit only the copied `dist` files, never the checkout or linked dependencies.
-Record the source commit, runtime, exact mutation and SHA-256 hashes before and
-after it. Existing controls replace anchor detachment with identity on Node 22,
-cache a source on its target on Node 26, retain only the smallest plain block,
-or add a module-level map populated with `name` and `source` (or the reverse) in
-`compute()`. An identity operation is a valid leak control only where that
-runtime actually keeps backing storage alive.
-
-Change to the printed owned directory so failure artifacts stay with the
-experiment, then supply the absolute runner and copied-product paths:
-
-```sh
-cd "<directory>"
-node "<runner>" "<product>"
-```
-
-An unmodified copy should exit 0. An actual retention control should exit 1 with
-the fixed sample in stdout and `artifacts/workspace-memory/<pid>/report.json`.
-Retain every declared result and useful failed evidence. Remove the owned
-`node_modules` junction/symlink itself before recursively deleting the owned
-copy; never remove the linked dependency target. Keep full-heap capture limited
-to the isolated, credential-free procedure above.
-
-The HTML-continuation check parses its fixtures once per size and clones their
-positioned trees for fresh range-cache keys. Those fixtures need no separate
-parser metadata; do not generalize that preparation to arbitrary parsed nodes.
-It retains the elapsed-time growth bound and observes native backtick search
-volume separately, so the former repeated suffix search fails even when its
-native calls do not dominate timing. The observer restores the native method
-before assertions and is never active during timed samples.
+The [testing
+procedures](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md)
+cover suite ownership, fixtures, native hosts and baseline updates, integration,
+performance and memory evidence. Use the [verification
+map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md)
+to choose the checks for a change.
 
 ## What the checks prove
 
-Each promise below names the checks that back it, when they run, and what they
-cannot show. "Every pull request" means CI: Linux Node.js 24 runs `check:ci`
-with unit evidence in the separate `Unit coverage` job; other matrix jobs run
-`test:ci`. Each environment builds and tests its own installed package.
-
-- **Source navigation auditing is bounded and read-only.**
-  `reachability.test.ts` in the unit and integration projects covers actual
-  references, disconnected cycles, multiple entries, excluded transit pages,
-  coverage failures, dialect selection, boundaries, JSON/text output and zero
-  document writes. Installed package smoke checks exercise the audit through
-  `mdrefine/node` and the CLI. The Benchmark workflow compares discovery,
-  collection and traversal costs with exact correctness assertions; its times
-  are measurements, not pass/fail limits. Unsupported navigation and incomplete
-  reads must not produce definitive unreachable findings.
-
-- **Formatting keeps what a document means.** The engine orchestrates phases and
-  refuses an edit that changes the parsed reading; `src/core/semantics.ts` owns
-  fingerprints and refusal locations, and `protection-edits.ts` checks renderer
-  boundaries from the root-cached `RendererProtections` result. `engine.test.ts`
-  covers phase order, convergence, overlapping edits, protection-result reuse
-  and workspace callback binding/errors. `config.test.ts` checks configuration
-  resolution and defaults; `plugins.test.ts` checks registration, synchronous
-  schema validation and identity-keyed schema caching. `engine-ranges`,
-  `engine-front-matter` and `engine-*-protections` retain their respective
-  selection and preservation regressions. `link-fingerprint.test.ts` covers
-  resolved target identity and literal URLs. `reference-conversion.test.ts`
-  checks the conversion-specific proof, label allocation, source retention,
-  suppression, ranges and interaction with other rules. Ordinary fingerprints
-  remain exact; only verified built-in inline to full-reference conversions
-  establish a new comparison baseline. Boundary regressions and
-  `tests/performance/engine.test.ts` cover source ranges, ordered protection
-  fields and bounded scans. These locations describe current ownership and
-  evidence, rather than requiring future helpers to accumulate there. The rule
-  tests format twice, compare the meaning, and disable the rule;
-  `renderers.test.ts` compares commonmark.js and markdown-it before and after
-  formatting. Every pull request. The guard compares the parser's own readings,
-  so a parser defect can hide from it; the renderer checks below and the
-  workarounds in the [dependency
-  overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) cover
-  what is known.
-- **Renderers show the same before and after.** GitHub: the Rendering workflow.
-  Obsidian, in Live Preview and Reading view: the Obsidian workflow. VitePress,
-  on every pull request: `vitepress-build.test.ts` builds the example site
-  before and after formatting, and `vitepress.test.ts` renders pages with
-  VitePress's own Markdown renderer and Vue. Math: `math.test.ts` against the
-  renderers' output recorded in `tests/support/math-renderers.ts`. Forgejo and
-  Gitea: the Forges workflow compares official disposable hosts through their
-  file-mode API and actual repository file views, including heading anchors. The
-  Rendering, Obsidian and Forges workflows run for pull requests that change a
-  native-sensitive input, with authored fixtures and realistic documents at
-  fixed seeds. The Native workflow classifies every PR and requires each
-  applicable host call to succeed through its `Native checks` aggregate. It
-  explicitly reports hosts that are inapplicable. The Release workflow runs all
-  three checks afresh and validates their reports at its exact commit.
-  `renderer-evidence.mjs` independently reconstructs intended fixture/generated
-  document names, widths, views, explicitly selected wrapping modes and
-  calibration controls. The shared sentence-wrapping fixture opts into that mode
-  on GitHub, both forges, and both Obsidian views. Plans also identify documents
-  that explicitly enable inline-to-reference conversion; each host must record
-  that its reference fixture actually converted. Reports distinguish planned
-  documents from attempted/completed formatting cases and changed output;
-  unchanged cases are legitimate and need no redundant host request. A
-  deterministic gate still requires at least one document comparison. Every
-  expected view records comparison or unchanged output. Actual repository file
-  views remain mandatory even when unchanged. Deterministic consumers bind the
-  report to their host and canonical workload sizes (25 generated documents per
-  seed for GitHub, ten for Obsidian and each forge), rejecting truncation even
-  if a report shrinks its own plan. `renderer-evidence.test.ts` exercises
-  missing, duplicate and incomplete cases, controls, views and host identities.
-  Partial reports and existing failure artifacts survive failed attempts. This
-  validates bookkeeping and trusted producers, not arbitrary fabricated reports.
-
-  Forge controls also run the opt-in autolink fix on shared authored heading
-  cases, asserting exact output and equal native HTML/anchors before accepting
-  their independently planned control records.
-
-  `github-normalization.test.ts` and `obsidian-normalization.test.ts` check
-  comparison normalization, including changes that must remain significant;
-  these offline controls do not replace native calibration or host execution.
-  Release consumes fresh workflow results within its producing run; reports are
-  not copied between runs, so no new cross-run report provenance is implied.
-  GitHub's Markdown API version remains externally uncontrolled. Weekly/manual
-  adversarial runs discover differences without gating delivery. New findings
-  receive an issue and a scope disposition; they do not automatically expand the
-  active fix. Forge images are pinned by version and digest in
-  `scripts/forge-images.json`. Run `npm run check:forges` with Docker to
-  reproduce the realistic gate;
-  `PROFILE=adversarial SEED=42 npm run check:forges` selects reproducible
-  discovery (set those environment variables in your shell). Each run creates
-  only disposable loopback instances and synthetic accounts, then removes its
-  containers and data. No owner credentials are used. Reports and differing
-  source/HTML are in `artifacts/forge-rendering/`. During assigned maintenance,
-  check the official [Forgejo](https://forgejo.org/download/) and
-  [Gitea](https://docs.gitea.com/installation/install-with-docker/) releases and
-  update pins through a tested PR. A weekly run tests the pinned hosts, not an
-  automatically upgraded server. Server HTML checks math recognition/source, not
-  browser KaTeX layout or custom instance settings.
-- **Configuration conversion preserves supported scopes and inherited values.**
-  Unit `convert.test.ts` checks individual option mappings. Integration
-  `convert.test.ts` and `editorconfig-intersections.test.ts` exercise fallback
-  and written configuration, comparing effective settings with Prettier's own
-  resolution. Exact and disjoint brace branches, ancestor rebasing, coupled
-  EditorConfig values and notices for unsupported remainders are checked on
-  every pull request. `competitor-ignores.test.ts` checks CLI1 selection,
-  ancestor rebasing, CLI2/Prettier coexistence, BOM-prefixed first patterns,
-  per-file negation recovery and read errors. Its selection fixtures were
-  compared with the installed reference CLI during implementation; repeat that
-  comparison when changing the imported semantics. Reported omissions still
-  require manual migration.
-- **Output is deterministic and formatting converges.** The unit tests format
-  their output again and expect no change, and each example workspace's `after/`
-  tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
-  Every pull request. The benchmark's output hash shows whether the benchmark
-  documents format differently.
-- **The bundled parser preserves the pinned modules' readings, apart from its
-  listed corrections.** `parser-inline`, `parser-autolink`, `parser-identity`,
-  `parser-labels`, `parser-emphasis-identity`, `parser-generated`,
-  `parser-build`, and `parser-work` check complete positioned trees, observer
-  compatibility, token identity, source guards, provenance and deterministic
-  work. Fragment source is checked directly by TypeScript/ESLint; parser-build
-  checks reject extra runtime boundaries and bind maintained source/tracking.
-  Marked and debug-disabled generation comparisons reject module headers absent
-  from the structured graph while preserving ordinary comments and strings.
-  `build-output.test.ts` changes fragment source, shared types and configuration
-  to prove that a live receipt rejects them. `parser-writer.test.ts` checks
-  actual output, concurrent builders, unchanged timestamps and recovery. Its
-  linked-checkout test retains body phase times and dependency-copy progress on
-  failure. Every pull request. `parser-emphasis-production` checks actual
-  compiled-product batch calls in an isolated V8 coverage session, including
-  lazy readings and four missing-registration mutants. `parser-lazy-lines`
-  checks live witnesses, positioned trees, resolver observations and
-  deterministic event work; `parser-lazy-production` binds the built runtime and
-  checks actual helper hits, event work, and missing-helper/cache-bypass
-  mutants. `parser-containers` checks restored whitespace cursors,
-  original-marker precedence, list identities and extension observations.
-  `parser-containers-production` binds both fragments to the built runtime and
-  rejects missing-helper, cache-bypass and repeated-descendant-scan mutants.
-  Direct generated-compiler listeners also compare fast/fallback observations
-  for tabbed, loose, quoted, ordered and footnote lists with LF/CRLF/CR. The
-  deep-list timing case accounts for its quadratic byte size; work counters
-  bound the two traversals, not all parser work. `obsidian-openers` bounds
-  failed literal-suffix scans; `obsidian-probe-metadata` checks complete and
-  interrupted capture bookkeeping. Tokenizer identity cases partition the full
-  deterministic corpus into contiguous batches under the unchanged unit
-  deadline, retaining every source, selection and identity assertion. These
-  checks do not prove native-host behavior or compatibility with arbitrary
-  event-history rewrites by external extensions. Mixed and multiple raw emphasis
-  pairs can still copy their interiors; syntax plugins retain the original
-  attention/strike resolvers and their cost. The [dependency
-  overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) lists
-  the corrections and remaining limits.
-- **Files are left safe.** `filesystem.test.ts`, `cli-access.test.ts`,
-  `cli-encoding.test.ts`, and `selection.test.ts`, which compares the files a
-  run selects with Git's own decisions, on Linux and on Windows, which covers
-  access control lists and junctions. Every pull request. macOS is not tested;
-  tests that need Unix permission modes are skipped on Windows and for the root
-  user.
-- **The installed package works.** `npm run test:package` installs the packed
-  package with npm and pnpm and runs the command, `import` and `require()`, a
-  shipped example, and TypeScript consumers, on every pull request. Consumers
-  run outside the checkout with `NODE_PATH` disabled, including syntax-plugin
-  declarations and execution, bundled GFM and directly imported VitePress
-  table/task-list paths. The compiler also checks the shipped internal parser
-  shim and protection-source declaration explicitly, because public declarations
-  do not reach them. These checks do not add exported entry points or promise
-  completeness for every internal declaration. The compiler executable comes
-  from the checkout; consumer imports resolve from the actual installation.
-  `release:pack` tests the exact tarball that the Release workflow publishes;
-  local `release:prepare` additionally runs the full checks, and
-  `scripts/verify-publication.mjs` checks that npm serves that tarball with
-  provenance naming the workflow and the commit.
-- **Rebuilds and packages contain current output only.** `build-output.test.ts`
-  builds synthetic source, renames and removes modules, rebuilds and inspects an
-  actual tarball. It checks source-map paths, unexpected output, failed
-  preparation, concurrent product builders, live/exited child-writer temporary
-  files, linked/lowercase-drive script dispatch, side-effect-free imports,
-  abandoned-staging checks, linked-output rejection, and receipt identity,
-  invalidation and cleanup. A failed abandoned-staging check retains child
-  durations, results and output, including ESLint startup/configuration traces.
-  These failure hooks cannot report an abruptly terminated worker or OS process.
-  The package smoke check independently compares the tarball's complete `dist`
-  file set with the compiler's expected names plus the four parser artifacts.
-  Every pull request. Per-file publication is not a directory transaction;
-  concurrent edits require a fresh invocation.
-- **Cost grows with the input as expected.** `tests/performance/` compares
-  growth and checks that memory is released. `wrap.test.ts` covers isolated
-  rereading with syntax plugins in CommonMark and VitePress, including body
-  paragraphs beginning with `---`. `large-inputs.test.ts` formats documents
-  beyond the engine's argument limits, each in its own process. Every pull
-  request. The parser's deterministic unit work gates fail on the original
-  algorithms; its public timing checks are broad catastrophic-growth bounds, and
-  some original algorithms pass them at the selected sizes. Timing alone does
-  not establish that a parser defect is fixed. The Benchmark workflow's
-  reference timings run for changes to `benchmarks/` and by hand, and the
-  benchmark page documents the known limits. `lazy-html-work.test.ts` gates the
-  GitHub lazy HTML collector's growth on counted work for its document shapes,
-  because timing could not separate correct code from a real quadratic on shared
-  runners ([#826](https://github.com/viell-dev/slop-markdown-tools/issues/826)).
-  `document-work.ts` counts the characters and tree properties read, including
-  inside native searches, and V8's block counts in `src/syntax/`, which also see
-  loops over local data; each misses some quadratic variants alone. A source use
-  that it cannot count fails the check. Counting shows nothing about shapes
-  outside the fixtures, native calls on local data, loops elsewhere, or
-  allocation cost. The collector's timing check remains a broad bound for
-  catastrophic growth. Lazy-HTML range and edit-application timing checks
-  compare equal work across different document sizes. The edit check targets 200
-  ms per window with a 32-call cap after reproducing quota-period sampling bias
-  ([#795](https://github.com/viell-dev/slop-markdown-tools/issues/795)); other
-  scaling checks retain the 25 ms target and eight-call default cap. Failed
-  assertions in these two checks include sizes, the timing target, warm-up and
-  calibration durations, call count, and four windows per size in milliseconds.
-  Their ratios use each size's fastest window.
-- **Public descriptions agree with the package.** `docs.test.ts`,
-  `benchmarks.test.ts`, and `metadata.test.ts` on every pull request;
-  `npm run check:live` for GitHub's settings, the newest release, npm, and the
-  deployed site, by hand after releases and setting changes. Prose still needs
-  reading.
-- **A release is the tested commit.** The Release workflow enforces the
-  [publication evidence contract](RELEASING.md#publish), runs fresh native
-  checks, refuses an existing version/tag, and publishes the tarball it tested.
-  `release-evidence.test.ts` rejects missing, queued, unsuccessful, wrong-SHA
-  and wrong-producer results and exercises recovery through the actual command
-  entry. `release-api.test.ts` checks bounded server-error recovery, deadline
-  and fail-closed controls, including a fresh producer read after a failed check
-  lookup. `metadata.test.ts` rejects an omitted, narrowed or non-gating release
-  audit. Hosted preparation reuses eligible CI evidence, then freshly builds and
-  tests the exact tarball and installed consumers. No build receipt crosses
-  jobs. The [release guide](RELEASING.md) owns commands, prerequisites and
-  recovery.
-
-`scripts/native-checks.mjs` owns native PR classification. Shared source,
-parser/build scripts, semantic helpers such as `src/workspace/html.ts`, shared
-validators and renderer fixtures select all hosts. Each host's harness and
-workflow select that host. Documentation, offline tests and examples do not
-select native hosts. All source changes, including `src/syntax/vitepress/`,
-select all hosts: shared callers invoke those helpers across dialects, and their
-dialect guards are part of the source under review. VitePress also has its real
-build/render checks in CI. Unknown paths select all hosts.
-
-For manifest and lockfile changes, the classifier compares the complete resolved
-graphs on both sides of the PR. Explicit VitePress-only dependencies and offline
-reference/type/tool dependencies can avoid native hosts. Shared indirect
-dependencies inherit every root's role, and semantic build tools such as
-Rolldown and TypeScript remain native even though they are development
-dependencies. Changes outside dependency declarations, unclassified roots,
-unsupported lockfiles and missing/ambiguous comparisons select all hosts. The
-comparison uses a complete local Git merge-base diff, including deletions and
-both sides of renames, rather than the path-filter or API changed-file limits.
-
-The unfiltered Native workflow runs on every `pull_request`, including forks,
-with read-only permissions. Its aggregate fails for a failed classifier, unknown
-selection, or an absent/unsuccessful applicable call. External-host failures
-block applicable PRs; investigate them without waiving evidence. The separate
-host workflows retain their schedules, manual inputs, artifacts and release
-calls. Their job names are `GitHub rendering`, `Obsidian rendering` and
-`Forgejo and Gitea rendering`. Link applicable runs in the pull request. When
-changing exemptions, inspect the native scripts' imports and file reads and add
-a routing regression. `native-checks.test.ts` covers routing and failure cases.
-`dependency-policy.test.ts` parses the maintained updater configuration and
-checks finite grouping, exclusion and ignored-version examples across dependency
-fields. These are policy assertions, not Dependabot service execution or proof
-that an upgrade installs or renders correctly. `metadata.test.ts` checks parsed
-workflow wiring, including harmless YAML reserialization and missing/wrong
-release dependencies and coverage ownership. `release-evidence.test.ts` binds
-every current required CI name to its producer. Keep exact permissions, security
-values, pinned Actions and protected evidence identities; structural checks do
-not replace their identity assertions. The PR aggregate is excluded by its exact
-name and Actions app identity from release status evidence; all other required
-exact-commit checks, coverage and fresh native release calls remain mandatory. A
-difference fails the check; investigate it and record it in an issue rather than
-running the check again until it passes. A realistic or existing
-regression-fixture difference blocks its gate. Adversarial discovery instead
-uses the [bounded renderer work](#bounded-renderer-work) scope rule: fix
-meaningful changes on plausible authored input, and document other cases as
-limits. A report from real use can reopen a limit. Reuse an issue for variants
-of the same cause.
-
-`scripts/renderer-known-differences.json` lists exact issue-linked discovery
-source/output/view pairs. Weekly discovery replays their sources and rejects
-stale entries; `renderer-profiles.test.ts` checks issue references and current
-formatter outputs offline. A known discovery entry never excuses a realistic
-gate difference. Keep the list empty when no measured differences remain.
-Previously fixed source fixtures stay; a new renderer regression there still
-requires investigation. Completing the fixed gates and disposing of discovery
-findings is the finish condition, rather than finding no more adversarial bugs.
+The [verification
+map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md)
+owns the check coverage, native routing, report contracts and evidence limits.
 
 ## Bounded renderer work
 
@@ -1091,16 +186,31 @@ only from such a run.
 
 ## Documentation
 
+Assume basic JavaScript/TypeScript and GitHub knowledge. Shared CLI, API,
+configuration and rule guidance must be usable without knowing optional
+applications such as Obsidian or VitePress. Lead with the general developer's
+task, then identify application-specific behavior where it first matters. Give a
+short syntax example, local explanation or targeted link when a term needs
+context; readers should not need to read the whole guide first. Dedicated
+integration pages can address that application's users directly.
+
+Preserve distinctions that affect behavior. For example, the workspace is what
+mdrefine scans, while an Obsidian vault is that application's notes folder;
+their roots can differ. A glossary can support these explanations but does not
+replace clear scope and context in an introduction, option or example.
+
 The site's source is `docs/`, built by VitePress. A user page explains what a
 reader needs to use the tool; the details that only maintainers need, such as
 lists of individual protections, internal limits, and parser work, go to the
-[maintainer notes](internals/README.md) in `internals/`, which the site does not
-build and the package does not ship, and the page links them by their GitHub
-address. How the checks run belongs in this guide, not in the user pages. The
-tool formats and lints the repository's own Markdown at 80 columns; Prettier
-formats everything else and leaves Markdown alone. The fixtures in
-`tests/fixtures/` and the documents of `examples/workspaces/` and
-`examples/plugin/notes/` are left unformatted on purpose.
+[maintainer
+notes](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/README.md)
+in `internals/`, which the site does not build and the package does not ship,
+and the page links them by their GitHub address. How the checks run belongs in
+the contributor and testing guides, not in the user pages. The tool formats and
+lints the repository's own Markdown at 80 columns; Prettier formats everything
+else and leaves Markdown alone. The fixtures in `tests/fixtures/` and the
+documents of `examples/workspaces/` and `examples/plugin/notes/` are left
+unformatted on purpose.
 
 ```sh
 npm run format:docs        # format the Markdown
@@ -1118,11 +228,25 @@ code, and reject version annotations in the pages, so update them with the
 behavior they describe. CI builds the site for every pull request. The site
 describes the newest stable release: the Pages workflow deploys it from that
 release's tag after the Release workflow publishes it, as
-[RELEASING.md](RELEASING.md) describes. A correction to that release's
-documentation goes to `main` and to the release's `site-VERSION` branch, which
-RELEASING.md also describes, so that the site never describes unreleased
-behavior. The deployed site's `version.json` names the commit it was built from.
-GitHub Pages must use GitHub Actions as its source.
+[RELEASING.md](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md)
+describes. A correction to that release's documentation goes to `main` and to
+the release's `site-VERSION` branch, which RELEASING.md also describes, so that
+the site never describes unreleased behavior. The deployed site's `version.json`
+names the commit it was built from. GitHub Pages must use GitHub Actions as its
+source.
+
+Keep links usable both in the checkout and in the installed package. A shipped
+page links source-only material, such as agent instructions, release procedures
+or maintainer guides, by its public GitHub address. Do not expand the package to
+include the maintenance tree just to satisfy a link. Update incoming links and
+retained redirects when moving a procedure.
+
+The package check reads the installed `README.md`, `CHANGELOG.md`,
+`CODE_OF_CONDUCT.md`, `CONTRIBUTING.md` and `SECURITY.md`. Their relative
+Markdown links, images and reference definitions must name files in the actual
+package. Code examples and deliberate broken-link fixtures are outside this
+bounded check. Remote URLs and heading fragments are not verified by it; the
+repository lint and site checks retain their own scope.
 
 A page describes the behavior of the version it documents, without version
 history: no notes such as "after 0.4.0", "since", "added in", or "unreleased".
@@ -1172,8 +296,9 @@ under the MIT license; follow the [code of conduct](CODE_OF_CONDUCT.md).
 - Describe the problem, the resulting behavior, and the decisions made and why,
   for a reader who will not read the diff. Link the issue.
 - Give the verification: the commands and their results, the platforms, the runs
-  of the [renderer checks](#what-the-checks-prove) when the change triggers
-  them, and what the evidence cannot show. Record which
+  of the [renderer
+  checks](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md#what-the-checks-prove)
+  when the change triggers them, and what the evidence cannot show. Record which
   [review](#review-and-verification) the change got.
 - A change to formatting needs tests of the expected output, of formatting
   twice, and of preserved meaning; a defect that changes rendering needs a
@@ -1204,11 +329,12 @@ GitHub's settings in sync. Main requires three `verify (OS, NODE)` jobs in
 the producer mapping in `scripts/release-evidence.mjs`, and
 `tests/integration/release-evidence.test.ts` kept aligned. The native aggregate
 requires successful applicable hosts and explicit inapplicability, as the [check
-map](#what-the-checks-prove) describes. An applicable external-host outage
-blocks merge; investigate it without waiving evidence or weakening the ruleset.
-The Node.js 26 job is not required. Zero required approvals is deliberate for a
-single-account, agent-maintained repository; PRs, passing checks, and resolved
-review threads remain mandatory.
+map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md#what-the-checks-prove)
+describes. An applicable external-host outage blocks merge; investigate it
+without waiving evidence or weakening the ruleset. The Node.js 26 job is not
+required. Zero required approvals is deliberate for a single-account,
+agent-maintained repository; PRs, passing checks, and resolved review threads
+remain mandatory.
 
 Merge with a merge commit after checking the exact head:
 `gh pr merge --merge --match-head-commit SHA`. Squash and rebase merging are
@@ -1219,9 +345,11 @@ Fast-forward local `main` before new work, then prune finished task branches and
 stale tracking refs without disturbing active work.
 
 The release procedure owns [exact-commit publication
-evidence](RELEASING.md#publish) and [hosted versus local
-preparation](RELEASING.md#prepare-without-publishing). PR checks may test a
-synthetic merge tree and cannot substitute for the release's push/main evidence.
+evidence](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md#publish)
+and [hosted versus local
+preparation](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md#prepare-without-publishing).
+PR checks may test a synthetic merge tree and cannot substitute for the
+release's push/main evidence.
 
 ## Review and verification
 
@@ -1250,10 +378,17 @@ choice:
 A PR's verification section records the commands and their results, the
 platforms tested, the runs of the real-renderer checks when its changes trigger
 them, what the evidence cannot show, and the review it got. The map of [what the
-checks prove](#what-the-checks-prove) says which checks back which promise and
-when the expensive ones run. Investigate a failing or intermittent check and fix
-the product or the check; do not rerun it until it passes, and do not widen a
-limit without understanding the failure.
+checks
+prove](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md#what-the-checks-prove)
+says which checks back which promise and when the expensive ones run.
+Investigate a failing or intermittent check and fix the product or the check; do
+not rerun it until it passes, and do not widen a limit without understanding the
+failure.
+
+Documentation review also follows the [audience and applicability
+guidance](#documentation). Follow the general developer's reading route to the
+common case, then check that application-specific branches establish their
+meaning and scope through a local example, explanation or targeted link.
 
 Review bots may provide PR reviews if usage levels allow. Their findings are
 claims to verify against the code and, for rendering, the actual renderer. Fix

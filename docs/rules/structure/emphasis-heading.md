@@ -42,8 +42,8 @@ after it.
 
 **Not checked:**
 
-- Emphasized text in a list item, block quote, callout, alert, VitePress
-  container such as `::: tip`, table cell, or footnote, where it labels the
-  content beside it.
+- Emphasized text in a list item, block quote (including alerts and Obsidian
+  callouts), VitePress container such as `::: tip`, table cell, or footnote,
+  where it labels the content beside it.
 - A paragraph with a link, an image, or a line break inside the emphasis, or
   other text beside it.
