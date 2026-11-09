@@ -37,6 +37,35 @@ it("exports the same unified diff that the CLI prints for a changed document", a
 });
 
 describe("filesystem discovery for library hosts (mdrefine/node)", () => {
+  it.each(["attachments", "named", "supplied", "supplied-existing"])(
+    "keeps inherited object names as ordinary %s link targets (#926)",
+    async (mode) => {
+      const names = ["__proto__", "constructor", "toString", "hasOwnProperty", "ordinary"];
+      const source = names.map((name) => `[${name}](${name})`).join("\n") + "\n";
+      const supplied = mode.startsWith("supplied");
+      const disk = Object.fromEntries(
+        names.map((name) => [name, mode === "attachments" ? Buffer.from([0xff]) : "# Disk\n"]),
+      );
+      const root = await fixture({ "README.md": source, ...(mode === "supplied" ? {} : disk) });
+      const discovery = await discoverWorkspace({
+        root,
+        config: { extends: [], dialect: "commonmark", rules: { "links/valid": "error" } },
+        inputs: mode === "named" ? ["README.md", ...names] : ["README.md"],
+        ...(supplied
+          ? { documents: Object.fromEntries(names.map((name) => [name, "# Buffer\n"])) }
+          : {}),
+      });
+      expect(discovery.selected).toEqual(
+        (mode === "attachments" ? ["README.md"] : ["README.md", ...names]).sort(),
+      );
+      expect(discovery.skipped).toEqual([]);
+      expect(lint(discovery.read("README.md"), discovery.options("README.md"))).toEqual([]);
+      if (mode !== "attachments")
+        for (const name of names)
+          expect(discovery.read(name)).toBe(supplied ? "# Buffer\n" : "# Disk\n");
+    },
+  );
+
   it("selects and prepares every document as the CLI does", async () => {
     const root = await fixture(files);
     const discovery = await discoverWorkspace({ root, config });
