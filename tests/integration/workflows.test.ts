@@ -595,6 +595,64 @@ describe("plugins named in a configuration", () => {
       expect(reported(start(cli, "lint"))).toBe(expected);
     },
   );
+  it.each([
+    ["default", [], undefined, "sync"],
+    ["disabled on the command line", ["--no-experimental-require-module"], undefined, "import"],
+    ["disabled through NODE_OPTIONS", [], "--no-experimental-require-module", "import"],
+    [
+      "re-enabled on the command line",
+      ["--experimental-require-module"],
+      "--no-experimental-require-module",
+      "sync",
+    ],
+    [
+      "explicit custom condition",
+      ["--no-experimental-require-module", "--conditions=module-sync"],
+      undefined,
+      "sync",
+    ],
+    [
+      "explicit condition through NODE_OPTIONS",
+      [],
+      "--no-experimental-require-module --conditions=module-sync",
+      "sync",
+    ],
+    ...(process.allowedNodeEnvironmentFlags.has("--no-require-module")
+      ? ([
+          ["modern disabling flag", ["--no-require-module"], undefined, "import"],
+          ["modern flag through NODE_OPTIONS", [], "--no-require-module", "import"],
+        ] as const)
+      : []),
+  ] as const)(
+    "matches Node's module-sync import condition when %s (#924)",
+    async (_, options, environment, expected) => {
+      const root = await fixture({
+        "mdrefine.config.json": config("sample-plugin"),
+        ...installed(
+          "sample-plugin",
+          {
+            type: "module",
+            exports: { ".": { "module-sync": "./sync.mjs", import: "./import.mjs" } },
+          },
+          { "sync.mjs": esm("sync"), "import.mjs": esm("import") },
+        ),
+        "real.mjs":
+          'const loaded = await import("sample-plugin");\nconsole.log(loaded.default.rules.report.check()[0].message);\n',
+        "note.md": "A note.\n",
+      });
+      const start = (...script: string[]) =>
+        spawnSync(process.execPath, [...options, ...script], {
+          cwd: root,
+          encoding: "utf8",
+          env: { ...process.env, NODE_OPTIONS: environment ?? "" },
+        });
+      const real = start("real.mjs");
+      expect(real.status, real.stderr).toBe(0);
+      expect(real.stdout.trim(), real.stderr).toBe(expected);
+      expect(reported(start(cli, "lint"))).toBe(expected);
+    },
+  );
+
   it("reads conditions from Node.js's options as Node.js does", () => {
     const defaults = ["node", "import", "module-sync", "node-addons"];
     expect([...importConditions([], undefined)]).toEqual(defaults);

@@ -242,16 +242,18 @@ function splitNodeOptions(value: string): string[] {
 }
 /**
  * The conditions Node.js applies to the `exports` of a package it imports: its defaults, as of
- * Node.js 22.12, changed by the options the process was started with. `--conditions` (`-C`)
- * adds one and `--no-addons` takes `node-addons` away, on the command line or in
- * `NODE_OPTIONS`. Node.js has no supported way to ask for the conditions in effect or to
- * resolve from another file, so they are worked out here.
+ * Node.js 22.12, with `module-sync` taken from the runtime's require(esm) feature state.
+ * `--conditions` (`-C`) adds one and `--no-addons` takes `node-addons` away, on the command line
+ * or in `NODE_OPTIONS`. Node.js has no supported way to ask for the complete condition set or
+ * to resolve from another file, so the other conditions are worked out here.
  */
 export function importConditions(
   execArgv: readonly string[] = process.execArgv,
   nodeOptions: string | undefined = process.env.NODE_OPTIONS,
 ): Set<string> {
-  const conditions = new Set(["node", "import", "module-sync", "node-addons"]);
+  const conditions = new Set(["node", "import"]);
+  if (process.features.require_module) conditions.add("module-sync");
+  conditions.add("node-addons");
   const options = [...splitNodeOptions(nodeOptions ?? ""), ...execArgv];
   for (let index = 0; index < options.length; index++) {
     const option = options[index]!;
