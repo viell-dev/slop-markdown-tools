@@ -9,7 +9,10 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.8.3 - 2026-11-09
+
+Clarify shared documentation, keep packaged contributor links usable, and make
+maintenance tests easier to locate and run. No upgrading steps are needed.
 
 ### Fixed
 
@@ -21,6 +24,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Refresh TypeScript-ESLint's indirect semver dependency to 7.8.6.
+- Group compatibility regressions by provenance, attribution, dispatch and edit
+  boundaries
+  ([#934](https://github.com/viell-dev/slop-markdown-tools/issues/934)).
+- Follow Node.js's active module support in the condition-helper test
+  ([#941](https://github.com/viell-dev/slop-markdown-tools/issues/941)).
 - Route contributors to focused dependency, testing and verification guides
   ([#931](https://github.com/viell-dev/slop-markdown-tools/issues/931)).
 

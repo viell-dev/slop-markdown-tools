@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { builtInRules, convertConfig, format, lint, parse, type Plugin } from "../../src/index.js";
+import { convertConfig, format, lint, type Plugin } from "../../src/index.js";
 
 const opts = (markdownlint: Record<string, unknown>, prettier?: Record<string, unknown>) => {
   const r = convertConfig({
@@ -8,6 +8,7 @@ const opts = (markdownlint: Record<string, unknown>, prettier?: Record<string, u
   });
   return { config: r.config, compatibility: r.compatibility };
 };
+
 it.each([
   [{ MD003: { style: "atx" }, MD019: true }, "MD019", "#  Heading\n", "# Heading\n"],
   [{ MD003: { style: "atx" }, MD023: true }, "MD023", "  # Heading\n", "# Heading\n"],
@@ -19,27 +20,25 @@ it.each([
     "| a | b |\n| --- | --- |\n| x | y |\n",
     "| a   | b   |\n| --- | --- |\n| x   | y   |\n",
   ],
-] as const)(
-  "round4 suppresses only the attributed behavior %s %s",
-  (checks, disabled, body, repaired) => {
-    for (const newline of ["\n", "\r\n"]) {
-      const prefix = `<!-- markdownlint-disable ${disabled} -->\n\n`;
-      const middle = `\n<!-- markdownlint-enable ${disabled} -->\n\n`;
-      const source = (prefix + body + middle + body).replaceAll("\n", newline);
-      const o = opts(checks);
-      const result = format(source, o);
-      expect(result.output).toBe((prefix + body + middle + repaired).replaceAll("\n", newline));
-      expect(
-        lint(source, o).every(
-          (d) => d.start >= (prefix + body + middle).replaceAll("\n", newline).length,
-        ),
-      ).toBe(true);
-      expect(format(result.output, o).output).toBe(result.output);
-      expect(result.diagnostics.filter((d) => d.rule.startsWith("engine/"))).toEqual([]);
-    }
-  },
-);
-it.each([undefined, {}])("round4 holds a table edit across changing regions %j", (prettier) => {
+] as const)("suppresses only the attributed behavior %s %s", (checks, disabled, body, repaired) => {
+  for (const newline of ["\n", "\r\n"]) {
+    const prefix = `<!-- markdownlint-disable ${disabled} -->\n\n`;
+    const middle = `\n<!-- markdownlint-enable ${disabled} -->\n\n`;
+    const source = (prefix + body + middle + body).replaceAll("\n", newline);
+    const o = opts(checks);
+    const result = format(source, o);
+    expect(result.output).toBe((prefix + body + middle + repaired).replaceAll("\n", newline));
+    expect(
+      lint(source, o).every(
+        (d) => d.start >= (prefix + body + middle).replaceAll("\n", newline).length,
+      ),
+    ).toBe(true);
+    expect(format(result.output, o).output).toBe(result.output);
+    expect(result.diagnostics.filter((d) => d.rule.startsWith("engine/"))).toEqual([]);
+  }
+});
+
+it.each([undefined, {}])("holds a table edit across changing regions %j", (prettier) => {
   const o = opts(
     { MD055: { style: "no_leading_or_trailing" }, MD060: { style: "aligned" } },
     prettier,
@@ -57,7 +56,8 @@ it.each([undefined, {}])("round4 holds a table edit across changing regions %j",
     expect(lint(source, o).every((d) => !d.edit)).toBe(true);
   }
 });
-it("round4 retains active body diagnostics below a suppressed table header", () => {
+
+it("retains active body diagnostics below a suppressed table header", () => {
   const source =
     "| a <!-- markdownlint-disable-line MD055 MD060 --> | b |\n| --- | --- |\n| x | y |\n";
   const o = opts({ MD055: { style: "no_leading_or_trailing" }, MD060: { style: "aligned" } });
@@ -66,6 +66,7 @@ it("round4 retains active body diagnostics below a suppressed table header", () 
   expect(diagnostics.every((d) => d.line >= 2 && !d.edit)).toBe(true);
   expect(format(source, o).output).toBe(source);
 });
+
 it.each([
   [
     { MD003: { style: "atx" } },
@@ -87,7 +88,7 @@ it.each([
     "-   one\n    <!-- markdownlint-disable-next-line MD030 -->\n-   two\n",
     "style/list-indent",
   ],
-] as const)("round4 holds spanning heading/list proposals %s %s", (checks, source, rule) => {
+] as const)("holds spanning heading/list proposals %s %s", (checks, source, rule) => {
   const o = opts(checks);
   expect(format(source, { config: o.config }).output).not.toBe(source);
   expect(format(source, o).output).toBe(source);
@@ -97,8 +98,9 @@ it.each([
       .every((d) => !d.edit),
   ).toBe(true);
 });
+
 it.each(["disable-line MD013", "disable-next-line MD013", "disable MD013"])(
-  "round4 holds paragraph edits crossing %s",
+  "holds paragraph edits crossing %s",
   (directive) => {
     const source = `one two three four five six seven eight\ntext <!-- markdownlint-${directive} -->\nmore words on another long line\n`;
     const o = opts({ MD013: { line_length: 20 } });
@@ -149,14 +151,14 @@ it.each(["disable-line MD013", "disable-next-line MD013", "disable MD013"])(
   },
 );
 
-it("round4 withholds a heading conversion that also normalizes suppressed spacing", () => {
+it("withholds a heading conversion that also normalizes suppressed spacing", () => {
   const source = "<!-- markdownlint-disable MD019 -->\n\n#  Heading\n";
   const o = opts({ MD003: { style: "setext" }, MD019: true });
   expect(lint(source, o).some((d) => d.rule === "style/heading" && !d.edit)).toBe(true);
   expect(format(source, o).output).toBe(source);
 });
 
-it("round4 locates active table rows with mixed line endings", () => {
+it("locates active table rows with mixed line endings", () => {
   const source =
     "| a <!-- markdownlint-disable-line MD055 MD060 --> | b |\r\n| --- | --- |\n| x | y |\r\n";
   const o = opts({ MD055: { style: "no_leading_or_trailing" }, MD060: { style: "aligned" } });
@@ -166,56 +168,17 @@ it("round4 locates active table rows with mixed line endings", () => {
   expect(format(source, o).output).toBe(source);
 });
 
-it("round4 retains nested peer consistency when MD007 is suppressed", () => {
+it("retains nested peer consistency when MD007 is suppressed", () => {
   const source = "<!-- markdownlint-disable MD007 -->\n\n- parent\n   - first\n  - second\n";
   const o = opts({ MD005: true, MD007: { indent: 2 } });
   expect(lint(source, o).some((d) => d.rule === "style/list-indent" && !d.edit)).toBe(true);
   expect(format(source, o).output).toBe(source);
 });
 
-it("round4 attributes edge-cell padding combined with pipe changes", () => {
+it("attributes edge-cell padding combined with pipe changes", () => {
   const source =
     "<!-- markdownlint-disable MD060 -->\n\n|  a  |  b  |\n| --- | --- |\n|  x  |  y  |\n";
   const o = opts({ MD055: { style: "no_leading_or_trailing" }, MD060: { style: "aligned" } });
   expect(lint(source, o).some((d) => d.rule === "style/table" && !d.edit)).toBe(true);
   expect(format(source, o).output).toBe(source);
-});
-it("keeps compatibility internals out of plugin options and of rules called directly", () => {
-  // Attribution and the compatibility marker are internal: a plugin's options
-  // and a built-in rule's findings show no extra keys, symbols included.
-  const r = convertConfig({ prettier: {} });
-  const seen: (string | symbol)[][] = [];
-  const plugins: Plugin[] = [
-    {
-      name: "probe",
-      rules: {
-        demo: {
-          kind: "style",
-          phase: "block",
-          description: "Record options",
-          check: ({ options }) => {
-            seen.push(Reflect.ownKeys(options));
-            return [];
-          },
-        },
-      },
-    },
-  ];
-  const rules = { ...r.config.rules, "probe/demo": "warn" as const };
-  lint("text\n", { config: { ...r.config, rules }, compatibility: r.compatibility, plugins });
-  expect(seen.length).toBeGreaterThan(0);
-  for (const keys of seen) expect(keys).toEqual([]);
-  for (const [name, source] of [
-    ["style/heading", "#  Heading\n"],
-    ["style/list-indent", "-   one\n"],
-    ["style/table", "a|b\n---|---\nx|y\n"],
-  ] as const) {
-    const findings = builtInRules[name]!.check({ document: parse(source, "github"), options: {} });
-    expect(Array.isArray(findings) && findings.length, name).toBeTruthy();
-    for (const finding of findings as object[])
-      expect(
-        Reflect.ownKeys(finding).filter((key) => typeof key === "symbol"),
-        name,
-      ).toEqual([]);
-  }
 });
