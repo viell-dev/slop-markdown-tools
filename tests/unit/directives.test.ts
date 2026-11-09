@@ -145,10 +145,8 @@ it.each<[Dialect, string]>([
   expect(format(source, { config: { ...config, dialect } }).output).toBe(source);
 });
 
-it.each([
-  "<!-- mdrefine-disable-next-line style/emphasis --> <b>x</b>",
-  "<div><!-- mdrefine-disable-next-line style/emphasis --></div>",
-])("keeps next-line spacing when the directive shares HTML with %s (#927)", (html) => {
+it("keeps next-line spacing when the directive shares HTML with a tag (#927)", () => {
+  const html = "<!-- mdrefine-disable-next-line style/emphasis --> <b>x</b>";
   const source = `${html}\n# *keep*\n`;
   const options = {
     config: { ...config, rules: { ...config.rules, "style/block-spacing": "warn" } },
@@ -169,6 +167,45 @@ it("honors an enable immediately following its disable (#927)", () => {
     "<!-- mdrefine-disable style/emphasis --><!-- mdrefine-enable style/emphasis -->\n\n*change*\n";
   expect(format(source, { config }).output).toBe(source.replace("*change*", "_change_"));
   expect(lint(source, { config })).toHaveLength(2);
+});
+
+it.each([
+  "Write `<!-- mdrefine-disable -->` to disable rules.\n<MyComponent />\n\n*change*\n",
+  "Write `<!-- mdrefine-disable -->` to disable rules.\n<my-component />\n\n*change*\n",
+  "- Example:\n\n  ```md\n  <!-- mdrefine-disable -->\n  ```\n\n- Last item\n<MyComponent />\n\n*change*\n",
+])("does not turn projected VitePress code examples into directives: %s (#927)", (source) => {
+  const settings = { config: { ...config, dialect: "vitepress" as const } };
+  expect(directives(parse(source, "vitepress"))).toEqual([]);
+  expect(format(source, settings).output).toBe(source.replace("*change*", "_change_"));
+  expect(format(format(source, settings).output, settings).changed).toBe(false);
+  expect(directives(parse(source, "commonmark"))).toEqual([]);
+  const separated = source.replace(/\n(<(?:MyComponent|my-component) \/>)/, "\n\n$1");
+  expect(directives(parse(separated, "vitepress"))).toEqual([]);
+});
+
+it("does not read projected VitePress math as HTML comments (#927)", () => {
+  const source = "$$\n<!-- mdrefine-disable -->\n$$\n\n*change*\n";
+  expect(directives(parse(source, "vitepress", "document.md", [], { math: true }))).toEqual([]);
+});
+
+it("skips plugin HTML values whose source line mapping no longer matches (#927)", () => {
+  const plugin: Plugin = {
+    name: "rewritten-html",
+    syntax: {
+      micromark: {},
+      mdast: {
+        transforms: [
+          (tree) =>
+            walk(tree, "html", (node) => {
+              node.value = "<div>\n\n\n" + node.value + "\n</div>";
+            }),
+        ],
+      },
+    },
+  };
+  const source = "*first*\n*second*\n\n<!-- mdrefine-disable-next-line -->\n*keep*\n\n*third*\n";
+  expect(directives(parse(source, "commonmark", "document.md", [plugin]))).toEqual([]);
+  expect(format(source, { config, plugins: [plugin] }).output).toBe(source.replaceAll("*", "_"));
 });
 
 it("applies mdrefine suppression regions and the next-line fast path", () => {

@@ -6,7 +6,7 @@ import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import { collectGithubLazyHtmlProtections } from "../../src/syntax/github-protections.js";
 import { lazyHtmlCases } from "./lazy-html-cases.js";
 import { measureScaling, scaling } from "./scaling.js";
-import { directives } from "../../src/core/directives.js";
+import { directives, suppressions } from "../../src/core/directives.js";
 const config: Config = { extends: ["recommended", "obsidian"], dialect: "obsidian" };
 
 it.each(["", "> <!-- x\n> --> "])(
@@ -33,6 +33,32 @@ it.each(["", "> <!-- x\n> --> "])(
     expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(10);
   },
 );
+
+it("scans delimiter-free HTML tag text without repeated suffix searches (#927)", () => {
+  const measurement = measureScaling(
+    [2000, 8000],
+    (count) => parse("<div>\n" + "<a".repeat(count) + "\n\nmdrefine-\n", "commonmark"),
+    directives,
+    (found) => expect(found).toEqual([]),
+    1,
+  );
+  expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(10);
+});
+
+it("indexes next-line suppression targets once for adjacent directives (#927)", () => {
+  const measurement = measureScaling(
+    [2000, 8000],
+    (count) => parse("<!--mdrefine-disable-next-line-->".repeat(count) + "\n*x*\n", "commonmark"),
+    suppressions,
+    (suppressed, document) => {
+      expect(
+        suppressed("style/emphasis", { start: document.source.indexOf("*x*"), message: "x" }),
+      ).toBe(true);
+    },
+    1,
+  );
+  expect(measurement.ratio, JSON.stringify(measurement)).toBeLessThan(10);
+});
 
 it("scans a comment's long marker line without quadratic backtracking (#492)", () => {
   expect(

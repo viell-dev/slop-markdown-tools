@@ -1,8 +1,9 @@
 import { walk } from "../syntax/walk.js";
 import type { Document, Finding } from "./types.js";
 import { range } from "../syntax/parse.js";
-import { countBelow, lineBreakMatcher, lineEnd, lineStarts } from "../syntax/source.js";
+import { countBelow, lineEnd, lineStarts } from "../syntax/source.js";
 import { htmlComments } from "../syntax/html-comments.js";
+import { isComponentBlock, isProjectedLiteral } from "../syntax/vitepress/projection.js";
 
 /** A suppression directive and the rules it names, `*` for all of them. */
 export interface Directive {
@@ -28,6 +29,9 @@ export function directives(document: Document): (Directive & { start: number; en
   const nodes: { value: string; start: number; end: number }[] = [];
   walk(document.tree, "html", (node) => {
     if (node.position?.start.offset === undefined || node.position.end.offset === undefined) return;
+    // Projected blocks contain raw Markdown, including code examples, rather
+    // than only the HTML comments/tags that this scan can interpret.
+    if (isComponentBlock(node) || isProjectedLiteral(node)) return;
     const [start, end] = range(node);
     nodes.push({ value: node.value, start, end });
   });
@@ -37,7 +41,16 @@ export function directives(document: Document): (Directive & { start: number; en
     const identical = raw === value;
     const valueLines = identical ? [] : lineStarts(value);
     const valueEnds = valueLines.map((at) => lineEnd(value, at));
-    const rawEnds = identical ? [] : lineStarts(raw).map((at) => lineEnd(raw, at));
+    const rawLines = identical ? [] : lineStarts(raw);
+    const rawEnds = rawLines.map((at) => lineEnd(raw, at));
+    if (
+      valueLines.length !== rawLines.length ||
+      valueLines.some(
+        (from, line) =>
+          !raw.slice(rawLines[line], rawEnds[line]).endsWith(value.slice(from, valueEnds[line])),
+      )
+    )
+      return [];
     // Parsed values omit container prefixes; map each endpoint by its line's
     // unchanged suffix, also when the parser normalizes physical line endings.
     const offset = (at: number) => {
@@ -56,18 +69,18 @@ export function suppressions(document: Document): (rule: string, finding: Findin
   // Directives can only appear in HTML comments containing this prefix.
   if (!document.source.includes("mdrefine-")) return () => false;
   const events: (Directive & { start: number; end: number })[] = [];
+  let starts: number[] | undefined;
+  let ends: number[] | undefined;
   for (const found of directives(document)) {
     const { start, end } = found;
     if (found.kind === "disable-next-line") {
       // The line after the directive's own, whichever of CommonMark's line endings ends each.
-      const lineBreak = lineBreakMatcher();
-      lineBreak.lastIndex = end;
-      const first = lineBreak.exec(document.source);
-      if (!first) continue;
-      const next = first.index + first[0].length;
-      lineBreak.lastIndex = next;
-      const last = lineBreak.exec(document.source);
-      events.push({ ...found, start: next, end: last ? last.index : document.source.length });
+      starts ??= lineStarts(document.source);
+      ends ??= starts.map((at) => lineEnd(document.source, at));
+      const line = countBelow(starts, end + 1);
+      const next = starts[line];
+      if (next === undefined) continue;
+      events.push({ ...found, start: next, end: ends[line]! });
     } else events.push({ ...found, start, end });
   }
   // Apply all-rule and named transitions to the same state for each rule.

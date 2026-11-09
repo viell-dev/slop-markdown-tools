@@ -17,7 +17,7 @@ export const commonFixtures = [
   {
     name: "adjacent-suppression-comments-927",
     source:
-      "An *editable introduction*.\n\n<!-- ordinary --> <!-- mdrefine-disable style/emphasis -->\n\n*keep these markers*\n\n<!-- mdrefine-enable style/emphasis --><!-- ordinary -->\n\n*format these markers*\n\n<div><!-- mdrefine-disable-next-line style/emphasis --></div>\n# *keep heading markers*\n",
+      "An *editable introduction*.\n\n<!-- ordinary --> <!-- mdrefine-disable style/emphasis -->\n\n*keep these markers*\n\n<!-- mdrefine-enable style/emphasis --><!-- ordinary -->\n\n*format these markers*\n\n<!-- mdrefine-disable-next-line style/emphasis --> <b>x</b>\n# *keep heading markers*\n",
   },
   {
     name: "prose",

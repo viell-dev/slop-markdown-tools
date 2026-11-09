@@ -12,7 +12,7 @@ export interface HtmlComment {
  * containers, code spans and Vue components can close or reinterpret elements.
  */
 export function htmlComments(html: string): HtmlComment[] {
-  const tagStart = /<\/?([a-z][^\t\n\f\r />]*)(?=[\t\n\f\r />])/iy;
+  const tagStart = /<\/?([a-z][^\t\n\f\r />]*)/iy;
   const opaque = new Set([
     "code",
     "iframe",
