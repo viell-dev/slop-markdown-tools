@@ -24,6 +24,7 @@ maintenance tests easier to locate and run. No upgrading steps are needed.
 
 ### Maintenance
 
+- Refresh TypeScript-ESLint's indirect semver dependency to 7.8.6.
 - Group compatibility regressions by provenance, attribution, dispatch and edit
   boundaries
   ([#934](https://github.com/viell-dev/slop-markdown-tools/issues/934)).
