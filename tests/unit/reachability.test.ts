@@ -4,6 +4,20 @@ import { navigation } from "../../src/audit/navigation.js";
 import { reachableFrom } from "../../src/audit/graph.js";
 
 describe("source navigation", () => {
+  it.each(["commonmark", "github", "forgejo", "gitea", "obsidian", "vitepress"] as const)(
+    "collects literal brace paths and external URLs in %s (#925)",
+    (dialect) => {
+      const result = navigation(
+        parse("[Guide]({{guide}}.md) and [External](https://example.com/{{slug}}).\n", dialect),
+      );
+      expect(result.limits).toEqual([]);
+      expect(result.links.map(({ destination }) => destination)).toEqual([
+        "{{guide}}.md",
+        "https://example.com/{{slug}}",
+      ]);
+    },
+  );
+
   it.each([
     "iframe",
     "noembed",

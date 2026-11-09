@@ -11,6 +11,29 @@ const require = createRequire(import.meta.resolve("vitepress"));
 const { createSSRApp } = require("vue") as typeof import("vue");
 const { renderToString } = require("vue/server-renderer") as typeof import("vue/server-renderer");
 
+it("renders brace destinations as static attributes and Vue bindings as dynamic (#925)", async () => {
+  const root = await fixture({ "{{guide}}.md": "# Guide\n" });
+  const renderer = await createMarkdownRenderer(root, { cache: false });
+  for (const source of ["[Guide]({{guide}}.md)", '<a :href="guide">Guide</a>']) {
+    const html = await renderer.renderAsync(source, {
+      path: path.join(root, "page.md"),
+      realPath: path.join(root, "page.md"),
+      relativePath: "page.md",
+      includes: [],
+    });
+    const rendered = await renderToString(
+      createSSRApp({
+        template: `<div>${html}</div>`,
+        data: () => ({ guide: "changed.html" }),
+      }),
+    );
+    const href = /href="([^"]+)"/.exec(rendered)?.[1];
+    expect(href).toBeDefined();
+    if (source.startsWith("[")) expect(decodeURIComponent(href!)).toContain("{{guide}}");
+    else expect(href).toBe("changed.html");
+  }
+});
+
 it("preserves VitePress containers, snippet imports, and literal table-of-contents markers", async () => {
   const root = await fixture({ "a.js": "const a = 1;\n", "b.js": "const b = 2;\n" });
   const renderer = await createMarkdownRenderer(root, { cache: false });

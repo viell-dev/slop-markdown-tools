@@ -60,8 +60,6 @@ export function navigation(document: Document): {
           ...position(node),
           message: "VitePress target/download links bypass modeled page-path resolution.",
         });
-      else if (destination.includes("{{"))
-        limits.push({ ...position(node), message: "Dynamic link destinations are not modeled." });
       else links.push({ destination, wiki: node.type === "wikiLink", ...position(node) });
     }
     if (node.type === "obsidianHighlight" && node.value.includes("["))
