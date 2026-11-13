@@ -2,7 +2,7 @@
 # display, driven by WebdriverIO through wdio-obsidian-service. The image holds
 # no Obsidian build: the service downloads one at run time into a volume,
 # because Obsidian's terms do not allow redistributing it.
-FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c
+FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
 LABEL org.mdrefine.base-image="node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c"
 
 RUN apt-get update \
