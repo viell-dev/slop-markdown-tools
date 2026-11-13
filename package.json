@@ -156,7 +156,7 @@
     "@types/cross-spawn": "6.0.6",
     "@types/node": "22.20.5",
     "@types/unist": "3.0.3",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "commonmark": "0.31.2",
     "eslint": "10.14.0",
     "fast-check": "4.10.2",
@@ -174,7 +174,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vitepress": "2.0.0-alpha.21",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }
