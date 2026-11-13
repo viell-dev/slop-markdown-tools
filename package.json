@@ -170,7 +170,7 @@
     "micromark-extension-gfm-strikethrough": "2.1.0",
     "npm-run-all2": "9.0.4",
     "prettier": "3.9.10",
-    "rolldown": "1.2.16",
+    "rolldown": "1.3.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vitepress": "2.0.0-alpha.21",
