@@ -6,7 +6,7 @@ import process from "node:process";
 import { log } from "node:console";
 import { URL } from "node:url";
 import { setupBrowser, setupDriver } from "@wdio/utils/node";
-import { install } from "@puppeteer/browsers";
+import { Cache, getDownloadUrl, install } from "@puppeteer/browsers";
 import { install as localInstall } from "./provided-binaries/index.mjs";
 import { launcher as VerifiedLauncher } from "./service.mjs";
 import { SevereServiceError } from "webdriverio";
@@ -17,6 +17,8 @@ assert.equal(
   realpathSync(new URL("./provided-binaries/index.mjs", import.meta.url)),
 );
 assert.equal(install, localInstall);
+assert.throws(() => new Cache(), /automatic browser downloading is disabled/);
+assert.throws(() => getDownloadUrl(), /automatic browser downloading is disabled/);
 for (const name of [
   "basic-ftp",
   "get-uri",

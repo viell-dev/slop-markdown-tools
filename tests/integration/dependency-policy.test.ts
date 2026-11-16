@@ -170,7 +170,7 @@ describe("dependency update policy", () => {
     },
   );
 
-  it("retains support-based TypeScript, minimum-Node and Obsidian major deferrals", () => {
+  it("retains TypeScript support, minimum-Node and verified Obsidian major deferrals", () => {
     expect(root.ignore!.filter((entry) => entry["dependency-name"] === "typescript")).toEqual([
       { "dependency-name": "typescript", versions: ["7.x"] },
     ]);

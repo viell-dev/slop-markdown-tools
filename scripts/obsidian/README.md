@@ -7,7 +7,7 @@ evidence. These dependencies are separate from the published mdrefine package.
 
 ## Download ownership
 
-`wdio-obsidian-service` 3.4.0 uses `obsidian-launcher` 3.4.0 to download the
+`wdio-obsidian-service` 3.5.0 uses `obsidian-launcher` 3.5.0 to download the
 Obsidian installer and application, and Electron's matching ChromeDriver. It
 supplies both executable paths before WebdriverIO starts:
 
@@ -32,9 +32,10 @@ entry and the service setup rather than enabling another downloader.
 The private, locally authored MIT package in `provided-binaries/` replaces
 `@puppeteer/browsers` through the harness's direct file dependency and matching
 npm override. This is a deliberately smaller contract, not a compatible
-Puppeteer fork. It supplies the seven runtime imports used by `@wdio/utils`
-9.32.0: browser/channel constants and five functions that fail explicitly when
-automatic browser setup is attempted. It downloads and extracts nothing.
+Puppeteer fork. It supplies the nine named runtime imports used by `@wdio/utils`
+9.33.1: browser/channel constants, six functions and a `Cache` constructor. The
+functions and constructor fail explicitly when automatic browser setup is
+attempted. It downloads and extracts nothing.
 
 The configured Obsidian service already owns all required downloads. Its cold
 and warm startup paths were checked before removing the unused fallback. This
@@ -67,7 +68,7 @@ Obsidian jobs exercise the service and actual host; these offline checks do not
 replace them.
 
 The `serialize-javascript` 7.1.3 override remains: `@wdio/mocha-framework`
-9.32.0 uses Mocha 10.8.2, whose `^6.0.2` range cannot select that verified
+9.33.1 uses Mocha 10.8.2, whose `^6.0.2` range cannot select that verified
 patch. Remove the override only when its owning chain disappears, or a supported
 update resolves a safely patched version without it and clean installation,
 audit, Mocha execution and actual Obsidian evidence pass. This pin is separate

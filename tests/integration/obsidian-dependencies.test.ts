@@ -12,8 +12,10 @@ it("rejects every automatic-browser operation instead of silently attempting ano
     boundary.resolveBuildId,
     boundary.detectBrowserPlatform,
     boundary.computeExecutablePath,
+    boundary.getDownloadUrl,
   ])
     expect(() => operation()).toThrow("automatic browser downloading is disabled");
+  expect(() => new boundary.Cache()).toThrow("automatic browser downloading is disabled");
 });
 
 it("checks both supplied executables before starting a session", () => {

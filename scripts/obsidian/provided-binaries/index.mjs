@@ -1,4 +1,4 @@
-// This is the seven-import boundary used by @wdio/utils 9.32.0, not a browser installer.
+// This is the nine-import boundary used by @wdio/utils 9.33.1, not a browser installer.
 // wdio-obsidian-service supplies both binaries through obsidian-launcher instead.
 // Maintenance ownership, verification and removal conditions: ../README.md and #639/#640.
 import { accessSync, constants, statSync } from "node:fs";
@@ -32,6 +32,13 @@ export const canDownload = () => unavailable("canDownload");
 export const resolveBuildId = () => unavailable("resolveBuildId");
 export const detectBrowserPlatform = () => unavailable("detectBrowserPlatform");
 export const computeExecutablePath = () => unavailable("computeExecutablePath");
+export const getDownloadUrl = () => unavailable("getDownloadUrl");
+
+export class Cache {
+  constructor() {
+    unavailable("Cache");
+  }
+}
 
 /** Reject missing or incomplete service setup before WebdriverIO can start a fallback. */
 export function assertProvidedBinaries(capabilities) {
