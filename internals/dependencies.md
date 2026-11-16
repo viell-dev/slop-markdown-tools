@@ -248,7 +248,7 @@ warnings or advance an assertion merely to make installation/building succeed.
 
 - **TypeScript:** when updating `typescript-eslint`, recheck its [official
   support](https://typescript-eslint.io/users/dependency-versions/) and the
-  installed parser's TypeScript peer. As of parser 8.72.1, that range is
+  installed parser's TypeScript peer. As of parser 8.72.2, that range is
   `>=4.8.4 <6.1.0`, excluding TypeScript 7. Revisit the `7.x` ignore from
   [#3](https://github.com/viell-dev/slop-markdown-tools/pull/3) when support
   includes the target; remove it only after an unforced install, typed lint,
@@ -260,16 +260,19 @@ warnings or advance an assertion merely to make installation/building succeed.
   engines, types, minimum-version CI and public requirements together; the
   development or newest advisory CI version alone does not justify advancing
   these types. Keep actual execution on the exact supported minimum.
-- **VitePress and markdown-it:** inspect peers for the ignored markdown-it 15
-  and attrs, container, emoji, footnote and tasklist plugin lines. The pinned
-  plugins accept markdown-it 14; the deferred generation requires 15. The
-  separate MathJax plugin deferral exists because VitePress alpha.21 peers
-  `markdown-it-mathjax3: ^4`; v5 changes the backend and adds native deasync,
-  rather than itself declaring a markdown-it 15 peer. Keep the bounded ranges in
-  the configuration until compatible peers return or a coordinated reference
-  migration passes actual VitePress builds/rendering, math, full and installed
-  package checks. Reassess for a security advisory even while a range is
-  ignored. Existing decisions:
+- **VitePress and markdown-it:** inspect requirements for the ignored
+  markdown-it 15 and component, attrs, container, emoji, footnote and tasklist
+  plugin lines. The pinned plugins accept markdown-it 14; the deferred
+  generation requires 15. Component 4 depends on markdown-it 15 and its types
+  directly, rather than declaring a peer; its plugin signature is incompatible
+  with the current markdown-it 14 reference. Keep component 3 until that
+  migration. The separate MathJax plugin deferral exists because VitePress
+  alpha.21 peers `markdown-it-mathjax3: ^4`; v5 changes the backend and adds
+  native deasync, rather than itself declaring a markdown-it 15 peer. Keep the
+  bounded ranges in the configuration until compatible peers return or a
+  coordinated reference migration passes actual VitePress builds/rendering,
+  math, full and installed package checks. Reassess for a security advisory even
+  while a range is ignored. Existing decisions:
   [#591](https://github.com/viell-dev/slop-markdown-tools/pull/591) through
   [#594](https://github.com/viell-dev/slop-markdown-tools/pull/594), and
   [#612](https://github.com/viell-dev/slop-markdown-tools/pull/612). The

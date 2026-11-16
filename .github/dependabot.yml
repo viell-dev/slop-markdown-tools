@@ -17,7 +17,7 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       # PR #591: VitePress alpha.21 peers mathjax3 ^4; v5 changes its backend.
-      # The deferred mdit plugin lines below peer markdown-it 15, while the
+      # The deferred mdit plugin lines below require markdown-it 15, while the
       # current VitePress reading uses 14. See CONTRIBUTING's dependency procedure.
       # PRs #592-#594, #608, #610 and #611; compatible older lines remain eligible.
       # Revisit when compatible peer ranges return, with a reference upgrade,
@@ -26,6 +26,10 @@ updates:
         versions: [">=5.0.0 <6.0.0"]
       - dependency-name: markdown-it
         versions: [">=15.0.0 <16.0.0"]
+      # PR #953: component 4 also requires markdown-it 15. Revisit with the
+      # coordinated reference migration, compatible support, or an advisory.
+      - dependency-name: "@mdit-vue/plugin-component"
+        versions: [">=4.0.0 <5.0.0"]
       - dependency-name: "@mdit/plugin-attrs"
         versions: [">=1.3.0 <2.0.0"]
       - dependency-name: "@mdit/plugin-container"

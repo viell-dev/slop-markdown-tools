@@ -17,6 +17,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   Obsidian verification dependencies
   ([#945](https://github.com/viell-dev/slop-markdown-tools/pull/945) through
   [#951](https://github.com/viell-dev/slop-markdown-tools/pull/951)).
+- Refresh Commander, TypeScript-ESLint and the parser bundler
+  ([#954](https://github.com/viell-dev/slop-markdown-tools/pull/954) through
+  [#956](https://github.com/viell-dev/slop-markdown-tools/pull/956)).
 
 ## 0.8.3 - 2026-11-09
 
