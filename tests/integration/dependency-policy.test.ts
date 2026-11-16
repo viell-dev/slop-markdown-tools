@@ -147,6 +147,7 @@ describe("dependency update policy", () => {
   it.each([
     ["markdown-it-mathjax3", ">=5.0.0 <6.0.0", "4.3.2", "5.2.0", "6.0.0"],
     ["markdown-it", ">=15.0.0 <16.0.0", "14.3.3", "15.0.3", "16.0.0"],
+    ["@mdit-vue/plugin-component", ">=4.0.0 <5.0.0", "3.0.2", "4.0.0", "5.0.0"],
     ["@mdit/plugin-attrs", ">=1.3.0 <2.0.0", "1.2.0", "1.3.4", "2.0.0"],
     ["@mdit/plugin-container", ">=2.0.0 <3.0.0", "1.0.2", "2.0.3", "3.0.0"],
     ["@mdit/plugin-emoji", ">=1.2.0 <2.0.0", "1.1.1", "1.2.3", "2.0.0"],
@@ -187,6 +188,6 @@ describe("dependency update policy", () => {
     expect(docker.ignore).toEqual([
       { "dependency-name": "node", "update-types": ["version-update:semver-major"] },
     ]);
-    expect(root.ignore).toHaveLength(9);
+    expect(root.ignore).toHaveLength(10);
   });
 });
