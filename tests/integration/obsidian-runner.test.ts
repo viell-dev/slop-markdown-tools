@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { expect, it, vi } from "vitest";
+import baseline from "../../scripts/obsidian/baseline.json" with { type: "json" };
 
 vi.mock("node:fs", () => ({
   chmodSync: vi.fn(),
@@ -40,8 +41,7 @@ it("passes a Windows-sized PROBE batch through the runner without putting it in 
             Architecture: "amd64",
             Config: {
               Labels: {
-                "org.mdrefine.base-image":
-                  "node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c",
+                "org.mdrefine.base-image": baseline.baseImage,
               },
             },
           },
