@@ -86,7 +86,9 @@ updates:
     cooldown:
       default-days: 7
     ignore:
-      # wdio-obsidian-service 3.4 needs WebdriverIO 9.
+      # Service 3.5 supports WDIO 10, but retain the verified WDIO 9 stack until
+      # a coordinated major migration passes the native and dependency checks.
+      # WDIO 10 alone does not fix the remaining minimatch paths (#837).
       - dependency-name: "webdriverio"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@wdio/*"

@@ -277,10 +277,12 @@ warnings or advance an assertion merely to make installation/building succeed.
   override; [#481](https://github.com/viell-dev/slop-markdown-tools/issues/481)
   records the source, renderer, audit and installed-package checks for its
   adoption.
-- **WebdriverIO:** `wdio-obsidian-service` 3.4.0 declares a webdriverio
-  `^9.18.1` peer. Retain WDIO major ignores until a service release supports the
-  target. Review its coherent WDIO packages and launcher together, then test the
-  actual Docker host, both views, controls and report identity. The service's
+- **WebdriverIO:** `wdio-obsidian-service` 3.5.0 declares a webdriverio
+  `>=9.18.1` peer, including WDIO 10. The verified harness stays on WDIO 9;
+  retain its major ignores until a coordinated migration has the required
+  verification. WDIO 10 alone does not fix every minimatch parent in #837.
+  Review its coherent WDIO packages and launcher together, then test the actual
+  Docker host, both views, controls and report identity. The service's
   `obsidian` API dependency is not the downloaded app or installer identity.
   Follow the [baseline and latest-route procedure](testing.md#tests)
   independently; no forced major is an established remedy for the separate
