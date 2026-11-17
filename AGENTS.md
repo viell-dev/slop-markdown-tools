@@ -55,6 +55,15 @@ micromark/micromark#253 at the start of each maintenance session, check the
 other entries' upstream state before a release they affect, and log each check
 in #330.
 
+## Scheduled discovery triage
+
+At the start of maintenance, read failed scheduled Rendering, Obsidian and
+Forges runs and their automatically opened discovery issues. Check for a missing
+issue if reporting failed. Triage each candidate under [bounded renderer
+work](./CONTRIBUTING.md#bounded-renderer-work); an automatic report is not a
+confirmed defect. See the [reporting
+procedure](./internals/testing.md#scheduled-discovery-triage).
+
 ## Keeping the repository consistent
 
 Before committing, search the repository for other statements of what the change

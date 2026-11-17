@@ -158,6 +158,14 @@ never a merge or release gate. Keep discoveries issue-linked; exact known
 source/output/view pairs are replayed, and stale entries fail. Offline tests
 bind entries to current formatter output without needing Docker.
 
+At maintenance start and release preparation, read failed scheduled Rendering,
+Obsidian and Forges runs and their automatic discovery issues. Check that every
+failed scheduled run since the previous release has an issue, including when
+reporting itself failed; read the report and log and record a disposition. The
+[reporting
+procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#scheduled-discovery-triage)
+explains retention, duplicate handling and missing reports.
+
 Before implementing a discovered difference, decide whether plausible authored
 CommonMark or documented dialect syntax loses meaningful rendered content or
 structure. Fix those cases. Record exotic constructions and stray-marker styling
