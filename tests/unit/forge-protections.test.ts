@@ -1,7 +1,7 @@
 import { semanticFingerprintWithCode } from "../../src/core/semantics.js";
 import { describe, expect, it } from "vitest";
-import { format, parse, range, semanticFingerprint } from "../../src/index.js";
-import type { DialectName, Plugin } from "../../src/index.js";
+import { format, parse, range, semanticFingerprint, validateConfig } from "../../src/index.js";
+import type { Config, DialectName, Plugin, ProcessOptions } from "../../src/index.js";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import {
   forgeBoundaryFixtures,
@@ -9,6 +9,12 @@ import {
   forgeFrontMatterCreationFixtures,
 } from "../fixtures/renderers/forges.mjs";
 import { formatted } from "../support/engine.js";
+
+const fixtureConfig = (value: unknown): Config => {
+  const config = value ?? {};
+  validateConfig(config);
+  return config;
+};
 
 const protectedSources = (source: string, dialect: DialectName) => {
   const { tableText, boundaryText } = rendererProtections(parse(source, dialect));
@@ -219,7 +225,9 @@ describe.each(["forgejo", "codeberg", "gitea"] as const)(
     it.each(forgeFrontMatterCreationFixtures)(
       "rejects creation and converges: $name",
       ({ source, config }) => {
-        const options = { config: { extends: ["recommended", dialect], dialect, ...config } };
+        const options = {
+          config: { extends: ["recommended", dialect], dialect, ...fixtureConfig(config) },
+        };
         const result = format(source, options);
         expect(result.output).toBe(source);
         expect(format(result.output, options).output).toBe(source);
@@ -231,7 +239,7 @@ describe.each(["forgejo", "codeberg", "gitea"] as const)(
         ["----\n\nNote: remember this.\n\n***\n", "***", "---"],
         ["----\ntitle: Example\n----\n", "----", "\n----"],
       ]) {
-        const options = {
+        const options: ProcessOptions = {
           plugins: [rewrite(before!, after!)],
           config: { dialect, extends: [], rules: { "probe/rewrite": "warn" } },
         };
@@ -259,9 +267,11 @@ describe.each(["commonmark", "github", "obsidian", "vitepress"] as const)(
         expected: expected[index],
       })),
     )("retains the other dialect output: $name", ({ source, config, expected }) => {
-      expect(formatted(source, { config: { extends: ["recommended"], ...config, dialect } })).toBe(
-        expected,
-      );
+      expect(
+        formatted(source, {
+          config: { extends: ["recommended"], ...fixtureConfig(config), dialect },
+        }),
+      ).toBe(expected);
     });
   },
 );
