@@ -236,6 +236,9 @@ below another block as text. These places are also left as written:
 - The boundary after a standalone `%%` comment: adding a blank line can split a
   native paragraph even when the parser reads a separate heading. Inline style
   edits below the comment remain available.
+- The boundary directly after a block where an HTML comment from an earlier
+  block closes: Live Preview can continue that paragraph below the closer, even
+  when the parser reads a heading. Later text still accepts inline edits.
 - A list directly after a list's final secondary paragraph or indented code
   block: a new blank line splits Live Preview's paragraph. Markers, numbering,
   and inline styles remain eligible. A sole first paragraph, final heading,

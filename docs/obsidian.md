@@ -94,6 +94,11 @@ Blocks outside these places still format. The [list of
 protections](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/obsidian.md)
 describes each case in detail.
 
+Generated combinations of quoted code containing unclosed HTML and unquoted
+continuation lines can still change Live Preview's paragraph grouping during
+formatting, while retaining the text and Reading view's structure. This is a
+[documented limit](design.md#limits), reconsidered with evidence from real use.
+
 ### Visible boundary refusals
 
 When a rule's edit is held this way, `lint` and `format` report

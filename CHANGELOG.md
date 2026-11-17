@@ -11,6 +11,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Keep Obsidian paragraphs together after comment-closing headings
+  ([#963](https://github.com/viell-dev/slop-markdown-tools/issues/963)).
+
 ### Maintenance
 
 - Refresh GFM tree readers, the matcher, parser bundler, test runner and
