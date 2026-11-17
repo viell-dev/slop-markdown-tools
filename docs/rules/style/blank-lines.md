@@ -48,6 +48,10 @@ the document means:
   the parser counts them toward: there it reads a list as loose when two or more
   follow and as tight when one does.
 
+On Forgejo and Gitea, the semantic guard also refuses removing leading blank
+lines when that would expose a native front matter envelope. Its dash fences may
+be longer than three dashes or have surrounding spaces.
+
 ## Dialect notes
 
 **In Obsidian:** a line of blank space that holds a tab, or that lies directly
