@@ -149,13 +149,21 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
             lines("+++", dialect === "vitepress" ? "+++" : "  +++", "==="),
           );
           // Other indented headings below the opener still lose their indentation.
-          expect(formatted(lines("---", "  Title", "  ===", "", "  ## Sub"), config)).toBe(
+          const headingSource = lines("---", "  Title", "  ===", "", "  ## Sub");
+          const headingResult = format(headingSource, { config });
+          expect(format(headingResult.output, { config }).output).toBe(headingResult.output);
+          expect(
+            headingResult.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
+          ).toBe(forge && style !== "atx");
+          expect(headingResult.output).toBe(
             keeps
               ? lines("---", "  Title", "  ===", "", "  ## Sub")
-              : style === "atx"
-                ? lines("---", "# Title", "", "## Sub")
-                : // An underline of four dashes, which closes no parser front matter.
-                  lines("---", "Title", "===", "", "Sub", "----"),
+              : forge && style !== "atx"
+                ? lines("---", "Title", "===", "", "## Sub")
+                : style === "atx"
+                  ? lines("---", "# Title", "", "## Sub")
+                  : // An underline of four dashes, which closes no parser front matter.
+                    lines("---", "Title", "===", "", "Sub", "----"),
           );
         }
       }

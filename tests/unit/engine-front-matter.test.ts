@@ -196,7 +196,14 @@ describe("a first line that opens no front matter", () => {
         "---\n\nText _a_.\n\n***\n\n___\n",
       );
       const setext = preset(dialect, { "style/heading": ["warn", { style: "setext" }] });
-      expect(formatted("---\n\n## Foo\n\nText.\n", setext)).toBe("---\n\nFoo\n----\n\nText.\n");
+      const headingSource = "---\n\n## Foo\n\nText.\n";
+      const forge = dialect === "forgejo" || dialect === "gitea";
+      const headingResult = format(headingSource, setext);
+      expect(headingResult.output).toBe(forge ? headingSource : "---\n\nFoo\n----\n\nText.\n");
+      expect(format(headingResult.output, setext).output).toBe(headingResult.output);
+      expect(headingResult.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(
+        forge,
+      );
       // A break that is not at the start of its line closes nothing, and `---`
       // does not close front matter that `+++` opens.
       expect(formatted("---\n\n> ***\n", preset(dialect))).toBe("---\n\n> ---\n");

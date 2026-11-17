@@ -59,7 +59,9 @@ function approvedValues(document: Document, node: Code, value: string): WeakMap<
 }
 function frontMatterSource(document: Document, edits: Edit[]): string {
   const source = applyEdits(document.source, edits);
-  return source.slice(0, frontmatterEnd(source));
+  return document.dialect === "forgejo" || document.dialect === "gitea"
+    ? source
+    : source.slice(0, frontmatterEnd(source));
 }
 /** An engine finding moved by one accepted whole-block replacement. */
 function movedDiagnostic(item: Diagnostic, edit: Edit): Diagnostic {

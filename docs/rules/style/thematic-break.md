@@ -43,6 +43,9 @@ means:
   as does a break separated from the math by a blank line.
 - On the line of a list item whose marker is the new marker's character, as in
   `- ***` with `---`: `- ---` is one thematic break, not a list item.
+- A change that creates Forgejo or Gitea front matter is refused by the semantic
+  guard, including writing a closing dash separator below an initial longer or
+  spaced dash line. Other edits of the same rule may be withheld with it.
 - Inside an initial Forgejo or Gitea metadata envelope with native separator
   fences, including longer dash runs and surrounding spaces; see [dialect
   protections](../../dialects.md#forgejo-and-gitea).

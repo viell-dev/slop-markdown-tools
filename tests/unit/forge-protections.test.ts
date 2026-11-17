@@ -1,8 +1,13 @@
+import { semanticFingerprintWithCode } from "../../src/core/semantics.js";
 import { describe, expect, it } from "vitest";
-import { format, parse, range } from "../../src/index.js";
+import { format, parse, range, semanticFingerprint } from "../../src/index.js";
 import type { DialectName, Plugin } from "../../src/index.js";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
-import { forgeBoundaryFixtures, forgeFrontMatterFixtures } from "../fixtures/renderers/forges.mjs";
+import {
+  forgeBoundaryFixtures,
+  forgeFrontMatterFixtures,
+  forgeFrontMatterCreationFixtures,
+} from "../fixtures/renderers/forges.mjs";
 import { formatted } from "../support/engine.js";
 
 const protectedSources = (source: string, dialect: DialectName) => {
@@ -205,5 +210,74 @@ it.each(["commonmark", "github", "obsidian", "vitepress"] as const)(
         ? source
         : "---\n\n## title: Example\n\nBody text.\n",
     );
+  },
+);
+
+describe.each(["forgejo", "codeberg", "gitea"] as const)(
+  "%s metadata creation guard",
+  (dialect) => {
+    it.each(forgeFrontMatterCreationFixtures)(
+      "rejects creation and converges: $name",
+      ({ source, config }) => {
+        const options = { config: { extends: ["recommended", dialect], dialect, ...config } };
+        const result = format(source, options);
+        expect(result.output).toBe(source);
+        expect(format(result.output, options).output).toBe(source);
+        expect(result.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(true);
+      },
+    );
+    it("rejects a plugin closing separator and insertion before existing metadata", () => {
+      for (const [source, before, after] of [
+        ["----\n\nNote: remember this.\n\n***\n", "***", "---"],
+        ["----\ntitle: Example\n----\n", "----", "\n----"],
+      ]) {
+        const options = {
+          plugins: [rewrite(before!, after!)],
+          config: { dialect, extends: [], rules: { "probe/rewrite": "warn" } },
+        };
+        const result = format(source!, options);
+        expect(result.output).toBe(source);
+        expect(format(result.output, options).output).toBe(source);
+      }
+    });
+  },
+);
+
+describe.each(["commonmark", "github", "obsidian", "vitepress"] as const)(
+  "%s creation controls",
+  (dialect) => {
+    const expected = [
+      "-----\n\nNote: remember this.\n\n---\n\nBody text.\n",
+      " ---\n\nNote: remember this.\n\n---\n\nBody text.\n",
+      "-----\n\nIntro paragraph.\n\n---\n\nBody text.\n",
+      "----\n\ntitle: Example\n--------------\n\nBody text.\n",
+      " ----\ntitle: Example\n ----\n\nBody text.\n",
+    ];
+    it.each(
+      forgeFrontMatterCreationFixtures.map((fixture, index) => ({
+        ...fixture,
+        expected: expected[index],
+      })),
+    )("retains the other dialect output: $name", ({ source, config, expected }) => {
+      expect(formatted(source, { config: { extends: ["recommended"], ...config, dialect } })).toBe(
+        expected,
+      );
+    });
+  },
+);
+
+it.each(["forgejo", "gitea"] as const)(
+  "keeps the native envelope exact in selected-code comparisons on %s",
+  (dialect) => {
+    const source = "----\n\n~~~txt\nNote: remember this.\n~~~\n";
+    const before = parse(source, dialect);
+    const code = before.tree.children.find((node) => node.type === "code")!;
+    const changed = parse(
+      source.replace("Note: remember this.", "----\nNote: remember this."),
+      dialect,
+    );
+    expect(
+      semanticFingerprintWithCode(before, new WeakMap([[code, "----\nNote: remember this."]])),
+    ).not.toBe(semanticFingerprint(changed));
   },
 );

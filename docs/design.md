@@ -152,7 +152,10 @@ The comparison is only as good as the parser's reading:
   dashes and surrounding spaces. When a later separator closes such an envelope
   and the parser has not already read it as YAML front matter, formatting keeps
   it as written, including its fences. This protection also applies to CRLF
-  documents and empty or invalid YAML; it does not predict whether the forge
+  documents and empty or invalid YAML. The semantic guard also refuses edits
+  that create, remove, move or change a native envelope, including edits from
+  plugins. A selected metadata formatter may change its value while retaining
+  its native closing boundary. These checks do not predict whether the forge
   displays metadata or change the parser's reading ([issue
   #958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
 - TOML front matter, between lines of `+++`, is read in every dialect, for site

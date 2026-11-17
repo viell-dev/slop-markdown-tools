@@ -48,6 +48,13 @@ export const forgeFrontMatterFixtures = [
   name: `frontmatter-${name}`,
   source: `${envelope}\n\nBody *text*.\n`,
 }));
+export const forgeFrontMatterCreationFixtures = [
+  { name: "metadata-create-break", source: "-----\n\nNote: remember this.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-indented", source: " ---\n\nNote: remember this.\n\n___\n\nBody text.\n" },
+  { name: "metadata-create-scalar", source: "-----\n\nIntro paragraph.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-setext", source: "----\n\n## title: Example\n\nBody text.\n", config: { rules: { "style/heading": ["warn", { style: "setext" }] } } },
+  { name: "metadata-create-leading-blank", config: { extends: [], rules: { "style/blank-lines": "warn" } }, source: "\n ----\ntitle: Example\n ----\n\nBody text.\n" },
+];
 export const forgeFixtures = [
   ...commonFixtures,
   ...forgeBoundaryFixtures,

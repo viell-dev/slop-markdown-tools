@@ -35,22 +35,25 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   resolution and defaults; `plugins.test.ts` checks registration, synchronous
   schema validation and identity-keyed schema caching. `forge-protections`
   checks native metadata envelope retention, parser-owned controls, dialect
-  isolation and plugin edits; its authored fixtures also run on both real
-  forges. `engine-ranges`, `engine-front-matter` and `engine-*-protections`
-  retain their respective selection and preservation regressions.
-  `link-fingerprint.test.ts` covers resolved target identity and literal URLs.
-  `reference-conversion.test.ts` checks the conversion-specific proof, label
-  allocation, source retention, suppression, ranges and interaction with other
-  rules. Ordinary fingerprints remain exact; only verified built-in inline to
-  full-reference conversions establish a new comparison baseline. Boundary
-  regressions and `tests/performance/engine.test.ts` cover source ranges,
-  ordered protection fields and bounded scans. These locations describe current
-  ownership and evidence, rather than requiring future helpers to accumulate
-  there. The rule tests format twice, compare the meaning, and disable the rule;
-  `renderers.test.ts` compares commonmark.js and markdown-it before and after
-  formatting. Every pull request. The guard compares the parser's own readings,
-  so a parser defect can hide from it; the renderer checks below and the
-  workarounds in the [dependency
+  isolation, envelope creation and plugin edits; configured metadata tests
+  retain selected-value changes while rejecting earlier native closers. Creation
+  controls force real forge comparisons even for unchanged output, with a
+  fixture-owned plan independent of execution records. Its authored fixtures
+  also run on both real forges. `engine-ranges`, `engine-front-matter` and
+  `engine-*-protections` retain their respective selection and preservation
+  regressions. `link-fingerprint.test.ts` covers resolved target identity and
+  literal URLs. `reference-conversion.test.ts` checks the conversion-specific
+  proof, label allocation, source retention, suppression, ranges and interaction
+  with other rules. Ordinary fingerprints remain exact; only verified built-in
+  inline to full-reference conversions establish a new comparison baseline.
+  Boundary regressions and `tests/performance/engine.test.ts` cover source
+  ranges, ordered protection fields and bounded scans. These locations describe
+  current ownership and evidence, rather than requiring future helpers to
+  accumulate there. The rule tests format twice, compare the meaning, and
+  disable the rule; `renderers.test.ts` compares commonmark.js and markdown-it
+  before and after formatting. Every pull request. The guard compares the
+  parser's own readings, so a parser defect can hide from it; the renderer
+  checks below and the workarounds in the [dependency
   overview](https://github.com/viell-dev/slop-markdown-tools/issues/330) cover
   what is known.
 - **Renderers show the same before and after.** GitHub: the Rendering workflow.
