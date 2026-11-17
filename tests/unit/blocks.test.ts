@@ -911,7 +911,8 @@ describe("the block and whitespace rules together", () => {
       "<!-- mdrefine-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdrefine-enable -->\n\nText\n\n```\ncode\n```\n",
     );
   });
-  it("keeps the meaning of randomly assembled documents", () => {
+  // Replay the same 400 cases in four slices under the unit deadline (#902).
+  it.each([0, 100, 200, 300])("keeps generated documents' meaning (offset %i)", (offset) => {
     const blocks = fc.constantFrom(
       "# Heading #",
       "## Heading",
@@ -1026,7 +1027,7 @@ describe("the block and whitespace rules together", () => {
           formatted(lines.join(newline) + (final ? newline : ""), config);
         },
       ),
-      { numRuns: 400, seed: 20261017 },
+      { numRuns: 100, seed: 20261017, path: String(offset) },
     );
   });
 });

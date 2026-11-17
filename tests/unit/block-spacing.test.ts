@@ -1197,7 +1197,8 @@ describe("style/block-spacing", () => {
         lint("# H\n", { config: only({ "style/block-spacing": ["warn", options] }) }),
       ).toThrow("Invalid options for style/block-spacing");
     });
-    it("keeps the meaning of randomly assembled documents with counted blank lines", () => {
+    // Replay the same 400 cases in four slices under the unit deadline (#902).
+    it.each([0, 100, 200, 300])("keeps meaning with counted blank lines (offset %i)", (offset) => {
       const blocks = fc.constantFrom(
         "# Heading",
         "### Deeper",
@@ -1276,7 +1277,7 @@ describe("style/block-spacing", () => {
             });
           },
         ),
-        { numRuns: 400, seed: 20261029 },
+        { numRuns: 100, seed: 20261029, path: String(offset) },
       );
     });
   });

@@ -112,6 +112,12 @@ registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
 `engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
 specific contracts. The printed diff has `diff.test.ts`.
 
+The generated-document properties in `blocks.test.ts`, `block-spacing.test.ts`
+and `engine-ranges.test.ts` replay consecutive slices of fixed fast-check seeds
+as separate tests. Each slice has the ordinary unit deadline and can still
+shrink a failing input. Keep the slices contiguous and complete when changing a
+property or its corpus.
+
 Competitor-comment regressions are grouped by what they prove:
 `competitor-comments-provenance.test.ts` owns source provenance and pragma
 gates; `competitor-comments-attribution.test.ts` owns source-check attribution
@@ -273,7 +279,8 @@ safeguards, `cli-access.test.ts` for access failures, `cli-encoding.test.ts` for
 UTF-8 handling, `selection.test.ts` for which files a run selects, compared with
 Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
 `mdrefine/node`, `code-formatters.test.ts` and `code-command.test.ts` for the
-opt-in code tools, `examples.test.ts` and `docs.test.ts` for the examples and
+opt-in code tools, `convert.test.ts` for fallback and written competitor
+configuration, `examples.test.ts` and `docs.test.ts` for the examples and
 documentation, `metadata.test.ts` for what the package, the README, the site,
 the issue forms, and the workflows say about the same facts, and
 `release-evidence.test.ts` for the Release workflow's check of CI.
