@@ -80,6 +80,19 @@ files run one at a time, apart from coverage and the processes that integration
 tests start. Unit and integration runs each use at most four workers, or the
 machine's available parallelism when it has fewer.
 
+Test and hook deadlines assume a machine with spare processor time and memory,
+as the hosted runners have. On a workstation that is also running other heavy
+work, a complete `check` can exceed the deadlines of cases that start processes,
+build bundles or copy files without anything hanging, because that work can run
+several times slower there than on a hosted runner. Do not widen a deadline or
+remove a case for that. Record the failure and the machine's load with the
+verification it belongs to, compare the same cases on hosted CI and in one
+focused run of the failing file while the machine has headroom, and treat a
+failure that remains in either as a defect. Keep each case's work proportionate
+to its deadline: split a test that checks many independent inputs, and share
+processes between inputs that need the same setup, as the generated-document
+properties and the MD041 conversion case do.
+
 `test:coverage` uses V8 coverage and writes an HTML report and
 `coverage-summary.json` to `coverage/unit/`. It includes every production
 TypeScript file, including files unit tests never execute. CI publishes the
