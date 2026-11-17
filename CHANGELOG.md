@@ -11,6 +11,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Preserve Forgejo, Codeberg and Gitea front matter with native separator fences
+  ([#958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
+
 ### Maintenance
 
 - Refresh GFM tree readers, the matcher, parser bundler, test runner and

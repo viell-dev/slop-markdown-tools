@@ -64,6 +64,30 @@ function cells(line: string): string[] {
   return result;
 }
 
+/** Mirror isYAMLSeparator, including its extra byte step after a Unicode space. */
+function yamlSeparator(line: string): boolean {
+  let at = 0;
+  const spaces = () => {
+    while (at < line.length) {
+      if (line[at] === " ") at++;
+      else if (
+        /^[\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$/.test(line[at]!)
+      ) {
+        at++;
+        // All Go non-ASCII spaces are BMP runes. Skipping one more UTF-8
+        // byte either skips an ASCII character or lands on an invalid rune.
+        if (at < line.length && line.charCodeAt(at) >= 0x80) return false;
+        at++;
+      } else break;
+    }
+    return true;
+  };
+  if (!spaces()) return false;
+  const start = at;
+  while (line[at] === "-") at++;
+  return at - start >= 3 && spaces() && at >= line.length;
+}
+
 /** Native forge readings absent from the GFM tree, shared by every edit producer. */
 export function collectForgeProtections(
   document: Document,
@@ -81,6 +105,20 @@ export function collectForgeProtections(
       end: { ...node.position!.end, offset: end },
     },
   });
+  // File renderers normalize CRLF before metadata extraction. Scan physical
+  // lines, retaining original offsets and bytes; no YAML interpretation (#958).
+  const firstEnd = lineAround(0)[1];
+  if (yamlSeparator(source.slice(0, firstEnd))) {
+    for (let end = firstEnd; end < source.length;) {
+      const start = end + (source.startsWith("\r\n", end) ? 2 : 1);
+      end = lineAround(start)[1];
+      if (!yamlSeparator(source.slice(start, end))) continue;
+      const first = document.tree.children[0];
+      if (first?.type !== "yaml" || first.position!.end.offset! < end)
+        boundaryText.add(region(document.tree, 0, end));
+      break;
+    }
+  }
   let tableUntil = 0;
   const visit = (parent: Parents, container: Container) => {
     for (let index = 0; index < parent.children.length; index++) {

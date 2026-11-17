@@ -53,13 +53,19 @@ describe("front matter that would end inside a code block", () => {
       // fence written with backticks would end it there.
       let result = format(yaml, preset(dialect));
       expect(result.output).toBe(yaml);
-      expect(refusals(result)).toEqual([
-        "style/wrap would change the parsed meaning at line 1; none of its edits were applied.",
-      ]);
+      // Forge metadata protection now withholds the edit before the guard (#958).
+      const forge = dialect === "forgejo" || dialect === "gitea";
+      expect(refusals(result)).toEqual(
+        forge
+          ? []
+          : [
+              "style/wrap would change the parsed meaning at line 1; none of its edits were applied.",
+            ],
+      );
       result = format(tildes, preset(dialect));
       expect(result.output).toBe(tildes);
       expect(refusals(result)).toEqual([
-        "style/code-fence would change the parsed meaning at line 1; none of its edits were applied.",
+        `style/code-fence would change the parsed meaning at line ${forge ? 5 : 1}; none of its edits were applied.`,
       ]);
       // With front matter, the closing fence opens a code block that holds `*a*`.
       result = format(toml, preset(dialect));

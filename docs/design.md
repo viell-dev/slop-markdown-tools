@@ -148,6 +148,13 @@ The comparison is only as good as the parser's reading:
   document, a rule whose edits would change either, such as joining the lines of
   the front matter, is refused ([issue
   #295](https://github.com/viell-dev/slop-markdown-tools/issues/295)).
+- In Forgejo and Gitea, initial YAML separator lines can have more than three
+  dashes and surrounding spaces. When a later separator closes such an envelope
+  and the parser has not already read it as YAML front matter, formatting keeps
+  it as written, including its fences. This protection also applies to CRLF
+  documents and empty or invalid YAML; it does not predict whether the forge
+  displays metadata or change the parser's reading ([issue
+  #958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
 - TOML front matter, between lines of `+++`, is read in every dialect, for site
   generators. GitHub, Forgejo, Gitea, Obsidian, commonmark.js, and markdown-it
   have no TOML front matter and read its lines as a paragraph, which the block
@@ -254,9 +261,9 @@ Syntax:
   available. Heading nesting paths in links, property aliases, PDF subpaths, and
   the syntax of community plugins are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
-  and shortlinks, is protected rather than read, and shortlinks are not checked
-  as links. Only the anchor of a heading that starts a definition description is
-  read.
+  shortlinks, and metadata envelopes outside the parser's front matter syntax,
+  is protected rather than read, and shortlinks are not checked as links. Only
+  the anchor of a heading that starts a definition description is read.
 - Legacy `> **Note**` callouts, table-of-contents front matter, emoji
   shortcodes, color previews, and issue or commit references are kept as text.
 - GitHub reads an escaped `\$` as the start of a formula; the tool does not.

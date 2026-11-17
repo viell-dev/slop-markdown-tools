@@ -112,6 +112,7 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
         for (const style of ["atx", "setext", "consistent"] as const) {
           const config = only({ "style/heading": ["warn", { style }] }, dialect);
           const keeps = dialect === "obsidian" || dialect === "vitepress";
+          const forge = dialect === "forgejo" || dialect === "gitea";
           for (const source of [
             lines("---", "Title", "  ---"),
             lines("---", "[[toc]]", "  ---", "  title: T", "  ---", "", "> > # H"),
@@ -128,14 +129,20 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
           // the end, which stays as written.
           const output = formatted(lines("---", "Title", "  ---"), config);
           expect(output).toBe(
-            keeps || style !== "atx" ? lines("---", "Title", "  ---") : lines("---", "## Title"),
+            keeps || forge || style !== "atx"
+              ? lines("---", "Title", "  ---")
+              : lines("---", "## Title"),
           );
           expect(formatted(lines("---", "[[toc]]", "  ---", "  title: T", "  ---"), config)).toBe(
             keeps
               ? lines("---", "[[toc]]", "  ---", "  title: T", "  ---")
-              : style === "atx"
-                ? lines("---", "## [[toc]]", "## title: T")
-                : lines("---", "[[toc]]", "  ---", "title: T", "  ---"),
+              : forge
+                ? style === "atx"
+                  ? lines("---", "[[toc]]", "  ---", "## title: T")
+                  : lines("---", "[[toc]]", "  ---", "title: T", "  ---")
+                : style === "atx"
+                  ? lines("---", "## [[toc]]", "## title: T")
+                  : lines("---", "[[toc]]", "  ---", "title: T", "  ---"),
           );
           // VitePress reads no TOML front matter.
           expect(formatted(lines("+++", "  +++", "==="), config)).toBe(
@@ -147,7 +154,7 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
               ? lines("---", "  Title", "  ===", "", "  ## Sub")
               : style === "atx"
                 ? lines("---", "# Title", "", "## Sub")
-                : // An underline of four dashes, which closes no front matter.
+                : // An underline of four dashes, which closes no parser front matter.
                   lines("---", "Title", "===", "", "Sub", "----"),
           );
         }

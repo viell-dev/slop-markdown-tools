@@ -31,9 +31,27 @@ export const forgeBoundaryFixtures = [
   { name: "url-backslash-space", source: "Visit www.example.com\\ \nThen continue.\n" },
   { name: "url-backslash-path", source: "Visit https://example.com/a\\b\nThen continue.\n" },
 ];
+// Initial native metadata envelopes missing from the primary parser (#958).
+export const forgeFrontMatterFixtures = [
+  ["long-close", "---\ntitle: Example\n----"],
+  ["indented-close", "---\ntitle: Example\n ---"],
+  ["long-open", "----\ntitle: Example\n---"],
+  ["spaces", "  -----  \ntitle: Example\n  ----  "],
+  ["scalar", "---\n\nintro with __strong__ text\n-----"],
+  ["sequence", "---\n* one\n* two\n-----"],
+  ["invalid", "----\n[invalid YAML\n----"],
+  ["empty", "----\n----"],
+  ["unicode", "\u0085----\ntitle: Example\n----\u0085"],
+  ["unicode-skipped-byte", "----\u00a0x\ntitle: Example\n----\u00a0x"],
+  ["crlf", "---\r\ntitle: Example\r\n----"],
+].map(([name, envelope]) => ({
+  name: `frontmatter-${name}`,
+  source: `${envelope}\n\nBody *text*.\n`,
+}));
 export const forgeFixtures = [
   ...commonFixtures,
   ...forgeBoundaryFixtures,
+  ...forgeFrontMatterFixtures,
   { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },
   { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
   { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail*.\n" },

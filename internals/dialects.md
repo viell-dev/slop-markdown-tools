@@ -49,6 +49,19 @@ and default rendering settings. Custom hard-break or math settings, themes and
 browser math layout need separate validation. Weekly adversarial generation
 discovers limits without becoming a release gate.
 
+`forge-protections.ts` retains initial metadata envelopes not already covered by
+a primary YAML node. It scans to the first native separator without changing
+`parse.ts` or interpreting YAML. The matcher follows `isYAMLSeparator`: ASCII
+spaces, at least three consecutive dashes, then spaces; tabs are excluded.
+Non-ASCII Go whitespace is accepted with the native loop's extra byte step
+following each rune (so a leading Unicode space immediately before three dashes
+fails, while four pass). Adjacent non-ASCII runes land on an invalid UTF-8 byte
+and fail. Physical CRLF lines are recognized because both pinned file renderers
+read their metadata, despite the standalone extractor's terminal-CR rejection.
+Empty closed regions are conservatively protected; unclosed ones are not. Unit
+`forge-protections.test.ts` and the shared `forgeFrontMatterFixtures` cover
+output, convergence and native rendering, including scalar and invalid YAML.
+
 Generated stray-marker text can still change emphasis or strikethrough pairing
 when wrapping moves markers across quoted lines. The observed case preserves
 text and block structure and is tracked as a bounded styling limit in
