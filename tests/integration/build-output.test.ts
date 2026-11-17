@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import { expect, it, onTestFailed } from "vitest";
 import { assertDistFiles, buildProduct, ordinaryFiles, verifyBuild } from "../../scripts/build.mjs";
 import { withBuild } from "../../scripts/with-build.mjs";
-import { fixture, linkDirectory, repository } from "../support/cli.js";
+import { exitTrace, fixture, linkDirectory, noCompileCache, repository } from "../support/cli.js";
 
 async function productFixture(): Promise<string> {
   const files: Record<string, string> = {
@@ -380,7 +380,12 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
     const lintStarted = performance.now();
     const linted = spawnSync(
       process.execPath,
-      [path.join(repository, "node_modules/eslint/bin/eslint.js"), generated, "--no-warn-ignored"],
+      [
+        ...exitTrace,
+        path.join(repository, "node_modules/eslint/bin/eslint.js"),
+        generated,
+        "--no-warn-ignored",
+      ],
       {
         cwd: repository,
         encoding: "utf8",
@@ -390,6 +395,7 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
         // These are printed only if this test fails; parent state is untouched.
         env: {
           ...process.env,
+          ...noCompileCache,
           DEBUG: [process.env.DEBUG, "eslint:cli,eslint:config-loader,eslint:eslint"]
             .filter(Boolean)
             .join(","),
@@ -415,12 +421,18 @@ it("excludes abandoned staging output from the actual code-check commands", asyn
     const formatStarted = performance.now();
     const formatted = spawnSync(
       process.execPath,
-      [path.join(repository, "node_modules/prettier/bin/prettier.cjs"), "--check", generated],
+      [
+        ...exitTrace,
+        path.join(repository, "node_modules/prettier/bin/prettier.cjs"),
+        "--check",
+        generated,
+      ],
       {
         cwd: repository,
         encoding: "utf8",
         timeout: 20000,
         windowsHide: true,
+        env: { ...process.env, ...noCompileCache },
       },
     );
     children.push({

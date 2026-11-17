@@ -12,12 +12,30 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach } from "vitest";
 
 /** The checkout under test. Integration tests run the built CLI and library from it. */
 export const repository = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 export const cli = path.join(repository, "dist/cli/main.js");
+/**
+ * Node arguments that make a tool child report on standard error when its JavaScript ended.
+ * A failed test prints them, to tell a stall in the tool's work from one while the process
+ * ends (#827, #888).
+ */
+export const exitTrace = [
+  "--import",
+  pathToFileURL(path.join(repository, "tests/support/exit-trace.mjs")).href,
+];
+/**
+ * Environment for a tool child that a test runs under a deadline. The launchers of ESLint,
+ * Prettier and VitePress enable Node's compile cache, and Node writes its new entries while
+ * the process ends, after the tool's last output. The first ESLint process on a machine
+ * writes about 500 files there, which took 0.9 to 1.5 seconds on Windows against less than
+ * 0.1 without the cache, and both hosted stalls of such a child came after its work was
+ * done (#827, #888). The cache only saves compilation, so these children run without it.
+ */
+export const noCompileCache = { NODE_DISABLE_COMPILE_CACHE: "1" };
 export const manifest = JSON.parse(
   await readFile(path.join(repository, "package.json"), "utf8"),
 ) as { name: string; version: string };

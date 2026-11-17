@@ -190,11 +190,15 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   abandoned-staging checks, linked-output rejection, and receipt identity,
   invalidation and cleanup. A failed abandoned-staging check retains child
   durations, results and output, including ESLint startup/configuration traces.
-  These failure hooks cannot report an abruptly terminated worker or OS process.
-  The package smoke check independently compares the tarball's complete `dist`
-  file set with the compiler's expected names plus the four parser artifacts.
-  Every pull request. Per-file publication is not a directory transaction;
-  concurrent edits require a fresh invocation.
+  Its ESLint and Prettier children, and the VitePress builds of
+  `vitepress-build.test.ts`, run without Node's compile cache, which a tool's
+  launcher writes while the process ends, and report on standard error when
+  their JavaScript ended; a failed VitePress build prints each build's duration,
+  result and output. These failure hooks cannot report an abruptly terminated
+  worker or OS process. The package smoke check independently compares the
+  tarball's complete `dist` file set with the compiler's expected names plus the
+  four parser artifacts. Every pull request. Per-file publication is not a
+  directory transaction; concurrent edits require a fresh invocation.
 - **Cost grows with the input as expected.** `tests/performance/` compares
   growth and checks that memory is released. `wrap.test.ts` covers isolated
   rereading with syntax plugins in CommonMark and VitePress, including body
