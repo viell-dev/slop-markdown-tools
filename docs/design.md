@@ -188,6 +188,11 @@ rule is one-sided on purpose: text taken for math is only left alone, while a
 formula taken for prose could be wrapped or restyled, so a condition is applied
 to a dialect only when its renderer was seen to apply it.
 
+Forgejo keeps dollar lines directly below paragraph text in that paragraph,
+including lazy list-item continuations. Block spacing preserves that boundary;
+the conservative parser reading still protects the lines as math. Gitea reads
+the unindented lines below a list as a separate math block.
+
 ## Limits
 
 Formatting:

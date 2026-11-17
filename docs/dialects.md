@@ -106,6 +106,10 @@ never restyled, and no line is broken inside it.
   interrupt a paragraph and close on the same line; a `math` code fence is
   ordinary code there.
 
+Forgejo also keeps `$$` lines directly below text in its paragraph, including
+unindented lines continuing a list item. Formatting keeps that boundary; Gitea
+reads those unindented lines as math below the list.
+
 GitHub also retains contiguous dollar display math and a Setext title
 immediately below it as one source range. GitHub's underline can include the
 dollar lines in that heading. A real blank before the title or an interrupting

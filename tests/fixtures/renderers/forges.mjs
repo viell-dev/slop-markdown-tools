@@ -34,6 +34,51 @@ export const forgeBoundaryFixtures = [
 export const forgeFixtures = [
   ...commonFixtures,
   ...forgeBoundaryFixtures,
+  // Dollar lines that continue item text on Forgejo (#961), and controls.
+  {
+    name: "math-continuation-math-below-text",
+    source: "Some text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-in-item-aligned",
+    source: "- item text\n  $$\n  x = 1\n  $$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-item",
+    source: "- item text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-item-paragraph",
+    source: "- item\n\n  second paragraph\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-nested-ordered",
+    source: "- outer\n  1. inner text  \n  lazy line\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-quote",
+    source: "> quote text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-after-blank-below-item",
+    source: "- item text\n\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-quoted-item",
+    source: "> - item text\n> $$\n> x = 1\n> $$\n",
+  },
+  {
+    name: "math-continuation-quoted-item-lazy",
+    source: "> - item text\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "math-continuation-crlf",
+    source: "- item text\r\n$$\r\nx = 1\r\n$$\r\n",
+  },
+  {
+    name: "math-continuation-eof",
+    source: "- item text\n$$\nx = 1\n$$",
+  },
   { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },
   { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
   { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail*.\n" },
