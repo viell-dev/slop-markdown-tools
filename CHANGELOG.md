@@ -48,6 +48,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Skip the native renderer checks for pull requests that change only the
   maintainer guides in `internals/`
   ([#972](https://github.com/viell-dev/slop-markdown-tools/issues/972)).
+- Check the shared Obsidian table-row scan by counting its work rather than
+  timing it, which failed correct code and passed the former slow scan on a
+  loaded machine
+  ([#969](https://github.com/viell-dev/slop-markdown-tools/issues/969)).
 
 ## 0.8.3 - 2026-11-09
 

@@ -259,9 +259,16 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   that it cannot count fails the check. Counting shows nothing about shapes
   outside the fixtures, native calls on local data, loops elsewhere, or
   allocation cost. The collector's timing check remains a broad bound for
-  catastrophic growth. Lazy-HTML range and edit-application timing checks
-  compare equal work across different document sizes. The edit check targets 200
-  ms per window with a 32-call cap after reproducing quota-period sampling bias
+  catastrophic growth. `table-row-work.test.ts` gates the Obsidian table-row
+  scan on V8's block counts alone, in place of a timing check that failed
+  correct code and passed the former once-per-table scan on a loaded machine
+  ([#969](https://github.com/viell-dev/slop-markdown-tools/issues/969)); a lower
+  bound on its growth rejects an answer cached before measurement. The read
+  counter cannot follow those collectors' own uses of the source, so that check
+  does not count work inside a native call. Lazy-HTML range and edit-application
+  timing checks compare equal work across different document sizes. The edit
+  check targets 200 ms per window with a 32-call cap after reproducing
+  quota-period sampling bias
   ([#795](https://github.com/viell-dev/slop-markdown-tools/issues/795)); other
   scaling checks retain the 25 ms target and eight-call default cap. Failed
   assertions in these two checks include sizes, the timing target, warm-up and
