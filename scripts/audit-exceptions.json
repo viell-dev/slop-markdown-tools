@@ -1,0 +1,16 @@
+[
+  {
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "severity": "high",
+    "range": "<=4.0.7",
+    "reason": "Development tools only: npm-run-all2, vite, vitest, tinyglobby and fdir use picomatch to match this repository's own script names, test file patterns and site configuration. The advisory needs an attacker to supply the glob pattern, and nothing passes user input to it.",
+    "issue": "https://github.com/viell-dev/slop-markdown-tools/issues/965",
+    "decided": "2026-11-18",
+    "reconsider": [
+      "A picomatch release fixes the advisory.",
+      "The advisory is withdrawn or changed.",
+      "picomatch reaches the installed or bundled code."
+    ]
+  }
+]

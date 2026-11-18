@@ -196,6 +196,10 @@ written.
 stay together. They can form one native heading or continue a list or quote
 paragraph.
 
+**On Forgejo:** `$$` lines directly below a list item's final paragraph stay
+adjacent, including unindented continuations and items inside block quotes.
+Forgejo keeps those lines in the item; a blank line would move them out.
+
 **On Forgejo and Gitea:** a table directly below the text of a definition
 description, as in `Term`, `: Description`, and a table below them, stays there.
 Those renderers put the table in the description.

@@ -1,3 +1,4 @@
+import { forgejoMathContinuations } from "../support/math-renderers.js";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
@@ -1280,4 +1281,45 @@ describe("style/block-spacing", () => {
       );
     });
   });
+});
+
+describe("Forgejo dollar lines continuing list text (#961)", () => {
+  it.each([
+    "- item text\n\n$$\nx = 1\n$$\n",
+    "- item text\n  $$\n  x = 1\n  $$\n",
+    "Paragraph\n$$\nx = 1\n$$\n",
+    "> Quote\n$$\nx = 1\n$$\n",
+  ])("keeps existing controls and disabled-rule source %j", (source) => {
+    expect(formatted(source, only({ "style/block-spacing": "warn" }, "forgejo"))).toBe(source);
+    expect(format(source, { config: only({}, "forgejo") }).output).toBe(source);
+  });
+  it.each(forgejoMathContinuations)("keeps $name in the item", ({ source }) => {
+    for (const preset of ["forgejo", "codeberg"]) {
+      for (const config of [
+        { extends: ["recommended", preset] },
+        { extends: [preset], rules: { "style/block-spacing": "warn" } },
+      ] satisfies Config[]) {
+        const result = format(source, { config });
+        const expected = config.extends.includes("recommended")
+          ? source.replace("  lazy line", "     lazy line").replace(/([^\n])$/, "$1\n")
+          : source;
+        expect(result.output).toBe(expected);
+        expect(result.diagnostics).toEqual([]);
+        expect(format(result.output, { config }).changed).toBe(false);
+        expect(semanticFingerprint(parse(result.output, "forgejo"))).toBe(
+          semanticFingerprint(parse(source, "forgejo")),
+        );
+      }
+    }
+  });
+  it.each(["gitea", "github", "commonmark", "obsidian", "vitepress"] as const)(
+    "keeps the existing %s output",
+    (dialect) => {
+      const source = "- item text\n$$\nx = 1\n$$\n";
+      const config = only({ "style/block-spacing": "warn" }, dialect);
+      const expected = dialect === "gitea" ? source.replace("text\n", "text\n\n") : source;
+      expect(format(source, { config }).output).toBe(expected);
+      expect(format(expected, { config }).output).toBe(expected);
+    },
+  );
 });
