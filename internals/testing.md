@@ -114,6 +114,21 @@ files run one at a time, apart from coverage and the processes that integration
 tests start. Unit and integration runs each use at most four workers, or the
 machine's available parallelism when it has fewer.
 
+Test and hook deadlines assume a machine with spare processor time and memory,
+as the hosted runners have. On a workstation that is also running other heavy
+work, a complete `check` can exceed the deadlines of cases that compute a lot,
+start processes, build bundles or copy files without anything hanging, because
+that work can run several times slower there than on a hosted runner. Do not
+widen a deadline or remove a case for that. Record the failure and the machine's
+load in the pull request's verification section or the issue being worked on,
+then compare the same cases on hosted CI and in one focused run of the failing
+file while the machine has headroom. A failure that remains in either is a
+defect. If both pass, record the failure as caused by load and check whether the
+case's work is proportionate to its deadline; the passing runs do not settle it
+by themselves. Split a test that checks many independent inputs, and share
+processes between inputs that need the same setup, as the generated-document
+properties and the MD041 conversion case do.
+
 `test:coverage` uses V8 coverage and writes an HTML report and
 `coverage-summary.json` to `coverage/unit/`. It includes every production
 TypeScript file, including files unit tests never execute. CI publishes the
@@ -147,6 +162,15 @@ registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
 specific contracts. The printed diff has `diff.test.ts`. How the code tools stop
 a formatter and end its processes has `code-termination.test.ts`, which drives
 simulated processes and timers.
+
+The generated-document properties in `blocks.test.ts`, `block-spacing.test.ts`
+and `engine-ranges.test.ts` replay consecutive slices of fixed fast-check seeds
+as separate tests, from `seededSlices()` in `tests/support/property-slices.ts`;
+`property-slices.test.ts` checks that the slices replay the unsliced run. Each
+slice has the ordinary unit deadline, so a property's total allowance grows with
+its number of slices. A failing slice still shrinks its input and reports a path
+that replays against the whole seeded run; its count of tests starts at the
+slice.
 
 Competitor-comment regressions are grouped by what they prove:
 `competitor-comments-provenance.test.ts` owns source provenance and pragma
@@ -309,7 +333,8 @@ safeguards, `cli-access.test.ts` for access failures, `cli-encoding.test.ts` for
 UTF-8 handling, `selection.test.ts` for which files a run selects, compared with
 Git's own decisions, `workflows.test.ts` for whole tasks, `node.test.ts` for
 `mdrefine/node`, `code-formatters.test.ts` and `code-command.test.ts` for the
-opt-in code tools, `examples.test.ts` and `docs.test.ts` for the examples and
+opt-in code tools, `convert.test.ts` for fallback and written competitor
+configuration, `examples.test.ts` and `docs.test.ts` for the examples and
 documentation, `metadata.test.ts` for what the package, the README, the site,
 the issue forms, and the workflows say about the same facts, and
 `release-evidence.test.ts` for the Release workflow's check of CI.

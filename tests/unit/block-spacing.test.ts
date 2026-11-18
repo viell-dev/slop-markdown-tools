@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
+import { seededSlices } from "../support/property-slices.js";
 import { only, formatted, refusals } from "../support/rules.js";
 describe("style/block-spacing", () => {
   const rule = { "style/block-spacing": "warn" } as const;
@@ -1198,7 +1199,9 @@ describe("style/block-spacing", () => {
         lint("# H\n", { config: only({ "style/block-spacing": ["warn", options] }) }),
       ).toThrow("Invalid options for style/block-spacing");
     });
-    it("keeps the meaning of randomly assembled documents with counted blank lines", () => {
+    // Replay the same 400 cases in four slices under the unit deadline (#902).
+    const slices = seededSlices(20261029, 400, 100);
+    it.each(slices)("keeps meaning with counted blank lines (offset %i)", (_, parameters) => {
       const blocks = fc.constantFrom(
         "# Heading",
         "### Deeper",
@@ -1277,7 +1280,7 @@ describe("style/block-spacing", () => {
             });
           },
         ),
-        { numRuns: 400, seed: 20261029 },
+        parameters,
       );
     });
   });
