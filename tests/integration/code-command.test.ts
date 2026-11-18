@@ -101,25 +101,23 @@ it("terminates the formatter's child process on a timeout", async () => {
 
 it("reports a timeout only after slow termination has finished", async () => {
   const { root, tool, config } = await setup("timeout");
-  let settled = false;
-  let settledBeforeConfirmation: boolean | undefined;
+  const events: string[] = [];
   vi.mocked(terminateTree).mockImplementationOnce(async (child) => {
     const closed = once(child, "close");
     const problem = await actual.terminateTree(child);
     await closed;
+    events.push("closed");
     // Longer than the fixed grace after which a timeout used to be reported
     // whether or not termination had finished.
     await setTimeout(1500);
-    settledBeforeConfirmation = settled;
+    events.push("confirmed");
     return problem;
   });
   const result = await formatWithCode(block(), {
     cwd: root,
     config: config([tool({ timeoutMs: 1000 })]),
-  }).finally(() => {
-    settled = true;
-  });
-  expect(settledBeforeConfirmation).toBe(false);
+  }).finally(() => events.push("reported"));
+  expect(events).toEqual(["closed", "confirmed", "reported"]);
   expect(result.diagnostics).toEqual([expect.objectContaining({ message: timedOut(1000) })]);
 });
 
