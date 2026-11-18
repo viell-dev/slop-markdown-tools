@@ -300,8 +300,8 @@ requirement; where recoverable, check that the former slow algorithm fails the
 comparison. When a slow variant and shared-runner noise overlap, count the work
 instead, as `lazy-html-work.test.ts` and `table-row-work.test.ts` do; each is a
 file of its own, which starts V8's block counter before anything runs the code
-it counts. Garbage-collection checks also run
-outside coverage, which changes execution and allocation costs.
+it counts. Garbage-collection checks also run outside coverage, which changes
+execution and allocation costs.
 
 Memory checks await V8's asynchronous `last-resort` major collection, which
 releases compilation caches and collects until its root set is stable. A regular
