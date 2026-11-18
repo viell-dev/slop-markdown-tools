@@ -24,6 +24,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   compile cache and record when they exit
   ([#827](https://github.com/viell-dev/slop-markdown-tools/issues/827),
   [#888](https://github.com/viell-dev/slop-markdown-tools/issues/888)).
+- Skip the native renderer checks for pull requests that change only the
+  maintainer guides in `internals/`
+  ([#972](https://github.com/viell-dev/slop-markdown-tools/issues/972)).
 
 ## 0.8.3 - 2026-11-09
 

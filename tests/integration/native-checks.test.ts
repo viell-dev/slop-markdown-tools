@@ -187,6 +187,33 @@ describe("native input classification", () => {
   ])("selects applicable hosts for %s", (file, expected) => {
     expect(selected(classifyChanges([file]))).toEqual(expected);
   });
+  it("avoids native hosts for each tracked internals guide and keeps other paths there conservative", () => {
+    const guides = execFileSync("git", ["ls-files", "-z", "--", "internals"], {
+      cwd: repository,
+      encoding: "utf8",
+    })
+      .split("\0")
+      .filter(Boolean);
+    expect(guides).toEqual(
+      expect.arrayContaining([
+        "internals/README.md",
+        "internals/dependencies.md",
+        "internals/testing.md",
+        "internals/verification.md",
+      ]),
+    );
+    for (const guide of guides) expect(selected(classifyChanges([guide])), guide).toEqual([]);
+    for (const file of [
+      "internals/new-guide.md",
+      "internals/notes/testing.md",
+      "internals/testing.mjs",
+      "Internals/testing.md",
+    ])
+      expect(selected(classifyChanges([file])), file).toEqual(hosts);
+    expect(selected(classifyChanges(["internals/testing.md", "internals/new-guide.md"]))).toEqual(
+      hosts,
+    );
+  });
   it("unions host-specific changes and never waives an unknown path alongside an irrelevant one", () => {
     expect(
       selected(classifyChanges(["scripts/forge-html.mjs", "scripts/obsidian-check.mjs"])),
