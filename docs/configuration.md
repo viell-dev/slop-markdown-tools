@@ -271,9 +271,14 @@ prove that a tool preserves programming-language semantics.
 
 A failed, missing, timed-out, non-UTF-8, oversized, or unsafe tool result keeps
 that block's content and reports `engine/code-formatter`. The CLI exits with
-`2`, and other safe edits remain available. Partial stdout is never inserted.
-Configured commands, including commands in JSON files, run with your
-permissions; use configurations and tools you trust.
+`2`, and other safe edits remain available. Partial stdout is never inserted. A
+tool that exceeds its timeout or output limit is stopped together with the
+processes it started, and the failure is reported once they have ended. If that
+cannot be confirmed within 10 seconds, the diagnostic says that its processes
+may still be running. Processes that detach themselves from the tool are outside
+this: on Unix, those that leave its process group, and on Windows, those whose
+parent has already exited. Configured commands, including commands in JSON
+files, run with your permissions; use configurations and tools you trust.
 
 ### Front matter formatters
 

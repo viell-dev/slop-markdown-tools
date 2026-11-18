@@ -1,7 +1,7 @@
-import { execFile } from "node:child_process";
 import path from "node:path";
 import spawn from "cross-spawn";
 import type { CodeFormatter } from "../core/types.js";
+import { terminateTree, terminationWaitMs } from "./terminate.js";
 
 /** Run a configured executable with argument arrays and a bounded UTF-8 response. */
 export function runFormatter(
@@ -38,13 +38,15 @@ export function runFormatter(
     let errorBytes = 0;
     let failure: string | undefined;
     let finished = false;
-    let fallback: ReturnType<typeof setTimeout> | undefined;
+    let terminated = false;
+    let closed = false;
+    let wait: ReturnType<typeof setTimeout> | undefined;
     const limit = formatter.maxOutputBytes ?? 1024 * 1024;
     const finish = (error?: string) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
-      clearTimeout(fallback);
+      clearTimeout(wait);
       child.stdin?.destroy();
       child.stdout?.destroy();
       child.stderr?.destroy();
@@ -62,30 +64,29 @@ export function runFormatter(
         }
       }
     };
+    // A stopped tool is reported only once it and the processes it started have
+    // ended and released its output, so that none of them still runs when the
+    // caller moves on. A failed or unfinished termination is reported as such.
+    const reportStopped = () => {
+      if (terminated && closed) finish(failure);
+    };
     const stop = (reason: string) => {
       if (failure || finished) return;
       failure = reason;
-      const pid = child.pid;
-      if (pid !== undefined) {
-        if (process.platform === "win32") {
-          // npm command shims can have a child; terminating cmd alone leaves it running.
-          execFile(
-            path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
-            ["/PID", String(pid), "/T", "/F"],
-            { windowsHide: true, timeout: 1000 },
-            () => {},
-          ).unref();
-        } else {
-          try {
-            process.kill(-pid, "SIGKILL");
-          } catch {
-            child.kill("SIGKILL");
-          }
+      wait = setTimeout(
+        () =>
+          finish(
+            `${reason}, and its processes may still be running (not confirmed stopped within ${terminationWaitMs} ms)`,
+          ),
+        terminationWaitMs,
+      );
+      void terminateTree(child).then((problem) => {
+        if (problem) finish(`${reason}, and its processes may still be running (${problem})`);
+        else {
+          terminated = true;
+          reportStopped();
         }
-      }
-      // A descendant can retain a stream after its parent exits. Do not let it
-      // hold the caller beyond the configured timeout and termination grace.
-      fallback = setTimeout(() => finish(failure), 1100);
+      });
     };
     const timer = setTimeout(
       () => stop(`exceeded its ${formatter.timeoutMs ?? 10000} ms timeout`),
@@ -103,12 +104,13 @@ export function runFormatter(
       errorBytes += chunk.length;
     });
     child.once("close", (code, signal) => {
+      closed = true;
+      if (failure) return reportStopped();
       const detail = Buffer.concat(stderr).toString("utf8").trim();
       finish(
-        failure ??
-          (code === 0
-            ? undefined
-            : `exited ${signal ? `with signal ${signal}` : `with code ${String(code)}`}${detail ? `: ${detail}` : ""}`),
+        code === 0
+          ? undefined
+          : `exited ${signal ? `with signal ${signal}` : `with code ${String(code)}`}${detail ? `: ${detail}` : ""}`,
       );
     });
     // An early successful exit can close stdin before consuming it; its exit

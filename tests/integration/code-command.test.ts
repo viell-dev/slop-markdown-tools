@@ -1,14 +1,30 @@
+import type { ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { afterEach, expect, it, vi } from "vitest";
+import { terminateTree, terminationWaitMs } from "../../src/code/terminate.js";
 import { formatWithCode } from "../../src/node.js";
 import { block, calls, setup } from "../support/code-format.js";
 import { run } from "../support/cli.js";
 import { parseReport } from "../support/json.js";
-import { stringContaining } from "../support/assertions.js";
 
-afterEach(() => vi.unstubAllEnvs());
+// Termination runs for real unless a test makes it slow or unconfirmed.
+vi.mock("../../src/code/terminate.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../src/code/terminate.js")>();
+  return { ...original, terminateTree: vi.fn(original.terminateTree) };
+});
+const actual = await vi.importActual<typeof import("../../src/code/terminate.js")>(
+  "../../src/code/terminate.js",
+);
+const timedOut = (ms: number, outcome = "") =>
+  `Code formatter "javascript" exceeded its ${ms} ms timeout${outcome}; this block was left unchanged.`;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.mocked(terminateTree).mockReset();
+});
 
 it("finds a local command before PATH and passes filename arguments literally", async () => {
   const { root, record, tool, config } = await setup();
@@ -76,14 +92,75 @@ it("terminates the formatter's child process on a timeout", async () => {
   });
   expect(result.output).toBe(source);
   expect(result.diagnostics).toEqual([
-    expect.objectContaining({
-      rule: "engine/code-formatter",
-      message: stringContaining("timeout"),
-    }),
+    expect.objectContaining({ rule: "engine/code-formatter", message: timedOut(3000) }),
   ]);
   const before = await readFile(record + ".heartbeat", "utf8");
   await setTimeout(250);
   expect(await readFile(record + ".heartbeat", "utf8")).toBe(before);
+});
+
+it("reports a timeout only after slow termination has finished", async () => {
+  const { root, tool, config } = await setup("timeout");
+  let settled = false;
+  let settledBeforeConfirmation: boolean | undefined;
+  vi.mocked(terminateTree).mockImplementationOnce(async (child) => {
+    const closed = once(child, "close");
+    const problem = await actual.terminateTree(child);
+    await closed;
+    // Longer than the fixed grace after which a timeout used to be reported
+    // whether or not termination had finished.
+    await setTimeout(1500);
+    settledBeforeConfirmation = settled;
+    return problem;
+  });
+  const result = await formatWithCode(block(), {
+    cwd: root,
+    config: config([tool({ timeoutMs: 1000 })]),
+  }).finally(() => {
+    settled = true;
+  });
+  expect(settledBeforeConfirmation).toBe(false);
+  expect(result.diagnostics).toEqual([expect.objectContaining({ message: timedOut(1000) })]);
+});
+
+it("reports a formatter whose termination fails or is not confirmed in time", async () => {
+  const { root, tool, config } = await setup("timeout");
+  const configured = { cwd: root, config: config([tool({ timeoutMs: 1000 })]) };
+  const ended: Promise<unknown>[] = [];
+  const end = (child: ChildProcess) =>
+    ended.push(Promise.all([once(child, "exit"), actual.terminateTree(child)]));
+  vi.mocked(terminateTree).mockImplementationOnce((child) => {
+    end(child);
+    return Promise.resolve("taskkill exited with code 1: ERROR: synthetic");
+  });
+  expect((await formatWithCode(block(), configured)).diagnostics).toEqual([
+    expect.objectContaining({
+      message: timedOut(
+        1000,
+        ", and its processes may still be running (taskkill exited with code 1: ERROR: synthetic)",
+      ),
+    }),
+  ]);
+  vi.mocked(terminateTree).mockImplementationOnce((child) => {
+    end(child);
+    return new Promise(() => {});
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    const pending = formatWithCode(block(), configured);
+    await vi.advanceTimersByTimeAsync(1000 + terminationWaitMs);
+    expect((await pending).diagnostics).toEqual([
+      expect.objectContaining({
+        message: timedOut(
+          1000,
+          `, and its processes may still be running (not confirmed stopped within ${terminationWaitMs} ms)`,
+        ),
+      }),
+    ]);
+  } finally {
+    vi.useRealTimers();
+  }
+  await Promise.all(ended);
 });
 
 it("keeps a document changed during the formatter run instead of overwriting it", async () => {
