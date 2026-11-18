@@ -11,6 +11,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Keep Forgejo, Codeberg and Gitea metadata with longer or spaced dash fences
+  from becoming Markdown, and prevent text from becoming front matter
+  ([#958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
+
 ### Maintenance
 
 - Refresh GFM tree readers, the matcher, parser bundler, test runner and
