@@ -49,6 +49,36 @@ and default rendering settings. Custom hard-break or math settings, themes and
 browser math layout need separate validation. Weekly adversarial generation
 discovers limits without becoming a release gate.
 
+`forge-protections.ts` retains initial metadata envelopes not already covered by
+a primary YAML node. It scans to the first native separator without changing
+`parse.ts` or interpreting YAML. `forge-front-matter.ts` owns the shared scan;
+`semantics.ts` includes the exact envelope text or its absence in every forge
+fingerprint. This refuses creation, removal and boundary moves by every writer,
+including plugins. Selected code values cannot vary it. A selected metadata
+value can vary only when the original native closer agrees with the primary YAML
+node's end and the replacement retains that boundary; VitePress keeps its
+separate projection. Creation fixtures run as forced native controls, including
+an explicit Setext option and isolated leading-blank removal, even when output
+is unchanged. The matcher follows `isYAMLSeparator`: ASCII spaces, at least
+three consecutive dashes, then spaces; tabs are excluded. Non-ASCII Go
+whitespace is accepted with the native loop's extra byte step following each
+rune (so a leading Unicode space immediately before three dashes fails, while
+four pass). Adjacent non-ASCII runes land on an invalid UTF-8 byte and fail.
+Physical CRLF lines are recognized because both pinned file renderers read their
+metadata, despite the standalone extractor's terminal-CR rejection. Empty closed
+regions are conservatively protected; unclosed ones are not. Unit
+`forge-protections.test.ts` and the shared `forgeFrontMatterFixtures` cover
+output, convergence and native rendering, including scalar and invalid YAML.
+
+For #961, Forgejo 17.0.1 keeps adjacent dollar lines in a list item's final
+paragraph, including a second paragraph, a nested item ending in a lazy line,
+and an item in a block quote. CRLF and a closing marker at EOF agree. Gitea
+28.3.0 reads a separate math block below the list. The conservative math tree
+stays unchanged: block spacing excludes only Forgejo's adjacent math boundary
+from the preceding list's spacing request. Paragraph and quote predecessors
+already supply no spacing subject. Native fixtures cover these cases and the
+blank-line and indented controls; observations live in `math-renderers.ts`.
+
 Generated stray-marker text can still change emphasis or strikethrough pairing
 when wrapping moves markers across quoted lines. The observed case preserves
 text and block structure and is tracked as a bounded styling limit in

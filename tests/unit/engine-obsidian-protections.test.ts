@@ -3,6 +3,7 @@ import { rendererProtections } from "../../src/syntax/renderer-protections.js";
 import { format, parse, createWorkspace, semanticFingerprint, range } from "../../src/index.js";
 import type { Config, Plugin } from "../../src/index.js";
 import { formatted } from "../support/engine.js";
+import { boundaryFixtures } from "../fixtures/renderers/obsidian-boundaries.mjs";
 describe("HTML comments that Live Preview continues across blocks", () => {
   const config: Config = {
     extends: ["recommended", "obsidian"],
@@ -10,6 +11,42 @@ describe("HTML comments that Live Preview continues across blocks", () => {
     rules: { "style/wrap": ["warn", { width: 20 }] },
   };
   const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  it.each(boundaryFixtures.filter(({ issue }) => issue === 963))(
+    "keeps the closing separator in $name (#963)",
+    ({ source, preserve }) => {
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const input = source.replaceAll("\n", newline);
+        // A Setext heading contains both comment ends in the same block;
+        // native capture permits ordinary spacing after its underline.
+        const expected = (
+          preserve === false ? source.replace("---\n", "---\n\n") : source
+        ).replaceAll("\n", newline);
+        expect(formatted(input, { config, workspace })).toBe(expected);
+        const spacingOnly: Config = {
+          extends: [],
+          dialect: "obsidian",
+          rules: { "style/block-spacing": "warn" },
+        };
+        expect(formatted(input, { config: spacingOnly })).toBe(expected);
+      }
+    },
+  );
+  it("keeps only the closing separator, allowing later style and spacing edits (#963)", () => {
+    const source = "a <!-- b\n## c --> d\ne *f*\n\n# Next\ntext *formats*\n";
+    expect(formatted(source, { config, workspace })).toBe(
+      "a <!-- b\n## c --> d\ne _f_\n\n# Next\n\ntext _formats_\n",
+    );
+  });
+  it.each(["commonmark", "github", "forgejo", "gitea"] as const)(
+    "still separates the comment-closing heading in %s (#963)",
+    (dialect) => {
+      expect(
+        formatted("a <!-- b\n## c --> d\ne\n", {
+          config: { extends: [], dialect, rules: { "style/block-spacing": "warn" } },
+        }),
+      ).toBe("a <!-- b\n\n## c --> d\n\ne\n");
+    },
+  );
   it.each([
     "a <!-- b\n\n> - c --> d e f g h i j k l m n o p q r s\n>   t u\n",
     "a <!-- b\n\n> - c\n>   --> d e f g h i j k l m n o p q r s\n",

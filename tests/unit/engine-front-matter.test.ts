@@ -53,13 +53,19 @@ describe("front matter that would end inside a code block", () => {
       // fence written with backticks would end it there.
       let result = format(yaml, preset(dialect));
       expect(result.output).toBe(yaml);
-      expect(refusals(result)).toEqual([
-        "style/wrap would change the parsed meaning at line 1; none of its edits were applied.",
-      ]);
+      // Forge metadata protection now withholds the edit before the guard (#958).
+      const forge = dialect === "forgejo" || dialect === "gitea";
+      expect(refusals(result)).toEqual(
+        forge
+          ? []
+          : [
+              "style/wrap would change the parsed meaning at line 1; none of its edits were applied.",
+            ],
+      );
       result = format(tildes, preset(dialect));
       expect(result.output).toBe(tildes);
       expect(refusals(result)).toEqual([
-        "style/code-fence would change the parsed meaning at line 1; none of its edits were applied.",
+        `style/code-fence would change the parsed meaning at line ${forge ? 5 : 1}; none of its edits were applied.`,
       ]);
       // With front matter, the closing fence opens a code block that holds `*a*`.
       result = format(toml, preset(dialect));
@@ -190,7 +196,14 @@ describe("a first line that opens no front matter", () => {
         "---\n\nText _a_.\n\n***\n\n___\n",
       );
       const setext = preset(dialect, { "style/heading": ["warn", { style: "setext" }] });
-      expect(formatted("---\n\n## Foo\n\nText.\n", setext)).toBe("---\n\nFoo\n----\n\nText.\n");
+      const headingSource = "---\n\n## Foo\n\nText.\n";
+      const forge = dialect === "forgejo" || dialect === "gitea";
+      const headingResult = format(headingSource, setext);
+      expect(headingResult.output).toBe(forge ? headingSource : "---\n\nFoo\n----\n\nText.\n");
+      expect(format(headingResult.output, setext).output).toBe(headingResult.output);
+      expect(headingResult.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(
+        forge,
+      );
       // A break that is not at the start of its line closes nothing, and `---`
       // does not close front matter that `+++` opens.
       expect(formatted("---\n\n> ***\n", preset(dialect))).toBe("---\n\n> ---\n");

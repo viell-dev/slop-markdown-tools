@@ -31,9 +31,79 @@ export const forgeBoundaryFixtures = [
   { name: "url-backslash-space", source: "Visit www.example.com\\ \nThen continue.\n" },
   { name: "url-backslash-path", source: "Visit https://example.com/a\\b\nThen continue.\n" },
 ];
+// Initial native metadata envelopes missing from the primary parser (#958).
+export const forgeFrontMatterFixtures = [
+  ["long-close", "---\ntitle: Example\n----"],
+  ["indented-close", "---\ntitle: Example\n ---"],
+  ["long-open", "----\ntitle: Example\n---"],
+  ["spaces", "  -----  \ntitle: Example\n  ----  "],
+  ["scalar", "---\n\nintro with __strong__ text\n-----"],
+  ["sequence", "---\n* one\n* two\n-----"],
+  ["invalid", "----\n[invalid YAML\n----"],
+  ["empty", "----\n----"],
+  ["unicode", "\u0085----\ntitle: Example\n----\u0085"],
+  ["unicode-skipped-byte", "----\u00a0x\ntitle: Example\n----\u00a0x"],
+  ["crlf", "---\r\ntitle: Example\r\n----"],
+].map(([name, envelope]) => ({
+  name: `frontmatter-${name}`,
+  source: `${envelope}\n\nBody *text*.\n`,
+}));
+export const forgeFrontMatterCreationFixtures = [
+  { name: "metadata-create-break", source: "-----\n\nNote: remember this.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-indented", source: " ---\n\nNote: remember this.\n\n___\n\nBody text.\n" },
+  { name: "metadata-create-scalar", source: "-----\n\nIntro paragraph.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-setext", source: "----\n\n## title: Example\n\nBody text.\n", config: { rules: { "style/heading": ["warn", { style: "setext" }] } } },
+  { name: "metadata-create-leading-blank", config: { extends: [], rules: { "style/blank-lines": "warn" } }, source: "\n ----\ntitle: Example\n ----\n\nBody text.\n" },
+];
 export const forgeFixtures = [
   ...commonFixtures,
   ...forgeBoundaryFixtures,
+  ...forgeFrontMatterFixtures,
+  // Dollar lines that continue item text on Forgejo (#961), and controls.
+  {
+    name: "math-continuation-math-below-text",
+    source: "Some text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-in-item-aligned",
+    source: "- item text\n  $$\n  x = 1\n  $$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-item",
+    source: "- item text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-item-paragraph",
+    source: "- item\n\n  second paragraph\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-nested-ordered",
+    source: "- outer\n  1. inner text  \n  lazy line\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "math-continuation-math-lazy-below-quote",
+    source: "> quote text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-math-after-blank-below-item",
+    source: "- item text\n\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-continuation-quoted-item",
+    source: "> - item text\n> $$\n> x = 1\n> $$\n",
+  },
+  {
+    name: "math-continuation-quoted-item-lazy",
+    source: "> - item text\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "math-continuation-crlf",
+    source: "- item text\r\n$$\r\nx = 1\r\n$$\r\n",
+  },
+  {
+    name: "math-continuation-eof",
+    source: "- item text\n$$\nx = 1\n$$",
+  },
   { name: "tasks", source: "- [X] Finished\n- [ ] Pending\n" },
   { name: "alert", source: "> [!NOTE]\n> Some *useful advice*.\n" },
   { name: "footnote", source: "A useful note[^1].\n\n[^1]: More *detail*.\n" },
