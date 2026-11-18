@@ -251,6 +251,10 @@ Syntax:
   documented limits, reopenable with evidence from real use. Fixed regression
   documents remain protected. A clean fixed realistic corpus is bounded
   evidence, not a claim to reproduce every renderer quirk.
+- In Obsidian, generated quoted code containing unclosed HTML followed by
+  unquoted continuation lines can change Live Preview's paragraph grouping
+  during formatting while retaining the text and Reading view's structure
+  ([#964](https://github.com/viell-dev/slop-markdown-tools/issues/964)).
 - On Forgejo and Gitea, wrapping generated stray-marker runs across quoted lines
   can change emphasis/strikethrough pairing while retaining text and block
   structure

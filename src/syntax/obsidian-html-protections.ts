@@ -168,6 +168,7 @@ export function collectCommentProtections(
   document: Document,
   { order }: ObsidianBlocks,
   positions: ProtectionSource,
+  boundaryText: Set<Nodes>,
 ): Set<Nodes> {
   const { source } = document;
   const { wholeLines } = positions;
@@ -215,7 +216,25 @@ export function collectCommentProtections(
         (closer < 0 || (order[last]![0].position?.end.offset ?? 0) < closer + 3)
       )
         last++;
-      commentText.add(wholeLines(leaf, order[last]![0]));
+      const closing = order[last]![0];
+      const region = wholeLines(leaf, closing);
+      commentText.add(region);
+      const next = order[last + 1]?.[0];
+      if (next?.position?.start.line === closing.position!.end.line + 1) {
+        // The closer's line can still belong to Live Preview's paragraph,
+        // even when the primary parse ends a heading or another block here
+        // (#963). Keep its adjacent separator, without freezing later text.
+        const start = region.position!.end;
+        const offset = start.offset!;
+        const length = source.startsWith("\r\n", offset) ? 2 : 1;
+        boundaryText.add(
+          positions.stretch(closing, start, {
+            line: start.line + 1,
+            column: 1,
+            offset: offset + length,
+          }),
+        );
+      }
       // The complete closing block stays: reflow on either side of the
       // closer could move words onto its line. Later blocks still format.
       break;

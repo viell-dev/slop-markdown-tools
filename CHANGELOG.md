@@ -18,6 +18,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
 - Keep adjacent `$$` lines inside list-item text on Forgejo
   ([#961](https://github.com/viell-dev/slop-markdown-tools/issues/961)).
+- Keep Obsidian paragraphs together after comment-closing headings
+  ([#963](https://github.com/viell-dev/slop-markdown-tools/issues/963)).
 
 ### Maintenance
 
