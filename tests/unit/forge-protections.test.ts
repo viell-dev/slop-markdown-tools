@@ -1,11 +1,22 @@
+import { semanticFingerprintWithCode } from "../../src/core/semantics.js";
 import { describe, expect, it } from "vitest";
-import { format, parse, range } from "../../src/index.js";
-import type { Dialect, Plugin } from "../../src/index.js";
+import { format, parse, range, semanticFingerprint, validateConfig } from "../../src/index.js";
+import type { Config, DialectName, Plugin, ProcessOptions } from "../../src/index.js";
 import { rendererProtections } from "../../src/syntax/renderer-protections.js";
-import { forgeBoundaryFixtures } from "../fixtures/renderers/forges.mjs";
+import {
+  forgeBoundaryFixtures,
+  forgeFrontMatterFixtures,
+  forgeFrontMatterCreationFixtures,
+} from "../fixtures/renderers/forges.mjs";
 import { formatted } from "../support/engine.js";
 
-const protectedSources = (source: string, dialect: Dialect) => {
+const fixtureConfig = (value: unknown): Config => {
+  const config = value ?? {};
+  validateConfig(config);
+  return config;
+};
+
+const protectedSources = (source: string, dialect: DialectName) => {
   const { tableText, boundaryText } = rendererProtections(parse(source, dialect));
   return [...tableText, ...boundaryText].map((node) => source.slice(...range(node)));
 };
@@ -138,5 +149,145 @@ it.each(["commonmark", "github", "vitepress"] as const)(
   (dialect) => {
     for (const { source } of forgeBoundaryFixtures)
       expect(protectedSources(source, dialect)).toEqual([]);
+  },
+);
+
+describe.each(["forgejo", "codeberg", "gitea"] as const)(
+  "%s native metadata envelopes",
+  (dialect) => {
+    it.each(forgeFrontMatterFixtures)(
+      "preserves the envelope and formats its body: $name",
+      ({ source }) => {
+        const envelope = source.slice(0, source.indexOf("\n\nBody"));
+        const output = formatted(source, { config: { extends: ["recommended", dialect] } });
+        expect(output).toBe(`${envelope}\n\nBody _text_.\n`);
+        expect(parse(source, dialect).tree.children[0]?.type).not.toBe("yaml");
+      },
+    );
+
+    it.each(["\n", "\r\n"])("protects through only the first closer (%j)", (newline) => {
+      const source = ["----", "title: *Example*", " ---", "", "Body *text*.", "", "----", ""].join(
+        newline,
+      );
+      expect(protectedSources(source, dialect)).toEqual([
+        ["----", "title: *Example*", " ---"].join(newline),
+      ]);
+      expect(formatted(source, { config: { extends: ["recommended", dialect] } })).toContain(
+        "Body _text_.",
+      );
+    });
+
+    it("leaves parser-owned front matter on its existing path", () => {
+      const source = "---\ntitle: *Example*\n---  \n\nBody *text*.\n";
+      expect(protectedSources(source, dialect)).toEqual([]);
+      expect(formatted(source, { config: { extends: ["recommended", dialect] } })).toBe(
+        source.replace("Body *text*", "Body _text_"),
+      );
+    });
+
+    it.each([
+      "----\ntitle: *Example*\n",
+      "\n----\ntitle: Example\n----\n",
+      "\t----\ntitle: Example\n----\n",
+      "\u00a0---\ntitle: Example\n----\n",
+    ])("does not protect a non-envelope: %j", (source) => {
+      expect(protectedSources(source, dialect)).toEqual([]);
+    });
+
+    it("rejects plugin edits inside the envelope", () => {
+      const source = "----\ntitle: Example\n----\n";
+      expect(
+        format(source, {
+          plugins: [rewrite("Example", "Changed")],
+          config: { dialect, extends: [], rules: { "probe/rewrite": "warn" } },
+        }).output,
+      ).toBe(source);
+    });
+  },
+);
+
+it.each(["commonmark", "github", "obsidian", "vitepress"] as const)(
+  "does not add forge envelopes in %s",
+  (dialect) => {
+    const source = "---\ntitle: Example\n----\n\nBody text.\n";
+    expect(protectedSources(source, dialect)).toEqual([]);
+    expect(formatted(source, { config: { extends: ["recommended"], dialect } })).toBe(
+      dialect === "obsidian" || dialect === "vitepress"
+        ? source
+        : "---\n\n## title: Example\n\nBody text.\n",
+    );
+  },
+);
+
+describe.each(["forgejo", "codeberg", "gitea"] as const)(
+  "%s metadata creation guard",
+  (dialect) => {
+    it.each(forgeFrontMatterCreationFixtures)(
+      "rejects creation and converges: $name",
+      ({ source, config }) => {
+        const options = {
+          config: { extends: ["recommended", dialect], dialect, ...fixtureConfig(config) },
+        };
+        const result = format(source, options);
+        expect(result.output).toBe(source);
+        expect(format(result.output, options).output).toBe(source);
+        expect(result.diagnostics.some((item) => item.rule === "engine/unsafe-format")).toBe(true);
+      },
+    );
+    it("rejects a plugin closing separator and insertion before existing metadata", () => {
+      for (const [source, before, after] of [
+        ["----\n\nNote: remember this.\n\n***\n", "***", "---"],
+        ["----\ntitle: Example\n----\n", "----", "\n----"],
+      ]) {
+        const options: ProcessOptions = {
+          plugins: [rewrite(before!, after!)],
+          config: { dialect, extends: [], rules: { "probe/rewrite": "warn" } },
+        };
+        const result = format(source!, options);
+        expect(result.output).toBe(source);
+        expect(format(result.output, options).output).toBe(source);
+      }
+    });
+  },
+);
+
+describe.each(["commonmark", "github", "obsidian", "vitepress"] as const)(
+  "%s creation controls",
+  (dialect) => {
+    const expected = [
+      "-----\n\nNote: remember this.\n\n---\n\nBody text.\n",
+      " ---\n\nNote: remember this.\n\n---\n\nBody text.\n",
+      "-----\n\nIntro paragraph.\n\n---\n\nBody text.\n",
+      "----\n\ntitle: Example\n--------------\n\nBody text.\n",
+      " ----\ntitle: Example\n ----\n\nBody text.\n",
+    ];
+    it.each(
+      forgeFrontMatterCreationFixtures.map((fixture, index) => ({
+        ...fixture,
+        expected: expected[index],
+      })),
+    )("retains the other dialect output: $name", ({ source, config, expected }) => {
+      expect(
+        formatted(source, {
+          config: { extends: ["recommended"], ...fixtureConfig(config), dialect },
+        }),
+      ).toBe(expected);
+    });
+  },
+);
+
+it.each(["forgejo", "gitea"] as const)(
+  "keeps the native envelope exact in selected-code comparisons on %s",
+  (dialect) => {
+    const source = "----\n\n~~~txt\nNote: remember this.\n~~~\n";
+    const before = parse(source, dialect);
+    const code = before.tree.children.find((node) => node.type === "code")!;
+    const changed = parse(
+      source.replace("Note: remember this.", "----\nNote: remember this."),
+      dialect,
+    );
+    expect(
+      semanticFingerprintWithCode(before, new WeakMap([[code, "----\nNote: remember this."]])),
+    ).not.toBe(semanticFingerprint(changed));
   },
 );

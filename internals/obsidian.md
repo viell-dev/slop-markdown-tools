@@ -53,9 +53,12 @@ note shows there, the tool keeps the text as written:
   blocks and restores quote or list styling only after the closer's line, where
   Reading view reads the blocks as Markdown. No rule changes the whole opening
   block or the blocks through the closing block, or through the note's end
-  without a closer. A heading's underline and the whole table stay too. Later
-  blocks still format. An opener in emphasis, a highlight, or a link or image's
-  text counts too; an escaped opener or one inside a code span does not.
+  without a closer. A heading's underline and the whole table stay too. The
+  separator directly after the closing block also stays when the next block
+  starts on the next line: Live Preview can continue the same paragraph across
+  it even when the parser reads a heading. Later text and independent boundaries
+  still format. An opener in emphasis, a highlight, or a link or image's text
+  counts too; an escaped opener or one inside a code span does not.
 - A paragraph, heading, or table cell with a backtick that no run of backticks
   closes, such as ``a ` b``, also in a highlight, an inline comment, or the text
   of a link or image. Live Preview shows the text after it as code, at least to

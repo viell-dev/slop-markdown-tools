@@ -148,6 +148,16 @@ The comparison is only as good as the parser's reading:
   document, a rule whose edits would change either, such as joining the lines of
   the front matter, is refused ([issue
   #295](https://github.com/viell-dev/slop-markdown-tools/issues/295)).
+- In Forgejo and Gitea, initial YAML separator lines can have more than three
+  dashes and surrounding spaces. When a later separator closes such an envelope
+  and the parser has not already read it as YAML front matter, formatting keeps
+  it as written, including its fences. This protection also applies to CRLF
+  documents and empty or invalid YAML. The semantic guard also refuses edits
+  that create, remove, move or change a native envelope, including edits from
+  plugins. A selected metadata formatter may change its value while retaining
+  its native closing boundary. These checks do not predict whether the forge
+  displays metadata or change the parser's reading ([issue
+  #958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
 - TOML front matter, between lines of `+++`, is read in every dialect, for site
   generators. GitHub, Forgejo, Gitea, Obsidian, commonmark.js, and markdown-it
   have no TOML front matter and read its lines as a paragraph, which the block
@@ -187,6 +197,11 @@ every run, and 22 cases that a person looked at in both of Obsidian's views. The
 rule is one-sided on purpose: text taken for math is only left alone, while a
 formula taken for prose could be wrapped or restyled, so a condition is applied
 to a dialect only when its renderer was seen to apply it.
+
+Forgejo keeps dollar lines directly below paragraph text in that paragraph,
+including lazy list-item continuations. Block spacing preserves that boundary;
+the conservative parser reading still protects the lines as math. Gitea reads
+the unindented lines below a list as a separate math block.
 
 ## Limits
 
@@ -236,6 +251,10 @@ Syntax:
   documented limits, reopenable with evidence from real use. Fixed regression
   documents remain protected. A clean fixed realistic corpus is bounded
   evidence, not a claim to reproduce every renderer quirk.
+- In Obsidian, generated quoted code containing unclosed HTML followed by
+  unquoted continuation lines can change Live Preview's paragraph grouping
+  during formatting while retaining the text and Reading view's structure
+  ([#964](https://github.com/viell-dev/slop-markdown-tools/issues/964)).
 - On Forgejo and Gitea, wrapping generated stray-marker runs across quoted lines
   can change emphasis/strikethrough pairing while retaining text and block
   structure
@@ -254,9 +273,9 @@ Syntax:
   available. Heading nesting paths in links, property aliases, PDF subpaths, and
   the syntax of community plugins are not supported.
 - Forgejo's and Gitea's own syntax, such as definition lists, backslash math,
-  and shortlinks, is protected rather than read, and shortlinks are not checked
-  as links. Only the anchor of a heading that starts a definition description is
-  read.
+  shortlinks, and metadata envelopes outside the parser's front matter syntax,
+  is protected rather than read, and shortlinks are not checked as links. Only
+  the anchor of a heading that starts a definition description is read.
 - Legacy `> **Note**` callouts, table-of-contents front matter, emoji
   shortcodes, color previews, and issue or commit references are kept as text.
 - GitHub reads an escaped `\$` as the start of a formula; the tool does not.

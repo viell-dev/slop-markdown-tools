@@ -106,12 +106,13 @@ The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
 `npm run schema` writes it to `config.schema.json`, which the package ships and
 the site serves; a test fails when the two differ.
 
-GitHub Actions runs static checks, performance/integration and a dependency
-audit on Linux with Node.js 24, with unit coverage on a separate Linux 24
-runner; the build and tests on Linux with Node.js 22.12.0, the lowest version
-the package supports, on Windows with Node.js 24, and on Linux with Node.js 26,
-and `test:package` on all four. `main` requires the first three, `Unit coverage`
-and the PR-only `Native checks` decision in the [verification
+GitHub Actions runs static checks, performance/integration and the dependency
+audit, `npm run check:audit`, on Linux with Node.js 24, with unit coverage on a
+separate Linux 24 runner; the build and tests on Linux with Node.js 22.12.0, the
+lowest version the package supports, on Windows with Node.js 24, and on Linux
+with Node.js 26, and `test:package` on all four. `main` requires the first
+three, `Unit coverage` and the PR-only `Native checks` decision in the
+[verification
 map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md).
 The Node.js 26 job is not required, so that a defect only the newest Node.js
 shows does not block unrelated merges; its failures get an issue. Windows covers

@@ -56,14 +56,35 @@ share the reviewed implementation. Development parser inputs remain
 native-sensitive; their installation label does not change their semantic role.
 
 Code bundled from development inputs also counts as shipped code for security
-fixes and patch-release policy. Release preparation freshly audits the full root
-tree with `npm audit --include=dev --audit-level=high`, retaining CI's broad
-high-severity gate for bundled, installed and build/test dependencies. This may
-block preparation for a tooling advisory; it avoids maintaining a separate
-advisory filter. Fixes confined to unshipped build/test code still follow the
-[dependency-only release
+fixes and patch-release policy. CI and release preparation both run
+`npm run check:audit`, which audits the committed lockfile's full root tree,
+development, optional and peer dependencies included, and asks the registry even
+when npm's configuration would omit a package type, ignore the lockfile or work
+offline. It fails on every high or critical advisory in bundled, installed and
+build/test dependencies apart from those listed in
+`scripts/audit-exceptions.json`. A package that npm reports at high or above
+passes only when every such advisory that it reaches through npm's `via` chain
+is listed; moderate and low advisories stay below the threshold. An audit that
+cannot run or be read fails the step, because npm exits with the same status for
+its own errors as for findings. Fixes confined to unshipped build/test code
+still follow the [dependency-only release
 policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
-The independently managed Obsidian harness is a separate dependency tree.
+The independently managed Obsidian harness is a separate dependency tree, which
+this audit does not cover.
+
+An exception needs the owner's decision, recorded on the issue that owns the
+advisory; maintainers do not add one on their own judgement. An entry covers one
+advisory of one package, and only while that package is outside the installed
+and bundled code: the audit fails when the package appears in the lockfile's
+production tree or in the parser's reviewed package graph,
+`scripts/parser-packages.json`. Each entry records the advisory's GHSA
+identifier and package, the severity and affected range the decision assessed,
+the reason, the issue, the date of the decision, and what would reconsider it,
+such as a fixed release, a withdrawn or changed advisory, or the package
+reaching shipped code. Entries have no end date. The audit prints a warning when
+an advisory no longer appears or falls below high; remove its entry then. It
+also warns when an advisory's severity or range changes, which means
+reconsidering the decision on its issue.
 
 `scripts/parser-patches.mjs` pins corrected source modules by package, version
 and SHA-256, with exact source anchors. Its existing per-kind guards also own

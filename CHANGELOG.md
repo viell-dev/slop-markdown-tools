@@ -11,6 +11,19 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- Keep Forgejo, Codeberg and Gitea metadata with longer or spaced dash fences
+  from becoming Markdown, and prevent text from becoming front matter
+  ([#958](https://github.com/viell-dev/slop-markdown-tools/issues/958)).
+- Keep adjacent `$$` lines inside list-item text on Forgejo
+  ([#961](https://github.com/viell-dev/slop-markdown-tools/issues/961)).
+- Keep Obsidian paragraphs together after comment-closing headings
+  ([#963](https://github.com/viell-dev/slop-markdown-tools/issues/963)).
+- Wait for a stopped code formatter's termination, and report stops that cannot
+  be confirmed
+  ([#970](https://github.com/viell-dev/slop-markdown-tools/issues/970)).
+
 ### Maintenance
 
 - Report failed scheduled rendering discovery runs as triage candidates in
@@ -28,6 +41,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   compile cache and record when they exit
   ([#827](https://github.com/viell-dev/slop-markdown-tools/issues/827),
   [#888](https://github.com/viell-dev/slop-markdown-tools/issues/888)).
+- Let the dependency audit excuse a development-only picomatch advisory, still
+  failing on every other high or critical one
+  ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).
 
 ## 0.8.3 - 2026-11-09
 

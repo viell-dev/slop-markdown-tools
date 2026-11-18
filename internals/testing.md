@@ -144,7 +144,9 @@ heading-attribute mock and cache assertions together. Dollar math is in
 `tests/support/math-renderers.ts`. Engine execution, configuration and plugin
 registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
 `engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
-specific contracts. The printed diff has `diff.test.ts`.
+specific contracts. The printed diff has `diff.test.ts`. How the code tools stop
+a formatter and end its processes has `code-termination.test.ts`, which drives
+simulated processes and timers.
 
 Competitor-comment regressions are grouped by what they prove:
 `competitor-comments-provenance.test.ts` owns source provenance and pragma

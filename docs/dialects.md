@@ -106,6 +106,10 @@ never restyled, and no line is broken inside it.
   interrupt a paragraph and close on the same line; a `math` code fence is
   ordinary code there.
 
+Forgejo also keeps `$$` lines directly below text in its paragraph, including
+unindented lines continuing a list item. Formatting keeps that boundary; Gitea
+reads those unindented lines as math below the list.
+
 GitHub also retains contiguous dollar display math and a Setext title
 immediately below it as one source range. GitHub's underline can include the
 dollar lines in that heading. A real blank before the title or an interrupting
@@ -198,6 +202,14 @@ Markdown and protects the rest:
   `\(` and `\)` on one line. Gitea reads backslash math only when its
   administrator enables `MATH_CODE_BLOCK_DETECTION`, which a document cannot
   reveal, so it is protected there too.
+- Initial YAML front matter with longer dash fences or surrounding spaces is
+  kept as written through the next separator, including in CRLF documents. This
+  also applies to the `codeberg` alias. Without a closing separator there is no
+  such source protection; the semantic guard still refuses edits that turn text
+  into an envelope, including thematic-break changes, Setext underlines and
+  removal of leading blank lines. The tool does not parse the YAML or predict
+  whether the forge displays a metadata box; ordinary parser-owned front matter
+  keeps its existing handling.
 - Shortlinks are not checked as links.
 - If an instance renders line breaks as hard breaks (Gitea's
   `new-line-hard-break` in `RENDER_OPTIONS_REPO_FILE`), disable `style/wrap`.
