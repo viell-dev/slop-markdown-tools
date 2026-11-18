@@ -184,19 +184,19 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   provenance naming the workflow and the commit.
 - **No unexcused high advisory is in the dependency tree.**
   `npm run check:audit` in the Linux Node.js 24 CI job and in release
-  preparation audits the full root tree, every package type included, from the
-  registry even under npm configuration that omits types or works offline. It
-  fails on every high or critical advisory that `scripts/audit-exceptions.json`
-  does not list, on an audit that cannot run or be read, and on a listed package
-  in the installed tree or the bundled parser's package graph. It warns about an
-  entry that is no longer needed or whose advisory has changed.
-  `dependency-audit.test.ts` covers these with synthetic reports and a stand-in
-  for npm, checks npm's own reading of the audit's arguments, and runs the real
-  npm offline against an unreachable registry, which must fail;
-  `metadata.test.ts` checks both workflow steps. The audit knows only the
-  advisories that the registry reports when it runs, and it does not cover the
-  Obsidian harness's tree. An entry's reason is the owner's assessment, which no
-  check proves.
+  preparation audits the committed lockfile's full root tree, every package type
+  included, from the registry even under npm configuration that omits types,
+  ignores the lockfile or works offline. It fails on every high or critical
+  advisory that `scripts/audit-exceptions.json` does not list, on an audit that
+  cannot run or be read, and on a listed package in the installed tree or the
+  bundled parser's package graph. It warns about an entry that is no longer
+  needed or whose advisory has changed. `dependency-audit.test.ts` covers these
+  with synthetic reports and a stand-in for npm, checks npm's own reading of the
+  audit's arguments, and runs the real npm offline against an unreachable
+  registry, which must fail; `metadata.test.ts` checks both workflow steps. The
+  audit knows only the advisories that the registry reports when it runs, and it
+  does not cover the Obsidian harness's tree. An entry's reason is the owner's
+  assessment, which no check proves.
 - **Rebuilds and packages contain current output only.** `build-output.test.ts`
   builds synthetic source, renames and removes modules, rebuilds and inspects an
   actual tarball. It checks source-map paths, unexpected output, failed

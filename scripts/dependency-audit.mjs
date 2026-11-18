@@ -2,17 +2,17 @@
 //
 //   npm run check:audit
 //
-// Audits the full root dependency tree, development, optional and peer dependencies included,
-// even when npm's configuration would omit them or work offline. It fails on every high or
-// critical advisory apart from those listed in audit-exceptions.json. A package that npm reports
-// at or above that threshold passes only when every advisory at or above it that the package
-// reaches through its `via` chain is listed. Each entry excuses one advisory of one
-// package, and only while that package is in neither the installed dependency tree nor the
-// bundled parser's reviewed package graph (parser-packages.json). An entry whose advisory no
-// longer needs it, or has changed since the decision, prints a warning. An audit that fails to
-// run, or a report that this script cannot read, fails the step: npm exits with the same status
-// for its own errors as for findings. The Obsidian harness in scripts/obsidian/ has its own
-// dependency tree, which this audit does not cover. The dependency guide,
+// Audits the committed lockfile's full root tree, development, optional and peer dependencies
+// included, even when npm's configuration would omit them, ignore the lockfile or work offline.
+// It fails on every high or critical advisory apart from those listed in audit-exceptions.json.
+// A package that npm reports at or above that threshold passes only when every advisory at or
+// above it that the package reaches through its `via` chain is listed. Each entry excuses one
+// advisory of one package, and only while that package is in neither the installed dependency
+// tree nor the bundled parser's reviewed package graph (parser-packages.json). An entry whose
+// advisory no longer needs it, or has changed since the decision, prints a warning. An audit
+// that fails to run, or a report that this script cannot read, fails the step: npm exits with
+// the same status for its own errors as for findings. The Obsidian harness in scripts/obsidian/
+// has its own dependency tree, which this audit does not cover. The dependency guide,
 // internals/dependencies.md, describes when an entry may be added.
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
@@ -34,14 +34,16 @@ export const severities = ["info", "low", "moderate", "high", "critical"];
 /** The lowest severity that fails the audit. */
 export const threshold = "high";
 /**
- * The whole root tree, whatever the environment's npm configuration says. npm leaves out of the
- * request every package type that `omit` names and `include` does not, and in offline mode it
- * prints an empty report without asking the registry.
+ * The whole root tree of the committed lockfile, whatever the environment's npm configuration
+ * says. npm leaves out of the request every package type that `omit` names and `include` does
+ * not; in offline mode it prints an empty report without asking the registry; and without
+ * `package-lock` it audits a tree resolved afresh from what is installed.
  */
 export const auditArguments = [
   "audit",
   "--json",
   "--offline=false",
+  "--package-lock=true",
   "--include=dev",
   "--include=optional",
   "--include=peer",

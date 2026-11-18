@@ -57,16 +57,17 @@ native-sensitive; their installation label does not change their semantic role.
 
 Code bundled from development inputs also counts as shipped code for security
 fixes and patch-release policy. CI and release preparation both run
-`npm run check:audit`, which audits the full root tree, development, optional
-and peer dependencies included, and asks the registry even when npm's
-configuration would omit a package type or work offline. It fails on every high
-or critical advisory in bundled, installed and build/test dependencies apart
-from those listed in `scripts/audit-exceptions.json`. A package that npm reports
-at high or above passes only when every such advisory that it reaches through
-npm's `via` chain is listed; moderate and low advisories stay below the
-threshold. An audit that cannot run or be read fails the step, because npm exits
-with the same status for its own errors as for findings. Fixes confined to
-unshipped build/test code still follow the [dependency-only release
+`npm run check:audit`, which audits the committed lockfile's full root tree,
+development, optional and peer dependencies included, and asks the registry even
+when npm's configuration would omit a package type, ignore the lockfile or work
+offline. It fails on every high or critical advisory in bundled, installed and
+build/test dependencies apart from those listed in
+`scripts/audit-exceptions.json`. A package that npm reports at high or above
+passes only when every such advisory that it reaches through npm's `via` chain
+is listed; moderate and low advisories stay below the threshold. An audit that
+cannot run or be read fails the step, because npm exits with the same status for
+its own errors as for findings. Fixes confined to unshipped build/test code
+still follow the [dependency-only release
 policy](https://github.com/viell-dev/slop-markdown-tools/blob/main/RELEASING.md).
 The independently managed Obsidian harness is a separate dependency tree, which
 this audit does not cover.

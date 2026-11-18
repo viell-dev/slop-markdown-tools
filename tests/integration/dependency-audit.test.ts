@@ -148,20 +148,28 @@ describe("the dependency audit's policy", () => {
   });
   // npm's own reading of the arguments, under configuration that would narrow the audit.
   it.each(["dev", "optional", "peer"])(
-    "audits online with every package type, even when the environment omits %s or works offline",
+    "audits the lockfile online with every package type, even when the environment omits %s, works offline and ignores the lockfile",
     (omitted) => {
       const result = spawnSync(
         process.execPath,
-        [realNpm(), ...auditArguments.slice(1), "config", "get", "omit", "offline"],
+        [realNpm(), ...auditArguments.slice(1), "config", "get", "omit", "offline", "package-lock"],
         {
           cwd: repository,
           encoding: "utf8",
           windowsHide: true,
-          env: environment({ npm_config_omit: omitted, npm_config_offline: "true" }),
+          env: environment({
+            npm_config_omit: omitted,
+            npm_config_offline: "true",
+            npm_config_package_lock: "false",
+          }),
         },
       );
       expect(result.status, result.stderr).toBe(0);
-      expect(result.stdout.split(/\r?\n/).filter(Boolean)).toEqual(["omit=", "offline=false"]);
+      expect(result.stdout.split(/\r?\n/).filter(Boolean)).toEqual([
+        "omit=",
+        "offline=false",
+        "package-lock=true",
+      ]);
     },
   );
 });
