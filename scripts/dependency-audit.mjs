@@ -2,10 +2,11 @@
 //
 //   npm run check:audit
 //
-// Audits the full root dependency tree, development dependencies included, and fails on every
-// high or critical advisory apart from those listed in audit-exceptions.json. A package that npm
-// reports at or above that threshold passes only when every advisory at or above it that the
-// package reaches through its `via` chain is listed. Each entry excuses one advisory of one
+// Audits the full root dependency tree, development, optional and peer dependencies included,
+// even when npm's configuration would omit them or work offline. It fails on every high or
+// critical advisory apart from those listed in audit-exceptions.json. A package that npm reports
+// at or above that threshold passes only when every advisory at or above it that the package
+// reaches through its `via` chain is listed. Each entry excuses one advisory of one
 // package, and only while that package is in neither the installed dependency tree nor the
 // bundled parser's reviewed package graph (parser-packages.json). An entry whose advisory no
 // longer needs it, or has changed since the decision, prints a warning. An audit that fails to
@@ -32,8 +33,19 @@ import { fileURLToPath } from "node:url";
 export const severities = ["info", "low", "moderate", "high", "critical"];
 /** The lowest severity that fails the audit. */
 export const threshold = "high";
-/** The whole root tree, whatever the environment's `omit` setting says. */
-export const auditArguments = ["audit", "--json", "--include=dev"];
+/**
+ * The whole root tree, whatever the environment's npm configuration says. npm leaves out of the
+ * request every package type that `omit` names and `include` does not, and in offline mode it
+ * prints an empty report without asking the registry.
+ */
+export const auditArguments = [
+  "audit",
+  "--json",
+  "--offline=false",
+  "--include=dev",
+  "--include=optional",
+  "--include=peer",
+];
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const rank = (severity) => severities.indexOf(severity);
@@ -190,7 +202,13 @@ export function readReport(result) {
     if (!Array.isArray(entry.via) || !entry.via.length)
       fail(`npm audit printed no via list for ${oneLine(name)}`);
     for (const via of entry.via) {
-      if (typeof via === "string" ? !Object.hasOwn(vulnerabilities, via) : !isAdvisory(via))
+      // npm lists each advisory under the package it affects, and another vulnerable package
+      // that this one depends on by that package's name.
+      if (
+        typeof via === "string"
+          ? !Object.hasOwn(vulnerabilities, via)
+          : !isAdvisory(via) || via.name !== name
+      )
         fail(`npm audit printed an unexpected via entry for ${oneLine(name)}`);
       // The gate reads each package's severity, as `npm audit --audit-level` does. npm gives a
       // package at least the severity of its own advisories; a package that only reaches an
@@ -233,9 +251,11 @@ function reachedAdvisories(vulnerabilities, name) {
   return [...advisories];
 }
 
-const advisoryId = (advisory) => advisoryUrl.exec(advisory.url)?.[1] ?? advisory.url;
+/** The advisory's GHSA identifier, read only from a GitHub advisory URL. */
+const advisoryGhsa = (advisory) => advisoryUrl.exec(advisory.url)?.[1];
+const advisoryId = (advisory) => advisoryGhsa(advisory) ?? advisory.url;
 const excuses = (exception, advisory) =>
-  advisory.name === exception.package && advisoryId(advisory) === exception.advisory;
+  advisory.name === exception.package && advisoryGhsa(advisory) === exception.advisory;
 
 /**
  * Apply the exceptions to a report from readReport.

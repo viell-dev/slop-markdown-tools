@@ -123,11 +123,47 @@ const outcome = (value: unknown, shipped = new Map<string, string[]>()) =>
 const errors = (lines: string[]) => lines.filter((line) => line.startsWith("::error::"));
 const warnings = (lines: string[]) => lines.filter((line) => line.startsWith("::warning::"));
 
+/**
+ * The test's environment with some variables replaced or removed. Windows ignores the case of
+ * their names, so npm's `NPM_EXECPATH` would otherwise survive next to `npm_execpath`.
+ */
+const environment = (changes: Record<string, string | undefined>) => {
+  const replaced = new Set(Object.keys(changes).map((name) => name.toLowerCase()));
+  const env: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(process.env))
+    if (!replaced.has(name.toLowerCase())) env[name] = value;
+  for (const [name, value] of Object.entries(changes)) if (value !== undefined) env[name] = value;
+  return env;
+};
+/** The npm that runs these tests, as the other integration tests use it. */
+const realNpm = () => {
+  const npm = process.env.npm_execpath;
+  expect(npm, "run the tests through npm").toBeTruthy();
+  return npm!;
+};
+
 describe("the dependency audit's policy", () => {
-  it("audits the whole tree, development dependencies included, at high", () => {
-    expect(auditArguments).toEqual(["audit", "--json", "--include=dev"]);
+  it("fails at high", () => {
     expect(threshold).toBe("high");
   });
+  // npm's own reading of the arguments, under configuration that would narrow the audit.
+  it.each(["dev", "optional", "peer"])(
+    "audits online with every package type, even when the environment omits %s or works offline",
+    (omitted) => {
+      const result = spawnSync(
+        process.execPath,
+        [realNpm(), ...auditArguments.slice(1), "config", "get", "omit", "offline"],
+        {
+          cwd: repository,
+          encoding: "utf8",
+          windowsHide: true,
+          env: environment({ npm_config_omit: omitted, npm_config_offline: "true" }),
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.split(/\r?\n/).filter(Boolean)).toEqual(["omit=", "offline=false"]);
+    },
+  );
 });
 
 describe("listed advisories", () => {
@@ -191,6 +227,14 @@ describe("listed advisories", () => {
     ]);
     expect(result.excused).toEqual([]);
     expect(gate(npm(value)).passed).toBe(false);
+  });
+  it("match the identifier only in an advisory's GitHub URL", () => {
+    const bare = { ...excusedAdvisory, url: excusedId };
+    const result = outcome(report({ globber: { severity: "high", via: [bare] } }));
+    expect(result.blocking.map((entry) => [entry.advisory, entry.package])).toEqual([
+      [excusedId, "globber"],
+    ]);
+    expect(result.excused).toEqual([]);
   });
   it("fail a package that reaches a listed advisory and another one through via", () => {
     const other = advisory("loader", "GHSA-8888-9999-aaaa", "critical");
@@ -371,6 +415,12 @@ describe("an audit that cannot be read", () => {
     ["an unknown severity", npm(unknownSeverity), "unexpected entry for walker"],
     ["an advisory without its URL", npm(brokenAdvisory), "unexpected via entry for globber"],
     [
+      // It would otherwise borrow the exception of the package that the advisory names.
+      "an advisory listed under another package",
+      npm(report({ ...entries(), other: { severity: "high", via: [excusedAdvisory] } })),
+      "unexpected via entry for other",
+    ],
+    [
       "a package below its own advisory",
       npm(report({ ...entries(), globber: { severity: "moderate", via: [excusedAdvisory] } })),
       "reports globber below the severity of its own advisory",
@@ -454,19 +504,6 @@ describe("the exception list", () => {
   });
 });
 
-/**
- * The test's environment with some variables replaced or removed. Windows ignores the case of
- * their names, so npm's `NPM_EXECPATH` would otherwise survive next to `npm_execpath`.
- */
-const environment = (changes: Record<string, string | undefined>) => {
-  const replaced = new Set(Object.keys(changes).map((name) => name.toLowerCase()));
-  const env: NodeJS.ProcessEnv = {};
-  for (const [name, value] of Object.entries(process.env))
-    if (!replaced.has(name.toLowerCase())) env[name] = value;
-  for (const [name, value] of Object.entries(changes)) if (value !== undefined) env[name] = value;
-  return env;
-};
-
 // The command itself, with a stand-in for npm, so that nothing reaches the registry.
 describe("npm run check:audit", () => {
   const script = path.join(repository, "scripts/dependency-audit.mjs");
@@ -538,6 +575,26 @@ process.exitCode = Number(process.env.FAKE_NPM_STATUS);
     const result = await run(report({}), 0);
     expect(result.status).toBe(0);
     expect(warnings(result.lines)).toHaveLength(listed.length);
+  });
+  it("fails with the real npm in offline mode when the registry cannot be reached", () => {
+    // Offline, npm would print an empty report without asking the registry, which passes.
+    const result = spawnSync(process.execPath, [script], {
+      cwd: repository,
+      encoding: "utf8",
+      windowsHide: true,
+      env: environment({
+        npm_execpath: realNpm(),
+        npm_config_offline: "true",
+        npm_config_registry: "http://127.0.0.1:1/",
+        npm_config_fetch_retries: "0",
+      }),
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(1);
+    expect(errors(result.stdout.split("\n"))).toEqual([
+      expect.stringMatching(
+        /^::error::Dependency audit failed: npm audit failed: .*127\.0\.0\.1:1/,
+      ),
+    ]);
   });
   it("refuses arguments and a run outside npm", async () => {
     expect((await run(report({}), 0, ["--omit=dev"])).status).toBe(2);
