@@ -103,6 +103,7 @@
     "check:forges": "run-s build check:forges:run",
     "check:forges:run": "node scripts/forge-rendering.mjs",
     "check:live": "node scripts/check-live.mjs",
+    "check:audit": "node scripts/dependency-audit.mjs",
     "release:prepare": "node scripts/with-build.mjs check:built release:pack:built",
     "release:pack": "node scripts/with-build.mjs release:pack:built",
     "release:pack:built": "node scripts/package-smoke.mjs --retain",
