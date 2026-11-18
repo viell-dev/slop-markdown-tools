@@ -8,8 +8,10 @@ export const terminationWaitMs = 10000;
 export const unconfirmed = (detail: string) => `and its processes may still be running (${detail})`;
 
 // On Windows the processes a tool started are found from its process ID, which
-// no longer leads to them once the tool has exited.
+// no longer leads to them once Node.js has seen the tool exit.
 const exitedFirst = "and had already exited, so any processes it started may not have been stopped";
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const notFound = (error: unknown) => (error as NodeJS.ErrnoException).code === "ESRCH";
 
 /**
  * Forcibly end a formatter process and the processes it started. Resolves with
@@ -36,8 +38,12 @@ export function endWindowsTree(
   return new Promise((resolve) => {
     let helper: ChildProcess;
     const abandon = () => {
+      try {
+        helper.kill();
+      } catch {
+        // A helper that cannot be signalled is still released below.
+      }
       // The helper's pipes would keep the event loop, and so the CLI, alive.
-      helper.kill();
       helper.stdin?.destroy();
       helper.stdout?.destroy();
       helper.stderr?.destroy();
@@ -58,8 +64,8 @@ export function endWindowsTree(
         (error, _stdout, stderr) => {
           signal.removeEventListener("abort", abandon);
           if (!error) return resolve(undefined);
-          // 128: no process has the ID any longer, as when the tool exited meanwhile.
-          if (error.code === 128) return resolve(exitedFirst);
+          // Any failure, including code 128, which taskkill also returns when it
+          // cannot end a descendant, leaves the outcome unknown.
           const detail = stderr.trim();
           resolve(
             unconfirmed(
@@ -72,31 +78,36 @@ export function endWindowsTree(
       );
     } catch (error) {
       // An invalid executable makes the launch throw instead of calling back.
-      return resolve(unconfirmed(`taskkill failed (${(error as Error).message})`));
+      return resolve(unconfirmed(`taskkill failed (${message(error)})`));
     }
     if (signal.aborted) abandon();
     else signal.addEventListener("abort", abandon, { once: true });
   });
 }
 
-/** Send `SIGKILL` to the tool's process group, which outlives the tool while a member runs. */
+/**
+ * Send `SIGKILL` to the tool's process group, which outlives the tool while a
+ * member runs. The call succeeds once it signals any member, so members that
+ * the caller may not signal can survive a success; when it may signal none of
+ * them, it fails with `EPERM`.
+ */
 export function signalProcessGroup(child: ChildProcess): Promise<string | undefined> {
   const { pid } = child;
   if (pid === undefined) return Promise.resolve(undefined);
+  let problem: string | undefined;
   try {
     process.kill(-pid, "SIGKILL");
-  } catch {
-    // The tool left its group; end the tool itself unless it has exited.
+  } catch (group) {
+    // `ESRCH` means that no member is left; anything else leaves them running.
+    if (!notFound(group)) problem = `its process group could not be signalled: ${message(group)}`;
+    // A tool that left its group is ended itself, unless it has exited.
     if (child.exitCode === null && child.signalCode === null) {
       try {
         process.kill(pid, "SIGKILL");
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ESRCH")
-          return Promise.resolve(
-            unconfirmed(`could not be signalled: ${(error as Error).message}`),
-          );
+        if (!notFound(error)) problem ??= `it could not be signalled: ${message(error)}`;
       }
     }
   }
-  return Promise.resolve(undefined);
+  return Promise.resolve(problem === undefined ? undefined : unconfirmed(problem));
 }

@@ -273,15 +273,17 @@ A failed, missing, timed-out, non-UTF-8, oversized, or unsafe tool result keeps
 that block's content and reports `engine/code-formatter`. The CLI exits with
 `2`, and other safe edits remain available. Partial stdout is never inserted.
 
-A tool that exceeds its timeout or output limit is forcibly ended with the
-processes it started: on Unix by `SIGKILL` to its process group, and on Windows
-by `taskkill /T /F`. The failure is reported once that has succeeded and the
-tool has exited and closed its output. The diagnostic instead says that its
-processes may still be running when termination fails or this does not happen
-within 10 seconds. On Windows it also says when the tool had already exited, so
-that processes it started could no longer be found. Processes that detach
-themselves from the tool are not reached: on Unix, those that leave its process
-group, and on Windows, those whose parent has already exited.
+When a tool exceeds its timeout or output limit, mdrefine tries to end it and
+the processes it started: on Unix it sends `SIGKILL` to the tool's process
+group, and on Windows it runs `taskkill /T /F`. It reports the failure once that
+attempt has succeeded and the tool has exited and closed its output. When the
+attempt fails, or this does not happen within 10 seconds, the diagnostic instead
+says that the tool's processes may still be running. On Windows it also says
+when the tool had already exited, so that processes it started could no longer
+be found. A successful attempt does not reach processes that detach themselves
+from the tool: on Unix, those that leave its process group, and on Windows,
+those whose parent has already exited. On Unix it can also miss processes that
+you are not permitted to signal.
 
 Configured commands, including commands in JSON files, run with your
 permissions; use configurations and tools you trust.

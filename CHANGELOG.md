@@ -13,8 +13,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
-- End a stopped code formatter's processes before reporting it, also on a busy
-  Windows machine
+- Wait for a stopped code formatter's termination, and report stops that cannot
+  be confirmed
   ([#970](https://github.com/viell-dev/slop-markdown-tools/issues/970)).
 
 ### Maintenance

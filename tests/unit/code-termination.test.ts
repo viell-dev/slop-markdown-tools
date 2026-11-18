@@ -205,7 +205,18 @@ it.each([
     "",
     "and its processes may still be running (taskkill failed (spawn taskkill.exe ENOENT))",
   ],
-  ["no longer finds the tool", failed(128), "ERROR: synthetic\r\n", exitedFirst],
+  [
+    "cannot end a descendant, with code 128",
+    failed(128),
+    "ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: synthetic.\r\n",
+    "and its processes may still be running (taskkill exited with code 128: ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: synthetic.)",
+  ],
+  [
+    "no longer finds the tool, with code 128",
+    failed(128),
+    'ERROR: The process "4242" not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242" not found.)',
+  ],
 ])("reports a taskkill that %s", async (_, error, stderr, clause) => {
   const { finish } = taskkill();
   const pending = endWindowsTree(asChild(new Simulated()), new AbortController().signal);
@@ -232,11 +243,22 @@ it("runs no taskkill for a tool that has exited, whose ID can be another process
   expect(execFile).not.toHaveBeenCalled();
 });
 
-it("ends an abandoned taskkill and releases its pipes", async () => {
+it.each([
+  ["", () => true],
+  [
+    " whose kill throws",
+    () => {
+      throw new Error("kill EINVAL");
+    },
+  ],
+])("ends an abandoned taskkill%s and releases its pipes", async (_, kill) => {
   const { helper } = taskkill();
+  helper.kill.mockImplementation(kill);
   const abandon = new AbortController();
   const pending = endWindowsTree(asChild(new Simulated()), abandon.signal);
   abandon.abort();
+  // An exception in the listener would surface on a later turn.
+  await settled();
   await expect(pending).resolves.toBe(
     "and its processes may still be running (taskkill did not finish)",
   );
@@ -259,12 +281,36 @@ it("signals a tool that left its group and reports when that fails", async () =>
     throw errno(pid < 0 ? "ESRCH" : "EPERM");
   });
   await expect(signalProcessGroup(asChild(new Simulated()))).resolves.toBe(
-    "and its processes may still be running (could not be signalled: kill EPERM)",
+    "and its processes may still be running (it could not be signalled: kill EPERM)",
   );
   expect(kill.mock.calls).toEqual([
     [-4242, "SIGKILL"],
     [4242, "SIGKILL"],
   ]);
+});
+
+it.each([
+  ["after the tool exited", 0, [[-4242, "SIGKILL"]]],
+  [
+    "although signalling the tool itself succeeds",
+    null,
+    [
+      [-4242, "SIGKILL"],
+      [4242, "SIGKILL"],
+    ],
+  ],
+])("reports a process group it may not signal %s", async (_, exitCode, calls) => {
+  // Linux fails with EPERM when no member is the caller's to signal.
+  const kill = vi.spyOn(process, "kill").mockImplementation((pid) => {
+    if (pid < 0) throw errno("EPERM");
+    return true;
+  });
+  const tool = new Simulated();
+  tool.exitCode = exitCode;
+  await expect(signalProcessGroup(asChild(tool))).resolves.toBe(
+    "and its processes may still be running (its process group could not be signalled: kill EPERM)",
+  );
+  expect(kill.mock.calls).toEqual(calls);
 });
 
 it("signals no exited tool outside its group", async () => {
