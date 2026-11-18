@@ -1,7 +1,7 @@
 import process from "node:process";
 import { Buffer } from "node:buffer";
 import { readFileSync, writeFileSync, existsSync, openSync, closeSync, unlinkSync } from "node:fs";
-import { setTimeout, setInterval } from "node:timers";
+import { setTimeout, setInterval, clearInterval } from "node:timers";
 import { spawn } from "node:child_process";
 
 const [mode, filepath, record, label = "formatted"] = process.argv.slice(2);
@@ -20,13 +20,23 @@ process.stdin.on("end", () => {
   else if (mode === "oversize") process.stdout.write("x".repeat(2048));
   else if (mode === "timeout") setInterval(() => {}, 1000);
   else if (mode === "tree") {
+    // The child outlives any test that observes it, and ends only a run that
+    // failed to stop it.
+    const heartbeat = record + ".heartbeat";
     const child = `
       const fs = require("node:fs");
       let count = 0;
       setInterval(() => { try { fs.writeFileSync(process.argv[1], String(++count)); } catch { process.exit(0); } }, 50);
-      setTimeout(() => process.exit(0), 10000);
+      setTimeout(() => process.exit(0), 60000);
     `;
-    spawn(process.execPath, ["-e", child, record + ".heartbeat"], { stdio: "ignore" });
+    spawn(process.execPath, ["-e", child, heartbeat], { stdio: "ignore" });
+    // Exceed a small output limit once the child runs, so the stop never
+    // precedes it however slowly the processes start.
+    const ready = setInterval(() => {
+      if (!existsSync(heartbeat)) return;
+      clearInterval(ready);
+      process.stdout.write("x".repeat(2048));
+    }, 20);
     setInterval(() => {}, 1000);
   }
   else if (mode === "collision") process.stdout.write("before\n```\nafter\n");

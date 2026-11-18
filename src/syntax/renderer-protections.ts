@@ -250,7 +250,8 @@ export interface RendererProtections {
    * such children: Reading view keeps them inside one code block. Later
    * independent blocks remain editable.
    * Forgejo and Gitea retain table header/delimiter pairs hidden inside primary
-   * paragraphs (#663), and URL-adjacent backslash hard breaks (#664).
+   * paragraphs (#663), URL-adjacent backslash hard breaks (#664), and initial
+   * metadata envelopes absent from the primary front matter reading (#958).
    */
   boundaryText: ReadonlySet<Nodes>;
   /**
