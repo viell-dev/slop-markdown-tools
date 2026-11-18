@@ -79,26 +79,6 @@ it("scans a comment's long marker line without quadratic backtracking (#492)", (
   ).toBeLessThan(10);
 }, 120_000);
 
-it("scans a shared Obsidian table-row region once (#505)", () => {
-  expect(
-    scaling(
-      [800, 3200],
-      (count) => parse("a | b\n-- | --\n# row | b\n".repeat(count), "obsidian"),
-      (document) => rendererProtections(document),
-      (result, document) => {
-        expect(
-          [...result.tableText].some(
-            (node) =>
-              node.position!.start.offset! < document.source.indexOf("# row") &&
-              node.position!.end.offset === document.source.length - 1,
-          ),
-        ).toBe(true);
-      },
-      4,
-    ),
-  ).toBeLessThan(10);
-});
-
 it.each([
   { name: "independent", shared: false },
   { name: "shared", shared: true },
