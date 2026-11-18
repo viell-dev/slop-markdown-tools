@@ -73,6 +73,15 @@ const verifyCommands = (ci: Workflow) => {
     if: "runner.os != 'Linux' || matrix.node != 24",
     run: "npm run test:ci",
   });
+  // The dependency audit, with its exceptions; scripts/dependency-audit.mjs owns its policy.
+  const install = commands.findIndex((step) => step.run === "npm ci");
+  const audit = commands.findIndex((step) => step.run === "npm run check:audit");
+  expect(install).toBeGreaterThanOrEqual(0);
+  expect(audit).toBeGreaterThan(install);
+  expect(commands[audit]).toEqual({
+    if: "runner.os == 'Linux' && matrix.node == 24",
+    run: "npm run check:audit",
+  });
 };
 const releaseHosts = (release: Workflow) => {
   expect(release.jobs.prepare!.needs).toEqual(
@@ -86,9 +95,7 @@ const releaseHosts = (release: Workflow) => {
 const releaseAudit = (release: Workflow) => {
   const steps = commandSteps(release.jobs.prepare!.steps!);
   const install = steps.findIndex((step) => step.run === "npm ci");
-  const audit = steps.findIndex(
-    (step) => step.run === "npm audit --include=dev --audit-level=high",
-  );
+  const audit = steps.findIndex((step) => step.run === "npm run check:audit");
   const pack = steps.findIndex((step) => step.run === "npm run release:pack");
   expect(install).toBeGreaterThanOrEqual(0);
   expect(audit).toBeGreaterThan(install);
@@ -233,6 +240,7 @@ describe("release workflow", () => {
   });
   it("freshly gates packing on a full-root audit including bundled development inputs", () => {
     releaseAudit(workflow(".github/workflows/release.yml"));
+    expect(pkg.scripts["check:audit"]).toBe("node scripts/dependency-audit.mjs");
   });
 });
 
@@ -262,9 +270,9 @@ describe("CI evidence ownership", () => {
 describe("workflow structural regression controls", () => {
   it("accepts a named literal-block release audit", () => {
     const release = workflow(".github/workflows/release.yml");
-    const audit = release.jobs.prepare!.steps!.find((step) => step.run?.startsWith("npm audit"))!;
+    const audit = release.jobs.prepare!.steps!.find((step) => step.run === "npm run check:audit")!;
     audit.name = "Fresh audit of shipped and tooling inputs";
-    audit.run = (parseYaml("run: |\n  npm audit --include=dev --audit-level=high\n") as Step).run!;
+    audit.run = (parseYaml("run: |\n  npm run check:audit\n") as Step).run!;
     releaseAudit(parseYaml(stringify(release)) as Workflow);
   });
   it("accepts a quoted action version and a literal-block standalone command", () => {
@@ -277,6 +285,7 @@ describe("workflow structural regression controls", () => {
     for (const [job, command] of [
       ["verify", "npm run check:ci"],
       ["verify", "npm run test:ci"],
+      ["verify", "npm run check:audit"],
       ["coverage", "npm run test:coverage"],
     ]) {
       const literal = parseYaml(`run: |\n  ${command}\n`) as Step;
@@ -307,6 +316,7 @@ describe("workflow structural regression controls", () => {
   it.each([
     ["verify", "npm run check:ci"],
     ["verify", "npm run test:ci"],
+    ["verify", "npm run check:audit"],
     ["coverage", "npm run test:coverage"],
   ])("rejects failure swallowing or changed execution context for %s / %s", (job, command) => {
     for (const extra of [
@@ -333,6 +343,7 @@ describe("workflow structural regression controls", () => {
   it.each([
     "omit-dev",
     "weaker-threshold",
+    "unexcused-command",
     "ignore-failure",
     "conditional",
     "wrong-directory",
@@ -342,12 +353,11 @@ describe("workflow structural regression controls", () => {
   ])("rejects a release audit with %s", (fault) => {
     const release = workflow(".github/workflows/release.yml");
     const steps = release.jobs.prepare!.steps!;
-    const index = steps.findIndex(
-      (step) => step.run === "npm audit --include=dev --audit-level=high",
-    );
+    const index = steps.findIndex((step) => step.run === "npm run check:audit");
     const audit = steps[index]!;
-    if (fault === "omit-dev") audit.run = "npm audit --omit=dev --audit-level=high";
+    if (fault === "omit-dev") audit.run = "npm run check:audit -- --omit=dev";
     if (fault === "weaker-threshold") audit.run = "npm audit --include=dev --audit-level=critical";
+    if (fault === "unexcused-command") audit.run = "npm audit --include=dev --audit-level=high";
     if (fault === "ignore-failure") audit["continue-on-error"] = true;
     if (fault === "conditional") audit.if = "inputs.publish";
     if (fault === "wrong-directory") audit["working-directory"] = "scripts/obsidian";

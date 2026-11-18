@@ -3,6 +3,7 @@ import type { Document } from "../core/types.js";
 import type { ProtectionSource } from "./protection-source.js";
 import { leaves } from "./protection-source.js";
 import { interruptingHtml } from "./obsidian-html-protections.js";
+import { forgeFrontMatterEnd } from "./forge-front-matter.js";
 import { escaped } from "./source.js";
 
 interface Container {
@@ -81,6 +82,13 @@ export function collectForgeProtections(
       end: { ...node.position!.end, offset: end },
     },
   });
+  const metadataEnd = forgeFrontMatterEnd(source, positions);
+  const first = document.tree.children[0];
+  if (
+    metadataEnd !== undefined &&
+    (first?.type !== "yaml" || first.position!.end.offset! < metadataEnd)
+  )
+    boundaryText.add(region(document.tree, 0, metadataEnd));
   let tableUntil = 0;
   const visit = (parent: Parents, container: Container) => {
     for (let index = 0; index < parent.children.length; index++) {

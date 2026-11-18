@@ -31,9 +31,34 @@ export const forgeBoundaryFixtures = [
   { name: "url-backslash-space", source: "Visit www.example.com\\ \nThen continue.\n" },
   { name: "url-backslash-path", source: "Visit https://example.com/a\\b\nThen continue.\n" },
 ];
+// Initial native metadata envelopes missing from the primary parser (#958).
+export const forgeFrontMatterFixtures = [
+  ["long-close", "---\ntitle: Example\n----"],
+  ["indented-close", "---\ntitle: Example\n ---"],
+  ["long-open", "----\ntitle: Example\n---"],
+  ["spaces", "  -----  \ntitle: Example\n  ----  "],
+  ["scalar", "---\n\nintro with __strong__ text\n-----"],
+  ["sequence", "---\n* one\n* two\n-----"],
+  ["invalid", "----\n[invalid YAML\n----"],
+  ["empty", "----\n----"],
+  ["unicode", "\u0085----\ntitle: Example\n----\u0085"],
+  ["unicode-skipped-byte", "----\u00a0x\ntitle: Example\n----\u00a0x"],
+  ["crlf", "---\r\ntitle: Example\r\n----"],
+].map(([name, envelope]) => ({
+  name: `frontmatter-${name}`,
+  source: `${envelope}\n\nBody *text*.\n`,
+}));
+export const forgeFrontMatterCreationFixtures = [
+  { name: "metadata-create-break", source: "-----\n\nNote: remember this.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-indented", source: " ---\n\nNote: remember this.\n\n___\n\nBody text.\n" },
+  { name: "metadata-create-scalar", source: "-----\n\nIntro paragraph.\n\n***\n\nBody text.\n" },
+  { name: "metadata-create-setext", source: "----\n\n## title: Example\n\nBody text.\n", config: { rules: { "style/heading": ["warn", { style: "setext" }] } } },
+  { name: "metadata-create-leading-blank", config: { extends: [], rules: { "style/blank-lines": "warn" } }, source: "\n ----\ntitle: Example\n ----\n\nBody text.\n" },
+];
 export const forgeFixtures = [
   ...commonFixtures,
   ...forgeBoundaryFixtures,
+  ...forgeFrontMatterFixtures,
   // Dollar lines that continue item text on Forgejo (#961), and controls.
   {
     name: "math-continuation-math-below-text",

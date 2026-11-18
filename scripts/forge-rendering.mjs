@@ -14,6 +14,7 @@ import { rendererSettings } from "./renderer-settings.mjs";
 import { classifyDifferences, knownSources } from "./renderer-differences.mjs";
 import {
   forgeFixtures as fixtures,
+  forgeFrontMatterCreationFixtures,
   fileFixtures,
   forgeAutolinkFixtures,
 } from "../tests/fixtures/renderers/forges.mjs";
@@ -204,6 +205,23 @@ for (const image of images) {
         forgeHtml(await render(fixture.source), fixture.source),
         forgeHtml(await render(result.output), result.output),
         `Changed ${image.name} ${fixture.name} rendering or heading anchors`,
+      );
+      report.controls.push({ name: `${image.name}/${fixture.name}`, passed: true });
+    }
+    // Force native comparisons even when the guard correctly retains the source.
+    for (const fixture of forgeFrontMatterCreationFixtures) {
+      const result = format(fixture.source, {
+        config: { ...config, dialect: image.name, ...fixture.config },
+      });
+      assert.equal(
+        result.output,
+        fixture.source,
+        `Created ${image.name} metadata in ${fixture.name}`,
+      );
+      assert.equal(
+        forgeHtml(await render(fixture.source), fixture.source),
+        forgeHtml(await render(result.output), result.output),
+        `Changed ${image.name} ${fixture.name} rendering`,
       );
       report.controls.push({ name: `${image.name}/${fixture.name}`, passed: true });
     }
