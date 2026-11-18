@@ -12,6 +12,40 @@ Start with [setup and ordinary checks](../CONTRIBUTING.md#set-up). Use the
 - [CLI and filesystem integration](#cli-and-filesystem-integration)
 - [Performance and retention](#performance-and-retention)
 
+## Scheduled discovery triage
+
+At maintenance start and before release preparation, read failed scheduled
+Rendering, Obsidian and Forges runs since the previous release, their reports
+and automatic issues. Follow CONTRIBUTING's [bounded renderer
+work](../CONTRIBUTING.md#bounded-renderer-work) to distinguish accepted defects,
+limits and infrastructure failures, linking follow-up issues and recording
+dispositions. Check that each failed scheduled run has an issue; create the
+missing report if automation failed.
+
+`discovery-issues.yml` reacts to completed host workflows but runs its reporter
+only when the source event was `schedule` and its conclusion was `failure`.
+Manual runs do not publish issues. The isolated job checks out only the trusted
+default-branch reporter, installs no dependencies and runs no product or Docker
+code. It downloads reports as data, prepares text without credentials, then
+passes the issue-write token only to the final `gh` adapter. Build and renderer
+jobs retain read-only permissions (Rendering uses its read token for the
+Markdown API). No repository setting change is needed.
+
+One issue per run ID carries only `Type: Maintenance` until reviewed. A hidden
+run-ID marker is checked against all open and closed issues through the REST
+API, without search-index delay; serialized reporting for that run ID prevents
+concurrent reruns from racing. A rerun leaves the original issue unchanged; read
+all attempts from its run link. Failed listing aborts rather than risking a
+duplicate. A missing or malformed report still opens an issue naming the run and
+commit, explicitly marking unavailable seeds, counts and document names.
+
+All three host artifacts are retained for 90 days, giving several weeks of
+triage time across weekly runs, within GitHub's standard retention allowance.
+The issue preserves available metadata after artifact expiry. Reporting failures
+remain visible in Actions and are checked during maintenance; this automation
+cannot guarantee delivery during GitHub outages. Discovery and its reporting are
+not merge or release gates. No live-state triage check is added.
+
 ## Build and invocation ownership
 
 Standalone `check`, `test` and its suite variants, `test:package`, `format:docs`
@@ -125,7 +159,9 @@ heading-attribute mock and cache assertions together. Dollar math is in
 `tests/support/math-renderers.ts`. Engine execution, configuration and plugin
 registration have `engine.test.ts`, `config.test.ts` and `plugins.test.ts`;
 `engine-ranges`, `engine-front-matter` and `engine-*-protections` cover those
-specific contracts. The printed diff has `diff.test.ts`.
+specific contracts. The printed diff has `diff.test.ts`. How the code tools stop
+a formatter and end its processes has `code-termination.test.ts`, which drives
+simulated processes and timers.
 
 The generated-document properties in `blocks.test.ts`, `block-spacing.test.ts`
 and `engine-ranges.test.ts` replay consecutive slices of fixed fast-check seeds

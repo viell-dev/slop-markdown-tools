@@ -5,6 +5,22 @@ import { URL } from "node:url";
 /** @type {{ issue: number, name: string, source: string, preserve?: boolean }[]} */
 export const boundaryFixtures = [
   ...[
+    "a <!-- b\n## c --> d\ne\n",
+    "a <!-- b\n\n## c --> d\ne\n",
+    "a <!-- b\n- c --> d\ne\n",
+    "a <!-- b\n> c --> d\ne\n",
+    "a <!-- b\n``` c --> d\ne\n```\nf\n",
+    "a <!-- b\nc --> d\n---\ne\n",
+    "a <!-- b\n---\nc --> d\ne\n",
+    "- a <!-- b\n  ## c --> d\n  e\n",
+    "> a <!-- b\n> ## c --> d\n> e\n",
+  ].map((source, index) => ({
+    issue: 963,
+    name: `paragraph at a carried comment's closing boundary ${index}`,
+    source,
+    preserve: index !== 5,
+  })),
+  ...[
     "a *b\n<i>\nc* d\n",
     "- a *b\n  <i>\n  c* d\n",
     "- a *b\n<i>\nc* d\n",

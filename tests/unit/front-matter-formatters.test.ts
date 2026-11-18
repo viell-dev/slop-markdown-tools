@@ -152,3 +152,14 @@ it.each(dialects)(
     }
   },
 );
+
+it.each(["forgejo", "gitea"] as const)(
+  "refuses an earlier native metadata closer from a formatter in %s",
+  async (dialect) => {
+    const source = "---\ntitle: Example\n---\n\nBody text.\n";
+    run.mockResolvedValue("title: Example\n----\nother: Hidden\n");
+    const result = await formatWithCode(source, { config: config(dialect) });
+    expect(result.output).toBe(source);
+    expect(result.diagnostics.some((item) => item.rule === "engine/code-formatter")).toBe(true);
+  },
+);

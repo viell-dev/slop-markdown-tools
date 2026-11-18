@@ -79,7 +79,10 @@ block quote, thematic break, fence, HTML, or link reference definition, when it
 contains `|`, which `---` below it could make a table, or when it ends with a
 backslash, and on Forgejo and Gitea when it contains `{`. Below a first line of
 `---` that no line closes, a level-2 underline has at least four `-`, because
-`---` would close it as front matter.
+`---` would close it as parser front matter. On Forgejo and Gitea, longer dash
+underlines can close native front matter too: the semantic guard refuses a
+conversion that creates such an envelope, retaining the heading's form. Other
+edits of the same rule may be withheld with it.
 
 ## Dialect notes
 
