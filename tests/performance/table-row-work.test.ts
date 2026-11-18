@@ -34,5 +34,9 @@ it("scans a shared Obsidian table-row region once (#505, #969)", () => {
   // cannot see inside a native search, and the source-read counter cannot follow
   // these collectors' own uses of the source, such as splitting it into lines.
   const growth = large!.blocks / ((sizes[1] / sizes[0]) * small!.blocks);
-  expect(growth, JSON.stringify({ sizes, small, large })).toBeLessThan(1.25);
+  const evidence = JSON.stringify({ sizes, small, large });
+  expect(growth, evidence).toBeLessThan(1.25);
+  // Each fresh root must pay for its own scan. An answer cached before either
+  // measurement would bring the growth to about 0.25 or below.
+  expect(growth, evidence).toBeGreaterThan(0.8);
 });
