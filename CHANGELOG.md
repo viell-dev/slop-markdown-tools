@@ -20,6 +20,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#961](https://github.com/viell-dev/slop-markdown-tools/issues/961)).
 - Keep Obsidian paragraphs together after comment-closing headings
   ([#963](https://github.com/viell-dev/slop-markdown-tools/issues/963)).
+- Wait for a stopped code formatter's termination, and report stops that cannot
+  be confirmed
+  ([#970](https://github.com/viell-dev/slop-markdown-tools/issues/970)).
 
 ### Maintenance
 
