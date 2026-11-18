@@ -835,7 +835,7 @@ export function collectObsidianProtections(
     const escapingHtml = collectEscapingHtml(document, blocks, topHtml, htmlText, blockHtmlText);
     const { escapingHtmlEnds } = escapingHtml;
     htmlCodeToEnd ||= escapingHtml.htmlCodeToEnd;
-    commentText = collectCommentProtections(document, blocks, positions);
+    commentText = collectCommentProtections(document, blocks, positions, boundaryText);
     const collectLineBoundaries = () => {
       // Items enclosing the current parent; a nested paragraph can leave later
       // blocks in an outer item even when its immediate item ends there.

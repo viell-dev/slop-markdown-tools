@@ -5,6 +5,7 @@ import {
   forgeFixtures,
   fileFixtures,
   forgeAutolinkFixtures,
+  forgeFrontMatterCreationFixtures,
 } from "../tests/fixtures/renderers/forges.mjs";
 import { fixtures as obsidianFixtures } from "../tests/fixtures/renderers/obsidian.mjs";
 import baseline from "./obsidian/baseline.json" with { type: "json" };
@@ -72,6 +73,7 @@ export function rendererPlan(renderer, { profile, seeds, count }) {
         });
       controls.push(
         ...forgeAutolinkFixtures.map((fixture) => `${image.name}/${fixture.name}`),
+        ...forgeFrontMatterCreationFixtures.map((fixture) => `${image.name}/${fixture.name}`),
         ...["text-difference", "math-recognition", "repository-anchors"].map(
           (name) => `${image.name}/${name}`,
         ),

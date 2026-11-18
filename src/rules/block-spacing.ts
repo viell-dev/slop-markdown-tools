@@ -284,7 +284,20 @@ function subjectOf(
         kind: "heading",
         lines: linesFor(node === after ? options.linesAbove : options.linesBelow, node.depth),
       });
-    else if (node.type === "list") subjects.push({ node, kind: "list", lines: 1 });
+    else if (
+      node.type === "list" &&
+      // Forgejo keeps adjacent dollar lines in the final item's paragraph,
+      // including its lazy continuation. As below ordinary paragraph or quote
+      // text, math alone supplies no reason to separate them (#961).
+      !(
+        document.dialect === "forgejo" &&
+        node === before &&
+        after.type === "math" &&
+        lastBlock(before).type === "paragraph" &&
+        before.position!.end.line + 1 === after.position!.start.line
+      )
+    )
+      subjects.push({ node, kind: "list", lines: 1 });
   // Fences can interrupt a paragraph, and the line after a closing fence
   // starts a block, so their neighbors keep their reading (#684).
   const fence = [after, before].find((node) => closedFence(document, node));

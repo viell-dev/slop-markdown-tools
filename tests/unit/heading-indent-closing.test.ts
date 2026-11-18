@@ -112,6 +112,7 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
         for (const style of ["atx", "setext", "consistent"] as const) {
           const config = only({ "style/heading": ["warn", { style }] }, dialect);
           const keeps = dialect === "obsidian" || dialect === "vitepress";
+          const forge = dialect === "forgejo" || dialect === "gitea";
           for (const source of [
             lines("---", "Title", "  ---"),
             lines("---", "[[toc]]", "  ---", "  title: T", "  ---", "", "> > # H"),
@@ -128,27 +129,41 @@ describe("style/heading indentation and closed styles (#680, #700)", () => {
           // the end, which stays as written.
           const output = formatted(lines("---", "Title", "  ---"), config);
           expect(output).toBe(
-            keeps || style !== "atx" ? lines("---", "Title", "  ---") : lines("---", "## Title"),
+            keeps || forge || style !== "atx"
+              ? lines("---", "Title", "  ---")
+              : lines("---", "## Title"),
           );
           expect(formatted(lines("---", "[[toc]]", "  ---", "  title: T", "  ---"), config)).toBe(
             keeps
               ? lines("---", "[[toc]]", "  ---", "  title: T", "  ---")
-              : style === "atx"
-                ? lines("---", "## [[toc]]", "## title: T")
-                : lines("---", "[[toc]]", "  ---", "title: T", "  ---"),
+              : forge
+                ? style === "atx"
+                  ? lines("---", "[[toc]]", "  ---", "## title: T")
+                  : lines("---", "[[toc]]", "  ---", "title: T", "  ---")
+                : style === "atx"
+                  ? lines("---", "## [[toc]]", "## title: T")
+                  : lines("---", "[[toc]]", "  ---", "title: T", "  ---"),
           );
           // VitePress reads no TOML front matter.
           expect(formatted(lines("+++", "  +++", "==="), config)).toBe(
             lines("+++", dialect === "vitepress" ? "+++" : "  +++", "==="),
           );
           // Other indented headings below the opener still lose their indentation.
-          expect(formatted(lines("---", "  Title", "  ===", "", "  ## Sub"), config)).toBe(
+          const headingSource = lines("---", "  Title", "  ===", "", "  ## Sub");
+          const headingResult = format(headingSource, { config });
+          expect(format(headingResult.output, { config }).output).toBe(headingResult.output);
+          expect(
+            headingResult.diagnostics.some((item) => item.rule === "engine/unsafe-format"),
+          ).toBe(forge && style !== "atx");
+          expect(headingResult.output).toBe(
             keeps
               ? lines("---", "  Title", "  ===", "", "  ## Sub")
-              : style === "atx"
-                ? lines("---", "# Title", "", "## Sub")
-                : // An underline of four dashes, which closes no front matter.
-                  lines("---", "Title", "===", "", "Sub", "----"),
+              : forge && style !== "atx"
+                ? lines("---", "Title", "===", "", "## Sub")
+                : style === "atx"
+                  ? lines("---", "# Title", "", "## Sub")
+                  : // An underline of four dashes, which closes no parser front matter.
+                    lines("---", "Title", "===", "", "Sub", "----"),
           );
         }
       }

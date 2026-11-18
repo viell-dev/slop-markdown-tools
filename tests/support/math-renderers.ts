@@ -244,3 +244,36 @@ export const obsidianMathCases: ObsidianMathCase[] = [
   { line: 21, source: "A $x$$ d.", reading: ["$x$"], live: ["$x$"] },
   { line: 22, source: "A $x +\ny$ d.", reading: ["$x +\ny$"], live: [] },
 ];
+
+/** Forgejo 17.0.1 keeps these dollar lines in item text; Gitea 28.3.0
+ * reads math below the list. Observed through file-mode markup on 2026-11-17 (#961). */
+export const forgejoMathContinuations = [
+  {
+    name: "math-lazy-below-item",
+    source: "- item text\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-lazy-below-item-paragraph",
+    source: "- item\n\n  second paragraph\n$$\nx = 1\n$$\n\nAfter.\n",
+  },
+  {
+    name: "math-lazy-below-nested-ordered",
+    source: "- outer\n  1. inner text  \n  lazy line\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "quoted-item",
+    source: "> - item text\n> $$\n> x = 1\n> $$\n",
+  },
+  {
+    name: "quoted-item-lazy",
+    source: "> - item text\n$$\nx = 1\n$$\n",
+  },
+  {
+    name: "crlf",
+    source: "- item text\r\n$$\r\nx = 1\r\n$$\r\n",
+  },
+  {
+    name: "eof",
+    source: "- item text\n$$\nx = 1\n$$",
+  },
+];

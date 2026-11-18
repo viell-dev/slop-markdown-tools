@@ -63,3 +63,4 @@ jobs:
           name: forges
           path: artifacts/forge-rendering/
           if-no-files-found: error
+          retention-days: 90

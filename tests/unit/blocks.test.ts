@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
 import { builtInRules } from "../../src/core/engine.js";
+import { seededSlices } from "../support/property-slices.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "github"): Config {
   return { extends: [], dialect, rules };
@@ -911,7 +912,9 @@ describe("the block and whitespace rules together", () => {
       "<!-- mdrefine-disable style/trailing-space style/code-fence -->\n\nText  \n\n~~~\ncode\n~~~\n\n<!-- mdrefine-enable -->\n\nText\n\n```\ncode\n```\n",
     );
   });
-  it("keeps the meaning of randomly assembled documents", () => {
+  // Replay the same 400 cases in four slices under the unit deadline (#902).
+  const slices = seededSlices(20261017, 400, 100);
+  it.each(slices)("keeps generated documents' meaning (offset %i)", (_, parameters) => {
     const blocks = fc.constantFrom(
       "# Heading #",
       "## Heading",
@@ -1026,7 +1029,7 @@ describe("the block and whitespace rules together", () => {
           formatted(lines.join(newline) + (final ? newline : ""), config);
         },
       ),
-      { numRuns: 400, seed: 20261017 },
+      parameters,
     );
   });
 });

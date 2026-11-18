@@ -6,6 +6,7 @@ import { headingAnchorSource, headingAttributeSource } from "../workspace/headin
 import { githubAnchors } from "../workspace/anchors.js";
 import { githubHeadingLimit } from "../workspace/github-heading-source.js";
 import { walk } from "../syntax/walk.js";
+import { forgeFrontMatterEnd } from "../syntax/forge-front-matter.js";
 import { lineBreak } from "../syntax/source.js";
 
 /**
@@ -186,6 +187,19 @@ function semanticTree(
     return result;
   }
   const result = normalize(document.tree) as Record<string, unknown>;
+  if (document.dialect === "forgejo" || document.dialect === "gitea") {
+    const end = forgeFrontMatterEnd(document.source);
+    let envelope = end === undefined ? null : document.source.slice(0, end);
+    // A selected metadata formatter may vary only its value. Its primary and
+    // native closing fences must still agree; an earlier separator introduced
+    // by the replacement must not acquire the rest of the YAML as body text.
+    if (frontMatter && end !== undefined && range(frontMatter.node)[1] === end) {
+      const updatedEnd = forgeFrontMatterEnd(frontMatter.source);
+      if (updatedEnd === end + frontMatter.source.length - document.source.length)
+        envelope = frontMatter.source.slice(0, updatedEnd);
+    }
+    result.forgeFrontMatter = envelope;
+  }
   if (document.dialect === "vitepress")
     result.vitepress = vitepressSemantics(document, workspace, codeValues, frontMatter?.source);
   // Where front matter would end inside a code block, an HTML block, or

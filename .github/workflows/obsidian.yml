@@ -112,4 +112,4 @@ jobs:
           name: obsidian
           path: artifacts/obsidian/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 90

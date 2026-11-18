@@ -106,12 +106,13 @@ The configuration's JSON Schema is `src/config/resolve.ts`'s `configSchema`.
 `npm run schema` writes it to `config.schema.json`, which the package ships and
 the site serves; a test fails when the two differ.
 
-GitHub Actions runs static checks, performance/integration and a dependency
-audit on Linux with Node.js 24, with unit coverage on a separate Linux 24
-runner; the build and tests on Linux with Node.js 22.12.0, the lowest version
-the package supports, on Windows with Node.js 24, and on Linux with Node.js 26,
-and `test:package` on all four. `main` requires the first three, `Unit coverage`
-and the PR-only `Native checks` decision in the [verification
+GitHub Actions runs static checks, performance/integration and the dependency
+audit, `npm run check:audit`, on Linux with Node.js 24, with unit coverage on a
+separate Linux 24 runner; the build and tests on Linux with Node.js 22.12.0, the
+lowest version the package supports, on Windows with Node.js 24, and on Linux
+with Node.js 26, and `test:package` on all four. `main` requires the first
+three, `Unit coverage` and the PR-only `Native checks` decision in the
+[verification
 map](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/verification.md).
 The Node.js 26 job is not required, so that a defect only the newest Node.js
 shows does not block unrelated merges; its failures get an issue. Windows covers
@@ -157,6 +158,14 @@ at fixed seeds. Weekly/manual adversarial discovery is a separate triage queue,
 never a merge or release gate. Keep discoveries issue-linked; exact known
 source/output/view pairs are replayed, and stale entries fail. Offline tests
 bind entries to current formatter output without needing Docker.
+
+At maintenance start and release preparation, read failed scheduled Rendering,
+Obsidian and Forges runs and their automatic discovery issues. Check that every
+failed scheduled run since the previous release has an issue, including when
+reporting itself failed; read the report and log and record a disposition. The
+[reporting
+procedure](https://github.com/viell-dev/slop-markdown-tools/blob/main/internals/testing.md#scheduled-discovery-triage)
+explains retention, duplicate handling and missing reports.
 
 Before implementing a discovered difference, decide whether plausible authored
 CommonMark or documented dialect syntax loses meaningful rendered content or
