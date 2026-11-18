@@ -13,9 +13,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
-- Report a code formatter's timeout or output limit only after the tool and the
-  processes it started have ended, also on a busy Windows machine, and say when
-  they may still be running
+- End a stopped code formatter's processes before reporting it, also on a busy
+  Windows machine
   ([#970](https://github.com/viell-dev/slop-markdown-tools/issues/970)).
 
 ### Maintenance

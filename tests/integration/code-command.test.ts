@@ -1,30 +1,15 @@
-import type { ChildProcess } from "node:child_process";
-import { once } from "node:events";
+import { spawnSync } from "node:child_process";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { afterEach, expect, it, vi } from "vitest";
-import { terminateTree, terminationWaitMs } from "../../src/code/terminate.js";
+import { terminationWaitMs } from "../../src/code/terminate.js";
 import { formatWithCode } from "../../src/node.js";
 import { block, calls, setup } from "../support/code-format.js";
-import { run } from "../support/cli.js";
+import { cli, run } from "../support/cli.js";
 import { parseReport } from "../support/json.js";
 
-// Termination runs for real unless a test makes it slow or unconfirmed.
-vi.mock("../../src/code/terminate.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../src/code/terminate.js")>();
-  return { ...original, terminateTree: vi.fn(original.terminateTree) };
-});
-const actual = await vi.importActual<typeof import("../../src/code/terminate.js")>(
-  "../../src/code/terminate.js",
-);
-const timedOut = (ms: number, outcome = "") =>
-  `Code formatter "javascript" exceeded its ${ms} ms timeout${outcome}; this block was left unchanged.`;
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.mocked(terminateTree).mockReset();
-});
+afterEach(() => vi.unstubAllEnvs());
 
 it("finds a local command before PATH and passes filename arguments literally", async () => {
   const { root, record, tool, config } = await setup();
@@ -83,83 +68,55 @@ it("reports missing commands with exit 2 and still writes safe edits to both fil
   expect(await readFile(path.join(root, "good.md"), "utf8")).toBe(block("formatted", "rs"));
 });
 
-it("terminates the formatter's child process on a timeout", async () => {
+it("terminates the processes a stopped formatter started", async () => {
   const { root, record, tool, config } = await setup("tree");
   const source = block();
+  // The fixture exceeds the output limit once its child writes; the timeout
+  // lies beyond the test's own deadline, so only that limit stops it.
   const result = await formatWithCode(source, {
     cwd: root,
-    config: config([tool({ timeoutMs: 3000 })]),
+    config: config([tool({ timeoutMs: 60000, maxOutputBytes: 64 })]),
   });
   expect(result.output).toBe(source);
   expect(result.diagnostics).toEqual([
-    expect.objectContaining({ rule: "engine/code-formatter", message: timedOut(3000) }),
+    expect.objectContaining({
+      rule: "engine/code-formatter",
+      message:
+        'Code formatter "javascript" exceeded its 64 byte output limit; this block was left unchanged.',
+    }),
   ]);
   const before = await readFile(record + ".heartbeat", "utf8");
   await setTimeout(250);
   expect(await readFile(record + ".heartbeat", "utf8")).toBe(before);
 });
 
-it("reports a timeout only after slow termination has finished", async () => {
-  const { root, tool, config } = await setup("timeout");
-  const events: string[] = [];
-  vi.mocked(terminateTree).mockImplementationOnce(async (child) => {
-    const closed = once(child, "close");
-    const problem = await actual.terminateTree(child);
-    await closed;
-    events.push("closed");
-    // Longer than the fixed grace after which a timeout used to be reported
-    // whether or not termination had finished.
-    await setTimeout(1500);
-    events.push("confirmed");
-    return problem;
-  });
-  const result = await formatWithCode(block(), {
-    cwd: root,
-    config: config([tool({ timeoutMs: 1000 })]),
-  }).finally(() => events.push("reported"));
-  expect(events).toEqual(["closed", "confirmed", "reported"]);
-  expect(result.diagnostics).toEqual([expect.objectContaining({ message: timedOut(1000) })]);
-});
-
-it("reports a formatter whose termination fails or is not confirmed in time", async () => {
-  const { root, tool, config } = await setup("timeout");
-  const configured = { cwd: root, config: config([tool({ timeoutMs: 1000 })]) };
-  const ended: Promise<unknown>[] = [];
-  const end = (child: ChildProcess) =>
-    ended.push(Promise.all([once(child, "exit"), actual.terminateTree(child)]));
-  vi.mocked(terminateTree).mockImplementationOnce((child) => {
-    end(child);
-    return Promise.resolve("taskkill exited with code 1: ERROR: synthetic");
-  });
-  expect((await formatWithCode(block(), configured)).diagnostics).toEqual([
-    expect.objectContaining({
-      message: timedOut(
-        1000,
-        ", and its processes may still be running (taskkill exited with code 1: ERROR: synthetic)",
-      ),
-    }),
-  ]);
-  vi.mocked(terminateTree).mockImplementationOnce((child) => {
-    end(child);
-    return new Promise(() => {});
-  });
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  try {
-    const pending = formatWithCode(block(), configured);
-    await vi.advanceTimersByTimeAsync(1000 + terminationWaitMs);
-    expect((await pending).diagnostics).toEqual([
+it.skipIf(process.platform !== "win32")(
+  "lets the CLI exit when taskkill stalls with its pipes open",
+  async () => {
+    const { root, tool, config } = await setup("timeout");
+    await writeFile(
+      path.join(root, "mdrefine.config.json"),
+      JSON.stringify(config([tool({ timeoutMs: 1000 })])),
+    );
+    await writeFile(path.join(root, "note.md"), block());
+    const stalled = new URL("../fixtures/stalled-taskkill.mjs", import.meta.url).href;
+    // A CLI held open by the stand-in would run until this limit ends it.
+    const result = spawnSync(
+      process.execPath,
+      ["--import", stalled, cli, "format", "--json", "note.md"],
+      { cwd: root, encoding: "utf8", timeout: 40000 },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(2);
+    expect(parseReport(result.stdout).files[0]?.diagnostics).toEqual([
       expect.objectContaining({
-        message: timedOut(
-          1000,
-          `, and its processes may still be running (not confirmed stopped within ${terminationWaitMs} ms)`,
-        ),
+        message: `Code formatter "javascript" exceeded its 1000 ms timeout, and its processes may still be running (not confirmed stopped within ${terminationWaitMs} ms); this block was left unchanged.`,
       }),
     ]);
-  } finally {
-    vi.useRealTimers();
-  }
-  await Promise.all(ended);
-});
+  },
+  // The formatter's timeout and the termination wait take 11 seconds.
+  50000,
+);
 
 it("keeps a document changed during the formatter run instead of overwriting it", async () => {
   const { root, config } = await setup("rewrite");

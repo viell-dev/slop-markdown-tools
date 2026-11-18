@@ -1,7 +1,7 @@
 import path from "node:path";
 import spawn from "cross-spawn";
 import type { CodeFormatter } from "../core/types.js";
-import { terminateTree, terminationWaitMs } from "./terminate.js";
+import { terminateTree, terminationWaitMs, unconfirmed } from "./terminate.js";
 
 /** Run a configured executable with argument arrays and a bounded UTF-8 response. */
 export function runFormatter(
@@ -41,12 +41,15 @@ export function runFormatter(
     let terminated = false;
     let closed = false;
     let wait: ReturnType<typeof setTimeout> | undefined;
+    // Ends a termination attempt still running when the result is settled.
+    const ending = new AbortController();
     const limit = formatter.maxOutputBytes ?? 1024 * 1024;
     const finish = (error?: string) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       clearTimeout(wait);
+      ending.abort();
       child.stdin?.destroy();
       child.stdout?.destroy();
       child.stderr?.destroy();
@@ -64,9 +67,9 @@ export function runFormatter(
         }
       }
     };
-    // A stopped tool is reported only once it and the processes it started have
-    // ended and released its output, so that none of them still runs when the
-    // caller moves on. A failed or unfinished termination is reported as such.
+    // A stopped tool is reported once the termination command has succeeded and
+    // the tool has exited and closed its output, so that the caller does not
+    // move on while it runs. An outcome that is not known is reported as such.
     const reportStopped = () => {
       if (terminated && closed) finish(failure);
     };
@@ -76,17 +79,23 @@ export function runFormatter(
       wait = setTimeout(
         () =>
           finish(
-            `${reason}, and its processes may still be running (not confirmed stopped within ${terminationWaitMs} ms)`,
+            `${reason}, ${unconfirmed(`not confirmed stopped within ${terminationWaitMs} ms`)}`,
           ),
         terminationWaitMs,
       );
-      void terminateTree(child).then((problem) => {
-        if (problem) finish(`${reason}, and its processes may still be running (${problem})`);
-        else {
-          terminated = true;
-          reportStopped();
-        }
-      });
+      void terminateTree(child, ending.signal).then(
+        (outcome) => {
+          if (outcome) finish(`${reason}, ${outcome}`);
+          else {
+            terminated = true;
+            reportStopped();
+          }
+        },
+        (error: unknown) =>
+          finish(
+            `${reason}, ${unconfirmed(error instanceof Error ? error.message : String(error))}`,
+          ),
+      );
     };
     const timer = setTimeout(
       () => stop(`exceeded its ${formatter.timeoutMs ?? 10000} ms timeout`),
