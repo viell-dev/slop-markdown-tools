@@ -94,6 +94,14 @@ workflow.
 
 ## Prepare the release pull request
 
+Before preparing the release, read failed scheduled Rendering, Obsidian and
+Forges runs since the previous release and their automatic discovery issues.
+Check for missing reports or issues and triage candidates under [bounded
+renderer work](CONTRIBUTING.md#bounded-renderer-work), recording each
+disposition. See [scheduled discovery
+triage](internals/testing.md#scheduled-discovery-triage). This is maintenance of
+the triage queue; adversarial rendering remains outside the release gate.
+
 On a branch, in one pull request:
 
 1. Set the version in `package.json` and `package-lock.json`, and

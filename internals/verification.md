@@ -11,6 +11,17 @@ installation. It excludes example/fixture corpora, code examples, remote URLs
 and heading-fragment validation. Source-only maintenance guides stay out of the
 package and are linked by their public repository URLs.
 
+`discovery-issues.test.ts` checks scheduled-failure selection, report metadata,
+missing-report fallback, issue text, open/closed duplicate suppression and the
+injected offline `gh` adapter. It also checks the completion workflow's source
+event guard, permissions, trusted checkout, token scope and common 90-day
+artifact retention. Real scheduled failure delivery, runner token authorization
+and artifact transfer require a real run; offline tests do not prove them. At
+maintenance start and release preparation, read failed scheduled host runs and
+triage their automatic issues as the [testing
+procedure](testing.md#scheduled-discovery-triage) describes. This adds no
+rendering, merge or release gate.
+
 Each promise below names the checks that back it, when they run, and what they
 cannot show. "Every pull request" means CI: Linux Node.js 24 runs `check:ci`
 with unit evidence in the separate `Unit coverage` job; other matrix jobs run
