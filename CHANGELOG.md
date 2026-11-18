@@ -45,6 +45,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).
 - Share MD041 CLI launches and partition three fixed-seed properties
   ([#902](https://github.com/viell-dev/slop-markdown-tools/issues/902)).
+- Skip the native renderer checks for pull requests that change only the
+  maintainer guides in `internals/`
+  ([#972](https://github.com/viell-dev/slop-markdown-tools/issues/972)).
 
 ## 0.8.3 - 2026-11-09
 
