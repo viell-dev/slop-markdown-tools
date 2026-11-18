@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect, RuleSetting } from "../../src/index.js";
 import { builtInRules } from "../../src/core/engine.js";
+import { seededSlices } from "../support/property-slices.js";
 
 function only(rules: Record<string, RuleSetting>, dialect: Dialect = "github"): Config {
   return { extends: [], dialect, rules };
@@ -912,7 +913,8 @@ describe("the block and whitespace rules together", () => {
     );
   });
   // Replay the same 400 cases in four slices under the unit deadline (#902).
-  it.each([0, 100, 200, 300])("keeps generated documents' meaning (offset %i)", (offset) => {
+  const slices = seededSlices(20261017, 400, 100);
+  it.each(slices)("keeps generated documents' meaning (offset %i)", (_, parameters) => {
     const blocks = fc.constantFrom(
       "# Heading #",
       "## Heading",
@@ -1027,7 +1029,7 @@ describe("the block and whitespace rules together", () => {
           formatted(lines.join(newline) + (final ? newline : ""), config);
         },
       ),
-      { numRuns: 100, seed: 20261017, path: String(offset) },
+      parameters,
     );
   });
 });

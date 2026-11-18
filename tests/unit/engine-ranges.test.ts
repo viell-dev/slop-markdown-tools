@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { format, lint, createWorkspace } from "../../src/index.js";
 import type { Plugin, ProcessOptions } from "../../src/index.js";
 import { narrow, formatted } from "../support/engine.js";
+import { seededSlices } from "../support/property-slices.js";
 describe("processing selected ranges", () => {
   const emphasis: ProcessOptions = {
     config: { extends: [], dialect: "github", rules: { "style/emphasis": "warn" } },
@@ -210,7 +211,8 @@ describe("processing selected ranges", () => {
     );
   });
   // Replay the same 150 cases in three slices under the unit deadline (#902).
-  it.each([0, 50, 100])("matches whole-document and full-range output (offset %i)", (offset) => {
+  const slices = seededSlices(20261017, 150, 50);
+  it.each(slices)("matches whole-document and full-range output (offset %i)", (_, parameters) => {
     fc.assert(
       fc.property(
         fc.array(
@@ -246,7 +248,7 @@ describe("processing selected ranges", () => {
           expect(format(part.output, { ...options, ranges: part.scope! }).changed).toBe(false);
         },
       ),
-      { numRuns: 50, seed: 20261017, path: String(offset) },
+      parameters,
     );
   });
 });

@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { dialects, format, lint, parse, presets, semanticFingerprint } from "../../src/index.js";
 import type { Config, Dialect } from "../../src/index.js";
+import { seededSlices } from "../support/property-slices.js";
 import { only, formatted, refusals } from "../support/rules.js";
 describe("style/block-spacing", () => {
   const rule = { "style/block-spacing": "warn" } as const;
@@ -1198,7 +1199,8 @@ describe("style/block-spacing", () => {
       ).toThrow("Invalid options for style/block-spacing");
     });
     // Replay the same 400 cases in four slices under the unit deadline (#902).
-    it.each([0, 100, 200, 300])("keeps meaning with counted blank lines (offset %i)", (offset) => {
+    const slices = seededSlices(20261029, 400, 100);
+    it.each(slices)("keeps meaning with counted blank lines (offset %i)", (_, parameters) => {
       const blocks = fc.constantFrom(
         "# Heading",
         "### Deeper",
@@ -1277,7 +1279,7 @@ describe("style/block-spacing", () => {
             });
           },
         ),
-        { numRuns: 100, seed: 20261029, path: String(offset) },
+        parameters,
       );
     });
   });

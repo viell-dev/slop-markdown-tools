@@ -53,7 +53,8 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   what is known. Generated-document properties in `blocks.test.ts`,
   `block-spacing.test.ts` and `engine-ranges.test.ts` retain their complete
   seeded input streams and assertions across consecutive slices, each under the
-  ordinary unit deadline.
+  ordinary unit deadline; `property-slices.test.ts` checks that slices replay
+  the unsliced run.
 - **Renderers show the same before and after.** GitHub: the Rendering workflow.
   Obsidian, in Live Preview and Reading view: the Obsidian workflow. VitePress,
   on every pull request: `vitepress-build.test.ts` builds the example site
@@ -115,16 +116,16 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   Unit `convert.test.ts` checks individual option mappings. Integration
   `convert.test.ts` and `editorconfig-intersections.test.ts` exercise fallback
   and written configuration, comparing effective settings with Prettier's own
-  resolution. The MD041 inputs share a configuration. The check verifies each
-  file's fallback report, exact bytes after formatting, and native diagnostic
-  after conversion. Exact and disjoint brace branches, ancestor rebasing,
-  coupled EditorConfig values and notices for unsupported remainders are checked
-  on every pull request. `competitor-ignores.test.ts` checks CLI1 selection,
-  ancestor rebasing, CLI2/Prettier coexistence, BOM-prefixed first patterns,
-  per-file negation recovery and read errors. Its selection fixtures were
-  compared with the installed reference CLI during implementation; repeat that
-  comparison when changing the imported semantics. Reported omissions still
-  require manual migration.
+  resolution. The MD041 inputs share one workspace and its CLI runs; the check
+  still verifies each file's fallback report, exact bytes after formatting, and
+  native diagnostic after conversion. Exact and disjoint brace branches,
+  ancestor rebasing, coupled EditorConfig values and notices for unsupported
+  remainders are checked on every pull request. `competitor-ignores.test.ts`
+  checks CLI1 selection, ancestor rebasing, CLI2/Prettier coexistence,
+  BOM-prefixed first patterns, per-file negation recovery and read errors. Its
+  selection fixtures were compared with the installed reference CLI during
+  implementation; repeat that comparison when changing the imported semantics.
+  Reported omissions still require manual migration.
 - **Output is deterministic and formatting converges.** The unit tests format
   their output again and expect no change, and each example workspace's `after/`
   tree is exactly what `format --write` makes of `before/` (`examples.test.ts`).
