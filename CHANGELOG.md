@@ -30,6 +30,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   compile cache and record when they exit
   ([#827](https://github.com/viell-dev/slop-markdown-tools/issues/827),
   [#888](https://github.com/viell-dev/slop-markdown-tools/issues/888)).
+- Let the dependency audit excuse a development-only picomatch advisory, still
+  failing on every other high or critical one
+  ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).
 
 ## 0.8.3 - 2026-11-09
 
