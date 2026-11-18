@@ -29,7 +29,6 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Report failed scheduled rendering discovery runs as triage candidates in
   issues, and retain all three hosts' reports for 90 days
   ([#962](https://github.com/viell-dev/slop-markdown-tools/issues/962)).
-
 - Refresh GFM tree readers, the matcher, parser bundler, test runner and
   Obsidian verification dependencies
   ([#945](https://github.com/viell-dev/slop-markdown-tools/pull/945) through
