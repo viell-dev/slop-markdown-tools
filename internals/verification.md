@@ -63,7 +63,10 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   VitePress's own Markdown renderer and Vue. Math: `math.test.ts` against the
   renderers' output recorded in `tests/support/math-renderers.ts`. Forgejo and
   Gitea: the Forges workflow compares official disposable hosts through their
-  file-mode API and actual repository file views, including heading anchors. The
+  file-mode API and actual repository file views, including heading anchors.
+  Authored math fixtures cover Forgejo list-paragraph continuations, quoted
+  items, CRLF and EOF closers; block-spacing unit tests check exact output,
+  idempotence, alias selection and unchanged output in other dialects. The
   Rendering, Obsidian and Forges workflows run for pull requests that change a
   native-sensitive input, with authored fixtures and realistic documents at
   fixed seeds. The Native workflow classifies every PR and requires each

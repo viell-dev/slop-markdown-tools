@@ -70,6 +70,15 @@ regions are conservatively protected; unclosed ones are not. Unit
 `forge-protections.test.ts` and the shared `forgeFrontMatterFixtures` cover
 output, convergence and native rendering, including scalar and invalid YAML.
 
+For #961, Forgejo 17.0.1 keeps adjacent dollar lines in a list item's final
+paragraph, including a second paragraph, a nested item ending in a lazy line,
+and an item in a block quote. CRLF and a closing marker at EOF agree. Gitea
+28.3.0 reads a separate math block below the list. The conservative math tree
+stays unchanged: block spacing excludes only Forgejo's adjacent math boundary
+from the preceding list's spacing request. Paragraph and quote predecessors
+already supply no spacing subject. Native fixtures cover these cases and the
+blank-line and indented controls; observations live in `math-renderers.ts`.
+
 Generated stray-marker text can still change emphasis or strikethrough pairing
 when wrapping moves markers across quoted lines. The observed case preserves
 text and block structure and is tracked as a bounded styling limit in
