@@ -11,6 +11,13 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Fixed
+
+- On Windows, report a code formatter that exits while it is being stopped, so
+  that `taskkill` no longer finds it, as having already exited rather than as
+  possibly still running
+  ([#978](https://github.com/viell-dev/slop-markdown-tools/issues/978)).
+
 ### Maintenance
 
 - Retry removing a test workspace that Windows briefly holds after the test
