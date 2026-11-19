@@ -18,6 +18,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   possibly still running
   ([#978](https://github.com/viell-dev/slop-markdown-tools/issues/978)).
 
+### Maintenance
+
+- Remove the picomatch audit exception now that GitHub has withdrawn the
+  advisory
+  ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).
+
 ## 0.8.4 - 2026-11-19
 
 Keep Forgejo and Gitea front matter fences and list-item math intact, keep

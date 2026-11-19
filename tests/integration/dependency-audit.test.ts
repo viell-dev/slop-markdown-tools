@@ -559,7 +559,8 @@ process.exitCode = Number(process.env.FAKE_NPM_STATUS);
         ]),
       ),
     );
-    const result = await run(value);
+    // npm exits with status 1 when it reports anything, and 0 for a clean audit.
+    const result = await run(value, listed.length ? 1 : 0);
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(errors(result.lines)).toEqual([]);
     expect(warnings(result.lines)).toEqual([]);
