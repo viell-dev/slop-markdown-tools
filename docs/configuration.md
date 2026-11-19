@@ -279,14 +279,16 @@ group, and on Windows it runs `taskkill /T /F`. It reports the failure once that
 attempt has succeeded and the tool has exited and closed its output. When the
 attempt fails, or this does not happen within 10 seconds, the diagnostic instead
 says that the tool's processes may still be running. When `taskkill` fails, the
-diagnostic quotes its exit code and its message, which names any process that it
-could not end. On Windows, a tool that exits on its own before `taskkill` can
-end it, as one that writes too much and then exits can, is reported as having
-already exited instead: the processes it started can then no longer be found
-from it, so they may not have been stopped. A successful attempt does not reach
-processes that detach themselves from the tool: on Unix, those that leave its
-process group, and on Windows, those whose parent has already exited. On Unix it
-can also miss processes that you are not permitted to signal.
+diagnostic quotes its exit code and any message it printed, which names a
+process that it could not end. On Windows, the diagnostic says instead that the
+tool had already exited when mdrefine saw the tool exit before it started
+`taskkill`, or when `taskkill` reports only that the tool's own process was not
+found and the tool has since exited, as a tool that writes too much and then
+exits can: the processes it started can then no longer be found from it, so they
+may not have been stopped. A successful attempt does not reach processes that
+detach themselves from the tool: on Unix, those that leave its process group,
+and on Windows, those whose parent has already exited. On Unix it can also miss
+processes that you are not permitted to signal.
 
 Configured commands, including commands in JSON files, run with your
 permissions; use configurations and tools you trust.

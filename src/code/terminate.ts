@@ -17,19 +17,20 @@ const exited = (child: ChildProcess) => child.exitCode !== null || child.signalC
 /**
  * Whether `taskkill` found the tool's own process gone, which happens when the
  * tool exits while `taskkill` starts. `taskkill` then exits with code 128,
- * prints nothing to stdout, because it ended nothing, and names no process but
- * the one it was given. It can also exit with code 128 for a descendant that it
- * could not end, whose message names that descendant and its parent. Its
- * messages are localized, so only that structure is read, and Node.js must
- * also have seen the tool exit.
+ * prints nothing to stdout, because it ended nothing, and its message contains
+ * one number: the process ID it was given. It can also exit with code 128 for
+ * a descendant that it could not end, whose message names that descendant and
+ * its parent. Its messages are localized, so only that structure is read,
+ * counting whole runs of digits in any script, and Node.js must also have seen
+ * the tool exit.
  */
 function toolWasGone(child: ChildProcess, code: unknown, stdout: string, stderr: string): boolean {
-  const ids = stderr.match(/\d+/g);
+  const ids = stderr.match(/\p{Nd}+/gu);
   return (
     code === 128 &&
     stdout.trim() === "" &&
-    ids !== null &&
-    ids.every((id) => id === String(child.pid)) &&
+    ids?.length === 1 &&
+    ids[0] === String(child.pid) &&
     exited(child)
   );
 }

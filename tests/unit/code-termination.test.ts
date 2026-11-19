@@ -267,6 +267,28 @@ it.each([
     `${stuck}Reason: Access is denied.\r\r\n`,
     "and its processes may still be running (taskkill exited with code 255: ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: Access is denied.)",
   ],
+  // Localized messages can write a process ID in other digits.
+  [
+    "ends nothing and not a descendant whose ID uses other digits",
+    failed(128),
+    "",
+    "ERROR: The process with PID ５１５２ (child process of PID 4242) could not be terminated.\r\n",
+    "and its processes may still be running (taskkill exited with code 128: ERROR: The process with PID ５１５２ (child process of PID 4242) could not be terminated.)",
+  ],
+  [
+    "no longer finds a longer ID that starts with the tool's",
+    failed(128),
+    "",
+    'ERROR: The process "4242８" not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242８" not found.)',
+  ],
+  [
+    "names the tool's ID more than once",
+    failed(128),
+    "",
+    'ERROR: The process "4242" (4242) not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242" (4242) not found.)',
+  ],
   [
     "no longer finds another process",
     failed(128),
