@@ -224,6 +224,126 @@ it.each([
   await expect(pending).resolves.toBe(clause);
 });
 
+const gone = 'ERROR: The process "4242" not found.\r\n';
+const stuck =
+  "ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\n";
+it.each([
+  ["no longer finds the tool", failed(128), "", gone, exitedFirst],
+  // A synthetic message in another language, with the same structure.
+  [
+    "no longer finds the tool, in another language",
+    failed(128),
+    "",
+    'エラー: プロセス "4242" が見つかりませんでした。\r\n',
+    exitedFirst,
+  ],
+  [
+    "ends the tool but not a descendant, with code 128",
+    failed(128),
+    "SUCCESS: The process with PID 4242 (child process of PID 1000) has been terminated.\r\n",
+    `${stuck}Reason: synthetic.\r\n`,
+    "and its processes may still be running (taskkill exited with code 128: ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: synthetic.)",
+  ],
+  [
+    "ends nothing and not a descendant, with code 128",
+    failed(128),
+    "",
+    `${stuck}Reason: synthetic.\r\n`,
+    "and its processes may still be running (taskkill exited with code 128: ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: synthetic.)",
+  ],
+  // The form that a public report shows for a descendant in Japanese.
+  [
+    "ends nothing and not a descendant, in another language",
+    failed(128),
+    "",
+    "エラー: PID 5150 のプロセス (PID 4242 の子プロセス) を終了できませんでした。\r\n理由: synthetic.\r\n",
+    "and its processes may still be running (taskkill exited with code 128: エラー: PID 5150 のプロセス (PID 4242 の子プロセス) を終了できませんでした。\r\n理由: synthetic.)",
+  ],
+  // As Windows 11 reports a descendant that taskkill may not open.
+  [
+    "is denied a descendant, with code 255",
+    failed(255),
+    "SUCCESS: The process with PID 4242 (child process of PID 1000) has been terminated.\r\n",
+    `${stuck}Reason: Access is denied.\r\r\n`,
+    "and its processes may still be running (taskkill exited with code 255: ERROR: The process with PID 5150 (child process of PID 4242) could not be terminated.\r\nReason: Access is denied.)",
+  ],
+  // Localized messages can write a process ID in other digits.
+  [
+    "ends nothing and not a descendant whose ID uses other digits",
+    failed(128),
+    "",
+    "ERROR: The process with PID ５１５２ (child process of PID 4242) could not be terminated.\r\n",
+    "and its processes may still be running (taskkill exited with code 128: ERROR: The process with PID ５１５２ (child process of PID 4242) could not be terminated.)",
+  ],
+  [
+    "no longer finds a longer ID that starts with the tool's",
+    failed(128),
+    "",
+    'ERROR: The process "4242８" not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242８" not found.)',
+  ],
+  [
+    "names the tool's ID more than once",
+    failed(128),
+    "",
+    'ERROR: The process "4242" (4242) not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242" (4242) not found.)',
+  ],
+  [
+    "no longer finds another process",
+    failed(128),
+    "",
+    'ERROR: The process "5150" not found.\r\n',
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "5150" not found.)',
+  ],
+  [
+    "ends a process although it no longer finds the tool",
+    failed(128),
+    "SUCCESS: The process with PID 5150 (child process of PID 4242) has been terminated.\r\n",
+    gone,
+    'and its processes may still be running (taskkill exited with code 128: ERROR: The process "4242" not found.)',
+  ],
+  [
+    "no longer finds the tool, with another code",
+    failed(1),
+    "",
+    gone,
+    'and its processes may still be running (taskkill exited with code 1: ERROR: The process "4242" not found.)',
+  ],
+  [
+    "exits with code 128 without a message",
+    failed(128),
+    "",
+    "",
+    "and its processes may still be running (taskkill exited with code 128)",
+  ],
+])(
+  "reports a taskkill that %s, once Node.js has seen the tool exit",
+  async (_, error, stdout, stderr, clause) => {
+    const { finish } = taskkill();
+    const tool = new Simulated();
+    const pending = endWindowsTree(asChild(tool), new AbortController().signal);
+    expect(execFile).toHaveBeenCalledOnce();
+    tool.exit();
+    finish(error, stdout, stderr);
+    await expect(pending).resolves.toBe(clause);
+  },
+);
+
+it("says when a Windows tool over its output limit exited while taskkill started", async () => {
+  vi.mocked(terminateTree).mockImplementationOnce(endWindowsTree);
+  const { finish } = taskkill();
+  const { tool, outcome } = start();
+  tool.stdout.emit("data", Buffer.alloc(100));
+  await settled();
+  expect(execFile).toHaveBeenCalledOnce();
+  // Node.js handles the tool's exit before taskkill's, which no longer finds it.
+  tool.exit();
+  finish(failed(128), "", gone);
+  await settled();
+  expect(outcome).toEqual({ error: `exceeded its 64 byte output limit, ${exitedFirst}` });
+});
+
 it("reports a taskkill whose launch throws", async () => {
   // Node.js throws `spawn UNKNOWN` for an executable that is not a program.
   vi.mocked(execFile).mockImplementationOnce(() => {
