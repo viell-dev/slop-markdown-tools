@@ -9,7 +9,12 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.8.4 - 2026-11-19
+
+Keep Forgejo and Gitea front matter fences and list-item math intact, keep
+Obsidian paragraphs together after comment-closing headings, and report a
+stopped code formatter only after its processes end. No upgrading steps are
+needed.
 
 ### Fixed
 
@@ -26,6 +31,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Refresh 40 indirect dependencies, including the installed `ansi-regex` 6.6.0,
+  `brace-expansion` 5.0.13, `markdown-table` 3.1.0 and `mdast-util-to-markdown`
+  2.2.3.
 - Report failed scheduled rendering discovery runs as triage candidates in
   issues, and retain all three hosts' reports for 90 days
   ([#962](https://github.com/viell-dev/slop-markdown-tools/issues/962)).
