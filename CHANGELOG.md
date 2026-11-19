@@ -13,6 +13,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Retry removing a test workspace that Windows briefly holds after the test
+  ([#980](https://github.com/viell-dev/slop-markdown-tools/issues/980)).
 - Remove the picomatch audit exception now that GitHub has withdrawn the
   advisory
   ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).

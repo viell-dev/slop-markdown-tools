@@ -40,6 +40,17 @@ export const manifest = JSON.parse(
   await readFile(path.join(repository, "package.json"), "utf8"),
 ) as { name: string; version: string };
 
+/**
+ * Remove a temporary workspace. On Windows, a process that a test started, or a
+ * file scanner, can hold the directory for a moment after the test's own
+ * processes have ended (#980). Removal therefore retries the transient errors
+ * that Node.js retries (`EBUSY`, `EMFILE`, `ENFILE`, `ENOTEMPTY` and `EPERM`)
+ * for about two seconds in all; a process that keeps it longer still fails the
+ * test.
+ */
+const removeWorkspace = (root: string) =>
+  rm(root, { recursive: true, force: true, maxRetries: 6, retryDelay: 100 });
+
 const temporary: string[] = [];
 const restricted: string[] = [];
 const denied: string[] = [];
@@ -52,7 +63,7 @@ afterEach(async () => {
     });
   for (const file of denied.splice(0).reverse())
     spawnSync(path.join(system32, "icacls.exe"), [file, "/remove:d", `*${user()}`]);
-  for (const root of temporary.splice(0)) await rm(root, { recursive: true, force: true });
+  for (const root of temporary.splice(0)) await removeWorkspace(root);
 });
 /**
  * Whether permissions can be taken away from this process with Unix modes: not
