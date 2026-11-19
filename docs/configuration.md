@@ -278,12 +278,15 @@ the processes it started: on Unix it sends `SIGKILL` to the tool's process
 group, and on Windows it runs `taskkill /T /F`. It reports the failure once that
 attempt has succeeded and the tool has exited and closed its output. When the
 attempt fails, or this does not happen within 10 seconds, the diagnostic instead
-says that the tool's processes may still be running. On Windows it also says
-when the tool had already exited, so that processes it started could no longer
-be found. A successful attempt does not reach processes that detach themselves
-from the tool: on Unix, those that leave its process group, and on Windows,
-those whose parent has already exited. On Unix it can also miss processes that
-you are not permitted to signal.
+says that the tool's processes may still be running. When `taskkill` fails, the
+diagnostic quotes its exit code and its message, which names any process that it
+could not end. On Windows, a tool that exits on its own before `taskkill` can
+end it, as one that writes too much and then exits can, is reported as having
+already exited instead: the processes it started can then no longer be found
+from it, so they may not have been stopped. A successful attempt does not reach
+processes that detach themselves from the tool: on Unix, those that leave its
+process group, and on Windows, those whose parent has already exited. On Unix it
+can also miss processes that you are not permitted to signal.
 
 Configured commands, including commands in JSON files, run with your
 permissions; use configurations and tools you trust.

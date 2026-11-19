@@ -8,10 +8,31 @@ export const terminationWaitMs = 10000;
 export const unconfirmed = (detail: string) => `and its processes may still be running (${detail})`;
 
 // On Windows the processes a tool started are found from its process ID, which
-// no longer leads to them once Node.js has seen the tool exit.
+// no longer leads to them once the tool has exited.
 const exitedFirst = "and had already exited, so any processes it started may not have been stopped";
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const notFound = (error: unknown) => (error as NodeJS.ErrnoException).code === "ESRCH";
+const exited = (child: ChildProcess) => child.exitCode !== null || child.signalCode !== null;
+
+/**
+ * Whether `taskkill` found the tool's own process gone, which happens when the
+ * tool exits while `taskkill` starts. `taskkill` then exits with code 128,
+ * prints nothing to stdout, because it ended nothing, and names no process but
+ * the one it was given. It can also exit with code 128 for a descendant that it
+ * could not end, whose message names that descendant and its parent. Its
+ * messages are localized, so only that structure is read, and Node.js must
+ * also have seen the tool exit.
+ */
+function toolWasGone(child: ChildProcess, code: unknown, stdout: string, stderr: string): boolean {
+  const ids = stderr.match(/\d+/g);
+  return (
+    code === 128 &&
+    stdout.trim() === "" &&
+    ids !== null &&
+    ids.every((id) => id === String(child.pid)) &&
+    exited(child)
+  );
+}
 
 /**
  * Forcibly end a formatter process and the processes it started. Resolves with
@@ -34,7 +55,7 @@ export function endWindowsTree(
   const { pid } = child;
   if (pid === undefined) return Promise.resolve(undefined);
   // Once Node.js has handled the exit, the ID can belong to another process.
-  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(exitedFirst);
+  if (exited(child)) return Promise.resolve(exitedFirst);
   return new Promise((resolve) => {
     let helper: ChildProcess;
     const abandon = () => {
@@ -61,11 +82,12 @@ export function endWindowsTree(
         path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
         ["/PID", String(pid), "/T", "/F"],
         { windowsHide: true },
-        (error, _stdout, stderr) => {
+        (error, stdout, stderr) => {
           signal.removeEventListener("abort", abandon);
           if (!error) return resolve(undefined);
-          // Any failure, including code 128, which taskkill also returns when it
-          // cannot end a descendant, leaves the outcome unknown.
+          if (toolWasGone(child, error.code, stdout, stderr)) return resolve(exitedFirst);
+          // Any other failure, including code 128 for a descendant that
+          // taskkill could not end, leaves the outcome unknown.
           const detail = stderr.trim();
           resolve(
             unconfirmed(
