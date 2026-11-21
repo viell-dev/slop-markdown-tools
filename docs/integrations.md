@@ -69,7 +69,7 @@ repos:
       - id: mdrefine
         name: mdrefine
         language: node
-        additional_dependencies: ["mdrefine@0.8.4"]
+        additional_dependencies: ["mdrefine@0.8.5"]
         entry: mdrefine lint --max-warnings 0 --no-warn-ignored
         types: [markdown]
 ```
@@ -133,6 +133,10 @@ does, as a gitignore pattern without regard to letter case:
   leave Markdown to another tool.
 - It does not count with only narrower entries, such as `docs/*.md`, or `/*.md`,
   which leaves the Markdown in subdirectories to Prettier.
+- It does not count with an entry that has three or more stars before a slash,
+  which Prettier versions read differently: Prettier 3.10 excludes every `.md`
+  file with `***/*.md`, but earlier versions leave the Markdown at the root to
+  Prettier.
 - It never counts with a negated (`!`) entry or a character class such as
   `*.[mM][dD]`, because then it cannot be proved to leave Prettier no Markdown:
   `**/*.md` with `!README.md` does not count, nor even `**/*.md` with `!docs/`,

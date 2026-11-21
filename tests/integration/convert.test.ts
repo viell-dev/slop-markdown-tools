@@ -1189,24 +1189,24 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     }
   });
 
-  it("retains Prettier settings when its matcher does not ignore root Markdown (#845)", async () => {
+  it("retains Prettier settings for a long star run that Prettier versions read differently (#845)", async () => {
     const root = await fixture({
       ".prettierrc": '{"proseWrap":"always","printWidth":31}',
       ".prettierignore": "***/*.md\n",
       "a.md": messy,
       "deep/a.md": messy,
     });
-    for (const [file, ignored] of [
-      ["a.md", false],
-      ["deep/a.md", true],
-    ] as const)
+    // The installed Prettier 3.10 bundles ignore 7.0.14 and ignores root Markdown too, but
+    // Prettier 3.9.10 and earlier leave root a.md to Prettier. A workspace can have either,
+    // so the entry does not prove that Prettier formats no Markdown.
+    for (const file of ["a.md", "deep/a.md"])
       expect(
         (
           await getFileInfo(path.join(root, file), {
             ignorePath: path.join(root, ".prettierignore"),
           })
         ).ignored,
-      ).toBe(ignored);
+      ).toBe(true);
     const reference = await prettierResolve(path.join(root, "a.md"));
     expect(reference?.printWidth).toBe(31);
     expect(explained(root).effective.rules["style/wrap"]).toEqual([
