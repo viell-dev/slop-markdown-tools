@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { beforeAll, expect, it } from "vitest";
+import { beforeAll, expect, it, onTestFailed } from "vitest";
 import {
   productionCases,
   profiles,
@@ -10,6 +10,7 @@ import {
 import {
   assertBinding,
   assertSources,
+  createPhaseTimeline,
   createRegistrationMutant,
   productionBinding,
   runCoverageChild,
@@ -54,16 +55,23 @@ it.each(profiles)(
 it.each(registrationCases())(
   "kills the missing-$registration mutant by a failed production-hit assertion",
   async (entry) => {
-    const mutant = await createRegistrationMutant(root, binding, entry.registration);
+    // Each phase's start time, printed only if this test fails or times out (#992).
+    const timeline = createPhaseTimeline(`Missing-${entry.registration} mutant`);
+    timeline.reportOnFailure(onTestFailed);
+    const mutant = await createRegistrationMutant(root, binding, entry.registration, timeline);
     try {
-      const child = await runCoverageChild({
-        schema: 1,
-        sourceRoot: root,
-        runtimeRoot: mutant.root,
-        binding,
-        mutation: mutant.mutation,
-        cases: [entry],
-      });
+      const child = await runCoverageChild(
+        {
+          schema: 1,
+          sourceRoot: root,
+          runtimeRoot: mutant.root,
+          binding,
+          mutation: mutant.mutation,
+          cases: [entry],
+        },
+        timeline,
+      );
+      timeline.mark("assert-child-result");
       expect(child.stderr).toBe("");
       expect(child.code).toBe(1);
       expect(child.result.status).toBe("failed");
@@ -87,7 +95,10 @@ it.each(registrationCases())(
     } finally {
       await mutant.cleanup();
     }
+    timeline.mark("assert-binding-final");
     await assertBinding(root, binding);
+    timeline.mark("assert-sources-final");
     await assertSources(root, binding);
+    timeline.mark("done");
   },
 );

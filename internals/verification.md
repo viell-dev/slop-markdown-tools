@@ -165,7 +165,8 @@ with unit evidence in the separate `Unit coverage` job; other matrix jobs run
   linked-checkout test retains body phase times and dependency-copy progress on
   failure. Every pull request. `parser-emphasis-production` checks actual
   compiled-product batch calls in an isolated V8 coverage session, including
-  lazy readings and four missing-registration mutants. `parser-lazy-lines`
+  lazy readings and four missing-registration mutants, whose tests retain phase
+  times and copy progress on failure. `parser-lazy-lines`
   checks live witnesses, positioned trees, resolver observations and
   deterministic event work; `parser-lazy-production` binds the built runtime and
   checks actual helper hits, event work, and missing-helper/cache-bypass

@@ -25,6 +25,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Remove the picomatch audit exception now that GitHub has withdrawn the
   advisory
   ([#965](https://github.com/viell-dev/slop-markdown-tools/issues/965)).
+- Print each phase's time when a parser emphasis registration-mutant test fails
+  or times out, to show which step slows on hosted Windows
+  ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
 
 ## 0.8.4 - 2026-11-19
 

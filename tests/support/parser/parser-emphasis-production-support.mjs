@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import console from "node:console";
 import { createHash } from "node:crypto";
 import {
   copyFile,
@@ -15,6 +16,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL, URL } from "node:url";
 import ts from "typescript";
@@ -30,6 +32,50 @@ import ts from "typescript";
 /** @typedef {{kind: string, id: string, message: string, stack?: string, calls?: number, expectHit?: boolean} & Record<string, unknown>} EmphasisCoverageFailure */
 /** @typedef {{schema: 1, status: "passed" | "failed", node: string, rows: EmphasisCoverageRow[], failures: EmphasisCoverageFailure[], parserURL?: string, normalParserHash?: string, observedParserHash?: string, mutation?: EmphasisMutation, hashesStable?: boolean, caseCount?: number}} EmphasisCoverageReport */
 /** @typedef {{code: number, result: EmphasisCoverageReport, stderr: string}} EmphasisCoverageChild */
+/** @typedef {{phase: string, elapsedMs: number} & Record<string, unknown>} EmphasisPhaseMark */
+/** @typedef {{mark: (phase: string, detail?: Record<string, unknown>) => void, progress: Record<string, unknown>, report: () => Record<string, unknown>, reportOnFailure: (onFailed: (handler: () => void) => void) => void}} EmphasisPhaseTimeline */
+
+/**
+ * Monotonic phase times for one test, kept in memory and written only by a
+ * failure handler (#992). A Vitest timeout abandons the test body without
+ * running its remaining statements, so the handler reports whatever phases
+ * and copy progress had been reached by then. A timeline whose
+ * `reportOnFailure` is never called is never written.
+ *
+ * @param {string} label
+ * @param {{now?: () => number, write?: (...values: unknown[]) => void}} [options]
+ * @returns {EmphasisPhaseTimeline}
+ */
+export function createPhaseTimeline(label, options = {}) {
+  const now = options.now ?? (() => performance.now());
+  const write = options.write ?? ((...values) => console.error(...values));
+  const startedAt = new Date().toISOString();
+  const started = now();
+  const elapsed = () => Math.round((now() - started) * 10) / 10;
+  /** @type {EmphasisPhaseMark[]} */
+  const phases = [];
+  /** @type {Record<string, unknown>} */
+  const progress = {};
+  const report = () => ({
+    node: process.version,
+    platform: process.platform,
+    startedAt,
+    elapsedMs: elapsed(),
+    phases,
+    progress,
+    resources: process.resourceUsage(),
+  });
+  return {
+    mark(phase, detail = {}) {
+      phases.push({ phase, elapsedMs: elapsed(), ...detail });
+    },
+    progress,
+    report,
+    reportOnFailure(onFailed) {
+      onFailed(() => write(`${label} failure phases:`, JSON.stringify(report(), null, 2)));
+    },
+  };
+}
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isEmphasisReportRecord(value) {
@@ -333,16 +379,26 @@ export function registrationSpans(source) {
  * @param {string} repositoryRoot
  * @param {EmphasisBinding} binding
  * @param {EmphasisRegistration} registration
+ * @param {EmphasisPhaseTimeline} [timeline]
  * @returns {Promise<EmphasisMutant>}
  */
-export async function createRegistrationMutant(repositoryRoot, binding, registration) {
+export async function createRegistrationMutant(
+  repositoryRoot,
+  binding,
+  registration,
+  timeline = createPhaseTimeline("Unreported"),
+) {
+  timeline.mark("assert-binding-before-copy");
   const sourceRoot = await realpath(repositoryRoot);
   await assertBinding(sourceRoot, binding);
+  timeline.mark("assert-sources-before-copy");
   await assertSources(sourceRoot, binding);
+  timeline.mark("create-temp-folder");
   const folder = await mkdtemp(path.join(tmpdir(), "mdrefine-emphasis-registration-"));
   const owned = await realpath(folder);
   const tempParent = await realpath(tmpdir());
   assert.equal(path.dirname(owned), tempParent);
+  timeline.mark("read-parser-spans", { folder: owned });
   const parser = await readFile(path.join(sourceRoot, binding.parserFile), "utf8");
   const span = registrationSpans(parser)[registration];
   assert(span, `Unknown registration ${registration}`);
@@ -355,29 +411,47 @@ export async function createRegistrationMutant(repositoryRoot, binding, registra
   };
   assert.notEqual(mutation.normalHash, mutation.mutantHash);
   try {
-    for (const file of Object.keys(binding.hashes)) {
+    const files = Object.keys(binding.hashes);
+    // Updated per file so that a stalled copy shows how far it got.
+    const copy = { files: files.length, copiedFiles: 0, copiedBytes: 0, current: "" };
+    timeline.progress.copy = copy;
+    timeline.mark("copy-dist", { files: files.length });
+    for (const file of files) {
+      copy.current = file;
       const destination = path.resolve(owned, file);
       inside(owned, destination);
       await mkdir(path.dirname(destination), { recursive: true });
       await copyFile(path.join(sourceRoot, file), destination);
+      copy.copiedFiles++;
+      copy.copiedBytes += (await lstat(destination)).size;
     }
+    copy.current = "";
+    timeline.mark("write-package-json", {
+      copiedFiles: copy.copiedFiles,
+      copiedBytes: copy.copiedBytes,
+    });
     await writeFile(path.join(owned, "package.json"), '{"type":"module","private":true}\n', {
       flag: "wx",
     });
+    timeline.mark("link-node-modules");
     // Resolution-only link: never mutate/chmod anything under node_modules.
     const modules = await realpath(path.join(sourceRoot, "node_modules"));
     const link = path.join(owned, "node_modules");
     await symlink(modules, link, process.platform === "win32" ? "junction" : "dir");
     assert.equal(await realpath(link), modules);
+    timeline.mark("write-mutant");
     const target = path.resolve(owned, binding.parserFile);
     inside(owned, target);
     assert(!(await lstat(target)).isSymbolicLink());
     await writeFile(target, mutant);
+    timeline.mark("assert-binding-after-copy");
     await assertBinding(owned, binding, mutation);
+    timeline.mark("mutant-ready");
     return {
       root: owned,
       mutation,
       async cleanup() {
+        timeline.mark("cleanup");
         assert.equal(await realpath(owned), owned);
         assert.equal(path.dirname(owned), tempParent);
         assert(path.basename(owned).startsWith("mdrefine-emphasis-registration-"));
@@ -387,6 +461,7 @@ export async function createRegistrationMutant(repositoryRoot, binding, registra
         assert.equal(await realpath(link), modules);
         await rm(link, { recursive: false });
         await rm(owned, { recursive: true });
+        timeline.mark("cleanup-done");
       },
     };
   } catch (error) {
@@ -398,9 +473,10 @@ export async function createRegistrationMutant(repositoryRoot, binding, registra
 
 /**
  * @param {EmphasisCoverageRequest} request
+ * @param {EmphasisPhaseTimeline} [timeline]
  * @returns {Promise<EmphasisCoverageChild>}
  */
-export async function runCoverageChild(request) {
+export async function runCoverageChild(request, timeline = createPhaseTimeline("Unreported")) {
   const childFile = fileURLToPath(
     new URL("./parser-emphasis-production-child.mjs", import.meta.url),
   );
@@ -416,6 +492,7 @@ export async function runCoverageChild(request) {
   ])
     delete env[key];
   return new Promise((resolve, reject) => {
+    timeline.mark("child-spawn");
     const child = execFile(
       process.execPath,
       [childFile],
@@ -428,6 +505,12 @@ export async function runCoverageChild(request) {
         maxBuffer: 32 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
+        timeline.mark("child-closed", {
+          code: error?.code ?? 0,
+          killed: error?.killed ?? false,
+          stdoutLength: stdout.length,
+          stderrLength: stderr.length,
+        });
         if (error && (typeof error.code !== "number" || error.killed || error.signal))
           return reject(error);
         try {
@@ -442,6 +525,13 @@ export async function runCoverageChild(request) {
         }
       },
     );
+    child.once("spawn", () => timeline.mark("child-spawned", { pid: child.pid }));
+    for (const [name, stream] of [
+      ["stdout", child.stdout],
+      ["stderr", child.stderr],
+    ])
+      stream?.once("data", () => timeline.mark("child-first-output", { stream: name }));
+    child.once("exit", (code, signal) => timeline.mark("child-exit", { code, signal }));
     child.stdin.on("error", reject);
     child.stdin.end(JSON.stringify(request));
   });
