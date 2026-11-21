@@ -11,8 +11,27 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Changed
+
+- Measure the display width of text with string-width 9.0.0, which counts
+  Devanagari conjuncts, Thai and Lao vowels such as sara am, and lone surrogates
+  as wider than before. `style/wrap`, `content/line-length`, `style/table` and
+  Setext heading underlines can therefore break lines, report lengths and pad
+  cells differently in such text
+  ([#987](https://github.com/viell-dev/slop-markdown-tools/pull/987)).
+
 ### Maintenance
 
+- Update the reference renderer mdast-util-to-hast to 13.2.2
+  ([#984](https://github.com/viell-dev/slop-markdown-tools/pull/984)).
+- Build the Obsidian check's image on the Node.js 24.22.3 security release
+  ([#983](https://github.com/viell-dev/slop-markdown-tools/pull/983)).
+- Update the development tools to ESLint 10.15.0, which no longer installs its
+  own minimatch 10.2.6, and Prettier 3.10.1, whose bundled ignore matcher reads
+  `***/*.md` as excluding root Markdown too. The Prettier fallback still keeps
+  the Prettier configuration for such an entry, because earlier Prettier
+  versions format root Markdown under it; the integrations page now says so
+  ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
 - Update the parser build tool to Rolldown 1.3.2, whose only change to the
   generated parser writes `Infinity` as the equal literal `1e400`
   ([#986](https://github.com/viell-dev/slop-markdown-tools/pull/986)).
