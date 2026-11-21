@@ -9,7 +9,22 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
-## Unreleased
+## 0.8.5 - 2026-11-21
+
+Update the shipped glob matcher for three minimatch security advisories, and
+report a Windows code formatter that exits while it is being stopped as stopped.
+No upgrading steps are needed.
+
+### Security
+
+- Update the shipped glob matcher, minimatch, to 11.0.8 for the advisories on
+  slow compilation of long wildcard patterns
+  ([GHSA-cf2h-pxjq-68xw](https://github.com/isaacs/minimatch/security/advisories/GHSA-cf2h-pxjq-68xw)),
+  inexact escaping
+  ([GHSA-c859-jr93-m5j4](https://github.com/isaacs/minimatch/security/advisories/GHSA-c859-jr93-m5j4))
+  and an unbounded pattern cache
+  ([GHSA-hqmv-qgp3-jx75](https://github.com/isaacs/minimatch/security/advisories/GHSA-hqmv-qgp3-jx75))
+  ([#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)).
 
 ### Fixed
 
@@ -20,6 +35,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
+- Refresh five indirect development dependencies, including
+  `@eslint/config-array` 0.23.6, which no longer installs its own minimatch
+  10.2.6 ([#837](https://github.com/viell-dev/slop-markdown-tools/issues/837)).
 - Retry removing a test workspace that Windows briefly holds after the test
   ([#980](https://github.com/viell-dev/slop-markdown-tools/issues/980)).
 - Remove the picomatch audit exception now that GitHub has withdrawn the
