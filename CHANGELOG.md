@@ -11,8 +11,56 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ## Unreleased
 
+### Changed
+
+- Measure the display width of text with string-width 9.0.0, which counts
+  Devanagari conjuncts, Thai and Lao vowels such as sara am, and lone surrogates
+  as wider than before. `style/wrap`, `content/line-length`, `style/table` and
+  Setext heading underlines can therefore break lines, report lengths and pad
+  cells differently in such text
+  ([#987](https://github.com/viell-dev/slop-markdown-tools/pull/987)).
+
+### Maintenance
+
+- Update the reference renderer mdast-util-to-hast to 13.2.2
+  ([#984](https://github.com/viell-dev/slop-markdown-tools/pull/984)).
+- Build the Obsidian check's image on the Node.js 24.22.3 security release
+  ([#983](https://github.com/viell-dev/slop-markdown-tools/pull/983)).
+- Update the development tools to ESLint 10.15.0, which no longer installs its
+  own minimatch 10.2.6, and Prettier 3.10.1, whose bundled ignore matcher reads
+  `***/*.md` as excluding root Markdown too. The Prettier fallback still keeps
+  the Prettier configuration for such an entry, because earlier Prettier
+  versions format root Markdown under it; the integrations page now says so
+  ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
+
+## 0.8.5 - 2026-11-21
+
+Update the shipped glob matcher for three minimatch security advisories, and
+report a Windows code formatter that exits while it is being stopped as having
+already exited. No upgrading steps are needed.
+
+### Security
+
+- Update the shipped glob matcher, minimatch, to 11.0.8, which no longer takes
+  time that grows with the square of the number of wildcard-only path parts to
+  compile a pattern
+  ([GHSA-cf2h-pxjq-68xw](https://github.com/isaacs/minimatch/security/advisories/GHSA-cf2h-pxjq-68xw),
+  [#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)). The
+  release also fixes
+  [GHSA-c859-jr93-m5j4](https://github.com/isaacs/minimatch/security/advisories/GHSA-c859-jr93-m5j4)
+  and
+  [GHSA-hqmv-qgp3-jx75](https://github.com/isaacs/minimatch/security/advisories/GHSA-hqmv-qgp3-jx75),
+  which concern its `escape()` function and the cache of its `minimatch()`
+  function; mdrefine calls neither.
+
 ### Fixed
 
+- Keep an escaped backslash in a pattern that also has a brace group, such as
+  `a\\{b,c}.md` in `ignore`, as a literal backslash; it was dropped when the
+  braces were expanded, so the pattern matched names without it. A path part
+  with more than 256 extglobs, such as `?(a)`, now stops mdrefine with the error
+  `pattern has too many extglobs`
+  ([#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)).
 - On Windows, report a code formatter that exits while it is being stopped, so
   that `taskkill` no longer finds it, as having already exited rather than as
   possibly still running
@@ -20,12 +68,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Maintenance
 
-- Update the development tools to ESLint 10.15.0, which no longer installs its
-  own minimatch 10.2.6, and Prettier 3.10.1, whose bundled ignore matcher reads
-  `***/*.md` as excluding root Markdown too. The Prettier fallback still keeps
-  the Prettier configuration for such an entry, because earlier Prettier
-  versions format root Markdown under it; the integrations page now says so
-  ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
+- Refresh five indirect development dependencies, including
+  `@eslint/config-array` 0.23.6, which no longer installs its own minimatch
+  10.2.6 ([#837](https://github.com/viell-dev/slop-markdown-tools/issues/837)).
 - Retry removing a test workspace that Windows briefly holds after the test
   ([#980](https://github.com/viell-dev/slop-markdown-tools/issues/980)).
 - Remove the picomatch audit exception now that GitHub has withdrawn the
