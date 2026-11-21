@@ -506,7 +506,9 @@ export async function runCoverageChild(request, timeline = createPhaseTimeline("
       },
       (error, stdout, stderr) => {
         timeline.mark("child-closed", {
-          code: error?.code ?? 0,
+          // A killed child has a null code; keep it null rather than 0.
+          code: error ? error.code : 0,
+          signal: error?.signal ?? null,
           killed: error?.killed ?? false,
           stdoutLength: stdout.length,
           stderrLength: stderr.length,
