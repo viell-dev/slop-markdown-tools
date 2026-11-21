@@ -12,22 +12,31 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 ## 0.8.5 - 2026-11-21
 
 Update the shipped glob matcher for three minimatch security advisories, and
-report a Windows code formatter that exits while it is being stopped as stopped.
-No upgrading steps are needed.
+report a Windows code formatter that exits while it is being stopped as having
+already exited. No upgrading steps are needed.
 
 ### Security
 
-- Update the shipped glob matcher, minimatch, to 11.0.8 for the advisories on
-  slow compilation of long wildcard patterns
-  ([GHSA-cf2h-pxjq-68xw](https://github.com/isaacs/minimatch/security/advisories/GHSA-cf2h-pxjq-68xw)),
-  inexact escaping
-  ([GHSA-c859-jr93-m5j4](https://github.com/isaacs/minimatch/security/advisories/GHSA-c859-jr93-m5j4))
-  and an unbounded pattern cache
-  ([GHSA-hqmv-qgp3-jx75](https://github.com/isaacs/minimatch/security/advisories/GHSA-hqmv-qgp3-jx75))
-  ([#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)).
+- Update the shipped glob matcher, minimatch, to 11.0.8, which no longer takes
+  time that grows with the square of the number of wildcard-only path parts to
+  compile a pattern
+  ([GHSA-cf2h-pxjq-68xw](https://github.com/isaacs/minimatch/security/advisories/GHSA-cf2h-pxjq-68xw),
+  [#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)). The
+  release also fixes
+  [GHSA-c859-jr93-m5j4](https://github.com/isaacs/minimatch/security/advisories/GHSA-c859-jr93-m5j4)
+  and
+  [GHSA-hqmv-qgp3-jx75](https://github.com/isaacs/minimatch/security/advisories/GHSA-hqmv-qgp3-jx75),
+  which concern its `escape()` function and the cache of its `minimatch()`
+  function; mdrefine calls neither.
 
 ### Fixed
 
+- Keep an escaped backslash in a pattern that also has a brace group, such as
+  `a\\{b,c}.md` in `ignore`, as a literal backslash; it was dropped when the
+  braces were expanded, so the pattern matched names without it. A path part
+  with more than 256 extglobs, such as `?(a)`, now stops mdrefine with the error
+  `pattern has too many extglobs`
+  ([#988](https://github.com/viell-dev/slop-markdown-tools/pull/988)).
 - On Windows, report a code formatter that exits while it is being stopped, so
   that `taskkill` no longer finds it, as having already exited rather than as
   possibly still running
