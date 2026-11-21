@@ -35,6 +35,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Update the parser build tool to Rolldown 1.3.2, whose only change to the
   generated parser writes `Infinity` as the equal literal `1e400`
   ([#986](https://github.com/viell-dev/slop-markdown-tools/pull/986)).
+- Print each phase's time when a parser emphasis registration-mutant test fails
+  or times out, to show which step slows on hosted Windows
+  ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
 
 ## 0.8.5 - 2026-11-21
 
