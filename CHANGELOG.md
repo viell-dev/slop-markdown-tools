@@ -26,6 +26,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#984](https://github.com/viell-dev/slop-markdown-tools/pull/984)).
 - Build the Obsidian check's image on the Node.js 24.22.3 security release
   ([#983](https://github.com/viell-dev/slop-markdown-tools/pull/983)).
+- Update the development tools to ESLint 10.15.0, which no longer installs its
+  own minimatch 10.2.6, and Prettier 3.10.1, whose bundled ignore matcher reads
+  `***/*.md` as excluding root Markdown too. The Prettier fallback still keeps
+  the Prettier configuration for such an entry, because earlier Prettier
+  versions format root Markdown under it; the integrations page now says so
+  ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
 
 ## 0.8.5 - 2026-11-21
 
