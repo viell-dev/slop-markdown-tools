@@ -32,6 +32,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   the Prettier configuration for such an entry, because earlier Prettier
   versions format root Markdown under it; the integrations page now says so
   ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
+- Update the parser build tool to Rolldown 1.3.2, whose only change to the
+  generated parser writes `Infinity` as the equal literal `1e400`
+  ([#986](https://github.com/viell-dev/slop-markdown-tools/pull/986)).
 
 ## 0.8.5 - 2026-11-21
 
