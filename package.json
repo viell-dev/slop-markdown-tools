@@ -148,7 +148,7 @@
     "micromark-util-types": "2.0.3",
     "minimatch": "11.0.8",
     "sentence-splitter": "5.0.1",
-    "string-width": "8.3.0",
+    "string-width": "9.0.0",
     "yaml": "2.9.1"
   },
   "devDependencies": {
@@ -163,7 +163,7 @@
     "fast-check": "4.10.2",
     "hast-util-to-html": "9.0.6",
     "markdown-it-mathjax3": "4.3.2",
-    "mdast-util-to-hast": "13.2.1",
+    "mdast-util-to-hast": "13.2.2",
     "micromark-extension-cjk-friendly": "2.0.2",
     "micromark-extension-gfm": "3.0.0",
     "micromark-extension-gfm-autolink-literal": "2.1.0",
