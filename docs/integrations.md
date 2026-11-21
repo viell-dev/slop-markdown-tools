@@ -131,6 +131,9 @@ does, as a gitignore pattern without regard to letter case:
   name and directory, such as `*.md`, `**/*.md`, `*.MD`, or `*`. An entry for
   `.markdown` is not needed: an entry for `.md` files alone is the usual way to
   leave Markdown to another tool.
+- It does not count with an entry that repeats `**/`, such as `**/**/*.md`,
+  which Prettier versions read differently: Prettier 3.10 excludes every `.md`
+  file with it, but earlier versions leave the Markdown at the root to Prettier.
 - It does not count with only narrower entries, such as `docs/*.md`, or `/*.md`,
   which leaves the Markdown in subdirectories to Prettier.
 - It never counts with a negated (`!`) entry or a character class such as

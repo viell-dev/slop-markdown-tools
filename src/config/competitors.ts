@@ -24,9 +24,11 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
  * that cannot be established, the answer is no and the Prettier configuration
  * stays in use. A negated entry can re-include documents in ways that samples
  * cannot rule out, so a file with one never qualifies, nor does one with a
- * character class. A long star run before a slash cannot establish it either:
- * Prettier's bundled matcher can leave root files unmatched where `ignore`
- * gives the run a zero-component globstar meaning.
+ * character class. An entry with a directory component other than one leading
+ * `**`, such as a star run or a repeated globstar before a slash, cannot
+ * establish it either: such an entry ignores root files only where a component
+ * matches no directory, which `ignore` allows for those forms but the matcher
+ * of Prettier 3.9 and earlier does not.
  * Otherwise one entry by itself must ignore every sample `.md` path, as Prettier
  * reads it, with the `ignore` package and without regard to letter case: names
  * and directories of a character absent from the entries,
@@ -51,8 +53,11 @@ export function ignoresAllMarkdown(text: string): boolean {
       for (let level = 0; level <= depth; level++)
         probes.push(`${`${directory}/`.repeat(level)}${stem}.md`);
   return lines.some((line) => {
-    // Prettier's bundled matcher can leave root files unmatched for this entry (#845).
-    if (line.includes("***/")) return false;
+    // A root file has no directories, so every directory component of a proving entry
+    // must match none. Prettier's bundled matchers agree only on one leading `**`; the
+    // newer one alone lets `***/` (#845) and `**/**/` (#990) match no directory.
+    const directories = line.replace(/^\//, "").split("/").slice(0, -1);
+    if (directories.some((component, index) => index > 0 || component !== "**")) return false;
     const matcher = gitignore({ allowRelativePaths: true }).add(line);
     return probes.every((probe) => matcher.ignores(probe));
   });

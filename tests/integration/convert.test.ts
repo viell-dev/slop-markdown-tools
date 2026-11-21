@@ -1224,6 +1224,33 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
     );
   });
 
+  it("retains Prettier settings for repeated globstars that Prettier versions read differently (#990)", async () => {
+    const root = await fixture({
+      ".prettierrc": '{"proseWrap":"always","printWidth":31}',
+      ".prettierignore": "**/**/*.md\n",
+      "a.md": messy,
+      "deep/a.md": messy,
+    });
+    // Prettier 3.9 and earlier leave root a.md to Prettier under this entry, while 3.10, which
+    // bundles the same ignore as mdrefine, ignores it too. A workspace can have either, so the
+    // entry does not prove that Prettier formats no Markdown, whichever is installed here.
+    expect(
+      (
+        await getFileInfo(path.join(root, "deep/a.md"), {
+          ignorePath: path.join(root, ".prettierignore"),
+        })
+      ).ignored,
+    ).toBe(true);
+    expect((await prettierResolve(path.join(root, "a.md")))?.printWidth).toBe(31);
+    const result = run(root, ["config", "explain", "a.md"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain("excludes all Markdown");
+    expect(parseExplanation(result.stdout).effective.rules["style/wrap"]).toEqual([
+      "warn",
+      { width: 31 },
+    ]);
+  });
+
   it("does not discover .prettierrc.jsonc, which Prettier ignores (#793)", async () => {
     const root = await fixture({
       ".prettierrc.jsonc": '{"proseWrap":"always","printWidth":31}',
@@ -1301,7 +1328,7 @@ describe("competitor fallback and conversion after the CLI review (#788)", () =>
       );
     },
   );
-  it.each(["*.md\n", "**/*.md\n"])(
+  it.each(["*.md\n", "**/*.md\n", "**/**/*.md\n**/*.md\n"])(
     "takes %j alone as leaving Markdown to mdrefine",
     async (text) => {
       const root = await fixture({
