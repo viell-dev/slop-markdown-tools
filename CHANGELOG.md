@@ -9,6 +9,24 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Changed
+
+- Measure the display width of text with string-width 9.0.0, which counts
+  Devanagari conjuncts, Thai and Lao vowels such as sara am, and lone surrogates
+  as wider than before. `style/wrap`, `content/line-length`, `style/table` and
+  Setext heading underlines can therefore break lines, report lengths and pad
+  cells differently in such text
+  ([#987](https://github.com/viell-dev/slop-markdown-tools/pull/987)).
+
+### Maintenance
+
+- Update the reference renderer mdast-util-to-hast to 13.2.2
+  ([#984](https://github.com/viell-dev/slop-markdown-tools/pull/984)).
+- Build the Obsidian check's image on the Node.js 24.22.3 security release
+  ([#983](https://github.com/viell-dev/slop-markdown-tools/pull/983)).
+
 ## 0.8.5 - 2026-11-21
 
 Update the shipped glob matcher for three minimatch security advisories, and
