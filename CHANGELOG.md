@@ -9,6 +9,16 @@ release](https://github.com/viell-dev/slop-markdown-tools/releases)'s notes;
 those of 0.6.0 and of the prereleases there are longer than their entries here.
 From 0.6 on, the site's release notes describe each minor version with examples.
 
+## Unreleased
+
+### Fixed
+
+- Keep using the Prettier configuration when `.prettierignore` has an entry
+  that repeats `**/`, such as `**/**/*.md`. Prettier 3.9 and earlier format the
+  Markdown at the root under such an entry, but mdrefine took it as excluding
+  all Markdown and applied its defaults instead
+  ([#990](https://github.com/viell-dev/slop-markdown-tools/issues/990)).
+
 ## 0.8.5 - 2026-11-21
 
 Update the shipped glob matcher for three minimatch security advisories, and
