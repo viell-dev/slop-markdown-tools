@@ -102,6 +102,18 @@ describe("configuration and plugins", () => {
       }),
     ).toThrow("Circular");
   });
+  it("reads a backslash in the path as a separator only on Windows (#1000)", () => {
+    // A POSIX file name can hold a backslash, which the CLI passes as it is.
+    // minimatch reads it as a separator on Windows, as for ignore patterns.
+    const windows = process.platform === "win32";
+    const dialect = (pattern: string) =>
+      resolveConfig({
+        config: { overrides: [{ files: [pattern], dialect: "obsidian" }] },
+        path: String.raw`sub/a\b.md`,
+      }).dialect;
+    expect(dialect(String.raw`sub/a\\b.md`)).toBe(windows ? "github" : "obsidian");
+    expect(dialect("sub/a/b.md")).toBe(windows ? "obsidian" : "github");
+  });
   it("matches override patterns with their letter case on every system", () => {
     const config: Config = { overrides: [{ files: ["docs/**"], dialect: "obsidian" }] };
     expect(resolveConfig({ config, path: "docs/a.md" }).dialect).toBe("obsidian");

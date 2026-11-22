@@ -3073,3 +3073,24 @@ describe("Workspace.resolve's lazy fragmentAnchor", () => {
     expect(sealed.fragmentAnchor).toBe("Changed");
   });
 });
+
+describe("a backslash in a workspace path (#1000)", () => {
+  // A POSIX file name can hold a backslash, which the CLI passes as it is. On
+  // Windows it separates folders, as minimatch reads it for overrides.
+  const name = String.raw`sub/a\b.md`;
+  const workspace = createWorkspace({ [name]: "# B\n", "sub/c.md": "", "sub/a/c.md": "" });
+  it.skipIf(process.platform === "win32")(
+    "is part of a file name where it is not a separator",
+    () => {
+      expect(workspace.resolve(name, "c.md", "github")).toMatchObject({ target: "sub/c.md" });
+      expect(workspace.resolve("sub/c.md", "a%5Cb.md#b", "github")).toMatchObject({
+        status: "resolved",
+        target: name,
+        fragmentExists: true,
+      });
+    },
+  );
+  it.runIf(process.platform === "win32")("separates folders on Windows", () => {
+    expect(workspace.resolve(name, "c.md", "github")).toMatchObject({ target: "sub/a/c.md" });
+  });
+});

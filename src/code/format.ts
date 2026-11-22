@@ -91,7 +91,8 @@ export async function formatWithCode(
   if (!config.codeFormatters.length || first.scope?.length === 0) return first;
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const filename = path.resolve(cwd, options.path ?? "document.md");
-  const named = (options.path ?? "document.md").replaceAll("\\", "/");
+  // As for overrides, minimatch reads a backslash as a separator only on Windows (#1000).
+  const named = options.path ?? "document.md";
   const routes = config.codeFormatters.map((formatter) => ({
     formatter,
     excluded: (formatter.exclude ?? []).some((pattern) =>

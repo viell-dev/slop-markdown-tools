@@ -478,9 +478,10 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
   }
   if (config.extends === undefined) merge(presets.recommended!, []);
   merge(config, []);
-  const document = path.replaceAll("\\", "/");
+  // minimatch reads a backslash in the path as a separator only on Windows, as
+  // ignore patterns and file selection do; elsewhere it is part of a name (#1000).
   for (const override of overrides) {
-    if (override.files.some((pattern) => overridePattern(pattern)(document))) {
+    if (override.files.some((pattern) => overridePattern(pattern)(path))) {
       if (override.dialect) result.dialect = canonicalDialect(override.dialect);
       if (override.vitepress) result.vitepress = { ...result.vitepress, ...override.vitepress };
       addRules(result.rules, override.rules);

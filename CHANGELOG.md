@@ -20,6 +20,15 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   cells differently in such text
   ([#987](https://github.com/viell-dev/slop-markdown-tools/pull/987)).
 
+### Fixed
+
+- Outside Windows, read a backslash in a document's path as part of its name, as
+  `ignore` and file selection already do. `overrides[].files`, a code
+  formatter's `exclude`, link checks and `audit reachability` entries now match
+  a file such as `sub/a\b.md` by its own name, not as `sub/a/b.md`. On Windows a
+  backslash still separates folders
+  ([#1000](https://github.com/viell-dev/slop-markdown-tools/issues/1000)).
+
 ### Maintenance
 
 - Update the reference renderer mdast-util-to-hast to 13.2.2

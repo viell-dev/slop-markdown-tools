@@ -50,20 +50,23 @@ interface Target {
   forge?: ForgeAnchors;
   vitepress?: VitePressAnchors;
 }
+/**
+ * A host's path with forward slashes. A backslash separates folders only where
+ * the platform's paths use it, as minimatch reads names for overrides and
+ * ignore patterns; elsewhere it is part of a name (#1000).
+ */
+export function slashed(name: string): string {
+  return name.split(path.sep).join("/");
+}
 /** The workspace's targets and lazy indexes, independent of one link's resolution. */
 export function createTargetIndex(
   files: Record<string, WorkspaceSource>,
   options: WorkspaceOptions = {},
 ) {
   const sources = new Map(
-    Object.entries(files).map(([name, source]) => [
-      name.replaceAll("\\", "/").replace(/^\.\//, ""),
-      source,
-    ]),
+    Object.entries(files).map(([name, source]) => [slashed(name).replace(/^\.\//, ""), source]),
   );
-  const directories = new Set(
-    (options.directories ?? []).map((name) => name.replaceAll("\\", "/")),
-  );
+  const directories = new Set((options.directories ?? []).map(slashed));
   directories.add(".");
   /** The directories above a path, nearest first, up to the workspace root. */
   function* parents(name: string): Generator<string> {
@@ -90,7 +93,7 @@ export function createTargetIndex(
   const unreadable = [
     ...new Set(
       (options.unreadable ?? []).map((name) =>
-        path.posix.normalize(name.replaceAll("\\", "/")).replace(/\/$/, ""),
+        path.posix.normalize(slashed(name)).replace(/\/$/, ""),
       ),
     ),
   ].sort();
@@ -377,7 +380,7 @@ export function createTargetIndex(
   const vaults = [
     ...new Set(
       (options.vaults ?? [])
-        .map((name) => path.posix.normalize(name.replaceAll("\\", "/")).replace(/\/$/, ""))
+        .map((name) => path.posix.normalize(slashed(name)).replace(/\/$/, ""))
         .filter((name) => name !== "." && name !== ""),
     ),
   ].sort((a, b) => b.length - a.length);
@@ -387,7 +390,7 @@ export function createTargetIndex(
   }
   // The folders from the vault that the root is a part of, down to the root.
   const rootFolders = path.posix
-    .normalize((options.rootInVault ?? "").replaceAll("\\", "/"))
+    .normalize(slashed(options.rootInVault ?? ""))
     .split("/")
     .filter((part) => part !== "" && part !== ".");
   const rootFolded = rootFolders.map((part) => part.toLowerCase());

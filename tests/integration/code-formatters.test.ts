@@ -279,6 +279,24 @@ it("does not replace an invalid Unicode input on its way to a tool", async () =>
   await expect(readFile(record)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
+it("matches exclusions with a backslash in the path as a separator only on Windows (#1000)", async () => {
+  const { root, record, tool, config } = await setup();
+  // A POSIX file name can hold a backslash; minimatch reads it as a separator
+  // on Windows, as for ignore patterns and overrides.
+  const windows = process.platform === "win32";
+  const excluded = async (pattern: string) =>
+    (
+      await formatWithCode(block(), {
+        cwd: root,
+        path: String.raw`sub/a\b.md`,
+        config: config([tool({ exclude: [pattern] })]),
+      })
+    ).output === block();
+  expect(await excluded(String.raw`sub/a\\b.md`)).toBe(!windows);
+  expect(await excluded("sub/a/b.md")).toBe(windows);
+  expect(await calls(record)).toHaveLength(1);
+});
+
 it("counts encoding marks in error offsets while reporting visible columns", async () => {
   const { root, config } = await setup("fail");
   for (const count of [1, 2]) {
