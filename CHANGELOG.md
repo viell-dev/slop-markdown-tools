@@ -27,6 +27,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   Markdown at the root under such an entry, but mdrefine took it as excluding
   all Markdown and applied its defaults instead
   ([#990](https://github.com/viell-dev/slop-markdown-tools/issues/990)).
+- Outside Windows, read a backslash in a document's path as part of its name, as
+  `ignore` and file selection already do. `overrides[].files`, a code
+  formatter's `exclude` and `audit reachability` entries now match a file such
+  as `sub/a\b.md` by its own name, not as `sub/a/b.md`. On Windows a backslash
+  still separates folders
+  ([#1000](https://github.com/viell-dev/slop-markdown-tools/issues/1000)).
 
 ### Maintenance
 

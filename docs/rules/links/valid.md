@@ -72,6 +72,11 @@ forms.
 - A link into a directory that the CLI does not visit, such as `dist`, or
   through a symbolic link is checked on disk; see [ignored
   files](../../configuration.md#ignored-files-and-link-targets).
+- A backslash in a file's path is read as a folder separator, so that a
+  workspace's paths check the same whether they were written on Windows or not.
+  A file whose own name contains a backslash, which only Linux and macOS allow,
+  is therefore checked as though the backslash separated folders: its relative
+  links resolve from the wrong folder, and links to it are reported as missing.
 
 **Not checked:** URLs with a scheme, such as `https:`, which are never fetched.
 Outside the Obsidian dialect, neither is a destination that starts with `/` or

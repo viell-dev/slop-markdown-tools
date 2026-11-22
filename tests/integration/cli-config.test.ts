@@ -2,7 +2,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { fixture, run } from "../support/cli.js";
-import { parseReport } from "../support/json.js";
+import { parseExplanation, parseReport } from "../support/json.js";
 describe("paths and configuration files that cannot be used", () => {
   const fails = (root: string, args: string[], message: string) => {
     const result = run(root, args);
@@ -219,4 +219,51 @@ describe("paths and configuration files that cannot be used", () => {
       "written",
     ]);
   });
+});
+
+describe("document paths with a backslash (#1000)", () => {
+  // The override for the real name enables links/valid, the one for the reading
+  // with a slash the Gitea dialect; neither applies to the other name.
+  const files = {
+    "mdrefine.config.json": JSON.stringify({
+      extends: [],
+      overrides: [
+        { files: [String.raw`sub/a\\b.md`], rules: { "links/valid": "error" } },
+        { files: ["sub/a/b.md"], dialect: "gitea" },
+      ],
+    }),
+  };
+  const text = "[x](missing.md)\n";
+  const explain = (root: string, file: string) => {
+    const result = run(root, ["config", "explain", file]);
+    expect(result.status, result.stderr).toBe(0);
+    return parseExplanation(result.stdout);
+  };
+  it("selects overrides for a path given with the platform's separators", async () => {
+    const root = await fixture({ ...files, "sub/a/b.md": text });
+    const explained = explain(root, path.join("sub", "a", "b.md"));
+    expect(explained.path).toBe("sub/a/b.md");
+    expect(explained.effective.dialect).toBe("gitea");
+    expect(explained.effective.rules["links/valid"]).toBeUndefined();
+  });
+  // Windows file names cannot hold a backslash, which separates folders there.
+  it.skipIf(process.platform === "win32")(
+    "selects overrides by a name that holds one",
+    async () => {
+      const name = String.raw`sub/a\b.md`;
+      const root = await fixture({ ...files, [name]: text });
+      const explained = explain(root, name);
+      expect(explained.path).toBe(name);
+      expect(explained.effective.dialect).toBe("github");
+      expect(explained.effective.rules["links/valid"]).toBe("error");
+      const checked = run(root, ["lint", "--json"]);
+      expect(checked.status, checked.stderr).toBe(1);
+      expect(
+        parseReport(checked.stdout).files.map(({ path, diagnostics }) => [
+          path,
+          diagnostics.map(({ rule }) => rule),
+        ]),
+      ).toEqual([[name, ["links/valid"]]]);
+    },
+  );
 });

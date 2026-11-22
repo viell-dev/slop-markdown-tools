@@ -83,7 +83,9 @@ export async function auditReachability(options: ReachabilityOptions): Promise<R
   const entries = [
     ...new Set(
       options.entries.map((entry) => {
-        const name = path.posix.normalize(entry.replaceAll("\\", "/"));
+        // Native separators, as for discoverWorkspace's documents; a backslash is
+        // part of a name where it does not separate folders (#1000).
+        const name = path.posix.normalize(entry.split(path.sep).join("/"));
         if (
           path.isAbsolute(entry) ||
           /^(?:[A-Za-z]:|\/)/.test(name) ||
