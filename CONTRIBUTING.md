@@ -392,10 +392,10 @@ that keeps it current rather than drifting toward whatever was written first.
   consistent in structure and naming with its surroundings, appropriately
   tested, and in line with current practice where reasonable. Working code that
   adds a poor pattern still needs changes.
-- Where a dependency brings its own conventions, such as micromark and
-  mdast utility extensions or VitePress and markdown-it plugins, follow
-  them for its idioms, composition, naming and tests. Check the dependency's
-  current documentation rather than remembered conventions.
+- Where a dependency brings its own conventions, such as micromark and mdast
+  utility extensions or VitePress and markdown-it plugins, follow them for its
+  idioms, composition, naming and tests. Check the dependency's current
+  documentation rather than remembered conventions.
 - A deliberate departure from the better practice is acceptable when that
   practice is infeasible here, under a host, dependency or compatibility
   constraint, or when the chosen form is significantly faster by measurement,

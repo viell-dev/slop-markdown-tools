@@ -63,6 +63,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Test that a pattern with an escaped backslash before a brace group keeps the
   backslash in `ignore`, overrides, code-formatter `exclude` and input patterns
   ([#994](https://github.com/viell-dev/slop-markdown-tools/issues/994)).
+- Document what reviews judge in the code, and how a security fix skips the
+  seven-day wait for new dependency versions
+  ([#1006](https://github.com/viell-dev/slop-markdown-tools/pull/1006)).
 
 ## 0.8.5 - 2026-11-21
 

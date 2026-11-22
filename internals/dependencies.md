@@ -264,10 +264,10 @@ its own pull request when the advisory is found, rather than holding it for the
 next release's `npm update`. Dependabot's security updates already ignore the
 cooldown; the same rules apply to them.
 
-- Confirm that the advisory's range covers the resolved version (`npm ls NAME
-  --all`), and that the fixed release comes from the package's usual
-  maintainers and source and is named as the fix by the advisory, changelog or
-  release notes (`npm view NAME time maintainers --json`).
+- Confirm that the advisory's range covers the resolved version
+  (`npm ls NAME --all`), and that the fixed release comes from the package's
+  usual maintainers and source and is named as the fix by the advisory,
+  changelog or release notes (`npm view NAME time maintainers --json`).
 - Fix it at the closest level that works:
   1. The vulnerable package has a fixed release within the range that this
      project or the depending package declares: update to it.
@@ -276,24 +276,23 @@ cooldown; the same rules apply to them.
      depending package where practical, once that package's use of it has been
      checked and the project's checks pass. Record the override, its advisory
      and its removal condition beside it, as
-     [`scripts/obsidian/README.md`](../scripts/obsidian/README.md) does. When the
-     depending package releases a version that adopts the fix, update to it, also
-     without the wait, and remove the override.
+     [`scripts/obsidian/README.md`](../scripts/obsidian/README.md) does. When
+     the depending package releases a version that adopts the fix, update to it,
+     also without the wait, and remove the override.
   3. No working fixed version exists: track the advisory in
      [#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) as
      blocked upstream or worked around, and apply the audit exception rules
      above where they apply.
 - Take the smallest version that resolves the advisory, normally its patch
-  release, and resolve the rest of the lockfile with `npm install
-  --package-lock-only --before=DATE` so that nothing else skips the wait.
-  Unrelated updates, and later releases of the same package, keep the wait.
+  release. Check that every other package the lockfile change resolves is past
+  the wait; unrelated updates, and later releases of the same package, keep it.
 - Skipping the wait moves its check to the maintainer. Compare the published
-  package contents of the current and fixed versions (`npm diff
-  --diff=NAME@OLD --diff=NAME@NEW`), not only the repository. Release notes and
-  that diff can suffice for a widely used, actively maintained package with an
-  established release process. Get an independent review of the diff for a less
-  widely used package, a recent change of maintainer or publishing method, or a
-  fix release with substantial unrelated changes.
+  package contents of the current and fixed versions
+  (`npm diff --diff=NAME@OLD --diff=NAME@NEW`), not only the repository. Release
+  notes and that diff can suffice for a widely used, actively maintained package
+  with an established release process. Get an independent review of the diff for
+  a less widely used package, a recent change of maintainer or publishing
+  method, or a fix release with substantial unrelated changes.
 - Record the advisory, the affected and fixed versions, the dependency path, the
   packages that skipped the wait with their publication times, and the review
   decision with its reason, in the pull request and, for parser or bundled code,
