@@ -13,8 +13,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
-- Keep using the Prettier configuration when `.prettierignore` has an entry
-  that repeats `**/`, such as `**/**/*.md`. Prettier 3.9 and earlier format the
+- Keep using the Prettier configuration when `.prettierignore` has an entry that
+  repeats `**/`, such as `**/**/*.md`. Prettier 3.9 and earlier format the
   Markdown at the root under such an entry, but mdrefine took it as excluding
   all Markdown and applied its defaults instead
   ([#990](https://github.com/viell-dev/slop-markdown-tools/issues/990)).
