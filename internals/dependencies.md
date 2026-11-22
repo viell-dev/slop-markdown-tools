@@ -304,7 +304,8 @@ warnings or advance an assertion merely to make installation/building succeed.
 - **WebdriverIO:** `wdio-obsidian-service` 3.5.0 declares a webdriverio
   `>=9.18.1` peer, including WDIO 10. The verified harness stays on WDIO 9;
   retain its major ignores until a coordinated migration has the required
-  verification. WDIO 10 alone does not fix every minimatch parent in #837.
+  verification. Its glob and readdir-glob overrides select minimatch 11 for the
+  WDIO 9 parents in #837; a migration rechecks whether they are still needed.
   Review its coherent WDIO packages and launcher together, then test the actual
   Docker host, both views, controls and report identity. The service's
   `obsidian` API dependency is not the downloaded app or installer identity.

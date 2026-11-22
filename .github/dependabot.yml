@@ -92,7 +92,7 @@ updates:
     ignore:
       # Service 3.5 supports WDIO 10, but retain the verified WDIO 9 stack until
       # a coordinated major migration passes the native and dependency checks.
-      # WDIO 10 alone does not fix the remaining minimatch paths (#837).
+      # The harness overrides for minimatch 11 (#837) are in scripts/obsidian/README.md.
       - dependency-name: "webdriverio"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@wdio/*"

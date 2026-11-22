@@ -16,6 +16,10 @@
   },
   "overrides": {
     "@puppeteer/browsers": "$@puppeteer/browsers",
+    "@wdio/config": {
+      "glob": "14.0.6"
+    },
+    "readdir-glob": "4.0.0",
     "serialize-javascript": "7.1.3"
   }
 }
