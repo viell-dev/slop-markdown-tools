@@ -104,6 +104,11 @@ maps each path, relative to the workspace root with forward slashes, to one of:
   link to a heading in that file resolve as `unreadable`, while a link to the
   file itself still resolves; any other error propagates.
 
+A backslash in these paths is read as a separator as well, so that paths written
+on Windows work on any platform. A file whose name contains a backslash, which
+only POSIX file systems allow, is therefore checked as though the backslash
+separated folders.
+
 A readable target can still have incomplete fragment information when
 renderer-dependent processing leaves its anchors uncertain. The result has
 status `unreadable` and `fragmentIncomplete: true`, without an unreadable file
