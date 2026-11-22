@@ -107,6 +107,18 @@ describe("configuration and plugins", () => {
     expect(resolveConfig({ config, path: "docs/a.md" }).dialect).toBe("obsidian");
     expect(resolveConfig({ config, path: "Docs/a.md" }).dialect).toBe("github");
   });
+  it("matches no name without the backslash by an escaped backslash before braces (#994)", () => {
+    const dialect = (pattern: string, file: string) =>
+      resolveConfig({
+        config: { overrides: [{ files: [pattern], dialect: "obsidian" }] },
+        path: file,
+      }).dialect;
+    for (const file of ["sub/ab.md", "sub/ac.md"]) {
+      expect(dialect("sub/a{b,c}.md", file)).toBe("obsidian");
+      // minimatch 11.0.5 dropped the backslash and matched both names.
+      expect(dialect(String.raw`sub/a\\{b,c}.md`, file)).toBe("github");
+    }
+  });
   it("accepts one preset name for extends and a severity alone in a list", () => {
     expect(resolveConfig({ config: { extends: "github" } })).toEqual(
       resolveConfig({ config: { extends: ["github"] } }),
