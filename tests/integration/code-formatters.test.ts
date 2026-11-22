@@ -70,6 +70,15 @@ it("uses exact aliases, a fallback, exclusions, and document order", async () =>
   });
   expect(excluded.output).toBe(block());
   expect(await calls(record)).toHaveLength(3);
+  // An escaped backslash before a brace group stays literal (#994), so this
+  // does not exclude draft/ab.md, which it did with minimatch 11.0.5.
+  const literal = await formatWithCode(block(), {
+    cwd: root,
+    path: "draft/ab.md",
+    config: config([{ ...exact, exclude: [String.raw`draft/a\\{b,c}.md`] }, fallback]),
+  });
+  expect(literal.output).toBe(block("exact"));
+  expect(await calls(record)).toHaveLength(4);
 });
 
 describe("fenced source layout", () => {

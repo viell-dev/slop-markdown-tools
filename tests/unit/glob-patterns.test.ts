@@ -1,5 +1,15 @@
-import { Minimatch } from "minimatch";
+import { minimatch, Minimatch } from "minimatch";
 import { expect, it } from "vitest";
+
+it("keeps an escaped backslash when it expands a brace group (#994)", () => {
+  // Input patterns expand their braces with braceExpand() before compiling
+  // each alternative. minimatch 11.0.5 returned sub/a\b.md, whose backslash
+  // then escaped the b, so the pattern matched sub/ab.md.
+  expect(minimatch.braceExpand(String.raw`sub/a\\{b,c}.md`)).toEqual([
+    String.raw`sub/a\\b.md`,
+    String.raw`sub/a\\c.md`,
+  ]);
+});
 
 it("bounds globparts amplification without changing ordinary matches (#837)", () => {
   // Reject the complete amplified pattern rather than silently keeping only

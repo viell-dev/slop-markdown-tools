@@ -793,6 +793,40 @@ describe("input patterns", () => {
   });
 });
 
+describe("a pattern with an escaped backslash before a brace group (#994)", () => {
+  // A literal backslash, then a brace group. minimatch 11.0.5 dropped the
+  // backslash when it expanded the braces, so this matched sub/ab.md and
+  // sub/ac.md; the backslash now stays part of the name that it matches.
+  const pattern = String.raw`sub/a\\{b,c}.md`;
+  const files = { "a.md": "A.\n", "sub/ab.md": "B.\n", "sub/ac.md": "C.\n" };
+  // a.md shows that the configuration is read.
+  const ignoring = { "mdrefine.config.json": JSON.stringify({ ignore: [pattern, "a.md"] }) };
+  const lint = (root: string, args: string[] = []) => {
+    const checked = run(root, ["lint", "--json", ...args]);
+    expect(checked.status, checked.stderr).toBe(0);
+    return paths(checked.stdout);
+  };
+
+  it("matches no name without the backslash, in ignore and as an input", async () => {
+    expect(lint(await fixture({ ...files, ...ignoring }))).toEqual(["sub/ab.md", "sub/ac.md"]);
+    // An input pattern expands its braces itself, before compiling each alternative.
+    const checked = run(await fixture(files), ["lint", pattern]);
+    expect(checked.status).toBe(2);
+    expect(checked.stderr).toBe(
+      `mdrefine: Input pattern matches no document: ${pattern} (patterns separate folders with /)\n`,
+    );
+  });
+  // Windows file names cannot hold a backslash, which separates folders there.
+  it.skipIf(process.platform === "win32")("matches names that hold the backslash", async () => {
+    const named = { ...files, "sub/a\\b.md": "D.\n", "sub/a\\c.md": "E.\n" };
+    const all = ["a.md", "sub/a\\b.md", "sub/a\\c.md", "sub/ab.md", "sub/ac.md"];
+    const root = await fixture(named);
+    expect(lint(root)).toEqual(all);
+    expect(lint(root, [pattern])).toEqual(["sub/a\\b.md", "sub/a\\c.md"]);
+    expect(lint(await fixture({ ...named, ...ignoring }))).toEqual(["sub/ab.md", "sub/ac.md"]);
+  });
+});
+
 describe("link targets in folders that discovery does not enter", () => {
   const files = {
     "mdrefine.config.json": '{"extends":["recommended","github"]}',
