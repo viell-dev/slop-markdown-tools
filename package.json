@@ -147,7 +147,7 @@
     "micromark-util-character": "2.1.1",
     "micromark-util-types": "2.0.3",
     "minimatch": "11.0.8",
-    "sentence-splitter": "5.0.1",
+    "sentence-splitter": "5.1.0",
     "string-width": "9.0.0",
     "yaml": "2.9.1"
   },
