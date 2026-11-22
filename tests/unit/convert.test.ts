@@ -445,6 +445,19 @@ describe("a .prettierignore that excludes all Markdown (#788)", () => {
     expect(ignoresAllMarkdown("***\n")).toBe(true);
     expect(ignoresAllMarkdown("***/*.md\n*.md\n")).toBe(true);
   });
+  // ignore 7.0.6 and later let a repeated `**/` match no directory; Prettier 3.9 bundles 7.0.5.
+  it.each(["**/**/*.md\n", "/**/**/*.md\n", "**/**/**/*.md\n", "**/**/*\n", "**/***/*.md\n"])(
+    "uses no repeated globstar as proof (#990): %j",
+    (text) => {
+      expect(ignoresAllMarkdown(text)).toBe(false);
+    },
+  );
+  it.each(["**/**/*.md\n*.md\n", "**/**/*.md\n**/*.md\n", "/**/*.md\n", "**/**\n"])(
+    "still takes an entry that Prettier versions read alike as proof (#990): %j",
+    (text) => {
+      expect(ignoresAllMarkdown(text)).toBe(true);
+    },
+  );
   it.each([
     "**/*.md\n**/*.markdown\n",
     "*.md\n*.markdown",

@@ -20,6 +20,14 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   cells differently in such text
   ([#987](https://github.com/viell-dev/slop-markdown-tools/pull/987)).
 
+### Fixed
+
+- Keep using the Prettier configuration when `.prettierignore` has an entry that
+  repeats `**/`, such as `**/**/*.md`. Prettier 3.9 and earlier format the
+  Markdown at the root under such an entry, but mdrefine took it as excluding
+  all Markdown and applied its defaults instead
+  ([#990](https://github.com/viell-dev/slop-markdown-tools/issues/990)).
+
 ### Maintenance
 
 - Update the reference renderer mdast-util-to-hast to 13.2.2
@@ -38,6 +46,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Print each phase's time when a parser emphasis registration-mutant test fails
   or times out, to show which step slows on hosted Windows
   ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
+- Stop a timed-out parser emphasis registration-mutant test's copying and
+  coverage child, and remove its temporary copy
+  ([#995](https://github.com/viell-dev/slop-markdown-tools/issues/995)).
 - Test that a pattern with an escaped backslash before a brace group keeps the
   backslash in `ignore`, overrides, code-formatter `exclude` and input patterns
   ([#994](https://github.com/viell-dev/slop-markdown-tools/issues/994)).

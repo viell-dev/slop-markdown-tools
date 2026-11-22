@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { beforeAll, expect, it, onTestFailed } from "vitest";
+import { beforeAll, expect, it } from "vitest";
 import {
   productionCases,
   profiles,
@@ -10,6 +10,7 @@ import {
 import {
   assertBinding,
   assertSources,
+  createMutantCancellation,
   createPhaseTimeline,
   createRegistrationMutant,
   productionBinding,
@@ -52,53 +53,66 @@ it.each(profiles)(
   },
 );
 
-it.each(registrationCases())(
+// `it.for` rather than `it.each`, for the test context's signal and hooks.
+it.for(registrationCases())(
   "kills the missing-$registration mutant by a failed production-hit assertion",
-  async (entry) => {
+  async (entry, { signal, onTestFailed, onTestFinished }) => {
     // Each phase's start time, printed only if this test fails or times out (#992).
     const timeline = createPhaseTimeline(`Missing-${entry.registration} mutant`);
     timeline.reportOnFailure(onTestFailed);
-    const mutant = await createRegistrationMutant(root, binding, entry.registration, timeline);
-    try {
-      const child = await runCoverageChild(
-        {
-          schema: 1,
-          sourceRoot: root,
-          runtimeRoot: mutant.root,
-          binding,
-          mutation: mutant.mutation,
-          cases: [entry],
-        },
+    // A timeout stops the body between steps and removes its folder (#995).
+    const cancellation = createMutantCancellation(signal, timeline);
+    onTestFinished(() => cancellation.finish());
+    await cancellation.run(async () => {
+      const mutant = await createRegistrationMutant(
+        root,
+        binding,
+        entry.registration,
         timeline,
+        cancellation,
       );
-      timeline.mark("assert-child-result");
-      expect(child.stderr).toBe("");
-      expect(child.code).toBe(1);
-      expect(child.result.status).toBe("failed");
-      expect(child.result.hashesStable).toBe(true);
-      expect(child.result.rows).toHaveLength(1);
-      const row = child.result.rows[0];
-      assert(row, "Missing actual registration-mutant row");
-      expect(row).toMatchObject({ calls: 0, expectHit: true, astParity: true });
-      expect(row.treeHash).toBe(row.originalResolverTreeHash);
-      expect(child.result.failures).toHaveLength(1);
-      expect(child.result.failures[0]).toMatchObject({
-        kind: "reachability",
-        id: `${entry.id}/primary`,
-        calls: 0,
-        expectHit: true,
-      });
-      // Only the exact registration CallExpression span changed. The helper
-      // records first-arg replacement and verifies all other copied dist bytes.
-      assert.equal(mutant.mutation.normalHash, binding.hashes[binding.parserFile]);
-      expect(child.result.mutation).toEqual(mutant.mutation);
-    } finally {
-      await mutant.cleanup();
-    }
-    timeline.mark("assert-binding-final");
-    await assertBinding(root, binding);
-    timeline.mark("assert-sources-final");
-    await assertSources(root, binding);
-    timeline.mark("done");
+      try {
+        const child = await runCoverageChild(
+          {
+            schema: 1,
+            sourceRoot: root,
+            runtimeRoot: mutant.root,
+            binding,
+            mutation: mutant.mutation,
+            cases: [entry],
+          },
+          timeline,
+          signal,
+        );
+        timeline.mark("assert-child-result");
+        expect(child.stderr).toBe("");
+        expect(child.code).toBe(1);
+        expect(child.result.status).toBe("failed");
+        expect(child.result.hashesStable).toBe(true);
+        expect(child.result.rows).toHaveLength(1);
+        const row = child.result.rows[0];
+        assert(row, "Missing actual registration-mutant row");
+        expect(row).toMatchObject({ calls: 0, expectHit: true, astParity: true });
+        expect(row.treeHash).toBe(row.originalResolverTreeHash);
+        expect(child.result.failures).toHaveLength(1);
+        expect(child.result.failures[0]).toMatchObject({
+          kind: "reachability",
+          id: `${entry.id}/primary`,
+          calls: 0,
+          expectHit: true,
+        });
+        // Only the exact registration CallExpression span changed. The helper
+        // records first-arg replacement and verifies all other copied dist bytes.
+        assert.equal(mutant.mutation.normalHash, binding.hashes[binding.parserFile]);
+        expect(child.result.mutation).toEqual(mutant.mutation);
+      } finally {
+        await mutant.cleanup();
+      }
+      timeline.mark("assert-binding-final");
+      await assertBinding(root, binding, undefined, signal);
+      timeline.mark("assert-sources-final");
+      await assertSources(root, binding, signal);
+      timeline.mark("done");
+    });
   },
 );
