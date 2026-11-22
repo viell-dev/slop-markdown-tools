@@ -38,6 +38,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Print each phase's time when a parser emphasis registration-mutant test fails
   or times out, to show which step slows on hosted Windows
   ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
+- Test that a pattern with an escaped backslash before a brace group keeps the
+  backslash in `ignore`, overrides, code-formatter `exclude` and input patterns
+  ([#994](https://github.com/viell-dev/slop-markdown-tools/issues/994)).
 
 ## 0.8.5 - 2026-11-21
 
