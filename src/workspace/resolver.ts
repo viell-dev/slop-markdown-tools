@@ -1,6 +1,5 @@
 import path from "node:path";
 import type { Dialect, LinkResolution } from "../core/types.js";
-import { slashed } from "./targets.js";
 import type { TargetIndex } from "./targets.js";
 import { vitepressPage } from "../syntax/vitepress/paths.js";
 
@@ -44,7 +43,7 @@ export function resolveLink(
 
   if (/^[a-z][a-z\d+.-]*:/i.test(destination) || destination.startsWith("//"))
     return { status: "external" };
-  source = slashed(source);
+  source = source.replaceAll("\\", "/");
   const parts = splitDestination(destination);
   if (dialect === "vitepress") {
     parts.path = parts.path.split("?", 1)[0]!;
