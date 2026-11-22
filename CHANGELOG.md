@@ -46,6 +46,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Print each phase's time when a parser emphasis registration-mutant test fails
   or times out, to show which step slows on hosted Windows
   ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
+- Stop a timed-out parser emphasis registration-mutant test's copying and
+  coverage child, and remove its temporary copy
+  ([#995](https://github.com/viell-dev/slop-markdown-tools/issues/995)).
 
 ## 0.8.5 - 2026-11-21
 
