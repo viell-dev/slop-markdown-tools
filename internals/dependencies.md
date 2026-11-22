@@ -249,11 +249,55 @@ older lines eligible. Update `tests/integration/dependency-policy.test.ts` with
 the policy change so unrelated compatible updates can proceed.
 
 Version proposals wait at least seven days after publication, leaving time for a
-broken or compromised release to be found. Security updates are not delayed by
-Dependabot's cooldown. Apply the [release procedure](../RELEASING.md) when
-adopting a security fix early; its documented exception waives neither
-verification nor review and covers shipped bundled code as well as installed
-dependencies. A merged update ships with the next release under that procedure.
+broken or compromised release to be found. A published advisory against a
+resolved version is handled under [security fixes](#security-fixes) instead. A
+merged update ships with the next release under the [release
+procedure](../RELEASING.md).
+
+## Security fixes
+
+The seven-day wait guards against an unknown risk in a new release; an advisory
+against a version in either dependency tree is a known one. Resolving it takes
+precedence over the wait and over routine batching, but only for the versions
+the fix needs, and only once the fix is shown to be genuine. Prepare the fix as
+its own pull request when the advisory is found, rather than holding it for the
+next release's `npm update`. Dependabot's security updates already ignore the
+cooldown; the same rules apply to them.
+
+- Confirm that the advisory's range covers the resolved version (`npm ls NAME
+  --all`), and that the fixed release comes from the package's usual
+  maintainers and source and is named as the fix by the advisory, changelog or
+  release notes (`npm view NAME time maintainers --json`).
+- Fix it at the closest level that works:
+  1. The vulnerable package has a fixed release within the range that this
+     project or the depending package declares: update to it.
+  2. The vulnerable package comes through a dependency that has not adopted the
+     fix: select the fixed version with an npm `overrides` entry, scoped to the
+     depending package where practical, once that package's use of it has been
+     checked and the project's checks pass. Record the override, its advisory
+     and its removal condition beside it, as
+     [`scripts/obsidian/README.md`](../scripts/obsidian/README.md) does. When the
+     depending package releases a version that adopts the fix, update to it, also
+     without the wait, and remove the override.
+  3. No working fixed version exists: track the advisory in
+     [#330](https://github.com/viell-dev/slop-markdown-tools/issues/330) as
+     blocked upstream or worked around, and apply the audit exception rules
+     above where they apply.
+- Take the smallest version that resolves the advisory, normally its patch
+  release, and resolve the rest of the lockfile with `npm install
+  --package-lock-only --before=DATE` so that nothing else skips the wait.
+  Unrelated updates, and later releases of the same package, keep the wait.
+- Skipping the wait moves its check to the maintainer. Compare the published
+  package contents of the current and fixed versions (`npm diff
+  --diff=NAME@OLD --diff=NAME@NEW`), not only the repository. Release notes and
+  that diff can suffice for a widely used, actively maintained package with an
+  established release process. Get an independent review of the diff for a less
+  widely used package, a recent change of maintainer or publishing method, or a
+  fix release with substantial unrelated changes.
+- Record the advisory, the affected and fixed versions, the dependency path, the
+  packages that skipped the wait with their publication times, and the review
+  decision with its reason, in the pull request and, for parser or bundled code,
+  in #330. The fix still needs every required check and the usual review.
 
 ## Revisiting ignores and tool pins
 

@@ -384,6 +384,37 @@ choice:
   focused follow-up review of the unresolved material finding and affected
   changes. Optional cases and wording nits do not start another review round.
 
+Every review, the author's own included, judges how the code is written as well
+as whether it works. No person reviews this code, so review is the only check
+that keeps it current rather than drifting toward whatever was written first.
+
+- Confirm the behavior, then judge the code: readable, idiomatic TypeScript,
+  consistent in structure and naming with its surroundings, appropriately
+  tested, and in line with current practice where reasonable. Working code that
+  adds a poor pattern still needs changes.
+- Where a dependency brings its own conventions, such as micromark and
+  mdast utility extensions or VitePress and markdown-it plugins, follow
+  them for its idioms, composition, naming and tests. Check the dependency's
+  current documentation rather than remembered conventions.
+- A deliberate departure from the better practice is acceptable when that
+  practice is infeasible here, under a host, dependency or compatibility
+  constraint, or when the chosen form is significantly faster by measurement,
+  not assumption; a marginal gain does not justify the inconsistency. Explain
+  the reason in a code comment at that site, with the constraint or measured
+  difference and the condition for revisiting it. An unexplained departure is a
+  finding. Use profiles and the [benchmarks](#benchmarks) to support a
+  performance departure and, from time to time, to check whether hot paths cost
+  more than expected.
+- Look for the source of a weak pattern, not only its instance. When a PR copies
+  merged code, an example, a template or contributor or agent guidance, the
+  precedent is the defect and the finding names it. Correct the source first in
+  separate PRs, one refactoring the precedent code and one updating the guidance
+  that taught it, as applicable. Then replace the original PR with one built on
+  the corrected base, or refactor it in place, and link the PRs to each other.
+- Weigh style findings by the project's scope and maturity. Prefer established
+  practice with a clear benefit over churn, and keep each recommendation
+  proportionate to the code it touches.
+
 A PR's verification section records the commands and their results, the
 platforms tested, the runs of the real-renderer checks when its changes trigger
 them, what the evidence cannot show, and the review it got. The map of [what the
