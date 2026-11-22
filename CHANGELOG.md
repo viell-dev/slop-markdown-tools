@@ -46,6 +46,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   the Prettier configuration for such an entry, because earlier Prettier
   versions format root Markdown under it; the integrations page now says so
   ([#989](https://github.com/viell-dev/slop-markdown-tools/pull/989)).
+- Update TypeScript-ESLint to 8.73.0, which no longer installs its own minimatch
+  10.2.6, and pin glob 14.0.6 under `@wdio/config` and readdir-glob 4.0.0 in the
+  Obsidian check, so that neither development graph keeps a minimatch affected
+  by GHSA-g3hv-75wg-m249
+  ([#837](https://github.com/viell-dev/slop-markdown-tools/issues/837)).
 - Update the parser build tool to Rolldown 1.3.2, whose only change to the
   generated parser writes `Infinity` as the equal literal `1e400`
   ([#986](https://github.com/viell-dev/slop-markdown-tools/pull/986)).

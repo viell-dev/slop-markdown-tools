@@ -74,6 +74,16 @@ update resolves a safely patched version without it and clean installation,
 audit, Mocha execution and actual Obsidian evidence pass. This pin is separate
 from the removed downloader chains; its presence does not assert a new defect.
 
+Two overrides select minimatch 11 for the paths that GHSA-g3hv-75wg-m249 affects
+([#837]). `@wdio/config` 9.33.1 requests glob `^10.2.2`, whose minimatch 9 has
+no fixed release, so its glob is pinned to 14.0.6; `@wdio/config` calls only
+`sync(pattern, { cwd, matchBase })`, which glob 14 keeps. Archiver 8.0.0
+requests readdir-glob `^3.0.0`, so readdir-glob is pinned to 4.0.0, whose code
+is identical to 3.0.0 apart from requiring minimatch 11 and Node.js 20. The
+minimatch 3 and 5 copies under Mocha, filelist and recursive-readdir lie outside
+the advisory's range. Remove each override when its parent's own range selects a
+fixed minimatch, after clean installation, audit and actual Obsidian evidence.
+
 ## Evidence limits
 
 The container runs as nonroot with a read-only checkout, synthetic documents and
@@ -85,3 +95,4 @@ audited archive implementation.
 
 [#639]: https://github.com/viell-dev/slop-markdown-tools/issues/639
 [#640]: https://github.com/viell-dev/slop-markdown-tools/issues/640
+[#837]: https://github.com/viell-dev/slop-markdown-tools/issues/837
