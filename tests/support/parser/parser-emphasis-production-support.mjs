@@ -34,6 +34,7 @@ import ts from "typescript";
 /** @typedef {{code: number, result: EmphasisCoverageReport, stderr: string}} EmphasisCoverageChild */
 /** @typedef {{phase: string, elapsedMs: number} & Record<string, unknown>} EmphasisPhaseMark */
 /** @typedef {{mark: (phase: string, detail?: Record<string, unknown>) => void, progress: Record<string, unknown>, report: () => Record<string, unknown>, reportOnFailure: (onFailed: (handler: () => void) => void) => void}} EmphasisPhaseTimeline */
+/** @typedef {{signal: AbortSignal, own: (remove: () => Promise<void>) => () => Promise<void>, run: <T>(body: () => Promise<T>) => Promise<T>, finish: () => Promise<void>}} EmphasisMutantCancellation */
 
 /**
  * Monotonic phase times for one test, kept in memory and written only by a
@@ -73,6 +74,60 @@ export function createPhaseTimeline(label, options = {}) {
     report,
     reportOnFailure(onFailed) {
       onFailed(() => write(`${label} failure phases:`, JSON.stringify(report(), null, 2)));
+    },
+  };
+}
+
+/**
+ * Ties one registration-mutant test's work to the test (#995). Vitest moves
+ * on when a test times out but cannot stop its body, which would keep copying,
+ * hashing and running its coverage child beside the next test. The test's
+ * context `signal` aborts at that timeout, or when the run is cancelled; the
+ * helpers below check it between steps and pass it to the coverage child.
+ *
+ * The test passes `finish` to `onTestFinished`, which runs after a pass, a
+ * failure or a timeout. After an abort it waits for the body given to `run`
+ * to stop, so removal cannot race a copy or a child holding files open, and
+ * then runs the removal registered with `own`. Without an abort the body's
+ * own `cleanup()` decides, so a setup failure still keeps its folder for
+ * inspection. Each registered removal runs at most once.
+ *
+ * @param {AbortSignal} signal
+ * @param {EmphasisPhaseTimeline} timeline
+ * @returns {EmphasisMutantCancellation}
+ */
+export function createMutantCancellation(signal, timeline) {
+  /** @type {(() => Promise<void>)[]} */
+  const removals = [];
+  /** @type {Promise<unknown>} */
+  let work = Promise.resolve();
+  const onAbort = () => {
+    const reason = signal.reason instanceof Error ? signal.reason.message : String(signal.reason);
+    timeline.mark("aborted", { reason: reason.split("\n", 1)[0] });
+  };
+  if (signal.aborted) onAbort();
+  else signal.addEventListener("abort", onAbort, { once: true });
+  return {
+    signal,
+    own(remove) {
+      /** @type {Promise<void> | undefined} */
+      let removing;
+      const once = () => (removing ??= remove());
+      removals.push(once);
+      return once;
+    },
+    run(body) {
+      const result = body();
+      work = result;
+      return result;
+    },
+    async finish() {
+      signal.removeEventListener("abort", onAbort);
+      if (!signal.aborted) return;
+      // The abandoned body rejects with the abort reason once it stops;
+      // Vitest has already reported the timeout, so only its end matters.
+      await work.catch(() => undefined);
+      for (const remove of removals) await remove();
     },
   };
 }
@@ -162,6 +217,7 @@ function readEmphasisCoverageReport(value) {
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const slash = (value) => value.replaceAll("\\", "/");
+const mutantPrefix = "mdrefine-emphasis-registration-";
 
 function inside(root, target) {
   const relative = path.relative(root, target);
@@ -281,15 +337,18 @@ export async function productionBinding(repositoryRoot) {
  * @param {string} root
  * @param {EmphasisBinding} binding
  * @param {EmphasisMutation} [mutation]
+ * @param {AbortSignal} [signal] Stops before each file once aborted (#995).
  * @returns {Promise<string>}
  */
-export async function assertBinding(root, binding, mutation) {
+export async function assertBinding(root, binding, mutation, signal) {
+  signal?.throwIfAborted();
   const canonical = await realpath(root);
   assert(!(await lstat(path.join(canonical, "dist"))).isSymbolicLink());
   inside(canonical, await realpath(path.join(canonical, "dist")));
   const files = await regularFiles(canonical, path.join(canonical, "dist"));
   assert.deepEqual(files, Object.keys(binding.hashes).sort(), "Dist file catalog changed");
   for (const file of files) {
+    signal?.throwIfAborted();
     const expected =
       mutation && file === binding.parserFile ? mutation.mutantHash : binding.hashes[file];
     assert.equal(
@@ -298,17 +357,22 @@ export async function assertBinding(root, binding, mutation) {
       `Runtime changed: ${file}`,
     );
   }
+  signal?.throwIfAborted();
   return canonical;
 }
 
 /**
  * @param {string} root
  * @param {EmphasisBinding} binding
+ * @param {AbortSignal} [signal] Stops before each file once aborted (#995).
  * @returns {Promise<void>}
  */
-export async function assertSources(root, binding) {
-  for (const [file, expected] of Object.entries(binding.sourceHashes))
+export async function assertSources(root, binding, signal) {
+  for (const [file, expected] of Object.entries(binding.sourceHashes)) {
+    signal?.throwIfAborted();
     assert.equal(hash(await readFile(path.join(root, file))), expected, `Source changed: ${file}`);
+  }
+  signal?.throwIfAborted();
 }
 
 /**
@@ -376,10 +440,43 @@ export function registrationSpans(source) {
 }
 
 /**
+ * Removes one registration-mutant folder after checking that it is the one
+ * this test created: its canonical path, directly inside the temporary
+ * folder, with the mutant prefix. `modules` names the installed
+ * `node_modules` target once the junction exists. The junction is checked
+ * against it and unlinked on its own before the recursive removal, so its
+ * target is never enumerated, deleted or followed. Without `modules`, the
+ * work stopped before linking, and nothing may stand at the link's place.
+ *
+ * @param {{owned: string, tempParent: string, modules?: string | undefined}} folder
+ * @returns {Promise<void>}
+ */
+export async function removeMutantFolder({ owned, tempParent, modules }) {
+  assert.equal(await realpath(owned), owned);
+  assert.equal(path.dirname(owned), tempParent);
+  assert(path.basename(owned).startsWith(mutantPrefix));
+  const link = path.join(owned, "node_modules");
+  /** @type {import("node:fs").Stats | undefined} */
+  const stat = await lstat(link).catch((error) => {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (modules === undefined) assert.equal(stat, undefined, `Unexpected entry at ${link}`);
+  else {
+    assert(stat?.isSymbolicLink(), `Missing owned junction at ${link}`);
+    assert.equal(await realpath(link), modules);
+    await rm(link, { recursive: false });
+  }
+  await rm(owned, { recursive: true });
+}
+
+/**
  * @param {string} repositoryRoot
  * @param {EmphasisBinding} binding
  * @param {EmphasisRegistration} registration
  * @param {EmphasisPhaseTimeline} [timeline]
+ * @param {EmphasisMutantCancellation} [cancellation] Stops the work between
+ *   steps once the test is cancelled, and owns the folder's removal (#995).
  * @returns {Promise<EmphasisMutant>}
  */
 export async function createRegistrationMutant(
@@ -387,36 +484,48 @@ export async function createRegistrationMutant(
   binding,
   registration,
   timeline = createPhaseTimeline("Unreported"),
+  cancellation = undefined,
 ) {
+  const signal = cancellation?.signal;
   timeline.mark("assert-binding-before-copy");
   const sourceRoot = await realpath(repositoryRoot);
-  await assertBinding(sourceRoot, binding);
+  await assertBinding(sourceRoot, binding, undefined, signal);
   timeline.mark("assert-sources-before-copy");
-  await assertSources(sourceRoot, binding);
+  await assertSources(sourceRoot, binding, signal);
   timeline.mark("create-temp-folder");
-  const folder = await mkdtemp(path.join(tmpdir(), "mdrefine-emphasis-registration-"));
+  const folder = await mkdtemp(path.join(tmpdir(), mutantPrefix));
   const owned = await realpath(folder);
   const tempParent = await realpath(tmpdir());
   assert.equal(path.dirname(owned), tempParent);
-  timeline.mark("read-parser-spans", { folder: owned });
-  const parser = await readFile(path.join(sourceRoot, binding.parserFile), "utf8");
-  const span = registrationSpans(parser)[registration];
-  assert(span, `Unknown registration ${registration}`);
-  const mutant = parser.slice(0, span.start) + span.replacement + parser.slice(span.end);
-  const mutation = {
-    registration,
-    ...span,
-    normalHash: hash(parser),
-    mutantHash: hash(mutant),
+  /** @type {string | undefined} Set once the owned junction exists. */
+  let modules;
+  const remove = async () => {
+    timeline.mark("cleanup");
+    await removeMutantFolder({ owned, tempParent, modules });
+    timeline.mark("cleanup-done");
   };
-  assert.notEqual(mutation.normalHash, mutation.mutantHash);
+  const cleanup = cancellation ? cancellation.own(remove) : remove;
   try {
+    signal?.throwIfAborted();
+    timeline.mark("read-parser-spans", { folder: owned });
+    const parser = await readFile(path.join(sourceRoot, binding.parserFile), "utf8");
+    const span = registrationSpans(parser)[registration];
+    assert(span, `Unknown registration ${registration}`);
+    const mutant = parser.slice(0, span.start) + span.replacement + parser.slice(span.end);
+    const mutation = {
+      registration,
+      ...span,
+      normalHash: hash(parser),
+      mutantHash: hash(mutant),
+    };
+    assert.notEqual(mutation.normalHash, mutation.mutantHash);
     const files = Object.keys(binding.hashes);
     // Updated per file so that a stalled copy shows how far it got.
     const copy = { files: files.length, copiedFiles: 0, copiedBytes: 0, current: "" };
     timeline.progress.copy = copy;
     timeline.mark("copy-dist", { files: files.length });
     for (const file of files) {
+      signal?.throwIfAborted();
       copy.current = file;
       const destination = path.resolve(owned, file);
       inside(owned, destination);
@@ -426,6 +535,7 @@ export async function createRegistrationMutant(
       copy.copiedBytes += (await lstat(destination)).size;
     }
     copy.current = "";
+    signal?.throwIfAborted();
     timeline.mark("write-package-json", {
       copiedFiles: copy.copiedFiles,
       copiedBytes: copy.copiedBytes,
@@ -433,40 +543,29 @@ export async function createRegistrationMutant(
     await writeFile(path.join(owned, "package.json"), '{"type":"module","private":true}\n', {
       flag: "wx",
     });
+    signal?.throwIfAborted();
     timeline.mark("link-node-modules");
     // Resolution-only link: never mutate/chmod anything under node_modules.
-    const modules = await realpath(path.join(sourceRoot, "node_modules"));
+    const installed = await realpath(path.join(sourceRoot, "node_modules"));
     const link = path.join(owned, "node_modules");
-    await symlink(modules, link, process.platform === "win32" ? "junction" : "dir");
+    await symlink(installed, link, process.platform === "win32" ? "junction" : "dir");
+    modules = installed;
     assert.equal(await realpath(link), modules);
+    signal?.throwIfAborted();
     timeline.mark("write-mutant");
     const target = path.resolve(owned, binding.parserFile);
     inside(owned, target);
     assert(!(await lstat(target)).isSymbolicLink());
     await writeFile(target, mutant);
     timeline.mark("assert-binding-after-copy");
-    await assertBinding(owned, binding, mutation);
+    await assertBinding(owned, binding, mutation, signal);
     timeline.mark("mutant-ready");
-    return {
-      root: owned,
-      mutation,
-      async cleanup() {
-        timeline.mark("cleanup");
-        assert.equal(await realpath(owned), owned);
-        assert.equal(path.dirname(owned), tempParent);
-        assert(path.basename(owned).startsWith("mdrefine-emphasis-registration-"));
-        // Unlink the owned junction itself before recursive removal; do not
-        // enumerate/delete or follow its installed dependency target.
-        assert((await lstat(link)).isSymbolicLink());
-        assert.equal(await realpath(link), modules);
-        await rm(link, { recursive: false });
-        await rm(owned, { recursive: true });
-        timeline.mark("cleanup-done");
-      },
-    };
+    return { root: owned, mutation, cleanup };
   } catch (error) {
-    // On setup failure, leave the owned location identifiable for inspection.
-    error.message += ` (owned mutant directory retained: ${owned})`;
+    // A cancelled test removes its folder when it finishes, and the error is
+    // the test's own timeout. On any other setup failure, leave the owned
+    // location identifiable for inspection.
+    if (!signal?.aborted) error.message += ` (owned mutant directory retained: ${owned})`;
     throw error;
   }
 }
@@ -474,9 +573,16 @@ export async function createRegistrationMutant(
 /**
  * @param {EmphasisCoverageRequest} request
  * @param {EmphasisPhaseTimeline} [timeline]
+ * @param {AbortSignal} [signal] Refuses to start once aborted, and kills a
+ *   running child on abort (#995).
  * @returns {Promise<EmphasisCoverageChild>}
  */
-export async function runCoverageChild(request, timeline = createPhaseTimeline("Unreported")) {
+export async function runCoverageChild(
+  request,
+  timeline = createPhaseTimeline("Unreported"),
+  signal = undefined,
+) {
+  signal?.throwIfAborted();
   const childFile = fileURLToPath(
     new URL("./parser-emphasis-production-child.mjs", import.meta.url),
   );
@@ -503,6 +609,8 @@ export async function runCoverageChild(request, timeline = createPhaseTimeline("
         windowsHide: true,
         timeout: 25000,
         maxBuffer: 32 * 1024 * 1024,
+        // Node.js kills the child when the test is cancelled (#995).
+        signal,
       },
       (error, stdout, stderr) => {
         timeline.mark("child-closed", {

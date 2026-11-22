@@ -22,6 +22,11 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 
 ### Fixed
 
+- Keep using the Prettier configuration when `.prettierignore` has an entry that
+  repeats `**/`, such as `**/**/*.md`. Prettier 3.9 and earlier format the
+  Markdown at the root under such an entry, but mdrefine took it as excluding
+  all Markdown and applied its defaults instead
+  ([#990](https://github.com/viell-dev/slop-markdown-tools/issues/990)).
 - Outside Windows, read a backslash in a document's path as part of its name, as
   `ignore` and file selection already do. `overrides[].files`, a code
   formatter's `exclude`, link checks and `audit reachability` entries now match
@@ -47,6 +52,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Print each phase's time when a parser emphasis registration-mutant test fails
   or times out, to show which step slows on hosted Windows
   ([#992](https://github.com/viell-dev/slop-markdown-tools/issues/992)).
+- Stop a timed-out parser emphasis registration-mutant test's copying and
+  coverage child, and remove its temporary copy
+  ([#995](https://github.com/viell-dev/slop-markdown-tools/issues/995)).
 
 ## 0.8.5 - 2026-11-21
 
