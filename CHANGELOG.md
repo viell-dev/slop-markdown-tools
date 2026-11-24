@@ -66,6 +66,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Document what reviews judge in the code, and how a security fix skips the
   seven-day wait for new dependency versions
   ([#1006](https://github.com/viell-dev/slop-markdown-tools/pull/1006)).
+- Update `sentence-splitter` to 5.1.0, which rewrites sentence scanning and
+  drops the transitive `structured-source` and `boundary` dependencies
+  ([#1005](https://github.com/viell-dev/slop-markdown-tools/pull/1005)).
 
 ## 0.8.5 - 2026-11-21
 
