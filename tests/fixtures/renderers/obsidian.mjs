@@ -2,8 +2,8 @@
 // Obsidian's own syntax, which the HTML renderers of tests/unit/renderers.test.ts do not know,
 // the cases where one of Obsidian's views showed what the HTML renderers did not (#15, #306,
 // #391, #395, #397, #398, #399, #404, #405, #407, #408, #409, #411, #414,
-// #428, #429, #433, #434, #435, #436, #437, #438, #439, #441), and those that the check has to read with care
-// (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
+// #428, #429, #433, #434, #435, #436, #437, #438, #439, #441, #1008), and those that the check
+// has to read with care (#385, #400, #401, #403, #406, #410, #421). Each paragraph is long enough
 // that formatting at 30 or 80 columns reflows it, unless the tool leaves it as written. Every word
 // is synthetic.
 
@@ -541,6 +541,54 @@ export const fixtures = [
     name: "label inside a paragraph",
     source:
       "Some words before the label [a]: tail words after it, enough of them to be reflowed at a narrow width.\n",
+  },
+  {
+    // #1008: at 80 columns in the first list and quote and at 30 in the second, a line would start
+    // with math before `>`, which Live Preview shows as a quote; the math stays on the line before.
+    name: "math before a greater-than sign in containers",
+    source:
+      "- The estimate holds for every sample in the set because the bounded value is $x$ > 5 and stays within it.\n\nBetween the lists.\n\n1. The estimate holds for now $x$> 5 and stays within it.\n   - The bounded value here $x$ $z$ > 5 and stays.\n\n> The estimate holds for every sample in the set because the bounded value is $x$ > 5 and stays within it.\n\nBetween the quotes.\n\n> The estimate holds for now a $x$ >= 5 and stays within it.\n\n> [!note] Title\n> The estimate holds for now a $x$ > 5 and stays within it.\n",
+  },
+  {
+    // #1008: at 80 columns, the first paragraph's line would start with math, below which Live
+    // Preview shows the last paragraph as a quote.
+    name: "math line introduced above a greater-than sign",
+    source:
+      "The estimate holds for every sample in the set because the bounded value there $y$ stays within the limit that was given above.\n\n- A list between them.\n\n$x$ > 5 holds for the rest.\n",
+  },
+  {
+    // #1008: the same at 30 columns, above a paragraph that keeps its lines.
+    name: "math line introduced above a hard break",
+    source:
+      "The estimate holds for now and $y$ stays within the limit.\n\nWords before a hard break  \n$x$ > 5 holds for the rest.\n",
+  },
+  {
+    // #1008: joining the first paragraph's lines would show the last paragraph as text again.
+    name: "only math line above a greater-than sign",
+    source:
+      "The bounded value\n$y$ stays within the limit that was given.\n\n$x$ > 5 holds for the rest, with enough *words* to be reflowed at a narrow width.\n",
+  },
+  {
+    // #1008: the lines that Live Preview already shows as quotes, and the text around them.
+    name: "existing lines of math before a greater-than sign",
+    source:
+      "- The bounded value\n  $x$ > 5 holds for the rest.\n- Some *words* in an item, enough for the text to wrap at thirty columns.\n\n> $x$ > 5 holds for the rest, with enough words to be reflowed at a narrow width.\n\n$y$ leads.\n\nThe bounded value\n$x$ > 5 holds for the rest.\n\n- A second paragraph\n\n  $x$ > 5 holds for the rest, with enough words to be reflowed at a narrow width.\n\n$x$ > 5 holds for the rest, with enough *words* to be reflowed at a narrow width.\n",
+  },
+  {
+    // #1008: controls, whose lines start with math at 80 and at 30 columns.
+    name: "math lines without a greater-than sign after them",
+    source:
+      "- The estimate holds for every sample in the set because the bounded value there $x$, > 5, stays within it.\n- The estimate holds for now a $x$ < 5 and stays within it.\n- The estimate holds for now a $x > 5$ and stays within it.\n\nThe estimate holds for every sample in the set because the bounded value there $y$ stays within the limit.\n\nThe estimate holds for now and $y$ stays within the limit.\n\nThe bounded value $x$ > 5 holds, and so does $x$ for the rest.\n",
+  },
+  {
+    // #1008: controls, where no line above or a line that stays in place decides about the `>`.
+    name: "math lines around a greater-than sign that shows the same",
+    source:
+      "Some words\n$z$ leads.\n\n$$\nz\n$$\n\nThe estimate holds for every sample in the set because the bounded value there $y$ stays within the limit.\n\nThe bounded value\n$y$ stays.\n\n$x$ > 5 holds for the rest, with enough *words* to be reflowed at a narrow width.\n",
+  },
+  {
+    name: "unaffected line of math before a greater-than sign",
+    source: "The bounded value\n$x$ > 5 holds for the rest, enough words to be reflowed.\n",
   },
   {
     // #409: at 30 columns, the line would break before `#glacier`, which Live Preview reads as

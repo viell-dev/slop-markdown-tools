@@ -1830,6 +1830,243 @@ describe("a tag directly after a block quote marker written without a space", ()
   });
 });
 
+describe("inline math at the start of a line before a greater-than sign (#1008)", () => {
+  // Live Preview reads what follows math at the start of a line as the start
+  // of a block, and shows a `>` there as a quote marker.
+  const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
+  const obsidian = (options: Record<string, unknown> = {}): Config => ({
+    ...wrap({ width: 30, ...options }),
+    dialect: "obsidian",
+  });
+  const checked = (source: string, options?: Record<string, unknown>) => {
+    const { output } = verify(source, obsidian(options), workspace);
+    for (const newline of ["\r\n", "\r"])
+      expect(verify(source.replaceAll("\n", newline), obsidian(options), workspace).output).toBe(
+        output.replaceAll("\n", newline),
+      );
+    expect(format(source, { config: { extends: [] }, workspace }).output).toBe(source);
+    return output;
+  };
+
+  it.each([
+    ["", ""],
+    ["- ", "  "],
+    ["1. ", "   "],
+    ["- a\n  - ", "    "],
+    ["> ", "> "],
+    ["> [!note] Title\n> ", "> "],
+    [" ", " "],
+    ["- [ ] ", "      "],
+  ])("keeps the math on the line before it after %j", (prefix, continuation) => {
+    const filler = "x".repeat(30 - continuation.length - 5);
+    for (const math of [
+      "$x$ >",
+      "$x$>",
+      "$x$ >=",
+      "$$x$$ >",
+      "$x$ $z$ >",
+      "$x$ $$z$$>",
+      "$x$\u00a0>",
+    ])
+      expect(checked(`${prefix}${filler} word ${math} 5 ends.\n`)).toBe(
+        `${prefix}${filler}\n${continuation}word ${math} 5 ends.\n`,
+      );
+  });
+  it.each([
+    "$x$, >",
+    "$x$ and >",
+    "$x$ <",
+    "$x > 5$ is",
+    "$x$ ->",
+    "$x$ =>",
+    "$x$ \\>",
+    "$x$ &gt;",
+    "$x$ `>`",
+    "*$x$* >",
+    "`$x$` >",
+    "$5 >",
+  ])("still starts a line with %s", (text) => {
+    for (const [prefix, continuation] of [
+      ["", ""],
+      ["- ", "  "],
+      ["> ", "> "],
+    ] as const) {
+      const filler = "x".repeat(30 - continuation.length - 5);
+      const output = checked(`${prefix}${filler} word ${text} 5 ends.\n`);
+      expect(output).toBe(`${prefix}${filler} word\n${continuation}${text} 5 ends.\n`);
+    }
+  });
+
+  it.each([
+    // With indentation or a quote marker, Live Preview shows the line as a quote already.
+    "- Some words\n  $x$ > 5 and more words here.\n",
+    "1. Some words\n   $x$> 5 and more words here.\n",
+    "- Some words\n  $x$ $z$ > 5 and more words here.\n",
+    "- Some *words\n  $x$ > 5* and more words here.\n",
+    "> Some words\n> $x$ > 5 and more words here.\n",
+    "> - Some words\n>   $x$ > 5 and more words here.\n",
+    "Some words\n $x$ > 5 and more words here.\n",
+    // At the first column it does below a line that starts with math there.
+    "$y$ leads.\n\nSome words\n$x$ > 5 and more words here.\n",
+    "$$\ny\n$$\n\nSome words\n$x$ > 5 and more words here.\n",
+    "$y$ leads the words\n$x$ > 5 and more words here.\n",
+    "$y$ leads.\n\n> Some words\n$x$ > 5 and more words here.\n",
+    // A quote's first line shows a nested quote, which its other lines are not in.
+    "> $x$ > 5 and more words than fit here.\n",
+    "> Words.\n>\n> $x$ > 5 and more words\n> than fit.\n",
+  ])("keeps the lines of %j as written", (source) => {
+    expect(checked(source)).toBe(source);
+    expect(checked(source, { mode: "never" })).toBe(source);
+    expect(
+      lint(source, {
+        config: obsidian({ width: 20, reportUnreflowed: true }),
+        workspace,
+      }).map(({ message }) => message),
+    ).toContain(
+      "Paragraph not reflowed: line that Live Preview reads as a quote after its math (width 20 columns).",
+    );
+  });
+  it.each([
+    // Nothing above makes Live Preview read a quote at the first column.
+    ["Some words\n$x$ > 5 and more words here.\n", "Some words $x$ > 5 and more\nwords here.\n"],
+    [
+      "- $y$ leads.\n\nSome words\n$x$ > 5 and more words here.\n",
+      "- $y$ leads.\n\nSome words $x$ > 5 and more\nwords here.\n",
+    ],
+    // A paragraph's first line shows the same quote with the words of its other lines.
+    ["$x$ > 5 and more words than fit here.\n", "$x$ > 5 and more words than\nfit here.\n"],
+    [
+      "$y$ leads.\n\n$x$ > 5 and more words than fit here.\n",
+      "$y$ leads.\n\n$x$ > 5 and more words than\nfit here.\n",
+    ],
+    ["- $x$ > 5 and more words than fit here.\n", "- $x$ > 5 and more words than\n  fit here.\n"],
+    [
+      "- Words.\n\n  $x$ > 5 and more words than fit here.\n",
+      "- Words.\n\n  $x$ > 5 and more words than\n  fit here.\n",
+    ],
+  ])("reflows %j, which Live Preview shows the same", (source, output) => {
+    expect(checked(source)).toBe(output);
+  });
+
+  describe("below which Live Preview would read another line otherwise", () => {
+    const below = "\n\n$x$ > 5 holds.\n";
+    const wide = "Enough words to fill the line $y$ ends.";
+    it("makes no line above it the first that starts with math", () => {
+      expect(checked(wide + below)).toBe(`Enough words to fill the\nline $y$ ends.${below}`);
+      // Any paragraph above it counts, and also one directly above.
+      const twice = `${wide}\n\nWords.\n\n${wide}`;
+      expect(checked(twice + below)).toBe(
+        `Enough words to fill the\nline $y$ ends.\n\nWords.\n\nEnough words to fill the\nline $y$ ends.${below}`,
+      );
+      // The line can also be one that this paragraph's own reflow leaves in place.
+      const hard = "\n\nWords  \n$x$ > 5 holds.\n";
+      expect(checked(wide + hard)).toBe(`Enough words to fill the\nline $y$ ends.${hard}`);
+    });
+    it("keeps the first line that starts with math", () => {
+      for (const start of ["Some words", "> Some words"]) {
+        const source = `${start}\n$y$ ends.${below}`;
+        expect(checked(source)).toBe(source);
+        expect(checked(source, { mode: "never" })).toBe(source);
+        expect(
+          lint(source, {
+            config: obsidian({ width: 20, reportUnreflowed: true }),
+            workspace,
+          }).map(({ message }) => message),
+        ).toEqual([]);
+      }
+      // Only the first such line matters, and it stays the first.
+      expect(checked(`${wide}\n\nSome words\n$y$ ends.\n\nSome words\n$z$ ends.${below}`)).toBe(
+        `Enough words to fill the\nline $y$ ends.\n\nSome words\n$y$ ends.\n\nSome words $z$ ends.${below}`,
+      );
+      // A line that is not a quote itself makes a later one a quote.
+      const second = `Some words\n$x$ > 5 ends.${below}`;
+      expect(checked(second)).toBe(second);
+    });
+    it("reports why it keeps that line", () => {
+      const source = `Some words that are long enough\n$y$ ends.${below}`;
+      const config = obsidian({ reportUnreflowed: true });
+      expect(verify(source, config, workspace).output).toBe(source);
+      expect(lint(source, { config, workspace }).map(({ message }) => message)).toEqual([
+        "Paragraph not reflowed: math at the start of a line, which decides how Live Preview shows a line below (width 30 columns).",
+      ]);
+    });
+    it.each(["$z$ leads.", "$$\nz\n$$", "$$z$$", "$z$ leads\n==="])(
+      "reflows around a line that stays in place, as of %j",
+      (stays) => {
+        const between = `\n\n${stays}`;
+        expect(checked(`Some words\n$y$ ends.${between}${below}`)).toBe(
+          `Some words $y$ ends.${between}${below}`,
+        );
+        expect(checked(`${wide}${between}${below}`)).toBe(
+          `Enough words to fill the line\n$y$ ends.${between}${below}`,
+        );
+      },
+    );
+    it.each([
+      "\n\n$x$ holds.\n",
+      "\n\n$x$, > 5 holds.\n",
+      "\n\n$x$ < 5 holds.\n",
+      "\n\n$x > 5$ holds.\n",
+      "\n\nThen $x$ > 5 holds.\n",
+      "\n\n- $x$ > 5 holds.\n",
+      "\n\n# $x$ > 5 holds\n",
+      // These show as a quote whatever is above them.
+      "\n\n> $x$ > 5 holds.\n",
+      "\n\n- Then\n\n  $x$ > 5 holds.\n",
+      "\n",
+    ])("reflows above %j, which shows the same either way", (text) => {
+      expect(checked(wide + text)).toBe(`Enough words to fill the line\n$y$ ends.${text}`);
+      expect(checked(`Some words\n$y$ ends.${text}`)).toBe(`Some words $y$ ends.${text}`);
+    });
+    it("reflows below the line and inside containers", () => {
+      expect(checked(`$x$ > 5 holds.\n\n${wide}\n`)).toBe(
+        "$x$ > 5 holds.\n\nEnough words to fill the line\n$y$ ends.\n",
+      );
+      expect(checked(`- ${wide}${below}`)).toBe(
+        `- Enough words to fill the\n  line $y$ ends.${below}`,
+      );
+      expect(checked(`> Enough words to fill a line $y$ ends.${below}`)).toBe(
+        `> Enough words to fill a line\n> $y$ ends.${below}`,
+      );
+    });
+  });
+
+  it("breaks no sentence before the math", () => {
+    const sentences = { mode: "sentences", width: 60 };
+    expect(checked("- This holds. $x$ > 5 follows. Then more.\n", sentences)).toBe(
+      "- This holds. $x$ > 5 follows.\n  Then more.\n",
+    );
+    expect(checked("- This holds. $x$ follows. Then more.\n", sentences)).toBe(
+      "- This holds.\n  $x$ follows.\n  Then more.\n",
+    );
+    expect(checked("This holds. $y$ follows.\n\n$x$ > 5 holds.\n", sentences)).toBe(
+      "This holds. $y$ follows.\n\n$x$ > 5 holds.\n",
+    );
+  });
+  it("keeps a lazy line that starts with math under style/lazy-continuation", () => {
+    const config: Config = { extends: ["recommended", "obsidian"] };
+    for (const source of [
+      "- Some words\n$x$ > 5 holds.\n",
+      "> Some words\n$x$ > 5 holds.\n",
+      "- Some words\n$y$ ends.\n\n$x$ > 5 holds.\n",
+    ])
+      expect(
+        format(source, {
+          config: { ...config, rules: { "style/wrap": "off" } },
+          workspace,
+        }).output,
+      ).toBe(source);
+  });
+  it("starts a line with the math in the other dialects", () => {
+    for (const dialect of dialects.filter((name) => name !== "obsidian"))
+      expect(
+        verify(`- ${"x".repeat(23)} word $x$ > 5 ends.\n`, { ...wrap({ width: 30 }), dialect })
+          .output,
+        dialect,
+      ).toBe(`- ${"x".repeat(23)} word\n  $x$ > 5 ends.\n`);
+  });
+});
+
 describe("tag-like text on a continuation line directly after a bare quote marker (#414)", () => {
   const workspace = createWorkspace({}, { dialect: "obsidian", strictLineBreaks: true });
   const obsidian = (width: number): Config => ({ ...wrap({ width }), dialect: "obsidian" });

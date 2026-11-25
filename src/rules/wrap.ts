@@ -4,6 +4,7 @@ import stringWidth from "string-width";
 import type { InlineCode, Paragraph, Parents } from "mdast";
 import type { Finding, Rule } from "../core/types.js";
 import { blockIdentifier } from "../syntax/block-identifier.js";
+import { type ObsidianMathLines, obsidianMathLines } from "../syntax/obsidian-math-lines.js";
 import { definitionLike } from "../syntax/obsidian-protections.js";
 import { vitepressCodeText, vitepressProtection } from "../syntax/vitepress/projection.js";
 import {
@@ -26,10 +27,12 @@ import { sentenceBreaks } from "./sentence-breaks.js";
  * Where dollar math could begin or end at the edge of a line although it does
  * not at a space: `start` when a dollar at the start of a line can end math
  * that a dollar before it began, and `end` for the words whose last dollar can
- * begin math at the end of a line, which a dollar after it could end.
+ * begin math at the end of a line, which a dollar after it could end. With
+ * `first`, the first dollar of the text may not start a line either.
  */
 interface DollarEdges {
   start: boolean;
+  first?: boolean;
   end?: (atom: string) => boolean;
 }
 
@@ -56,7 +59,7 @@ function wrappingAtoms(words: string[], openers: RegExp[], dollars?: DollarEdges
     if (
       joined.length &&
       (openers.some((opener) => opener.test(atom)) ||
-        (dollars?.start && dollarBefore && atom.startsWith("$")))
+        (dollars?.start && (dollars.first || dollarBefore) && atom.startsWith("$")))
     )
       joined[joined.length - 1] += ` ${atom}`;
     else joined.push(atom);
@@ -618,6 +621,7 @@ function blankLineComments(document: Document): ReadonlySet<Paragraph> {
 
 interface WrapContext extends Pick<RuleContext, "document" | "options"> {
   blankCommentParagraphs: ReadonlySet<Paragraph>;
+  mathLines: ObsidianMathLines;
   syntaxPlugins: boolean;
   width: number;
   measure: (text: string) => number;
@@ -936,6 +940,27 @@ function paragraphSkipReason(
   return skipped;
 }
 
+/**
+ * Why a line of the paragraph that starts with inline math must stay for
+ * Obsidian's Live Preview to show the same (issue #1008), given where the
+ * paragraph's inline math starts.
+ */
+function mathLineReason(
+  { start, prefix }: PreparedParagraph,
+  mathStarts: number[],
+  { quotes, kept }: ObsidianMathLines,
+): string | undefined {
+  for (const at of mathStarts) {
+    // The quote that Live Preview reads on a paragraph's first line continues
+    // on its other lines, however they break, except in a quote.
+    if (quotes.has(at) && (at > start || (at === start && prefix.includes(">"))))
+      return "line that Live Preview reads as a quote after its math";
+    if (at === kept)
+      return "math at the start of a line, which decides how Live Preview shows a line below";
+  }
+  return undefined;
+}
+
 /** Propose wrapping and overflow findings for one located paragraph. */
 function wrapParagraph(
   node: Paragraph,
@@ -974,12 +999,23 @@ function wrapParagraph(
   // lone `$`, stays on the line of the word after it when a dollar comes
   // after it. Forgejo and Gitea have neither condition.
   const maths: string[] = [];
+  const mathStarts: number[] = [];
   if (document.dialect === "obsidian")
     walk(node, "inlineMath", (math) => {
       maths.push(source.slice(...range(math)));
+      mathStarts.push(range(math)[0]);
     });
+  // The paragraph's first dollar stays on the line of the word before it too
+  // where it begins math at the start of a line that Live Preview would read as
+  // a quote, or that would make it read a line further down so (issue #1008).
+  const { mathLines } = context;
+  const firstMath = mathStarts.find((at) => at >= start);
   const dollars: DollarEdges = {
     start: document.dialect === "github" || document.dialect === "obsidian",
+    first:
+      firstMath !== undefined &&
+      source.indexOf("$", start) === firstMath &&
+      (mathLines.opening.has(firstMath) || (!continuation && firstMath < mathLines.guarded)),
     ...(document.dialect === "obsidian"
       ? {
           end: (atom: string) => dollarEnd.test(atom) && !maths.some((math) => atom.endsWith(math)),
@@ -1054,7 +1090,8 @@ function wrapParagraph(
   };
   const skipped = context.blankCommentParagraphs.has(node)
     ? "Obsidian comment crossing a blank line"
-    : paragraphSkipReason(document, prepared, inline, protections.reason);
+    : (paragraphSkipReason(document, prepared, inline, protections.reason) ??
+      mathLineReason(prepared, mathStarts, mathLines));
   if (skipped) {
     reportSkipped(skipped);
     return;
@@ -1188,6 +1225,7 @@ const wrap: Rule = {
       unit,
       newline,
       blankCommentParagraphs: blankLineComments(document),
+      mathLines: obsidianMathLines(document),
       syntaxPlugins: hasSyntaxPlugins(document),
     };
     walk(document.tree, "paragraph", (node, index, parent) =>
