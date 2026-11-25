@@ -33,6 +33,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   as `sub/a\b.md` by its own name, not as `sub/a/b.md`. On Windows a backslash
   still separates folders
   ([#1000](https://github.com/viell-dev/slop-markdown-tools/issues/1000)).
+- In Obsidian, `style/wrap` no longer starts a line with inline math that a `>`
+  follows, such as `$x$ > 5`, where Live Preview hides the `>` and shows the
+  line as a quote, nor changes how Live Preview shows such a line further down
+  ([#1008](https://github.com/viell-dev/slop-markdown-tools/issues/1008)).
 
 ### Maintenance
 

@@ -87,6 +87,8 @@ cases are unusual source forms:
 - `=` or `-` underlines that one view reads as a heading and the other as text;
 - tables that one view reads otherwise, such as rows directly below a list, a
   fence, or a footnote;
+- lines that start with inline math and a `>` after it, such as `$x$ > 5`, which
+  Live Preview can show as quotes;
 - footnote definitions, link reference definitions, display math, and `%%`
   comments directly beside other blocks.
 

@@ -189,6 +189,15 @@ Preview in mind:
   colon line also keeps the following destination line, even across blank lines.
   A list's marker line still wraps normally, because it shows the label and
   destination as text.
+- No new line starts with inline math that a `>` follows, such as `$x$ > 5`:
+  Live Preview can hide the `>` there and show the rest of the line as a quote.
+  The math stays on the line of the word before it. A `>` after other text, as
+  in `$x$, > 5`, or inside the math does not count.
+- At the first column, Live Preview shows such a line as a quote only below
+  another line that starts with math there, anywhere above it in the note.
+  Reflow therefore neither makes nor removes the first such line above one that
+  starts like `$x$ > 5`. Math starts a line as usual where no line like that
+  follows, or below a math line that stays in place, such as a `$$` block.
 - In a block quote whose markers are written without a space after them, such as
   `>text`, a tag such as `#tag` stays on the line before it, because Live
   Preview reads a tag directly after `>` as text.
@@ -213,6 +222,12 @@ In Obsidian, a paragraph is also left as written when it:
 - has a definition-like label that already spans lines, contains a nested
   opening bracket, or has a tab after its colon: reflow changes Live Preview's
   link styling;
+- has a later line that Live Preview already shows as a quote because it starts
+  with math and a `>`, such as `$x$ > 5`, or, in a block quote, a first line
+  that starts so;
+- has a later line that is the note's first to start with math at the first
+  column, where joining it would change how Live Preview shows a line further
+  down;
 - opens a block quote on a list item's marker line, such as `- > words`: Live
   Preview shows the first line as list text with a literal `>` and only
   continuation lines as a quote. Its first paragraph stays as written, while

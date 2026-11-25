@@ -145,6 +145,36 @@ note shows there, the tool keeps the text as written:
   directly after `>`, its paragraph stays as written: joining it to the line
   above would create a tag in Live Preview. A tag-like word on the paragraph's
   first line stays after the same marker, so that paragraph can reflow.
+- A line that starts with inline math and, after it, blank space or more math
+  and a `>`, as in `$x$ > 5` or `$x$ $z$> 5`. Live Preview resumes reading at
+  block level after math that starts a line's content, so it hides the `>` and
+  shows the rest of the line as a quote, where Reading view shows text. It does
+  so on a line with indentation or a quote marker before the math. On a line
+  that starts with the math at the first column, also a lazy one, it does so
+  only below an earlier line that starts with math at the first column; nothing
+  between them ends that. Such an earlier line can be a paragraph's, an
+  underlined heading's, or a lazy line, also where the math is in emphasis or a
+  link's text that started on the line above, or one of display math. Math
+  inside a list item, block quote, footnote definition, `#` heading, or a table
+  with leading pipes is not at the first column. A list item's or footnote's
+  first line, and a line indented by four or more columns from its container's
+  content, as a task item's wrapped lines are, show text.
+
+  `style/wrap` starts no line with such math, whatever the container: an earlier
+  dollar in the paragraph already keeps later ones off the start of a line, so
+  only the paragraph's first math needs it. A paragraph with a later line that
+  Live Preview shows as a quote so stays as written, and in a block quote also
+  one whose first line does; elsewhere the quote that starts on a paragraph's
+  first line continues on its other lines, however they break. A later line that
+  shows text because of its indentation stays too. Where a line at the first
+  column has such math, `style/wrap` starts no line above the note's first math
+  line with math, and leaves the paragraph that holds that line beyond its own
+  first line as written, unless a math line that stays in place decides the
+  same. `style/lazy-continuation` rewrites no lazy line that starts with `$`.
+  Math followed by four spaces, a Tab, or a label and `]:` is read at block
+  level too, and has no protection of its own (#1008). Math lines that
+  `style/table` moves, or that stand in a `%%` comment block, and two formulas
+  without a space between them are not covered either (#1009).
 - A fenced code block that a list item or block quote ends before its closing
   fence, as in `` - ``` `` and `Text` below it. Obsidian reads the lines below
   as more of the code: Reading view those directly below the list or quote, Live
