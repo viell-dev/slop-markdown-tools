@@ -244,26 +244,30 @@ selects discovery: one fresh seed and 100 documents. `SEEDS` selects a list,
 `OBSIDIAN_VERSION` and `OBSIDIAN_INSTALLER_VERSION` override the app and
 installer independently. They default to the verified versions in
 `scripts/obsidian/baseline.json`; read its `app` and `installer` fields for the
-selected versions. Realistic generation uses separated blocks, proper container
-prefixes, closed fences and documented dialect syntax. Existing adversarial seed
-behavior is retained. `REDUCE`, a comma-separated list of generated documents
-from a report, shortens each to the lines that still show its difference, and
-`PROBE`, a JSON array of documents, only shows each in Obsidian. Live Preview is
-compared by its lines' text and styles, with the characters that it shows as
-written left out where only the source differs, and Reading view by its HTML.
-List-number normalization applies to styled ordered markers and source-only list
-prefixes before lines join; ordinary numbers and numeric hash-prefixed text
-retain their digits. The check requires the editor to finish parsing the whole
-note and publish that syntax tree before collecting styles; incomplete parsing
-fails the run. Empty table source rows with no text or embed are ignored. Table
-widgets ignore their known focus and active-handle classes and a generated cell
-editor only when the cell also retains its rendered preview. Rendered content,
-styles, code spacing, alignment, link destinations, and row counts remain
-significant. A host control activates header, code, and link cells with real
-input and checks those negative cases; nested authored tables and editor-only
-payload remain intact. Boundary regressions in
-`tests/fixtures/renderers/obsidian-boundaries.mjs` are shared with the unit
-suite, including the long synthetic note in
+selected versions. The comparison has 30 minutes, Mocha's limit in
+`scripts/obsidian/wdio.conf.mjs`, which keeps a stalled run below the workflow's
+60-minute job limit so that it still writes its report. A run with one
+adversarial seed of 100 documents takes about 20 minutes; keep `COUNT` at 100 or
+less and run further seeds separately, each with `SEED=none`. Realistic
+generation uses separated blocks, proper container prefixes, closed fences and
+documented dialect syntax. Existing adversarial seed behavior is retained.
+`REDUCE`, a comma-separated list of generated documents from a report, shortens
+each to the lines that still show its difference, and `PROBE`, a JSON array of
+documents, only shows each in Obsidian. Live Preview is compared by its lines'
+text and styles, with the characters that it shows as written left out where
+only the source differs, and Reading view by its HTML. List-number normalization
+applies to styled ordered markers and source-only list prefixes before lines
+join; ordinary numbers and numeric hash-prefixed text retain their digits. The
+check requires the editor to finish parsing the whole note and publish that
+syntax tree before collecting styles; incomplete parsing fails the run. Empty
+table source rows with no text or embed are ignored. Table widgets ignore their
+known focus and active-handle classes and a generated cell editor only when the
+cell also retains its rendered preview. Rendered content, styles, code spacing,
+alignment, link destinations, and row counts remain significant. A host control
+activates header, code, and link cells with real input and checks those negative
+cases; nested authored tables and editor-only payload remain intact. Boundary
+regressions in `tests/fixtures/renderers/obsidian-boundaries.mjs` are shared
+with the unit suite, including the long synthetic note in
 `tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
 delimiter of styled list lines, including checkbox widgets, and normalizes
 spaces within and around italic and bold runs while keeping styled characters,
