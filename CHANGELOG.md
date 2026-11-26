@@ -76,6 +76,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - The Obsidian check no longer reports a Setext title with leading math below a
   line that starts with math, where only an invisible space changes style
   ([#1007](https://github.com/viell-dev/slop-markdown-tools/issues/1007)).
+- Document that the Obsidian check's comparison stops after 30 minutes, about
+  one adversarial seed of 100 documents
+  ([#1012](https://github.com/viell-dev/slop-markdown-tools/issues/1012)).
 
 ## 0.8.5 - 2026-11-21
 
