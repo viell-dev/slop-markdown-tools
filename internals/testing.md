@@ -267,23 +267,28 @@ suite, including the long synthetic note in
 `tests/fixtures/renderers/obsidian/508.txt`. The comparison retains the source
 delimiter of styled list lines, including checkbox widgets, and normalizes
 spaces within and around italic and bold runs while keeping styled characters,
-code, highlights, and decorations significant. Unchecked checkbox widgets retain
-their presence and count even with no text. Styled fence delimiters ignore only
-their terminal spaces and tabs; code body whitespace and internal info-string
-spacing remain significant. A host control checks both the normalization and
-those negative cases. Native heading lines and Setext underlines retain heading
-boundaries independently of optional blank separators; host controls retain
-changes to their count, levels, text, styles, and embeds, including
-single-character underlines and empty headings. Unstyled records emptied by
-punctuation normalization are omitted after grouping, so their removal cannot
-join visible paragraphs. Styled records, code, and widgets remain significant.
-For the default Obsidian theme, a lone unattributed paragraph directly inside a
-list item has no extra spacing and is compared as inline content. Multiple
-paragraphs, attributed paragraphs, and other block boundaries remain
-significant; a deterministic host control checks these cases on every comparison
-run. The Obsidian workflow runs the check for pull requests with an [applicable
-native input](verification.md#what-the-checks-prove), in the Release workflow,
-and by hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
+code, highlights, and decorations significant. The blank space after a Setext
+title's leading math is compared as plain: Live Preview styles it as the title
+or not depending on lines above, and in the default theme a title shows both
+alike. A host control measures that the words stay in place and keeps the level,
+text, a missing space, visible styles, code, heading typography, and block
+changes significant. Unchecked checkbox widgets retain their presence and count
+even with no text. Styled fence delimiters ignore only their terminal spaces and
+tabs; code body whitespace and internal info-string spacing remain significant.
+A host control checks both the normalization and those negative cases. Native
+heading lines and Setext underlines retain heading boundaries independently of
+optional blank separators; host controls retain changes to their count, levels,
+text, styles, and embeds, including single-character underlines and empty
+headings. Unstyled records emptied by punctuation normalization are omitted
+after grouping, so their removal cannot join visible paragraphs. Styled records,
+code, and widgets remain significant. For the default Obsidian theme, a lone
+unattributed paragraph directly inside a list item has no extra spacing and is
+compared as inline content. Multiple paragraphs, attributed paragraphs, and
+other block boundaries remain significant; a deterministic host control checks
+these cases on every comparison run. The Obsidian workflow runs the check for
+pull requests with an [applicable native
+input](verification.md#what-the-checks-prove), in the Release workflow, and by
+hand with `gh workflow run obsidian.yml --ref BRANCH`, with the inputs
 `profile`, `seed`, `count`, `obsidian-version`, and
 `obsidian-installer-version`; its `obsidian` artifact holds the report and
 screenshots. It fails when the check compared nothing. PR and release gates

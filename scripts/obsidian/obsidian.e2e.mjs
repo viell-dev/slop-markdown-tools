@@ -400,7 +400,12 @@ function livePreview(lines) {
     const level = line.runs
       .map(([classes]) => /\bcm-header-(\d)\b/.exec(classes)?.[1])
       .find(Boolean);
-    if (!line.kind && level) line.kind = `HyperMD-header HyperMD-header-${level}`;
+    if (!line.kind && level)
+      line = {
+        ...line,
+        kind: `HyperMD-header HyperMD-header-${level}`,
+        runs: plainAfterLeadingMath(line.runs),
+      };
     const code = line.kind.includes("HyperMD-codeblock");
     // A code block in a list item shows the list's indentation, which the list rules choose, on
     // each of its lines: the blank space before the item's marker on the line that opens the
@@ -621,6 +626,30 @@ function livePreview(lines) {
 function afterQuotes(runs) {
   const start = runs.findIndex(([classes]) => !/\bcm-formatting-quote\b/.test(classes));
   return start < 0 ? [] : runs.slice(start);
+}
+
+/**
+ * A Setext title line's runs with the heading style taken off the blank space after its leading
+ * math. Below an earlier line that starts with math, Live Preview leaves that space out of the
+ * title's styled text (#1008). In the default theme a title line, unlike a native heading line,
+ * shows that style as plain text, so the space looks the same either way (#1007). Other runs
+ * keep their styles.
+ */
+function plainAfterLeadingMath(runs) {
+  const result = [];
+  let math = false;
+  for (const [index, [classes, value]] of runs.entries()) {
+    const blank = /^\s*/.exec(value)[0];
+    if (/\bmath\b/.test(classes)) math = true;
+    else if (math && blank && /^cm-header-\d$/.test(classes)) {
+      result.push(["", blank]);
+      // A run of blank space only, which another widget or a styled run can follow.
+      if (blank === value) continue;
+      return [...result, [classes, value.slice(blank.length)], ...runs.slice(index + 1)];
+    } else if (classes || blank !== value) return [...result, ...runs.slice(index)];
+    result.push([classes, value]);
+  }
+  return result;
 }
 
 /** How many characters of blank space a line starts with after its quote markers. */
@@ -987,6 +1016,132 @@ describe("Obsidian before and after formatting", function () {
         JSON.stringify(livePreview(globalThis.structuredClone(after.lines)));
       expect({ name, same }).toEqual({ name, same: equal });
     }
+  });
+
+  it("compares the blank space after a Setext title's leading math as plain (#1007)", async function () {
+    if (probe || reduce) this.skip();
+    // Wrapping the paragraph so that a line starts with math changes how Live Preview styles
+    // the space after the title's leading math below it (#1008).
+    const plain = "alpha $y$ beta\n\n";
+    const shifted = "alpha\n$y$ beta\n\n";
+    const title = "$x^2$ ember amber\n---\n";
+    /** The same title below each form of the paragraph. */
+    const both = (source, equal = true) => [plain + source, shifted + source, equal];
+    const cases = [
+      ["reported title", ...both(title)],
+      ["level 1 title", ...both("$x^2$ ember amber\n===\n")],
+      ["emphasis after the math", ...both("$x^2$ *ember* amber\n---\n")],
+      ["two leading widgets", ...both("$x^2$ $y$ ember\n---\n")],
+      ["math on a later title line", ...both("ember\n$x^2$ amber\n---\n")],
+      ["heading level", plain + title, shifted + "$x^2$ ember amber\n===\n", false],
+      ["title text", plain + title, shifted + "$x^2$ other amber\n---\n", false],
+      ["missing space", plain + "$x^2$ember amber\n---\n", shifted + title, false],
+      ["visible style", plain + title, shifted + "$x^2$ ==ember== amber\n---\n", false],
+      ["space before code", plain + "$x^2$ `ember`\n---\n", shifted + "$x^2$`ember`\n---\n", false],
+      [
+        "native heading typography (#569)",
+        plain + title,
+        shifted + "## $x^2$ ember amber\n",
+        false,
+      ],
+      ["quote after the math (#1008)", ...both("$x^2$ > 5 ember\n---\n", false)],
+      ["indented code after the math (#1008)", ...both("$x^2$    ember amber\n---\n", false)],
+    ];
+    /** The words of the line that shows `x^2`, placed relative to that line, in Live Preview. */
+    const words = (path) =>
+      browser.executeObsidian(async ({ app, require }, path) => {
+        const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const leaf = app.workspace.getLeaf(false);
+        await leaf.openFile(app.vault.getFileByPath(path), {
+          active: true,
+          state: { mode: "source", source: false },
+        });
+        const cm = leaf.view.editor.cm;
+        cm.contentDOM.blur();
+        await settle(150);
+        if (!require("@codemirror/language").forceParsing(cm, cm.state.doc.length, 10000))
+          throw new Error(`Live Preview did not parse all of ${path}`);
+        await settle(100);
+        const line = [...cm.contentDOM.querySelectorAll(".cm-line")].find((element) =>
+          [...element.querySelectorAll(".math [data-latex]")].some(
+            (math) => math.dataset.latex === "x^2",
+          ),
+        );
+        if (!line) throw new Error(`No line shows x^2 in ${path}`);
+        const origin = line.getBoundingClientRect();
+        const found = [];
+        const walker = document.createTreeWalker(line, globalThis.NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (node.parentElement.closest(".math")) continue;
+          for (const match of node.data.matchAll(/\S+/g)) {
+            const range = document.createRange();
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+            const rect = range.getBoundingClientRect();
+            found.push({
+              text: match[0],
+              left: rect.left - origin.left,
+              top: rect.top - origin.top,
+              width: rect.width,
+            });
+          }
+        }
+        return found;
+      }, path);
+    const titleLine = (lines) =>
+      lines.find((line) =>
+        line.runs?.some(([classes, value]) => /\bmath\b/.test(classes) && value === "x^2"),
+      );
+    const records = [];
+    for (const [index, [name, source, paired, equal]] of cases.entries()) {
+      const record = { name, source, paired, equal };
+      records.push(record);
+      for (const [side, text] of [
+        ["before", source],
+        ["after", paired],
+      ]) {
+        const path = `controls/setext-math-${index}-${side}.md`;
+        await obsidianPage.write(path, text);
+        const view = await shown(path, text);
+        record[side] = {
+          livePreview: livePreview(view.lines),
+          reading: cleanHtml(view.reading),
+          title: titleLine(view.lines),
+          words: equal || name === "missing space" ? await words(path) : undefined,
+        };
+      }
+      writeFileSync("/out/setext-math-controls.json", `${JSON.stringify(records, null, 2)}\n`);
+    }
+    // Text after a span boundary can move by Chromium's layout unit, 1/64 px, which shows as
+    // nothing. A space in a title is about 5 px wide.
+    const placed = (one, other) =>
+      one.length === other.length &&
+      one.every(
+        (word, index) =>
+          word.text === other[index].text &&
+          ["left", "top", "width"].every((key) => Math.abs(word[key] - other[index][key]) < 0.25),
+      );
+    for (const { name, equal, before, after } of records) {
+      if (!equal) {
+        expect({ name, livePreview: before.livePreview }).not.toEqual({
+          name,
+          livePreview: after.livePreview,
+        });
+        continue;
+      }
+      // The state of #1008 changed what Live Preview captured, but not where the words show.
+      expect({ name, title: before.title }).not.toEqual({ name, title: after.title });
+      expect({ name, placed: placed(before.words, after.words) }).toEqual({ name, placed: true });
+      expect({ name, livePreview: before.livePreview, reading: before.reading }).toEqual({
+        name,
+        livePreview: after.livePreview,
+        reading: after.reading,
+      });
+    }
+    // The measurement sees a space that is there in one form only.
+    const missing = records.find(({ name }) => name === "missing space");
+    expect(placed(missing.before.words, missing.after.words)).toBe(false);
   });
 
   it("normalizes styled Setext markers while retaining real heading content (#544)", async function () {

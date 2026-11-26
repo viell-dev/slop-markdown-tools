@@ -302,6 +302,67 @@ describe("Obsidian Live Preview normalizer", () => {
       );
   });
 
+  it("compares the blank space after a Setext title's leading math as plain (#1007)", () => {
+    const math = " math font-size=16px font-weight=400 line-height=24px";
+    const underline = {
+      kind: "HyperMD-header-line HyperMD-header-line-2",
+      runs: [["cm-formatting cm-formatting-header cm-formatting-header-2 cm-header-2", "---"]],
+    };
+    // A Setext title's line has no class of its own, only its text has the heading's.
+    const title = (...runs: string[][]) => livePreview([{ kind: "", runs }, underline]);
+    const heading = (...runs: string[][]) =>
+      livePreview([{ kind: "HyperMD-header HyperMD-header-2", runs }]);
+    // Each pair as Obsidian 1.14.5 captured it below `alpha $y$ beta` and below `alpha` / `$y$ beta`.
+    expect(title([math, "x^2"], ["cm-header-2", " ember amber"])).toEqual(
+      title([math, "x^2"], ["", " "], ["cm-header-2", "ember amber"]),
+    );
+    expect(
+      title(
+        [math, "x^2"],
+        ["cm-header-2", " "],
+        ["cm-em cm-header-2", "ember"],
+        ["cm-header-2", " amber"],
+      ),
+    ).toEqual(
+      title([math, "x^2"], ["", " "], ["cm-em cm-header-2", "ember"], ["cm-header-2", " amber"]),
+    );
+    expect(
+      title([math, "x^2"], ["cm-header-2", " "], [math, "y"], ["cm-header-2", " ember"]),
+    ).toEqual(title([math, "x^2"], ["", " "], [math, "y"], ["", " "], ["cm-header-2", "ember"]));
+    expect(title(["", " "], [math, "x^2"], ["cm-header-2", " ember"])).toEqual(
+      title(["", " "], [math, "x^2"], ["", " "], ["cm-header-2", "ember"]),
+    );
+    // Still significant: a missing space, a native heading line, text before the math, and
+    // styles that show the space.
+    expect(title([math, "x^2"], ["cm-header-2", "ember"])).not.toEqual(
+      title([math, "x^2"], ["", " "], ["cm-header-2", "ember"]),
+    );
+    expect(heading([math, "x^2"], ["cm-header-2", " ember"])).not.toEqual(
+      heading([math, "x^2"], ["", " "], ["cm-header-2", "ember"]),
+    );
+    expect(title(["cm-header-2", "ember "], [math, "x^2"], ["cm-header-2", " amber"])).not.toEqual(
+      title(["cm-header-2", "ember "], [math, "x^2"], ["", " "], ["cm-header-2", "amber"]),
+    );
+    for (const style of ["cm-header-2 cm-inline-code", "cm-header-2 cm-highlight"])
+      expect(title([math, "x^2"], [style, " ember"])).not.toEqual(
+        title([math, "x^2"], ["", " "], [style, "ember"]),
+      );
+    // The captured lines stay as read, for the probe's record of them.
+    const lines = [
+      {
+        kind: "",
+        runs: [
+          [math, "x^2"],
+          ["cm-header-2", " ember"],
+        ],
+      },
+      underline,
+    ];
+    const read = structuredClone(lines);
+    livePreview(lines);
+    expect(lines).toEqual(read);
+  });
+
   it("ignores empty table source rows while retaining table content (#497)", () => {
     const widget = { widget: "cm-table-widget", html: "<table><tr><td>a</td></tr></table>" };
     const empty = { kind: "HyperMD-table-row HyperMD-table-row-1", runs: [] };

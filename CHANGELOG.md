@@ -73,6 +73,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Update `sentence-splitter` to 5.1.0, which rewrites sentence scanning and
   drops the transitive `structured-source` and `boundary` dependencies
   ([#1005](https://github.com/viell-dev/slop-markdown-tools/pull/1005)).
+- The Obsidian check no longer reports a Setext title with leading math below a
+  line that starts with math, where only an invisible space changes style
+  ([#1007](https://github.com/viell-dev/slop-markdown-tools/issues/1007)).
 
 ## 0.8.5 - 2026-11-21
 
