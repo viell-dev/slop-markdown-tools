@@ -17,6 +17,7 @@ export const obsidianControls = [
   "retains rendered table content while a real cell editor owns focus (#550)",
   "retains heading boundaries while ignoring their optional blank separators (#544)",
   "retains inherited math typography across heading forms (#383, #569)",
+  "compares the blank space after a Setext title's leading math as plain (#1007)",
   "normalizes styled Setext markers while retaining real heading content (#544)",
   "omits raw-source empty records while retaining visible paragraph splits (#545)",
   "normalizes styled fence separators while retaining code and info content (#533)",
