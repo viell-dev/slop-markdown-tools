@@ -94,6 +94,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#1016](https://github.com/viell-dev/slop-markdown-tools/pull/1016)).
 - Update the reference renderer hast-util-to-html to 9.0.7
   ([#1017](https://github.com/viell-dev/slop-markdown-tools/pull/1017)).
+- Update the test tools to Vitest 5.1.1 and fast-check 4.10.3
+  ([#1018](https://github.com/viell-dev/slop-markdown-tools/pull/1018)).
 
 ## 0.8.5 - 2026-11-21
 
