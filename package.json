@@ -133,7 +133,7 @@
     "mdast-util-from-markdown": "2.1.0",
     "mdast-util-frontmatter": "2.0.1",
     "mdast-util-gfm": "3.1.0",
-    "mdast-util-gfm-autolink-literal": "2.1.0",
+    "mdast-util-gfm-autolink-literal": "2.1.2",
     "mdast-util-gfm-footnote": "2.1.0",
     "mdast-util-gfm-strikethrough": "2.0.1",
     "mdast-util-gfm-table": "2.0.1",
@@ -146,7 +146,7 @@
     "micromark-factory-space": "2.1.0",
     "micromark-util-character": "2.1.1",
     "micromark-util-types": "2.0.3",
-    "minimatch": "11.0.8",
+    "minimatch": "11.0.9",
     "sentence-splitter": "5.1.0",
     "string-width": "9.0.0",
     "yaml": "2.9.1"
@@ -157,11 +157,11 @@
     "@types/cross-spawn": "6.0.6",
     "@types/node": "22.20.5",
     "@types/unist": "3.0.3",
-    "@vitest/coverage-v8": "5.1.0",
+    "@vitest/coverage-v8": "5.1.1",
     "commonmark": "0.31.2",
     "eslint": "10.15.0",
-    "fast-check": "4.10.2",
-    "hast-util-to-html": "9.0.6",
+    "fast-check": "4.10.3",
+    "hast-util-to-html": "9.0.7",
     "markdown-it-mathjax3": "4.3.2",
     "mdast-util-to-hast": "13.2.2",
     "micromark-extension-cjk-friendly": "2.0.2",
@@ -175,7 +175,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.73.0",
     "vitepress": "2.0.0-alpha.21",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   },
   "homepage": "https://viell-dev.github.io/slop-markdown-tools/"
 }

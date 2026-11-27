@@ -37,6 +37,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   follows, such as `$x$ > 5`, where Live Preview hides the `>` and shows the
   line as a quote, nor changes how Live Preview shows such a line further down
   ([#1008](https://github.com/viell-dev/slop-markdown-tools/issues/1008)).
+- Match a numeric range of 100 or more values inside `*(...)` or `+(...)` as its
+  expansion does. In `ignore`, `overrides[].files` and a code formatter's
+  `exclude`, a pattern such as `*({1..100}).md` matched names that join
+  different values, such as `510.md`. The shipped glob matcher, minimatch, is
+  updated to 11.0.9 for this
+  ([#1020](https://github.com/viell-dev/slop-markdown-tools/pull/1020)).
 
 ### Maintenance
 
@@ -83,6 +89,13 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   `AGENTS.md` into a maintainer guide, keeping `AGENTS.md` within the size that
   agent tools read in full
   ([#1015](https://github.com/viell-dev/slop-markdown-tools/pull/1015)).
+- Update mdast-util-gfm-autolink-literal to 2.1.2, whose two fixes change only
+  how it escapes text when writing Markdown, which mdrefine does not use
+  ([#1016](https://github.com/viell-dev/slop-markdown-tools/pull/1016)).
+- Update the reference renderer hast-util-to-html to 9.0.7
+  ([#1017](https://github.com/viell-dev/slop-markdown-tools/pull/1017)).
+- Update the test tools to Vitest 5.1.1 and fast-check 4.10.3
+  ([#1018](https://github.com/viell-dev/slop-markdown-tools/pull/1018)).
 - Update the parser build tool to Rolldown 1.3.3, whose only change to the
   generated parser writes one number of a character-width table, `1048573`, as
   the equal literal `0xffffd`
