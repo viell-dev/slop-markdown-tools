@@ -500,6 +500,7 @@ describe("labels", () => {
       "AGENTS.md",
       "CONTRIBUTING.md",
       "internals/dependencies.md",
+      "internals/maintenance.md",
       "internals/testing.md",
       "internals/verification.md",
       "RELEASING.md",

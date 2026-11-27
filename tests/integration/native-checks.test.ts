@@ -198,6 +198,7 @@ describe("native input classification", () => {
       expect.arrayContaining([
         "internals/README.md",
         "internals/dependencies.md",
+        "internals/maintenance.md",
         "internals/testing.md",
         "internals/verification.md",
       ]),

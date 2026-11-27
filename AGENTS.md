@@ -5,13 +5,14 @@ documents. The [README](./README.md#status) states how the project is
 maintained. [CONTRIBUTING.md](./CONTRIBUTING.md) is the entry guide for setup,
 ordinary checks, documentation and pull requests. Specialist procedures live in
 the [dependency guide](./internals/dependencies.md), [testing
-procedures](./internals/testing.md) and [verification
-map](./internals/verification.md); [RELEASING.md](./RELEASING.md) owns releases.
-Follow the applicable procedures and do not repeat them here. Issues and PRs own
-investigations, decisions, progress and verification receipts; keep live
-guidance focused on current instructions and useful explanations. User and API
-documentation belongs in `docs/`, and the details that users do not need, such
-as lists of individual protections and internal limits, in the [maintainer
+procedures](./internals/testing.md), [verification
+map](./internals/verification.md) and [maintenance
+procedures](./internals/maintenance.md); [RELEASING.md](./RELEASING.md) owns
+releases. Follow the applicable procedures and do not repeat them here. Issues
+and PRs own investigations, decisions, progress and verification receipts; keep
+live guidance focused on current instructions and useful explanations. User and
+API documentation belongs in `docs/`, and the details that users do not need,
+such as lists of individual protections and internal limits, in the [maintainer
 notes](./internals/README.md).
 
 ## Repository boundary
@@ -73,80 +74,17 @@ and Node.js requirements, and policy.
 Adding or changing a feature includes maintaining every affected public
 description, usage example, and discovery field. Complete this routine work with
 the feature; do not wait for the owner to identify omissions. Check both tracked
-files and live repository metadata. The couplings below are a starting point,
-not an exhaustive list. At publication, verify that hosted descriptions reflect
-the capabilities users can install; editing source files does not update them.
+files and live repository metadata. The [known
+couplings](./internals/maintenance.md#repository-couplings) are a starting
+point, not an exhaustive list. At publication, verify that hosted descriptions
+reflect the capabilities users can install; editing source files does not update
+them.
 
-Known couplings:
-
-- Behavior and its descriptions: the `docs/` pages, the `internals/` notes, the
-  README, `examples/` and each workspace's `after/` tree, CLI help text, type
-  declarations, and `CHANGELOG.md`. The integration tests compare some of these
-  with the code, not all.
-- Public descriptions and discovery: the README's opening description, feature
-  and configuration lists; GitHub's About description, topics, and homepage;
-  `package.json`'s description and keywords; and the documentation site's
-  description and navigation. Update the affected fields whenever capabilities
-  change, including support for another renderer. The About description follows
-  the README's opening description and retains the agent-maintained disclosure;
-  topics include the supported renderers.
-- Rules: `docs/rules.md` has one index row per rule, in alphabetical order of
-  rule ID, whose description is the rule's `description` in code, and
-  `docs/rules/<category>/<name>.md` has the rule's page; a new rule adds both.
-- The maintenance statement: the README's status section, which other documents
-  link to rather than repeat.
-- Labels: `.github/labels.json`, GitHub, the issue templates,
-  `.github/dependabot.yml`, and the policy below.
-- Branch and tag policy: `.github/rulesets/`, GitHub's settings, the job names
-  in `ci.yml`, and `scripts/release-evidence.mjs`, which reads the required
-  checks from the ruleset for `main`.
-- Native PR classification: `scripts/native-checks.mjs` owns the conservative
-  path and dependency-role contract; `native.yml` calls Rendering, Obsidian and
-  Forges when applicable and always reports `Native checks`. Keep its tests,
-  each reusable host workflow, the ruleset, release evidence and the
-  [verification map](./internals/verification.md) consistent in meaning.
-  Shared/transitive inputs and unknown changes select all hosts; host-specific
-  inputs can differ. Dependency roles follow actual native use and shared
-  lockfile reachability, never npm's development label alone. Consistent
-  classification does not require identical broad path lists. Check native
-  imports and file reads before exempting a path.
-- Native report contracts: `scripts/renderer-evidence.mjs` derives plans from
-  owned fixtures and settings independently of execution records. Deterministic
-  consumers pass their expected host and canonical workload; never derive an
-  expectation from completed records or accept a report's shrunken plan. Keep
-  unchanged formatting attempts explicit. Obsidian's verified baseline belongs
-  in `scripts/obsidian/baseline.json` and the Dockerfile; maintain observed host
-  identity and the separate explicit latest route as the [testing
-  procedures](./internals/testing.md#advancing-the-obsidian-baseline) describe.
-  These same-run workflow results are not cross-run report provenance.
-- Versions and requirements: `package.json`, the lockfile, the installation
-  commands in the README and the `docs/` pages, the CI matrix in `ci.yml` and
-  CONTRIBUTING.md, and `CHANGELOG.md`. The lowest supported Node.js version also
-  sets the `node-version` of the CI job labeled `22` and the major version of
-  `@types/node`, whose major updates `.github/dependabot.yml` ignores. The
-  development version, in `.nvmrc`, is also the `node-version` of the other
-  workflows, the base image of `scripts/obsidian/Dockerfile`, and CONTRIBUTING's
-  set-up section. The workflows name it themselves, because the Pages workflow
-  builds from a release tag that may predate a change of `.nvmrc`.
-- Known renderer differences: the allow lists in `tests/unit/renderers.test.ts`
-  and `scripts/github-rendering.mjs` name an issue for each entry; a fix removes
-  the entries it makes stale.
-- The Obsidian check (`scripts/obsidian-check.mjs`): its own dependencies and
-  lockfile in `scripts/obsidian/`, which Dependabot updates on their own, with
-  WebdriverIO's major version held at the one `wdio-obsidian-service` supports;
-  the documents that `scripts/rendering.mjs` generates for the `obsidian`
-  syntax; and its description in the [testing
-  procedures](./internals/testing.md#obsidian-host). Test in Docker, as this
-  check does, not in a profile of an installed application.
-
-`docs.test.ts` and `metadata.test.ts` compare the mechanically comparable
-couplings offline in CI. `npm run check:live` compares the live ones without
-changing anything: GitHub's labels, rulesets, About description, topics,
-homepage, and the settings listed here and in RELEASING.md, the newest release
-with npm's `latest` and its assets, and the commit the deployed site was built
-from. It needs an administrator's `gh` login; run it at the start of
-maintenance, after changing a setting, and after each release. Prose still needs
-reading for its meaning.
+Offline tests and `npm run check:live` compare the mechanically comparable
+couplings, as the [maintenance
+guide](./internals/maintenance.md#consistency-checks) describes; prose still
+needs reading for its meaning. Run `check:live` at the start of maintenance,
+after changing a setting, and after each release.
 
 Drift found along the way is a defect. Correct it in the same PR when it lies in
 what the PR already changes; otherwise file an issue rather than widening the
@@ -154,61 +92,19 @@ assignment.
 
 ## Issues and labels
 
-Take each assigned issue through these steps, and leave it accurate after each;
-the issue, not the session, is the record:
-
-1. **Validate.** Reproduce a defect, or measure a performance or presentation
-   claim, on current `main`. Post the commands, inputs, and results, and where
-   they differ from the report.
-2. **Decide.** Accept, narrow, or decline, settle the open design questions, and
-   post the decision, its reasoning, and the alternatives rejected.
-3. **Split.** A further input that shows the same problem stays. A different
-   problem that could be accepted, declined, or validated on its own gets its
-   own issue, even when one PR will fix both; link them, and remove the
-   split-off part from the original decision.
-4. **Label and retitle.** Set the status the evidence supports, and correct the
-   type when the item is another kind: a discussion that ends in an accepted
-   change becomes a bug, an enhancement, or a feature request. Make the title
-   name the confirmed problem or the accepted request. Leave the reporter's
-   description as the record and correct it in comments; edit your own comment
-   when a later step makes it wrong, and say so.
-5. **Close or keep open.** Close a declined or duplicate issue as not planned,
-   keeping its disposition label. Keep an accepted issue open until its fix
-   merges. The fixing PR names it with a closing keyword such as `Fixes #123`,
-   carries the same type label, and describes each issue separately when it
-   resolves several. After the merge, confirm that the issue closed and remove
-   its transient status.
+Take each assigned issue through the [issue
+procedure](./internals/maintenance.md#issue-procedure): validate, decide, split,
+label and retitle, then close or keep open. Leave it accurate after each step;
+the issue, not the session, is the record.
 
 Labels follow [`.github/labels.json`](./.github/labels.json), which holds their
 names, colors, and descriptions; keep GitHub in sync with it. Review labels
 whenever an item is answered, triaged, implemented, closed, or reopened; they do
-not replace explanatory comments or links to PRs.
-
-- Every item has one `Type:` label and at most one `Status:` label, for its
-  current disposition or next action. A feature's implementation PR uses
-  `Type: Feature Request`. There are no priority labels; milestones and projects
-  are not used. Requests for people are assigned to the person being asked.
-- New items carry only a type until an assigned agent reviews them.
-  `Status: Confirmed` means a reproduced defect or an accepted request within
-  scope.
-- `Status: Needs Information` states the evidence needed; `Status: Blocked`
-  links the dependency, decision, or other condition that the item waits for and
-  what unblocks it, and stays on an upstream defect that is closed while parked
-  (see [Upstream defects](#upstream-defects)); `Status: Can't Reproduce` follows
-  a documented attempt with version, input, and result.
-- `Needs: Owner` marks a request that only the repository owner can answer: a
-  change of direction or scope, or a step that needs their identity, sign-in, or
-  second factor, such as npm account settings. `Needs: Human` marks an
-  observation, usability judgement, or action that a suitable person can
-  provide. Use only the more specific of the two; either can stand with
-  `Status: Blocked`. See [Requests for people](#requests-for-people).
-- A duplicate links the canonical item and keeps `Status: Duplicate`; a declined
-  item explains the decision and keeps `Status: Won't Do`, and can be
-  reconsidered with new evidence. On reopening, replace the old disposition.
-- On completion, remove transient statuses and keep the type. A closed, unmerged
-  PR keeps its disposition.
-- `Good First Issue` goes only on a ready, well-explained beginner task, with
-  `Help Wanted`; remove both when the item closes or stops being ready.
+not replace explanatory comments or links to PRs. Every item has one `Type:`
+label and at most one `Status:` label, for its current disposition or next
+action; the [label guide](./internals/maintenance.md#labels) gives each label's
+use. There are no priority labels; milestones and projects are not used.
+Requests for people are assigned to the person being asked.
 
 In an issue or PR's own body, comments, or reviews, call it "this issue" or
 "this PR" rather than linking it, which GitHub shows as a self-reference. Keep

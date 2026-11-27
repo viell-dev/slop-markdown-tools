@@ -191,7 +191,7 @@ export function classifyChanges(files, before, after) {
       ) ||
       // Maintainer guides, by name: no native script imports or reads them. A new guide, or any
       // other path under internals/, selects every host until it is checked and classified.
-      /^internals\/(?:README|benchmarks|conversion|dependencies|dialects|obsidian|testing|verification|vitepress)\.md$/.test(
+      /^internals\/(?:README|benchmarks|conversion|dependencies|dialects|maintenance|obsidian|testing|verification|vitepress)\.md$/.test(
         file,
       ) ||
       /^(?:LICENSE|THIRD_PARTY_NOTICES|\.gitignore|\.prettierignore|\.prettierrc\.json|eslint\.config\.js|vitest\.config\.ts)$/.test(
