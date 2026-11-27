@@ -37,6 +37,12 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   follows, such as `$x$ > 5`, where Live Preview hides the `>` and shows the
   line as a quote, nor changes how Live Preview shows such a line further down
   ([#1008](https://github.com/viell-dev/slop-markdown-tools/issues/1008)).
+- Match a numeric range of 100 or more values inside `*(...)` or `+(...)` as its
+  expansion does. In `ignore`, `overrides[].files` and a code formatter's
+  `exclude`, a pattern such as `*({1..100}).md` matched names that join
+  different values, such as `510.md`. The shipped glob matcher, minimatch, is
+  updated to 11.0.9 for this
+  ([#1020](https://github.com/viell-dev/slop-markdown-tools/pull/1020)).
 
 ### Maintenance
 

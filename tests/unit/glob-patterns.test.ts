@@ -11,6 +11,19 @@ it("keeps an escaped backslash when it expands a brace group (#994)", () => {
   ]);
 });
 
+it("matches a long numeric range inside a repeating extglob as its expansion does (#1020)", () => {
+  // `ignore`, overrides and code-formatter excludes compile their braces in
+  // Minimatch. From 100 values, minimatch 11.0.8 matched a range as one class,
+  // so *(...) and +(...) could repeat different values: *({1..100}).md matched
+  // 510.md, which no expanded pattern such as *(5).md or *(10).md matches.
+  for (const pattern of ["*({1..100}).md", "+({1..100}).md"]) {
+    const matcher = new Minimatch(pattern, { dot: true });
+    expect(matcher.match("510.md")).toBe(false);
+    expect(matcher.match("1010.md")).toBe(true);
+    expect(matcher.match("100.md")).toBe(true);
+  }
+});
+
 it("bounds globparts amplification without changing ordinary matches (#837)", () => {
   // Reject the complete amplified pattern rather than silently keeping only
   // the first rows, which could change which paths match.
