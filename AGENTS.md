@@ -80,8 +80,8 @@ point, not an exhaustive list. At publication, verify that hosted descriptions
 reflect the capabilities users can install; editing source files does not update
 them.
 
-Offline tests and `npm run check:live` compare the mechanically comparable
-couplings, as the [maintenance
+Offline tests compare the mechanically comparable couplings and
+`npm run check:live` the live ones, as the [maintenance
 guide](./internals/maintenance.md#consistency-checks) describes; prose still
 needs reading for its meaning. Run `check:live` at the start of maintenance,
 after changing a setting, and after each release.
