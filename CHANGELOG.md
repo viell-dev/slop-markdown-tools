@@ -89,6 +89,9 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   `AGENTS.md` into a maintainer guide, keeping `AGENTS.md` within the size that
   agent tools read in full
   ([#1015](https://github.com/viell-dev/slop-markdown-tools/pull/1015)).
+- Update mdast-util-gfm-autolink-literal to 2.1.2, whose two fixes change only
+  how it escapes text when writing Markdown, which mdrefine does not use
+  ([#1016](https://github.com/viell-dev/slop-markdown-tools/pull/1016)).
 
 ## 0.8.5 - 2026-11-21
 
