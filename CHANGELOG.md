@@ -96,6 +96,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
   ([#1017](https://github.com/viell-dev/slop-markdown-tools/pull/1017)).
 - Update the test tools to Vitest 5.1.1 and fast-check 4.10.3
   ([#1018](https://github.com/viell-dev/slop-markdown-tools/pull/1018)).
+- Update the parser build tool to Rolldown 1.3.3, whose only change to the
+  generated parser writes one number of a character-width table, `1048573`, as
+  the equal literal `0xffffd`
+  ([#1019](https://github.com/viell-dev/slop-markdown-tools/pull/1019)).
 
 ## 0.8.5 - 2026-11-21
 
