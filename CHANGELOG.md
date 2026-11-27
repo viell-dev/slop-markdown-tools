@@ -79,6 +79,10 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Document that the Obsidian check's comparison stops after 30 minutes, about
   one adversarial seed of 100 documents
   ([#1012](https://github.com/viell-dev/slop-markdown-tools/issues/1012)).
+- Move the maintainers' list of couplings, issue steps and label uses from
+  `AGENTS.md` into a maintainer guide, keeping `AGENTS.md` within the size that
+  agent tools read in full
+  ([#1015](https://github.com/viell-dev/slop-markdown-tools/pull/1015)).
 
 ## 0.8.5 - 2026-11-21
 

@@ -32,3 +32,5 @@ documentation and pull requests. The focused guides own specialist procedures:
   native hosts and baseline updates, integration, performance and retention.
 - [Verification map](verification.md): what each check proves, native routing,
   report contracts and evidence limits.
+- [Maintenance procedures](maintenance.md): repository couplings and the checks
+  that compare them, the issue procedure and each label's use.
