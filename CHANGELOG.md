@@ -92,6 +92,8 @@ From 0.6 on, the site's release notes describe each minor version with examples.
 - Update mdast-util-gfm-autolink-literal to 2.1.2, whose two fixes change only
   how it escapes text when writing Markdown, which mdrefine does not use
   ([#1016](https://github.com/viell-dev/slop-markdown-tools/pull/1016)).
+- Update the reference renderer hast-util-to-html to 9.0.7
+  ([#1017](https://github.com/viell-dev/slop-markdown-tools/pull/1017)).
 
 ## 0.8.5 - 2026-11-21
 
